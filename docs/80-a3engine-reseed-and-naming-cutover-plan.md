@@ -546,6 +546,7 @@ Stop:
 - `mv a3-engine a3-engine-legacy`
 - `mkdir a3-engine`
 - `rsync -a --exclude '.git' --exclude '.work' --exclude 'tmp' --exclude 'log' a3-v2/ a3-engine/`
+- `git -C a3-engine init -b main`
 - `test -x a3-engine/bin/a3`
 
 ### Verification
