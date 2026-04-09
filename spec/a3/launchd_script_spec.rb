@@ -15,7 +15,7 @@ RSpec.describe A3Launchd do
         <plist version="1.0">
           <dict>
             <key>Label</key>
-            <string>dev.a3-engine.portal.watch</string>
+            <string>dev.a3.portal.watch</string>
           </dict>
         </plist>
       XML
@@ -47,7 +47,7 @@ RSpec.describe A3Launchd do
     expect(rc).to eq(0)
     expect(described_class).to have_received(:run).with("launchctl", "bootout", "gui/501", File.expand_path(@plist_path), check: false)
     expect(described_class).to have_received(:run).with("launchctl", "bootstrap", "gui/501", File.expand_path(@plist_path))
-    expect(described_class).to have_received(:run).with("launchctl", "kickstart", "-k", "gui/501/dev.a3-engine.portal.watch")
+    expect(described_class).to have_received(:run).with("launchctl", "kickstart", "-k", "gui/501/dev.a3.portal.watch")
   end
 
   it "prints status for the label" do
@@ -58,7 +58,7 @@ RSpec.describe A3Launchd do
     rc = described_class.main(["status", "--plist", @plist_path])
 
     expect(rc).to eq(0)
-    expect(described_class).to have_received(:run).with("launchctl", "print", "gui/501/dev.a3-engine.portal.watch")
+    expect(described_class).to have_received(:run).with("launchctl", "print", "gui/501/dev.a3.portal.watch")
   end
 
   it "fails fast outside macOS" do

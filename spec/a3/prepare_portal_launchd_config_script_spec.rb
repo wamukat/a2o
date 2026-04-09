@@ -16,7 +16,7 @@ RSpec.describe PreparePortalLaunchdConfig do
             "executor" => { "kind" => "ai-cli", "implementation" => "openai-codex" },
             "scheduler" => {
               "backend" => "launchd",
-              "job_name" => "dev.a3-engine.portal.watch",
+              "job_name" => "dev.a3.portal.watch",
               "interval_seconds" => 60,
               "command_argv" => ["/bin/sh", "-lc", "echo 'Legacy Portal A3 scheduler is disabled. Use task a3:portal-v2:scheduler:*.' >&2; exit 1"],
               "working_directory" => "../../../../"

@@ -101,7 +101,7 @@ RSpec.describe A3Reconcile do
       launcher_config.write(
         JSON.pretty_generate(
           "executor" => { "kind" => "ai-cli", "implementation" => "openai-codex" },
-          "scheduler" => { "backend" => "manual", "job_name" => "dev.a3-engine.portal.watch", "command_argv" => ["/bin/sh", "-lc", "true"] },
+          "scheduler" => { "backend" => "manual", "job_name" => "dev.a3.portal.watch", "command_argv" => ["/bin/sh", "-lc", "true"] },
           "runtime_env" => { "required_bins" => [], "path_entries" => [] },
           "shell" => { "executable" => "/bin/sh", "login" => false, "interactive" => false, "inherit_env" => false, "env_files" => [env_file.to_s], "env_overrides" => { "JAVA_HOME" => "/opt/jdk-25" } },
           "kanban" => { "backend" => "subprocess-cli", "command_argv" => ["task", "kanban:api", "--"], "working_directory" => root.to_s }
@@ -164,14 +164,14 @@ RSpec.describe A3Reconcile do
   it "recognizes current portal-v2 scheduler shot processes" do
     allow(IO).to receive(:popen).and_return(<<~PS)
       ruby scripts/a3/portal_v2_scheduler_launcher.rb --run-shot
-      ruby -I a3-v2/lib a3-v2/bin/a3 execute-until-idle --storage-dir .work/a3-v2/portal-kanban-scheduler-auto scripts/a3/config/portal/a3-v2-runtime-manifest.yml
+      ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/portal-kanban-scheduler-auto scripts/a3/config/portal/a3-runtime-manifest.yml
     PS
 
     matches = described_class.live_portal_processes("portal")
     expect(matches).to eq(
       [
         "ruby scripts/a3/portal_v2_scheduler_launcher.rb --run-shot",
-        "ruby -I a3-v2/lib a3-v2/bin/a3 execute-until-idle --storage-dir .work/a3-v2/portal-kanban-scheduler-auto scripts/a3/config/portal/a3-v2-runtime-manifest.yml"
+        "ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/portal-kanban-scheduler-auto scripts/a3/config/portal/a3-runtime-manifest.yml"
       ]
     )
   end
