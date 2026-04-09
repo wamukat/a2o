@@ -39,6 +39,8 @@ RSpec.describe PreparePortalV2LaunchdConfig do
       expect(plist).to include("<integer>60</integer>")
       expect(plist).to include(env_file.to_s)
       expect(plist).to include(root.join("scripts", "a3", "portal_v2_scheduler_launcher.rb").to_s)
+      expect(plist).not_to include("<string>\n")
+      expect(plist).not_to include("\n      </string>")
     end
   end
 end
