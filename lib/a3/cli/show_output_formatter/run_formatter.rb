@@ -1,0 +1,116 @@
+# frozen_string_literal: true
+
+module A3
+  module CLI
+    module ShowOutputFormatter
+      module RunFormatter
+        module_function
+
+        def lines(run)
+          [].tap do |result|
+            result << "run #{run.ref} task=#{run.task_ref} phase=#{run.phase} workspace=#{run.workspace_kind} source=#{run.source_type}:#{run.source_ref} outcome=#{run.terminal_outcome}"
+            append_recovery_lines(result, run.recovery)
+            append_evidence_lines(result, run.evidence_summary)
+            append_latest_execution_lines(result, run.latest_execution)
+            append_latest_blocked_lines(result, run.latest_blocked_diagnosis)
+            result << "phase_records=#{run.evidence_summary.phase_records_count}"
+          end
+        end
+
+        def append_recovery_lines(result, recovery)
+          return unless recovery
+
+          result << "recovery decision=#{recovery.decision} next_action=#{recovery.next_action} operator_action_required=#{recovery.operator_action_required}"
+          result << "runtime_package_action=#{recovery.package_expectation}"
+          result << "runtime_package_guidance=#{recovery.runtime_package_guidance}" if recovery.runtime_package_guidance
+          result << "runtime_package_contract_health=#{recovery.runtime_package_contract_health}" if recovery.runtime_package_contract_health
+          result << "runtime_package_execution_modes=#{recovery.runtime_package_execution_modes}" if recovery.runtime_package_execution_modes
+          result << "runtime_package_execution_mode_contract=#{recovery.runtime_package_execution_mode_contract}" if recovery.runtime_package_execution_mode_contract
+          result << "runtime_package_schema_action=#{recovery.runtime_package_schema_action}" if recovery.runtime_package_schema_action
+          result << "runtime_package_preset_schema_action=#{recovery.runtime_package_preset_schema_action}" if recovery.runtime_package_preset_schema_action
+          result << "runtime_package_repo_source_action=#{recovery.runtime_package_repo_source_action}" if recovery.runtime_package_repo_source_action
+          result << "runtime_package_secret_delivery_action=#{recovery.runtime_package_secret_delivery_action}" if recovery.runtime_package_secret_delivery_action
+          result << "runtime_package_scheduler_store_migration_action=#{recovery.runtime_package_scheduler_store_migration_action}" if recovery.runtime_package_scheduler_store_migration_action
+          result << "runtime_package_recommended_execution_mode=#{recovery.runtime_package_recommended_execution_mode}" if recovery.runtime_package_recommended_execution_mode
+          result << "runtime_package_recommended_execution_mode_reason=#{recovery.runtime_package_recommended_execution_mode_reason}" if recovery.runtime_package_recommended_execution_mode_reason
+          result << "runtime_package_recommended_execution_mode_command=#{recovery.runtime_package_recommended_execution_mode_command}"
+          result << "runtime_package_operator_action=#{recovery.runtime_package_operator_action}"
+          result << "runtime_package_operator_action_command=#{recovery.runtime_package_operator_action_command}"
+          result << "runtime_package_next_execution_mode=#{recovery.runtime_package_next_execution_mode}"
+          result << "runtime_package_next_execution_mode_reason=#{recovery.runtime_package_next_execution_mode_reason}"
+          result << "runtime_package_next_execution_mode_command=#{recovery.runtime_package_next_execution_mode_command}"
+          result << "runtime_package_next_command=#{recovery.runtime_package_next_command}" if recovery.runtime_package_next_command
+          result << "runtime_package_doctor_command=#{recovery.runtime_package_doctor_command}" if recovery.runtime_package_doctor_command
+          result << "runtime_package_migration_command=#{recovery.runtime_package_migration_command}" if recovery.runtime_package_migration_command
+          result << "runtime_package_runtime_command=#{recovery.runtime_package_runtime_command}" if recovery.runtime_package_runtime_command
+          result << "runtime_package_runtime_canary_command=#{recovery.runtime_package_runtime_canary_command}" if recovery.runtime_package_runtime_canary_command
+          result << "runtime_package_startup_sequence=#{recovery.runtime_package_startup_sequence}" if recovery.runtime_package_startup_sequence
+          result << "runtime_package_startup_blockers=#{recovery.runtime_package_startup_blockers}" if recovery.runtime_package_startup_blockers
+          result << "runtime_package_persistent_state_model=#{recovery.runtime_package_persistent_state_model}" if recovery.runtime_package_persistent_state_model
+          result << "runtime_package_retention_policy=#{recovery.runtime_package_retention_policy}" if recovery.runtime_package_retention_policy
+          result << "runtime_package_materialization_model=#{recovery.runtime_package_materialization_model}" if recovery.runtime_package_materialization_model
+          result << "runtime_package_runtime_configuration_model=#{recovery.runtime_package_runtime_configuration_model}" if recovery.runtime_package_runtime_configuration_model
+          result << "runtime_package_repository_metadata_model=#{recovery.runtime_package_repository_metadata_model}" if recovery.runtime_package_repository_metadata_model
+          result << "runtime_package_branch_resolution_model=#{recovery.runtime_package_branch_resolution_model}" if recovery.runtime_package_branch_resolution_model
+          result << "runtime_package_credential_boundary_model=#{recovery.runtime_package_credential_boundary_model}" if recovery.runtime_package_credential_boundary_model
+          result << "runtime_package_observability_boundary_model=#{recovery.runtime_package_observability_boundary_model}" if recovery.runtime_package_observability_boundary_model
+          result << "runtime_package_deployment_shape=#{recovery.runtime_package_deployment_shape}" if recovery.runtime_package_deployment_shape
+          result << "runtime_package_networking_boundary=#{recovery.runtime_package_networking_boundary}" if recovery.runtime_package_networking_boundary
+          result << "runtime_package_upgrade_contract=#{recovery.runtime_package_upgrade_contract}" if recovery.runtime_package_upgrade_contract
+          result << "runtime_package_fail_fast_policy=#{recovery.runtime_package_fail_fast_policy}" if recovery.runtime_package_fail_fast_policy
+          result << "rerun_hint=#{recovery.rerun_hint}" if recovery.rerun_hint
+        end
+
+        def append_evidence_lines(result, summary)
+          if summary.review_base && summary.review_head
+            result << "review_target=#{summary.review_base}..#{summary.review_head}"
+          end
+          result << "edit_scope=#{summary.edit_scope.join(',')}"
+          result << "verification_scope=#{summary.verification_scope.join(',')}"
+          result << "ownership_scope=#{summary.ownership_scope}"
+          if summary.artifact_owner_ref
+            result << "artifact_owner=#{summary.artifact_owner_ref} (#{summary.artifact_owner_scope}) snapshot=#{summary.artifact_snapshot_version}"
+          end
+        end
+
+        def append_latest_execution_lines(result, execution)
+          return unless execution
+
+          result << "latest_execution phase=#{execution.phase} summary=#{execution.summary}"
+          result << "verification_summary=#{execution.verification_summary}" if execution.verification_summary
+          result << "failing_command=#{execution.failing_command}" if execution.failing_command
+          result << "observed_state=#{execution.observed_state}" if execution.observed_state
+          result << "worker_response_bundle=#{FormattingHelpers.diagnostic_value(execution.worker_response_bundle)}" if execution.worker_response_bundle
+          execution.diagnostics.sort.each do |key, value|
+            result << "execution_diagnostic.#{key}=#{FormattingHelpers.diagnostic_value(value)}"
+          end
+          append_runtime_lines(result, execution.runtime_snapshot)
+        end
+
+        def append_runtime_lines(result, runtime)
+          return unless runtime
+
+          result << "runtime task_kind=#{runtime.task_kind} repo_scope=#{runtime.repo_scope} phase=#{runtime.phase}"
+          result << "runtime implementation_skill=#{runtime.implementation_skill}" if runtime.implementation_skill
+          result << "runtime review_skill=#{runtime.review_skill}" if runtime.review_skill
+          result << "runtime verification_commands=#{runtime.verification_commands.join(' ')}" unless runtime.verification_commands.empty?
+          result << "runtime remediation_commands=#{runtime.remediation_commands.join(' ')}" unless runtime.remediation_commands.empty?
+          result << "runtime workspace_hook=#{runtime.workspace_hook}" if runtime.workspace_hook
+          result << "runtime merge_target=#{runtime.merge_target} merge_policy=#{runtime.merge_policy}"
+        end
+
+        def append_latest_blocked_lines(result, diagnosis)
+          return unless diagnosis
+
+          result << "latest_blocked phase=#{diagnosis.phase} summary=#{diagnosis.summary}"
+          result << "blocked_expected=#{diagnosis.expected_state}"
+          result << "blocked_observed=#{diagnosis.observed_state}"
+          result << "blocked_failing_command=#{diagnosis.failing_command}" if diagnosis.failing_command
+          diagnosis.infra_diagnostics.sort.each do |key, value|
+            result << "blocked_diagnostic.#{key}=#{FormattingHelpers.diagnostic_value(value)}"
+          end
+        end
+      end
+    end
+  end
+end

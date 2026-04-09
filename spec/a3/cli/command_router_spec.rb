@@ -1,0 +1,116 @@
+# frozen_string_literal: true
+
+require "a3/cli/command_router"
+
+RSpec.describe A3::CLI::CommandRouter do
+  describe ".definition_for" do
+    it "derives container dependency needs from session kind" do
+      manifest = described_class.definition_for("show-project-surface")
+      storage = described_class.definition_for("show-scheduler-state")
+      runtime = described_class.definition_for("run-worker-phase")
+      runtime_package = described_class.definition_for("doctor-runtime")
+
+      expect(manifest.requires_container_dependencies?).to be(false)
+      expect(storage.requires_container_dependencies?).to be(true)
+      expect(runtime.requires_container_dependencies?).to be(true)
+      expect(runtime_package.requires_container_dependencies?).to be(false)
+    end
+  end
+
+  describe ".session_kind_for" do
+    it "exposes explicit session kinds for storage, manifest, and runtime commands" do
+      expect(described_class.session_kind_for("show-scheduler-state")).to eq(:storage)
+      expect(described_class.session_kind_for("pause-scheduler")).to eq(:storage)
+      expect(described_class.session_kind_for("recover-rerun")).to eq(:storage_runtime_package)
+      expect(described_class.session_kind_for("show-blocked-diagnosis")).to eq(:storage_runtime_package)
+      expect(described_class.session_kind_for("show-run")).to eq(:storage_runtime_package)
+      expect(described_class.session_kind_for("watch-summary")).to eq(:storage)
+      expect(described_class.session_kind_for("show-project-context")).to eq(:manifest)
+      expect(described_class.session_kind_for("show-phase-runtime-config")).to eq(:manifest)
+      expect(described_class.session_kind_for("execute-until-idle")).to eq(:runtime)
+      expect(described_class.session_kind_for("run-worker-phase")).to eq(:runtime)
+      expect(described_class.session_kind_for("doctor-runtime")).to eq(:runtime_package)
+      expect(described_class.session_kind_for("show-runtime-package")).to eq(:runtime_package)
+      expect(described_class.session_kind_for("migrate-scheduler-store")).to eq(:runtime_package)
+      expect(described_class.session_kind_for("run-runtime-canary")).to eq(:runtime)
+    end
+
+    it "returns nil for unknown commands" do
+      expect(described_class.session_kind_for("unknown-command")).to be_nil
+    end
+  end
+
+  describe ".dispatch" do
+    it "still dispatches known commands" do
+      cli = Class.new do
+        def handle_show_scheduler_state(argv, out:, **kwargs)
+          out.puts("handled=#{argv.join(',')}")
+        end
+      end.new
+
+      out = StringIO.new
+
+      dispatched = described_class.dispatch(
+        cli,
+        command: "show-scheduler-state",
+        argv: ["--storage-dir", "/tmp/a3"],
+        out: out,
+        run_id_generator: -> { "run-1" },
+        command_runner: A3::Infra::LocalCommandRunner.new,
+        merge_runner: A3::Infra::LocalMergeRunner.new,
+        worker_gateway: nil
+      )
+
+      expect(dispatched).to be(true)
+      expect(out.string).to include("handled=--storage-dir,/tmp/a3")
+    end
+
+    it "dispatches manifest commands without injecting container dependencies" do
+      cli = Class.new do
+        def handle_show_project_surface(argv, out:)
+          out.puts("manifest=#{argv.join(',')}")
+        end
+      end.new
+
+      out = StringIO.new
+
+      dispatched = described_class.dispatch(
+        cli,
+        command: "show-project-surface",
+        argv: ["manifest.yml"],
+        out: out,
+        run_id_generator: -> { "run-1" },
+        command_runner: A3::Infra::LocalCommandRunner.new,
+        merge_runner: A3::Infra::LocalMergeRunner.new,
+        worker_gateway: nil
+      )
+
+      expect(dispatched).to be(true)
+      expect(out.string).to include("manifest=manifest.yml")
+    end
+
+    it "dispatches runtime package commands without injecting container dependencies" do
+      cli = Class.new do
+        def handle_doctor_runtime(argv, out:)
+          out.puts("runtime_package=#{argv.join(',')}")
+        end
+      end.new
+
+      out = StringIO.new
+
+      dispatched = described_class.dispatch(
+        cli,
+        command: "doctor-runtime",
+        argv: ["manifest.yml"],
+        out: out,
+        run_id_generator: -> { "run-1" },
+        command_runner: A3::Infra::LocalCommandRunner.new,
+        merge_runner: A3::Infra::LocalMergeRunner.new,
+        worker_gateway: nil
+      )
+
+      expect(dispatched).to be(true)
+      expect(out.string).to include("runtime_package=manifest.yml")
+    end
+  end
+end

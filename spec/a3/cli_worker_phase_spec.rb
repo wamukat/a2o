@@ -1,0 +1,273 @@
+# frozen_string_literal: true
+
+require "json"
+require "tmpdir"
+require "yaml"
+
+RSpec.describe A3::CLI do
+  let(:worker_gateway) { instance_double("WorkerGateway") }
+  let(:command_runner) { instance_double(A3::Infra::LocalCommandRunner) }
+
+  it "runs implementation worker end-to-end through sqlite backend" do
+    Dir.mktmpdir do |dir|
+      repo_sources = create_repo_sources(dir)
+      seed_context(dir)
+      task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
+      run_repository = A3::Infra::SqliteRunRepository.new(File.join(dir, "a3.sqlite3"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "A3-v2#3025",
+          kind: :child,
+          edit_scope: [:repo_alpha],
+          verification_scope: %i[repo_alpha repo_beta],
+          status: :in_progress,
+          current_run_ref: "run-worker-1",
+          parent_ref: "A3-v2#3022"
+        )
+      )
+      run_repository.save(
+        A3::Domain::Run.new(
+          ref: "run-worker-1",
+          task_ref: "A3-v2#3025",
+          phase: :implementation,
+          workspace_kind: :ticket_workspace,
+          source_descriptor: A3::Domain::SourceDescriptor.new(
+            workspace_kind: :ticket_workspace,
+            source_type: :branch_head,
+            ref: "refs/heads/a3/work/3025",
+            task_ref: "A3-v2#3025"
+          ),
+          scope_snapshot: A3::Domain::ScopeSnapshot.new(
+            edit_scope: [:repo_alpha],
+            verification_scope: %i[repo_alpha repo_beta],
+            ownership_scope: :task
+          ),
+          review_target: A3::Domain::ReviewTarget.new(
+            base_commit: "base123",
+            head_commit: "head456",
+            task_ref: "A3-v2#3025",
+            phase_ref: :review
+          ),
+          artifact_owner: A3::Domain::ArtifactOwner.new(
+            owner_ref: "A3-v2#3022",
+            owner_scope: :task,
+            snapshot_version: "head456"
+          )
+        )
+      )
+      allow(worker_gateway).to receive(:run).and_return(
+        A3::Application::ExecutionResult.new(success: true, summary: "implementation completed")
+      )
+
+      out = StringIO.new
+      described_class.start(
+        [
+          "run-worker-phase",
+          "A3-v2#3025",
+          "run-worker-1",
+          File.join(dir, "manifest.yml"),
+          "--storage-backend", "sqlite",
+          "--storage-dir", dir,
+          *repo_source_args(repo_sources),
+          "--preset-dir", File.join(dir, "presets")
+        ],
+        out: out,
+        worker_gateway: worker_gateway
+      )
+
+      expect(out.string).to include("worker phase completed run-worker-1")
+      expect(task_repository.fetch("A3-v2#3025").status).to eq(:in_review)
+    end
+  end
+
+  it "runs review worker end-to-end through sqlite backend" do
+    Dir.mktmpdir do |dir|
+      repo_sources = create_repo_sources(dir)
+      seed_context(dir)
+      task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
+      run_repository = A3::Infra::SqliteRunRepository.new(File.join(dir, "a3.sqlite3"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "A3-v2#3026",
+          kind: :child,
+          edit_scope: [:repo_alpha],
+          verification_scope: %i[repo_alpha repo_beta],
+          status: :in_review,
+          current_run_ref: "run-review-1",
+          parent_ref: "A3-v2#3022"
+        )
+      )
+      run_repository.save(
+        A3::Domain::Run.new(
+          ref: "run-review-1",
+          task_ref: "A3-v2#3026",
+          phase: :review,
+          workspace_kind: :runtime_workspace,
+          source_descriptor: A3::Domain::SourceDescriptor.new(
+            workspace_kind: :runtime_workspace,
+            source_type: :integration_record,
+            ref: "refs/heads/a3/work/3026",
+            task_ref: "A3-v2#3026"
+          ),
+          scope_snapshot: A3::Domain::ScopeSnapshot.new(
+            edit_scope: [:repo_alpha],
+            verification_scope: %i[repo_alpha repo_beta],
+            ownership_scope: :task
+          ),
+          review_target: A3::Domain::ReviewTarget.new(
+            base_commit: "base789",
+            head_commit: "head999",
+            task_ref: "A3-v2#3026",
+            phase_ref: :review
+          ),
+          artifact_owner: A3::Domain::ArtifactOwner.new(
+            owner_ref: "A3-v2#3022",
+            owner_scope: :task,
+            snapshot_version: "head999"
+          )
+        )
+      )
+      allow(worker_gateway).to receive(:run).and_return(
+        A3::Application::ExecutionResult.new(success: true, summary: "review completed")
+      )
+
+      out = StringIO.new
+      described_class.start(
+        [
+          "run-worker-phase",
+          "A3-v2#3026",
+          "run-review-1",
+          File.join(dir, "manifest.yml"),
+          "--storage-backend", "sqlite",
+          "--storage-dir", dir,
+          *repo_source_args(repo_sources),
+          "--preset-dir", File.join(dir, "presets")
+        ],
+        out: out,
+        worker_gateway: worker_gateway
+      )
+
+      expect(out.string).to include("worker phase completed run-review-1")
+      expect(task_repository.fetch("A3-v2#3026").status).to eq(:verifying)
+    end
+  end
+
+  it "uses the default local worker gateway and passes worker request env through bootstrap wiring" do
+    Dir.mktmpdir do |dir|
+      repo_sources = create_repo_sources(dir)
+      seed_context(dir)
+      task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
+      run_repository = A3::Infra::SqliteRunRepository.new(File.join(dir, "a3.sqlite3"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "A3-v2#3027",
+          kind: :child,
+          edit_scope: [:repo_alpha],
+          verification_scope: %i[repo_alpha repo_beta],
+          status: :in_progress,
+          current_run_ref: "run-default-gateway-1",
+          parent_ref: "A3-v2#3022"
+        )
+      )
+      run_repository.save(
+        A3::Domain::Run.new(
+          ref: "run-default-gateway-1",
+          task_ref: "A3-v2#3027",
+          phase: :implementation,
+          workspace_kind: :ticket_workspace,
+          source_descriptor: A3::Domain::SourceDescriptor.new(
+            workspace_kind: :ticket_workspace,
+            source_type: :branch_head,
+            ref: "refs/heads/a3/work/3027",
+            task_ref: "A3-v2#3027"
+          ),
+          scope_snapshot: A3::Domain::ScopeSnapshot.new(
+            edit_scope: [:repo_alpha],
+            verification_scope: %i[repo_alpha repo_beta],
+            ownership_scope: :task
+          ),
+          review_target: A3::Domain::ReviewTarget.new(
+            base_commit: "base3027",
+            head_commit: "head3027",
+            task_ref: "A3-v2#3027",
+            phase_ref: :review
+          ),
+          artifact_owner: A3::Domain::ArtifactOwner.new(
+            owner_ref: "A3-v2#3022",
+            owner_scope: :task,
+            snapshot_version: "head3027"
+          )
+        )
+      )
+
+      allow(command_runner).to receive(:run).with(
+        ["skills/implementation/base.md"],
+        workspace: an_instance_of(A3::Domain::PreparedWorkspace),
+        env: hash_including("A3_WORKER_REQUEST_PATH", "A3_WORKSPACE_ROOT")
+      ) do |_commands, workspace:, env:|
+        request_path = Pathname(env.fetch("A3_WORKER_REQUEST_PATH"))
+        expect(request_path).to eq(workspace.root_path.join(".a3", "worker-request.json"))
+        expect(request_path).to exist
+
+        request = JSON.parse(request_path.read)
+        expect(request).to include(
+          "task_ref" => "A3-v2#3027",
+          "run_ref" => "run-default-gateway-1",
+          "phase" => "implementation",
+          "skill" => "skills/implementation/base.md"
+        )
+
+        A3::Application::ExecutionResult.new(success: true, summary: "implementation completed")
+      end
+
+      out = StringIO.new
+      described_class.start(
+        [
+          "run-worker-phase",
+          "A3-v2#3027",
+          "run-default-gateway-1",
+          File.join(dir, "manifest.yml"),
+          "--storage-backend", "sqlite",
+          "--storage-dir", dir,
+          *repo_source_args(repo_sources),
+          "--preset-dir", File.join(dir, "presets")
+        ],
+        out: out,
+        command_runner: command_runner
+      )
+
+      expect(out.string).to include("worker phase completed run-default-gateway-1")
+      expect(task_repository.fetch("A3-v2#3027").status).to eq(:in_review)
+    end
+  end
+
+  def seed_context(dir)
+    preset_dir = File.join(dir, "presets")
+    FileUtils.mkdir_p(preset_dir)
+    File.write(
+      File.join(preset_dir, "base.yml"),
+      YAML.dump(
+        {
+          "schema_version" => "1",
+          "implementation_skill" => "skills/implementation/base.md",
+          "review_skill" => "skills/review/default.md",
+          "verification_commands" => ["commands/verify-all"],
+          "remediation_commands" => ["commands/apply-remediation"],
+          "workspace_hook" => "hooks/prepare-runtime.sh"
+        }
+      )
+    )
+    File.write(
+      File.join(dir, "manifest.yml"),
+      YAML.dump(
+        {
+          "presets" => ["base"],
+          "core" => {
+            "merge_target" => "merge_to_parent",
+            "merge_policy" => "ff_only"
+          }
+        }
+      )
+    )
+  end
+end

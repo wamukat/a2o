@@ -1,0 +1,10 @@
+schema_version: "1"
+review_skill:
+  default: skills/review/default.md
+  variants:
+    task_kind:
+      child:
+        repo_scope:
+          repo_alpha:
+            phase:
+              review: skills/review/repo-alpha-child.md

@@ -1,0 +1,88 @@
+# frozen_string_literal: true
+
+require "a3/domain/runnable_task_assessment"
+
+RSpec.describe A3::Domain::RunnableTaskAssessment do
+  let(:tasks) do
+    [
+      A3::Domain::Task.new(
+        ref: "A3-v2#3020",
+        kind: :child,
+        edit_scope: [:repo_alpha],
+        status: :in_progress,
+        current_run_ref: "run-1",
+        parent_ref: "A3-v2#3019"
+      ),
+      A3::Domain::Task.new(
+        ref: "A3-v2#3021",
+        kind: :child,
+        edit_scope: [:repo_beta],
+        status: :todo,
+        parent_ref: "A3-v2#3019"
+      ),
+      A3::Domain::Task.new(
+        ref: "A3-v2#3019",
+        kind: :parent,
+        edit_scope: %i[repo_alpha repo_beta],
+        status: :todo,
+        child_refs: %w[A3-v2#3020 A3-v2#3021]
+      )
+    ]
+  end
+
+  it "explains when a child task is blocked by a running sibling" do
+    assessment = described_class.evaluate(task: tasks[1], tasks: tasks)
+
+    expect(assessment.runnable?).to eq(false)
+    expect(assessment.reason).to eq(:sibling_running)
+    expect(assessment.phase).to eq(:implementation)
+    expect(assessment.blocking_task_refs).to eq(["A3-v2#3020"])
+  end
+
+  it "explains when a parent task waits for unfinished children" do
+    assessment = described_class.evaluate(task: tasks[2], tasks: tasks)
+
+    expect(assessment.runnable?).to eq(false)
+    expect(assessment.reason).to eq(:parent_waiting_for_children)
+    expect(assessment.phase).to eq(:review)
+    expect(assessment.blocking_task_refs).to eq(%w[A3-v2#3020 A3-v2#3021])
+  end
+
+  it "marks runnable tasks explicitly" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3030",
+      kind: :single,
+      edit_scope: [:repo_alpha],
+      status: :in_review
+    )
+
+    assessment = described_class.evaluate(task: task, tasks: [task])
+
+    expect(assessment.runnable?).to eq(true)
+    expect(assessment.reason).to eq(:runnable)
+    expect(assessment.phase).to eq(:review)
+  end
+
+  it "does not treat a missing cached child as pending once parent topology is known" do
+    parent = A3::Domain::Task.new(
+      ref: "A3-v2#3040",
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      status: :todo,
+      child_refs: %w[A3-v2#3041 A3-v2#3042]
+    )
+    cached_child = A3::Domain::Task.new(
+      ref: "A3-v2#3041",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :done,
+      parent_ref: parent.ref
+    )
+
+    assessment = described_class.evaluate(task: parent, tasks: [parent, cached_child])
+
+    expect(assessment.runnable?).to eq(true)
+    expect(assessment.reason).to eq(:runnable)
+    expect(assessment.phase).to eq(:review)
+  end
+end

@@ -1,0 +1,151 @@
+# frozen_string_literal: true
+
+RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
+  it "renders aligned phase headers and colorized task rows" do
+    summary = Struct.new(:scheduler_paused, :scheduler_paused_at, :tasks, :next_candidates, :running_entries).new(
+      false,
+      nil,
+      [
+        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+          "Portal#1",
+          nil,
+          "Parent task",
+          false,
+          false,
+          true,
+          false,
+          false,
+          nil,
+          {},
+          []
+        ),
+        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+          "Portal#2",
+          "Portal#1",
+          "Blocked child",
+          true,
+          false,
+          false,
+          false,
+          false,
+          "review",
+          { "implementation" => 1, "review" => 1 },
+          ["review blocked"]
+        )
+      ],
+      ["Portal#1"],
+      []
+    )
+
+    lines = described_class.lines(summary)
+
+    expect(lines[0]).to include("\e[36mScheduler: idle\e[0m")
+    expect(lines).to include(a_string_matching(/○ idle\s+… waiting\s+│\s+· none\s+│\s+Merging ─+┐$/))
+    expect(lines).to include(a_string_matching(/▷ next\s+▶ running\s+│\s+▶ running\s+│\s+Inspecting ─+┐\s+│$/))
+    expect(lines).to include(a_string_matching(/✔ done\s+│\s+✔ done\s+│\s+Review ─+┐\s+│\s+│$/))
+    expect(lines).to include(a_string_matching(/✖ blocked\s+│\s+✖ blocked\s+│\s+Implementation ─+┐\s+│\s+│\s+│$/))
+    expect(lines).to include("\e[36mTask Tree\e[0m")
+    expect(lines).to include(a_string_including("\e[36m▷ #1"))
+    expect(lines).to include(a_string_including("\e[31m✖   #2"))
+  end
+
+  it "shows review-phase tasks as running when running_entry is present" do
+    running_entry = Struct.new(:task_ref, :phase, :internal_phase, :state, :heartbeat_age_seconds, :detail).new(
+      "Portal#3141",
+      "review",
+      "review",
+      "running_command",
+      nil,
+      "refs/heads/a3/work/Portal-3141"
+    )
+    summary = Struct.new(:scheduler_paused, :scheduler_paused_at, :tasks, :next_candidates, :running_entries).new(
+      false,
+      nil,
+      [
+        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+          "Portal#3141",
+          nil,
+          "Review task",
+          false,
+          true,
+          false,
+          false,
+          false,
+          "review",
+          { "implementation" => 1, "review" => 1 },
+          []
+        )
+      ],
+      [],
+      [running_entry]
+    )
+
+    lines = described_class.lines(summary).join("\n")
+
+    expect(lines).to include("✔/▶/·/·")
+    expect(lines).to include("- #3141 review/review/running_command hb=?")
+  end
+
+  it "shows scheduler as running when a running entry exists" do
+    running_entry = Struct.new(:task_ref, :phase, :internal_phase, :state, :heartbeat_age_seconds, :detail).new(
+      "Portal#3141",
+      "review",
+      "review",
+      "running_command",
+      nil,
+      nil
+    )
+    summary = Struct.new(:scheduler_paused, :scheduler_paused_at, :tasks, :next_candidates, :running_entries).new(
+      false,
+      nil,
+      [],
+      [],
+      [running_entry]
+    )
+
+    expect(described_class.lines(summary).first).to include("\e[36mScheduler: running\e[0m")
+  end
+
+  it "does not indent orphan tasks whose parent is not present in the summary" do
+    summary = Struct.new(:scheduler_paused, :scheduler_paused_at, :tasks, :next_candidates, :running_entries).new(
+      false,
+      nil,
+      [
+        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+          "Portal#3179",
+          nil,
+          "Parent task",
+          false,
+          true,
+          false,
+          false,
+          false,
+          "review",
+          { "implementation" => 1, "review" => 1 },
+          []
+        ),
+        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+          "Portal#3166",
+          "Portal#3165",
+          "Orphan child",
+          false,
+          false,
+          false,
+          false,
+          true,
+          nil,
+          {},
+          []
+        )
+      ],
+      [],
+      []
+    )
+
+    lines = described_class.lines(summary)
+    orphan_line = lines.find { |line| line.include?("#3166") }
+
+    expect(orphan_line).to include("✔ #3166")
+    expect(orphan_line).not_to include("✔   #3166")
+  end
+end

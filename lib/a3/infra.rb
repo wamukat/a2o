@@ -1,0 +1,40 @@
+# frozen_string_literal: true
+
+module A3
+  module Infra
+  end
+end
+
+require "a3/infra/in_memory_task_repository"
+require "a3/infra/in_memory_run_repository"
+require "a3/infra/in_memory_scheduler_store"
+require "a3/infra/in_memory_scheduler_state_repository"
+require "a3/infra/in_memory_scheduler_cycle_repository"
+require "a3/infra/json_task_repository"
+require "a3/infra/json_run_repository"
+require "a3/infra/json_scheduler_store"
+require "a3/infra/json_scheduler_state_repository"
+require "a3/infra/json_scheduler_cycle_repository"
+require "a3/infra/sqlite_task_repository"
+require "a3/infra/sqlite_run_repository"
+require "a3/infra/sqlite_scheduler_store"
+require "a3/infra/sqlite_scheduler_state_repository"
+require "a3/infra/sqlite_scheduler_cycle_repository"
+require "a3/infra/local_git_workspace_backend"
+require "a3/infra/local_workspace_provisioner"
+require "a3/infra/local_worker_gateway"
+require "a3/infra/local_command_runner"
+require "a3/infra/local_merge_runner"
+require "a3/infra/local_workspace_change_publisher"
+require "a3/infra/local_migration_marker_store"
+require "a3/infra/null_external_task_source"
+require "a3/infra/null_external_task_status_publisher"
+require "a3/infra/null_external_task_activity_publisher"
+require "a3/infra/null_external_task_snapshot_reader"
+require "a3/infra/kanban_bridge_bundle"
+require "a3/infra/kanban_cli_command_client"
+require "a3/infra/kanban_cli_task_source"
+require "a3/infra/kanban_cli_task_status_publisher"
+require "a3/infra/kanban_cli_task_activity_publisher"
+require "a3/infra/kanban_cli_follow_up_child_writer"
+require "a3/infra/kanban_cli_task_snapshot_reader"

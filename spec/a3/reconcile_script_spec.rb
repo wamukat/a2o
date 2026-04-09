@@ -1,0 +1,178 @@
+# frozen_string_literal: true
+
+require "json"
+require "tmpdir"
+require_relative "../../../scripts/a3/reconcile"
+
+RSpec.describe A3Reconcile do
+  it "flags terminal and missing runs as stale" do
+    Dir.mktmpdir("a3-reconcile-") do |dir|
+      root = Pathname(dir)
+      active_runs = root.join("active-runs.json")
+      worker_runs = root.join("worker-runs.json")
+      active_runs.write(JSON.generate({ "active_task_refs" => ["Portal#1", "Portal#2"] }))
+      worker_runs.write(
+        JSON.generate(
+          "runs" => {
+            "Portal#1" => {
+              "task_ref" => "Portal#1", "task_id" => 1, "team" => "implementation", "phase" => "implementation",
+              "state" => "completed", "started_at" => "2026-03-23T00:00:00+00:00", "heartbeat_at" => "2026-03-23T00:00:01+00:00",
+              "updated_at_epoch_ms" => 1
+            }
+          }
+        )
+      )
+      allow(described_class).to receive(:live_portal_processes).and_return([])
+
+      payload = described_class.inspect_stale_active_runs(project: "portal", active_runs_file: active_runs, worker_runs_file: worker_runs)
+      reasons = payload.fetch("stale_active_runs").each_with_object({}) { |item, acc| acc[item.fetch("task_ref")] = item.fetch("reason") }
+      ids = payload.fetch("stale_active_runs").each_with_object({}) { |item, acc| acc[item.fetch("task_ref")] = item["task_id"] }
+
+      expect(reasons["Portal#1"]).to eq("latest_run_terminal")
+      expect(reasons["Portal#2"]).to eq("missing_worker_run")
+      expect(ids["Portal#1"]).to eq(1)
+      expect(ids["Portal#2"]).to be_nil
+      expect(payload.fetch("active_refs_after")).to eq([])
+    end
+  end
+
+  it "clears stale nonterminal runs when no live process exists" do
+    Dir.mktmpdir("a3-reconcile-") do |dir|
+      root = Pathname(dir)
+      active_runs = root.join("active-runs.json")
+      worker_runs = root.join("worker-runs.json")
+      active_runs.write(JSON.generate({ "active_task_refs" => ["Portal#9"] }))
+      worker_runs.write(
+        JSON.generate(
+          "runs" => {
+            "Portal#9" => {
+              "task_ref" => "Portal#9", "task_id" => 9, "team" => "implementation", "phase" => "implementation",
+              "state" => "running", "started_at" => "2026-03-23T00:00:00+00:00", "heartbeat_at" => "2026-03-23T00:10:00+00:00",
+              "updated_at_epoch_ms" => 10
+            }
+          }
+        )
+      )
+      allow(described_class).to receive(:live_portal_processes).and_return([])
+
+      payload = described_class.apply_stale_active_run_reconciliation(project: "portal", active_runs_file: active_runs, worker_runs_file: worker_runs)
+
+      expect(payload.fetch("applied")).to eq(true)
+      expect(payload.fetch("stale_active_runs").map { |item| item.fetch("task_ref") }).to eq(["Portal#9"])
+      expect(JSON.parse(active_runs.read)).to eq({ "active_task_refs" => [] })
+      worker_payload = JSON.parse(worker_runs.read)
+      expect(worker_payload.fetch("runs").fetch("Portal#9").fetch("state")).to eq("failed")
+      expect(worker_payload.fetch("runs").fetch("Portal#9").fetch("detail")).to include("reconciled_stale_run(reason=stale_worker_run)")
+    end
+  end
+
+  it "flags worker run without active ref as stale" do
+    Dir.mktmpdir("a3-reconcile-") do |dir|
+      root = Pathname(dir)
+      active_runs = root.join("active-runs.json")
+      worker_runs = root.join("worker-runs.json")
+      active_runs.write(JSON.generate({ "active_task_refs" => [] }))
+      worker_runs.write(
+        JSON.generate(
+          "runs" => {
+            "Portal#2561" => {
+              "task_ref" => "Portal#2561", "task_id" => 2561, "team" => "implementation", "phase" => "implementation",
+              "state" => "running", "started_at" => "2026-03-23T00:00:00+00:00", "heartbeat_at" => "2026-03-23T00:10:00+00:00",
+              "updated_at_epoch_ms" => 10
+            }
+          }
+        )
+      )
+      allow(described_class).to receive(:live_portal_processes).and_return([])
+
+      payload = described_class.inspect_stale_active_runs(project: "portal", active_runs_file: active_runs, worker_runs_file: worker_runs)
+      expect(payload.fetch("stale_active_runs")).to eq([
+        { "task_ref" => "Portal#2561", "task_id" => 2561, "reason" => "stale_worker_run", "latest_state" => "running" }
+      ])
+    end
+  end
+
+  it "applies status reset with runtime env" do
+    Dir.mktmpdir("a3-reconcile-") do |dir|
+      root = Pathname(dir)
+      launcher_config = root.join("launcher.json")
+      env_file = root.join("portal.env")
+      env_file.write("KANBOARD_API_TOKEN=test-token\nPATH=/usr/bin:/bin\n")
+      launcher_config.write(
+        JSON.pretty_generate(
+          "executor" => { "kind" => "ai-cli", "implementation" => "openai-codex" },
+          "scheduler" => { "backend" => "manual", "job_name" => "dev.a3-engine.portal.watch", "command_argv" => ["/bin/sh", "-lc", "true"] },
+          "runtime_env" => { "required_bins" => [], "path_entries" => [] },
+          "shell" => { "executable" => "/bin/sh", "login" => false, "interactive" => false, "inherit_env" => false, "env_files" => [env_file.to_s], "env_overrides" => { "JAVA_HOME" => "/opt/jdk-25" } },
+          "kanban" => { "backend" => "subprocess-cli", "command_argv" => ["task", "kanban:api", "--"], "working_directory" => root.to_s }
+        )
+      )
+
+      received = nil
+      allow(described_class).to receive(:system) do |env, *argv, **kwargs|
+        received = { env: env, argv: argv, kwargs: kwargs }
+        true
+      end
+
+      described_class.apply_status_reset(launcher_config: launcher_config, task_ref: "Portal#2561", task_id: 2561, status: "To do")
+
+      expect(received[:argv]).to eq(["task", "kanban:api", "--", "task-transition", "--task-id", "2561", "--status", "To do"])
+      expect(received[:kwargs][:chdir]).to eq(root.to_s)
+      expect(received[:env]["KANBOARD_API_TOKEN"]).to eq("test-token")
+      expect(received[:env]["JAVA_HOME"]).to eq("/opt/jdk-25")
+    end
+  end
+
+  it "resolves vendor rg when allowed" do
+    Dir.mktmpdir("a3-reconcile-") do |dir|
+      root = Pathname(dir)
+      launcher_config = root.join("launcher.json")
+      env_file = root.join("portal.env")
+      codex_home = root.join(".codex")
+      vendor_dir = codex_home.join("vendor", "ripgrep")
+      vendor_dir.mkpath
+      vendor_rg = vendor_dir.join("rg")
+      vendor_rg.write("#!/bin/sh\nexit 0\n")
+      File.chmod(0o755, vendor_rg)
+      env_file.write("CODEX_HOME=#{codex_home}\nPATH=/usr/bin:/bin\n")
+      launcher_config.write(
+        JSON.pretty_generate(
+          "runtime_env" => { "required_bins" => ["rg"], "path_entries" => [], "allow_executor_vendor_rg_fallback" => true },
+          "shell" => { "inherit_env" => false, "env_files" => [env_file.to_s], "env_overrides" => {} },
+          "kanban" => { "backend" => "subprocess-cli", "command_argv" => ["task", "kanban:api", "--"], "working_directory" => root.to_s }
+        )
+      )
+
+      received = nil
+      allow(described_class).to receive(:system) do |env, *_argv, **_kwargs|
+        received = env
+        true
+      end
+
+      described_class.apply_status_reset(launcher_config: launcher_config, task_ref: "Portal#2561", task_id: 2561, status: "To do")
+      expect(received.fetch("PATH").split(":").first).to eq(vendor_dir.to_s)
+    end
+  end
+
+
+  it "ignores unrelated codex exec processes when checking portal liveness" do
+    allow(IO).to receive(:popen).and_return("codex exec --json -\n")
+
+    expect(described_class.live_portal_processes("portal")).to eq([])
+  end
+
+  it "recognizes current portal-v2 scheduler shot processes" do
+    allow(IO).to receive(:popen).and_return(<<~PS)
+      ruby scripts/a3/portal_v2_scheduler_launcher.rb --run-shot
+      ruby -I a3-v2/lib a3-v2/bin/a3 execute-until-idle --storage-dir .work/a3-v2/portal-kanban-scheduler-auto scripts/a3/config/portal/a3-v2-runtime-manifest.yml
+    PS
+
+    matches = described_class.live_portal_processes("portal")
+    expect(matches).to eq(
+      [
+        "ruby scripts/a3/portal_v2_scheduler_launcher.rb --run-shot",
+        "ruby -I a3-v2/lib a3-v2/bin/a3 execute-until-idle --storage-dir .work/a3-v2/portal-kanban-scheduler-auto scripts/a3/config/portal/a3-v2-runtime-manifest.yml"
+      ]
+    )
+  end
+end

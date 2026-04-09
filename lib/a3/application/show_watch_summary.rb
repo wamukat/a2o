@@ -1,0 +1,199 @@
+# frozen_string_literal: true
+
+module A3
+  module Application
+    class ShowWatchSummary
+      Summary = Struct.new(
+        :scheduler_paused,
+        :scheduler_paused_at,
+        :next_candidates,
+        :running_entries,
+        :tasks,
+        keyword_init: true
+      )
+
+      RunningEntry = Struct.new(
+        :task_ref,
+        :phase,
+        :internal_phase,
+        :state,
+        :heartbeat_age_seconds,
+        :detail,
+        keyword_init: true
+      )
+
+      TaskEntry = Struct.new(
+        :ref,
+        :title,
+        :status,
+        :parent_ref,
+        :next_candidate,
+        :running,
+        :waiting,
+        :done,
+        :blocked,
+        :blocked_lines,
+        :running_entry,
+        :phase_counts,
+        :latest_phase,
+        keyword_init: true
+      )
+
+      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {})
+        @task_repository = task_repository
+        @run_repository = run_repository
+        @scheduler_state_repository = scheduler_state_repository
+        @kanban_snapshots_by_ref = kanban_snapshots_by_ref || {}
+        @kanban_snapshots_by_id = kanban_snapshots_by_id || {}
+      end
+
+      def call
+        tasks = @task_repository.all
+        runs = @run_repository.all
+        runs_by_task = runs.group_by(&:task_ref)
+        state = @scheduler_state_repository.fetch
+
+        task_entries = tasks.each_with_object([]) do |task, entries|
+          entries << build_task_entry(task, runs_by_task: runs_by_task)
+        end
+
+        Summary.new(
+          scheduler_paused: state.paused,
+          scheduler_paused_at: nil,
+          next_candidates: task_entries.select(&:next_candidate).map(&:ref).sort.freeze,
+          running_entries: task_entries.map(&:running_entry).compact.sort_by(&:task_ref).freeze,
+          tasks: sort_tasks_for_tree(task_entries).freeze
+        )
+      end
+
+      private
+
+      def build_task_entry(task, runs_by_task:)
+        task_runs = runs_by_task.fetch(task.ref, [])
+        current_run = task.current_run_ref && task_runs.find { |candidate| candidate.ref == task.current_run_ref }
+        latest_run = task_runs.last
+        latest_phase = resolve_latest_phase(current_run: current_run, latest_run: latest_run)
+        running_entry = build_running_entry(task, run: current_run)
+        blocked_lines = build_blocked_lines(latest_run)
+        kanban_snapshot = resolve_kanban_snapshot(task)
+
+        TaskEntry.new(
+          ref: task.ref,
+          title: display_title(task, kanban_snapshot: kanban_snapshot),
+          status: display_status(task.status.to_sym),
+          parent_ref: task.parent_ref,
+          next_candidate: task.status.to_sym == :todo,
+          running: !running_entry.nil?,
+          waiting: false,
+          done: task.status.to_sym == :done,
+          blocked: task.status.to_sym == :blocked,
+          blocked_lines: blocked_lines,
+          running_entry: running_entry,
+          phase_counts: phase_counts_for(task_runs),
+          latest_phase: latest_phase
+        )
+      end
+
+      def display_title(task, kanban_snapshot:)
+        return task.ref unless kanban_snapshot.is_a?(Hash)
+
+        title = String(kanban_snapshot["title"]).strip
+        title = task.ref if title.empty?
+        kanban_status = String(kanban_snapshot["status"]).strip
+        internal_status = display_status(task.status.to_sym)
+        return title if kanban_status.empty? || kanban_status == internal_status
+
+        "#{title} [kanban=#{kanban_status} internal=#{internal_status}]"
+      end
+
+      def resolve_kanban_snapshot(task)
+        @kanban_snapshots_by_id[task.external_task_id] || @kanban_snapshots_by_ref[task.ref]
+      end
+
+      def display_status(status)
+        {
+          todo: "To do",
+          in_progress: "In progress",
+          in_review: "In review",
+          verifying: "Inspection",
+          merging: "Merging",
+          done: "Done",
+          blocked: "Blocked"
+        }.fetch(status, status.to_s)
+      end
+
+      def build_running_entry(task, run:)
+        return nil unless running_status?(task.status.to_sym)
+        return nil unless run
+
+        phase = run.phase.to_sym.to_s
+        RunningEntry.new(
+          task_ref: task.ref,
+          phase: phase,
+          internal_phase: phase,
+          state: "running_command",
+          heartbeat_age_seconds: nil,
+          detail: run.source_descriptor.ref
+        )
+      end
+
+      def running_status?(status)
+        %i[in_progress in_review verifying merging].include?(status)
+      end
+
+      def build_blocked_lines(run)
+        return [].freeze unless run
+
+        phase_record = run.phase_records.reverse_each.find { |item| !item.blocked_diagnosis.nil? }
+        diagnosis = phase_record&.blocked_diagnosis
+        return [].freeze unless diagnosis
+
+        [diagnosis.diagnostic_summary || diagnosis.observed_state].compact.map(&:to_s).reject(&:empty?).freeze
+      end
+
+      def phase_counts_for(task_runs)
+        task_runs.each_with_object(Hash.new(0)) do |run, counts|
+          phase = normalize_phase(run.phase.to_sym.to_s)
+          counts[phase] += 1 if phase
+        end
+      end
+
+      def resolve_latest_phase(current_run:, latest_run:)
+        [current_run, latest_run].compact.reverse_each do |run|
+          normalized = normalize_phase(run.phase.to_sym.to_s)
+          return normalized if normalized
+        end
+        nil
+      end
+
+      def normalize_phase(value)
+        {
+          "implementation" => "implementation",
+          "review" => "review",
+          "verification" => "inspection",
+          "verifying" => "inspection",
+          "merge" => "merge",
+          "merging" => "merge"
+        }[value]
+      end
+
+      def sort_tasks_for_tree(tasks)
+        by_parent = Hash.new { |hash, key| hash[key] = [] }
+        tasks.each { |task| by_parent[task.parent_ref] << task }
+        by_parent.each_value { |children| children.sort_by! { |task| task.ref } }
+
+        ordered = []
+        visit = lambda do |parent_ref|
+          by_parent[parent_ref].each do |task|
+            ordered << task
+            visit.call(task.ref)
+          end
+        end
+        visit.call(nil)
+        missing = tasks.reject { |task| ordered.include?(task) }.sort_by(&:ref)
+        ordered.concat(missing)
+        ordered
+      end
+    end
+  end
+end

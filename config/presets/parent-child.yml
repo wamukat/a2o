@@ -1,0 +1,9 @@
+review_skill:
+  default: skills/review/default.md
+  variants:
+    task_kind:
+      parent:
+        repo_scope:
+          both:
+            phase:
+              review: skills/review/parent.md

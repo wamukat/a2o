@@ -1,0 +1,72 @@
+# frozen_string_literal: true
+
+require "tmpdir"
+require "yaml"
+
+RSpec.describe A3::CLI do
+  it "prints resolved phase runtime config from project context" do
+    Dir.mktmpdir do |dir|
+      preset_dir = File.join(dir, "presets")
+      FileUtils.mkdir_p(preset_dir)
+      File.write(
+        File.join(preset_dir, "base.yml"),
+        YAML.dump(
+          {
+            "schema_version" => "1",
+            "implementation_skill" => "skills/implementation/base.md",
+            "review_skill" => {
+              "default" => "skills/review/default.md",
+              "variants" => {
+                "task_kind" => {
+                  "child" => {
+                    "repo_scope" => {
+                      "repo_alpha" => {
+                        "phase" => {
+                          "review" => "skills/review/repo-alpha-child.md"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "verification_commands" => ["commands/verify-all"],
+            "remediation_commands" => ["commands/apply-remediation"],
+            "workspace_hook" => "hooks/prepare-runtime.sh"
+          }
+        )
+      )
+      manifest_path = File.join(dir, "manifest.yml")
+      File.write(
+        manifest_path,
+        YAML.dump(
+          {
+            "presets" => ["base"],
+            "core" => {
+              "merge_target" => "merge_to_parent",
+              "merge_policy" => "ff_only"
+            }
+          }
+        )
+      )
+
+      out = StringIO.new
+
+      described_class.start(
+        [
+          "show-phase-runtime-config",
+          manifest_path,
+          "--preset-dir", preset_dir,
+          "--task-kind", "child",
+          "--repo-scope", "repo_alpha",
+          "--phase", "review"
+        ],
+        out: out
+      )
+
+      expect(out.string).to include("implementation_skill=skills/implementation/base.md")
+      expect(out.string).to include("review_skill=skills/review/repo-alpha-child.md")
+      expect(out.string).to include("merge_target=merge_to_parent")
+    end
+  end
+end
