@@ -49,9 +49,9 @@ RSpec.describe PortalV2WatchSummary do
     expect(command).to include("python3")
     expect(command).to include("--kanban-project")
     expect(command).to include("Portal")
-    expect(command).to include("--show-details")
     expect(command).to include("/tmp/custom-storage")
     expect(command).not_to include("--json")
+    expect(command).not_to include("--show-details")
   end
 
   it "strips ansi escapes when no_color is requested" do
