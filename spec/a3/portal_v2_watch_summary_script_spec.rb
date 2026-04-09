@@ -40,11 +40,10 @@ RSpec.describe PortalV2WatchSummary do
   it "builds a ruby watch-summary command with portal-specific kanban bridge options" do
     command = described_class.watch_summary_command(
       storage_dirs: ["/tmp/custom-storage"],
-      show_details: true,
-      json: false
+      show_details: true
     )
 
-    expect(command).to include("a3-v2/bin/a3")
+    expect(command).to include("a3-engine/bin/a3")
     expect(command).to include("watch-summary")
     expect(command).to include("--kanban-command")
     expect(command).to include("python3")
@@ -52,6 +51,7 @@ RSpec.describe PortalV2WatchSummary do
     expect(command).to include("Portal")
     expect(command).to include("--show-details")
     expect(command).to include("/tmp/custom-storage")
+    expect(command).not_to include("--json")
   end
 
   it "strips ansi escapes when no_color is requested" do
@@ -66,5 +66,29 @@ RSpec.describe PortalV2WatchSummary do
     )
 
     expect(rendered).to eq("Scheduler: running")
+  end
+
+  it "renders wrapper-owned json without passing --json to the cli" do
+    allow(Open3).to receive(:capture3).and_return(["Scheduler: idle\n\nTask Tree\n  (no tasks to watch)\n", "", instance_double(Process::Status, success?: true)])
+    allow(described_class).to receive(:load_scheduler_runtime_status).and_return(
+      described_class::SchedulerRuntimeStatus.new(state: "idle", exit_code: 0, detail: nil)
+    )
+
+    rendered = described_class.render_once(
+      storage_dirs: [],
+      show_details: false,
+      json: true,
+      no_color: true
+    )
+
+    payload = JSON.parse(rendered)
+    expect(payload).to include(
+      "rendered_text" => "Scheduler: idle\n\nTask Tree\n  (no tasks to watch)",
+      "scheduler_runtime" => {
+        "state" => "idle",
+        "exit_code" => 0,
+        "detail" => nil
+      }
+    )
   end
 end
