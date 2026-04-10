@@ -8,6 +8,8 @@ require "a3/infra/workspace_trace_logger"
 module A3
   module Infra
     class LocalWorkspaceProvisioner
+      IGNORED_REPO_SOURCE_ENTRIES = %w[.git .a3 .work target node_modules].freeze
+
       def initialize(base_dir:, repo_sources: {}, git_workspace_backend: A3::Infra::LocalGitWorkspaceBackend.new)
         @base_dir = Pathname(base_dir)
         @repo_sources = repo_sources.transform_keys(&:to_sym).transform_values { |value| Pathname(value) }.freeze
@@ -177,10 +179,29 @@ module A3
         raise A3::Domain::ConfigurationError, "Missing repo source directory: #{source_root}" unless source_root.directory?
 
         source_root.children.each do |entry|
-          next if %w[.git .a3].include?(entry.basename.to_s)
+          next if ignored_repo_source_entry?(entry)
 
-          FileUtils.cp_r(entry, slot_path)
+          copy_repo_source_entry!(entry, slot_path.join(entry.basename))
         end
+      end
+
+      def copy_repo_source_entry!(source_entry, destination_entry)
+        if source_entry.symlink?
+          FileUtils.ln_s(File.readlink(source_entry), destination_entry)
+        elsif source_entry.directory?
+          FileUtils.mkdir_p(destination_entry)
+          source_entry.children.each do |child|
+            next if ignored_repo_source_entry?(child)
+
+            copy_repo_source_entry!(child, destination_entry.join(child.basename))
+          end
+        else
+          FileUtils.copy_entry(source_entry, destination_entry)
+        end
+      end
+
+      def ignored_repo_source_entry?(entry)
+        IGNORED_REPO_SOURCE_ENTRIES.include?(entry.basename.to_s)
       end
 
       def write_slot_metadata(slot_path, source_root, task_ref, workspace_plan, requirement, artifact_owner, bootstrap_marker)

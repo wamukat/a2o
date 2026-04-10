@@ -79,6 +79,62 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     )
   end
 
+  it "skips generated local artifacts when copying non-git repo sources" do
+    repo_sources = create_repo_sources(tmpdir, slots: [:repo_alpha])
+    source_root = Pathname(repo_sources.fetch(:repo_alpha))
+    source_root.join("src").mkpath
+    source_root.join("src", "App.java").write("class App {}\n")
+    source_root.join(".work", "a3", "state.json").tap do |path|
+      path.dirname.mkpath
+      path.write("{}\n")
+    end
+    source_root.join("target", "classes").mkpath
+    source_root.join("node_modules", ".bin").mkpath
+    source_root.join("module-a", "target").mkpath
+    source_root.join("module-a", "README.md").tap do |path|
+      path.dirname.mkpath
+      path.write("module\n")
+    end
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3026",
+      kind: :child,
+      edit_scope: [:repo_alpha]
+    )
+    workspace_plan = A3::Domain::WorkspacePlan.new(
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :detached_commit,
+        ref: "abc123",
+        task_ref: task.ref
+      ),
+      slot_requirements: [
+        A3::Domain::SlotRequirement.new(repo_slot: :repo_alpha, sync_class: :eager)
+      ]
+    )
+    provisioner = described_class.new(base_dir: tmpdir, repo_sources: repo_sources)
+
+    workspace = provisioner.call(
+      task: task,
+      workspace_plan: workspace_plan,
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: task.ref,
+        owner_scope: :task,
+        snapshot_version: "abc123"
+      ),
+      bootstrap_marker: "workspace-hook:v1"
+    )
+
+    slot_path = workspace.slot_paths.fetch(:repo_alpha)
+    expect(slot_path.join("README.md").read).to eq("repo_alpha source\n")
+    expect(slot_path.join("src", "App.java")).to exist
+    expect(slot_path.join("module-a", "README.md")).to exist
+    expect(slot_path.join(".work")).not_to exist
+    expect(slot_path.join("target")).not_to exist
+    expect(slot_path.join("node_modules")).not_to exist
+    expect(slot_path.join("module-a", "target")).not_to exist
+  end
+
   it "re-materializes stale slot metadata when source freshness mismatches" do
     repo_sources = create_repo_sources(tmpdir, slots: [:repo_alpha])
     task = A3::Domain::Task.new(

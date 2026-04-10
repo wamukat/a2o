@@ -7,11 +7,13 @@ module A3
   module Infra
     class LocalGitWorkspaceBackend
       def git_repo?(source_root)
+        ensure_safe_directory!(source_root)
         _stdout, _stderr, status = Open3.capture3("git", "-C", source_root.to_s, "rev-parse", "--git-common-dir")
         status.success?
       end
 
       def materialize(source_root:, destination:, ref:, create_branch_if_missing: false, reset_branch_to: nil)
+        ensure_safe_directory!(source_root)
         assert_repo_identity!(source_root, source_root, label: "source_root")
         run_git!(source_root, "worktree", "prune")
         if create_branch_if_missing
@@ -20,12 +22,15 @@ module A3
           reset_branch_ref!(source_root, ref, reset_to: reset_branch_to)
         end
         run_git!(source_root, "worktree", "add", "--force", "--detach", destination.to_s, ref)
+        ensure_safe_directory!(destination)
         assert_same_repository!(destination, source_root, label: "destination")
       end
 
       def ready?(source_root:, destination:, ref:)
         return false unless destination.exist?
 
+        ensure_safe_directory!(source_root)
+        ensure_safe_directory!(destination)
         return false unless repo_identity_matches?(source_root, source_root)
         return false unless same_repository?(destination, source_root)
 
@@ -39,6 +44,8 @@ module A3
       def remove(source_root:, destination:)
         return unless destination.exist?
 
+        ensure_safe_directory!(source_root)
+        ensure_safe_directory!(destination)
         unless registered_worktree?(source_root, destination)
           FileUtils.rm_rf(destination)
           return
@@ -109,6 +116,7 @@ module A3
       end
 
       def registered_worktree?(root, destination)
+        ensure_safe_directory!(root)
         stdout, stderr, status = Open3.capture3("git", "-C", root.to_s, "worktree", "list", "--porcelain")
         raise A3::Domain::ConfigurationError, "git worktree list failed: #{stderr}" unless status.success?
 
@@ -118,6 +126,17 @@ module A3
           paths << normalize_path(line.delete_prefix("worktree "))
         end
         listed_paths.include?(normalize_path(destination.to_s))
+      end
+
+      def ensure_safe_directory!(path)
+        normalized = normalize_path(path.to_s)
+        stdout, _stderr, status = Open3.capture3("git", "config", "--global", "--get-all", "safe.directory")
+        return if status.success? && stdout.each_line(chomp: true).include?(normalized)
+
+        _stdout, stderr, add_status = Open3.capture3("git", "config", "--global", "--add", "safe.directory", normalized)
+        return if add_status.success?
+
+        raise A3::Domain::ConfigurationError, "git config safe.directory failed: #{stderr}"
       end
 
       def normalize_path(path)

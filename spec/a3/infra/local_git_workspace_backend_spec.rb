@@ -41,6 +41,28 @@ RSpec.describe A3::Infra::LocalGitWorkspaceBackend do
     end
   end
 
+  it "registers source and materialized worktree paths as git safe directories" do
+    Dir.mktmpdir do |dir|
+      home = File.join(dir, "home")
+      FileUtils.mkdir_p(home)
+      with_env("HOME" => home) do
+        source_root = Pathname(File.join(dir, "repo"))
+        destination = Pathname(File.join(dir, "worktree"))
+
+        create_git_repo_source(dir, name: "repo")
+        backend.materialize(
+          source_root: source_root,
+          destination: destination,
+          ref: "HEAD"
+        )
+
+        safe_directories = `git config --global --get-all safe.directory`.lines.map(&:strip)
+        expect(safe_directories).to include(source_root.realpath.to_s)
+        expect(safe_directories).to include(destination.realpath.to_s)
+      end
+    end
+  end
+
   it "resets an existing ticket branch to HEAD when requested" do
     Dir.mktmpdir do |dir|
       source_root = Pathname(File.join(dir, "repo"))
