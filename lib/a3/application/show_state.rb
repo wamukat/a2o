@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../domain/task_phase_projection"
+
 module A3
   module Application
     class ShowState
@@ -49,7 +51,7 @@ module A3
           memo << ActiveRunView.new(
             task_ref: task.ref,
             run_ref: task.current_run_ref,
-            phase: run&.phase,
+            phase: run && canonical_phase_for(task, run.phase),
             status: active_run_status(run, shot_state)
           )
         end
@@ -60,12 +62,16 @@ module A3
           phase = task.runnable_phase
           next unless phase
 
-          memo << TaskView.new(task_ref: task.ref, status: task.status, phase: phase)
+          memo << TaskView.new(
+            task_ref: task.ref,
+            status: canonical_status_for(task),
+            phase: canonical_phase_for(task, phase)
+          )
         end
 
         blocked_tasks = tasks
           .select { |task| task.status == :blocked }
-          .map { |task| TaskView.new(task_ref: task.ref, status: task.status, phase: nil) }
+          .map { |task| TaskView.new(task_ref: task.ref, status: canonical_status_for(task), phase: nil) }
 
         repairable_items = []
         repairable_items << "stale_shot_lock" if shot_state.stale?
@@ -92,6 +98,14 @@ module A3
         return :stale_process unless shot_state.active? || @execution_process_probe.active_execute_until_idle?
 
         :active
+      end
+
+      def canonical_status_for(task)
+        A3::Domain::TaskPhaseProjection.status_for(task_kind: task.kind, status: task.status)
+      end
+
+      def canonical_phase_for(task, phase)
+        A3::Domain::TaskPhaseProjection.phase_for(task_kind: task.kind, phase: phase)
       end
 
       def workspace_present?(run)

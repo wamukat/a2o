@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../task_phase_projection"
+
 module A3
   module Domain
     class OperatorInspectionReadModel
@@ -18,7 +20,7 @@ module A3
 
           new(
             ref: task.ref,
-            status: task.status,
+            status: A3::Domain::TaskPhaseProjection.status_for(task_kind: task.kind, status: task.status),
             current_run_ref: task.current_run_ref
           )
         end

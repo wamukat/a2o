@@ -184,4 +184,47 @@ RSpec.describe A3::Application::ShowState do
       expect(result.repairable_items).to eq([])
     end
   end
+
+  it "canonicalizes historical child review runs to verification in operator state" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::InMemoryTaskRepository.new
+      run_repository = A3::Infra::InMemoryRunRepository.new
+      scheduler_state_repository = A3::Infra::InMemorySchedulerStateRepository.new
+      scheduler_cycle_repository = A3::Infra::InMemorySchedulerCycleRepository.new
+
+      scheduler_state_repository.save(
+        A3::Domain::SchedulerState.new(paused: false, last_stop_reason: :idle, last_executed_count: 0)
+      )
+
+      run_repository.save(
+        A3::Domain::Run.new(
+          ref: "run-legacy-review",
+          task_ref: "Portal#9",
+          phase: :review,
+          workspace_kind: :runtime_workspace,
+          source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Portal#9", ref: "refs/heads/a3/work/Portal-9"),
+          scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], ownership_scope: :task),
+          artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: "Portal#9", owner_scope: :task, snapshot_version: "refs/heads/a3/work/Portal-9")
+        )
+      )
+      task_repository.save(
+        A3::Domain::Task.new(ref: "Portal#9", kind: :child, edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], status: :in_review, current_run_ref: "run-legacy-review")
+      )
+
+      FileUtils.mkdir_p(File.join(dir, "workspaces", "Portal-9", "runtime_workspace"))
+      File.write(File.join(dir, "scheduler-shot.lock"), Process.pid.to_s)
+
+      result = described_class.new(
+        task_repository: task_repository,
+        run_repository: run_repository,
+        scheduler_state_repository: scheduler_state_repository,
+        scheduler_cycle_repository: scheduler_cycle_repository,
+        storage_dir: dir
+      ).call
+
+      expect(result.active_runs.map(&:task_ref)).to eq(["Portal#9"])
+      expect(result.active_runs.first.phase).to eq(:verification)
+      expect(result.active_runs.first.status).to eq(:active)
+    end
+  end
 end
