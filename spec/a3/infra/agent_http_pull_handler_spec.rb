@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
+require "digest"
 require "spec_helper"
 
 RSpec.describe A3::Infra::AgentHttpPullHandler do
   let(:tmpdir) { Dir.mktmpdir }
   let(:store) { A3::Infra::JsonAgentJobStore.new(File.join(tmpdir, "agent-jobs.json")) }
-  let(:handler) { described_class.new(job_store: store, clock: -> { "2026-04-11T08:00:00Z" }) }
+  let(:artifact_store) { A3::Infra::FileAgentArtifactStore.new(File.join(tmpdir, "agent-artifacts")) }
+  let(:handler) { described_class.new(job_store: store, artifact_store: artifact_store, clock: -> { "2026-04-11T08:00:00Z" }) }
 
   after do
     FileUtils.rm_rf(tmpdir)
@@ -74,6 +76,31 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
 
     expect(response.status).to eq(400)
     expect(JSON.parse(response.body).fetch("error")).to include("missing query parameter: agent")
+  end
+
+  it "accepts artifact uploads into the configured artifact store" do
+    content = "verification log\n"
+    digest = "sha256:#{Digest::SHA256.hexdigest(content)}"
+
+    response = handler.handle(
+      method: "PUT",
+      path: "/v1/agent/artifacts/art-log-1",
+      query: {
+        "role" => "combined-log",
+        "digest" => digest,
+        "byte_size" => content.bytesize.to_s,
+        "retention_class" => "diagnostic",
+        "media_type" => "text/plain"
+      },
+      body: content
+    )
+
+    expect(response.status).to eq(201)
+    expect(JSON.parse(response.body).fetch("artifact")).to include(
+      "artifact_id" => "art-log-1",
+      "digest" => digest
+    )
+    expect(artifact_store.read("art-log-1")).to eq(content)
   end
 
   def agent_job_request(job_id)

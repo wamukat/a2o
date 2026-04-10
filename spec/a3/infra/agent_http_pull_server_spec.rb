@@ -2,12 +2,14 @@
 
 require "json"
 require "net/http"
+require "digest"
 require "spec_helper"
 
 RSpec.describe A3::Infra::AgentHttpPullServer do
   let(:tmpdir) { Dir.mktmpdir }
   let(:store) { A3::Infra::JsonAgentJobStore.new(File.join(tmpdir, "agent-jobs.json")) }
-  let(:handler) { A3::Infra::AgentHttpPullHandler.new(job_store: store, clock: -> { "2026-04-11T08:00:00Z" }) }
+  let(:artifact_store) { A3::Infra::FileAgentArtifactStore.new(File.join(tmpdir, "agent-artifacts")) }
+  let(:handler) { A3::Infra::AgentHttpPullHandler.new(job_store: store, artifact_store: artifact_store, clock: -> { "2026-04-11T08:00:00Z" }) }
   let(:server) { described_class.new(handler: handler, port: 0) }
   let(:server_thread) { Thread.new { server.start } }
 
@@ -39,10 +41,33 @@ RSpec.describe A3::Infra::AgentHttpPullServer do
     expect(store.fetch("job-1")).to have_attributes(state: :completed)
   end
 
+  it "serves artifact upload requests over HTTP" do
+    server_thread
+    base_uri = URI("http://127.0.0.1:#{server.bound_port}")
+    content = "verification log\n"
+    digest = "sha256:#{Digest::SHA256.hexdigest(content)}"
+
+    response = put_content(
+      base_uri + "/v1/agent/artifacts/art-log-1?role=combined-log&digest=#{digest}&byte_size=#{content.bytesize}&retention_class=diagnostic&media_type=text/plain",
+      content
+    )
+
+    expect(response.code).to eq("201")
+    expect(artifact_store.fetch_metadata("art-log-1").digest).to eq(digest)
+    expect(artifact_store.read("art-log-1")).to eq(content)
+  end
+
   def post_json(uri, payload)
     request = Net::HTTP::Post.new(uri)
     request["content-type"] = "application/json"
     request.body = JSON.generate(payload)
+    Net::HTTP.start(uri.hostname, uri.port) { |http| http.request(request) }
+  end
+
+  def put_content(uri, content)
+    request = Net::HTTP::Put.new(uri)
+    request["content-type"] = "text/plain"
+    request.body = content
     Net::HTTP.start(uri.hostname, uri.port) { |http| http.request(request) }
   end
 

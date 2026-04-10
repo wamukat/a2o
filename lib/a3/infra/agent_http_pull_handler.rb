@@ -7,8 +7,9 @@ module A3
     class AgentHttpPullHandler
       Response = Struct.new(:status, :headers, :body, keyword_init: true)
 
-      def initialize(job_store:, clock: -> { Time.now.utc.iso8601 })
+      def initialize(job_store:, artifact_store: nil, clock: -> { Time.now.utc.iso8601 })
         @job_store = job_store
+        @artifact_store = artifact_store
         @clock = clock
       end
 
@@ -19,7 +20,9 @@ module A3
         when ["GET", "/v1/agent/jobs/next"]
           claim_next(query)
         else
-          if method.to_s.upcase == "POST" && path.match?(%r{\A/v1/agent/jobs/[^/]+/result\z})
+          if method.to_s.upcase == "PUT" && path.match?(%r{\A/v1/agent/artifacts/[^/]+\z})
+            upload_artifact(path, query, body)
+          elsif method.to_s.upcase == "POST" && path.match?(%r{\A/v1/agent/jobs/[^/]+/result\z})
             record_result(path, body)
           else
             json_response(404, "error" => "not_found")
@@ -54,6 +57,21 @@ module A3
 
         record = @job_store.complete(result)
         json_response(200, "job" => record.persisted_form)
+      end
+
+      def upload_artifact(path, query, body)
+        raise A3::Domain::ConfigurationError, "agent artifact store is not configured" unless @artifact_store
+
+        upload = A3::Domain::AgentArtifactUpload.new(
+          artifact_id: path.split("/").last,
+          role: required_query(query, "role"),
+          digest: required_query(query, "digest"),
+          byte_size: required_query(query, "byte_size"),
+          retention_class: required_query(query, "retention_class"),
+          media_type: query["media_type"]
+        )
+        stored = @artifact_store.put(upload, body.to_s)
+        json_response(201, "artifact" => stored.persisted_form)
       end
 
       def parse_body(body)

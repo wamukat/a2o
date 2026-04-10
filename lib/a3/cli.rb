@@ -666,7 +666,8 @@ module A3
     def handle_agent_server(argv, out:)
       options = parse_agent_server_options(argv)
       store = A3::Infra::JsonAgentJobStore.new(options.fetch(:job_store_path))
-      handler = A3::Infra::AgentHttpPullHandler.new(job_store: store)
+      artifact_store = A3::Infra::FileAgentArtifactStore.new(options.fetch(:artifact_store_dir))
+      handler = A3::Infra::AgentHttpPullHandler.new(job_store: store, artifact_store: artifact_store)
       server = A3::Infra::AgentHttpPullServer.new(
         handler: handler,
         host: options.fetch(:host),
@@ -952,7 +953,8 @@ module A3
         storage_dir: default_storage_dir,
         host: A3::Infra::AgentHttpPullServer::DEFAULT_HOST,
         port: A3::Infra::AgentHttpPullServer::DEFAULT_PORT,
-        job_store_path: nil
+        job_store_path: nil,
+        artifact_store_dir: nil
       }
 
       parser = OptionParser.new
@@ -960,9 +962,11 @@ module A3
       parser.on("--host HOST") { |value| options[:host] = value }
       parser.on("--port PORT") { |value| options[:port] = Integer(value) }
       parser.on("--job-store PATH") { |value| options[:job_store_path] = File.expand_path(value) }
+      parser.on("--artifact-store-dir DIR") { |value| options[:artifact_store_dir] = File.expand_path(value) }
       parser.parse(argv)
 
       options[:job_store_path] ||= File.join(options.fetch(:storage_dir), "agent_jobs.json")
+      options[:artifact_store_dir] ||= File.join(options.fetch(:storage_dir), "agent_artifacts")
       options
     end
 
