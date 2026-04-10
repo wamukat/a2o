@@ -48,7 +48,8 @@ module A3
           @execute_until_idle ||= A3::Application::ExecuteUntilIdle.new(
             execute_next_runnable_task: execute_next_runnable_task,
             cycle_journal: scheduler_cycle_journal,
-            quarantine_terminal_task_workspaces: quarantine_terminal_task_workspaces
+            quarantine_terminal_task_workspaces: quarantine_terminal_task_workspaces,
+            cleanup_terminal_task_workspaces: cleanup_terminal_task_workspaces
           )
         end
 

@@ -4,6 +4,7 @@ RSpec.describe A3::Application::SchedulerLoop do
   let(:execute_next_runnable_task) { instance_double(A3::Application::ExecuteNextRunnableTask) }
   let(:cycle_journal) { instance_double(A3::Application::SchedulerCycleJournal) }
   let(:quarantine_runner) { instance_double(A3::Application::SchedulerQuarantineRunner) }
+  let(:cleanup_runner) { instance_double(A3::Application::SchedulerCleanupRunner) }
   let(:project_context) do
     A3::Domain::ProjectContext.new(
       surface: A3::Domain::ProjectSurface.new(
@@ -24,7 +25,8 @@ RSpec.describe A3::Application::SchedulerLoop do
     described_class.new(
       execute_next_runnable_task: execute_next_runnable_task,
       cycle_journal: cycle_journal,
-      quarantine_runner: quarantine_runner
+      quarantine_runner: quarantine_runner,
+      cleanup_runner: cleanup_runner
     )
   end
 
@@ -54,6 +56,7 @@ RSpec.describe A3::Application::SchedulerLoop do
       )
     )
     allow(quarantine_runner).to receive(:call).and_return(1)
+    allow(cleanup_runner).to receive(:call).and_return(1)
     allow(cycle_journal).to receive(:record).and_return(
       A3::Domain::SchedulerCycle.new(
         cycle_number: 1,
@@ -70,6 +73,7 @@ RSpec.describe A3::Application::SchedulerLoop do
     expect(result.stop_reason).to eq(:idle)
     expect(cycle_journal).to have_received(:record)
     expect(quarantine_runner).to have_received(:call)
+    expect(cleanup_runner).to have_received(:call)
   end
 
   it "stops scheduling additional tasks when pause is requested during the cycle" do
@@ -85,6 +89,7 @@ RSpec.describe A3::Application::SchedulerLoop do
       )
     end
     allow(quarantine_runner).to receive(:call).and_return(0)
+    allow(cleanup_runner).to receive(:call)
     allow(cycle_journal).to receive(:record).and_return(
       A3::Domain::SchedulerCycle.new(
         cycle_number: 2,
@@ -100,5 +105,6 @@ RSpec.describe A3::Application::SchedulerLoop do
     expect(result.executed_count).to eq(1)
     expect(result.stop_reason).to eq(:paused)
     expect(execute_next_runnable_task).to have_received(:call).once
+    expect(cleanup_runner).not_to have_received(:call)
   end
 end

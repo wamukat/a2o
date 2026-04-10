@@ -12,6 +12,7 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
   let(:state_repository) { A3::Infra::InMemorySchedulerStateRepository.new(scheduler_store) }
   let(:cycle_repository) { A3::Infra::InMemorySchedulerCycleRepository.new(scheduler_store) }
   let(:quarantine_terminal_task_workspaces) { instance_double(A3::Application::QuarantineTerminalTaskWorkspaces) }
+  let(:cleanup_terminal_task_workspaces) { instance_double(A3::Application::CleanupTerminalTaskWorkspaces) }
   let(:project_context) do
     A3::Domain::ProjectContext.new(
       surface: A3::Domain::ProjectSurface.new(
@@ -32,13 +33,22 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
     described_class.new(
       execute_next_runnable_task: execute_next_runnable_task,
       cycle_journal: scheduler_cycle_journal,
-      quarantine_terminal_task_workspaces: quarantine_terminal_task_workspaces
+      quarantine_terminal_task_workspaces: quarantine_terminal_task_workspaces,
+      cleanup_terminal_task_workspaces: cleanup_terminal_task_workspaces
     )
   end
 
   it "persists stop reason and executed count after a cycle" do
     allow(quarantine_terminal_task_workspaces).to receive(:call).and_return(
       A3::Application::QuarantineTerminalTaskWorkspaces::Result.new(quarantined: [])
+    )
+    allow(cleanup_terminal_task_workspaces).to receive(:call).and_return(
+      A3::Application::CleanupTerminalTaskWorkspaces::Result.new(
+        cleaned: [],
+        dry_run: false,
+        statuses: %i[done blocked],
+        scopes: %i[ticket_workspace runtime_workspace]
+      )
     )
     allow(execute_next_runnable_task).to receive(:call).and_return(
       A3::Application::ExecuteNextRunnableTask::Result.new(
@@ -84,17 +94,31 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
         ]
       )
     )
+    allow(cleanup_terminal_task_workspaces).to receive(:call).and_return(
+      A3::Application::CleanupTerminalTaskWorkspaces::Result.new(
+        cleaned: [],
+        dry_run: false,
+        statuses: %i[done blocked],
+        scopes: %i[ticket_workspace runtime_workspace]
+      )
+    )
 
     result = use_case.call(project_context: project_context)
 
     expect(result.stop_reason).to eq(:idle)
     expect(result.quarantined_count).to eq(1)
     expect(quarantine_terminal_task_workspaces).to have_received(:call)
+    expect(cleanup_terminal_task_workspaces).to have_received(:call).with(
+      statuses: %i[done blocked],
+      scopes: %i[ticket_workspace runtime_workspace],
+      dry_run: false
+    )
   end
 
   it "does not execute when the scheduler is paused" do
     allow(execute_next_runnable_task).to receive(:call)
     allow(quarantine_terminal_task_workspaces).to receive(:call)
+    allow(cleanup_terminal_task_workspaces).to receive(:call)
     state_repository.save(A3::Domain::SchedulerState.new(paused: true))
 
     result = use_case.call(project_context: project_context)
@@ -103,5 +127,6 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
     expect(result.stop_reason).to eq(:paused)
     expect(execute_next_runnable_task).not_to have_received(:call)
     expect(quarantine_terminal_task_workspaces).not_to have_received(:call)
+    expect(cleanup_terminal_task_workspaces).not_to have_received(:call)
   end
 end

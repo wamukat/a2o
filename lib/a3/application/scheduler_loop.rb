@@ -8,9 +8,10 @@ module A3
     class SchedulerLoop
       Result = Struct.new(:executions, :executed_count, :idle_reached, :stop_reason, :quarantined_count, :scheduler_cycle, keyword_init: true)
 
-      def initialize(execute_next_runnable_task:, cycle_journal:, quarantine_runner:)
+      def initialize(execute_next_runnable_task:, cycle_journal:, quarantine_runner:, cleanup_runner:)
         @cycle_journal = cycle_journal
         @quarantine_runner = quarantine_runner
+        @cleanup_runner = cleanup_runner
         @cycle_executor = A3::Application::SchedulerCycleExecutor.new(
           execute_next_runnable_task: execute_next_runnable_task,
           paused_checker: -> { @cycle_journal.paused? }
@@ -31,7 +32,12 @@ module A3
           )
         end
         cycle_result = @cycle_executor.call(project_context: project_context, max_steps: max_steps)
-        quarantined_count = cycle_result.idle_reached ? @quarantine_runner.call : 0
+        if cycle_result.idle_reached
+          quarantined_count = @quarantine_runner.call
+          @cleanup_runner.call
+        else
+          quarantined_count = 0
+        end
         result = @loop_policy.result_for(
           cycle_result: cycle_result,
           quarantined_count: quarantined_count
