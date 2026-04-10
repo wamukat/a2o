@@ -80,7 +80,9 @@ RSpec.describe A3Cleanup do
         done_ttl_hours: 24,
         blocked_ttl_hours: 24,
         result_ttl_hours: 168,
-        log_ttl_hours: 168
+        log_ttl_hours: 168,
+        quarantine_ttl_hours: 168,
+        cache_ttl_hours: 168
       )
 
       expect(candidates.length).to eq(2)
@@ -112,7 +114,9 @@ RSpec.describe A3Cleanup do
         done_ttl_hours: 24,
         blocked_ttl_hours: 24,
         result_ttl_hours: 24,
-        log_ttl_hours: 24
+        log_ttl_hours: 24,
+        quarantine_ttl_hours: 24,
+        cache_ttl_hours: 24
       )
 
       expect(candidates.length).to eq(4)
@@ -154,7 +158,9 @@ RSpec.describe A3Cleanup do
         done_ttl_hours: 24,
         blocked_ttl_hours: 24,
         result_ttl_hours: 168,
-        log_ttl_hours: 168
+        log_ttl_hours: 168,
+        quarantine_ttl_hours: 168,
+        cache_ttl_hours: 168
       )
 
       expect(candidates).to eq([])
@@ -183,7 +189,9 @@ RSpec.describe A3Cleanup do
         done_ttl_hours: 24,
         blocked_ttl_hours: 24,
         result_ttl_hours: 168,
-        log_ttl_hours: 168
+        log_ttl_hours: 168,
+        quarantine_ttl_hours: 168,
+        cache_ttl_hours: 168
       )
 
       expect(candidates).to eq([])
@@ -287,7 +295,9 @@ RSpec.describe A3Cleanup do
         done_ttl_hours: 24,
         blocked_ttl_hours: 24,
         result_ttl_hours: 24,
-        log_ttl_hours: 24
+        log_ttl_hours: 24,
+        quarantine_ttl_hours: 24,
+        cache_ttl_hours: 24
       )
 
       expect(candidates.length).to eq(4)
@@ -302,10 +312,68 @@ RSpec.describe A3Cleanup do
         done_ttl_hours: 24,
         blocked_ttl_hours: 24,
         result_ttl_hours: 24,
-        log_ttl_hours: 24
+        log_ttl_hours: 24,
+        quarantine_ttl_hours: 24,
+        cache_ttl_hours: 24
       )
 
       expect(kept).to eq([])
+    end
+  end
+
+  it "selects current scheduler quarantine workspaces older than ttl" do
+    Dir.mktmpdir("a3-cleanup-") do |dir|
+      root = Pathname(dir)
+      quarantine_dir = root.join(".work", "a3", "portal-kanban-scheduler-auto", "quarantine", "Portal-3238")
+      FileUtils.mkdir_p(quarantine_dir)
+      old = Time.now.utc - (200 * 3600)
+      File.utime(old, old, quarantine_dir)
+
+      candidates = described_class.build_cleanup_candidates(
+        root_dir: root,
+        project: "portal",
+        task_project_ref: nil,
+        task_snapshots: [{ "ref" => "Portal#3238", "status" => "Done", "labels" => [] }],
+        active_refs: Set.new,
+        now: Time.now.utc,
+        done_ttl_hours: 24,
+        blocked_ttl_hours: 24,
+        result_ttl_hours: 168,
+        log_ttl_hours: 168,
+        quarantine_ttl_hours: 168,
+        cache_ttl_hours: 168
+      )
+
+      expect(candidates.map(&:kind)).to include("quarantine_workspace")
+      expect(candidates.map(&:task_ref)).to include("Portal#3238")
+    end
+  end
+
+  it "selects disposable cache directories older than ttl" do
+    Dir.mktmpdir("a3-cleanup-") do |dir|
+      root = Pathname(dir)
+      cache_dir = root.join(".work", "cache", "m2-seed")
+      FileUtils.mkdir_p(cache_dir)
+      old = Time.now.utc - (200 * 3600)
+      File.utime(old, old, cache_dir)
+
+      candidates = described_class.build_cleanup_candidates(
+        root_dir: root,
+        project: "portal",
+        task_project_ref: nil,
+        task_snapshots: [],
+        active_refs: Set.new,
+        now: Time.now.utc,
+        done_ttl_hours: 24,
+        blocked_ttl_hours: 24,
+        result_ttl_hours: 168,
+        log_ttl_hours: 168,
+        quarantine_ttl_hours: 168,
+        cache_ttl_hours: 168
+      )
+
+      expect(candidates.map(&:kind)).to include("cache_dir")
+      expect(candidates.map(&:path)).to include(cache_dir.to_s)
     end
   end
 end

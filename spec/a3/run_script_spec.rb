@@ -15,7 +15,7 @@ RSpec.describe A3RootUtilityLauncher do
     stdout, stderr, status = Open3.capture3("ruby", "scripts/a3/run.rb", "--help", chdir: described_class::ROOT_DIR.to_s)
 
     expect(status.success?).to eq(true), stderr
-    expect(stdout).to include("Root utility launcher for A3-v2 migration support.")
+    expect(stdout).to include("Root utility launcher for A3 migration support.")
     expect(stdout).not_to include("describe-project")
   end
 
@@ -78,7 +78,9 @@ RSpec.describe A3RootUtilityLauncher do
         "--done-ttl-hours", "24",
         "--blocked-ttl-hours", "24",
         "--result-ttl-hours", "168",
-        "--log-ttl-hours", "168"
+        "--log-ttl-hours", "168",
+        "--quarantine-ttl-hours", "168",
+        "--cache-ttl-hours", "168"
       ]
     )
   end
