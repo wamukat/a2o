@@ -921,6 +921,15 @@ SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/
 
 2026-04-10 の local spike では、SoloBoard を Docker で `http://127.0.0.1:3460` に起動し、board 作成、lane 初期化、tag 作成、ticket 作成、parent/child 参照、blocker 更新、comment 作成、lane name による transition、detail / relations / comments / ticket list の取得まで確認した。したがって、bootstrap は単なる board seed ではなく「A3 current surface が要求する operator 初期化」を担うものとして設計する。
 
+2026-04-10 の追加実装で、workspace root では次を current progress として確認した。
+
+- `scripts/kanban/kanban_cli.py` に backend adapter 境界を入れ、`soloboard` backend で `task-get`, `task-list`, `task-snapshot-list`, `task-comment-list/create`, `task-transition`, `task-label-add/remove`, `task-relation-list/create/delete`, `task-create`, `task-update`, `label-ensure` を実行できる
+- `task soloboard:doctor`, `task soloboard:api`, `task soloboard:bootstrap` を追加し、SoloBoard runtime 単体でも operator surface を踏める
+- `task kanban:up/down/logs/url/doctor/api/bootstrap:*` は `KANBAN_BACKEND=soloboard` で SoloBoard 側へ切り替えられる
+- `Portal`, `OIDC`, `A3Engine` の board / lane / tag bootstrap は generic `kanban:bootstrap:*` からも実行できる
+
+したがって、step 1 から step 5a までは概ね着手済みであり、残る main work は「未使用 command contract の parity 確認」「SoloBoard を live backend として切り替える judgment」「その後の Docker/runtime packaging」である。
+
 この検討のゴールは「backend を増やすこと」ではなく、「A3 Engine runtime が backend 非依存 contract に本当に閉じているか」を current surface で実証し、Docker/runtime packaging 前に bundled kanban backend を一本化することにある。SoloBoard はその検証対象として妥当であり、実装着手時も `Project Surface` と phase rule を backend 固有都合で汚染しないことを継続条件とする。
 
 #### 0.4.5.2 phase model 再検討メモ
