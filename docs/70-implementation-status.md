@@ -124,7 +124,8 @@ current `a3-v2` を future `a3-engine` base として seed するため、`a3-en
   - repeated scheduler-loop と長時間運用で read-after-write 揺れが追加 hardening を要しないか確認する
   - Kanboard compatibility path を撤去または historical path に下げる判断を完了する
   - A3 image から project 固有 JDK / Maven / verification runtime を剥がす
-  - `a3-agent` の JobRequest / JobResult / lifecycle / policy / transport を実装可能な粒度で固定する
+  - `a3-agent` の JobRequest / JobResult / lifecycle / policy / transport を実装可能な粒度で固定する。特に HTTP transport では log/artifact を local path 参照ではなく A3-managed artifact store へ upload/stream する
+  - workspace materialization / dirty check / cleanup の owner を agent runtime として実装し、A3 は source descriptor と workspace descriptor / evidence を検証する形に寄せる
   - Go single binary agent の scaffold と installer 方針を固定する
   - Docker compose bundle を `docker:a3` + `docker:soloboard` + optional `docker:dev-env(a3-agent)` の形へ更新する
   - bundle smoke と Portal full verification の完了条件を分離し、full verification は `a3-agent` 経由で再実行する
