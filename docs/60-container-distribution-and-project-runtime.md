@@ -1102,6 +1102,8 @@ transport は次の順で実装する。
 
 workspace materialization の owner は `a3-agent` 側 runtime とする。A3 は source descriptor / repo slot / target ref / isolation requirement を job に含めるが、checkout/worktree 作成、実行前 dirty check、実行後 cleanup、quarantine snapshot 作成は agent が配置された runtime の filesystem で行う。A3 は agent が返す `workspace_descriptor` と artifact/evidence を検証し、phase 開始前の existence guarantee を domain rule として判定する。これにより host runtime と docker dev-env runtime の両方で同じ protocol を使える。
 
+2026-04-11 時点では、Ruby domain 側の最小 contract として `AgentJobRequest`、`AgentJobResult`、`AgentArtifactUpload`、`AgentWorkspaceDescriptor` を追加した。これは agent 本体や HTTP endpoint の実装ではなく、A3 control plane が受け入れる job/result JSON shape を先に固定するための実装である。特に `AgentJobResult` は `stdout_log` / `stderr_log` / `combined_log` / `artifacts` の local path field を拒否し、A3-managed artifact store の upload reference だけを受け付ける。
+
 #### 0.4.5.2 phase model 再検討メモ
 
 Kanboard baseline canary を通した結果、A3-v2 のような自動実行では `review` を独立 phase として持つ価値が薄く見えていた。特に軽量 task では、`review` を通しても最終的には `verification` の通過可否で戻し先が決まるため、中間 phase と Kanban 列の往復がオーバーヘッドになりやすい。2026-04-10 時点では、この再設計は fresh `single` / `child` について実装済みで、現行正本は `single/child = implementation -> verification -> merge`, `parent = review -> verification -> merge` である。
