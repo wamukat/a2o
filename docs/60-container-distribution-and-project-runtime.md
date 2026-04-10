@@ -927,9 +927,10 @@ SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/
 - `task soloboard:doctor`, `task soloboard:api`, `task soloboard:bootstrap` を追加し、SoloBoard runtime 単体でも operator surface を踏める
 - `task soloboard:smoke` を追加し、current kanban compatibility surface を SoloBoard に対して一通り打つ parity smoke を実行できる
 - `task kanban:up/down/logs/url/doctor/api/bootstrap:*` は `KANBAN_BACKEND=soloboard` で SoloBoard 側へ切り替えられる
+- `task kanban:smoke` も `KANBAN_BACKEND=soloboard` で generic 導線から実行できる
 - `Portal`, `OIDC`, `A3Engine` の board / lane / tag bootstrap は generic `kanban:bootstrap:*` からも実行できる
 
-したがって、step 1 から step 5a までは概ね着手済みであり、残る main work は「未使用 command contract の parity 確認」「SoloBoard を live backend として切り替える judgment」「その後の Docker/runtime packaging」である。
+したがって、step 1 から step 5a までは概ね着手済みであり、残る main work は「未使用 command contract の parity 確認」「current `.work/a3/*` state と衝突しない isolated A3 canary」「SoloBoard を live backend として切り替える judgment」「その後の Docker/runtime packaging」である。
 
 この検討のゴールは「backend を増やすこと」ではなく、「A3 Engine runtime が backend 非依存 contract に本当に閉じているか」を current surface で実証し、Docker/runtime packaging 前に bundled kanban backend を一本化することにある。SoloBoard はその検証対象として妥当であり、実装着手時も `Project Surface` と phase rule を backend 固有都合で汚染しないことを継続条件とする。
 
