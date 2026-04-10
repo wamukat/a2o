@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "set"
+
 module A3
   module Infra
     class KanbanCliTaskSource
@@ -23,7 +25,7 @@ module A3
 
       def load
         selection_snapshots = load_selection_snapshots
-        topology_snapshots = load_topology_snapshots
+        topology_snapshots = load_topology_snapshots(selection_snapshots: selection_snapshots)
         build_tasks(selection_snapshots, topology_snapshots: topology_snapshots)
       end
 
@@ -71,11 +73,69 @@ module A3
         payload.map { |raw_snapshot| normalize_snapshot(raw_snapshot) }.compact.freeze
       end
 
-      def load_topology_snapshots
-        payload = @client.run_json_command("task-snapshot-list", "--project", @project)
-        raise A3::Domain::ConfigurationError, "kanban task-snapshot-list must return an array" unless payload.is_a?(Array)
+      def load_topology_snapshots(selection_snapshots:)
+        snapshots_by_ref = selection_snapshots.each_with_object({}) do |snapshot, memo|
+          memo[snapshot.fetch("ref")] = snapshot
+        end
+        queued_refs = Set.new
+        queue = selection_snapshots.map do |snapshot|
+          queued_refs << snapshot.fetch("ref")
+          [snapshot.fetch("ref"), snapshot.fetch("task_id")]
+        end
 
-        payload.map { |raw_snapshot| normalize_snapshot(raw_snapshot, ignore_status_filter: true, ignore_trigger_filter: true) }.compact.freeze
+        until queue.empty?
+          task_ref, task_id = queue.shift
+          topology_snapshot, related_refs = fetch_topology_snapshot(task_ref: task_ref, task_id: task_id)
+          snapshots_by_ref[topology_snapshot.fetch("ref")] = topology_snapshot
+
+          related_refs.each do |related_ref, related_task_id|
+            next if snapshots_by_ref.key?(related_ref) || queued_refs.include?(related_ref)
+
+            queued_refs << related_ref
+            queue << [related_ref, related_task_id]
+          end
+        end
+
+        snapshots_by_ref.values.freeze
+      end
+
+      def fetch_topology_snapshot(task_ref:, task_id:)
+        payload =
+          if task_id
+            @client.fetch_task_by_id(task_id)
+          else
+            @client.fetch_task_by_ref(task_ref)
+          end
+        resolved_task_id = Integer(payload.fetch("id"))
+        labels = load_task_labels(resolved_task_id)
+        relations = @client.run_json_command("task-relation-list", "--project", @project, "--task-id", resolved_task_id.to_s)
+        raise A3::Domain::ConfigurationError, "kanban task-relation-list must return an object" unless relations.is_a?(Hash)
+
+        parent_refs = normalize_relation_refs(relations.fetch("parenttask", []))
+        child_refs = normalize_relation_refs(relations.fetch("subtask", []))
+
+        [
+          {
+            "task_id" => resolved_task_id,
+            "ref" => String(payload.fetch("ref")).strip,
+            "status" => normalize_status(payload.fetch("status", nil), labels: labels),
+            "edit_scope" => labels.flat_map { |label| @repo_label_map.fetch(label, []) }.uniq.freeze,
+            "parent_ref" => parent_refs.first&.first
+          },
+          (parent_refs + child_refs).to_h
+        ]
+      end
+
+      def normalize_relation_refs(items)
+        Array(items).each_with_object([]) do |item, refs|
+          next unless item.is_a?(Hash)
+
+          ref = String(item["ref"]).strip
+          task_id = integer_or_nil(item["id"])
+          next if ref.empty? || task_id.nil?
+
+          refs << [ref, task_id]
+        end
       end
 
       def build_tasks(snapshots, topology_snapshots:)
@@ -222,6 +282,12 @@ module A3
 
       def load_task_labels(task_id)
         @client.load_task_labels(task_id).map { |item| String(item.fetch("title")) }.reject(&:empty?).freeze
+      end
+
+      def integer_or_nil(value)
+        Integer(value)
+      rescue ArgumentError, TypeError
+        nil
       end
     end
   end

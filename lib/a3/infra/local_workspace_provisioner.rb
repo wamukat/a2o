@@ -3,6 +3,7 @@
 require "fileutils"
 require "json"
 require "pathname"
+require "a3/infra/workspace_trace_logger"
 
 module A3
   module Infra
@@ -15,6 +16,16 @@ module A3
 
       def call(task:, workspace_plan:, artifact_owner:, bootstrap_marker:)
         root_path = workspace_root(task.ref, workspace_plan.workspace_kind)
+        A3::Infra::WorkspaceTraceLogger.log(
+          workspace_root: root_path,
+          event: "workspace_provision.start",
+          payload: {
+            "task_ref" => task.ref,
+            "workspace_kind" => workspace_plan.workspace_kind.to_s,
+            "source_type" => workspace_plan.source_descriptor.source_type.to_s,
+            "source_ref" => workspace_plan.source_descriptor.ref
+          }
+        )
         slot_paths = materialize_slot_paths(
           root_path,
           task.ref,
@@ -23,6 +34,15 @@ module A3
           bootstrap_marker
         )
         write_metadata(root_path, task.ref, workspace_plan)
+        A3::Infra::WorkspaceTraceLogger.log(
+          workspace_root: root_path,
+          event: "workspace_provision.finish",
+          payload: {
+            "task_ref" => task.ref,
+            "workspace_kind" => workspace_plan.workspace_kind.to_s,
+            "slots" => slot_paths.transform_values(&:to_s)
+          }
+        )
 
         A3::Domain::PreparedWorkspace.new(
           workspace_kind: workspace_plan.workspace_kind,
@@ -80,7 +100,31 @@ module A3
         workspace_plan.slot_requirements.each_with_object({}) do |requirement, slot_paths|
           slot_path = root_path.join(repo_slot_directory(requirement.repo_slot))
           source_root = repo_source_for(requirement.repo_slot)
-          rematerialize_slot!(slot_path, source_root, workspace_plan, requirement.repo_slot) unless slot_ready?(slot_path, source_root, task_ref, workspace_plan, requirement, artifact_owner, bootstrap_marker)
+          ready = slot_ready?(slot_path, source_root, task_ref, workspace_plan, requirement, artifact_owner, bootstrap_marker)
+          unless ready
+            A3::Infra::WorkspaceTraceLogger.log(
+              workspace_root: root_path,
+              event: "workspace_provision.rematerialize_slot.start",
+              payload: {
+                "task_ref" => task_ref,
+                "workspace_kind" => workspace_plan.workspace_kind.to_s,
+                "repo_slot" => requirement.repo_slot.to_s,
+                "source_root" => source_root.to_s,
+                "source_ref" => workspace_plan.source_descriptor.ref
+              }
+            )
+            rematerialize_slot!(slot_path, source_root, workspace_plan, requirement.repo_slot)
+            A3::Infra::WorkspaceTraceLogger.log(
+              workspace_root: root_path,
+              event: "workspace_provision.rematerialize_slot.finish",
+              payload: {
+                "task_ref" => task_ref,
+                "workspace_kind" => workspace_plan.workspace_kind.to_s,
+                "repo_slot" => requirement.repo_slot.to_s,
+                "slot_path" => slot_path.to_s
+              }
+            )
+          end
           write_slot_metadata(slot_path, source_root, task_ref, workspace_plan, requirement, artifact_owner, bootstrap_marker)
           slot_paths[requirement.repo_slot] = slot_path
         end

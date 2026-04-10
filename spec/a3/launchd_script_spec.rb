@@ -26,7 +26,7 @@ RSpec.describe A3Launchd do
     FileUtils.remove_entry(@temp_dir)
   end
 
-  it "bootstraps the plist on install" do
+  it "boots out, bootstraps, and kickstarts on install" do
     allow(described_class).to receive(:find_launchctl).and_return("/bin/launchctl")
     allow(described_class).to receive(:gui_domain_target).and_return("gui/501")
     allow(described_class).to receive(:run).and_return(0)
@@ -34,7 +34,9 @@ RSpec.describe A3Launchd do
     rc = described_class.main(["install", "--plist", @plist_path])
 
     expect(rc).to eq(0)
+    expect(described_class).to have_received(:run).with("launchctl", "bootout", "gui/501", File.expand_path(@plist_path), check: false)
     expect(described_class).to have_received(:run).with("launchctl", "bootstrap", "gui/501", File.expand_path(@plist_path))
+    expect(described_class).to have_received(:run).with("launchctl", "kickstart", "-k", "gui/501/dev.a3.portal.watch")
   end
 
   it "boots out, bootstraps, and kickstarts on reload" do

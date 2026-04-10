@@ -610,6 +610,47 @@ Stop:
 - residual follow-up は cutover 完了後の別レーンとして扱う
 - residual があっても、current 導線を壊さない範囲に限って cutover 完了を許容する
 
+## Workspace Hygiene Follow-Up Inventory
+
+### Purpose
+
+- cutover 後の current operator surface が安定していても、`.work` 配下の historical state / cache / logs が残り続けると disk full を再発させる
+- この問題は単発 cleanup ではなく、`何を current として保持し、何を archive/delete できるか` を棚卸しして retention policy に落とす必要がある
+
+### Inventory Targets
+
+- `.work/a3/*`
+  - current scheduler / state / workspaces / results / logs / repos / live-targets のうち、runtime 継続に必須なものと再生成可能なものを分ける
+- `.work/a3-v2/*`
+  - historical runtime state / old scheduler store / direct repo sources / quarantine を archive 対象とするか即 delete 対象とするか判断する
+- `.work/cache/*`
+  - `m2-seed` などの bootstrap cache を、再生成前提で delete 可能にするか、size cap を持つ shared cache として残すかを決める
+- `.work/automation/*`
+  - legacy automation logs / issue workspace / codex-home を current A3 導線から切り離し、archive/delete policy を決める
+- project-local build outputs under current workspaces
+  - `target/`, local `.work/m2/repository`, generated reports を task terminal cleanup の対象に含めるか、rerun/recovery 用 evidence として一定期間保持するかを決める
+- non-current side systems
+  - `.work/plane-selfhost`, `.work/planka`, `.work/redmine` のような current Portal canary と無関係な runtime を、保守対象か disposable cache かで分類する
+
+### Planning Questions
+
+- current Portal canary / scheduler を壊さずに削除できる path はどこまでか
+- blocked diagnosis / rerun investigation に必要な最小証跡は何か
+- `results`, `logs`, `quarantine`, `workspaces`, `m2 cache` に age / size / count のどの retention rule を掛けるべきか
+- terminal task 完了時に即削除するものと、operator 明示 command でだけ削除するものをどう分けるか
+- `.work/a3-v2/*` や legacy automation 資産を、cutover sign-off 後に archive へ移すか delete するか
+- disk pressure を検知したときの fail-fast / warning / auto-cleanup のどこまでを A3 本体責務にするか
+
+### Expected Outputs
+
+- current runtime に必須な path と disposable path の一覧
+- `.work` cleanup command inventory
+- retention policy の設計メモ
+- follow-up task refs
+  - terminal cleanup 実装
+  - historical `.work/a3-v2/*` archive/delete
+  - cache/log size cap
+
 ## Documentation Update Order
 
 ### Order

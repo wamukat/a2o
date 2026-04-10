@@ -99,6 +99,38 @@ module FakeKanbanCliHelper
             }
           end
           print JSON.generate(labels)
+        when "task-relation-list"
+          task_id = ARGV.each_cons(2).find { |flag, _value| flag == "--task-id" }&.last
+          snapshots = JSON.parse(File.read(state_path))
+          task = snapshots.find { |item| !task_id.nil? && Integer(item["id"]) == Integer(task_id) }
+          if task.nil?
+            warn("task not found: \#{task_id}")
+            exit 1
+          end
+          task_ref = task["ref"]
+          parent = snapshots.find { |item| item["ref"] == task["parent_ref"] }
+          children = snapshots.select { |item| item["parent_ref"] == task_ref }
+          render_relation = lambda do |item|
+            {
+              "id" => Integer(item["id"]),
+              "ref" => item["ref"],
+              "title" => item["title"] || "",
+              "status" => item["status"],
+              "project_id" => 1,
+              "project_title" => item["ref"].split("#", 2).first
+            }
+          end
+          print JSON.generate(
+            {
+              "parenttask" => parent ? [render_relation.call(parent)] : [],
+              "subtask" => children.map { |item| render_relation.call(item) },
+              "blocked" => [],
+              "blocking" => [],
+              "related" => [],
+              "duplicateof" => [],
+              "duplicates" => []
+            }
+          )
         when "task-transition"
           task_id = ARGV.each_cons(2).find { |flag, _value| flag == "--task-id" }&.last
           target_status = ARGV.each_cons(2).find { |flag, _value| flag == "--status" }&.last

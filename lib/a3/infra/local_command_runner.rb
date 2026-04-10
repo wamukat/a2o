@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "open3"
+require "a3/infra/workspace_trace_logger"
 
 module A3
   module Infra
@@ -8,7 +9,21 @@ module A3
       def run(commands, workspace:, env: {})
         command_env = default_env.merge(env)
         results = Array(commands).map do |command|
+          A3::Infra::WorkspaceTraceLogger.log(
+            workspace_root: workspace.root_path,
+            event: "command_runner.command.start",
+            payload: { "command" => command }
+          )
           stdout, stderr, status = Open3.capture3(command_env, command, chdir: workspace.root_path.to_s)
+          A3::Infra::WorkspaceTraceLogger.log(
+            workspace_root: workspace.root_path,
+            event: "command_runner.command.finish",
+            payload: {
+              "command" => command,
+              "exit_status" => status.exitstatus,
+              "success" => status.success?
+            }
+          )
           return A3::Application::ExecutionResult.new(
             success: false,
             summary: "#{command} failed",

@@ -21,7 +21,7 @@ RSpec.describe A3::Domain::MergeConfigResolver do
         "variants" => {
           "task_kind" => {
             "child" => {
-              "default" => "ff_only"
+              "default" => "ff_or_merge"
             }
           }
         }
@@ -54,7 +54,7 @@ RSpec.describe A3::Domain::MergeConfigResolver do
     )
 
     expect(resolver.resolve(task: child_task, phase: :merge)).to eq(
-      A3::Domain::MergeConfig.new(target: :merge_to_parent, policy: :ff_only, target_ref: "refs/heads/live")
+      A3::Domain::MergeConfig.new(target: :merge_to_parent, policy: :ff_or_merge, target_ref: "refs/heads/live")
     )
   end
 

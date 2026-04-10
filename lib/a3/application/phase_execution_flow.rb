@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "a3/infra/workspace_trace_logger"
+
 module A3
   module Application
     class PhaseExecutionFlow
@@ -22,11 +24,34 @@ module A3
         run ||= @run_repository.fetch(run_ref)
         runtime = project_context.resolve_phase_runtime(task: task, phase: run.phase)
         prepared_workspace = @orchestrator.prepare(task: task, run: run, runtime: runtime)
+        A3::Infra::WorkspaceTraceLogger.log(
+          workspace_root: prepared_workspace.workspace.root_path,
+          event: "phase_execution.execute.start",
+          payload: {
+            "task_ref" => task.ref,
+            "run_ref" => run.ref,
+            "phase" => run.phase.to_s,
+            "workspace_kind" => prepared_workspace.workspace.workspace_kind.to_s
+          }
+        )
         execution = strategy.execute(
           task: task,
           run: run,
           runtime: runtime,
           workspace: prepared_workspace.workspace
+        )
+        A3::Infra::WorkspaceTraceLogger.log(
+          workspace_root: prepared_workspace.workspace.root_path,
+          event: "phase_execution.execute.finish",
+          payload: {
+            "task_ref" => task.ref,
+            "run_ref" => run.ref,
+            "phase" => run.phase.to_s,
+            "success" => execution.success,
+            "summary" => execution.summary,
+            "failing_command" => execution.failing_command,
+            "observed_state" => execution.observed_state
+          }
         )
         completion = @orchestrator.persist_and_complete(
           task_ref: task_ref,
@@ -45,6 +70,17 @@ module A3
             extra_diagnostics: strategy.blocked_extra_diagnostics(execution)
           ),
           execution_record: execution_record || default_execution_record(execution: execution, runtime: runtime)
+        )
+        A3::Infra::WorkspaceTraceLogger.log(
+          workspace_root: prepared_workspace.workspace.root_path,
+          event: "phase_execution.persist.finish",
+          payload: {
+            "task_ref" => completion.task.ref,
+            "run_ref" => completion.run.ref,
+            "phase" => completion.run.phase.to_s,
+            "task_status" => completion.task.status.to_s,
+            "run_terminal_outcome" => completion.run.terminal_outcome&.to_s
+          }
         )
         Result.new(task: completion.task, run: completion.run, workspace: prepared_workspace.workspace)
       end

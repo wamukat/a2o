@@ -4,6 +4,7 @@ require "json"
 require "fileutils"
 require "open3"
 require "shellwords"
+require "a3/infra/workspace_trace_logger"
 
 module A3
   module Infra
@@ -17,6 +18,16 @@ module A3
       def run(skill:, workspace:, task:, run:, phase_runtime:, task_packet:)
         result_path = worker_result_path(workspace)
         FileUtils.rm_f(result_path)
+        A3::Infra::WorkspaceTraceLogger.log(
+          workspace_root: workspace.root_path,
+          event: "worker_gateway.request.start",
+          payload: {
+            "task_ref" => task.ref,
+            "run_ref" => run.ref,
+            "phase" => run.phase.to_s,
+            "skill" => skill
+          }
+        )
         write_worker_request(
           skill: skill,
           workspace: workspace,
@@ -26,6 +37,16 @@ module A3
           task_packet: task_packet
         )
         command = worker_command_for(skill)
+        A3::Infra::WorkspaceTraceLogger.log(
+          workspace_root: workspace.root_path,
+          event: "worker_gateway.command.start",
+          payload: {
+            "task_ref" => task.ref,
+            "run_ref" => run.ref,
+            "phase" => run.phase.to_s,
+            "command" => command
+          }
+        )
         @command_runner.run(
           [command],
           workspace: workspace,
@@ -35,6 +56,19 @@ module A3
             "A3_WORKSPACE_ROOT" => workspace.root_path.to_s
           }
         ).then do |execution_result|
+          A3::Infra::WorkspaceTraceLogger.log(
+            workspace_root: workspace.root_path,
+            event: "worker_gateway.command.finish",
+            payload: {
+              "task_ref" => task.ref,
+              "run_ref" => run.ref,
+              "phase" => run.phase.to_s,
+              "success" => execution_result.success,
+              "summary" => execution_result.summary,
+              "failing_command" => execution_result.failing_command,
+              "observed_state" => execution_result.observed_state
+            }
+          )
           worker_response = load_worker_result(result_path)
           if worker_response.is_a?(A3::Application::ExecutionResult)
             worker_response
@@ -150,6 +184,16 @@ module A3
           expected_phase: expected_phase
         )
         unless validation_errors.empty?
+          A3::Infra::WorkspaceTraceLogger.log(
+            workspace_root: workspace.root_path,
+            event: "worker_gateway.result.invalid",
+            payload: {
+              "task_ref" => expected_task_ref,
+              "run_ref" => expected_run_ref,
+              "phase" => expected_phase.to_s,
+              "validation_errors" => validation_errors
+            }
+          )
           return A3::Application::ExecutionResult.new(
             success: false,
             summary: "worker result schema invalid",
