@@ -67,4 +67,29 @@ RSpec.describe A3::Application::BuildWorkerTaskPacket do
       described_class.new(external_task_source: external_task_source).call(task: internal_task)
     end.to raise_error(A3::Domain::ConfigurationError, /missing external task packet/)
   end
+
+  it "synthesizes a minimal packet when no external task source is configured" do
+    internal_task = A3::Domain::Task.new(
+      ref: "Sample#9999",
+      kind: :child,
+      status: :verifying,
+      edit_scope: %i[repo_alpha repo_beta],
+      verification_scope: [:repo_alpha],
+      parent_ref: "Sample#9990"
+    )
+
+    packet = described_class.new(external_task_source: A3::Infra::NullExternalTaskSource.new).call(task: internal_task)
+
+    expect(packet.request_form).to include(
+      "ref" => "Sample#9999",
+      "kind" => "child",
+      "title" => "Sample#9999",
+      "status" => "Inspection",
+      "labels" => [],
+      "parent_ref" => "Sample#9990",
+      "edit_scope" => %w[repo_alpha repo_beta],
+      "verification_scope" => ["repo_alpha"]
+    )
+    expect(packet.request_form.fetch("description")).to include("synthesized task packet")
+  end
 end

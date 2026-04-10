@@ -33,6 +33,7 @@ module A3
           else
             load_by_task_ref(task)
           end
+        snapshot = synthesized_snapshot(task) if snapshot.nil? && @external_task_source.is_a?(A3::Infra::NullExternalTaskSource)
         raise A3::Domain::ConfigurationError, "missing external task packet for #{task.ref}" unless snapshot.is_a?(Hash)
 
         snapshot_ref = String(snapshot["ref"]).strip
@@ -51,6 +52,27 @@ module A3
           "status" => String(snapshot["status"]),
           "labels" => Array(snapshot["labels"]).map(&:to_s)
         }
+      end
+
+      def synthesized_snapshot(task)
+        {
+          "title" => task.ref,
+          "description" => "A3 synthesized task packet because no external task source is configured. Use repository context and task topology as the source of truth.",
+          "status" => synthesized_status(task.status),
+          "labels" => []
+        }
+      end
+
+      def synthesized_status(status)
+        {
+          todo: "To do",
+          in_progress: "In progress",
+          in_review: "In review",
+          verifying: "Inspection",
+          merging: "Merging",
+          done: "Done",
+          blocked: "Blocked"
+        }.fetch(status.to_sym, status.to_s)
       end
 
       def load_by_external_task_id(task)

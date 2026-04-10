@@ -229,7 +229,7 @@ RSpec.describe A3::CLI do
     end
   end
 
-  it "transitions the external kanban task to In review when using worker command options" do
+  it "transitions the external kanban task to Inspection when using worker command options" do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)
       seed_context(dir)

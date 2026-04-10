@@ -2,6 +2,7 @@
 
 require "tmpdir"
 require "yaml"
+require "shellwords"
 
 RSpec.describe A3::CLI do
   let(:worker_gateway) { instance_double("WorkerGateway") }
@@ -12,13 +13,28 @@ RSpec.describe A3::CLI do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)
       seed_context(dir)
+      File.write(
+        File.join(dir, "manifest.yml"),
+        YAML.dump(
+          {
+            "presets" => ["base"],
+            "core" => {
+              "merge_target" => "merge_to_live",
+              "merge_policy" => "ff_only",
+              "merge_target_ref" => "refs/heads/main"
+            }
+          }
+        )
+      )
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
       task_repository.save(
-        build_child_task(
+        A3::Domain::Task.new(
           ref: "A3-v2#3030",
+          kind: :single,
           edit_scope: [:repo_alpha],
+          verification_scope: [:repo_alpha],
           status: :todo,
-          parent_ref: "A3-v2#3022"
+          parent_ref: nil
         )
       )
       allow(worker_gateway).to receive(:run).and_return(
@@ -57,9 +73,9 @@ RSpec.describe A3::CLI do
         merge_runner: merge_runner
       )
 
-      expect(out.string).to include("executed 4 task(s); idle=true stop_reason=idle")
+      expect(out.string).to include("executed 3 task(s); idle=true stop_reason=idle")
       expect(out.string).to include("quarantined=1")
-      expect(out.string).to include("steps=A3-v2#3030:implementation")
+      expect(out.string).to include("steps=A3-v2#3030:implementation,A3-v2#3030:verification,A3-v2#3030:merge")
       expect(task_repository.fetch("A3-v2#3030").status).to eq(:done)
       expect(Pathname(dir).join("quarantine", "A3-v2-3030")).to exist
     end
@@ -67,7 +83,12 @@ RSpec.describe A3::CLI do
 
   it "executes a parent task from review through merge after children are done" do
     Dir.mktmpdir do |dir|
-      repo_sources = create_repo_sources(dir)
+      create_git_repo_source(dir, name: "repo-alpha-source", file_content: "repo_alpha source\n")
+      create_git_repo_source(dir, name: "repo-beta-source", file_content: "repo_beta source\n")
+      repo_sources = {
+        repo_alpha: File.join(dir, "repo-alpha-source"),
+        repo_beta: File.join(dir, "repo-beta-source")
+      }
       seed_context(dir)
       File.write(
         File.join(dir, "manifest.yml"),
@@ -76,11 +97,16 @@ RSpec.describe A3::CLI do
             "presets" => ["base"],
             "core" => {
               "merge_target" => "merge_to_live",
-              "merge_policy" => "ff_only"
+              "merge_policy" => "ff_only",
+              "merge_target_ref" => "refs/heads/main"
             }
           }
         )
       )
+      repo_sources.each_value do |repo_path|
+        head = `git -C #{Shellwords.escape(repo_path)} rev-parse HEAD`.strip
+        system("git", "-C", repo_path, "update-ref", "refs/heads/a3/parent/A3-v2-3022", head, exception: true, out: File::NULL, err: File::NULL)
+      end
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
       task_repository.save(
         build_child_task(
@@ -149,7 +175,7 @@ RSpec.describe A3::CLI do
     end
   end
 
-  it "processes a filtered kanban queue through implementation, review, verification, and merge" do
+  it "processes a filtered kanban queue through implementation, verification, and merge" do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)
       seed_context(dir)
@@ -160,7 +186,8 @@ RSpec.describe A3::CLI do
             "presets" => ["base"],
             "core" => {
               "merge_target" => "merge_to_live",
-              "merge_policy" => "ff_only"
+              "merge_policy" => "ff_only",
+              "merge_target_ref" => "refs/heads/main"
             }
           }
         )
@@ -172,6 +199,8 @@ RSpec.describe A3::CLI do
           {
             "id" => 5001,
             "ref" => "Sample#5001",
+            "title" => "Filtered ui-app canary",
+            "description" => "Run the filtered ui-app canary path.",
             "status" => "To do",
             "labels" => ["repo:ui-app", "trigger:auto-scheduler-canary"],
             "parent_ref" => nil
@@ -179,6 +208,8 @@ RSpec.describe A3::CLI do
           {
             "id" => 5002,
             "ref" => "Sample#5002",
+            "title" => "Filtered both-repo canary",
+            "description" => "Run the filtered both-repo canary path.",
             "status" => "To do",
             "labels" => ["repo:both", "trigger:auto-scheduler-canary"],
             "parent_ref" => nil
@@ -186,6 +217,8 @@ RSpec.describe A3::CLI do
           {
             "id" => 5003,
             "ref" => "Sample#5003",
+            "title" => "Completed canary",
+            "description" => "Already completed and should be ignored.",
             "status" => "Done",
             "labels" => ["repo:ui-app", "trigger:auto-scheduler-canary"],
             "parent_ref" => nil
@@ -243,28 +276,37 @@ RSpec.describe A3::CLI do
       transitions = read_fake_kanban_transitions(fake_cli.fetch(:transitions_path))
       comments = read_fake_kanban_comments(fake_cli.fetch(:comments_path))
 
-      expect(out.string).to include("executed 8 task(s); idle=true stop_reason=idle")
+      expect(out.string).to include("executed 6 task(s); idle=true stop_reason=idle")
       expect(out.string).to include(
-        "steps=Sample#5001:implementation,Sample#5001:review,Sample#5001:verification,Sample#5001:merge," \
-        "Sample#5002:implementation,Sample#5002:review,Sample#5002:verification,Sample#5002:merge"
+        "steps=Sample#5001:implementation,Sample#5001:verification,Sample#5001:merge," \
+        "Sample#5002:implementation,Sample#5002:verification,Sample#5002:merge"
       )
       expect(task_repository.fetch("Sample#5001").status).to eq(:done)
       expect(task_repository.fetch("Sample#5002").status).to eq(:done)
       expect(task_repository.all.map(&:ref)).not_to include("Sample#5003")
       expect(transitions.map { |item| item.fetch("argv").last }).to eq(
-        ["In progress", "In review", "In review", "Inspection", "Inspection", "Merging", "Merging", "Done",
-         "In progress", "In review", "In review", "Inspection", "Inspection", "Merging", "Merging", "Done"]
+        ["In progress", "Inspection", "Inspection", "Merging", "Merging", "Done",
+         "In progress", "Inspection", "Inspection", "Merging", "Merging", "Done"]
       )
-      expect(comments.fetch("5001").size).to eq(8)
-      expect(comments.fetch("5002").size).to eq(8)
+      expect(comments.fetch("5001").size).to eq(6)
+      expect(comments.fetch("5002").size).to eq(6)
       expect(comments).not_to have_key("5003")
     end
   end
 
-  it "does not advance a parent canary when its child is outside the selected status but still unfinished" do
+  it "continues an imported unfinished child before advancing its parent canary" do
     Dir.mktmpdir do |dir|
-      repo_sources = create_repo_sources(dir)
+      create_git_repo_source(dir, name: "repo-alpha-source", file_content: "repo_alpha source\n")
+      create_git_repo_source(dir, name: "repo-beta-source", file_content: "repo_beta source\n")
+      repo_sources = {
+        repo_alpha: File.join(dir, "repo-alpha-source"),
+        repo_beta: File.join(dir, "repo-beta-source")
+      }
       seed_context(dir)
+      repo_sources.each_value do |repo_path|
+        head = `git -C #{Shellwords.escape(repo_path)} rev-parse HEAD`.strip
+        system("git", "-C", repo_path, "update-ref", "refs/heads/a3/parent/Sample-5100", head, exception: true, out: File::NULL, err: File::NULL)
+      end
       fake_cli = create_fake_kanban_cli(
         dir,
         mutate_state_on_transition: true,
@@ -272,6 +314,8 @@ RSpec.describe A3::CLI do
           {
             "id" => 5100,
             "ref" => "Sample#5100",
+            "title" => "Parent canary",
+            "description" => "Wait for all child canaries to finish.",
             "status" => "To do",
             "labels" => ["repo:both", "trigger:auto-parent"],
             "parent_ref" => nil
@@ -279,11 +323,31 @@ RSpec.describe A3::CLI do
           {
             "id" => 5101,
             "ref" => "Sample#5101",
-            "status" => "In review",
+            "title" => "Child canary still running",
+            "description" => "This child is already in verification.",
+            "status" => "Inspection",
             "labels" => ["repo:ui-app", "trigger:auto-implement"],
             "parent_ref" => "Sample#5100"
           }
         ]
+      )
+      allow(worker_gateway).to receive(:run).and_return(
+        A3::Application::ExecutionResult.new(
+          success: true,
+          summary: "implementation completed"
+        )
+      )
+      allow(command_runner).to receive(:run).and_return(
+        A3::Application::ExecutionResult.new(
+          success: true,
+          summary: "verification completed"
+        )
+      )
+      allow(merge_runner).to receive(:run).and_return(
+        A3::Application::ExecutionResult.new(
+          success: true,
+          summary: "merge completed"
+        )
       )
 
       out = StringIO.new
@@ -316,13 +380,21 @@ RSpec.describe A3::CLI do
 
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
       parent = task_repository.fetch("Sample#5100")
+      child = task_repository.fetch("Sample#5101")
       transitions = read_fake_kanban_transitions(fake_cli.fetch(:transitions_path))
+      comments = read_fake_kanban_comments(fake_cli.fetch(:comments_path))
 
-      expect(out.string).to include("executed 0 task(s); idle=true stop_reason=idle")
+      expect(out.string).to include("executed 4 task(s); idle=false stop_reason=max_steps")
+      expect(out.string).to include(
+        "steps=Sample#5101:verification,Sample#5101:merge,Sample#5100:review,Sample#5100:verification"
+      )
       expect(parent.kind).to eq(:parent)
       expect(parent.child_refs).to eq(["Sample#5101"])
-      expect(parent.status).to eq(:todo)
-      expect(transitions).to eq([])
+      expect(parent.status).to eq(:merging)
+      expect(child.status).to eq(:done)
+      expect(transitions.map { |item| item.fetch("argv").last }).to include("Inspection", "Merging", "In review")
+      expect(comments.fetch("5101").size).to eq(4)
+      expect(comments.fetch("5100").size).to be >= 2
     end
   end
 
@@ -345,14 +417,15 @@ RSpec.describe A3::CLI do
     File.write(
       File.join(dir, "manifest.yml"),
       YAML.dump(
-        {
-          "presets" => ["base"],
-          "core" => {
-            "merge_target" => "merge_to_parent",
-            "merge_policy" => "ff_only"
+          {
+            "presets" => ["base"],
+            "core" => {
+              "merge_target" => "merge_to_parent",
+              "merge_policy" => "ff_only",
+              "merge_target_ref" => "refs/heads/main"
+            }
           }
-        }
+        )
       )
-    )
   end
 end
