@@ -81,7 +81,9 @@ review worker に渡す skill。
 
 - review 観点
 - findings の出し方
-- parent review / child review の観点差を variant で吸収する
+- current canonical flow では parent review の観点差を variant で吸収する
+
+single / child では `review_skill` を phase surface としては使わず、implementation evidence の self-review / findings fix に吸収する。
 
 ### 3.3 verification commands
 

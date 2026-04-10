@@ -149,7 +149,7 @@ current `a3-v2` を future `a3-engine` base として seed するため、`a3-en
   現状: `portal-dev` bootstrap では `a3/issue` / `a3/parent` を materialize できるが、Portal live runtime / canary では child `work_branch_ref` と parent `integration_branch_ref` の分離がまだ全面適用されていない。
   残課題:
   - Portal live manifest / launcher で new child + new parent を distinct branch refs で materialize する
-  - child implementation / review / inspection を shared issue branch ではなく child work branch に閉じる
+  - child implementation / verification を shared issue branch ではなく child work branch に閉じる
   - live Portal parent-child canary で separated branch model を完走させる
   根拠: `scripts/a3/bootstrap_portal_dev_repos.py`, `scripts/a3/config/portal-dev/project.json`
 
