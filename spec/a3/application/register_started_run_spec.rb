@@ -58,7 +58,7 @@ RSpec.describe A3::Application::RegisterStartedRun do
     expect(run_repository.fetch("run-1")).to eq(run)
     expect(result.task.status).to eq(:in_progress)
     expect(result.task.current_run_ref).to eq("run-1")
-    expect(status_publisher).to have_received(:publish).with(task_ref: "A3-v2#3025", external_task_id: 3025, status: :in_progress)
+    expect(status_publisher).to have_received(:publish).with(task_ref: "A3-v2#3025", external_task_id: 3025, status: :in_progress, task_kind: :child)
     expect(activity_publisher).to have_received(:publish).with(
       task_ref: "A3-v2#3025",
       external_task_id: 3025,
@@ -108,7 +108,7 @@ RSpec.describe A3::Application::RegisterStartedRun do
 
     expect(result.task.status).to eq(:in_review)
     expect(result.task.current_run_ref).to eq("run-2")
-    expect(status_publisher).to have_received(:publish).with(task_ref: "A3-v2#3022", external_task_id: 3022, status: :in_review)
+    expect(status_publisher).to have_received(:publish).with(task_ref: "A3-v2#3022", external_task_id: 3022, status: :in_review, task_kind: :parent)
     expect(activity_publisher).to have_received(:publish).with(
       task_ref: "A3-v2#3022",
       external_task_id: 3022,

@@ -20,7 +20,8 @@ module A3
         @publish_external_task_status&.publish(
           task_ref: updated_task.ref,
           external_task_id: updated_task.external_task_id,
-          status: updated_task.status
+          status: updated_task.status,
+          task_kind: updated_task.kind
         )
         @publish_external_task_activity&.publish(
           task_ref: updated_task.ref,

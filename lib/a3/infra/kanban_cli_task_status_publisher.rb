@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../domain/task_phase_projection"
+
 module A3
   module Infra
     class KanbanCliTaskStatusPublisher
@@ -18,9 +20,9 @@ module A3
         @blocked_label = blocked_label.to_s
       end
 
-      def publish(task_ref:, status:, external_task_id: nil)
+      def publish(task_ref:, status:, external_task_id: nil, task_kind: nil)
         task_id = resolve_task_id(task_ref, external_task_id: external_task_id)
-        normalized_status = status.to_sym
+        normalized_status = canonical_status(task_kind: task_kind, status: status)
 
         if normalized_status == :blocked
           add_blocked_label(task_id)
@@ -67,6 +69,12 @@ module A3
       def blocked_label_present?(task_id)
         payload = @client.load_task_labels(task_id, include_project: true)
         payload.any? { |item| String(item.fetch("title", "")).strip == @blocked_label }
+      end
+
+      def canonical_status(task_kind:, status:)
+        return status.to_sym unless task_kind
+
+        A3::Domain::TaskPhaseProjection.status_for(task_kind: task_kind, status: status)
       end
     end
   end

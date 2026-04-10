@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../domain/task_phase_projection"
+
 module A3
   module Application
     class BuildWorkerTaskPacket
@@ -49,7 +51,7 @@ module A3
         {
           "title" => title,
           "description" => description,
-          "status" => String(snapshot["status"]),
+          "status" => canonical_status_label(task, snapshot["status"]),
           "labels" => Array(snapshot["labels"]).map(&:to_s)
         }
       end
@@ -58,12 +60,12 @@ module A3
         {
           "title" => task.ref,
           "description" => "A3 synthesized task packet because no external task source is configured. Use repository context and task topology as the source of truth.",
-          "status" => synthesized_status(task.status),
+          "status" => synthesized_status(task),
           "labels" => []
         }
       end
 
-      def synthesized_status(status)
+      def synthesized_status(task)
         {
           todo: "To do",
           in_progress: "In progress",
@@ -72,7 +74,36 @@ module A3
           merging: "Merging",
           done: "Done",
           blocked: "Blocked"
-        }.fetch(status.to_sym, status.to_s)
+        }.fetch(canonical_status_symbol(task, task.status), task.status.to_s)
+      end
+
+      def canonical_status_label(task, status)
+        {
+          todo: "To do",
+          in_progress: "In progress",
+          in_review: "In review",
+          verifying: "Inspection",
+          merging: "Merging",
+          done: "Done",
+          blocked: "Blocked"
+        }.fetch(canonical_status_symbol(task, status), status.to_s)
+      end
+
+      def canonical_status_symbol(task, status)
+        normalized_status =
+          case String(status).strip
+          when "To do" then :todo
+          when "In progress" then :in_progress
+          when "In review" then :in_review
+          when "Inspection" then :verifying
+          when "Merging" then :merging
+          when "Done" then :done
+          when "Blocked" then :blocked
+          else
+            status
+          end
+
+        A3::Domain::TaskPhaseProjection.status_for(task_kind: task.kind, status: normalized_status)
       end
 
       def load_by_external_task_id(task)

@@ -44,6 +44,31 @@ RSpec.describe A3::Application::BuildWorkerTaskPacket do
     )
   end
 
+  it "canonicalizes external In review to Inspection for child packets" do
+    child_task = A3::Domain::Task.new(
+      ref: "Sample#3154",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      external_task_id: 3154
+    )
+    external_task_source = instance_double("ExternalTaskSource")
+    allow(external_task_source).to receive(:fetch_task_packet_by_external_task_id).with(3154).and_return(
+      {
+        "task_id" => 3154,
+        "ref" => "Sample#3154",
+        "title" => "Legacy review task",
+        "description" => "Imported from kanban as In review.",
+        "status" => "In review",
+        "labels" => %w[repo:alpha trigger:auto-implement]
+      }
+    )
+
+    packet = described_class.new(external_task_source: external_task_source).call(task: child_task)
+
+    expect(packet.request_form.fetch("status")).to eq("Inspection")
+  end
+
   it "fails closed when an external task exists but the task packet is unavailable" do
     external_task_source = instance_double("ExternalTaskSource")
     allow(external_task_source).to receive(:fetch_task_packet_by_external_task_id).with(3153).and_return(nil)

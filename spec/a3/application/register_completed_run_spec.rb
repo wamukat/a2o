@@ -89,7 +89,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       )
     )
 
-    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :verifying)
+    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :verifying, task_kind: :child)
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
@@ -158,7 +158,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     )
     run_repository.save(review_run.append_blocked_diagnosis(blocked_diagnosis))
 
-    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :blocked)
+    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :blocked, task_kind: :child)
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
@@ -207,7 +207,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     )
     run_repository.save(merge_run)
 
-    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :done)
+    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :done, task_kind: :child)
     expect(activity_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, body: /A3-v2 実行完了: merge/)
     result = use_case.call(task_ref: task.ref, run_ref: merge_run.ref, outcome: :completed)
 
@@ -259,7 +259,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       )
     )
 
-    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :blocked)
+    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :blocked, task_kind: :child)
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
@@ -284,7 +284,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     task_repository.save(task)
     run_repository.save(run)
 
-    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :in_progress)
+    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :in_progress, task_kind: :child)
     expect(activity_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, body: /A3-v2 実行完了: implementation/)
     result = use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :retryable)
 
@@ -382,7 +382,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       handle_parent_review_disposition: handler
     )
 
-    expect(status_publisher).to receive(:publish).with(task_ref: parent_task.ref, external_task_id: 3140, status: :todo)
+    expect(status_publisher).to receive(:publish).with(task_ref: parent_task.ref, external_task_id: 3140, status: :todo, task_kind: :parent)
     expect(activity_publisher).to receive(:publish).with(
       task_ref: parent_task.ref,
       external_task_id: 3140,
@@ -446,7 +446,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     task_repository.save(parent_task)
     run_repository.save(parent_run)
 
-    expect(status_publisher).to receive(:publish).with(task_ref: parent_task.ref, external_task_id: 3140, status: :blocked)
+    expect(status_publisher).to receive(:publish).with(task_ref: parent_task.ref, external_task_id: 3140, status: :blocked, task_kind: :parent)
 
     result = use_case.call(task_ref: parent_task.ref, run_ref: parent_run.ref, outcome: :rework)
 

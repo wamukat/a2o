@@ -127,6 +127,34 @@ RSpec.describe A3::Infra::KanbanCliTaskStatusPublisher do
     expect(transitions.fetch(1).fetch("argv")).to include("task-transition", "--task-id", "5002", "--status", "In progress")
   end
 
+  it "canonicalizes child in_review publishes to Inspection" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 5003,
+          "ref" => "Sample#5003",
+          "status" => "In progress",
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    publisher = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      publisher.publish(task_ref: "Sample#5003", status: :in_review, task_kind: :child)
+    end
+
+    transitions = read_fake_kanban_transitions(fake_cli.fetch(:transitions_path))
+    expect(transitions.fetch(0).fetch("argv")).to include("task-transition", "--task-id", "5003", "--status", "Inspection")
+  end
+
   it "derives the task id from a canonical task ref when available" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,

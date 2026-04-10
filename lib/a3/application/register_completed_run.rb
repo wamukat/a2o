@@ -37,7 +37,8 @@ module A3
         @publish_external_task_status&.publish(
           task_ref: completed_task.ref,
           external_task_id: completed_task.external_task_id,
-          status: completed_task.status
+          status: completed_task.status,
+          task_kind: completed_task.kind
         )
         @publish_external_task_activity&.publish(
           task_ref: completed_task.ref,
@@ -106,7 +107,8 @@ module A3
         @publish_external_task_status&.publish(
           task_ref: completed_task.ref,
           external_task_id: completed_task.external_task_id,
-          status: completed_task.status
+          status: completed_task.status,
+          task_kind: completed_task.kind
         )
         body = completed_run_comment(run: completed_run, task: completed_task, extra_lines: result.comment_lines)
         @publish_external_task_activity&.publish(
