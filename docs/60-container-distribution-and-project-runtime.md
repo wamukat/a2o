@@ -927,6 +927,7 @@ SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/
 - `task soloboard:doctor`, `task soloboard:api`, `task soloboard:bootstrap` を追加し、SoloBoard runtime 単体でも operator surface を踏める
 - `task soloboard:smoke` を追加し、current kanban compatibility surface を SoloBoard に対して一通り打つ parity smoke を実行できる
 - `task kanban:up/down/logs/url/doctor/api/bootstrap:*` は `KANBAN_BACKEND=soloboard` で SoloBoard 側へ切り替えられ、current generic default も SoloBoard に寄せた
+- `task a3:portal:cutover:doctor` を追加し、current generic backend で `kanban:doctor -> watch-summary -> describe-state -> kanban:smoke` を一連で観測できるようにした。`task a3:portal:cutover:doctor:kanboard` で旧 compatibility path も比較できる
 - `task a3:portal-soloboard:scheduler:run-once`, `task a3:portal-soloboard:watch-summary`, `task a3:portal-soloboard:describe-state`, `task a3:portal-soloboard:scheduler:control` を追加し、current `.work/a3/portal-kanban-scheduler-auto` と衝突しない isolated storage (`.work/a3/portal-soloboard-canary`) で one-shot canary を流せる
 - `task a3:portal-soloboard:direct-canary:run-once` で isolated single full-phase canary を流し、`Portal#17` が `implementation -> verification -> merge -> Done` まで完走した
 - `task a3:portal-soloboard:parent-child:direct-canary:run-once`, `watch-summary`, `describe-state` を追加し、isolated parent-child canary で `Portal#18/#19/#20` が `Done` まで完走した
