@@ -82,7 +82,7 @@ module A3
         when :in_progress
           kind == :parent ? nil : :implementation
         when :in_review
-          :review
+          kind == :parent ? :review : nil
         when :verifying
           :verification
         when :merging

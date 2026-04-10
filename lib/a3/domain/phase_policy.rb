@@ -9,12 +9,6 @@ module A3
         parent: %i[review verification merge].freeze
       }.freeze
 
-      LEGACY_REENTRY_PHASES = {
-        single: %i[review].freeze,
-        child: %i[review].freeze,
-        parent: [].freeze
-      }.freeze
-
       NEXT_PHASE_BY_KIND = {
         single: {
           implementation: :verification,
@@ -45,8 +39,7 @@ module A3
       end
 
       def supports_phase?(phase)
-        phase_name = phase.to_sym
-        SUPPORTED_PHASES.fetch(@task_kind).include?(phase_name) || legacy_reentry_phase?(phase_name)
+        SUPPORTED_PHASES.fetch(@task_kind).include?(phase.to_sym)
       end
 
       def next_phase_for(phase)
@@ -65,14 +58,6 @@ module A3
         return :done if phase.to_sym == :merge
 
         :done
-      end
-
-      private
-
-      def legacy_reentry_phase?(phase_name)
-        return false unless @current_status == :in_review
-
-        LEGACY_REENTRY_PHASES.fetch(@task_kind).include?(phase_name)
       end
     end
   end

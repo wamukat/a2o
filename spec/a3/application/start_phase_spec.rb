@@ -66,17 +66,27 @@ RSpec.describe A3::Application::StartPhase do
     expect(result.run.phase_records.first.phase).to eq(:implementation)
   end
 
-  it "starts review on the runtime workspace" do
+  it "starts parent review on the runtime workspace" do
+    parent_scope_snapshot = A3::Domain::ScopeSnapshot.new(
+      edit_scope: %i[repo_alpha repo_beta],
+      verification_scope: %i[repo_alpha repo_beta],
+      ownership_scope: :parent
+    )
+    parent_artifact_owner = A3::Domain::ArtifactOwner.new(
+      owner_ref: "A3-v2#3022",
+      owner_scope: :parent,
+      snapshot_version: "head456"
+    )
     task = A3::Domain::Task.new(
-      ref: "A3-v2#3025",
-      kind: :child,
-      edit_scope: [:repo_alpha],
+      ref: "A3-v2#3022",
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
       status: :in_review
     )
     runtime_source_descriptor = A3::Domain::SourceDescriptor.new(
       workspace_kind: :runtime_workspace,
-      source_type: :branch_head,
-      ref: "refs/heads/a3/work/A3-v2-3025",
+      source_type: :integration_record,
+      ref: "refs/heads/a3/parent/A3-v2-3022",
       task_ref: task.ref
     )
 
@@ -84,9 +94,9 @@ RSpec.describe A3::Application::StartPhase do
       task: task,
       phase: :review,
       source_descriptor: runtime_source_descriptor,
-      scope_snapshot: scope_snapshot,
+      scope_snapshot: parent_scope_snapshot,
       review_target: review_target,
-      artifact_owner: artifact_owner
+      artifact_owner: parent_artifact_owner
     )
 
     expect(result.run.phase).to eq(:review)
@@ -94,11 +104,44 @@ RSpec.describe A3::Application::StartPhase do
     expect(result.run.evidence.review_target).to eq(review_target)
   end
 
-  it "rejects fresh child review once canonical phases shrink to three stages" do
+  it "rejects a source descriptor that does not match the canonical phase input" do
+    task = A3::Domain::Task.new(ref: "A3-v2#3022", kind: :parent, edit_scope: %i[repo_alpha repo_beta], status: :in_review)
+    mismatched_source_descriptor = A3::Domain::SourceDescriptor.new(
+      workspace_kind: :runtime_workspace,
+      source_type: :detached_commit,
+      ref: "refs/heads/a3/parent/A3-v2-3022",
+      task_ref: task.ref
+    )
+
+    expect do
+      described_class.new(run_id_generator: run_id_generator).call(
+        task: task,
+        phase: :review,
+        source_descriptor: mismatched_source_descriptor,
+        scope_snapshot: A3::Domain::ScopeSnapshot.new(
+          edit_scope: %i[repo_alpha repo_beta],
+          verification_scope: %i[repo_alpha repo_beta],
+          ownership_scope: :parent
+        ),
+        review_target: review_target,
+        artifact_owner: A3::Domain::ArtifactOwner.new(
+          owner_ref: "A3-v2#3022",
+          owner_scope: :parent,
+          snapshot_version: "head456"
+        )
+      )
+    end.to raise_error(
+      A3::Domain::ConfigurationError,
+      /phase review requires runtime_workspace\/integration_record source descriptor/
+    )
+  end
+
+  it "rejects child review entirely" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",
       kind: :child,
-      edit_scope: [:repo_alpha]
+      edit_scope: [:repo_alpha],
+      status: :in_review
     )
     runtime_source_descriptor = A3::Domain::SourceDescriptor.new(
       workspace_kind: :runtime_workspace,
@@ -117,35 +160,6 @@ RSpec.describe A3::Application::StartPhase do
         artifact_owner: artifact_owner
       )
     end.to raise_error(A3::Domain::InvalidPhaseError, /Unsupported phase review for child/)
-  end
-
-  it "rejects a source descriptor that does not match the canonical phase input" do
-    task = A3::Domain::Task.new(
-      ref: "A3-v2#3025",
-      kind: :child,
-      edit_scope: [:repo_alpha],
-      status: :in_review
-    )
-    mismatched_source_descriptor = A3::Domain::SourceDescriptor.new(
-      workspace_kind: :runtime_workspace,
-      source_type: :detached_commit,
-      ref: "refs/heads/a3/work/A3-v2-3025",
-      task_ref: task.ref
-    )
-
-    expect do
-      described_class.new(run_id_generator: run_id_generator).call(
-        task: task,
-        phase: :review,
-        source_descriptor: mismatched_source_descriptor,
-        scope_snapshot: scope_snapshot,
-        review_target: review_target,
-        artifact_owner: artifact_owner
-      )
-    end.to raise_error(
-      A3::Domain::ConfigurationError,
-      /phase review requires runtime_workspace\/branch_head source descriptor/
-    )
   end
 
   it "rejects unsupported phases" do

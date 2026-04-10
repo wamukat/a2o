@@ -23,17 +23,6 @@ RSpec.describe A3::Domain::Task do
       expect(task.supports_phase?(:implementation)).to be(true)
       expect(task.supports_phase?(:review)).to be(false)
     end
-
-    it "keeps review support for legacy child tasks already in review" do
-      task = described_class.new(
-        ref: "A3-v2#3025",
-        kind: :child,
-        edit_scope: [:repo_alpha],
-        status: :in_review
-      )
-
-      expect(task.supports_phase?(:review)).to be(true)
-    end
   end
 
   describe "#next_phase_for" do
@@ -117,17 +106,16 @@ RSpec.describe A3::Domain::Task do
       task = described_class.new(
         ref: "A3-v2#3025",
         kind: :child,
-        edit_scope: [:repo_alpha],
-        status: :in_review
+        edit_scope: [:repo_alpha]
       )
 
-      updated = task.start_run("run-1", phase: :review)
+      updated = task.start_run("run-1", phase: :implementation)
 
       expect(updated).not_to equal(task)
       expect(updated.current_run_ref).to eq("run-1")
-      expect(updated.status).to eq(:in_review)
+      expect(updated.status).to eq(:in_progress)
       expect(task.current_run_ref).to be_nil
-      expect(task.status).to eq(:in_review)
+      expect(task.status).to eq(:todo)
     end
   end
 
@@ -163,6 +151,17 @@ RSpec.describe A3::Domain::Task do
         kind: :parent,
         edit_scope: %i[repo_alpha repo_beta],
         status: :in_progress
+      )
+
+      expect(task.runnable_phase).to be_nil
+    end
+
+    it "does not resume child review from in_review anymore" do
+      task = described_class.new(
+        ref: "Portal#3141",
+        kind: :child,
+        edit_scope: [:repo_alpha],
+        status: :in_review
       )
 
       expect(task.runnable_phase).to be_nil
