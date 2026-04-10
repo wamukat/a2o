@@ -652,9 +652,9 @@ Stop:
   - cache/log size cap
 - current 進捗メモ
   - root cleanup は current scheduler quarantine (`.work/a3/portal-kanban-scheduler-auto/quarantine/*`) と legacy results/logs に age+count+size retention を掛けられる状態まで進めた
-  - disposable cache (`.work/cache/m2-seed`) も age+size で候補化できる
+  - disposable cache (`.work/cache/m2-seed`) と quarantined build outputs (`target/`, `.work/m2/repository`, generated reports) も age+size で候補化できる
   - scheduler-loop は idle 到達後に quarantine と terminal workspace cleanup を自動実行する
-  - 次段の未完は project-local build output / reports の budget 化と `.work` 全体棚卸し
+  - 次段の未完は `.work` 全体棚卸し
 
 ## Documentation Update Order
 

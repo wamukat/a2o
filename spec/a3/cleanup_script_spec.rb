@@ -547,4 +547,86 @@ RSpec.describe A3Cleanup do
       expect(candidates.map(&:kind)).to include("cache_dir")
     end
   end
+
+  it "selects quarantined build outputs older than ttl" do
+    Dir.mktmpdir("a3-cleanup-") do |dir|
+      root = Pathname(dir)
+      output_dir = root.join(".work", "a3", "portal-kanban-scheduler-auto", "quarantine", "Portal-3238", "runtime_workspace", "repo-alpha", "target")
+      FileUtils.mkdir_p(output_dir)
+      old = Time.now.utc - (200 * 3600)
+      File.utime(old, old, output_dir)
+
+      candidates = described_class.build_cleanup_candidates(
+        root_dir: root,
+        project: "portal",
+        task_project_ref: nil,
+        task_snapshots: [{ "ref" => "Portal#3238", "status" => "Done", "labels" => [] }],
+        active_refs: Set.new,
+        now: Time.now.utc,
+        done_ttl_hours: 999,
+        blocked_ttl_hours: 999,
+        result_ttl_hours: 999,
+        log_ttl_hours: 999,
+        quarantine_ttl_hours: 999,
+        cache_ttl_hours: 999,
+        build_output_ttl_hours: 168,
+        max_quarantine_count: nil,
+        max_result_count: nil,
+        max_log_count: nil,
+        max_quarantine_bytes: nil,
+        max_result_bytes: nil,
+        max_log_bytes: nil,
+        max_cache_bytes: nil,
+        max_build_output_bytes: nil
+      )
+
+      expect(candidates.map(&:kind)).to include("build_output_dir")
+      expect(candidates.map(&:reason)).to include("build_output_ttl>168h")
+      expect(candidates.map(&:task_ref)).to include("Portal#3238")
+    end
+  end
+
+  it "selects quarantined build outputs beyond size budget" do
+    Dir.mktmpdir("a3-cleanup-") do |dir|
+      root = Pathname(dir)
+      older = root.join(".work", "a3", "portal-kanban-scheduler-auto", "quarantine", "Portal-3231", "runtime_workspace", "repo-alpha", "target")
+      newer = root.join(".work", "a3", "portal-kanban-scheduler-auto", "quarantine", "Portal-3238", "runtime_workspace", "repo-alpha", "target")
+      [older, newer].each { |path| FileUtils.mkdir_p(path) }
+      File.write(older.join("payload.txt"), "x" * 16)
+      File.write(newer.join("payload.txt"), "x" * 16)
+      now = Time.now.utc
+      File.utime(now - 3600, now - 3600, older)
+      File.utime(now, now, newer)
+
+      candidates = described_class.build_cleanup_candidates(
+        root_dir: root,
+        project: "portal",
+        task_project_ref: nil,
+        task_snapshots: [
+          { "ref" => "Portal#3231", "status" => "Done", "labels" => [] },
+          { "ref" => "Portal#3238", "status" => "Done", "labels" => [] }
+        ],
+        active_refs: Set.new,
+        now: now,
+        done_ttl_hours: 999,
+        blocked_ttl_hours: 999,
+        result_ttl_hours: 999,
+        log_ttl_hours: 999,
+        quarantine_ttl_hours: 999,
+        cache_ttl_hours: 999,
+        build_output_ttl_hours: 999,
+        max_quarantine_count: nil,
+        max_result_count: nil,
+        max_log_count: nil,
+        max_quarantine_bytes: nil,
+        max_result_bytes: nil,
+        max_log_bytes: nil,
+        max_cache_bytes: nil,
+        max_build_output_bytes: 20
+      )
+
+      expect(candidates.map(&:reason)).to include("build_output_bytes>20")
+      expect(candidates.select { |item| item.reason == "build_output_bytes>20" }.map(&:task_ref)).to eq(["Portal#3231"])
+    end
+  end
 end
