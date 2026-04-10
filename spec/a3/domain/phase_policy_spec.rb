@@ -8,6 +8,16 @@ RSpec.describe A3::Domain::PhasePolicy do
       expect(policy.supports_phase?(:implementation)).to be(true)
     end
 
+    it "does not treat child review as a canonical phase for fresh tasks" do
+      expect(policy.supports_phase?(:review)).to be(false)
+    end
+
+    it "keeps child review runnable for legacy in_review tasks" do
+      legacy_policy = described_class.new(task_kind: :child, current_status: :in_review)
+
+      expect(legacy_policy.supports_phase?(:review)).to be(true)
+    end
+
     it "does not support implementation for parent tasks" do
       parent_policy = described_class.new(task_kind: :parent, current_status: :in_review)
 

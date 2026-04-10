@@ -70,7 +70,8 @@ RSpec.describe A3::Application::StartPhase do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",
       kind: :child,
-      edit_scope: [:repo_alpha]
+      edit_scope: [:repo_alpha],
+      status: :in_review
     )
     runtime_source_descriptor = A3::Domain::SourceDescriptor.new(
       workspace_kind: :runtime_workspace,
@@ -93,11 +94,37 @@ RSpec.describe A3::Application::StartPhase do
     expect(result.run.evidence.review_target).to eq(review_target)
   end
 
-  it "rejects a source descriptor that does not match the canonical phase input" do
+  it "rejects fresh child review once canonical phases shrink to three stages" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",
       kind: :child,
       edit_scope: [:repo_alpha]
+    )
+    runtime_source_descriptor = A3::Domain::SourceDescriptor.new(
+      workspace_kind: :runtime_workspace,
+      source_type: :branch_head,
+      ref: "refs/heads/a3/work/A3-v2-3025",
+      task_ref: task.ref
+    )
+
+    expect do
+      described_class.new(run_id_generator: run_id_generator).call(
+        task: task,
+        phase: :review,
+        source_descriptor: runtime_source_descriptor,
+        scope_snapshot: scope_snapshot,
+        review_target: review_target,
+        artifact_owner: artifact_owner
+      )
+    end.to raise_error(A3::Domain::InvalidPhaseError, /Unsupported phase review for child/)
+  end
+
+  it "rejects a source descriptor that does not match the canonical phase input" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :in_review
     )
     mismatched_source_descriptor = A3::Domain::SourceDescriptor.new(
       workspace_kind: :runtime_workspace,

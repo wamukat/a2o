@@ -21,6 +21,18 @@ RSpec.describe A3::Domain::Task do
       )
 
       expect(task.supports_phase?(:implementation)).to be(true)
+      expect(task.supports_phase?(:review)).to be(false)
+    end
+
+    it "keeps review support for legacy child tasks already in review" do
+      task = described_class.new(
+        ref: "A3-v2#3025",
+        kind: :child,
+        edit_scope: [:repo_alpha],
+        status: :in_review
+      )
+
+      expect(task.supports_phase?(:review)).to be(true)
     end
   end
 
@@ -105,7 +117,8 @@ RSpec.describe A3::Domain::Task do
       task = described_class.new(
         ref: "A3-v2#3025",
         kind: :child,
-        edit_scope: [:repo_alpha]
+        edit_scope: [:repo_alpha],
+        status: :in_review
       )
 
       updated = task.start_run("run-1", phase: :review)
@@ -114,7 +127,7 @@ RSpec.describe A3::Domain::Task do
       expect(updated.current_run_ref).to eq("run-1")
       expect(updated.status).to eq(:in_review)
       expect(task.current_run_ref).to be_nil
-      expect(task.status).to eq(:todo)
+      expect(task.status).to eq(:in_review)
     end
   end
 
