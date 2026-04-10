@@ -656,6 +656,40 @@ Stop:
   - scheduler-loop は idle 到達後に quarantine と terminal workspace cleanup を自動実行する
   - 次段の未完は `.work` 全体棚卸し
 
+### Current `.work` Inventory Snapshot
+
+- keep as current runtime
+  - `.work/a3/portal-kanban-scheduler-auto`
+    - current Portal scheduler の state root
+    - `tasks.json`, `runs.json`, `scheduler_journal.json`, active `workspaces/` を含む
+  - `.work/a3/state`
+    - current root utility / pause control / active-run state
+  - `.work/a3/scheduler`
+    - current launchd plist / stdout / stderr
+  - `.work/a3/env`
+    - current launchd env file
+  - `.work/kanboard`
+    - current Kanboard backend data
+- keep as reusable bootstrap source
+  - `.work/a3/repos/portal-dev/*`
+    - portal-dev repo mirror。current Portal scheduler の state rootではないが、bootstrap source として維持
+- retention managed / disposable
+  - `.work/a3/portal-kanban-scheduler-auto/quarantine/*`
+  - `.work/a3/results/*`
+  - `.work/cache/*`
+  - `.work/kanban/trace.log`
+- effectively empty or low-value in current root
+  - `.work/a3/issues`
+  - `.work/a3/live-targets`
+  - `.work/a3/notifications`
+
+### Current Judgment
+
+- `portal-kanban-scheduler-auto` と `kanboard` は current runtime のため delete 対象にしない
+- `portal-kanban-scheduler-auto/quarantine/*` は retention policy の対象で、evidence 保持期間を超えたら delete 候補
+- `results/logs/cache` は disposable として扱い、operator cleanup または scheduler idle cleanup の管理下に置く
+- `.work/a3/issues`, `.work/a3/live-targets`, `.work/a3/notifications` は現時点の current Portal flow では主要導線ではないため、将来 delete / archive 候補として扱う
+
 ## Documentation Update Order
 
 ### Order
