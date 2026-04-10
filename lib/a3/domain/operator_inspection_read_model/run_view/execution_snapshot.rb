@@ -5,9 +5,9 @@ module A3
     class OperatorInspectionReadModel
       class RunView
         class ExecutionSnapshot
-          attr_reader :phase, :summary, :verification_summary, :failing_command, :observed_state, :diagnostics, :worker_response_bundle, :runtime_snapshot
+          attr_reader :phase, :summary, :verification_summary, :failing_command, :observed_state, :diagnostics, :worker_response_bundle, :runtime_snapshot, :review_disposition
 
-          def initialize(phase:, summary:, verification_summary:, failing_command:, observed_state:, diagnostics:, worker_response_bundle:, runtime_snapshot:)
+          def initialize(phase:, summary:, verification_summary:, failing_command:, observed_state:, diagnostics:, worker_response_bundle:, runtime_snapshot:, review_disposition:)
             @phase = phase.to_sym
             @summary = summary
             @verification_summary = verification_summary
@@ -16,6 +16,7 @@ module A3
             @diagnostics = diagnostics
             @worker_response_bundle = worker_response_bundle
             @runtime_snapshot = runtime_snapshot
+            @review_disposition = review_disposition
             freeze
           end
 
@@ -32,6 +33,7 @@ module A3
               observed_state: phase_record.execution_record.observed_state,
               diagnostics: diagnostics,
               worker_response_bundle: worker_response_bundle,
+              review_disposition: phase_record.execution_record.review_disposition,
               runtime_snapshot: RuntimeSnapshot.from_phase_runtime_snapshot(
                 phase_record.execution_record.runtime_snapshot
               )

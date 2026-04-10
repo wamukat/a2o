@@ -225,6 +225,74 @@ RSpec.describe A3::Application::ShowRun do
     expect(result.recovery.package_expectation).to eq(:inspect_runtime_package)
   end
 
+  it "surfaces implementation-side review evidence on the latest execution snapshot" do
+    run = A3::Domain::Run.new(
+      ref: "run-impl-1",
+      task_ref: "A3-v2#child",
+      phase: :implementation,
+      workspace_kind: :ticket_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :ticket_workspace,
+        source_type: :branch_head,
+        ref: "refs/heads/a3/work/child",
+        task_ref: "A3-v2#child"
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        ownership_scope: :task
+      ),
+      review_target: A3::Domain::ReviewTarget.new(
+        base_commit: "base123",
+        head_commit: "head456",
+        task_ref: "A3-v2#child",
+        phase_ref: :implementation
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: "A3-v2#child",
+        owner_scope: :task,
+        snapshot_version: "head456"
+      ),
+      terminal_outcome: :completed
+    ).append_phase_evidence(
+      phase: :implementation,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :ticket_workspace,
+        source_type: :branch_head,
+        ref: "refs/heads/a3/work/child",
+        task_ref: "A3-v2#child"
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        ownership_scope: :task
+      ),
+      execution_record: A3::Domain::PhaseExecutionRecord.new(
+        summary: "implementation completed",
+        diagnostics: {},
+        review_disposition: {
+          "kind" => "completed",
+          "repo_scope" => "repo_alpha",
+          "summary" => "No findings",
+          "description" => "Implementation finished and final self-review found no outstanding issues.",
+          "finding_key" => "completed-no-findings"
+        }
+      )
+    )
+    run_repository.save(run)
+
+    result = use_case.call(run_ref: "run-impl-1", runtime_package: runtime_package)
+
+    expect(result.latest_execution.phase).to eq(:implementation)
+    expect(result.latest_execution.review_disposition).to eq(
+      "kind" => "completed",
+      "repo_scope" => "repo_alpha",
+      "summary" => "No findings",
+      "description" => "Implementation finished and final self-review found no outstanding issues.",
+      "finding_key" => "completed-no-findings"
+    )
+  end
+
   it "returns same-phase retry recovery for non-terminal runs with matching intent" do
     run_repository.save(
       A3::Domain::Run.new(

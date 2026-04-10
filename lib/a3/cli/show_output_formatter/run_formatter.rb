@@ -78,6 +78,7 @@ module A3
 
           result << "latest_execution phase=#{execution.phase} summary=#{execution.summary}"
           result << "verification_summary=#{execution.verification_summary}" if execution.verification_summary
+          append_review_disposition_lines(result, execution.review_disposition)
           result << "failing_command=#{execution.failing_command}" if execution.failing_command
           result << "observed_state=#{execution.observed_state}" if execution.observed_state
           result << "worker_response_bundle=#{FormattingHelpers.diagnostic_value(execution.worker_response_bundle)}" if execution.worker_response_bundle
@@ -97,6 +98,14 @@ module A3
           result << "runtime remediation_commands=#{runtime.remediation_commands.join(' ')}" unless runtime.remediation_commands.empty?
           result << "runtime workspace_hook=#{runtime.workspace_hook}" if runtime.workspace_hook
           result << "runtime merge_target=#{runtime.merge_target} merge_policy=#{runtime.merge_policy}"
+        end
+
+        def append_review_disposition_lines(result, review_disposition)
+          return unless review_disposition.is_a?(Hash)
+
+          result << "review_disposition kind=#{review_disposition['kind']} repo_scope=#{review_disposition['repo_scope']} finding_key=#{review_disposition['finding_key']}"
+          result << "review_disposition_summary=#{review_disposition['summary']}" if review_disposition["summary"]
+          result << "review_disposition_description=#{review_disposition['description']}" if review_disposition["description"]
         end
 
         def append_latest_blocked_lines(result, diagnosis)
