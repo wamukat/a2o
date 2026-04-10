@@ -75,15 +75,15 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
         "review_skill" => {
           "default" => "skills/review/default.md",
           "variants" => {
-            "task_kind" => {
-              "child" => {
-                "repo_scope" => {
-                  "repo_alpha" => {
-                    "phase" => {
-                      "review" => "skills/review/repo-alpha-child.md"
+                "task_kind" => {
+                  "parent" => {
+                    "repo_scope" => {
+                      "repo_alpha" => {
+                        "phase" => {
+                          "review" => "skills/review/repo-alpha-parent.md"
+                        }
+                      }
                     }
-                  }
-                }
               }
             }
           }
@@ -94,9 +94,9 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     manifest_path = write_manifest({ "presets" => ["base"] })
     surface = loader.load(manifest_path)
 
-    expect(surface.resolve(:review_skill, task_kind: :child, repo_scope: :repo_alpha, phase: :review))
-      .to eq("skills/review/repo-alpha-child.md")
-    expect(surface.resolve(:review_skill, task_kind: :child, repo_scope: :repo_beta, phase: :review))
+    expect(surface.resolve(:review_skill, task_kind: :parent, repo_scope: :repo_alpha, phase: :review))
+      .to eq("skills/review/repo-alpha-parent.md")
+    expect(surface.resolve(:review_skill, task_kind: :parent, repo_scope: :repo_beta, phase: :review))
       .to eq("skills/review/default.md")
   end
 
@@ -107,15 +107,15 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
         "review_skill" => {
           "default" => "skills/review/default.md",
           "variants" => {
-            "task_kind" => {
-              "child" => {
-                "repo_scope" => {
-                  "repo_alpha" => {
-                    "phase" => {
-                      "review" => "skills/review/repo-alpha-child.md"
+                "task_kind" => {
+                  "parent" => {
+                    "repo_scope" => {
+                      "repo_alpha" => {
+                        "phase" => {
+                          "review" => "skills/review/repo-alpha-parent.md"
+                        }
+                      }
                     }
-                  }
-                }
               }
             }
           }
@@ -128,15 +128,15 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
         "review_skill" => {
           "default" => "skills/review/default.md",
           "variants" => {
-            "task_kind" => {
-              "child" => {
-                "repo_scope" => {
-                  "repo_beta" => {
-                    "phase" => {
-                      "review" => "skills/review/repo-beta-child.md"
+                "task_kind" => {
+                  "parent" => {
+                    "repo_scope" => {
+                      "repo_beta" => {
+                        "phase" => {
+                          "review" => "skills/review/repo-beta-parent.md"
+                        }
+                      }
                     }
-                  }
-                }
               }
             }
           }
@@ -147,10 +147,10 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     manifest_path = write_manifest({ "presets" => ["base", "frontend-child"] })
     surface = loader.load(manifest_path)
 
-    expect(surface.resolve(:review_skill, task_kind: :child, repo_scope: :repo_alpha, phase: :review))
-      .to eq("skills/review/repo-alpha-child.md")
-    expect(surface.resolve(:review_skill, task_kind: :child, repo_scope: :repo_beta, phase: :review))
-      .to eq("skills/review/repo-beta-child.md")
+    expect(surface.resolve(:review_skill, task_kind: :parent, repo_scope: :repo_alpha, phase: :review))
+      .to eq("skills/review/repo-alpha-parent.md")
+    expect(surface.resolve(:review_skill, task_kind: :parent, repo_scope: :repo_beta, phase: :review))
+      .to eq("skills/review/repo-beta-parent.md")
   end
 
   it "deep-freezes resolved surface structures" do
@@ -160,15 +160,15 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
         "review_skill" => {
           "default" => "skills/review/default.md",
           "variants" => {
-            "task_kind" => {
-              "child" => {
-                "repo_scope" => {
-                  "repo_alpha" => {
-                    "phase" => {
-                      "review" => "skills/review/repo-alpha-child.md"
+                "task_kind" => {
+                  "parent" => {
+                    "repo_scope" => {
+                      "repo_alpha" => {
+                        "phase" => {
+                          "review" => "skills/review/repo-alpha-parent.md"
+                        }
+                      }
                     }
-                  }
-                }
               }
             }
           }

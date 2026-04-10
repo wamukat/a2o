@@ -8,11 +8,11 @@ RSpec.describe A3::Domain::ProjectContext do
         "default" => "skills/review/default.md",
         "variants" => {
           "task_kind" => {
-            "child" => {
+            "parent" => {
               "repo_scope" => {
                 "repo_alpha" => {
                   "phase" => {
-                    "review" => "skills/review/repo-alpha-child.md"
+                    "review" => "skills/review/repo-alpha-parent.md"
                   }
                 }
               }
@@ -37,22 +37,22 @@ RSpec.describe A3::Domain::ProjectContext do
     )
   end
 
-  it "resolves phase runtime config for a child repo alpha review" do
+  it "resolves phase runtime config for a parent review" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",
-      kind: :child,
-      edit_scope: [:repo_alpha],
-      verification_scope: [:repo_alpha, :repo_beta],
-      parent_ref: "A3-v2#3022"
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      verification_scope: %i[repo_alpha repo_beta],
+      child_refs: ["A3-v2#3030"]
     )
 
     runtime = context.resolve_phase_runtime(task: task, phase: :review)
 
-    expect(runtime.task_kind).to eq(:child)
-    expect(runtime.repo_scope).to eq(:repo_alpha)
+    expect(runtime.task_kind).to eq(:parent)
+    expect(runtime.repo_scope).to eq(:both)
     expect(runtime.phase).to eq(:review)
     expect(runtime.implementation_skill).to eq("skills/implementation/base.md")
-    expect(runtime.review_skill).to eq("skills/review/repo-alpha-child.md")
+    expect(runtime.review_skill).to eq("skills/review/default.md")
     expect(runtime.merge_target).to eq(:merge_to_parent)
     expect(runtime.merge_policy).to eq(:ff_only)
     expect(runtime.merge_target_ref).to eq("refs/heads/live")
@@ -61,21 +61,21 @@ RSpec.describe A3::Domain::ProjectContext do
   it "builds a worker request payload from the resolved phase runtime config" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",
-      kind: :child,
-      edit_scope: [:repo_alpha],
-      verification_scope: [:repo_alpha, :repo_beta],
-      parent_ref: "A3-v2#3022"
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      verification_scope: %i[repo_alpha repo_beta],
+      child_refs: ["A3-v2#3030"]
     )
 
     runtime = context.resolve_phase_runtime(task: task, phase: :review)
 
     expect(runtime.worker_request_form).to eq(
-      "task_kind" => "child",
-      "repo_scope" => "repo_alpha",
+      "task_kind" => "parent",
+      "repo_scope" => "both",
       "phase" => "review",
       "workspace_hook" => "hooks/prepare-runtime.sh",
       "implementation_skill" => "skills/implementation/base.md",
-      "review_skill" => "skills/review/repo-alpha-child.md",
+      "review_skill" => "skills/review/default.md",
       "verification_commands" => ["commands/verify-all"],
       "remediation_commands" => ["commands/apply-remediation"],
       "merge_target" => "merge_to_parent",

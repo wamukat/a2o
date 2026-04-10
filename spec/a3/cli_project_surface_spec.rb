@@ -18,11 +18,11 @@ RSpec.describe A3::CLI do
               "default" => "skills/review/default.md",
               "variants" => {
                 "task_kind" => {
-                  "child" => {
+                  "parent" => {
                     "repo_scope" => {
                       "repo_alpha" => {
                         "phase" => {
-                          "review" => "skills/review/repo-alpha-child.md"
+                          "review" => "skills/review/repo-alpha-parent.md"
                         }
                       }
                     }
@@ -53,7 +53,7 @@ RSpec.describe A3::CLI do
           "show-project-surface",
           manifest_path,
           "--preset-dir", preset_dir,
-          "--task-kind", "child",
+          "--task-kind", "parent",
           "--repo-scope", "repo_alpha",
           "--phase", "review"
         ],
@@ -61,7 +61,7 @@ RSpec.describe A3::CLI do
       )
 
       expect(out.string).to include("implementation_skill=skills/implementation/base.md")
-      expect(out.string).to include("review_skill=skills/review/repo-alpha-child.md")
+      expect(out.string).to include("review_skill=skills/review/repo-alpha-parent.md")
       expect(out.string).to include("verification_commands=commands/verify-all")
     end
   end
