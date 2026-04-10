@@ -88,11 +88,8 @@ module A3
       private
 
       def default_execution_record(execution:, runtime:)
-        A3::Domain::PhaseExecutionRecord.new(
-          summary: execution.summary,
-          failing_command: execution.failing_command,
-          observed_state: execution.observed_state,
-          diagnostics: execution.diagnostics,
+        A3::Domain::PhaseExecutionRecord.from_execution_result(
+          execution,
           runtime_snapshot: A3::Domain::PhaseRuntimeSnapshot.from_phase_runtime(runtime)
         )
       end

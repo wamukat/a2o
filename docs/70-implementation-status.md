@@ -114,7 +114,7 @@ current `a3-v2` を future `a3-engine` base として seed するため、`a3-en
 ## Next Design Slice
 
 - [ ] single / child 向け phase redesign slice
-  現状: first implementation step として、fresh な `single` / `child` は `implementation completed -> verification` へ進み、kanban status も `Inspection` へ遷移するようにした。legacy `in_review` task と `parent` は引き続き `review` を実行可能に残し、watch-summary など operator 表示は canonical 4 phase を維持している。残りは `review` evidence を implementation loop へ正式に内包し、single / child の canonical phase 自体を 3 段へ縮約すること。
+  現状: first implementation step として、fresh な `single` / `child` は `implementation completed -> verification` へ進み、kanban status も `Inspection` へ遷移するようにした。legacy `in_review` task と `parent` は引き続き `review` を実行可能に残し、watch-summary など operator 表示は canonical 4 phase を維持している。implementation worker は optional `review_disposition(kind=completed)` を返せるようになり、self-review clean の evidence は implementation run record に保持できる。残りはこの evidence を operator read model / diagnostics に surfaced し、single / child の canonical phase 自体を 3 段へ縮約すること。
   根拠: `docs/60-container-distribution-and-project-runtime.md` の `0.4.5.2` と `0.4.5.3`
 
 ## Portal Dev 実運用トラック

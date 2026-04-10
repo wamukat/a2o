@@ -269,6 +269,12 @@ module A3
             unless valid_repo_scopes.include?(disposition["repo_scope"])
               errors << "review_disposition.repo_scope must be one of #{valid_repo_scopes.join(', ')}"
             end
+          elsif implementation_phase
+            valid_repo_scopes = %w[repo_alpha repo_beta both]
+            errors << "review_disposition.kind must be completed for implementation evidence" unless disposition["kind"] == "completed"
+            unless valid_repo_scopes.include?(disposition["repo_scope"])
+              errors << "review_disposition.repo_scope must be one of #{valid_repo_scopes.join(', ')}"
+            end
           end
         end
         if worker_response.fetch("success", nil) == false &&

@@ -406,7 +406,58 @@ RSpec.describe "a3_v2_stdin_bundle_worker.rb" do
       expect(status.success?).to eq(true), "#{stdout}\n#{stderr}"
       schema = JSON.parse(stdout)
       expect(schema.fetch("required")).to include("changed_files")
-      expect(schema.fetch("properties")).not_to have_key("review_disposition")
+      expect(schema.fetch("properties").fetch("review_disposition").fetch("type")).to eq("object")
+    end
+  end
+
+  it "rejects non-completed review evidence in the implementation schema" do
+    request = base_request
+    Dir.mktmpdir("a3-v2-stdin-worker-implementation-evidence-") do |temp_dir_text|
+      temp_dir = Pathname(temp_dir_text)
+      request_path = temp_dir.join("request.json")
+      result_path = temp_dir.join("result.json")
+      workspace_root = temp_dir.join("workspace")
+      workspace_root.mkpath
+      request_path.write(JSON.generate(request))
+
+      payload = {
+        "task_ref" => request.fetch("task_ref"),
+        "run_ref" => request.fetch("run_ref"),
+        "phase" => "implementation",
+        "success" => true,
+        "summary" => "implemented",
+        "failing_command" => nil,
+        "observed_state" => nil,
+        "rework_required" => false,
+        "changed_files" => { "repo_alpha" => ["src/main.rb"] },
+        "review_disposition" => {
+          "kind" => "blocked",
+          "repo_scope" => "repo_alpha",
+          "summary" => "No findings",
+          "description" => "invalid",
+          "finding_key" => "invalid"
+        }
+      }
+
+      ruby = <<~RUBY
+        require #{worker_script.to_s.inspect}
+        request = load_json(#{request_path.to_s.inspect})
+        payload = JSON.parse(#{JSON.generate(payload).inspect})
+        print JSON.generate(validate_payload(payload, request: request))
+      RUBY
+
+      stdout, stderr, status = run_ruby(
+        ruby,
+        env: {
+          "A3_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A3_WORKER_RESULT_PATH" => result_path.to_s,
+          "A3_WORKSPACE_ROOT" => workspace_root.to_s
+        }
+      )
+
+      expect(status.success?).to eq(true), "#{stdout}\n#{stderr}"
+      errors = JSON.parse(stdout)
+      expect(errors).to include("review_disposition.kind must be completed for implementation evidence")
     end
   end
 

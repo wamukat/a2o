@@ -52,4 +52,30 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
       record.diagnostics.fetch("worker_response_bundle").fetch("diagnostics")["stderr"] << "again"
     end.to raise_error(FrozenError)
   end
+
+  it "captures review disposition from an execution result" do
+    execution = A3::Application::ExecutionResult.new(
+      success: true,
+      summary: "implemented with self-review",
+      response_bundle: {
+        "review_disposition" => {
+          "kind" => "completed",
+          "repo_scope" => "repo_alpha",
+          "summary" => "No findings",
+          "description" => "Implementation finished and final self-review found no outstanding issues.",
+          "finding_key" => "completed-no-findings"
+        }
+      }
+    )
+
+    record = described_class.from_execution_result(execution)
+
+    expect(record.review_disposition).to eq(
+      "kind" => "completed",
+      "repo_scope" => "repo_alpha",
+      "summary" => "No findings",
+      "description" => "Implementation finished and final self-review found no outstanding issues.",
+      "finding_key" => "completed-no-findings"
+    )
+  end
 end

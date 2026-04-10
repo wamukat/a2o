@@ -607,6 +607,54 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     expect(execution.response_bundle).to eq(bundle)
   end
 
+  it "accepts implementation review evidence alongside changed_files" do
+    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    bundle = {
+      "task_ref" => task.ref,
+      "run_ref" => run.ref,
+      "phase" => "implementation",
+      "success" => true,
+      "summary" => "implementation clean",
+      "failing_command" => nil,
+      "observed_state" => nil,
+      "rework_required" => false,
+      "changed_files" => { "repo_beta" => ["nested/actual.txt"] },
+      "review_disposition" => {
+        "kind" => "completed",
+        "repo_scope" => "repo_beta",
+        "summary" => "No findings",
+        "description" => "Implementation finished and final self-review found no outstanding issues.",
+        "finding_key" => "completed-no-findings"
+      }
+    }
+    gateway = described_class.new(command_runner: command_runner)
+
+    allow(command_runner).to receive(:run) do
+      workspace.slot_paths.fetch(:repo_beta).join("nested").mkpath
+      workspace.slot_paths.fetch(:repo_beta).join("nested", "actual.txt").write("changed")
+      result_path.write(JSON.pretty_generate(bundle))
+      A3::Application::ExecutionResult.new(success: true, summary: "command runner succeeded")
+    end
+
+    execution = gateway.run(
+      skill: phase_runtime.implementation_skill,
+      workspace: workspace,
+      task: task,
+      run: run,
+      phase_runtime: phase_runtime,
+      task_packet: task_packet
+    )
+
+    expect(execution.success?).to be(true)
+    expect(execution.response_bundle.fetch("review_disposition")).to eq(
+      "kind" => "completed",
+      "repo_scope" => "repo_beta",
+      "summary" => "No findings",
+      "description" => "Implementation finished and final self-review found no outstanding issues.",
+      "finding_key" => "completed-no-findings"
+    )
+  end
+
   it "fails fast when parent review disposition uses a non-canonical kind" do
     result_path = workspace.root_path.join(".a3", "worker-result.json")
     parent_task = A3::Domain::Task.new(
@@ -687,6 +735,48 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     expect(execution.summary).to eq("worker result schema invalid")
     expect(execution.diagnostics.fetch("validation_errors")).to include(
       "review_disposition.kind must be one of completed, follow_up_child, blocked"
+    )
+  end
+
+  it "fails fast when implementation review evidence is not canonical completed evidence" do
+    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    bundle = {
+      "task_ref" => task.ref,
+      "run_ref" => run.ref,
+      "phase" => "implementation",
+      "success" => true,
+      "summary" => "implementation clean",
+      "failing_command" => nil,
+      "observed_state" => nil,
+      "rework_required" => false,
+      "changed_files" => { "repo_beta" => ["declared.txt"] },
+      "review_disposition" => {
+        "kind" => "follow_up_child",
+        "repo_scope" => "repo_beta",
+        "summary" => "No findings",
+        "description" => "Invalid implementation evidence.",
+        "finding_key" => "invalid-implementation-evidence"
+      }
+    }
+    gateway = described_class.new(command_runner: command_runner)
+
+    allow(command_runner).to receive(:run) do
+      result_path.write(JSON.pretty_generate(bundle))
+      A3::Application::ExecutionResult.new(success: true, summary: "command runner succeeded")
+    end
+
+    execution = gateway.run(
+      skill: phase_runtime.implementation_skill,
+      workspace: workspace,
+      task: task,
+      run: run,
+      phase_runtime: phase_runtime,
+      task_packet: task_packet
+    )
+
+    expect(execution.success?).to be(false)
+    expect(execution.diagnostics.fetch("validation_errors")).to include(
+      "review_disposition.kind must be completed for implementation evidence"
     )
   end
 

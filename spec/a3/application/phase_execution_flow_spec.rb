@@ -128,6 +128,52 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
     )
   end
 
+  it "persists implementation-side review evidence from the worker response bundle" do
+    prepared_workspace = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: :ticket_workspace,
+      root_path: "/tmp/work",
+      source_descriptor: run.source_descriptor,
+      slot_paths: { repo_alpha: "/tmp/work/repo-alpha" }
+    )
+    execution = A3::Application::ExecutionResult.new(
+      success: true,
+      summary: "completed",
+      response_bundle: {
+        "review_disposition" => {
+          "kind" => "completed",
+          "repo_scope" => "repo_alpha",
+          "summary" => "No findings",
+          "description" => "Implementation finished and final self-review found no outstanding issues.",
+          "finding_key" => "completed-no-findings"
+        }
+      }
+    )
+
+    allow(prepare_workspace).to receive(:call).and_return(
+      A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
+    )
+    allow(strategy).to receive(:execute).and_return(execution)
+    allow(strategy).to receive(:verification_summary).with(execution).and_return(nil)
+    allow(strategy).to receive(:blocked_expected_state).and_return("phase succeeds")
+    allow(strategy).to receive(:blocked_default_failing_command).and_return("adapter")
+    allow(strategy).to receive(:blocked_extra_diagnostics).with(execution).and_return(execution.diagnostics)
+
+    result = flow.call(
+      task_ref: task.ref,
+      run_ref: run.ref,
+      project_context: project_context,
+      strategy: strategy
+    )
+
+    expect(result.run.phase_records.last.execution_record.review_disposition).to eq(
+      "kind" => "completed",
+      "repo_scope" => "repo_alpha",
+      "summary" => "No findings",
+      "description" => "Implementation finished and final self-review found no outstanding issues.",
+      "finding_key" => "completed-no-findings"
+    )
+  end
+
   it "records blocked failure evidence through the shared flow" do
     prepared_workspace = A3::Domain::PreparedWorkspace.new(
       workspace_kind: :ticket_workspace,
