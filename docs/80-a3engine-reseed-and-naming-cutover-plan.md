@@ -678,17 +678,23 @@ Stop:
   - `.work/a3/results/*`
   - `.work/cache/*`
   - `.work/kanban/trace.log`
+- keep as reusable live target source
+  - `.work/a3/live-targets/portal-dev/*`
+    - `portal-dev` bootstrap が参照する live target mirror。current Portal scheduler の state root ではないが、delete 候補にはしない
 - effectively empty or low-value in current root
   - `.work/a3/issues`
-  - `.work/a3/live-targets`
+    - current root では実質空で、legacy-compatible path の残骸に近い
   - `.work/a3/notifications`
+    - `automation-events.jsonl` のみ。current operator flow の必須 state ではない
 
 ### Current Judgment
 
 - `portal-kanban-scheduler-auto` と `kanboard` は current runtime のため delete 対象にしない
 - `portal-kanban-scheduler-auto/quarantine/*` は retention policy の対象で、evidence 保持期間を超えたら delete 候補
 - `results/logs/cache` は disposable として扱い、operator cleanup または scheduler idle cleanup の管理下に置く
-- `.work/a3/issues`, `.work/a3/live-targets`, `.work/a3/notifications` は現時点の current Portal flow では主要導線ではないため、将来 delete / archive 候補として扱う
+- `.work/a3/live-targets/portal-dev/*` は `portal-dev` bootstrap の参照先のため delete 候補にしない
+- `.work/a3/issues` は current root では実質空のため、legacy-compatible path として残すか delete するかを後続判断に回す
+- `.work/a3/notifications/automation-events.jsonl` は low-value log として retention/delete 候補にできる
 
 ## Documentation Update Order
 
