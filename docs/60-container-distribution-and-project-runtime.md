@@ -967,8 +967,9 @@ SoloBoard を current generic default に寄せた時点で、Docker/runtime pac
   - isolated parent-child canary が `Done`
   - current mainline cutover doctor が SoloBoard default で通る
   - repeated scheduler-loop 観測で追加 hardening 要否が判断できる
+  - local compose bundle (`task a3:portal:bundle:up/bootstrap/doctor/smoke`) が通る
 
-したがって、次の packaging slice では compose 設計そのものより先に「どの entrypoint を bundle 後も変えないか」と「Kanboard compatibility path を bundle に残すか外出しするか」を確定する。
+2026-04-11 時点では、workspace root に `docker-compose.a3-portal-soloboard.yml` と `docker/a3-runtime/Dockerfile` を置き、`task a3:portal:bundle:up`, `:doctor`, `:bootstrap`, `:smoke`, `:down`, `:logs` を追加した。local bundle は `a3-runtime` container と `soloboard` container を同一 compose project で起動し、`doctor` で `ruby`, `python3`, `task`, SoloBoard `/api/boards` を確認し、`bootstrap` で `Portal` / `OIDC` / `A3Engine` board/lane/tag surface を seed し、`smoke` で relation/comment/transition を含む compatibility surface を実機確認できる。したがって packaging は「未着手の構想」ではなく local bundle spike まで完了しており、次の slice は volume / state retention と launch entrypoint の固定に寄る。
 
 #### 0.4.5.2 phase model 再検討メモ
 

@@ -15,7 +15,7 @@ current `a3-v2` を future `a3-engine` base として seed するため、`a3-en
 - Redmine backend 実験は破棄済みで、historical baseline backend は Kanboard、current generic default backend は SoloBoard である
 - next の backend migration target は SoloBoard であり、Docker/runtime packaging は SoloBoard parity judgment の後に行う
 - 現行 `a3-engine` は、そのまま上書きせず `a3-engine-legacy` として退避してから新しい `a3-engine` を作る
-- packaging freeze 入力として、current generic operator default は SoloBoard、`task a3:portal:cutover:doctor` は current mainline 観測入口、Kanboard は explicit compatibility path として扱う
+- packaging freeze 入力として、current generic operator default は SoloBoard、`task a3:portal:cutover:doctor` / `:observe` は current mainline 観測入口、`task a3:portal:bundle:*` は local compose bundle spike、Kanboard は explicit compatibility path として扱う
 
 ## 進め方
 
