@@ -693,8 +693,9 @@ Stop:
 - `portal-kanban-scheduler-auto/quarantine/*` は retention policy の対象で、evidence 保持期間を超えたら delete 候補
 - `results/logs/cache` は disposable として扱い、operator cleanup または scheduler idle cleanup の管理下に置く
 - `.work/a3/live-targets/portal-dev/*` は `portal-dev` bootstrap の参照先のため delete 候補にしない
-- `.work/a3/issues` は current root では実質空のため、legacy-compatible path として残すか delete するかを後続判断に回す
-- `.work/a3/notifications/automation-events.jsonl` は low-value log として retention/delete 候補にできる
+- `.work/a3/issues` は current runtime では使わない。rerun readiness / quarantine utility が legacy-compatible path として参照するため、top-level path だけ残して中身は空運用でよい
+- `.work/a3/issues/*` に payload が残っている場合は delete 候補とし、retention 対象にしない
+- `.work/a3/notifications/automation-events.jsonl` は low-value log として retention/delete 対象にする
 
 ## Documentation Update Order
 
