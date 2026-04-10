@@ -925,6 +925,7 @@ SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/
 
 - `scripts/kanban/kanban_cli.py` に backend adapter 境界を入れ、`soloboard` backend で `task-get`, `task-list`, `task-snapshot-list`, `task-comment-list/create`, `task-transition`, `task-label-add/remove`, `task-relation-list/create/delete`, `task-create`, `task-update`, `label-ensure` を実行できる
 - `task soloboard:doctor`, `task soloboard:api`, `task soloboard:bootstrap` を追加し、SoloBoard runtime 単体でも operator surface を踏める
+- `task soloboard:smoke` を追加し、current kanban compatibility surface を SoloBoard に対して一通り打つ parity smoke を実行できる
 - `task kanban:up/down/logs/url/doctor/api/bootstrap:*` は `KANBAN_BACKEND=soloboard` で SoloBoard 側へ切り替えられる
 - `Portal`, `OIDC`, `A3Engine` の board / lane / tag bootstrap は generic `kanban:bootstrap:*` からも実行できる
 
