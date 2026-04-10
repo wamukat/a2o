@@ -66,7 +66,7 @@ RSpec.describe A3::CLI do
       end
 
       expect(out.string).to include("executed next runnable A3-v2#3030 at implementation")
-      expect(task_repository.fetch("A3-v2#3030").status).to eq(:in_review)
+      expect(task_repository.fetch("A3-v2#3030").status).to eq(:verifying)
     end
   end
 
@@ -153,9 +153,9 @@ RSpec.describe A3::CLI do
       transitions = read_fake_kanban_transitions(fake_cli.fetch(:transitions_path))
 
       expect(out.string).to include("executed next runnable Sample#3046 at implementation")
-      expect(task_repository.fetch("Sample#3046").status).to eq(:in_review)
+      expect(task_repository.fetch("Sample#3046").status).to eq(:verifying)
       expect(transitions.fetch(0).fetch("argv")).to include("task-transition", "--task-id", "3046", "--status", "In progress")
-      expect(transitions.fetch(1).fetch("argv")).to include("task-transition", "--task-id", "3046", "--status", "In review")
+      expect(transitions.fetch(1).fetch("argv")).to include("task-transition", "--task-id", "3046", "--status", "Inspection")
     end
   end
 
@@ -225,7 +225,7 @@ RSpec.describe A3::CLI do
       end
 
       expect(out.string).to include("executed next runnable A3-v2#3030 at implementation")
-      expect(task_repository.fetch("A3-v2#3030").status).to eq(:in_review)
+      expect(task_repository.fetch("A3-v2#3030").status).to eq(:verifying)
     end
   end
 
@@ -301,9 +301,9 @@ RSpec.describe A3::CLI do
       transitions = read_fake_kanban_transitions(fake_cli.fetch(:transitions_path))
 
       expect(out.string).to include("executed next runnable Sample#3045 at implementation")
-      expect(task_repository.fetch("Sample#3045").status).to eq(:in_review)
+      expect(task_repository.fetch("Sample#3045").status).to eq(:verifying)
       expect(transitions.fetch(0).fetch("argv")).to include("task-transition", "--task-id", "3045", "--status", "In progress")
-      expect(transitions.fetch(1).fetch("argv")).to include("task-transition", "--task-id", "3045", "--status", "In review")
+      expect(transitions.fetch(1).fetch("argv")).to include("task-transition", "--task-id", "3045", "--status", "Inspection")
     end
   end
 

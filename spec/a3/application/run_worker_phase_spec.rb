@@ -19,6 +19,7 @@ RSpec.describe A3::Application::RunWorkerPhase do
   end
   let(:prepare_workspace) { instance_double(A3::Application::PrepareWorkspace) }
   let(:worker_gateway) { instance_double("WorkerGateway") }
+  let(:task_packet_builder) { ->(task:) { { "task_ref" => task.ref } } }
 
   subject(:use_case) do
     described_class.new(
@@ -26,7 +27,8 @@ RSpec.describe A3::Application::RunWorkerPhase do
       run_repository: run_repository,
       register_completed_run: register_completed_run,
       prepare_workspace: prepare_workspace,
-      worker_gateway: worker_gateway
+      worker_gateway: worker_gateway,
+      task_packet_builder: task_packet_builder
     )
   end
 
@@ -163,23 +165,26 @@ RSpec.describe A3::Application::RunWorkerPhase do
     run_repository.save(review_run)
   end
 
-  it "runs implementation through the worker gateway and advances to review" do
+  it "runs implementation through the worker gateway and advances to verification" do
     allow(prepare_workspace).to receive(:call).and_return(
       A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
     )
     allow(worker_gateway).to receive(:run).with(
-      skill: "skills/implementation/base.md",
-      workspace: prepared_workspace,
-      task: task,
-      run: run,
-      phase_runtime: project_context.resolve_phase_runtime(task: task, phase: run.phase)
+      hash_including(
+        skill: "skills/implementation/base.md",
+        workspace: prepared_workspace,
+        task: task,
+        run: run,
+        phase_runtime: project_context.resolve_phase_runtime(task: task, phase: run.phase),
+        task_packet: { "task_ref" => task.ref }
+      )
     ).and_return(
       A3::Application::ExecutionResult.new(success: true, summary: "implementation completed")
     )
 
     result = use_case.call(task_ref: task.ref, run_ref: run.ref, project_context: project_context)
 
-    expect(result.task.status).to eq(:in_review)
+    expect(result.task.status).to eq(:verifying)
     expect(result.run.terminal_outcome).to eq(:completed)
     expect(result.workspace).to eq(prepared_workspace)
     expect(result.run.phase_records.last.verification_summary).to be_nil
@@ -384,11 +389,14 @@ RSpec.describe A3::Application::RunWorkerPhase do
       A3::Application::PrepareWorkspace::Result.new(workspace: review_workspace)
     )
     allow(worker_gateway).to receive(:run).with(
-      skill: "skills/review/base.md",
-      workspace: review_workspace,
-      task: review_task,
-      run: review_run,
-      phase_runtime: project_context.resolve_phase_runtime(task: review_task, phase: review_run.phase)
+      hash_including(
+        skill: "skills/review/base.md",
+        workspace: review_workspace,
+        task: review_task,
+        run: review_run,
+        phase_runtime: project_context.resolve_phase_runtime(task: review_task, phase: review_run.phase),
+        task_packet: { "task_ref" => review_task.ref }
+      )
     ).and_return(
       A3::Application::ExecutionResult.new(success: true, summary: "review completed")
     )

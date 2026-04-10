@@ -11,12 +11,12 @@ module A3
 
       NEXT_PHASE_BY_KIND = {
         single: {
-          implementation: :review,
+          implementation: :verification,
           review: :verification,
           verification: :merge
         }.freeze,
         child: {
-          implementation: :review,
+          implementation: :verification,
           review: :verification,
           verification: :merge
         }.freeze,

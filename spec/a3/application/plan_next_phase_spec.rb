@@ -11,7 +11,7 @@ RSpec.describe A3::Application::PlanNextPhase do
     )
   end
 
-  it "moves a child task from implementation to review" do
+  it "moves a child task from implementation to verification" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",
       kind: :child,
@@ -45,7 +45,7 @@ RSpec.describe A3::Application::PlanNextPhase do
 
     result = use_case.call(task: task, run: run, outcome: :completed)
 
-    expect(result.next_phase).to eq(:review)
+    expect(result.next_phase).to eq(:verification)
   end
 
   it "moves a parent task from review to verification" do

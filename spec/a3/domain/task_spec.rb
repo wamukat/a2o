@@ -25,14 +25,14 @@ RSpec.describe A3::Domain::Task do
   end
 
   describe "#next_phase_for" do
-    it "returns review after child implementation" do
+    it "returns verification after child implementation" do
       task = described_class.new(
         ref: "A3-v2#3025",
         kind: :child,
         edit_scope: [:repo_alpha]
       )
 
-      expect(task.next_phase_for(:implementation)).to eq(:review)
+      expect(task.next_phase_for(:implementation)).to eq(:verification)
     end
 
     it "returns verification after parent review" do
@@ -166,9 +166,9 @@ RSpec.describe A3::Domain::Task do
         current_run_ref: "run-1"
       )
 
-      updated = task.complete_run(next_phase: :review, terminal_status: nil)
+      updated = task.complete_run(next_phase: :verification, terminal_status: nil)
 
-      expect(updated.status).to eq(:in_review)
+      expect(updated.status).to eq(:verifying)
       expect(updated.current_run_ref).to be_nil
       expect(task.current_run_ref).to eq("run-1")
     end

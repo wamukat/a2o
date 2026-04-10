@@ -16,8 +16,8 @@ RSpec.describe A3::Domain::PhasePolicy do
   end
 
   describe "#next_phase_for" do
-    it "returns review after implementation" do
-      expect(policy.next_phase_for(:implementation)).to eq(:review)
+    it "returns verification after implementation" do
+      expect(policy.next_phase_for(:implementation)).to eq(:verification)
     end
 
     it "returns merge after verification for parent tasks" do

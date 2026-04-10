@@ -70,7 +70,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     )
   end
 
-  it "moves a completed implementation run to in_review" do
+  it "moves a completed implementation run to verifying" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",
       kind: :child,
@@ -89,7 +89,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       )
     )
 
-    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :in_review)
+    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :verifying)
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
@@ -97,7 +97,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     )
     result = use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :completed)
 
-    expect(result.task.status).to eq(:in_review)
+    expect(result.task.status).to eq(:verifying)
     expect(result.task.current_run_ref).to be_nil
     expect(result.run.terminal_outcome).to eq(:completed)
   end

@@ -118,7 +118,7 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
       strategy: strategy
     )
 
-    expect(result.task.status).to eq(:in_review)
+    expect(result.task.status).to eq(:verifying)
     expect(result.workspace).to eq(prepared_workspace)
     expect(strategy).to have_received(:execute).with(
       task: task,

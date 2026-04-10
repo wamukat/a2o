@@ -12,6 +12,19 @@ RSpec.describe A3::CLI do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)
       seed_context(dir)
+      fake_cli = create_fake_kanban_cli(
+        dir,
+        snapshots: [
+          {
+            "id" => 3025,
+            "ref" => "A3-v2#3025",
+            "title" => "Implementation task",
+            "description" => "Run implementation worker.",
+            "status" => "In progress",
+            "labels" => ["repo:alpha"]
+          }
+        ]
+      )
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
       run_repository = A3::Infra::SqliteRunRepository.new(File.join(dir, "a3.sqlite3"))
       task_repository.save(
@@ -22,7 +35,8 @@ RSpec.describe A3::CLI do
           verification_scope: %i[repo_alpha repo_beta],
           status: :in_progress,
           current_run_ref: "run-worker-1",
-          parent_ref: "A3-v2#3022"
+          parent_ref: "A3-v2#3022",
+          external_task_id: 3025
         )
       )
       run_repository.save(
@@ -60,23 +74,30 @@ RSpec.describe A3::CLI do
       )
 
       out = StringIO.new
-      described_class.start(
-        [
-          "run-worker-phase",
-          "A3-v2#3025",
-          "run-worker-1",
-          File.join(dir, "manifest.yml"),
-          "--storage-backend", "sqlite",
-          "--storage-dir", dir,
-          *repo_source_args(repo_sources),
-          "--preset-dir", File.join(dir, "presets")
-        ],
-        out: out,
-        worker_gateway: worker_gateway
-      )
+      with_env(fake_cli.fetch(:env)) do
+        described_class.start(
+          [
+            "run-worker-phase",
+            "A3-v2#3025",
+            "run-worker-1",
+            File.join(dir, "manifest.yml"),
+            "--storage-backend", "sqlite",
+            "--storage-dir", dir,
+            *repo_source_args(repo_sources),
+            "--preset-dir", File.join(dir, "presets"),
+            "--kanban-command", "ruby",
+            "--kanban-command-arg", fake_cli.fetch(:script_path),
+            "--kanban-project", "A3-v2",
+            "--kanban-repo-label", "repo:alpha=repo_alpha",
+            "--kanban-working-dir", dir
+          ],
+          out: out,
+          worker_gateway: worker_gateway
+        )
+      end
 
       expect(out.string).to include("worker phase completed run-worker-1")
-      expect(task_repository.fetch("A3-v2#3025").status).to eq(:in_review)
+      expect(task_repository.fetch("A3-v2#3025").status).to eq(:verifying)
     end
   end
 
@@ -84,6 +105,19 @@ RSpec.describe A3::CLI do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)
       seed_context(dir)
+      fake_cli = create_fake_kanban_cli(
+        dir,
+        snapshots: [
+          {
+            "id" => 3026,
+            "ref" => "A3-v2#3026",
+            "title" => "Review task",
+            "description" => "Run review worker.",
+            "status" => "In review",
+            "labels" => ["repo:alpha"]
+          }
+        ]
+      )
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
       run_repository = A3::Infra::SqliteRunRepository.new(File.join(dir, "a3.sqlite3"))
       task_repository.save(
@@ -94,7 +128,8 @@ RSpec.describe A3::CLI do
           verification_scope: %i[repo_alpha repo_beta],
           status: :in_review,
           current_run_ref: "run-review-1",
-          parent_ref: "A3-v2#3022"
+          parent_ref: "A3-v2#3022",
+          external_task_id: 3026
         )
       )
       run_repository.save(
@@ -132,20 +167,27 @@ RSpec.describe A3::CLI do
       )
 
       out = StringIO.new
-      described_class.start(
-        [
-          "run-worker-phase",
-          "A3-v2#3026",
-          "run-review-1",
-          File.join(dir, "manifest.yml"),
-          "--storage-backend", "sqlite",
-          "--storage-dir", dir,
-          *repo_source_args(repo_sources),
-          "--preset-dir", File.join(dir, "presets")
-        ],
-        out: out,
-        worker_gateway: worker_gateway
-      )
+      with_env(fake_cli.fetch(:env)) do
+        described_class.start(
+          [
+            "run-worker-phase",
+            "A3-v2#3026",
+            "run-review-1",
+            File.join(dir, "manifest.yml"),
+            "--storage-backend", "sqlite",
+            "--storage-dir", dir,
+            *repo_source_args(repo_sources),
+            "--preset-dir", File.join(dir, "presets"),
+            "--kanban-command", "ruby",
+            "--kanban-command-arg", fake_cli.fetch(:script_path),
+            "--kanban-project", "A3-v2",
+            "--kanban-repo-label", "repo:alpha=repo_alpha",
+            "--kanban-working-dir", dir
+          ],
+          out: out,
+          worker_gateway: worker_gateway
+        )
+      end
 
       expect(out.string).to include("worker phase completed run-review-1")
       expect(task_repository.fetch("A3-v2#3026").status).to eq(:verifying)
@@ -156,6 +198,19 @@ RSpec.describe A3::CLI do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)
       seed_context(dir)
+      fake_cli = create_fake_kanban_cli(
+        dir,
+        snapshots: [
+          {
+            "id" => 3027,
+            "ref" => "A3-v2#3027",
+            "title" => "Default gateway task",
+            "description" => "Run default gateway worker.",
+            "status" => "In progress",
+            "labels" => ["repo:alpha"]
+          }
+        ]
+      )
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
       run_repository = A3::Infra::SqliteRunRepository.new(File.join(dir, "a3.sqlite3"))
       task_repository.save(
@@ -166,7 +221,8 @@ RSpec.describe A3::CLI do
           verification_scope: %i[repo_alpha repo_beta],
           status: :in_progress,
           current_run_ref: "run-default-gateway-1",
-          parent_ref: "A3-v2#3022"
+          parent_ref: "A3-v2#3022",
+          external_task_id: 3027
         )
       )
       run_repository.save(
@@ -221,23 +277,30 @@ RSpec.describe A3::CLI do
       end
 
       out = StringIO.new
-      described_class.start(
-        [
-          "run-worker-phase",
-          "A3-v2#3027",
-          "run-default-gateway-1",
-          File.join(dir, "manifest.yml"),
-          "--storage-backend", "sqlite",
-          "--storage-dir", dir,
-          *repo_source_args(repo_sources),
-          "--preset-dir", File.join(dir, "presets")
-        ],
-        out: out,
-        command_runner: command_runner
-      )
+      with_env(fake_cli.fetch(:env)) do
+        described_class.start(
+          [
+            "run-worker-phase",
+            "A3-v2#3027",
+            "run-default-gateway-1",
+            File.join(dir, "manifest.yml"),
+            "--storage-backend", "sqlite",
+            "--storage-dir", dir,
+            *repo_source_args(repo_sources),
+            "--preset-dir", File.join(dir, "presets"),
+            "--kanban-command", "ruby",
+            "--kanban-command-arg", fake_cli.fetch(:script_path),
+            "--kanban-project", "A3-v2",
+            "--kanban-repo-label", "repo:alpha=repo_alpha",
+            "--kanban-working-dir", dir
+          ],
+          out: out,
+          command_runner: command_runner
+        )
+      end
 
       expect(out.string).to include("worker phase completed run-default-gateway-1")
-      expect(task_repository.fetch("A3-v2#3027").status).to eq(:in_review)
+      expect(task_repository.fetch("A3-v2#3027").status).to eq(:verifying)
     end
   end
 
@@ -264,7 +327,8 @@ RSpec.describe A3::CLI do
           "presets" => ["base"],
           "core" => {
             "merge_target" => "merge_to_parent",
-            "merge_policy" => "ff_only"
+            "merge_policy" => "ff_only",
+            "merge_target_ref" => "refs/heads/a3/parent/default"
           }
         }
       )
