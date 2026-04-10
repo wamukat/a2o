@@ -861,7 +861,7 @@ cleanup は「registered worktree を source repo から外す責務」と「調
 
 ### 0.4.5 Kanboard standard backend plan
 
-2026-04-09 時点で、A3-v2 の標準 kanban backend は `Kanboard` に固定する。`Portal` 上の Kanboard baseline canary は `Portal#3170/#3171/#3172`, `Portal#3173/#3174/#3175`, `Portal#3179`, `Portal#3180` で完了しており、当面はこの current surface を正規運用経路として維持する。Redmine backend 実験は破棄し、既存 `Portal` / `A3-v2` project の live data migration や新規 bootstrap/cutover は計画対象から外した。
+2026-04-10 時点で、A3 Engine の current kanban backend baseline は `Kanboard` である。`Portal` 上の Kanboard baseline canary は `Portal#3170/#3171/#3172`, `Portal#3173/#3174/#3175`, `Portal#3179`, `Portal#3180` で完了しており、current operator surface の正本は引き続きこの経路である。Redmine backend 実験は破棄し、backend 差し替えの次候補は `SoloBoard` に絞る。
 
 Kanboard baseline の current evidence:
 
@@ -876,7 +876,7 @@ Kanboard baseline の current evidence:
 - stale recovery / reconcile canary
   - `Portal#3180` で shot kill / stale run 露出 / `repair-runs --apply` / clean rerun を通し、`Done` まで復旧した
 
-したがって、backend 追加検証を前提に current operator surface を揺らす判断は行わず、Kanboard を唯一の正規 backend として扱う。
+したがって、当面の live backend は Kanboard を維持する。ただし「唯一の正規 backend」として固定し続けるのではなく、next mainline の設計課題として SoloBoard parity と migration を進め、その後に Docker/runtime packaging の標準同梱 backend を一本化する。
 
 #### 契約
 
@@ -897,14 +897,14 @@ Kanboard baseline の current evidence:
     - `task-create`
     - `label-ensure`
 - `Project Surface` は backend 固有の domain rule を持たず、backend 差分は launcher/bootstrap/adapter に閉じる
-- Redmine backend canary は破棄し、当面の標準 backend は Kanboard に固定する
-- backend 追加検証は再開時に別 spike として扱い、既存 operator surface や launcher contract を同時に揺らさない
+- Redmine backend canary は破棄し、backend 差し替え対象は SoloBoard に絞る
+- current operator surface や launcher contract を揺らさず、差し替えは adapter / bootstrap / Docker packaging の順に閉じ込める
 
 #### 0.4.5.1 SoloBoard 載せ替え可否と対応計画
 
-2026-04-10 時点の調査では、`SoloBoard` は A3 Engine の kanban backend 置き換え候補として検討可能である。判断根拠は、A3 Engine が Kanboard の UI や DB schema ではなく、workspace root の `task kanban:api -- ...` と `scripts/kanban/kanban_cli.py` が提供する compatibility surface に依存している点にある。実運用で踏んでいる contract は `task-snapshot-list`, `task-get`, `task-label-list`, `task-transition`, `task-label-add`, `task-label-remove`, `task-comment-create`, `task-relation-list`, `task-relation-create`, `task-create`, `label-ensure` に集中しており、backend 差分は引き続き launcher/bootstrap/adapter に閉じ込められる見込みが高い。
+2026-04-10 時点の調査では、`SoloBoard` は A3 Engine の kanban backend 置き換え候補として検討可能であり、next mainline の migration target として扱う。判断根拠は、A3 Engine が Kanboard の UI や DB schema ではなく、workspace root の `task kanban:api -- ...` と `scripts/kanban/kanban_cli.py` が提供する compatibility surface に依存している点にある。実運用で踏んでいる contract は `task-snapshot-list`, `task-get`, `task-label-list`, `task-transition`, `task-label-add`, `task-label-remove`, `task-comment-create`, `task-relation-list`, `task-relation-create`, `task-create`, `label-ensure` に集中しており、backend 差分は引き続き launcher/bootstrap/adapter に閉じ込められる見込みが高い。
 
-SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/child`, `transition` を持ち、A3 Engine が現在使っている operator surface の主要部分を受け止められる。特に `Done` 列と completion flag の分離は現行 Kanboard 運用でも `task-transition --complete` により CLI 側で吸収しているため、SoloBoard だけが新たに持ち込む制約ではない。したがって、載せ替えの主戦場は `Taskfile` と `scripts/kanban/kanban_cli.py` であり、A3 Engine runtime 本体へ backend 固有分岐を持ち込まずに進める方針を維持できる。
+SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/child`, `transition` を持ち、A3 Engine が現在使っている operator surface の主要部分を受け止められる。さらに `GET /api/tickets/{ticketId}/comments`, `GET /api/tickets/{ticketId}/relations`, `PATCH /api/tickets/{ticketId}/transition`, `ref` / `shortRef` が OpenAPI に入っており、A3 adapter で必要だった補助 API も揃い始めている。特に `Done` 列と completion flag の分離は現行 Kanboard 運用でも `task-transition --complete` により CLI 側で吸収しているため、SoloBoard だけが新たに持ち込む制約ではない。したがって、載せ替えの主戦場は `Taskfile` と `scripts/kanban/kanban_cli.py` であり、A3 Engine runtime 本体へ backend 固有分岐を持ち込まずに進める方針を維持できる。
 
 対応計画:
 
@@ -913,11 +913,12 @@ SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/
 - step 3: `project -> board`, `status -> lane`, `done flag -> isCompleted` を adapter 規約として固定し、canonical ref `Portal#123` を維持する
 - step 4: relation は現行利用が濃い `subtask` と blocking 系を優先し、workspace 実使用の薄い relation kind は必要になるまで広げない
 - step 5: `Taskfile` / bootstrap / doctor / up/down を SoloBoard runtime に差し替えて canary し、operator surface が維持されることを確認する
-- step 6: SoloBoard の Docker runtime を標準起動経路として整理し、`task kanban:up` / `task kanban:down` / `task kanban:logs` / `task kanban:url` がその経路を指すようにする。公開ポート番号も既存 Kanboard と同じ値を維持し、operator の接続先を変えない
-- step 7: bootstrap は SoloBoard board/lane/label 初期化まで含め、既存の `Portal` / `OIDC` / `A3Engine` surface を再現できるようにする
-- step 8: parity が取れるまで標準 backend は Kanboard のまま据え置き、SoloBoard は spike/canary として扱う
+- step 6: Docker/runtime packaging は SoloBoard parity 後に着手し、A3 runtime と kanban backend を同一 compose/runtime bundle として同梱する
+- step 7: SoloBoard の Docker runtime を標準起動経路として整理し、`task kanban:up` / `task kanban:down` / `task kanban:logs` / `task kanban:url` がその経路を指すようにする。公開ポート番号も既存 Kanboard と同じ値を維持し、operator の接続先を変えない
+- step 8: bootstrap は SoloBoard board/lane/label 初期化まで含め、既存の `Portal` / `OIDC` / `A3Engine` surface を再現できるようにする
+- step 9: parity が取れるまで live backend は Kanboard のまま据え置き、SoloBoard は canary として扱う
 
-この検討のゴールは「backend を増やすこと」ではなく、「A3 Engine runtime が backend 非依存 contract に本当に閉じているか」を current surface で実証することにある。SoloBoard はその検証対象として妥当であり、実装着手時も `Project Surface` と phase rule を backend 固有都合で汚染しないことを継続条件とする。
+この検討のゴールは「backend を増やすこと」ではなく、「A3 Engine runtime が backend 非依存 contract に本当に閉じているか」を current surface で実証し、Docker/runtime packaging 前に bundled kanban backend を一本化することにある。SoloBoard はその検証対象として妥当であり、実装着手時も `Project Surface` と phase rule を backend 固有都合で汚染しないことを継続条件とする。
 
 #### 0.4.5.2 phase model 再検討メモ
 

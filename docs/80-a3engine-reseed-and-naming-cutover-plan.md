@@ -12,7 +12,8 @@ current `a3-v2` を future `a3-engine` base として seed するため、`a3-en
 ## 前提
 
 - `Kanboard baseline` は完了している
-- Redmine backend 実験は破棄済みで、Kanboard が唯一の正規 backend である
+- Redmine backend 実験は破棄済みで、current baseline backend は Kanboard である
+- next の backend migration target は SoloBoard であり、Docker/runtime packaging は SoloBoard parity judgment の後に行う
 - 現行 `a3-engine` は、そのまま上書きせず `a3-engine-legacy` として退避してから新しい `a3-engine` を作る
 
 ## 進め方

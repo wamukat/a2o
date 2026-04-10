@@ -114,8 +114,16 @@ current `a3-v2` を future `a3-engine` base として seed するため、`a3-en
 ## Next Design Slice
 
 - [ ] single / child 向け phase redesign slice
-  現状: fresh な `single` / `child` は `implementation completed -> verification` へ進み、kanban status も `Inspection` へ遷移する。implementation worker は optional `review_disposition(kind=completed)` を返せるようになり、self-review clean の evidence は implementation run record と operator view に保持できる。あわせて `single` / `child` では `review` を canonical support phase から外し、Kanban 由来の `In review` も child/single では `Inspection` 相当へ正規化するようにした。watch-summary など operator 表示は canonical 4 phase を維持している。runtime / CLI / manual worker flow に残っていた child review 前提は撤去済みで、operator/read-model でも historical な `child in_review / phase=review` は `verification` / `Inspection` 相当へ投影するようにした。残りは CLI / operator wording を 3 段 canonical へ揃えること。
+  現状: fresh な `single` / `child` は `implementation completed -> verification` へ進み、kanban status も `Inspection` へ遷移する。implementation worker は optional `review_disposition(kind=completed)` を返せるようになり、self-review clean の evidence は implementation run record と operator view に保持できる。あわせて `single` / `child` では `review` を canonical support phase から外し、Kanban 由来の `In review` も child/single では `Inspection` 相当へ正規化するようにした。watch-summary は canonical 4 phase を維持しつつ、current runtime / CLI / manual worker flow / operator read model から child review 前提は撤去済みである。残りは current 3-phase child flow を実 canary で継続確認しつつ、backend adapter 差し替え時に phase rule が backend 固有都合で汚染されないことを検証すること。
   根拠: `docs/60-container-distribution-and-project-runtime.md` の `0.4.5.2` と `0.4.5.3`
+
+- [ ] SoloBoard backend replacement preparation
+  現状: SoloBoard は `comments`, `relations`, `transition`, `ref` / `shortRef` を含む API を公開しており、A3 Engine が現在使う kanban compatibility surface を adapter 経由で受け止められる見込みが高い。計画上も Kanboard fixed ではなく、Kanboard baseline を current operator surface としつつ SoloBoard を next backend migration target に昇格した。
+  残課題:
+  - `task kanban:api -- ...` current contract を regression test で固定する
+  - `scripts/kanban/kanban_cli.py` へ backend adapter 境界を入れる
+  - SoloBoard canary と Docker bundle の順序を保ち、backend parity 前に runtime packaging を固定しない
+  根拠: `docs/60-container-distribution-and-project-runtime.md` の `0.4.5.1`
 
 ## Portal Dev 実運用トラック
 
