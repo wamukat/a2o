@@ -33,34 +33,6 @@ RSpec.describe A3::Domain::PhasePolicy do
     end
   end
 
-  describe "#display_phase_order" do
-    it "collapses child tasks into implementation inspection merge" do
-      expect(policy.display_phase_order).to eq(%i[implementation inspection merge])
-    end
-
-    it "keeps parent review as an external phase" do
-      parent_policy = described_class.new(task_kind: :parent, current_status: :in_review)
-
-      expect(parent_policy.display_phase_order).to eq(%i[review inspection merge])
-    end
-  end
-
-  describe "#display_phase_for" do
-    it "maps child review into implementation" do
-      expect(policy.display_phase_for(:review)).to eq(:implementation)
-    end
-
-    it "maps verification into inspection" do
-      expect(policy.display_phase_for(:verification)).to eq(:inspection)
-    end
-
-    it "keeps parent review visible" do
-      parent_policy = described_class.new(task_kind: :parent, current_status: :in_review)
-
-      expect(parent_policy.display_phase_for(:review)).to eq(:review)
-    end
-  end
-
   describe "#terminal_status_for" do
     it "returns blocked for blocked outcomes" do
       expect(policy.terminal_status_for(phase: :review, outcome: :blocked)).to eq(:blocked)

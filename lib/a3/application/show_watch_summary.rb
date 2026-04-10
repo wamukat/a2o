@@ -70,11 +70,10 @@ module A3
 
       def build_task_entry(task, runs_by_task:)
         task_runs = runs_by_task.fetch(task.ref, [])
-        phase_policy = A3::Domain::PhasePolicy.new(task_kind: task.kind, current_status: task.status)
         current_run = task.current_run_ref && task_runs.find { |candidate| candidate.ref == task.current_run_ref }
         latest_run = task_runs.last
-        latest_phase = resolve_latest_phase(current_run: current_run, latest_run: latest_run, phase_policy: phase_policy)
-        running_entry = build_running_entry(task, run: current_run, phase_policy: phase_policy)
+        latest_phase = resolve_latest_phase(current_run: current_run, latest_run: latest_run)
+        running_entry = build_running_entry(task, run: current_run)
         blocked_lines = build_blocked_lines(latest_run)
         kanban_snapshot = resolve_kanban_snapshot(task)
 
@@ -90,7 +89,7 @@ module A3
           blocked: task.status.to_sym == :blocked,
           blocked_lines: blocked_lines,
           running_entry: running_entry,
-          phase_counts: phase_counts_for(task_runs, phase_policy: phase_policy),
+          phase_counts: phase_counts_for(task_runs),
           latest_phase: latest_phase
         )
       end
@@ -123,16 +122,15 @@ module A3
         }.fetch(status, status.to_s)
       end
 
-      def build_running_entry(task, run:, phase_policy:)
+      def build_running_entry(task, run:)
         return nil unless running_status?(task.status.to_sym)
         return nil unless run
 
-        internal_phase = run.phase.to_sym
-        display_phase = phase_policy.display_phase_for(internal_phase) || internal_phase
+        phase = run.phase.to_sym.to_s
         RunningEntry.new(
           task_ref: task.ref,
-          phase: display_phase.to_s,
-          internal_phase: internal_phase.to_s,
+          phase: phase,
+          internal_phase: phase,
           state: "running_command",
           heartbeat_age_seconds: nil,
           detail: run.source_descriptor.ref
@@ -153,23 +151,30 @@ module A3
         [diagnosis.diagnostic_summary || diagnosis.observed_state].compact.map(&:to_s).reject(&:empty?).freeze
       end
 
-      def phase_counts_for(task_runs, phase_policy:)
+      def phase_counts_for(task_runs)
         task_runs.each_with_object(Hash.new(0)) do |run, counts|
-          phase = normalize_phase(run.phase.to_sym, phase_policy: phase_policy)
+          phase = normalize_phase(run.phase.to_sym.to_s)
           counts[phase] += 1 if phase
         end
       end
 
-      def resolve_latest_phase(current_run:, latest_run:, phase_policy:)
+      def resolve_latest_phase(current_run:, latest_run:)
         [current_run, latest_run].compact.reverse_each do |run|
-          normalized = normalize_phase(run.phase.to_sym, phase_policy: phase_policy)
+          normalized = normalize_phase(run.phase.to_sym.to_s)
           return normalized if normalized
         end
         nil
       end
 
-      def normalize_phase(value, phase_policy:)
-        phase_policy.display_phase_for(value)&.to_s
+      def normalize_phase(value)
+        {
+          "implementation" => "implementation",
+          "review" => "review",
+          "verification" => "inspection",
+          "verifying" => "inspection",
+          "merge" => "merge",
+          "merging" => "merge"
+        }[value]
       end
 
       def sort_tasks_for_tree(tasks)
