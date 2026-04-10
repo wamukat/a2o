@@ -940,6 +940,36 @@ SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/
 
 この検討のゴールは「backend を増やすこと」ではなく、「A3 Engine runtime が backend 非依存 contract に本当に閉じているか」を current surface で実証し、Docker/runtime packaging 前に bundled kanban backend を一本化することにある。SoloBoard はその検証対象として妥当であり、実装着手時も `Project Surface` と phase rule を backend 固有都合で汚染しないことを継続条件とする。
 
+#### 0.4.5.1a Docker/runtime packaging freeze inputs
+
+SoloBoard を current generic default に寄せた時点で、Docker/runtime packaging で先に固定すべき入力は次のとおりである。
+
+- bundle contents
+  - `a3-runtime` container
+    - `a3-engine/bin/a3`
+    - current preset/config
+    - workspace root の `scripts/a3/*` thin launcher / operator helper
+  - `soloboard` container
+    - board/lane/tag bootstrap を含む current backend
+  - shared writable state volume
+    - `.work/a3/*`
+    - backend state
+    - scheduler/runtime logs
+- operator entrypoints to preserve
+  - `task kanban:*`
+  - `task a3:portal:*`
+  - `task a3:portal:cutover:doctor`
+- compatibility entrypoints to keep explicit
+  - `KANBAN_BACKEND=kanboard task kanban:*`
+  - `kanboard:*`
+- freeze acceptance before compose lock
+  - isolated single canary が `Done`
+  - isolated parent-child canary が `Done`
+  - current mainline cutover doctor が SoloBoard default で通る
+  - repeated scheduler-loop 観測で追加 hardening 要否が判断できる
+
+したがって、次の packaging slice では compose 設計そのものより先に「どの entrypoint を bundle 後も変えないか」と「Kanboard compatibility path を bundle に残すか外出しするか」を確定する。
+
 #### 0.4.5.2 phase model 再検討メモ
 
 Kanboard baseline canary を通した結果、A3-v2 のような自動実行では `review` を独立 phase として持つ価値が薄く見えていた。特に軽量 task では、`review` を通しても最終的には `verification` の通過可否で戻し先が決まるため、中間 phase と Kanban 列の往復がオーバーヘッドになりやすい。2026-04-10 時点では、この再設計は fresh `single` / `child` について実装済みで、現行正本は `single/child = implementation -> verification -> merge`, `parent = review -> verification -> merge` である。
