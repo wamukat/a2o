@@ -100,28 +100,30 @@ The following are stable enough for continued migration work:
 - SoloBoard parity smoke
 - isolated A3 no-op canary on `.work/a3/portal-soloboard-canary`
 - `plan-next-runnable-task` selection smoke against labeled SoloBoard tasks
+- isolated single full-phase canary on `Portal#17`
+- isolated parent-child canary on `Portal#18/#19/#20`
 
 ## What Still Needs More Evidence
 
-The following are not yet proven by a full end-to-end SoloBoard canary:
+The following still need more evidence:
 
-- full child `implementation -> verification -> merge`
-- parent finalize on SoloBoard backend
 - repeated scheduler-loop operation over time
-- whether transition/relation confirmation also need retry hardening
+- whether `transition`, `relation`, or `done` confirmation also need the same retry hardening as labels under heavier write volume
+- whether mainline non-isolated Portal storage can switch defaults without operational surprises
 
 ## Current Judgment
 
 Current judgment is:
 
 - SoloBoard is usable as the next backend migration target
+- SoloBoard has already passed isolated single and parent-child end-to-end canaries
 - the main observed instability is short-lived post-mutation read inconsistency
 - this is not currently a blocker for continued migration work
-- but it is still too early to call the backend fully production-ready for A3 without a full-phase isolated canary
+- but it still needs longer-running scheduler evidence before calling the backend fully production-ready for A3
 
 ## Recommended Next Checks
 
-1. Run an isolated SoloBoard child canary through full phase completion.
+1. Observe repeated scheduler-loop operation on SoloBoard backend for drift or read-after-write gaps.
 2. Observe whether `transition`, `relation`, or `done` confirmation need the same retry treatment as labels.
-3. Run a parent finalize canary on the same isolated storage.
-4. Only after those pass, make the live backend cutover judgment.
+3. Complete mainline cutover judgment for generic `task kanban:*` and explicit Kanboard compatibility path.
+4. Only after those hold, lock Docker/runtime packaging to SoloBoard.
