@@ -2,6 +2,7 @@
 
 require "tmpdir"
 require "yaml"
+require "shellwords"
 
 RSpec.describe A3::CLI do
   let(:command_runner) { instance_double("CommandRunner") }
@@ -54,6 +55,12 @@ RSpec.describe A3::CLI do
           )
         )
       )
+      allow(command_runner).to receive(:run).and_return(
+        A3::Application::ExecutionResult.new(
+          success: true,
+          summary: "commands/apply-remediation ok"
+        )
+      )
       allow(command_runner).to receive(:run).with(
         ["commands/verify-all"],
         workspace: an_instance_of(A3::Domain::PreparedWorkspace)
@@ -88,8 +95,18 @@ RSpec.describe A3::CLI do
 
   it "runs merge end-to-end through sqlite backend" do
     Dir.mktmpdir do |dir|
-      repo_sources = create_repo_sources(dir)
+      create_git_repo_source(dir, name: "repo-alpha-source", file_content: "repo_alpha source\n")
+      create_git_repo_source(dir, name: "repo-beta-source", file_content: "repo_beta source\n")
+      repo_sources = {
+        repo_alpha: File.join(dir, "repo-alpha-source"),
+        repo_beta: File.join(dir, "repo-beta-source")
+      }
       seed_merge_child_context(dir)
+      repo_sources.each_value do |repo_path|
+        head = `git -C #{Shellwords.escape(repo_path)} rev-parse HEAD`.strip
+        system("git", "-C", repo_path, "update-ref", "refs/heads/a3/parent/A3-v2-3022", head, exception: true, out: File::NULL, err: File::NULL)
+        system("git", "-C", repo_path, "update-ref", "refs/heads/a3/work/3025", head, exception: true, out: File::NULL, err: File::NULL)
+      end
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
       run_repository = A3::Infra::SqliteRunRepository.new(File.join(dir, "a3.sqlite3"))
       task_repository.save(
@@ -166,8 +183,14 @@ RSpec.describe A3::CLI do
 
   it "accepts kanban bridge options when running merge directly" do
     Dir.mktmpdir do |dir|
-      repo_sources = create_repo_sources(dir)
+      create_git_repo_source(dir, name: "repo-alpha-source", file_content: "repo_alpha source\n")
+      repo_sources = {
+        repo_alpha: File.join(dir, "repo-alpha-source")
+      }
       seed_merge_child_context(dir)
+      head = `git -C #{Shellwords.escape(repo_sources.fetch(:repo_alpha))} rev-parse HEAD`.strip
+      system("git", "-C", repo_sources.fetch(:repo_alpha), "update-ref", "refs/heads/a3/parent/A3-v2-3022", head, exception: true, out: File::NULL, err: File::NULL)
+      system("git", "-C", repo_sources.fetch(:repo_alpha), "update-ref", "refs/heads/a3/work/3028", head, exception: true, out: File::NULL, err: File::NULL)
       kanban_stub = File.join(dir, "kanban_stub.py")
       File.write(
         kanban_stub,
@@ -183,6 +206,14 @@ RSpec.describe A3::CLI do
             print(json.dumps({"id": 3028, "ref": "A3-v2#3028"}))
           elif command == "task-transition":
             print(json.dumps({"ok": True}))
+          elif command == "task-label-list":
+            print(json.dumps([]))
+          elif command == "task-label-add":
+            print(json.dumps([]))
+          elif command == "task-label-remove":
+            print(json.dumps([]))
+          elif command == "task-comment-create":
+            print(json.dumps({"id": 1, "comment": "ok"}))
           else:
             raise SystemExit(f"unsupported command: {command}")
         PY
@@ -288,7 +319,8 @@ RSpec.describe A3::CLI do
           "presets" => ["base"],
           "core" => {
             "merge_target" => "merge_to_parent",
-            "merge_policy" => "ff_only"
+            "merge_policy" => "ff_only",
+            "merge_target_ref" => "refs/heads/a3/parent/A3-v2-3022"
           }
         }
       )

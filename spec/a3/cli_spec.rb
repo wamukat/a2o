@@ -788,7 +788,7 @@ RSpec.describe A3::CLI do
       persisted_run = run_repository.fetch("run-1")
 
       expect(out.string).to include("completed run run-1")
-      expect(persisted_task.status).to eq(:in_review)
+      expect(persisted_task.status).to eq(:verifying)
       expect(persisted_task.current_run_ref).to be_nil
       expect(persisted_run.terminal_outcome).to eq(:completed)
     end
