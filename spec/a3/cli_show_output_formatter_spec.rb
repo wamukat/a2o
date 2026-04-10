@@ -690,8 +690,8 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
 
     result = described_class.run_lines(run_view)
 
-    expect(result).to include("run run-1 task=A3-v2#child phase=review workspace=runtime_workspace source=detached_commit:head456 outcome=blocked")
-    expect(result).to include("latest_execution phase=review summary=review launch could not resolve runtime workspace")
+    expect(result).to include("run run-1 task=A3-v2#child phase=verification workspace=runtime_workspace source=detached_commit:head456 outcome=blocked")
+    expect(result).to include("latest_execution phase=verification summary=review launch could not resolve runtime workspace")
     expect(result).to include("worker_response_bundle={\"success\"=>false, \"summary\"=>\"review blocked\", \"failing_command\"=>\"codex exec --json -\", \"observed_state\"=>\"repo-beta missing\"}")
     expect(result).to include("runtime_package_action=inspect_runtime_package")
     expect(result).to include("runtime_package_guidance=run doctor-runtime and inspect repo sources, secret delivery, and scheduler store migration before rerun")
@@ -726,6 +726,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     run_view = A3::Domain::OperatorInspectionReadModel::RunView.new(
       ref: "run-impl-1",
       task_ref: "A3-v2#child",
+      task_kind: :child,
       phase: :implementation,
       workspace_kind: :ticket_workspace,
       source_type: :branch_head,

@@ -179,8 +179,8 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
       expect(result.topology.children).to contain_exactly(
         have_attributes(ref: "A3-v2#child", status: :missing, current_run_ref: nil)
       )
-      expect(result.runnable_assessment.reason).to eq(:parent_waiting_for_children)
-      expect(result.runnable_assessment.blocking_task_refs).to eq(["A3-v2#child"])
+      expect(result.runnable_assessment.reason).to eq(:runnable)
+      expect(result.runnable_assessment.blocking_task_refs).to eq([])
     end
   end
 
@@ -284,7 +284,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
       expect(result.ref).to eq("run-1")
       expect(result.evidence_summary.review_base).to eq("base123")
       expect(result.evidence_summary.phase_records_count).to eq(2)
-      expect(result.latest_execution.phase).to eq(:review)
+      expect(result.latest_execution.phase).to eq(:verification)
       expect(result.latest_execution.summary).to eq("review launch could not resolve runtime workspace")
       expect(result.latest_execution.verification_summary).to be_nil
       expect(result.latest_execution.diagnostics).to eq(
@@ -309,7 +309,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
         merge_target: :merge_to_parent
       )
       expect(result.latest_blocked_diagnosis).to have_attributes(
-        phase: :review,
+        phase: :verification,
         summary: "review launch could not resolve runtime workspace",
         expected_state: "runtime workspace available",
         observed_state: "repo-beta missing",

@@ -21,7 +21,8 @@ module A3
 
         A3::Domain::OperatorInspectionReadModel::RunView.from_run(
           run,
-          recovery: recovery.recovery
+          recovery: recovery.recovery,
+          task_kind: task.kind
         )
       end
     end

@@ -254,9 +254,9 @@ RSpec.describe A3::Application::ShowWatchSummary do
     task_entry = result.tasks.find { |item| item.ref == "Portal#imported-7" }
     expect(task_entry.title).to include("Imported task")
     expect(task_entry.title).to include("[kanban=To do internal=Blocked]")
-    expect(task_entry.latest_phase).to eq("review")
+    expect(task_entry.latest_phase).to eq("inspection")
     expect(task_entry.blocked_lines).to eq(["review blocked"])
-    expect(task_entry.phase_counts).to eq("implementation" => 1, "review" => 1)
+    expect(task_entry.phase_counts).to eq("implementation" => 1, "inspection" => 1)
   end
 
   it "treats in-review tasks with a current run as running review work" do
@@ -300,8 +300,8 @@ RSpec.describe A3::Application::ShowWatchSummary do
 
     task_entry = result.tasks.find { |item| item.ref == "Portal#3141" }
     expect(task_entry.running).to be(true)
-    expect(task_entry.latest_phase).to eq("review")
+    expect(task_entry.latest_phase).to eq("inspection")
     expect(result.running_entries.map(&:task_ref)).to eq(["Portal#3141"])
-    expect(result.running_entries.first.phase).to eq("review")
+    expect(result.running_entries.first.phase).to eq("verification")
   end
 end

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../../task_phase_projection"
+
 module A3
   module Domain
     class OperatorInspectionReadModel
@@ -29,7 +31,7 @@ module A3
             new(
               task_kind: runtime_snapshot.task_kind,
               repo_scope: runtime_snapshot.repo_scope,
-              phase: runtime_snapshot.phase,
+              phase: A3::Domain::TaskPhaseProjection.phase_for(task_kind: runtime_snapshot.task_kind, phase: runtime_snapshot.phase),
               implementation_skill: runtime_snapshot.implementation_skill,
               review_skill: runtime_snapshot.review_skill,
               verification_commands: runtime_snapshot.verification_commands,

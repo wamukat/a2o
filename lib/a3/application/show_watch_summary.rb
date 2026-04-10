@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../domain/task_phase_projection"
+
 module A3
   module Application
     class ShowWatchSummary
@@ -72,7 +74,8 @@ module A3
         task_runs = runs_by_task.fetch(task.ref, [])
         current_run = task.current_run_ref && task_runs.find { |candidate| candidate.ref == task.current_run_ref }
         latest_run = task_runs.last
-        latest_phase = resolve_latest_phase(current_run: current_run, latest_run: latest_run)
+        canonical_status = canonical_status_for(task)
+        latest_phase = resolve_latest_phase(task: task, current_run: current_run, latest_run: latest_run)
         running_entry = build_running_entry(task, run: current_run)
         blocked_lines = build_blocked_lines(latest_run)
         kanban_snapshot = resolve_kanban_snapshot(task)
@@ -80,16 +83,16 @@ module A3
         TaskEntry.new(
           ref: task.ref,
           title: display_title(task, kanban_snapshot: kanban_snapshot),
-          status: display_status(task.status.to_sym),
+          status: display_status(canonical_status),
           parent_ref: task.parent_ref,
-          next_candidate: task.status.to_sym == :todo,
+          next_candidate: canonical_status == :todo,
           running: !running_entry.nil?,
           waiting: false,
-          done: task.status.to_sym == :done,
-          blocked: task.status.to_sym == :blocked,
+          done: canonical_status == :done,
+          blocked: canonical_status == :blocked,
           blocked_lines: blocked_lines,
           running_entry: running_entry,
-          phase_counts: phase_counts_for(task_runs),
+          phase_counts: phase_counts_for(task, task_runs),
           latest_phase: latest_phase
         )
       end
@@ -123,10 +126,10 @@ module A3
       end
 
       def build_running_entry(task, run:)
-        return nil unless running_status?(task.status.to_sym)
+        return nil unless running_status?(canonical_status_for(task))
         return nil unless run
 
-        phase = run.phase.to_sym.to_s
+        phase = canonical_phase_for(task, run.phase).to_s
         RunningEntry.new(
           task_ref: task.ref,
           phase: phase,
@@ -151,19 +154,27 @@ module A3
         [diagnosis.diagnostic_summary || diagnosis.observed_state].compact.map(&:to_s).reject(&:empty?).freeze
       end
 
-      def phase_counts_for(task_runs)
+      def phase_counts_for(task, task_runs)
         task_runs.each_with_object(Hash.new(0)) do |run, counts|
-          phase = normalize_phase(run.phase.to_sym.to_s)
+          phase = normalize_phase(canonical_phase_for(task, run.phase).to_s)
           counts[phase] += 1 if phase
         end
       end
 
-      def resolve_latest_phase(current_run:, latest_run:)
+      def resolve_latest_phase(task:, current_run:, latest_run:)
         [current_run, latest_run].compact.reverse_each do |run|
-          normalized = normalize_phase(run.phase.to_sym.to_s)
+          normalized = normalize_phase(canonical_phase_for(task, run.phase).to_s)
           return normalized if normalized
         end
         nil
+      end
+
+      def canonical_status_for(task)
+        A3::Domain::TaskPhaseProjection.status_for(task_kind: task.kind, status: task.status)
+      end
+
+      def canonical_phase_for(task, phase)
+        A3::Domain::TaskPhaseProjection.phase_for(task_kind: task.kind, phase: phase)
       end
 
       def normalize_phase(value)
