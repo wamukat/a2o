@@ -114,7 +114,7 @@ current `a3-v2` を future `a3-engine` base として seed するため、`a3-en
 ## Next Design Slice
 
 - [ ] single / child 向け phase redesign slice
-  現状: fresh な `single` / `child` は `implementation completed -> verification` へ進み、kanban status も `Inspection` へ遷移する。implementation worker は optional `review_disposition(kind=completed)` を返せるようになり、self-review clean の evidence は implementation run record と operator view に保持できる。あわせて `single` / `child` では `review` を canonical support phase から外し、Kanban 由来の `In review` も child/single では `Inspection` 相当へ正規化するようにした。watch-summary など operator 表示は canonical 4 phase を維持している。残りは CLI / operator wording を 3 段 canonical へ揃えること。
+  現状: fresh な `single` / `child` は `implementation completed -> verification` へ進み、kanban status も `Inspection` へ遷移する。implementation worker は optional `review_disposition(kind=completed)` を返せるようになり、self-review clean の evidence は implementation run record と operator view に保持できる。あわせて `single` / `child` では `review` を canonical support phase から外し、Kanban 由来の `In review` も child/single では `Inspection` 相当へ正規化するようにした。watch-summary など operator 表示は canonical 4 phase を維持している。runtime / CLI / manual worker flow に残っていた child review 前提は撤去済みで、残っている `child in_review / phase=review` fixture は historical run 観測互換として意図的に保留している。残りは historical compatibility を維持するか捨てるかの判断を明文化し、その結論に沿って operator/read-model 側の痕跡を整理すること。
   根拠: `docs/60-container-distribution-and-project-runtime.md` の `0.4.5.2` と `0.4.5.3`
 
 ## Portal Dev 実運用トラック
