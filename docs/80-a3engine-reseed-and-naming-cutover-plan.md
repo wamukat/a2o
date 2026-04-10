@@ -651,8 +651,9 @@ Stop:
   - historical `.work/a3-v2/*` archive/delete
   - cache/log size cap
 - current 進捗メモ
-  - root cleanup は current scheduler quarantine (`.work/a3/portal-kanban-scheduler-auto/quarantine/*`) と disposable cache (`.work/cache/m2-seed`) を age-based に候補化できる状態まで進めた
-  - 次段の未完は size budget / count budget / scheduler-loop からの自動 cleanup 連携
+  - root cleanup は current scheduler quarantine (`.work/a3/portal-kanban-scheduler-auto/quarantine/*`) と legacy results/logs に age+count retention を掛けられる状態まで進めた
+  - disposable cache (`.work/cache/m2-seed`) も age-based に候補化できる
+  - 次段の未完は size budget と scheduler-loop からの自動 cleanup 連携
 
 ## Documentation Update Order
 

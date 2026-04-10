@@ -85,6 +85,42 @@ RSpec.describe A3RootUtilityLauncher do
     )
   end
 
+  it "passes explicit cleanup count budgets through to the root script" do
+    allow(described_class).to receive(:run_simple_script).and_return(0)
+
+    rc = described_class.main(
+      [
+        "cleanup",
+        "--project", "portal-dev",
+        "--max-quarantine-count", "5",
+        "--max-result-count", "10",
+        "--max-log-count", "8"
+      ]
+    )
+
+    expect(rc).to eq(0)
+    expect(described_class).to have_received(:run_simple_script).with(
+      described_class::CLEANUP_SCRIPT,
+      [
+        "--project", "portal-dev",
+        "--kanban-project", "Portal",
+        "--root-dir", described_class::ROOT_DIR.to_s,
+        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "active-runs.json").to_s,
+        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "worker-runs.json").to_s,
+        "--launcher-config", described_class::CONFIG_DIR.join("portal-dev", "launcher.json").to_s,
+        "--done-ttl-hours", "24",
+        "--blocked-ttl-hours", "24",
+        "--result-ttl-hours", "168",
+        "--log-ttl-hours", "168",
+        "--quarantine-ttl-hours", "168",
+        "--cache-ttl-hours", "168",
+        "--max-quarantine-count", "5",
+        "--max-result-count", "10",
+        "--max-log-count", "8"
+      ]
+    )
+  end
+
   it "uses project defaults for reconcile-active-runs" do
     allow(described_class).to receive(:run_reconcile_command).and_return(0)
 
