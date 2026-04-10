@@ -111,6 +111,12 @@ current `a3-v2` を future `a3-engine` base として seed するため、`a3-en
   現状: launchd / cron / systemd-timer backend について、launcher config から deterministic な packaging artifact を describe/materialize できる。
   根拠: `a3_engine/scheduler_packaging.py`, `tests/test_scheduler_packaging.py`, `scripts/a3/run.py`
 
+## Next Design Slice
+
+- [ ] single / child 向け phase redesign slice
+  現状: current canonical phase は引き続き `implementation -> review -> verification -> merge` だが、cleanup / retention と parent-child canary は完了したため、次の設計課題は single / child の external phase を `implementation -> verification -> merge` へ縮約する slice である。`parent` は first slice では `review -> verification -> merge` を維持し、review evidence は implementation run 配下の structured evidence として残す。
+  根拠: `docs/60-container-distribution-and-project-runtime.md` の `0.4.5.2` と `0.4.5.3`
+
 ## Portal Dev 実運用トラック
 
 - [x] isolated repo bootstrap
