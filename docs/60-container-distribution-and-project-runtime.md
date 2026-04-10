@@ -913,10 +913,13 @@ SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/
 - step 3: `project -> board`, `status -> lane`, `done flag -> isCompleted` を adapter 規約として固定し、canonical ref `Portal#123` を維持する
 - step 4: relation は現行利用が濃い `subtask` と blocking 系を優先し、workspace 実使用の薄い relation kind は必要になるまで広げない
 - step 5: `Taskfile` / bootstrap / doctor / up/down を SoloBoard runtime に差し替えて canary し、operator surface が維持されることを確認する
+- step 5a: bootstrap には board 作成だけでなく、lane 順序整備、tag 初期化、`Portal` / `OIDC` / `A3Engine` board の初期 seed、初回 ticket 作成まで含める
 - step 6: Docker/runtime packaging は SoloBoard parity 後に着手し、A3 runtime と kanban backend を同一 compose/runtime bundle として同梱する
 - step 7: SoloBoard の Docker runtime を標準起動経路として整理し、`task kanban:up` / `task kanban:down` / `task kanban:logs` / `task kanban:url` がその経路を指すようにする。公開ポート番号も既存 Kanboard と同じ値を維持し、operator の接続先を変えない
 - step 8: bootstrap は SoloBoard board/lane/label 初期化まで含め、既存の `Portal` / `OIDC` / `A3Engine` surface を再現できるようにする
 - step 9: parity が取れるまで live backend は Kanboard のまま据え置き、SoloBoard は canary として扱う
+
+2026-04-10 の local spike では、SoloBoard を Docker で `http://127.0.0.1:3460` に起動し、board 作成、lane 初期化、tag 作成、ticket 作成、parent/child 参照、blocker 更新、comment 作成、lane name による transition、detail / relations / comments / ticket list の取得まで確認した。したがって、bootstrap は単なる board seed ではなく「A3 current surface が要求する operator 初期化」を担うものとして設計する。
 
 この検討のゴールは「backend を増やすこと」ではなく、「A3 Engine runtime が backend 非依存 contract に本当に閉じているか」を current surface で実証し、Docker/runtime packaging 前に bundled kanban backend を一本化することにある。SoloBoard はその検証対象として妥当であり、実装着手時も `Project Surface` と phase rule を backend 固有都合で汚染しないことを継続条件とする。
 

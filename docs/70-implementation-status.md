@@ -118,10 +118,11 @@ current `a3-v2` を future `a3-engine` base として seed するため、`a3-en
   根拠: `docs/60-container-distribution-and-project-runtime.md` の `0.4.5.2` と `0.4.5.3`
 
 - [ ] SoloBoard backend replacement preparation
-  現状: SoloBoard は `comments`, `relations`, `transition`, `ref` / `shortRef` を含む API を公開しており、A3 Engine が現在使う kanban compatibility surface を adapter 経由で受け止められる見込みが高い。計画上も Kanboard fixed ではなく、Kanboard baseline を current operator surface としつつ SoloBoard を next backend migration target に昇格した。
+  現状: SoloBoard は `comments`, `relations`, `transition`, `ref` / `shortRef` を含む API を公開しており、A3 Engine が現在使う kanban compatibility surface を adapter 経由で受け止められる見込みが高い。計画上も Kanboard fixed ではなく、Kanboard baseline を current operator surface としつつ SoloBoard を next backend migration target に昇格した。local Docker spike では `http://127.0.0.1:3460` で board / lane / tag / ticket / relation / comment / transition / list 系 API の疎通を確認済み。
   残課題:
   - `task kanban:api -- ...` current contract を regression test で固定する
   - `scripts/kanban/kanban_cli.py` へ backend adapter 境界を入れる
+  - bootstrap に board / lane / tag / initial ticket seed を含める
   - SoloBoard canary と Docker bundle の順序を保ち、backend parity 前に runtime packaging を固定しない
   根拠: `docs/60-container-distribution-and-project-runtime.md` の `0.4.5.1`
 
