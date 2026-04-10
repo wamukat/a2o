@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../../domain/task_phase_projection"
+
 module A3
   module CLI
       module ShowOutputFormatter
@@ -11,9 +13,10 @@ module A3
             diagnosis = result.diagnosis
             recovery = result.recovery
             worker_response_bundle = result.worker_response_bundle
+            phase = A3::Domain::TaskPhaseProjection.phase_for(task_kind: result.task.kind, phase: diagnosis.phase)
 
             output << "blocked diagnosis #{diagnosis.outcome} for #{result.run.ref} on #{result.task.ref}"
-            output << "phase=#{diagnosis.phase} observed=#{diagnosis.observed_state}"
+            output << "phase=#{phase} observed=#{diagnosis.observed_state}"
             output << "expected=#{diagnosis.expected_state}"
             output << "failing_command=#{diagnosis.failing_command}"
             output << "summary=#{diagnosis.diagnostic_summary}"

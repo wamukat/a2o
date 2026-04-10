@@ -70,4 +70,55 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("merge_target=merge_to_parent")
     end
   end
+
+  it "does not print review_skill for child implementation runtime config" do
+    Dir.mktmpdir do |dir|
+      preset_dir = File.join(dir, "presets")
+      FileUtils.mkdir_p(preset_dir)
+      File.write(
+        File.join(preset_dir, "base.yml"),
+        YAML.dump(
+          {
+            "schema_version" => "1",
+            "implementation_skill" => "skills/implementation/base.md",
+            "review_skill" => "skills/review/default.md",
+            "verification_commands" => ["commands/verify-all"],
+            "remediation_commands" => ["commands/apply-remediation"],
+            "workspace_hook" => "hooks/prepare-runtime.sh"
+          }
+        )
+      )
+      manifest_path = File.join(dir, "manifest.yml")
+      File.write(
+        manifest_path,
+        YAML.dump(
+          {
+            "presets" => ["base"],
+            "core" => {
+              "merge_target" => "merge_to_parent",
+              "merge_policy" => "ff_only",
+              "merge_target_ref" => "refs/heads/a3/parent/A3-v2-3022"
+            }
+          }
+        )
+      )
+
+      out = StringIO.new
+
+      described_class.start(
+        [
+          "show-phase-runtime-config",
+          manifest_path,
+          "--preset-dir", preset_dir,
+          "--task-kind", "child",
+          "--repo-scope", "repo_alpha",
+          "--phase", "implementation"
+        ],
+        out: out
+      )
+
+      expect(out.string).to include("implementation_skill=skills/implementation/base.md")
+      expect(out.string).not_to include("review_skill=")
+    end
+  end
 end

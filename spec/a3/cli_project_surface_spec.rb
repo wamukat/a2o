@@ -65,4 +65,41 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("verification_commands=commands/verify-all")
     end
   end
+
+  it "does not print review_skill for child implementation surface" do
+    Dir.mktmpdir do |dir|
+      preset_dir = File.join(dir, "presets")
+      FileUtils.mkdir_p(preset_dir)
+      File.write(
+        File.join(preset_dir, "base.yml"),
+        YAML.dump(
+          {
+            "schema_version" => "1",
+            "implementation_skill" => "skills/implementation/base.md",
+            "review_skill" => "skills/review/default.md",
+            "verification_commands" => ["commands/verify-all"]
+          }
+        )
+      )
+      manifest_path = File.join(dir, "manifest.yml")
+      File.write(manifest_path, YAML.dump({ "presets" => ["base"] }))
+
+      out = StringIO.new
+
+      described_class.start(
+        [
+          "show-project-surface",
+          manifest_path,
+          "--preset-dir", preset_dir,
+          "--task-kind", "child",
+          "--repo-scope", "repo_alpha",
+          "--phase", "implementation"
+        ],
+        out: out
+      )
+
+      expect(out.string).to include("implementation_skill=skills/implementation/base.md")
+      expect(out.string).not_to include("review_skill=")
+    end
+  end
 end

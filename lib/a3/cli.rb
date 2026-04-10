@@ -437,7 +437,9 @@ module A3
       surface = load_project_surface(options)
 
       out.puts("implementation_skill=#{surface.resolve(:implementation_skill, task_kind: options.fetch(:task_kind), repo_scope: options.fetch(:repo_scope), phase: options.fetch(:phase))}")
-      out.puts("review_skill=#{surface.resolve(:review_skill, task_kind: options.fetch(:task_kind), repo_scope: options.fetch(:repo_scope), phase: options.fetch(:phase))}")
+      if options.fetch(:task_kind) == :parent && options.fetch(:phase) == :review
+        out.puts("review_skill=#{surface.resolve(:review_skill, task_kind: options.fetch(:task_kind), repo_scope: options.fetch(:repo_scope), phase: options.fetch(:phase))}")
+      end
       out.puts("verification_commands=#{surface.verification_commands.join(' ')}")
     end
 
@@ -463,7 +465,7 @@ module A3
         runtime = session.project_context.resolve_phase_runtime(task: preview_task(session.options), phase: session.options.fetch(:phase))
 
         out.puts("implementation_skill=#{runtime.implementation_skill}")
-        out.puts("review_skill=#{runtime.review_skill}")
+        out.puts("review_skill=#{runtime.review_skill}") if session.options.fetch(:task_kind) == :parent && session.options.fetch(:phase) == :review
         out.puts("merge_target=#{runtime.merge_target}")
         out.puts("merge_policy=#{runtime.merge_policy}")
       end
