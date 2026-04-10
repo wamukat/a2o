@@ -9,6 +9,8 @@ module A3
       Result = Struct.new(:task, :run, :workspace, keyword_init: true)
 
       def initialize(task_repository:, run_repository:, register_completed_run:, prepare_workspace:, worker_gateway:, task_packet_builder:, workspace_change_publisher: A3::Infra::LocalWorkspaceChangePublisher.new, blocked_diagnosis_factory: A3::Domain::BlockedDiagnosisFactory.new)
+        @task_repository = task_repository
+        @run_repository = run_repository
         @strategy = A3::Application::WorkerPhaseExecutionStrategy.new(
           worker_gateway: worker_gateway,
           task_packet_builder: task_packet_builder,
@@ -24,11 +26,18 @@ module A3
       end
 
       def call(task_ref:, run_ref:, project_context:)
+        task = @task_repository.fetch(task_ref)
+        run = @run_repository.fetch(run_ref)
+        phase_name = run.phase.to_sym
+        raise A3::Domain::InvalidPhaseError, "Unsupported phase #{phase_name} for #{task.kind}" unless task.supports_phase?(phase_name)
+
         @flow.call(
           task_ref: task_ref,
           run_ref: run_ref,
           project_context: project_context,
-          strategy: @strategy
+          strategy: @strategy,
+          task: task,
+          run: run
         )
       end
     end

@@ -90,12 +90,12 @@ RSpec.describe A3::Application::RunWorkerPhase do
   let(:review_task) do
     A3::Domain::Task.new(
       ref: "A3-v2#3026",
-      kind: :child,
-      edit_scope: [:repo_alpha],
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
       verification_scope: %i[repo_alpha repo_beta],
       status: :in_review,
       current_run_ref: "run-review-1",
-      parent_ref: "A3-v2#3022"
+      child_refs: ["A3-v2#3030", "A3-v2#3031"]
     )
   end
 
@@ -123,8 +123,8 @@ RSpec.describe A3::Application::RunWorkerPhase do
         phase_ref: :review
       ),
       artifact_owner: A3::Domain::ArtifactOwner.new(
-        owner_ref: "A3-v2#3022",
-        owner_scope: :task,
+        owner_ref: "A3-v2#3026",
+        owner_scope: :parent,
         snapshot_version: "head999"
       )
     )
@@ -267,15 +267,7 @@ RSpec.describe A3::Application::RunWorkerPhase do
       phase: :review,
       review_skill: "skills/review/base.md"
     )
-    expect(result.run.phase_records.last.blocked_diagnosis&.infra_diagnostics).to include(
-      "stderr" => "refresh failed",
-      "worker_response_bundle" => {
-        "success" => false,
-        "summary" => "review blocked",
-        "failing_command" => "worker review",
-        "observed_state" => "blocked_refresh_failure"
-      }
-    )
+    expect(result.run.phase_records.last.blocked_diagnosis&.infra_diagnostics).to eq({})
   end
 
   it "connects worker result schema failures to blocked phase outcome diagnostics" do
@@ -407,5 +399,54 @@ RSpec.describe A3::Application::RunWorkerPhase do
     expect(result.run.terminal_outcome).to eq(:completed)
     expect(result.workspace).to eq(review_workspace)
     expect(result.run.phase_records.last.execution_record&.summary).to eq("review completed")
+  end
+
+  it "rejects an unsupported child review rerun before invoking the worker gateway" do
+    child_review_task = A3::Domain::Task.new(
+      ref: "A3-v2#3099",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: %i[repo_alpha repo_beta],
+      status: :in_review,
+      current_run_ref: "run-review-child-1",
+      parent_ref: "A3-v2#3022"
+    )
+    child_review_run = A3::Domain::Run.new(
+      ref: "run-review-child-1",
+      task_ref: child_review_task.ref,
+      phase: :review,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :integration_record,
+        ref: "refs/heads/a3/work/3099",
+        task_ref: child_review_task.ref
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_alpha],
+        verification_scope: %i[repo_alpha repo_beta],
+        ownership_scope: :task
+      ),
+      review_target: A3::Domain::ReviewTarget.new(
+        base_commit: "base3099",
+        head_commit: "head3099",
+        task_ref: child_review_task.ref,
+        phase_ref: :review
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: "A3-v2#3022",
+        owner_scope: :task,
+        snapshot_version: "head3099"
+      )
+    )
+    task_repository.save(child_review_task)
+    run_repository.save(child_review_run)
+    allow(worker_gateway).to receive(:run)
+
+    expect do
+      use_case.call(task_ref: child_review_task.ref, run_ref: child_review_run.ref, project_context: project_context)
+    end.to raise_error(A3::Domain::InvalidPhaseError, "Unsupported phase review for child")
+
+    expect(worker_gateway).not_to have_received(:run)
   end
 end
