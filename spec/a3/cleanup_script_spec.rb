@@ -458,4 +458,93 @@ RSpec.describe A3Cleanup do
       expect(candidates.select { |item| item.reason == "log_count>1" }.map(&:task_ref)).to eq(["Portal#3231"])
     end
   end
+
+  it "selects quarantine/result/log surplus beyond size budgets" do
+    Dir.mktmpdir("a3-cleanup-") do |dir|
+      root = Pathname(dir)
+      quarantine_older = root.join(".work", "a3", "portal-kanban-scheduler-auto", "quarantine", "Portal-3231")
+      quarantine_newer = root.join(".work", "a3", "portal-kanban-scheduler-auto", "quarantine", "Portal-3238")
+      result_older = root.join(".work", "a3", "results", "portal", "20260322T000000Z-Portal-3231.json")
+      result_newer = root.join(".work", "a3", "results", "portal", "20260323T000000Z-Portal-3238.json")
+      log_older = root.join(".work", "a3", "results", "logs", "portal", "Portal-3231")
+      log_newer = root.join(".work", "a3", "results", "logs", "portal", "Portal-3238")
+      [quarantine_older, quarantine_newer, log_older, log_newer].each { |path| FileUtils.mkdir_p(path) }
+      FileUtils.mkdir_p(result_older.dirname)
+      File.write(quarantine_older.join("payload.txt"), "x" * 16)
+      File.write(quarantine_newer.join("payload.txt"), "x" * 16)
+      File.write(result_older, "x" * 16)
+      File.write(result_newer, "x" * 16)
+      File.write(log_older.join("payload.txt"), "x" * 16)
+      File.write(log_newer.join("payload.txt"), "x" * 16)
+      now = Time.now.utc
+      [quarantine_older, result_older, log_older].each { |path| File.utime(now - 3600, now - 3600, path) }
+      [quarantine_newer, result_newer, log_newer].each { |path| File.utime(now, now, path) }
+
+      candidates = described_class.build_cleanup_candidates(
+        root_dir: root,
+        project: "portal",
+        task_project_ref: nil,
+        task_snapshots: [
+          { "ref" => "Portal#3231", "status" => "Done", "labels" => [] },
+          { "ref" => "Portal#3238", "status" => "Done", "labels" => [] }
+        ],
+        active_refs: Set.new,
+        now: now,
+        done_ttl_hours: 999,
+        blocked_ttl_hours: 999,
+        result_ttl_hours: 999,
+        log_ttl_hours: 999,
+        quarantine_ttl_hours: 999,
+        cache_ttl_hours: 999,
+        max_quarantine_count: nil,
+        max_result_count: nil,
+        max_log_count: nil,
+        max_quarantine_bytes: 20,
+        max_result_bytes: 20,
+        max_log_bytes: 20,
+        max_cache_bytes: nil
+      )
+
+      expect(candidates.map(&:reason)).to include("quarantine_bytes>20")
+      expect(candidates.map(&:reason)).to include("result_bytes>20")
+      expect(candidates.map(&:reason)).to include("log_bytes>20")
+      expect(candidates.select { |item| item.reason == "quarantine_bytes>20" }.map(&:task_ref)).to eq(["Portal#3231"])
+      expect(candidates.select { |item| item.reason == "result_bytes>20" }.map(&:task_ref)).to eq(["Portal#3231"])
+      expect(candidates.select { |item| item.reason == "log_bytes>20" }.map(&:task_ref)).to eq(["Portal#3231"])
+    end
+  end
+
+  it "selects disposable cache surplus beyond size budget" do
+    Dir.mktmpdir("a3-cleanup-") do |dir|
+      root = Pathname(dir)
+      cache_dir = root.join(".work", "cache", "m2-seed")
+      FileUtils.mkdir_p(cache_dir)
+      File.write(cache_dir.join("payload.txt"), "x" * 16)
+
+      candidates = described_class.build_cleanup_candidates(
+        root_dir: root,
+        project: "portal",
+        task_project_ref: nil,
+        task_snapshots: [],
+        active_refs: Set.new,
+        now: Time.now.utc,
+        done_ttl_hours: 999,
+        blocked_ttl_hours: 999,
+        result_ttl_hours: 999,
+        log_ttl_hours: 999,
+        quarantine_ttl_hours: 999,
+        cache_ttl_hours: 999,
+        max_quarantine_count: nil,
+        max_result_count: nil,
+        max_log_count: nil,
+        max_quarantine_bytes: nil,
+        max_result_bytes: nil,
+        max_log_bytes: nil,
+        max_cache_bytes: 10
+      )
+
+      expect(candidates.map(&:reason)).to include("cache_bytes>10")
+      expect(candidates.map(&:kind)).to include("cache_dir")
+    end
+  end
 end
