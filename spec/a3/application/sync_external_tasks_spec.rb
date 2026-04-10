@@ -145,7 +145,7 @@ RSpec.describe A3::Application::SyncExternalTasks do
       kind: :single,
       edit_scope: [:repo_beta],
       verification_scope: [:repo_beta],
-      status: :in_review,
+      status: :verifying,
       external_task_id: 3046
     )
     refreshed_task = A3::Domain::Task.new(
@@ -153,7 +153,7 @@ RSpec.describe A3::Application::SyncExternalTasks do
       kind: :single,
       edit_scope: [:repo_beta],
       verification_scope: [:repo_beta],
-      status: :in_review,
+      status: :verifying,
       external_task_id: 3046
     )
     task_repository.save(progressed_task)
@@ -195,6 +195,34 @@ RSpec.describe A3::Application::SyncExternalTasks do
     expect(preserved.child_refs).to eq(["Sample#3047"])
     expect(preserved.status).to eq(:in_review)
     expect(result.pruned_task_refs).to eq([])
+  end
+
+  it "canonicalizes imported child in_review to verifying during refresh" do
+    local_task = A3::Domain::Task.new(
+      ref: "Sample#3046",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :todo,
+      parent_ref: "Sample#3040",
+      external_task_id: 3046
+    )
+    refreshed_task = A3::Domain::Task.new(
+      ref: "Sample#3046",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :verifying,
+      parent_ref: "Sample#3040",
+      external_task_id: 3046
+    )
+    task_repository.save(local_task)
+    allow(external_task_source).to receive(:load).and_return([])
+    allow(external_task_source).to receive(:fetch_by_external_task_id).with(3046).and_return(refreshed_task)
+
+    use_case.call
+
+    expect(task_repository.fetch("Sample#3046").status).to eq(:verifying)
   end
 
   it "refreshes a blocked task from Kanban when the blocked label has been cleared" do

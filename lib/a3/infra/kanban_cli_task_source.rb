@@ -186,12 +186,13 @@ module A3
 
       def build_task_from_snapshot(snapshot, child_refs_by_parent:)
         child_refs = child_refs_by_parent.fetch(snapshot.fetch("ref"), []).sort.freeze
+        task_kind = task_kind_for(snapshot: snapshot, child_refs: child_refs)
         A3::Domain::Task.new(
           ref: snapshot.fetch("ref"),
-          kind: task_kind_for(snapshot: snapshot, child_refs: child_refs),
+          kind: task_kind,
           edit_scope: snapshot.fetch("edit_scope"),
           verification_scope: snapshot.fetch("edit_scope"),
-          status: snapshot.fetch("status"),
+          status: canonicalize_status_for_kind(snapshot.fetch("status"), task_kind),
           parent_ref: snapshot.fetch("parent_ref"),
           child_refs: child_refs,
           external_task_id: snapshot.fetch("task_id")
@@ -199,12 +200,13 @@ module A3
       end
 
       def build_scalar_task_from_snapshot(snapshot)
+        task_kind = task_kind_for(snapshot: snapshot, child_refs: [].freeze)
         A3::Domain::Task.new(
           ref: snapshot.fetch("ref"),
-          kind: task_kind_for(snapshot: snapshot, child_refs: [].freeze),
+          kind: task_kind,
           edit_scope: snapshot.fetch("edit_scope"),
           verification_scope: snapshot.fetch("edit_scope"),
-          status: snapshot.fetch("status"),
+          status: canonicalize_status_for_kind(snapshot.fetch("status"), task_kind),
           parent_ref: snapshot.fetch("parent_ref"),
           child_refs: [],
           external_task_id: snapshot.fetch("task_id")
@@ -216,6 +218,12 @@ module A3
         return :child if snapshot.fetch("parent_ref")
 
         :single
+      end
+
+      def canonicalize_status_for_kind(status, task_kind)
+        return :verifying if status == :in_review && task_kind != :parent
+
+        status
       end
 
       def normalize_snapshot(raw_snapshot, ignore_status_filter: false, ignore_trigger_filter: false)
