@@ -1102,7 +1102,7 @@ transport は次の順で実装する。
 
 workspace materialization の owner は `a3-agent` 側 runtime とする。A3 は source descriptor / repo slot / target ref / isolation requirement を job に含めるが、checkout/worktree 作成、実行前 dirty check、実行後 cleanup、quarantine snapshot 作成は agent が配置された runtime の filesystem で行う。A3 は agent が返す `workspace_descriptor` と artifact/evidence を検証し、phase 開始前の existence guarantee を domain rule として判定する。これにより host runtime と docker dev-env runtime の両方で同じ protocol を使える。
 
-2026-04-11 時点では、Ruby domain 側の最小 contract として `AgentJobRequest`、`AgentJobResult`、`AgentArtifactUpload`、`AgentWorkspaceDescriptor` を追加した。これは agent 本体や HTTP server の完成実装ではなく、A3 control plane が受け入れる job/result JSON shape を先に固定するための実装である。特に `AgentJobResult` は `stdout_log` / `stderr_log` / `combined_log` / `artifacts` の local path field を拒否し、A3-managed artifact store の upload reference だけを受け付ける。あわせて JSON-backed job store と `/v1/agent/jobs` / `/v1/agent/jobs/next` / `/v1/agent/jobs/{job_id}/result` の pull handler を追加し、実 server entrypoint を後続で被せられる状態にした。
+2026-04-11 時点では、Ruby domain 側の最小 contract として `AgentJobRequest`、`AgentJobResult`、`AgentArtifactUpload`、`AgentWorkspaceDescriptor` を追加した。これは agent 本体の完成実装ではなく、A3 control plane が受け入れる job/result JSON shape を先に固定するための実装である。特に `AgentJobResult` は `stdout_log` / `stderr_log` / `combined_log` / `artifacts` の local path field を拒否し、A3-managed artifact store の upload reference だけを受け付ける。あわせて JSON-backed job store と `/v1/agent/jobs` / `/v1/agent/jobs/next` / `/v1/agent/jobs/{job_id}/result` の pull handler を追加し、`a3 agent-server` から同 API を実 HTTP endpoint として listen できる最小 entrypoint まで追加済みである。残りは production daemon 管理、auth、artifact upload store、agent binary 本体との接続である。
 
 #### 0.4.5.2 phase model 再検討メモ
 

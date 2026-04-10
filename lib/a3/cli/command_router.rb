@@ -55,6 +55,7 @@ module A3
         "show-task" => Definition.new(handler: :handle_show_task, session_kind: :storage),
         "show-run" => Definition.new(handler: :handle_show_run, session_kind: :storage_runtime_package),
         "watch-summary" => Definition.new(handler: :handle_watch_summary, session_kind: :storage),
+        "agent-server" => Definition.new(handler: :handle_agent_server, session_kind: :agent_control),
         "run-verification" => Definition.new(handler: :handle_run_verification, needs_worker_gateway: true, session_kind: :runtime),
         "run-worker-phase" => Definition.new(handler: :handle_run_worker_phase, needs_worker_gateway: true, session_kind: :runtime),
         "run-merge" => Definition.new(handler: :handle_run_merge, needs_worker_gateway: true, session_kind: :runtime)

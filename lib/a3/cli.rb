@@ -663,6 +663,20 @@ module A3
       end
     end
 
+    def handle_agent_server(argv, out:)
+      options = parse_agent_server_options(argv)
+      store = A3::Infra::JsonAgentJobStore.new(options.fetch(:job_store_path))
+      handler = A3::Infra::AgentHttpPullHandler.new(job_store: store)
+      server = A3::Infra::AgentHttpPullServer.new(
+        handler: handler,
+        host: options.fetch(:host),
+        port: options.fetch(:port)
+      )
+
+      out.puts("agent server listening on #{options.fetch(:host)}:#{options.fetch(:port)}")
+      server.start
+    end
+
     def parse_start_run_options(argv)
       options = {
         storage_backend: :json,
@@ -930,6 +944,25 @@ module A3
       parser.on("--scope LIST") { |value| options[:scopes] = parse_cleanup_list(value) }
       parser.parse(argv)
 
+      options
+    end
+
+    def parse_agent_server_options(argv)
+      options = {
+        storage_dir: default_storage_dir,
+        host: A3::Infra::AgentHttpPullServer::DEFAULT_HOST,
+        port: A3::Infra::AgentHttpPullServer::DEFAULT_PORT,
+        job_store_path: nil
+      }
+
+      parser = OptionParser.new
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--host HOST") { |value| options[:host] = value }
+      parser.on("--port PORT") { |value| options[:port] = Integer(value) }
+      parser.on("--job-store PATH") { |value| options[:job_store_path] = File.expand_path(value) }
+      parser.parse(argv)
+
+      options[:job_store_path] ||= File.join(options.fetch(:storage_dir), "agent_jobs.json")
       options
     end
 
