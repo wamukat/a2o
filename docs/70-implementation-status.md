@@ -117,15 +117,18 @@ current `a3-v2` を future `a3-engine` base として seed するため、`a3-en
   現状: fresh な `single` / `child` は `implementation completed -> verification` へ進み、kanban status も `Inspection` へ遷移する。implementation worker は optional `review_disposition(kind=completed)` を返せるようになり、self-review clean の evidence は implementation run record と operator view に保持できる。あわせて `single` / `child` では `review` を canonical support phase から外し、Kanban 由来の `In review` も child/single では `Inspection` 相当へ正規化するようにした。watch-summary は canonical 4 phase を維持しつつ、current runtime / CLI / manual worker flow / operator read model から child review 前提は撤去済みである。残りは current 3-phase child flow を実 canary で継続確認しつつ、backend adapter 差し替え時に phase rule が backend 固有都合で汚染されないことを検証すること。
   根拠: `docs/60-container-distribution-and-project-runtime.md` の `0.4.5.2` と `0.4.5.3`
 
-- [ ] SoloBoard backend replacement preparation
-  現状: SoloBoard は `comments`, `relations`, `transition`, `ref` / `shortRef` を含む API を公開しており、A3 Engine が現在使う kanban compatibility surface を adapter 経由で受け止められる。local Docker spike では `http://127.0.0.1:3460` で board / lane / tag / ticket / relation / comment / transition / list 系 API の疎通を確認済みで、workspace root では `task soloboard:doctor`, `task soloboard:api`, `task soloboard:bootstrap`, `task soloboard:smoke` と generic `task kanban:*` / `task kanban:smoke` の既定 backend を SoloBoard に寄せた。さらに `task a3:portal-soloboard:*` の isolated storage surface で single full-phase canary (`Portal#17`) と parent-child canary (`Portal#18/#19/#20`) を current live storage と分離して `Done` まで確認済みであり、mainline 観測用に `task a3:portal:cutover:doctor` / `:kanboard` と `task a3:portal:cutover:observe` を追加した。加えて local bundle spike として `task a3:portal:bundle:up`, `:doctor`, `:bootstrap`, `:smoke`, `:watch-summary`, `:describe-state`, `:run-once` を追加し、A3 runtime container + SoloBoard container の compose 入口と runtime container 内 implementation canary まで実機確認した。bundle state は host `.work` ではなく Docker volume `/var/lib/a3` に置く方針へ変更し、Portal starters の Java 25 前提に合わせて runtime image は Temurin 25 JDK を含む。
+- [ ] SoloBoard bundled kanban and agent runtime packaging
+  現状: SoloBoard は `comments`, `relations`, `transition`, `ref` / `shortRef` を含む API を公開しており、A3 Engine が現在使う kanban compatibility surface を adapter 経由で受け止められる。local Docker spike では `http://127.0.0.1:3460` で board / lane / tag / ticket / relation / comment / transition / list 系 API の疎通を確認済みで、workspace root では `task soloboard:doctor`, `task soloboard:api`, `task soloboard:bootstrap`, `task soloboard:smoke` と generic `task kanban:*` / `task kanban:smoke` の既定 backend を SoloBoard に寄せた。さらに `task a3:portal-soloboard:*` の isolated storage surface で single full-phase canary (`Portal#17`) と parent-child canary (`Portal#18/#19/#20`) を current live storage と分離して `Done` まで確認済みである。加えて local bundle spike として `task a3:portal:bundle:up`, `:doctor`, `:bootstrap`, `:smoke`, `:watch-summary`, `:describe-state`, `:run-once` を追加し、A3 runtime container + SoloBoard container の compose 入口と runtime container 内 implementation canary まで実機確認した。ただしこの spike は Portal verification のために A3 runtime image へ Temurin 25 JDK を入れており、完成形ではない。完成形では `docker:a3` は汎用 control plane、`docker:soloboard` は bundled kanban、project command 実行は host または project dev-env container に配置した `a3-agent` が担当する。
   残課題:
   - current A3 がまだ使っていない command surface を parity 確認する
   - repeated scheduler-loop と長時間運用で read-after-write 揺れが追加 hardening を要しないか確認する
-  - Kanboard compatibility path をどこまで残すか judgment する
-  - SoloBoard current default と local bundle spike を踏まえ、runtime packaging の entrypoint を SoloBoard 前提で固定する
-  - bundle 配布 smoke と Portal full verification の完了条件を分離し、`portal_v2_verification.rb` が使う Maven dependency cache / Docker daemon / retry policy を整理して full verification canary を再実行する
-  根拠: `docs/60-container-distribution-and-project-runtime.md` の `0.4.5.1`
+  - Kanboard compatibility path を撤去または historical path に下げる判断を完了する
+  - A3 image から project 固有 JDK / Maven / verification runtime を剥がす
+  - `a3-agent` の JobRequest / JobResult / lifecycle / policy / transport を実装可能な粒度で固定する
+  - Go single binary agent の scaffold と installer 方針を固定する
+  - Docker compose bundle を `docker:a3` + `docker:soloboard` + optional `docker:dev-env(a3-agent)` の形へ更新する
+  - bundle smoke と Portal full verification の完了条件を分離し、full verification は `a3-agent` 経由で再実行する
+  根拠: `docs/60-container-distribution-and-project-runtime.md` の `0.4.5.1` と `0.4.5.1b`
 
 ## Portal Dev 実運用トラック
 

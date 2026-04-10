@@ -900,20 +900,20 @@ Kanboard baseline の current evidence:
     - `task-relation-create`
     - `task-create`
     - `label-ensure`
-- `Project Surface` は backend 固有の domain rule を持たず、backend 差分は launcher/bootstrap/adapter に閉じる
-- Redmine backend canary は破棄し、backend 差し替え対象は SoloBoard に絞る
-- current operator surface や launcher contract を揺らさず、差し替えは adapter / bootstrap / Docker packaging の順に閉じ込める
+- `Project Surface` は SoloBoard 固有の domain rule を持たず、kanban I/O 差分は launcher/bootstrap/adapter に閉じる
+- Redmine backend canary は破棄し、A3 の bundled kanban は SoloBoard 前提に固定する
+- current operator surface や launcher contract を揺らさず、SoloBoard 固定化は adapter / bootstrap / Docker packaging の順に閉じ込める
 
-#### 0.4.5.1 SoloBoard 載せ替え可否と対応計画
+#### 0.4.5.1 SoloBoard 固定化と対応計画
 
-2026-04-10 時点の調査では、`SoloBoard` は A3 Engine の kanban backend 置き換え候補として検討可能であり、next mainline の migration target として扱う。判断根拠は、A3 Engine が Kanboard の UI や DB schema ではなく、workspace root の `task kanban:api -- ...` と `scripts/kanban/kanban_cli.py` が提供する compatibility surface に依存している点にある。実運用で踏んでいる contract は `task-snapshot-list`, `task-get`, `task-label-list`, `task-transition`, `task-label-add`, `task-label-remove`, `task-comment-create`, `task-relation-list`, `task-relation-create`, `task-create`, `label-ensure` に集中しており、backend 差分は引き続き launcher/bootstrap/adapter に閉じ込められる見込みが高い。
+2026-04-11 時点の方針では、A3 の bundled kanban は `SoloBoard` 前提に固定する。判断根拠は、A3 Engine が Kanboard の UI や DB schema ではなく、workspace root の `task kanban:api -- ...` と `scripts/kanban/kanban_cli.py` が提供する compatibility surface に依存しており、その current surface を SoloBoard が満たせることを local spike と isolated canary で確認した点にある。実運用で踏んでいる contract は `task-snapshot-list`, `task-get`, `task-label-list`, `task-transition`, `task-label-add`, `task-label-remove`, `task-comment-create`, `task-relation-list`, `task-relation-create`, `task-create`, `label-ensure` に集中しており、A3 domain rule は SoloBoard の API shape へ直接依存させない。
 
-SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/child`, `transition` を持ち、A3 Engine が現在使っている operator surface の主要部分を受け止められる。さらに `GET /api/tickets/{ticketId}/comments`, `GET /api/tickets/{ticketId}/relations`, `PATCH /api/tickets/{ticketId}/transition`, `ref` / `shortRef` が OpenAPI に入っており、A3 adapter で必要だった補助 API も揃い始めている。特に `Done` 列と completion flag の分離は現行 Kanboard 運用でも `task-transition --complete` により CLI 側で吸収しているため、SoloBoard だけが新たに持ち込む制約ではない。したがって、載せ替えの主戦場は `Taskfile` と `scripts/kanban/kanban_cli.py` であり、A3 Engine runtime 本体へ backend 固有分岐を持ち込まずに進める方針を維持できる。
+SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/child`, `transition` を持ち、A3 Engine が現在使っている operator surface の主要部分を受け止められる。さらに `GET /api/tickets/{ticketId}/comments`, `GET /api/tickets/{ticketId}/relations`, `PATCH /api/tickets/{ticketId}/transition`, `ref` / `shortRef` が OpenAPI に入っており、A3 adapter で必要だった補助 API も揃い始めている。したがって、今後の主戦場は「kanban backend を増やすこと」ではなく、SoloBoard 固定の compose bundle と bootstrap / doctor / smoke / long-running observation を安定化することである。
 
 対応計画:
 
 - step 1: `task kanban:api -- ...` の current contract を固定し、A3 Engine が実際に使う command/output shape を regression test で保護する
-- step 2: `scripts/kanban/kanban_cli.py` に backend adapter 境界を導入し、Kanboard 実装と SoloBoard 実装を切り替え可能にする
+- step 2: `scripts/kanban/kanban_cli.py` の SoloBoard adapter 境界を維持し、A3 domain rule が SoloBoard API shape に漏れないことを regression test で保護する
 - step 3: `project -> board`, `status -> lane`, `done flag -> isCompleted` を adapter 規約として固定し、canonical ref `Portal#123` を維持する
 - step 4: relation は現行利用が濃い `subtask` と blocking 系を優先し、workspace 実使用の薄い relation kind は必要になるまで広げない
 - step 5: `Taskfile` / bootstrap / doctor / up/down を SoloBoard runtime に差し替えて canary し、operator surface が維持されることを確認する
@@ -921,7 +921,7 @@ SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/
 - step 6: Docker/runtime packaging は SoloBoard parity 後に着手し、A3 runtime と kanban backend を同一 compose/runtime bundle として同梱する
 - step 7: SoloBoard の Docker runtime を標準起動経路として整理し、`task kanban:up` / `task kanban:down` / `task kanban:logs` / `task kanban:url` がその経路を指すようにする。公開ポート番号も既存 Kanboard と同じ値を維持し、operator の接続先を変えない
 - step 8: bootstrap は SoloBoard board/lane/label 初期化まで含め、既存の `Portal` / `OIDC` / `A3Engine` surface を再現できるようにする
-- step 9: isolated canary で single / parent-child が完走した後は、generic operator default を SoloBoard に寄せ、Kanboard は explicit compatibility path に下げる
+- step 9: isolated canary で single / parent-child が完走した後は、generic operator default を SoloBoard に固定し、Kanboard は historical compatibility path として扱う
 
 2026-04-10 の local spike では、SoloBoard を Docker で `http://127.0.0.1:3460` に起動し、board 作成、lane 初期化、tag 作成、ticket 作成、parent/child 参照、blocker 更新、comment 作成、lane name による transition、detail / relations / comments / ticket list の取得まで確認した。したがって、bootstrap は単なる board seed ではなく「A3 current surface が要求する operator 初期化」を担うものとして設計する。
 
@@ -940,25 +940,29 @@ SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/
 - `task kanban:smoke` も `KANBAN_BACKEND=soloboard` で generic 導線から実行できる
 - `Portal`, `OIDC`, `A3Engine` の board / lane / tag bootstrap は generic `kanban:bootstrap:*` からも実行できる
 
-したがって、step 1 から step 5b と isolated canary の single / parent-child 完走までは確認済みであり、残る main work は「未使用 command contract の parity 確認」「長期 scheduler-loop 運用と read-after-write hardening」「Kanboard compatibility path をどこまで残すかの整理」「その後の Docker/runtime packaging」である。
+したがって、step 1 から step 5b と isolated canary の single / parent-child 完走までは確認済みであり、残る main work は「未使用 command contract の parity 確認」「長期 scheduler-loop 運用と read-after-write hardening」「Kanboard compatibility path の撤去/履歴化判断」「Docker/runtime packaging」である。
 
-この検討のゴールは「backend を増やすこと」ではなく、「A3 Engine runtime が backend 非依存 contract に本当に閉じているか」を current surface で実証し、Docker/runtime packaging 前に bundled kanban backend を一本化することにある。SoloBoard はその検証対象として妥当であり、実装着手時も `Project Surface` と phase rule を backend 固有都合で汚染しないことを継続条件とする。
+この検討のゴールは「backend を増やすこと」ではなく、「A3 Engine runtime が SoloBoard を bundled kanban として使うときも Project Surface と phase rule を汚染しないこと」を current surface で実証することにある。実装着手時も `Project Surface` と phase rule を SoloBoard 固有都合で汚染しないことを継続条件とする。
 
 #### 0.4.5.1a Docker/runtime packaging freeze inputs
 
 SoloBoard を current generic default に寄せた時点で、Docker/runtime packaging で先に固定すべき入力は次のとおりである。
 
 - bundle contents
-  - `a3-runtime` container
+  - `a3` container
     - `a3-engine/bin/a3`
     - current preset/config
     - workspace root の `scripts/a3/*` thin launcher / operator helper
   - `soloboard` container
     - board/lane/tag bootstrap を含む current backend
+  - project runtime container or host runtime with `a3-agent`
+    - project 固有 toolchain (`task`, `mvn`, `java`, `npm` など)
+    - A3 job protocol の consumer
+    - log / exit code / artifact collection
   - shared writable state volume
-    - `.work/a3/*`
-    - backend state
-    - scheduler/runtime logs
+    - A3 scheduler/runtime state
+    - SoloBoard state
+    - job result / evidence / runtime logs
 - operator entrypoints to preserve
   - `task kanban:*`
   - `task a3:portal:*`
@@ -973,7 +977,122 @@ SoloBoard を current generic default に寄せた時点で、Docker/runtime pac
   - repeated scheduler-loop 観測で追加 hardening 要否が判断できる
   - local compose bundle (`task a3:portal:bundle:up/bootstrap/doctor/smoke`) が通る
 
-2026-04-11 時点では、workspace root に `docker-compose.a3-portal-soloboard.yml` と `docker/a3-runtime/Dockerfile` を置き、`task a3:portal:bundle:up`, `:doctor`, `:bootstrap`, `:smoke`, `:down`, `:logs` を追加した。local bundle は `a3-runtime` container と `soloboard` container を同一 compose project で起動し、`doctor` で `ruby`, `python3`, `task`, SoloBoard `/api/boards` を確認し、`bootstrap` で `Portal` / `OIDC` / `A3Engine` board/lane/tag surface を seed し、`smoke` で relation/comment/transition を含む compatibility surface を実機確認できる。したがって packaging は「未着手の構想」ではなく local bundle spike まで完了しており、次の slice は volume / state retention と launch entrypoint の固定に寄る。
+2026-04-11 時点では、workspace root に `docker-compose.a3-portal-soloboard.yml` と `docker/a3-runtime/Dockerfile` を置き、`task a3:portal:bundle:up`, `:doctor`, `:bootstrap`, `:smoke`, `:down`, `:logs` を追加した。local bundle は `a3-runtime` container と `soloboard` container を同一 compose project で起動し、`doctor` で `ruby`, `python3`, `task`, SoloBoard `/api/boards` を確認し、`bootstrap` で `Portal` / `OIDC` / `A3Engine` board/lane/tag surface を seed し、`smoke` で relation/comment/transition を含む compatibility surface を実機確認できる。
+
+ただし、この spike では Portal verification を A3 runtime container 内で直接実行するために Temurin 25 JDK を A3 image へ入れており、これは完成形ではない。完成形では A3 container は汎用 orchestration/control plane とし、project 固有 toolchain は host または project dev-env container に配置した `a3-agent` が引き受ける。したがって次の slice は「A3 image から project runtime を剥がす」「A3 job protocol と `a3-agent` MVP を設計する」「SoloBoard 固定 compose bundle に agent service を接続する」に寄せる。
+
+#### 0.4.5.1b A3 container / SoloBoard / project agent deployment shape
+
+A3 の Docker 配布は single container ではなく、SoloBoard と project runtime agent を含む compose bundle として設計する。SoloBoard は A3 image に内包しない。A3 は SoloBoard API を bundled kanban として利用し、project command 実行は `a3-agent` へ job として委譲する。
+
+```text
+--------------------------------------------------+
+| docker compose project                           |
+|                                                  |
+|  +-------------------+                           |
+|  | docker:a3          |                           |
+|  | scheduler/state    |                           |
+|  | kanban adapter     |                           |
+|  | job queue/API      |                           |
+|  +----+----------+---+                           |
+|       |          |                               |
+|       |          | job protocol                  |
+|       |          v                               |
+|       |   +------+----------------+              |
+|       |   | docker:dev-env         |              |
+|       |   | a3-agent               |              |
+|       |   | project toolchain      |              |
+|       |   | task/mvn/java/npm      |              |
+|       |   +-----------------------+              |
+|       |                                          |
+|       | SoloBoard API                            |
+|       v                                          |
+|  +----+--------------+                           |
+|  | docker:soloboard  |                           |
+|  | kanban UI/API     |                           |
+|  +-------------------+                           |
++--------------------------------------------------+
+```
+
+責務境界:
+
+- `docker:a3`
+  - A3 engine / scheduler / orchestration / state / job queue / SoloBoard adapter を持つ
+  - project 固有の JDK / Maven / Node / DB client / test runner は持たない
+  - SoloBoard の board/lane/tag/ticket/comment/label/relation を kanban surface として扱う
+- `docker:soloboard`
+  - A3 bundled kanban service として compose で同梱する
+  - A3 state store ではなく、kanban UI/API として扱う
+  - board/lane/tag bootstrap は A3 bundle bootstrap の一部にする
+- `a3-agent`
+  - host OS、project dev-env container、CI runner のいずれにも配置できる lightweight worker とする
+  - A3 job を pull/claim し、配置先 runtime の command を実行する
+  - stdout/stderr/exit code/artifact/heartbeat を A3 へ返す
+  - policy により workspace / command / env / timeout / artifact path を制限する
+
+初期協調方式は `agent pull` を第一候補とする。agent が自分の runtime 準備完了後に A3 へ接続し、A3 が保持する job queue から work を取るため、A3 container が agent の起動順や配置先を強く仮定しなくてよい。
+
+```text
+docker:a3                       docker:dev-env or host
+---------                       ----------------------
+poll SoloBoard
+plan phase job
+enqueue job
+                                a3-agent polls next job
+                                claim job
+                                run project command
+                                capture logs/artifacts
+                                post result
+read result
+update A3 state
+update SoloBoard
+```
+
+`a3-agent` の技術選択は cross-platform single binary を優先し、Go を第一候補とする。理由は Windows / Linux / macOS の配布が容易で、process execution、signal/cancel、file/HTTP transport、JSON、service 化の実装を runtime 依存なしで持てるためである。A3 本体が Ruby であっても、A3 と agent の境界は JSON job protocol にするため言語差は domain model へ漏れない。
+
+Job protocol の最小 contract:
+
+- `JobRequest`
+  - `job_id`
+  - `task_ref`
+  - `phase`
+  - `runtime_profile`
+  - `working_dir`
+  - `command`
+  - `args`
+  - `env`
+  - `timeout_seconds`
+  - `artifact_rules`
+- `JobResult`
+  - `job_id`
+  - `status`
+  - `exit_code`
+  - `started_at`
+  - `finished_at`
+  - `summary`
+  - `stdout_log`
+  - `stderr_log`
+  - `combined_log`
+  - `artifacts`
+  - `heartbeat`
+
+transport は次の順で実装する。
+
+1. HTTP pull transport
+   - 同一 compose network の `docker:dev-env` agent と自然に接続できる
+   - host agent でも `localhost` port publish で利用できる
+2. file exchange transport
+   - offline / air-gapped / restricted network 向けの fallback
+   - atomic write と retention policy を別途定義する
+
+この方式により、project runtime は次のどちらにもできる。
+
+- host runtime
+  - host に install した `a3-agent` が local `task` / `mvn` / `java` を実行する
+- docker dev-env runtime
+  - project dev-env image に install した `a3-agent` が container 内の toolchain で実行する
+
+いずれの場合も、A3 は SoloBoard と job result だけを見て phase を進める。project 固有 runtime を A3 image へ bake しないことを配布設計の完了条件に追加する。
 
 #### 0.4.5.2 phase model 再検討メモ
 
@@ -1182,7 +1301,8 @@ runtime 開始時に次を validate する。
 ## 1. 目的
 
 - A3-v2 を共通 Docker image として配布可能にする
-- 案件ごとの差分を image rebuild ではなく runtime package 差し替えで扱えるようにする
+- bundled kanban は SoloBoard とし、compose service として A3 と同梱できるようにする
+- 案件ごとの差分を A3 image rebuild ではなく runtime package と `a3-agent` 配置先 runtime で扱えるようにする
 - scheduler state / workspace / evidence / artifact cache を案件単位で分離する
 - 既存の project surface、workspace、evidence の責務境界を Docker 配備後も維持する
 
@@ -1200,16 +1320,20 @@ runtime 開始時に次を validate する。
 つまり、1案件 runtime の中で複数 task が実行される。
 workspace や run/evidence の直接の owner は task/run だが、それらを保持する storage root や runtime instance の分離単位は案件である。
 
-### 2.1 配布単位は共通 image、利用単位は案件 runtime
+### 2.1 配布単位は共通 A3 image + SoloBoard compose、利用単位は案件 runtime
 
 A3-v2 は次の 2 層で提供する。
 
 - product image
-  - engine 本体、標準 preset、標準 adapter、CLI、runtime 依存を含む
+  - engine 本体、標準 preset、SoloBoard adapter、CLI、runtime 依存を含む
+- bundled service
+  - SoloBoard container と bootstrap surface を含む
 - project runtime package
   - manifest、案件固有 skill、hook、command script、案件 metadata を含む
+- execution agent
+  - host または project dev-env container に置き、project command 実行と log/artifact 返却を担当する
 
-つまり、案件差分は image に焼き込まず、runtime package と環境変数/secret/volume で与える。
+つまり、案件差分は A3 image に焼き込まず、runtime package、環境変数/secret/volume、`a3-agent` の runtime profile で与える。
 
 ### 2.1.1 write boundary は runtime package ではなく repo source injection で分ける
 
@@ -1300,7 +1424,8 @@ product image が持つものは次に限定する。
 - `a3` CLI
 - engine code
 - 標準 preset
-- 標準 adapter / infra 実装
+- SoloBoard adapter / infra 実装
+- job queue / agent protocol の control plane
 - Ruby runtime と必要 native dependency
 - health / doctor 用の補助 entrypoint
 
@@ -1311,6 +1436,8 @@ product image が持たないもの:
 - 案件固有 skill / hook / verification script
 - 案件 workspace
 - 案件 scheduler state / evidence
+- 案件固有 toolchain (`JDK`, `Maven`, `Node`, DB client, test runner など)
+- project command を直接実行するための dev-env 依存
 
 image は immutable artifact として扱い、案件運用中に container 内へ手作業で設定を書き足す前提は採らない。
 
@@ -1378,6 +1505,30 @@ runtime package は「この案件で A3-v2 をどう使うか」を表す。
 - 案件固有の補助 script をどこに置くか
 
 runtime package は engine code を上書きするための拡張面ではない。
+
+### 4.3 a3-agent runtime profile の責務
+
+`a3-agent` は runtime package の内容を解釈して A3 domain rule を実装するものではなく、A3 が発行した job を配置先 runtime で安全に実行する worker である。
+
+runtime profile は少なくとも次を表す。
+
+- agent name
+- A3 control plane URL
+- allowed workspace roots
+- allowed commands
+- allowed environment keys
+- default working directory
+- timeout / max log size
+- artifact collection rules
+
+runtime profile が持たないもの:
+
+- phase transition rule
+- task selection rule
+- blocked classification rule
+- SoloBoard status mutation rule
+
+これらは `docker:a3` 側の domain/application layer が保持する。
 
 ## 5. Container Filesystem Contract
 
@@ -1542,26 +1693,32 @@ phase ごとの具体的な `SourceDescriptor` や `ReviewTarget` は task/run e
 
 ## 9. Execution Modes
 
-container は少なくとも次の実行モードを持てるようにする。
+A3 container は少なくとも次の実行モードを持てるようにする。
 
 - one-shot CLI
   - operator が個別 command を実行する
 - scheduler loop
   - scheduler が継続的に runnable task を処理する
+- job control plane
+  - `a3-agent` が job を pull/claim し、result を返す
 - doctor / inspect
   - state / config / mount / secret の健全性確認を行う
 
 この違いは entrypoint / command の違いであり、domain model の違いではない。
+
+project command execution は A3 container の execution mode ではない。host runtime または project dev-env container に配置した `a3-agent` の責務である。
 
 ## 10. Networking and Secret Boundaries
 
 container が外部と通信する対象は次に限定する。
 
 - Git hosting
-- issue / kanban / review API
+- SoloBoard API
+- review / LLM / worker gateway
+- `a3-agent` job protocol endpoint
 - package registry
-- LLM / worker gateway
-- 案件 verification に必要な service
+
+案件 verification に必要な service へ直接通信するのは、原則として `a3-agent` が配置された project runtime 側の責務である。A3 container が project verification のために DB / browser / test service へ直接接続する前提は採らない。
 
 運用原則:
 
@@ -1598,23 +1755,28 @@ container が起動した後に曖昧な fallback で吸収しない。
 - 1案件につき 1 runtime package
 - 1案件につき 1 writable state set
 - 1案件につき 1 scheduler instance
-- image は共通 tag を再利用
+- A3 image は共通 tag を再利用
+- SoloBoard は compose service として同梱する
+- project command 実行は host または project dev-env container の `a3-agent` が担当する
 
 概念図:
 
 ```text
 shared image: a3:v2.x
+bundled kanban: soloboard
 
 project-a:
   runtime package A
   state volume A
-  workspace volume A
+  a3-agent runtime A
+  workspace/source A
   artifact volume A
 
 project-b:
   runtime package B
   state volume B
-  workspace volume B
+  a3-agent runtime B
+  workspace/source B
   artifact volume B
 ```
 
@@ -1627,7 +1789,7 @@ project-b:
 - Kubernetes 専用設計
 - SaaS multi-tenant control plane の詳細
 - Git credential broker の実装詳細
-- worker を別 container / 別 node へ分離する際の RPC 詳細
+- remote worker pool / multi-node scheduling の詳細
 
 ここで固定したいのは、Docker 配布時にも崩さない product/runtime/state の責務境界である。
 
@@ -1635,13 +1797,17 @@ project-b:
 
 - product image に bundling する preset / sample runtime package の最小集合
 - scheduler store migration の具体手順
-- host mirror mount と remote clone のどちらを標準とするか
+- `a3-agent` の Go single binary scaffold / installer / service 化の具体手順
+- job protocol の HTTP pull transport と file exchange transport の実装順
+- host runtime と project dev-env container runtime の profile schema
 - local operator 向け `docker compose` テンプレートの提供範囲
 - secret store 連携の標準実装
 
 ## 15. この文書の完了条件
 
 - 共通 image と案件 runtime package の責務境界が定義されている
+- SoloBoard を bundled kanban として compose service に分離する方針が定義されている
+- project command execution を `a3-agent` に委譲し、A3 image に project toolchain を bake しない方針が定義されている
 - writable state / workspace / artifact の案件分離原則が定義されている
 - Docker 化が domain rule を上書きしないことが明記されている
 - upgrade / fail-fast / secret 運用の原則が定義されている
