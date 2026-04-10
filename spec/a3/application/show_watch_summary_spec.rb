@@ -254,9 +254,9 @@ RSpec.describe A3::Application::ShowWatchSummary do
     task_entry = result.tasks.find { |item| item.ref == "Portal#imported-7" }
     expect(task_entry.title).to include("Imported task")
     expect(task_entry.title).to include("[kanban=To do internal=Blocked]")
-    expect(task_entry.latest_phase).to eq("review")
+    expect(task_entry.latest_phase).to eq("implementation")
     expect(task_entry.blocked_lines).to eq(["review blocked"])
-    expect(task_entry.phase_counts).to eq("implementation" => 1, "review" => 1)
+    expect(task_entry.phase_counts).to eq("implementation" => 2)
   end
 
   it "treats in-review tasks with a current run as running review work" do
@@ -300,8 +300,58 @@ RSpec.describe A3::Application::ShowWatchSummary do
 
     task_entry = result.tasks.find { |item| item.ref == "Portal#3141" }
     expect(task_entry.running).to be(true)
-    expect(task_entry.latest_phase).to eq("review")
+    expect(task_entry.latest_phase).to eq("implementation")
     expect(result.running_entries.map(&:task_ref)).to eq(["Portal#3141"])
+    expect(result.running_entries.first.phase).to eq("implementation")
+    expect(result.running_entries.first.internal_phase).to eq("review")
+  end
+
+  it "keeps parent review visible in the watch summary" do
+    task = A3::Domain::Task.new(
+      ref: "Portal#parent",
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      verification_scope: %i[repo_alpha repo_beta],
+      status: :in_review,
+      current_run_ref: "run-parent"
+    )
+    task_repository.save(task)
+
+    run_repository.save(
+      A3::Domain::Run.new(
+        ref: "run-parent",
+        task_ref: "Portal#parent",
+        phase: :review,
+        workspace_kind: :runtime_workspace,
+        source_descriptor: A3::Domain::SourceDescriptor.new(
+          workspace_kind: :runtime_workspace,
+          source_type: :branch_head,
+          ref: "refs/heads/a3/parent/Portal-parent",
+          task_ref: "Portal#parent"
+        ),
+        scope_snapshot: A3::Domain::ScopeSnapshot.new(
+          edit_scope: %i[repo_alpha repo_beta],
+          verification_scope: %i[repo_alpha repo_beta],
+          ownership_scope: :task
+        ),
+        artifact_owner: A3::Domain::ArtifactOwner.new(
+          owner_ref: "Portal#parent",
+          owner_scope: :task,
+          snapshot_version: "refs/heads/a3/parent/Portal-parent"
+        )
+      )
+    )
+
+    result = described_class.new(
+      task_repository: task_repository,
+      run_repository: run_repository,
+      scheduler_state_repository: scheduler_state_repository
+    ).call
+
+    task_entry = result.tasks.find { |item| item.ref == "Portal#parent" }
+    expect(task_entry.latest_phase).to eq("review")
+    expect(task_entry.phase_counts).to eq("review" => 1)
     expect(result.running_entries.first.phase).to eq("review")
+    expect(result.running_entries.first.internal_phase).to eq("review")
   end
 end

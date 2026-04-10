@@ -33,6 +33,32 @@ module A3
         merge: :merging
       }.freeze
 
+      DISPLAY_PHASE_ORDER = {
+        single: %i[implementation inspection merge].freeze,
+        child: %i[implementation inspection merge].freeze,
+        parent: %i[review inspection merge].freeze
+      }.freeze
+
+      DISPLAY_PHASE_BY_KIND = {
+        single: {
+          implementation: :implementation,
+          review: :implementation,
+          verification: :inspection,
+          merge: :merge
+        }.freeze,
+        child: {
+          implementation: :implementation,
+          review: :implementation,
+          verification: :inspection,
+          merge: :merge
+        }.freeze,
+        parent: {
+          review: :review,
+          verification: :inspection,
+          merge: :merge
+        }.freeze
+      }.freeze
+
       def initialize(task_kind:, current_status:)
         @task_kind = task_kind.to_sym
         @current_status = current_status.to_sym
@@ -48,6 +74,14 @@ module A3
 
       def status_for_phase(phase)
         STATUS_BY_PHASE.fetch(phase.to_sym)
+      end
+
+      def display_phase_order
+        DISPLAY_PHASE_ORDER.fetch(@task_kind)
+      end
+
+      def display_phase_for(phase)
+        DISPLAY_PHASE_BY_KIND.fetch(@task_kind).fetch(phase.to_sym, nil)
       end
 
       def terminal_status_for(phase:, outcome:)

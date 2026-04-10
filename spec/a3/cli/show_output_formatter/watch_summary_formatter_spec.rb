@@ -52,7 +52,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
   it "shows review-phase tasks as running when running_entry is present" do
     running_entry = Struct.new(:task_ref, :phase, :internal_phase, :state, :heartbeat_age_seconds, :detail).new(
       "Portal#3141",
-      "review",
+      "implementation",
       "review",
       "running_command",
       nil,
@@ -71,8 +71,8 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
           false,
           false,
           false,
-          "review",
-          { "implementation" => 1, "review" => 1 },
+          "implementation",
+          { "implementation" => 2 },
           []
         )
       ],
@@ -82,8 +82,8 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
 
     lines = described_class.lines(summary).join("\n")
 
-    expect(lines).to include("✔/▶/·/·")
-    expect(lines).to include("- #3141 review/review/running_command hb=?")
+    expect(lines).to include("▶/·/·/·")
+    expect(lines).to include("- #3141 implementation/review/running_command hb=?")
   end
 
   it "shows scheduler as running when a running entry exists" do
