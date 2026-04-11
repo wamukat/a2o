@@ -32,6 +32,16 @@ This writes binaries under `dist/` for:
 
 By default this installs to `$HOME/.local/bin/a3-agent`. Override with `PREFIX=/path` or `BIN_DIR=/path`.
 
+## Protocol Smoke
+
+To verify the Go agent against the Ruby A3 control plane:
+
+```sh
+./scripts/smoke-ruby-control-plane.sh
+```
+
+This starts `a3 agent-server`, enqueues one verification job, runs the Go agent once, and checks that combined logs and matched artifacts were uploaded to the A3-managed artifact store.
+
 ## Run Once
 
 ```sh

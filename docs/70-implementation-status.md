@@ -126,7 +126,7 @@ current `a3-v2` を future `a3-engine` base として seed するため、`a3-en
   - A3 image から project 固有 JDK / Maven / verification runtime を剥がした状態で bundle doctor / smoke を継続確認する
   - `a3-agent` の JobRequest / JobResult / lifecycle / policy / transport を実装可能な粒度で固定する。特に HTTP transport では log/artifact を local path 参照ではなく A3-managed artifact store へ upload/stream する。Ruby domain 側では `AgentJobRequest` / `AgentJobResult` / upload-backed artifact reference / agent workspace descriptor の最小 contract を追加済みで、JSON-backed job store、file-backed artifact store、pull handler、artifact upload endpoint、`a3 agent-server` の最小 HTTP entrypoint、Ruby reference agent (`a3-agent`) の 1 job worker loop も追加済み。Go 側は `agent-go` module として 1 job worker loop を標準 library のみで build / test できる scaffold まで追加済み
   - workspace materialization / dirty check / cleanup の owner を agent runtime として実装し、A3 は source descriptor と workspace descriptor / evidence を検証する形に寄せる
-  - Go single binary agent の scaffold と installer 方針を固定する。`agent-go/scripts/build-release.sh` と `agent-go/scripts/install-local.sh` は追加済み
+  - Go single binary agent の scaffold と installer 方針を固定する。`agent-go/scripts/build-release.sh`、`agent-go/scripts/install-local.sh`、Ruby control plane との protocol smoke は追加済み
   - Docker compose bundle を `docker:a3` + `docker:soloboard` + optional `docker:dev-env(a3-agent)` の形へ更新する
   - bundle smoke と Portal full verification の完了条件を分離し、full verification は `a3-agent` 経由で再実行する
   根拠: `docs/60-container-distribution-and-project-runtime.md` の `0.4.5.1` と `0.4.5.1b`
