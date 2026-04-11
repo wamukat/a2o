@@ -162,6 +162,35 @@ Add a focused smoke that proves the full bridge:
 
 This is intentionally smaller than Portal full verification. Portal full verification should be a later slice after the gateway contract is stable.
 
+### CLI Bundle Smoke
+
+Status: implemented as `task a3:portal:bundle:agent-worker-gateway-smoke`.
+
+Add a root-level bundle smoke that proves the operator CLI path can use `agent-http`:
+
+1. Start `a3-runtime` and `soloboard` through the existing compose bundle.
+2. Bootstrap SoloBoard board/lane/tag surface.
+3. Start `a3 agent-server` inside `a3-runtime`.
+4. Create a small SoloBoard task with `repo:starters` and `trigger:auto-implement`.
+5. Run `bin/a3 execute-until-idle` inside `a3-runtime` with:
+   - `--worker-gateway agent-http`
+   - `--agent-control-plane-url http://127.0.0.1:<port>`
+   - `--agent-shared-workspace-mode same-path`
+   - `--max-steps 1`
+   - `--worker-command sh`
+   - `--worker-command-arg -lc`
+   - `--worker-command-arg <inline worker-result writer>`
+6. Run the compose `a3-agent` service against `http://a3-runtime:<port>` until the gateway process finishes.
+7. Assert:
+   - gateway output reports executed work
+   - the agent job is completed
+   - the task reached `Inspection` after the single implementation step
+   - combined log artifact exists
+
+This smoke must remain separate from Portal full verification. It validates the control-plane/agent/worker-gateway CLI wiring only; Maven, Java, Ruby worker scripts, NullAway, and full Portal verification stay in later slices. The generic compose `a3-agent` image is a Go single-binary image and must not gain Ruby or Portal-specific runtime just for this smoke.
+
+Operational constraint: the gateway command blocks while waiting for the agent job, so the smoke must run the gateway in the background, then run one or more `a3-agent` single-job executions, then wait for the gateway process and fail with captured `server_log`, `gateway_log`, and `agent_log` if it does not exit. Use a dedicated smoke storage directory under `/workspace/.work/...`, not the regular bundle canary storage, because the first slice requires the A3-prepared workspace path to be visible at the same path from both `a3-runtime` and `a3-agent`.
+
 ## Failure Policy
 
 - Missing or unsupported shared workspace mode: fail before enqueue with `observed_state=agent_workspace_unavailable`.
