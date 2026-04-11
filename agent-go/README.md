@@ -104,4 +104,34 @@ The current command runs a single poll cycle:
 
 The runtime profile file is the host/dev-env side `alias -> local path` contract. A3 job payloads still carry only `slot -> alias`; they do not carry these local paths.
 
-Long-running service mode, installer packaging, auth, and deeper policy hardening are intentionally left for later slices.
+## Long-Running Mode
+
+For daemon managers or container services, run the same profile in loop mode:
+
+```sh
+a3-agent -config /path/to/agent-profile.json --loop --poll-interval 2s
+```
+
+Useful flags and environment overrides:
+
+- `--loop`: keep polling until the process is interrupted or fails.
+- `--poll-interval` / `A3_AGENT_POLL_INTERVAL`: idle sleep duration, for example `2s`.
+- `--max-iterations` / `A3_AGENT_MAX_ITERATIONS`: bounded loop count for smoke tests; `0` means unlimited.
+
+Loop mode exits non-zero on control-plane or job execution errors so an external daemon manager can restart or alert. Installer packaging, auth, and deeper policy hardening are intentionally left for later slices.
+
+Generate a service-manager template for local installation:
+
+```sh
+a3-agent service-template systemd \
+  -config /etc/a3/agent-profile.json \
+  -binary /usr/local/bin/a3-agent \
+  > ~/.config/systemd/user/a3-agent.service
+
+a3-agent service-template launchd \
+  -config "$HOME/.a3/agent-profile.json" \
+  -binary "$HOME/.local/bin/a3-agent" \
+  > "$HOME/Library/LaunchAgents/dev.a3.agent.plist"
+```
+
+The template command only renders the unit/plist. Installing, loading, and enabling the service remains an operator or installer responsibility.

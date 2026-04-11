@@ -31,6 +31,46 @@ type Worker struct {
 	Now          func() time.Time
 }
 
+type LoopOptions struct {
+	PollInterval  time.Duration
+	MaxIterations int
+	Sleep         func(time.Duration)
+}
+
+type LoopResult struct {
+	Iterations int
+	Jobs       int
+	Idle       int
+	LastResult *JobResult
+}
+
+func (w Worker) RunLoop(options LoopOptions) (LoopResult, error) {
+	result := LoopResult{}
+	pollInterval := options.PollInterval
+	if pollInterval <= 0 {
+		pollInterval = time.Second
+	}
+	sleep := options.Sleep
+	if sleep == nil {
+		sleep = time.Sleep
+	}
+	for options.MaxIterations <= 0 || result.Iterations < options.MaxIterations {
+		jobResult, idle, err := w.RunOnce()
+		result.Iterations++
+		if err != nil {
+			return result, err
+		}
+		if idle {
+			result.Idle++
+			sleep(pollInterval)
+			continue
+		}
+		result.Jobs++
+		result.LastResult = jobResult
+	}
+	return result, nil
+}
+
 func (w Worker) RunOnce() (*JobResult, bool, error) {
 	request, err := w.Client.ClaimNext(w.AgentName)
 	if err != nil {

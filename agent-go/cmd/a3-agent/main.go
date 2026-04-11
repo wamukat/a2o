@@ -3,10 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"html"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/wamukat/a3-engine/agent-go/internal/agent"
 )
@@ -18,6 +21,9 @@ func main() {
 func run(args []string) int {
 	if len(args) > 0 && args[0] == "doctor" {
 		return runDoctor(args[1:])
+	}
+	if len(args) > 0 && args[0] == "service-template" {
+		return runServiceTemplate(args[1:])
 	}
 
 	configPath := preScanConfigPath(args)
@@ -32,6 +38,9 @@ func run(args []string) int {
 	agentName := flags.String("agent", defaultString("A3_AGENT_NAME", config.AgentName, "local-agent"), "agent name used when polling the A3 control plane")
 	controlPlaneURL := flags.String("control-plane-url", defaultString("A3_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393"), "A3 control plane base URL")
 	workspaceRoot := flags.String("workspace-root", defaultString("A3_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root for materialized jobs")
+	loop := flags.Bool("loop", false, "run continuously until interrupted")
+	pollInterval := flags.Duration("poll-interval", envDuration("A3_AGENT_POLL_INTERVAL", time.Second), "idle poll interval for loop mode")
+	maxIterations := flags.Int("max-iterations", envInt("A3_AGENT_MAX_ITERATIONS", 0), "maximum loop iterations; 0 means unlimited")
 	sourceAliases := sourceAliasFlag(mergeSourceAliases(config.SourceAliases, parseSourceAliases(os.Getenv("A3_AGENT_SOURCE_ALIASES"))))
 	flags.Var(&sourceAliases, "source-alias", "source alias mapping for materialized jobs, in name=path form; repeatable")
 	if err := flags.Parse(args); err != nil {
@@ -49,6 +58,18 @@ func run(args []string) int {
 			WorkspaceRoot: *workspaceRoot,
 			SourceAliases: map[string]string(sourceAliases),
 		}
+	}
+	if *loop {
+		result, err := worker.RunLoop(agent.LoopOptions{
+			PollInterval:  *pollInterval,
+			MaxIterations: *maxIterations,
+		})
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Printf("agent loop completed iterations=%d jobs=%d idle=%d\n", result.Iterations, result.Jobs, result.Idle)
+		return 0
 	}
 	result, idle, err := worker.RunOnce()
 	if err != nil {
@@ -91,6 +112,137 @@ func runDoctor(args []string) int {
 		sourceAliases.String(),
 	)
 	return 0
+}
+
+func runServiceTemplate(args []string) int {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: a3-agent service-template systemd|launchd -config /path/to/profile.json")
+		return 2
+	}
+	kind := args[0]
+	flags := flag.NewFlagSet("a3-agent service-template", flag.ContinueOnError)
+	configPath := flags.String("config", preScanConfigPath(args[1:]), "runtime profile JSON file")
+	binaryPath := flags.String("binary", "a3-agent", "a3-agent binary path used by the service manager")
+	label := flags.String("label", "dev.a3.agent", "service label/name")
+	pollInterval := flags.String("poll-interval", "2s", "idle poll interval passed to loop mode")
+	workingDir := flags.String("working-dir", "", "optional working directory for the service")
+	if err := flags.Parse(args[1:]); err != nil {
+		return 2
+	}
+	if flags.NArg() != 0 {
+		fmt.Fprintln(os.Stderr, "usage: a3-agent service-template systemd|launchd -config /path/to/profile.json")
+		return 2
+	}
+	options := serviceTemplateOptions{
+		Kind:         kind,
+		Label:        *label,
+		BinaryPath:   *binaryPath,
+		ConfigPath:   *configPath,
+		PollInterval: *pollInterval,
+		WorkingDir:   *workingDir,
+	}
+	output, err := renderServiceTemplate(options)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(output)
+	return 0
+}
+
+type serviceTemplateOptions struct {
+	Kind         string
+	Label        string
+	BinaryPath   string
+	ConfigPath   string
+	PollInterval string
+	WorkingDir   string
+}
+
+func renderServiceTemplate(options serviceTemplateOptions) (string, error) {
+	if options.Label == "" {
+		return "", fmt.Errorf("service label is required")
+	}
+	if options.BinaryPath == "" {
+		return "", fmt.Errorf("binary path is required")
+	}
+	if options.ConfigPath == "" {
+		return "", fmt.Errorf("runtime profile config is required")
+	}
+	if _, err := time.ParseDuration(options.PollInterval); err != nil {
+		return "", fmt.Errorf("invalid poll interval: %w", err)
+	}
+	switch options.Kind {
+	case "systemd":
+		return renderSystemdService(options)
+	case "launchd":
+		return renderLaunchdPlist(options), nil
+	default:
+		return "", fmt.Errorf("unsupported service template: %s", options.Kind)
+	}
+}
+
+func renderSystemdService(options serviceTemplateOptions) (string, error) {
+	for _, value := range []string{options.BinaryPath, options.ConfigPath, options.PollInterval, options.WorkingDir} {
+		if hasWhitespace(value) {
+			return "", fmt.Errorf("systemd template values must not contain whitespace: %q", value)
+		}
+	}
+	var builder strings.Builder
+	builder.WriteString("[Unit]\n")
+	builder.WriteString("Description=A3 Agent (" + options.Label + ")\n")
+	builder.WriteString("After=network-online.target\n")
+	builder.WriteString("Wants=network-online.target\n\n")
+	builder.WriteString("[Service]\n")
+	builder.WriteString("Type=simple\n")
+	if options.WorkingDir != "" {
+		builder.WriteString("WorkingDirectory=" + options.WorkingDir + "\n")
+	}
+	builder.WriteString("ExecStart=" + options.BinaryPath + " -config " + options.ConfigPath + " --loop --poll-interval " + options.PollInterval + "\n")
+	builder.WriteString("Restart=on-failure\n")
+	builder.WriteString("RestartSec=5\n\n")
+	builder.WriteString("[Install]\n")
+	builder.WriteString("WantedBy=default.target\n")
+	return builder.String(), nil
+}
+
+func renderLaunchdPlist(options serviceTemplateOptions) string {
+	args := []string{options.BinaryPath, "-config", options.ConfigPath, "--loop", "--poll-interval", options.PollInterval}
+	var builder strings.Builder
+	builder.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+	builder.WriteString("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n")
+	builder.WriteString("<plist version=\"1.0\">\n")
+	builder.WriteString("<dict>\n")
+	builder.WriteString("  <key>Label</key>\n")
+	builder.WriteString("  <string>" + xmlEscape(options.Label) + "</string>\n")
+	builder.WriteString("  <key>ProgramArguments</key>\n")
+	builder.WriteString("  <array>\n")
+	for _, arg := range args {
+		builder.WriteString("    <string>" + xmlEscape(arg) + "</string>\n")
+	}
+	builder.WriteString("  </array>\n")
+	if options.WorkingDir != "" {
+		builder.WriteString("  <key>WorkingDirectory</key>\n")
+		builder.WriteString("  <string>" + xmlEscape(options.WorkingDir) + "</string>\n")
+	}
+	builder.WriteString("  <key>KeepAlive</key>\n")
+	builder.WriteString("  <dict>\n")
+	builder.WriteString("    <key>SuccessfulExit</key>\n")
+	builder.WriteString("    <false/>\n")
+	builder.WriteString("  </dict>\n")
+	builder.WriteString("  <key>RunAtLoad</key>\n")
+	builder.WriteString("  <true/>\n")
+	builder.WriteString("</dict>\n")
+	builder.WriteString("</plist>\n")
+	return builder.String()
+}
+
+func hasWhitespace(value string) bool {
+	return strings.ContainsAny(value, " \t\r\n")
+}
+
+func xmlEscape(value string) string {
+	return html.EscapeString(value)
 }
 
 func doctorConfig(config agent.RuntimeProfileConfig) error {
@@ -238,4 +390,28 @@ func envDefault(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func envDuration(key string, fallback time.Duration) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func envInt(key string, fallback int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }

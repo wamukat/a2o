@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -66,6 +67,90 @@ func TestRunDoctorValidatesRuntimeProfile(t *testing.T) {
 
 	if code := run([]string{"doctor", "-config", configPath}); code != 0 {
 		t.Fatalf("doctor exit code = %d", code)
+	}
+}
+
+func TestRenderSystemdServiceTemplate(t *testing.T) {
+	output, err := renderServiceTemplate(serviceTemplateOptions{
+		Kind:         "systemd",
+		Label:        "dev.a3.agent",
+		BinaryPath:   "/usr/local/bin/a3-agent",
+		ConfigPath:   "/etc/a3/agent-profile.json",
+		PollInterval: "2s",
+		WorkingDir:   "/var/lib/a3-agent",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	required := []string{
+		"Description=A3 Agent (dev.a3.agent)",
+		"WorkingDirectory=/var/lib/a3-agent",
+		"ExecStart=/usr/local/bin/a3-agent -config /etc/a3/agent-profile.json --loop --poll-interval 2s",
+		"Restart=on-failure",
+		"WantedBy=default.target",
+	}
+	for _, want := range required {
+		if !strings.Contains(output, want) {
+			t.Fatalf("systemd template does not contain %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRenderLaunchdServiceTemplate(t *testing.T) {
+	output, err := renderServiceTemplate(serviceTemplateOptions{
+		Kind:         "launchd",
+		Label:        "dev.a3.agent",
+		BinaryPath:   "/usr/local/bin/a3-agent",
+		ConfigPath:   "/Users/dev/.a3/agent-profile.json",
+		PollInterval: "2s",
+		WorkingDir:   "/Users/dev/project",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	required := []string{
+		"<key>Label</key>",
+		"<string>dev.a3.agent</string>",
+		"<string>/usr/local/bin/a3-agent</string>",
+		"<string>-config</string>",
+		"<string>/Users/dev/.a3/agent-profile.json</string>",
+		"<string>--loop</string>",
+		"<string>--poll-interval</string>",
+		"<string>2s</string>",
+		"<key>WorkingDirectory</key>",
+		"<string>/Users/dev/project</string>",
+		"<key>KeepAlive</key>",
+		"<key>RunAtLoad</key>",
+	}
+	for _, want := range required {
+		if !strings.Contains(output, want) {
+			t.Fatalf("launchd template does not contain %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRenderServiceTemplateRejectsInvalidInput(t *testing.T) {
+	cases := []serviceTemplateOptions{
+		{Kind: "systemd", Label: "dev.a3.agent", BinaryPath: "/usr/local/bin/a3-agent", ConfigPath: "/etc/a3/agent-profile.json", PollInterval: "invalid"},
+		{Kind: "unknown", Label: "dev.a3.agent", BinaryPath: "/usr/local/bin/a3-agent", ConfigPath: "/etc/a3/agent-profile.json", PollInterval: "2s"},
+		{Kind: "systemd", Label: "dev.a3.agent", BinaryPath: "/usr/local/bin/a3 agent", ConfigPath: "/etc/a3/agent-profile.json", PollInterval: "2s"},
+	}
+	for _, options := range cases {
+		if _, err := renderServiceTemplate(options); err == nil {
+			t.Fatalf("renderServiceTemplate(%+v) succeeded, want error", options)
+		}
+	}
+}
+
+func TestRunServiceTemplateAcceptsKindThenFlags(t *testing.T) {
+	code := runServiceTemplate([]string{
+		"systemd",
+		"-config", "/etc/a3/agent-profile.json",
+		"-binary", "/usr/local/bin/a3-agent",
+		"-poll-interval", "2s",
+	})
+	if code != 0 {
+		t.Fatalf("service-template exit code = %d, want 0", code)
 	}
 }
 

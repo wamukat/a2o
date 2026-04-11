@@ -152,6 +152,35 @@ func TestWorkerReturnsIdleWithoutJob(t *testing.T) {
 	}
 }
 
+func TestWorkerRunLoopStopsAfterMaxIterations(t *testing.T) {
+	tmp := t.TempDir()
+	request := testRequest(tmp)
+	client := &fakeClient{requests: []*JobRequest{nil, &request, nil}}
+	var sleeps []time.Duration
+
+	result, err := Worker{
+		AgentName: "host-local",
+		Client:    client,
+		Executor:  fakeExecutor{},
+		Now:       func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+	}.RunLoop(LoopOptions{
+		PollInterval:  25 * time.Millisecond,
+		MaxIterations: 3,
+		Sleep: func(duration time.Duration) {
+			sleeps = append(sleeps, duration)
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Iterations != 3 || result.Jobs != 1 || result.Idle != 2 {
+		t.Fatalf("unexpected loop result: %#v", result)
+	}
+	if len(sleeps) != 2 || sleeps[0] != 25*time.Millisecond || sleeps[1] != 25*time.Millisecond {
+		t.Fatalf("unexpected sleeps: %#v", sleeps)
+	}
+}
+
 type fakeExecutor struct{}
 
 func (fakeExecutor) Execute(JobRequest) ExecutionResult {
@@ -208,12 +237,18 @@ func (failingExecutor) Execute(JobRequest) ExecutionResult {
 }
 
 type fakeClient struct {
-	request *JobRequest
-	uploads []ArtifactUpload
-	result  *JobResult
+	request  *JobRequest
+	requests []*JobRequest
+	uploads  []ArtifactUpload
+	result   *JobResult
 }
 
 func (f *fakeClient) ClaimNext(string) (*JobRequest, error) {
+	if len(f.requests) > 0 {
+		request := f.requests[0]
+		f.requests = f.requests[1:]
+		return request, nil
+	}
 	return f.request, nil
 }
 
