@@ -60,6 +60,33 @@ This starts the Ruby control plane, runs the Ruby `AgentWorkerGateway` in `agent
 
 ## Run Once
 
+Create a runtime profile for the host or dev-env where commands will run:
+
+```json
+{
+  "agent": "host-local",
+  "control_plane_url": "http://127.0.0.1:7393",
+  "workspace_root": "/tmp/a3-agent-workspaces",
+  "source_aliases": {
+    "member-portal-starters": "/path/to/scratch-parent-repo"
+  }
+}
+```
+
+Validate the profile:
+
+```sh
+/tmp/a3-agent doctor -config /path/to/agent-profile.json
+```
+
+Run one poll cycle with the profile:
+
+```sh
+/tmp/a3-agent -config /path/to/agent-profile.json
+```
+
+The individual flags remain available as overrides:
+
 ```sh
 /tmp/a3-agent \
   -agent host-local \
@@ -75,4 +102,6 @@ The current command runs a single poll cycle:
 - `PUT /v1/agent/artifacts/{artifact_id}` for combined logs and matched artifact rules
 - `POST /v1/agent/jobs/{job_id}/result`
 
-Long-running service mode, installer packaging, auth, and policy hardening are intentionally left for later slices.
+The runtime profile file is the host/dev-env side `alias -> local path` contract. A3 job payloads still carry only `slot -> alias`; they do not carry these local paths.
+
+Long-running service mode, installer packaging, auth, and deeper policy hardening are intentionally left for later slices.

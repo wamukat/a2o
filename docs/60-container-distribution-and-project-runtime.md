@@ -1102,7 +1102,7 @@ transport は次の順で実装する。
 
 workspace materialization の owner は `a3-agent` 側 runtime とする。A3 は source descriptor / repo slot / target ref / isolation requirement を job に含めるが、checkout/worktree 作成、実行前 dirty check、実行後 cleanup、quarantine snapshot 作成は agent が配置された runtime の filesystem で行う。A3 は agent が返す `workspace_descriptor` と artifact/evidence を検証し、phase 開始前の existence guarantee を domain rule として判定する。これにより host runtime と docker dev-env runtime の両方で同じ protocol を使える。
 
-2026-04-11 時点では、Ruby domain 側の最小 contract として `AgentJobRequest`、`AgentJobResult`、`AgentArtifactUpload`、`AgentWorkspaceDescriptor`、`AgentWorkspaceRequest` を追加した。これは agent 本体の完成実装ではなく、A3 control plane が受け入れる job/result JSON shape を先に固定するための実装である。特に `AgentJobResult` は `stdout_log` / `stderr_log` / `combined_log` / `artifacts` の local path field を拒否し、A3-managed artifact store の upload reference だけを受け付ける。あわせて JSON-backed job store と `/v1/agent/jobs` / `/v1/agent/jobs/next` / `/v1/agent/jobs/{job_id}` / `/v1/agent/jobs/{job_id}/result` の pull handler を追加し、`a3 agent-server` から同 API を実 HTTP endpoint として listen できる最小 entrypoint まで追加済みである。さらに file-backed artifact store と `PUT /v1/agent/artifacts/{artifact_id}` を追加し、digest / byte size を A3 側で検証してから upload metadata を保存できるようにした。Go toolchain がない環境でも protocol を検証できるよう、Ruby reference agent (`a3-agent`) を追加し、1 job poll、local command 実行、combined log / artifact upload、result submit までの挙動を固定した。現在は `agent-go` module を追加し、同じ 1 job worker loop を Go standard library だけで build / test できる状態にした。`agent-go/scripts/build-release.sh` は macOS / Linux / Windows 向け cross-build、`agent-go/scripts/install-local.sh` は `$HOME/.local/bin` への local install、`agent-go/scripts/smoke-ruby-control-plane.sh` は Ruby control plane との protocol smoke を担当する。workspace root の compose bundle では optional `a3-agent` service と `task a3:portal:bundle:agent-smoke` を追加し、`a3-runtime` control plane から `docker-dev-env` agent container へ job を流して result / artifact upload まで通ることを確認済みである。さらに Go agent の `local_git` alias + `worktree_detached` materializer、worker protocol transport、A3 `AgentWorkerGateway` の `agent-materialized` branch、CLI の `--agent-source-alias`、`agent-go/scripts/smoke-materialized-worker-protocol.sh`、`agent-go/scripts/smoke-materialized-agent-gateway.sh` まで追加し、agent-owned workspace から worker result と descriptor-derived `changed_files` を返す end-to-end path を確認済みである。残りは runtime package / runtime profile 配布、production daemon 管理、auth、artifact retention/GC、service 化、Portal full verification job への接続である。
+2026-04-11 時点では、Ruby domain 側の最小 contract として `AgentJobRequest`、`AgentJobResult`、`AgentArtifactUpload`、`AgentWorkspaceDescriptor`、`AgentWorkspaceRequest` を追加した。これは agent 本体の完成実装ではなく、A3 control plane が受け入れる job/result JSON shape を先に固定するための実装である。特に `AgentJobResult` は `stdout_log` / `stderr_log` / `combined_log` / `artifacts` の local path field を拒否し、A3-managed artifact store の upload reference だけを受け付ける。あわせて JSON-backed job store と `/v1/agent/jobs` / `/v1/agent/jobs/next` / `/v1/agent/jobs/{job_id}` / `/v1/agent/jobs/{job_id}/result` の pull handler を追加し、`a3 agent-server` から同 API を実 HTTP endpoint として listen できる最小 entrypoint まで追加済みである。さらに file-backed artifact store と `PUT /v1/agent/artifacts/{artifact_id}` を追加し、digest / byte size を A3 側で検証してから upload metadata を保存できるようにした。Go toolchain がない環境でも protocol を検証できるよう、Ruby reference agent (`a3-agent`) を追加し、1 job poll、local command 実行、combined log / artifact upload、result submit までの挙動を固定した。現在は `agent-go` module を追加し、同じ 1 job worker loop を Go standard library だけで build / test できる状態にした。`agent-go/scripts/build-release.sh` は macOS / Linux / Windows 向け cross-build、`agent-go/scripts/install-local.sh` は `$HOME/.local/bin` への local install、`agent-go/scripts/smoke-ruby-control-plane.sh` は Ruby control plane との protocol smoke を担当する。workspace root の compose bundle では optional `a3-agent` service と `task a3:portal:bundle:agent-smoke` を追加し、`a3-runtime` control plane から `docker-dev-env` agent container へ job を流して result / artifact upload まで通ることを確認済みである。さらに Go agent の `local_git` alias + `worktree_detached` materializer、worker protocol transport、A3 `AgentWorkerGateway` の `agent-materialized` branch、CLI の `--agent-source-alias`、`agent-go/scripts/smoke-materialized-worker-protocol.sh`、`agent-go/scripts/smoke-materialized-agent-gateway.sh` まで追加し、agent-owned workspace から worker result と descriptor-derived `changed_files` を返す end-to-end path を確認済みである。runtime package は A3 側の `slot -> alias` contract と worker gateway option summary を公開し、Go agent は runtime profile JSON (`alias -> local path`) と `a3-agent doctor -config ...` を持つ。残りは production daemon 管理、auth、artifact retention/GC、service 化、Portal full verification job への接続である。
 
 #### 0.4.5.2 phase model 再検討メモ
 
@@ -1524,7 +1524,8 @@ runtime profile は少なくとも次を表す。
 
 - agent name
 - A3 control plane URL
-- allowed workspace roots
+- workspace root
+- source aliases (`alias -> local path`)
 - allowed commands
 - allowed environment keys
 - default working directory
@@ -1539,6 +1540,13 @@ runtime profile が持たないもの:
 - SoloBoard status mutation rule
 
 これらは `docker:a3` 側の domain/application layer が保持する。
+
+runtime package と agent runtime profile の責務は分ける。
+
+- runtime package: A3 が job payload に使う `repo slot -> source alias`、agent profile 名、workspace freshness / cleanup policy、worker gateway option summary を公開する。
+- agent runtime profile JSON: host/dev-env 側で `source alias -> local git path` と workspace root を保持する。
+- A3 doctor: profile 名、alias coverage、workspace policy 値を検査する。agent runtime filesystem には触らない。
+- `a3-agent doctor -config ...`: local git path の存在、git worktree 性、dirty 状態、workspace root の書き込み可否を検査する。
 
 ## 5. Container Filesystem Contract
 
@@ -1810,7 +1818,7 @@ project-b:
 - scheduler store migration の具体手順
 - `a3-agent` の Go single binary service 化と daemon 管理の具体手順
 - file exchange transport を HTTP pull transport の後に追加するかの判断
-- host runtime と project dev-env container runtime の profile schema / doctor surface
+- host runtime と project dev-env container runtime の profile schema / doctor surface の hardening
 - local operator 向け `docker compose` テンプレートの提供範囲
 - secret store 連携の標準実装
 

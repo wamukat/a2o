@@ -189,11 +189,27 @@ done
   go build -trimpath -o "${TMP_DIR}/a3-agent" ./cmd/a3-agent
 )
 
+AGENT_PROFILE="${TMP_DIR}/agent-profile.json"
+AGENT_PROFILE="${AGENT_PROFILE}" BASE_URL="${BASE_URL}" WORKSPACE_ROOT="${WORKSPACE_ROOT}" SOURCE_ROOT="${SOURCE_ROOT}" ruby -rjson -e '
+  File.write(
+    ENV.fetch("AGENT_PROFILE"),
+    JSON.pretty_generate(
+      "agent" => "host-local",
+      "control_plane_url" => ENV.fetch("BASE_URL"),
+      "workspace_root" => ENV.fetch("WORKSPACE_ROOT"),
+      "source_aliases" => {
+        "member-portal-starters" => ENV.fetch("SOURCE_ROOT")
+      }
+    )
+  )
+'
+
 "${TMP_DIR}/a3-agent" \
-  -agent host-local \
-  -control-plane-url "${BASE_URL}" \
-  -workspace-root "${WORKSPACE_ROOT}" \
-  -source-alias "member-portal-starters=${SOURCE_ROOT}" > "${TMP_DIR}/agent.log"
+  doctor \
+  -config "${AGENT_PROFILE}" >> "${TMP_DIR}/agent.log"
+
+"${TMP_DIR}/a3-agent" \
+  -config "${AGENT_PROFILE}" >> "${TMP_DIR}/agent.log"
 
 wait "${GATEWAY_PID}"
 GATEWAY_PID=""

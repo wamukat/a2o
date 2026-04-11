@@ -23,7 +23,10 @@ module A3
           secret_delivery_check(descriptor),
           scheduler_store_migration_check(descriptor),
           *writable_root_checks(descriptor),
-          *repo_source_checks(descriptor)
+          *repo_source_checks(descriptor),
+          agent_runtime_profile_check(descriptor),
+          agent_source_alias_coverage_check(descriptor),
+          agent_workspace_policy_check(descriptor)
         ].freeze
 
         Result.new(
@@ -83,6 +86,33 @@ module A3
           path = Pathname(path)
           path.exist? ? writable_path_check("repo_source.#{slot}".to_sym, path) : directory_check("repo_source.#{slot}".to_sym, path)
         end
+      end
+
+      def agent_runtime_profile_check(descriptor)
+        if descriptor.agent_runtime_profile.empty? || descriptor.agent_control_plane_url.empty?
+          return PathCheck.new(name: :agent_runtime_profile, path: descriptor.agent_profile_path, status: :invalid, detail: "agent runtime profile and control plane url are required")
+        end
+
+        PathCheck.new(name: :agent_runtime_profile, path: descriptor.agent_profile_path, status: :ok, detail: "agent runtime profile contract is present")
+      end
+
+      def agent_source_alias_coverage_check(descriptor)
+        missing_slots = descriptor.repo_source_slots.reject { |slot| descriptor.agent_source_aliases.key?(slot) && !descriptor.agent_source_aliases.fetch(slot).empty? }
+        if missing_slots.empty?
+          return PathCheck.new(name: :agent_source_aliases, path: descriptor.agent_profile_path, status: :ok, detail: "agent source aliases cover repo source slots")
+        end
+
+        PathCheck.new(name: :agent_source_aliases, path: descriptor.agent_profile_path, status: :invalid, detail: "missing agent source aliases for #{missing_slots.join(',')}")
+      end
+
+      def agent_workspace_policy_check(descriptor)
+        freshness_ok = A3::Domain::AgentWorkspaceRequest::FRESHNESS_POLICIES.include?(descriptor.agent_workspace_freshness_policy)
+        cleanup_ok = A3::Domain::AgentWorkspaceRequest::CLEANUP_POLICIES.include?(descriptor.agent_workspace_cleanup_policy)
+        if freshness_ok && cleanup_ok
+          return PathCheck.new(name: :agent_workspace_policy, path: descriptor.agent_profile_path, status: :ok, detail: "agent workspace policies are supported")
+        end
+
+        PathCheck.new(name: :agent_workspace_policy, path: descriptor.agent_profile_path, status: :invalid, detail: "unsupported agent workspace policy")
       end
 
       def writable_root_checks(descriptor)
@@ -176,11 +206,13 @@ module A3
         schema_check = checks.find { |check| check.name == :manifest_schema }
         preset_schema_check = checks.find { |check| check.name == :preset_schema }
         repo_source_status = repo_source_health(checks)
+        agent_runtime_status = agent_runtime_health(checks)
         secret_check = checks.find { |check| check.name == :secret_delivery }
         migration_check = checks.find { |check| check.name == :scheduler_store_migration }
         actions << descriptor.schema_action_summary unless schema_check&.status == :ok
         actions << descriptor.preset_schema_action_summary unless preset_schema_check&.status == :ok
         actions << descriptor.repo_source_action_summary unless repo_source_status == :ok
+        actions << "fix agent runtime profile contract" unless agent_runtime_status == :ok
         actions << descriptor.secret_delivery_action_summary unless secret_check&.status == :ok
         actions << descriptor.scheduler_store_migration_action_summary unless migration_check&.status == :ok
         return "startup ready; runtime package contract satisfied; run #{descriptor.runtime_command_summary}" if actions.empty?
@@ -259,6 +291,7 @@ module A3
         blockers << :preset_schema if checks.any? { |check| check.name == :preset_schema && check.status != :ok }
         blockers << :runtime_paths if checks.any? { |check| runtime_path_check?(check) && check.status != :ok }
         blockers << :repo_sources unless repo_source_health(checks) == :ok
+        blockers << :agent_runtime unless agent_runtime_health(checks) == :ok
         blockers << :secret_delivery if checks.any? { |check| check.name == :secret_delivery && check.status != :ok }
         blockers << :scheduler_store_migration if checks.any? { |check| check.name == :scheduler_store_migration && check.status != :ok }
         return "none" if blockers.empty?
@@ -276,6 +309,14 @@ module A3
         return :missing if non_ok.include?(:missing)
 
         non_ok.first
+      end
+
+      def agent_runtime_health(checks)
+        agent_checks = checks.select { |check| %i[agent_runtime_profile agent_source_aliases agent_workspace_policy].include?(check.name) }
+        return :ok if agent_checks.empty?
+
+        non_ok = agent_checks.map(&:status).reject { |status| status == :ok }
+        non_ok.empty? ? :ok : non_ok.first
       end
 
       def runtime_path_check?(check)

@@ -97,7 +97,10 @@ module A3
         secret_delivery_mode: ENV.fetch("A3_SECRET_DELIVERY_MODE", "environment_variable"),
         secret_reference: ENV.fetch("A3_SECRET_REFERENCE"),
         scheduler_store_migration_state: ENV.fetch("A3_SCHEDULER_STORE_MIGRATION", "not_required"),
-        migration_entrypoint: ENV.fetch("A3_MIGRATION_ENTRYPOINT", "bin/a3 migrate-scheduler-store")
+        migration_entrypoint: ENV.fetch("A3_MIGRATION_ENTRYPOINT", "bin/a3 migrate-scheduler-store"),
+        agent_runtime_profile: ENV.fetch("A3_AGENT_RUNTIME_PROFILE", "host-local"),
+        agent_control_plane_url: ENV.fetch("A3_AGENT_CONTROL_PLANE_URL", "http://127.0.0.1:7393"),
+        agent_profile_path: ENV.fetch("A3_AGENT_PROFILE_PATH", "<agent-runtime-profile.json>")
       )
     end
 

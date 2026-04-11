@@ -375,12 +375,19 @@ The first operator-facing bridge is explicit CLI configuration, not implicit inf
 
 - A3 CLI accepts `--agent-shared-workspace-mode agent-materialized` only with `--agent-source-alias SLOT=ALIAS`.
 - A3 job payload contains only `source.alias`, never the agent filesystem path.
-- The agent process independently resolves `ALIAS=PATH` through its own `a3-agent --source-alias` / runtime profile configuration.
+- The agent process independently resolves `ALIAS=PATH` through its own runtime profile file or `a3-agent --source-alias` override.
 - Implementation requires `edit_scope` slots as `read_write`.
 - Review uses `edit_scope ∪ verification_scope`; edit slots are `read_write`, verification-only slots are `read_only`.
 - Verification requires `verification_scope` slots as `read_only`.
 - Freshness defaults to `reuse_if_clean_and_ref_matches`.
 - Cleanup defaults to `retain_until_a3_cleanup`; `cleanup_after_job` is available for smoke/dev.
+
+The runtime package surface exposes two separate command shapes:
+
+- A3-side worker gateway options: `--worker-gateway agent-http --agent-shared-workspace-mode agent-materialized --agent-source-alias SLOT=ALIAS ...`
+- Agent-side runtime profile command: `a3-agent -config <agent-runtime-profile.json>`
+
+The first is `slot -> alias` and is safe for A3 job construction. The second is `alias -> local path` and belongs to the host/dev-env runtime where commands execute. A3 doctor validates profile name, alias coverage, and policy values; `a3-agent doctor -config ...` validates local profile shape and filesystem accessibility.
 
 ### Non-Goals For This Slice
 

@@ -101,7 +101,7 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
       expect(result.startup_sequence).to eq("doctor=bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} migrate=skip runtime=bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
       expect(result.operator_guidance).to eq("startup ready; runtime package contract satisfied; run bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
       expect(result.checks.map(&:status)).to all(eq(:ok))
-      expect(result.checks.map(&:name)).to include(:preset_schema, :project_runtime_root, :secret_delivery, :scheduler_store_migration, :writable_root_state_root, :writable_root_workspace_root, :writable_root_artifact_root)
+      expect(result.checks.map(&:name)).to include(:preset_schema, :project_runtime_root, :secret_delivery, :scheduler_store_migration, :writable_root_state_root, :writable_root_workspace_root, :writable_root_artifact_root, :agent_runtime_profile, :agent_source_aliases, :agent_workspace_policy)
       end
     end
   end

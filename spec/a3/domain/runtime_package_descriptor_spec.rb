@@ -68,6 +68,9 @@ RSpec.describe A3::Domain::RuntimePackageDescriptor do
     expect(descriptor.operator_summary.fetch("preset_schema_action")).to eq("no preset schema action required")
     expect(descriptor.operator_summary.fetch("secret_contract")).to eq("secret_delivery_mode=environment_variable secret_reference=A3_SECRET")
     expect(descriptor.operator_summary.fetch("migration_contract")).to eq("scheduler_store_migration_state=not_required")
+    expect(descriptor.operator_summary.fetch("agent_runtime_profile")).to eq("profile=host-local control_plane_url=http://127.0.0.1:7393 profile_path=<agent-runtime-profile.json> source_aliases= freshness_policy=reuse_if_clean_and_ref_matches cleanup_policy=retain_until_a3_cleanup")
+    expect(descriptor.operator_summary.fetch("agent_runtime_command")).to eq("a3-agent -config <agent-runtime-profile.json>")
+    expect(descriptor.operator_summary.fetch("agent_worker_gateway_options")).to eq("--worker-gateway agent-http --agent-control-plane-url http://127.0.0.1:7393 --agent-runtime-profile host-local --agent-shared-workspace-mode agent-materialized --agent-workspace-freshness-policy reuse_if_clean_and_ref_matches --agent-workspace-cleanup-policy retain_until_a3_cleanup")
     expect(descriptor.operator_summary.fetch("runtime_contract")).to eq("manifest_schema_version=1 required_manifest_schema_version=1 required_preset_schema_version=1 preset_schema_versions= repo_source_strategy=none repo_source_slots= secret_delivery_mode=environment_variable secret_reference=A3_SECRET scheduler_store_migration_state=not_required")
     expect(descriptor.operator_summary.fetch("secret_delivery_action")).to eq("provide secrets via environment variable A3_SECRET")
     expect(descriptor.operator_summary.fetch("scheduler_store_migration_action")).to eq("scheduler store migration not required")
@@ -90,6 +93,40 @@ RSpec.describe A3::Domain::RuntimePackageDescriptor do
     expect(descriptor.operator_summary.fetch("runtime_command")).to eq("bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
     expect(descriptor.operator_summary.fetch("runtime_canary_command")).to eq("bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state && bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
     expect(descriptor.operator_summary.fetch("startup_sequence")).to eq("doctor=bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state migrate=skip runtime=bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
+  end
+
+  it "keeps agent source aliases as slot to alias contract without agent local paths" do
+    descriptor = described_class.build(
+      image_version: "a3:v2.1.0",
+      manifest_path: "/tmp/runtime/manifest.yml",
+      preset_dir: "/tmp/runtime/presets",
+      storage_backend: :sqlite,
+      storage_dir: "/tmp/runtime/state",
+      repo_sources: { repo_alpha: "/repos/alpha", repo_beta: "/repos/beta" },
+      manifest_schema_version: "1",
+      required_manifest_schema_version: "1",
+      preset_chain: [],
+      preset_schema_versions: {},
+      required_preset_schema_version: "1",
+      secret_reference: "A3_SECRET",
+      agent_runtime_profile: "dev-env",
+      agent_control_plane_url: "http://a3-runtime:7393",
+      agent_profile_path: "/profiles/dev-env-agent.json",
+      agent_source_aliases: {
+        repo_alpha: "member-portal-starters",
+        repo_beta: "member-portal-ui-app"
+      },
+      agent_workspace_cleanup_policy: :cleanup_after_job
+    )
+
+    expect(descriptor.agent_runtime_profile_summary.fetch("source_aliases")).to eq(
+      "repo_alpha" => "member-portal-starters",
+      "repo_beta" => "member-portal-ui-app"
+    )
+    expect(descriptor.agent_runtime_profile_summary.fetch("agent_command")).to eq("a3-agent -config /profiles/dev-env-agent.json")
+    expect(descriptor.operator_summary.fetch("agent_runtime_profile")).to include("source_aliases=repo_alpha=member-portal-starters,repo_beta=member-portal-ui-app")
+    expect(descriptor.operator_summary.fetch("agent_worker_gateway_options")).to include("--agent-source-alias repo_alpha=member-portal-starters")
+    expect(descriptor.operator_summary.fetch("agent_worker_gateway_options")).not_to include("/repos/alpha")
   end
 
   it "accepts an explicit distribution contract" do

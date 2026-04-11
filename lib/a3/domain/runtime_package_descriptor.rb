@@ -12,12 +12,14 @@ module A3
       attr_reader :image_version, :manifest_path, :project_runtime_root, :preset_dir,
                   :storage_backend, :state_root, :workspace_root, :artifact_root,
                   :repo_source_strategy, :repo_source_slots, :repo_sources,
+                  :agent_runtime_profile, :agent_control_plane_url, :agent_profile_path,
+                  :agent_source_aliases, :agent_workspace_freshness_policy, :agent_workspace_cleanup_policy,
                   :distribution_image_ref, :runtime_entrypoint, :doctor_entrypoint, :migration_entrypoint,
                   :secret_delivery_mode, :secret_reference, :scheduler_store_migration_state,
                   :manifest_schema_version, :required_manifest_schema_version,
                   :preset_chain, :preset_schema_versions, :required_preset_schema_version
 
-      def initialize(image_version:, manifest_path:, project_runtime_root:, preset_dir:, storage_backend:, state_root:, workspace_root:, artifact_root:, repo_source_strategy:, repo_source_slots:, repo_sources:, distribution_image_ref:, runtime_entrypoint:, doctor_entrypoint:, migration_entrypoint:, secret_delivery_mode:, secret_reference:, scheduler_store_migration_state:, manifest_schema_version:, required_manifest_schema_version:, preset_chain:, preset_schema_versions:, required_preset_schema_version:)
+      def initialize(image_version:, manifest_path:, project_runtime_root:, preset_dir:, storage_backend:, state_root:, workspace_root:, artifact_root:, repo_source_strategy:, repo_source_slots:, repo_sources:, distribution_image_ref:, runtime_entrypoint:, doctor_entrypoint:, migration_entrypoint:, secret_delivery_mode:, secret_reference:, scheduler_store_migration_state:, manifest_schema_version:, required_manifest_schema_version:, preset_chain:, preset_schema_versions:, required_preset_schema_version:, agent_runtime_profile: "host-local", agent_control_plane_url: "http://127.0.0.1:7393", agent_profile_path: "<agent-runtime-profile.json>", agent_source_aliases: nil, agent_workspace_freshness_policy: :reuse_if_clean_and_ref_matches, agent_workspace_cleanup_policy: :retain_until_a3_cleanup)
         @image_version = image_version.to_s
         @manifest_path = Pathname(manifest_path)
         @project_runtime_root = Pathname(project_runtime_root)
@@ -29,6 +31,13 @@ module A3
         @repo_source_strategy = repo_source_strategy.to_sym
         @repo_source_slots = Array(repo_source_slots).map(&:to_sym).sort.freeze
         @repo_sources = repo_sources.transform_keys(&:to_sym).transform_values { |value| Pathname(value) }.freeze
+        @agent_runtime_profile = agent_runtime_profile.to_s
+        @agent_control_plane_url = agent_control_plane_url.to_s
+        @agent_profile_path = agent_profile_path.to_s
+        agent_source_aliases ||= @repo_source_slots.each_with_object({}) { |slot, aliases| aliases[slot] = slot.to_s }
+        @agent_source_aliases = agent_source_aliases.transform_keys(&:to_sym).transform_values(&:to_s).freeze
+        @agent_workspace_freshness_policy = agent_workspace_freshness_policy.to_sym
+        @agent_workspace_cleanup_policy = agent_workspace_cleanup_policy.to_sym
         @distribution_image_ref = distribution_image_ref.to_s
         @runtime_entrypoint = runtime_entrypoint.to_s
         @doctor_entrypoint = doctor_entrypoint.to_s
@@ -45,12 +54,13 @@ module A3
         freeze
       end
 
-      def self.build(image_version:, manifest_path:, preset_dir:, storage_backend:, storage_dir:, repo_sources:, manifest_schema_version:, required_manifest_schema_version:, preset_chain:, preset_schema_versions:, required_preset_schema_version:, distribution_image_ref: nil, runtime_entrypoint: nil, doctor_entrypoint: nil, migration_entrypoint: nil, secret_delivery_mode: :environment_variable, secret_reference:, scheduler_store_migration_state: :not_required)
+      def self.build(image_version:, manifest_path:, preset_dir:, storage_backend:, storage_dir:, repo_sources:, manifest_schema_version:, required_manifest_schema_version:, preset_chain:, preset_schema_versions:, required_preset_schema_version:, distribution_image_ref: nil, runtime_entrypoint: nil, doctor_entrypoint: nil, migration_entrypoint: nil, secret_delivery_mode: :environment_variable, secret_reference:, scheduler_store_migration_state: :not_required, agent_runtime_profile: "host-local", agent_control_plane_url: "http://127.0.0.1:7393", agent_profile_path: "<agent-runtime-profile.json>", agent_source_aliases: nil, agent_workspace_freshness_policy: :reuse_if_clean_and_ref_matches, agent_workspace_cleanup_policy: :retain_until_a3_cleanup)
         state_root = Pathname(storage_dir)
         distribution_image_ref ||= "a3-engine:#{image_version}"
         runtime_entrypoint ||= "bin/a3"
         doctor_entrypoint ||= "bin/a3 doctor-runtime"
         migration_entrypoint ||= "bin/a3 migrate-scheduler-store"
+        agent_source_aliases ||= repo_sources.keys.each_with_object({}) { |slot, aliases| aliases[slot] = slot.to_s }
         secret_delivery_mode = secret_delivery_mode.to_sym
         new(
           image_version: image_version,
@@ -64,6 +74,12 @@ module A3
           repo_source_strategy: repo_sources.empty? ? :none : :explicit_map,
           repo_source_slots: repo_sources.keys,
           repo_sources: repo_sources,
+          agent_runtime_profile: agent_runtime_profile,
+          agent_control_plane_url: agent_control_plane_url,
+          agent_profile_path: agent_profile_path,
+          agent_source_aliases: agent_source_aliases,
+          agent_workspace_freshness_policy: agent_workspace_freshness_policy,
+          agent_workspace_cleanup_policy: agent_workspace_cleanup_policy,
           distribution_image_ref: distribution_image_ref,
           runtime_entrypoint: runtime_entrypoint,
           doctor_entrypoint: doctor_entrypoint,
@@ -102,6 +118,19 @@ module A3
           "strategy" => repo_source_strategy,
           "slots" => repo_source_slots,
           "sources" => repo_sources.transform_values(&:to_s)
+        }.freeze
+      end
+
+      def agent_runtime_profile_summary
+        {
+          "profile" => agent_runtime_profile,
+          "control_plane_url" => agent_control_plane_url,
+          "profile_path" => agent_profile_path,
+          "source_aliases" => agent_source_aliases.transform_keys(&:to_s),
+          "freshness_policy" => agent_workspace_freshness_policy,
+          "cleanup_policy" => agent_workspace_cleanup_policy,
+          "agent_command" => agent_runtime_command_summary,
+          "worker_gateway_options" => agent_worker_gateway_options_summary
         }.freeze
       end
 
@@ -164,6 +193,9 @@ module A3
           "runtime_configuration_model" => runtime_configuration_model_summary,
           "repository_metadata_model" => repository_metadata_model_summary,
           "branch_resolution_model" => branch_resolution_model_summary,
+          "agent_runtime_profile" => agent_runtime_profile_contract_summary,
+          "agent_runtime_command" => agent_runtime_command_summary,
+          "agent_worker_gateway_options" => agent_worker_gateway_options_summary,
           "credential_boundary_model" => credential_boundary_model_summary,
           "observability_boundary_model" => observability_boundary_model_summary,
           "deployment_shape" => deployment_shape_summary,
@@ -194,6 +226,36 @@ module A3
           "repo_source_strategy=#{repo_source_strategy}",
           "repo_source_slots=#{repo_source_slots.join(',')}"
         ].join(" ")
+      end
+
+      def agent_runtime_profile_contract_summary
+        [
+          "profile=#{agent_runtime_profile}",
+          "control_plane_url=#{agent_control_plane_url}",
+          "profile_path=#{agent_profile_path}",
+          "source_aliases=#{agent_source_aliases.map { |slot, source_alias| "#{slot}=#{source_alias}" }.join(',')}",
+          "freshness_policy=#{agent_workspace_freshness_policy}",
+          "cleanup_policy=#{agent_workspace_cleanup_policy}"
+        ].join(" ")
+      end
+
+      def agent_runtime_command_summary
+        "a3-agent -config #{agent_profile_path}"
+      end
+
+      def agent_worker_gateway_options_summary
+        alias_args = agent_source_aliases.sort_by { |slot, _| slot.to_s }.map do |slot, source_alias|
+          "--agent-source-alias #{slot}=#{source_alias}"
+        end
+        ([
+          "--worker-gateway agent-http",
+          "--agent-control-plane-url #{agent_control_plane_url}",
+          "--agent-runtime-profile #{agent_runtime_profile}",
+          "--agent-shared-workspace-mode agent-materialized"
+        ] + alias_args + [
+          "--agent-workspace-freshness-policy #{agent_workspace_freshness_policy}",
+          "--agent-workspace-cleanup-policy #{agent_workspace_cleanup_policy}"
+        ]).join(" ")
       end
 
       def schema_contract_summary
@@ -433,6 +495,12 @@ module A3
           other.repo_source_strategy == repo_source_strategy &&
           other.repo_source_slots == repo_source_slots &&
           other.repo_sources == repo_sources &&
+          other.agent_runtime_profile == agent_runtime_profile &&
+          other.agent_control_plane_url == agent_control_plane_url &&
+          other.agent_profile_path == agent_profile_path &&
+          other.agent_source_aliases == agent_source_aliases &&
+          other.agent_workspace_freshness_policy == agent_workspace_freshness_policy &&
+          other.agent_workspace_cleanup_policy == agent_workspace_cleanup_policy &&
           other.distribution_image_ref == distribution_image_ref &&
           other.runtime_entrypoint == runtime_entrypoint &&
           other.doctor_entrypoint == doctor_entrypoint &&
@@ -497,6 +565,11 @@ module A3
         raise ConfigurationError, "state_root must be absolute" unless state_root.absolute?
         raise ConfigurationError, "workspace_root must be absolute" unless workspace_root.absolute?
         raise ConfigurationError, "artifact_root must be absolute" unless artifact_root.absolute?
+        raise ConfigurationError, "agent_runtime_profile must be provided" if agent_runtime_profile.empty?
+        raise ConfigurationError, "agent_control_plane_url must be provided" if agent_control_plane_url.empty?
+        raise ConfigurationError, "agent_profile_path must be provided" if agent_profile_path.empty?
+        raise ConfigurationError, "agent source aliases must cover repo source slots" unless agent_source_aliases.keys.sort == repo_source_slots.sort
+        raise ConfigurationError, "agent source aliases must be provided" if agent_source_aliases.values.any?(&:empty?)
         raise ConfigurationError, "distribution_image_ref must be provided" if distribution_image_ref.empty?
         raise ConfigurationError, "runtime_entrypoint must be provided" if runtime_entrypoint.empty?
         raise ConfigurationError, "doctor_entrypoint must be provided" if doctor_entrypoint.empty?
@@ -514,6 +587,12 @@ module A3
         end
         unless KNOWN_SCHEDULER_STORE_MIGRATION_STATES.include?(scheduler_store_migration_state)
           raise ConfigurationError, "unsupported scheduler_store_migration_state: #{scheduler_store_migration_state.inspect}"
+        end
+        unless A3::Domain::AgentWorkspaceRequest::FRESHNESS_POLICIES.include?(agent_workspace_freshness_policy)
+          raise ConfigurationError, "unsupported agent workspace freshness policy: #{agent_workspace_freshness_policy.inspect}"
+        end
+        unless A3::Domain::AgentWorkspaceRequest::CLEANUP_POLICIES.include?(agent_workspace_cleanup_policy)
+          raise ConfigurationError, "unsupported agent workspace cleanup policy: #{agent_workspace_cleanup_policy.inspect}"
         end
         return if KNOWN_REPO_SOURCE_STRATEGIES.include?(repo_source_strategy)
 
