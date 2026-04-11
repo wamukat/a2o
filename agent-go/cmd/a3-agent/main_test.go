@@ -70,6 +70,36 @@ func TestRunDoctorValidatesRuntimeProfile(t *testing.T) {
 	}
 }
 
+func TestResolveAgentTokenReadsTokenFile(t *testing.T) {
+	tokenPath := filepath.Join(t.TempDir(), "agent-token")
+	if err := os.WriteFile(tokenPath, []byte("file-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	token, err := resolveAgentToken("", tokenPath, "profile-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token != "file-token" {
+		t.Fatalf("token = %q", token)
+	}
+}
+
+func TestResolveAgentTokenPrefersDirectToken(t *testing.T) {
+	tokenPath := filepath.Join(t.TempDir(), "agent-token")
+	if err := os.WriteFile(tokenPath, []byte("file-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	token, err := resolveAgentToken("direct-token", tokenPath, "profile-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token != "direct-token" {
+		t.Fatalf("token = %q", token)
+	}
+}
+
 func TestRenderSystemdServiceTemplate(t *testing.T) {
 	output, err := renderServiceTemplate(serviceTemplateOptions{
 		Kind:         "systemd",

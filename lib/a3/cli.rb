@@ -984,7 +984,8 @@ module A3
         port: A3::Infra::AgentHttpPullServer::DEFAULT_PORT,
         job_store_path: nil,
         artifact_store_dir: nil,
-        agent_token: ENV.fetch("A3_AGENT_TOKEN", "")
+        agent_token: ENV.fetch("A3_AGENT_TOKEN", ""),
+        agent_token_file: ENV.fetch("A3_AGENT_TOKEN_FILE", "")
       }
 
       parser = OptionParser.new
@@ -994,10 +995,12 @@ module A3
       parser.on("--job-store PATH") { |value| options[:job_store_path] = File.expand_path(value) }
       parser.on("--artifact-store-dir DIR") { |value| options[:artifact_store_dir] = File.expand_path(value) }
       parser.on("--agent-token TOKEN") { |value| options[:agent_token] = value }
+      parser.on("--agent-token-file PATH") { |value| options[:agent_token_file] = File.expand_path(value) }
       parser.parse(argv)
 
       options[:job_store_path] ||= File.join(options.fetch(:storage_dir), "agent_jobs.json")
       options[:artifact_store_dir] ||= File.join(options.fetch(:storage_dir), "agent_artifacts")
+      options[:agent_token] = agent_auth_token(options)
       options
     end
 
@@ -1260,11 +1263,13 @@ module A3
 
     def add_worker_gateway_options(parser, options)
       options[:agent_token] ||= ENV.fetch("A3_AGENT_TOKEN", "")
+      options[:agent_token_file] ||= ENV.fetch("A3_AGENT_TOKEN_FILE", "")
       parser.on("--worker-gateway VALUE") { |value| options[:worker_gateway] = value }
       parser.on("--worker-command VALUE") { |value| options[:worker_command] = value }
       parser.on("--worker-command-arg VALUE") { |value| options[:worker_command_args] << value }
       parser.on("--agent-control-plane-url URL") { |value| options[:agent_control_plane_url] = value }
       parser.on("--agent-token TOKEN") { |value| options[:agent_token] = value }
+      parser.on("--agent-token-file PATH") { |value| options[:agent_token_file] = File.expand_path(value) }
       parser.on("--agent-runtime-profile VALUE") { |value| options[:agent_runtime_profile] = value }
       parser.on("--agent-shared-workspace-mode VALUE") { |value| options[:agent_shared_workspace_mode] = value }
       parser.on("--agent-source-alias SLOT=ALIAS") { |value| add_named_option(options[:agent_source_aliases] ||= {}, value, option_name: "agent source alias") }
@@ -1379,7 +1384,7 @@ module A3
         return A3::Infra::AgentWorkerGateway.new(
           control_plane_client: A3::Infra::AgentControlPlaneClient.new(
             base_url: options.fetch(:agent_control_plane_url),
-            auth_token: options.fetch(:agent_token, "")
+            auth_token: agent_auth_token(options)
           ),
           worker_command: options[:worker_command],
           worker_command_args: options.fetch(:worker_command_args, []),
@@ -1408,7 +1413,7 @@ module A3
         return A3::Infra::AgentCommandRunner.new(
           control_plane_client: A3::Infra::AgentControlPlaneClient.new(
             base_url: options.fetch(:agent_control_plane_url),
-            auth_token: options.fetch(:agent_token, "")
+            auth_token: agent_auth_token(options)
           ),
           runtime_profile: options.fetch(:agent_runtime_profile, "default"),
           shared_workspace_mode: shared_workspace_mode,
@@ -1419,6 +1424,19 @@ module A3
       end
 
       raise ArgumentError, "Unsupported verification command runner: #{runner}"
+    end
+
+    def agent_auth_token(options)
+      token = options.fetch(:agent_token, "").to_s
+      return token unless token.empty?
+
+      token_file = options.fetch(:agent_token_file, "").to_s
+      return "" if token_file.empty?
+
+      content = File.read(token_file).strip
+      raise ArgumentError, "agent token file is empty: #{token_file}" if content.empty?
+
+      content
     end
 
     def agent_workspace_request_builder(options)

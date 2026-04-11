@@ -116,6 +116,36 @@ RSpec.describe "A3 CLI worker gateway options" do
     expect(runner).to be_a(A3::Infra::AgentCommandRunner)
   end
 
+  it "resolves the agent auth token from a token file when no direct token is configured" do
+    Dir.mktmpdir do |dir|
+      token_path = File.join(dir, "agent-token")
+      File.write(token_path, "file-token\n")
+
+      token = A3::CLI.send(
+        :agent_auth_token,
+        agent_token: "",
+        agent_token_file: token_path
+      )
+
+      expect(token).to eq("file-token")
+    end
+  end
+
+  it "prefers a direct agent auth token over a token file" do
+    Dir.mktmpdir do |dir|
+      token_path = File.join(dir, "agent-token")
+      File.write(token_path, "file-token\n")
+
+      token = A3::CLI.send(
+        :agent_auth_token,
+        agent_token: "direct-token",
+        agent_token_file: token_path
+      )
+
+      expect(token).to eq("direct-token")
+    end
+  end
+
   it "requires a control-plane URL for the agent HTTP verification command runner" do
     expect do
       A3::CLI.send(

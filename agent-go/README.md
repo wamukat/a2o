@@ -95,7 +95,7 @@ Create a runtime profile for the host or dev-env where commands will run:
 {
   "agent": "host-local",
   "control_plane_url": "http://127.0.0.1:7393",
-  "agent_token": "local-shared-token",
+  "agent_token_file": "/run/secrets/a3-agent-token",
   "workspace_root": "/tmp/a3-agent-workspaces",
   "source_aliases": {
     "member-portal-starters": "/path/to/scratch-parent-repo"
@@ -121,7 +121,7 @@ The individual flags remain available as overrides:
 /tmp/a3-agent \
   -agent host-local \
   -control-plane-url http://127.0.0.1:7393 \
-  -agent-token local-shared-token \
+  -agent-token-file /run/secrets/a3-agent-token \
   -workspace-root /tmp/a3-agent-workspaces \
   -source-alias member-portal-starters=/path/to/scratch-parent-repo
 ```
@@ -135,7 +135,7 @@ The current command runs a single poll cycle:
 
 The runtime profile file is the host/dev-env side `alias -> local path` contract. A3 job payloads still carry only `slot -> alias`; they do not carry these local paths.
 
-`agent_token` is optional for local-only development. When the A3 control plane is started with `--agent-token` or `A3_AGENT_TOKEN`, the Go agent must provide the same token through `agent_token`, `A3_AGENT_TOKEN`, or `-agent-token`.
+`agent_token` is optional for local-only development. When the A3 control plane is started with `--agent-token` or `A3_AGENT_TOKEN`, the Go agent must provide the same token through `A3_AGENT_TOKEN`, `-agent-token`, `agent_token_file`, `A3_AGENT_TOKEN_FILE`, `-agent-token-file`, or the inline profile `agent_token`. Prefer token files for service manager / container operation so the token is not exposed through process arguments.
 
 ## Long-Running Mode
 

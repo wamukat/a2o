@@ -255,7 +255,7 @@ Uploaded agent artifacts are retained in the A3-managed artifact store and can b
 
 The first HTTP pull transport remains dev/local oriented. It exposes job request details, including environment values, through the local control-plane API, so non-local deployment still requires TLS, authorization scope, response redaction, and token rotation policy.
 
-As a minimum hardening step, the control plane and agents support an optional shared bearer token. A3 `agent-server` accepts `--agent-token` or `A3_AGENT_TOKEN`; Go `a3-agent` reads profile `agent_token`, `A3_AGENT_TOKEN`, or `-agent-token`; A3-side `agent-http` gateway clients also pass `--agent-token` / `A3_AGENT_TOKEN`. When configured, all pull API calls must include `Authorization: Bearer <token>`.
+As a minimum hardening step, the control plane and agents support an optional shared bearer token. A3 `agent-server` accepts `--agent-token`, `--agent-token-file`, `A3_AGENT_TOKEN`, or `A3_AGENT_TOKEN_FILE`; Go `a3-agent` reads profile `agent_token_file` / `agent_token`, `A3_AGENT_TOKEN_FILE`, `A3_AGENT_TOKEN`, `-agent-token-file`, or `-agent-token`; A3-side `agent-http` gateway clients also pass the same token options. When configured, all pull API calls must include `Authorization: Bearer <token>`. Prefer token files for service manager / container operation so the token is not exposed through process arguments.
 
 ## Agent-Owned Workspace Materialization
 
