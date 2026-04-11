@@ -3,16 +3,33 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${DIST_DIR:-"${ROOT_DIR}/dist"}"
+VERSION="${VERSION:-"dev"}"
+PACKAGE_ARCHIVES="${PACKAGE_ARCHIVES:-1}"
 
-targets=(
-  "darwin/amd64"
-  "darwin/arm64"
-  "linux/amd64"
-  "linux/arm64"
-  "windows/amd64"
-)
+if [[ -n "${TARGETS:-}" ]]; then
+  read -r -a targets <<< "${TARGETS}"
+else
+  targets=(
+    "darwin/amd64"
+    "darwin/arm64"
+    "linux/amd64"
+    "linux/arm64"
+    "windows/amd64"
+  )
+fi
 
 mkdir -p "${DIST_DIR}"
+: > "${DIST_DIR}/checksums.txt"
+: > "${DIST_DIR}/release-manifest.jsonl"
+
+sha256sum_or_shasum() {
+  local path="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "${path}" | awk '{print $1}'
+  else
+    shasum -a 256 "${path}" | awk '{print $1}'
+  fi
+}
 
 for target in "${targets[@]}"; do
   goos="${target%%/*}"
@@ -30,6 +47,28 @@ for target in "${targets[@]}"; do
     GOOS="${goos}" GOARCH="${goarch}" CGO_ENABLED=0 \
       go build -trimpath -o "${out_dir}/${binary_name}" ./cmd/a3-agent
   )
+
+  archive_name="a3-agent-${VERSION}-${goos}-${goarch}"
+  if [[ "${PACKAGE_ARCHIVES}" == "1" ]]; then
+    if [[ "${goos}" == "windows" ]]; then
+      if ! command -v zip >/dev/null 2>&1; then
+        echo "zip is required to package windows archives" >&2
+        exit 2
+      fi
+      archive_path="${DIST_DIR}/${archive_name}.zip"
+      (
+        cd "${out_dir}"
+        zip -q -X "${archive_path}" "${binary_name}"
+      )
+    else
+      archive_path="${DIST_DIR}/${archive_name}.tar.gz"
+      tar -C "${out_dir}" -czf "${archive_path}" "${binary_name}"
+    fi
+    checksum="$(sha256sum_or_shasum "${archive_path}")"
+    printf '%s  %s\n' "${checksum}" "$(basename "${archive_path}")" >> "${DIST_DIR}/checksums.txt"
+    printf '{"version":"%s","goos":"%s","goarch":"%s","archive":"%s","sha256":"%s"}\n' \
+      "${VERSION}" "${goos}" "${goarch}" "$(basename "${archive_path}")" "${checksum}" >> "${DIST_DIR}/release-manifest.jsonl"
+  fi
 done
 
 echo "built artifacts in ${DIST_DIR}"

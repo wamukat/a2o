@@ -13,16 +13,25 @@ go build -o /tmp/a3-agent ./cmd/a3-agent
 For release-style cross-builds:
 
 ```sh
-./scripts/build-release.sh
+VERSION=0.1.0 ./scripts/build-release.sh
 ```
 
-This writes binaries under `dist/` for:
+This writes binaries and release archives under `dist/` for:
 
 - `darwin/amd64`
 - `darwin/arm64`
 - `linux/amd64`
 - `linux/arm64`
 - `windows/amd64`
+
+Release output includes:
+
+- platform binary directories, for example `dist/linux-amd64/a3-agent`
+- archives, for example `dist/a3-agent-0.1.0-linux-amd64.tar.gz`
+- `dist/checksums.txt`
+- `dist/release-manifest.jsonl`
+
+Use `TARGETS="linux/amd64 darwin/arm64"` to build a subset. Set `PACKAGE_ARCHIVES=0` to build binaries only.
 
 ## Local Install
 
@@ -134,7 +143,7 @@ Useful flags and environment overrides:
 - `--poll-interval` / `A3_AGENT_POLL_INTERVAL`: idle sleep duration, for example `2s`.
 - `--max-iterations` / `A3_AGENT_MAX_ITERATIONS`: bounded loop count for smoke tests; `0` means unlimited.
 
-Loop mode exits non-zero on control-plane or job execution errors so an external daemon manager can restart or alert. Installer packaging, auth, and deeper policy hardening are intentionally left for later slices.
+Loop mode exits non-zero on control-plane or job execution errors so an external daemon manager can restart or alert. Release archive generation, local service template installation, and shared bearer-token auth are available; deeper policy hardening remains for later slices.
 
 Generate a service-manager template for local installation:
 
