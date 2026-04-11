@@ -86,6 +86,13 @@ func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T)
 	if result.WorkerProtocolResult["status"] != "succeeded" {
 		t.Fatalf("missing worker protocol result: %#v", result.WorkerProtocolResult)
 	}
+	slot := result.WorkspaceDescriptor.SlotDescriptors["repo_alpha"]
+	if got := stringSlice(slot["changed_files"]); !bytes.Equal([]byte(join(got)), []byte("changed.txt")) {
+		t.Fatalf("unexpected changed files: %#v", slot["changed_files"])
+	}
+	if slot["dirty_after"] != true {
+		t.Fatalf("expected dirty_after=true: %#v", slot)
+	}
 	if roles := uploadRoles(client.uploads); !bytes.Equal([]byte(roles), []byte("combined-log,worker-result")) {
 		t.Fatalf("unexpected upload roles: %s", roles)
 	}
@@ -182,6 +189,14 @@ func (workerProtocolExecutor) Execute(request JobRequest) ExecutionResult {
 		code := 1
 		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
 	}
+	if err := os.WriteFile(filepath.Join(request.WorkingDir, "repo-alpha", "changed.txt"), []byte("changed\n"), 0o644); err != nil {
+		code := 1
+		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
+	}
+	if err := os.WriteFile(filepath.Join(request.WorkingDir, ".a3", "ignored.txt"), []byte("ignored\n"), 0o644); err != nil {
+		code := 1
+		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
+	}
 	code := 0
 	return ExecutionResult{Status: "succeeded", ExitCode: &code, CombinedLog: []byte("worker protocol ok\n")}
 }
@@ -265,4 +280,32 @@ func uploadRoles(uploads []ArtifactUpload) string {
 		roles = append(roles, upload.Role...)
 	}
 	return string(roles)
+}
+
+func stringSlice(value any) []string {
+	switch typed := value.(type) {
+	case []string:
+		return typed
+	case []any:
+		result := make([]string, 0, len(typed))
+		for _, item := range typed {
+			if stringItem, ok := item.(string); ok {
+				result = append(result, stringItem)
+			}
+		}
+		return result
+	default:
+		return nil
+	}
+}
+
+func join(values []string) string {
+	var out []byte
+	for index, value := range values {
+		if index > 0 {
+			out = append(out, ',')
+		}
+		out = append(out, value...)
+	}
+	return string(out)
 }

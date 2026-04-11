@@ -236,7 +236,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     )
   end
 
-  it "fails closed for successful implementation in agent materialized mode until changed files evidence is designed" do
+  it "accepts successful implementation in agent materialized mode using descriptor changed files as canonical evidence" do
     client.on_fetch = lambda do |job_id|
       client.complete(
         job_id,
@@ -244,7 +244,38 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
           job_id,
           :succeeded,
           0,
-          worker_protocol_result: worker_success
+          worker_protocol_result: worker_success.merge("changed_files" => { "repo_beta" => ["worker-claimed.txt"] }),
+          workspace_descriptor: workspace_descriptor(
+            "repo_beta" => materialized_slot_descriptor("changed.txt")
+          )
+        )
+      )
+    end
+    gateway = materialized_gateway
+
+    execution = run_gateway(gateway)
+
+    expect(execution).to have_attributes(
+      success: true,
+      summary: "worker completed"
+    )
+    expect(execution.response_bundle.fetch("changed_files")).to eq("repo_beta" => ["changed.txt"])
+    expect(execution.diagnostics.fetch("worker_changed_files")).to eq("repo_beta" => ["worker-claimed.txt"])
+    expect(execution.diagnostics.fetch("canonical_changed_files")).to eq("repo_beta" => ["changed.txt"])
+  end
+
+  it "rejects materialized implementation when required changed files evidence is missing" do
+    client.on_fetch = lambda do |job_id|
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: worker_success,
+          workspace_descriptor: workspace_descriptor(
+            "repo_beta" => materialized_slot_descriptor_without_changed_files
+          )
         )
       )
     end
@@ -255,8 +286,9 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     expect(execution).to have_attributes(
       success: false,
       failing_command: "agent_materialized_changed_files",
-      observed_state: "agent_materialized_changed_files_unavailable"
+      observed_state: "agent_materialized_changed_files_invalid"
     )
+    expect(execution.diagnostics.fetch("validation_errors")).to include("repo_beta.changed_files must be an array of strings")
   end
 
   it "runs through an HTTP agent server and the Ruby reference agent" do
@@ -445,7 +477,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     end
   end
 
-  def agent_result(job_id, status, exit_code, worker_protocol_result: nil)
+  def agent_result(job_id, status, exit_code, worker_protocol_result: nil, workspace_descriptor: self.workspace_descriptor)
     A3::Domain::AgentJobResult.new(
       job_id: job_id,
       status: status,
@@ -465,13 +497,33 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: task.ref, ref: "abc123")
   end
 
-  def workspace_descriptor
+  def workspace_descriptor(slot_descriptors = {})
     A3::Domain::AgentWorkspaceDescriptor.new(
       workspace_kind: :runtime_workspace,
       runtime_profile: "host-local",
       workspace_id: "host-local-job-1",
       source_descriptor: source_descriptor,
-      slot_descriptors: {}
+      slot_descriptors: slot_descriptors
     )
+  end
+
+  def materialized_slot_descriptor(*changed_files)
+    materialized_slot_descriptor_without_changed_files.merge(
+      "changed_files" => changed_files
+    )
+  end
+
+  def materialized_slot_descriptor_without_changed_files
+    {
+      "runtime_path" => "/agent/workspaces/Portal-42-runtime/repo-beta",
+      "source_kind" => "local_git",
+      "source_alias" => "member-portal-starters",
+      "checkout" => "worktree_detached",
+      "requested_ref" => "abc123",
+      "resolved_head" => "abc123",
+      "dirty_before" => false,
+      "dirty_after" => true,
+      "access" => "read_write"
+    }
   end
 end

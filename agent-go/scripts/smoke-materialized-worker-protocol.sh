@@ -65,6 +65,7 @@ JOB_PATH="${JOB_PATH}" SOURCE_HEAD="${SOURCE_HEAD}" ruby -rjson -e '
   command = <<~SH
     set -eu
     test -f repo-alpha/README.md
+    printf "changed by worker\n" > repo-alpha/changed.txt
     mkdir -p "$(dirname "$A3_WORKER_RESULT_PATH")"
     cat > "$A3_WORKER_RESULT_PATH" <<JSON
     {"success":true,"summary":"materialized worker completed","task_ref":"Portal#42","run_ref":"run-42","phase":"implementation","rework_required":false,"changed_files":{}}
@@ -154,6 +155,9 @@ JOB_RESULT_PATH="${JOB_RESULT_PATH}" SOURCE_HEAD="${SOURCE_HEAD}" SOURCE_ROOT="$
   raise "requested ref mismatch" unless slot.fetch("requested_ref") == ENV.fetch("SOURCE_HEAD")
   runtime_path = slot.fetch("runtime_path")
   raise "runtime path outside workspace root" unless runtime_path.start_with?(ENV.fetch("WORKSPACE_ROOT"))
+  changed_files = slot.fetch("changed_files")
+  raise "changed_files evidence mismatch: #{changed_files.inspect}" unless changed_files == ["changed.txt"]
+  raise "dirty_after should be true" unless slot.fetch("dirty_after") == true
   raise "materialized workspace was not cleaned" if File.exist?(File.join(ENV.fetch("WORKSPACE_ROOT"), "Portal-42-ticket"))
   worktree_list = `git -C "#{ENV.fetch("SOURCE_ROOT")}" worktree list --porcelain`
   raise "worktree registration leaked" if worktree_list.include?(runtime_path)

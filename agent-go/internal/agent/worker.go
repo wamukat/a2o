@@ -53,6 +53,12 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 	}
 
 	execution := w.executor().Execute(runRequest)
+	if prepared != nil {
+		if err := RefreshWorkspaceEvidence(*prepared); err != nil {
+			return nil, false, err
+		}
+		workspaceDescriptor = requestedWorkspaceDescriptor(runRequest, prepared.SlotDescriptors)
+	}
 	finishedAt := w.now().Format(time.RFC3339)
 	logUpload, err := w.upload("combined-log", safeID(request.JobID+"-combined-log"), "diagnostic", "text/plain", execution.CombinedLog)
 	if err != nil {

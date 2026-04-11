@@ -92,15 +92,22 @@ module A3
         completed = wait_for_completion(request.job_id)
         return completed if completed.is_a?(A3::Application::ExecutionResult)
         return agent_result_execution(completed.result) unless completed.result.succeeded?
-        return materialized_implementation_changed_files_unavailable(completed.result) if run.phase.to_sym == :implementation && completed.result.worker_protocol_result&.fetch("success", nil) == true
 
         worker_response = completed.result.worker_protocol_result
+        canonical_changed_files = nil
+        if run.phase.to_sym == :implementation && worker_response&.fetch("success", nil) == true
+          evidence = materialized_changed_files_evidence(workspace_request: request.workspace_request, result: completed.result)
+          return evidence if evidence.is_a?(A3::Application::ExecutionResult)
+
+          canonical_changed_files = evidence
+        end
         execution = @worker_protocol.build_execution_result(
           worker_response,
           workspace: workspace,
           expected_task_ref: task.ref,
           expected_run_ref: run.ref,
-          expected_phase: run.phase
+          expected_phase: run.phase,
+          canonical_changed_files: canonical_changed_files
         )
         return execution if execution
 
@@ -193,13 +200,48 @@ module A3
         )
       end
 
-      def materialized_implementation_changed_files_unavailable(result)
+      def materialized_changed_files_evidence(workspace_request:, result:)
+        errors = []
+        slots = result.workspace_descriptor.slot_descriptors
+        canonical_changed_files = {}
+        workspace_request.slots.each do |slot_name, request_slot|
+          next unless request_slot.fetch("required")
+
+          descriptor = slots[slot_name]
+          if descriptor.nil?
+            errors << "workspace descriptor missing required slot #{slot_name}"
+            next
+          end
+          source = request_slot.fetch("source")
+          {
+            "source_kind" => source.fetch("kind"),
+            "source_alias" => source.fetch("alias"),
+            "checkout" => request_slot.fetch("checkout"),
+            "requested_ref" => request_slot.fetch("ref"),
+            "access" => request_slot.fetch("access")
+          }.each do |key, expected|
+            errors << "#{slot_name}.#{key} must match workspace_request" unless descriptor[key] == expected
+          end
+          errors << "#{slot_name}.runtime_path must be present" unless descriptor["runtime_path"].is_a?(String) && !descriptor["runtime_path"].empty?
+          errors << "#{slot_name}.resolved_head must be present" unless descriptor["resolved_head"].is_a?(String) && !descriptor["resolved_head"].empty?
+          errors << "#{slot_name}.dirty_before must be false" unless descriptor["dirty_before"] == false
+          errors << "#{slot_name}.dirty_after must be true or false" unless [true, false].include?(descriptor["dirty_after"])
+          changed_files = descriptor["changed_files"]
+          unless changed_files.is_a?(Array) && changed_files.all? { |entry| entry.is_a?(String) }
+            errors << "#{slot_name}.changed_files must be an array of strings"
+            next
+          end
+          canonical_changed_files[slot_name] = changed_files.sort.uniq unless changed_files.empty?
+        end
+        return canonical_changed_files if errors.empty?
+
         A3::Application::ExecutionResult.new(
           success: false,
-          summary: "agent materialized implementation changed_files evidence is not available",
+          summary: "agent materialized implementation changed_files evidence is invalid",
           failing_command: "agent_materialized_changed_files",
-          observed_state: "agent_materialized_changed_files_unavailable",
+          observed_state: "agent_materialized_changed_files_invalid",
           diagnostics: {
+            "validation_errors" => errors,
             "agent_job_result" => result.result_form,
             "control_plane_url" => control_plane_url
           },

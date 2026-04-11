@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strings"
 )
 
 type WorkspaceMaterializer struct {
@@ -78,6 +80,62 @@ func (m WorkspaceMaterializer) Cleanup(prepared PreparedWorkspace) error {
 		firstErr = err
 	}
 	return firstErr
+}
+
+func RefreshWorkspaceEvidence(prepared PreparedWorkspace) error {
+	for _, descriptor := range prepared.SlotDescriptors {
+		runtimePath, ok := descriptor["runtime_path"].(string)
+		if !ok || runtimePath == "" {
+			return fmt.Errorf("slot descriptor runtime_path is required")
+		}
+		changedFiles, err := gitChangedPaths(runtimePath)
+		if err != nil {
+			return err
+		}
+		dirtyAfter, err := gitDirty(runtimePath)
+		if err != nil {
+			return err
+		}
+		descriptor["changed_files"] = changedFiles
+		descriptor["dirty_after"] = dirtyAfter
+	}
+	return nil
+}
+
+func gitChangedPaths(root string) ([]string, error) {
+	out, err := gitOutput(root, "status", "--porcelain", "--untracked-files=all", "--", ".", ":(exclude).a3")
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, line := range strings.FieldsFunc(out, func(char rune) bool { return char == '\n' || char == '\r' }) {
+		if len(line) < 4 {
+			continue
+		}
+		path := line[3:]
+		if path == "" {
+			continue
+		}
+		if _, after, found := strings.Cut(path, " -> "); found {
+			path = after
+		}
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return uniqueStrings(paths), nil
+}
+
+func uniqueStrings(values []string) []string {
+	if len(values) == 0 {
+		return values
+	}
+	unique := values[:1]
+	for _, value := range values[1:] {
+		if value != unique[len(unique)-1] {
+			unique = append(unique, value)
+		}
+	}
+	return unique
 }
 
 func (m WorkspaceMaterializer) workspaceRoot(workspaceID string) (string, error) {

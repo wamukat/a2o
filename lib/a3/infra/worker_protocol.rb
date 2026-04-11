@@ -95,7 +95,7 @@ module A3
         invalid_result("worker result file is missing", {})
       end
 
-      def build_execution_result(worker_response, workspace:, expected_task_ref:, expected_run_ref:, expected_phase:)
+      def build_execution_result(worker_response, workspace:, expected_task_ref:, expected_run_ref:, expected_phase:, canonical_changed_files: nil)
         return nil if worker_response.nil?
 
         unless worker_response.is_a?(Hash)
@@ -140,7 +140,8 @@ module A3
           worker_response,
           workspace: workspace,
           expected_phase: expected_phase,
-          diagnostics: diagnostics
+          diagnostics: diagnostics,
+          canonical_changed_files: canonical_changed_files
         )
 
         A3::Application::ExecutionResult.new(
@@ -166,10 +167,10 @@ module A3
         )
       end
 
-      def canonicalize_response_bundle(worker_response, workspace:, expected_phase:, diagnostics:)
+      def canonicalize_response_bundle(worker_response, workspace:, expected_phase:, diagnostics:, canonical_changed_files: nil)
         return worker_response unless expected_phase.to_s == "implementation" && worker_response["success"] == true
 
-        canonical_changed_files = changed_files_from_workspace(workspace)
+        canonical_changed_files ||= changed_files_from_workspace(workspace)
         worker_changed_files = worker_response["changed_files"]
         if worker_changed_files != canonical_changed_files
           diagnostics["worker_changed_files"] = worker_changed_files

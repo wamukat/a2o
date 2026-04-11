@@ -317,13 +317,13 @@ Do not move full Portal execution yet. Split implementation into three commits:
    - Add an agent-owned way to carry the worker result back to A3 without relying on same-path filesystem reads.
 4. HTTP smoke: implemented.
    - Add an HTTP smoke where `AgentJobRequest` has `workspace_request`, the agent creates the worktree, writes worker protocol files under the materialized workspace root, runs `sh`, uploads the worker result evidence, and returns `AgentWorkspaceDescriptor`.
-5. Gateway materialized-mode internal branch: implemented for non-implementation phases only.
+5. Gateway materialized-mode internal branch: implemented.
    - `WorkerProtocol#request_form` exposes the same payload that same-path mode writes to `.a3/worker-request.json`.
    - `AgentWorkerGateway` can accept an injected `workspace_request_builder` and enqueue `workspace_request` + `worker_protocol_request`.
    - The mode is not exposed through CLI/runtime config yet.
-   - Successful implementation is fail-closed until changed-files evidence/canonicalization for agent-owned workspaces is designed.
+   - Successful implementation uses agent-returned slot `changed_files` evidence as canonical input after validating it against `workspace_request`.
 
-The next implementation step is changed-files evidence for agent-owned implementation. Directly completing implementation from inline `worker_protocol_result` would weaken the current same-path contract because `WorkerProtocol` canonicalizes implementation `changed_files` from the execution workspace, and the A3-local workspace is not the agent-owned execution workspace.
+The next implementation step is runtime-profile wiring for `workspace_request_builder`. Directly deriving `workspace_request` from A3-local `PreparedWorkspace#slot_paths` would weaken the host/dev-env boundary; source aliases and agent workspace roots must come from runtime configuration.
 
 ### Worker Loop Integration With Agent-Owned Workspace
 
@@ -344,7 +344,7 @@ The worker protocol needs one additional transport slice before the materialized
 
 Configured `artifact_rules` in materialized mode are evaluated relative to the prepared workspace root after worker-result capture. Cleanup must occur only after worker-result capture, configured artifact uploads, and result submission attempts complete. For the first smoke, use a cleanup policy that allows deterministic test cleanup while still preserving enough uploaded evidence for A3 to parse the worker result.
 
-`AgentWorkerGateway` materialized mode currently supports parsing completed non-implementation worker results through `AgentJobResult.worker_protocol_result`. Successful implementation returns `agent_materialized_changed_files_unavailable` until the agent can provide changed-files evidence that A3 can validate without reading agent-local paths.
+`AgentWorkerGateway` materialized mode parses completed worker results through `AgentJobResult.worker_protocol_result`. For successful implementation, A3 derives canonical `changed_files` from `AgentWorkspaceDescriptor.slot_descriptors[*].changed_files`, validates the descriptor against `workspace_request`, records worker-payload mismatches in diagnostics, and writes the descriptor-derived value to the final response bundle. A3 treats agent `runtime_path` values as diagnostics only and does not read them.
 
 ### Non-Goals For This Slice
 
