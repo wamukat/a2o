@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+AGENT_DIR="${ROOT_DIR}/agent-go"
+PORT="${PORT:-17394}"
+BASE_URL="http://127.0.0.1:${PORT}"
+TMP_DIR="$(mktemp -d)"
+SERVER_PID=""
+
+dump_logs() {
+  local status=$?
+  if [[ "${status}" -ne 0 ]]; then
+    for log in "${TMP_DIR}/agent-server.log" "${TMP_DIR}/agent.log"; do
+      if [[ -f "${log}" ]]; then
+        echo "---- ${log} ----" >&2
+        tail -200 "${log}" >&2 || true
+      fi
+    done
+  fi
+  return "${status}"
+}
+
+cleanup() {
+  local status=$?
+  if [[ -n "${SERVER_PID}" ]]; then
+    kill "${SERVER_PID}" >/dev/null 2>&1 || true
+    wait "${SERVER_PID}" >/dev/null 2>&1 || true
+  fi
+  rm -rf "${TMP_DIR}"
+  return "${status}"
+}
+trap 'dump_logs; cleanup' EXIT
+
+SOURCE_ROOT="${TMP_DIR}/sources/member-portal-starters"
+WORKSPACE_ROOT="${TMP_DIR}/agent-workspaces"
+STORAGE_DIR="${TMP_DIR}/storage"
+
+mkdir -p "${SOURCE_ROOT}"
+git -C "${SOURCE_ROOT}" init -q
+git -C "${SOURCE_ROOT}" config user.name "A3 Smoke"
+git -C "${SOURCE_ROOT}" config user.email "a3-smoke@example.com"
+printf 'materialized source\n' > "${SOURCE_ROOT}/README.md"
+git -C "${SOURCE_ROOT}" add README.md
+git -C "${SOURCE_ROOT}" commit -q -m "initial source"
+SOURCE_HEAD="$(git -C "${SOURCE_ROOT}" rev-parse HEAD)"
+
+ruby -I "${ROOT_DIR}/lib" "${ROOT_DIR}/bin/a3" agent-server \
+  --storage-dir "${STORAGE_DIR}" \
+  --host 127.0.0.1 \
+  --port "${PORT}" > "${TMP_DIR}/agent-server.log" 2>&1 &
+SERVER_PID="$!"
+
+for _ in $(seq 1 50); do
+  if curl -fsS "${BASE_URL}/v1/agent/jobs/next?agent=probe" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.1
+done
+
+JOB_PATH="${TMP_DIR}/job.json"
+JOB_PATH="${JOB_PATH}" SOURCE_HEAD="${SOURCE_HEAD}" ruby -rjson -e '
+  job_path = ENV.fetch("JOB_PATH")
+  source_head = ENV.fetch("SOURCE_HEAD")
+  command = <<~SH
+    set -eu
+    test -f repo-alpha/README.md
+    mkdir -p "$(dirname "$A3_WORKER_RESULT_PATH")"
+    cat > "$A3_WORKER_RESULT_PATH" <<JSON
+    {"success":true,"summary":"materialized worker completed","task_ref":"Portal#42","run_ref":"run-42","phase":"implementation","rework_required":false,"changed_files":{}}
+    JSON
+    echo "materialized worker protocol ok"
+  SH
+  File.write(
+    job_path,
+    JSON.pretty_generate(
+      "job_id" => "job-materialized-1",
+      "task_ref" => "Portal#42",
+      "phase" => "implementation",
+      "runtime_profile" => "host-local",
+      "source_descriptor" => {
+        "workspace_kind" => "ticket_workspace",
+        "source_type" => "branch_head",
+        "ref" => source_head,
+        "task_ref" => "Portal#42"
+      },
+      "workspace_request" => {
+        "mode" => "agent_materialized",
+        "workspace_kind" => "ticket_workspace",
+        "workspace_id" => "Portal-42-ticket",
+        "freshness_policy" => "reuse_if_clean_and_ref_matches",
+        "cleanup_policy" => "cleanup_after_job",
+        "slots" => {
+          "repo_alpha" => {
+            "source" => {
+              "kind" => "local_git",
+              "alias" => "member-portal-starters"
+            },
+            "ref" => source_head,
+            "checkout" => "worktree_detached",
+            "access" => "read_write",
+            "required" => true
+          }
+        }
+      },
+      "worker_protocol_request" => {
+        "task_ref" => "Portal#42",
+        "run_ref" => "run-42",
+        "phase" => "implementation"
+      },
+      "working_dir" => ".",
+      "command" => "sh",
+      "args" => ["-lc", command],
+      "env" => {},
+      "timeout_seconds" => 30,
+      "artifact_rules" => []
+    )
+  )
+'
+
+curl -fsS \
+  -H "content-type: application/json" \
+  --data-binary "@${JOB_PATH}" \
+  "${BASE_URL}/v1/agent/jobs" >/dev/null
+
+(
+  cd "${AGENT_DIR}"
+  go build -trimpath -o "${TMP_DIR}/a3-agent" ./cmd/a3-agent
+)
+
+"${TMP_DIR}/a3-agent" \
+  -agent host-local \
+  -control-plane-url "${BASE_URL}" \
+  -workspace-root "${WORKSPACE_ROOT}" \
+  -source-alias "member-portal-starters=${SOURCE_ROOT}" > "${TMP_DIR}/agent.log"
+
+grep -q "agent completed job-materialized-1 status=succeeded" "${TMP_DIR}/agent.log"
+
+JOB_RESULT_PATH="${TMP_DIR}/job-result.json"
+curl -fsS "${BASE_URL}/v1/agent/jobs/job-materialized-1" > "${JOB_RESULT_PATH}"
+
+JOB_RESULT_PATH="${JOB_RESULT_PATH}" SOURCE_HEAD="${SOURCE_HEAD}" SOURCE_ROOT="${SOURCE_ROOT}" WORKSPACE_ROOT="${WORKSPACE_ROOT}" ruby -rjson -e '
+  job = JSON.parse(File.read(ENV.fetch("JOB_RESULT_PATH"))).fetch("job")
+  result = job.fetch("result")
+  raise "job was not completed" unless job.fetch("state") == "completed"
+  raise "job did not succeed" unless result.fetch("status") == "succeeded"
+  worker_result = result.fetch("worker_protocol_result")
+  raise "missing worker protocol result" unless worker_result.fetch("summary") == "materialized worker completed"
+  uploads = result.fetch("artifact_uploads")
+  raise "missing worker-result artifact" unless uploads.any? { |upload| upload.fetch("role") == "worker-result" }
+  slot = result.fetch("workspace_descriptor").fetch("slot_descriptors").fetch("repo_alpha")
+  raise "source alias mismatch" unless slot.fetch("source_alias") == "member-portal-starters"
+  raise "checkout mismatch" unless slot.fetch("checkout") == "worktree_detached"
+  raise "requested ref mismatch" unless slot.fetch("requested_ref") == ENV.fetch("SOURCE_HEAD")
+  runtime_path = slot.fetch("runtime_path")
+  raise "runtime path outside workspace root" unless runtime_path.start_with?(ENV.fetch("WORKSPACE_ROOT"))
+  raise "materialized workspace was not cleaned" if File.exist?(File.join(ENV.fetch("WORKSPACE_ROOT"), "Portal-42-ticket"))
+  worktree_list = `git -C "#{ENV.fetch("SOURCE_ROOT")}" worktree list --porcelain`
+  raise "worktree registration leaked" if worktree_list.include?(runtime_path)
+'
+
+test -f "${STORAGE_DIR}/agent_artifacts/artifacts/job-materialized-1-worker-result.json"
+
+echo "go agent materialized worker protocol smoke ok"

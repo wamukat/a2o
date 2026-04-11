@@ -42,12 +42,22 @@ To verify the Go agent against the Ruby A3 control plane:
 
 This starts `a3 agent-server`, enqueues one verification job, runs the Go agent once, and checks that combined logs and matched artifacts were uploaded to the A3-managed artifact store.
 
+To verify agent-owned workspace materialization and worker protocol transport:
+
+```sh
+./scripts/smoke-materialized-worker-protocol.sh
+```
+
+This starts the same Ruby control plane, creates a tiny clean Git source repo, enqueues one implementation job with `workspace_request` and `worker_protocol_request`, runs the Go agent with `--workspace-root` and `--source-alias`, and checks that the worker result is returned both as inline result JSON and as an uploaded `worker-result` artifact.
+
 ## Run Once
 
 ```sh
 /tmp/a3-agent \
   -agent host-local \
-  -control-plane-url http://127.0.0.1:7393
+  -control-plane-url http://127.0.0.1:7393 \
+  -workspace-root /tmp/a3-agent-workspaces \
+  -source-alias member-portal-starters=/path/to/scratch-parent-repo
 ```
 
 The current command runs a single poll cycle:
