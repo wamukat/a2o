@@ -91,6 +91,24 @@ This is intentionally narrow.
 It does not assume broad backend inconsistency everywhere.
 It only hardens the call sites where false negatives were actually observed.
 
+## 2026-04-11 Bundle Agent Loop Evidence
+
+The bundle agent loop exercises the normal A3 distribution shape: `docker:a3` as control plane, `docker:soloboard` as kanban, and `docker:dev-env(a3-agent)` as project command runtime.
+
+Observed evidence:
+
+- `ITERATIONS=1 INTERVAL_SECONDS=5 task a3:portal:bundle:agent-loop`
+  - `Portal#44` worker gateway reached `Done`
+  - `Portal#45` verification command runner reached `Done`
+  - `Portal#46/#47/#48` parent topology reached `Done`
+- `ITERATIONS=2 INTERVAL_SECONDS=10 task a3:portal:bundle:agent-loop`
+  - first iteration: `Portal#49/#50/#51/#52/#53` reached `Done`
+  - second iteration: `Portal#54/#55/#56/#57/#58` reached `Done`
+- after each loop observation, `watch-summary` and `show-state` reported no active, queued, or blocked tasks
+- host disk stayed at 93Gi available, Docker build cache reclaimable stayed at 667.2MB, and local volumes stayed around 115MB
+
+No read-after-write false negative was observed for label, transition, relation, or done confirmation during these loops.
+
 ## What Is Stable Enough Today
 
 The following are stable enough for continued migration work:
@@ -102,13 +120,14 @@ The following are stable enough for continued migration work:
 - `plan-next-runnable-task` selection smoke against labeled SoloBoard tasks
 - isolated single full-phase canary on `Portal#17`
 - isolated parent-child canary on `Portal#18/#19/#20`
+- bundle agent worker / verification / parent topology loops through `Portal#44` to `Portal#58`
 
 ## What Still Needs More Evidence
 
 The following still need more evidence:
 
 - repeated scheduler-loop operation over time
-- whether `transition`, `relation`, or `done` confirmation also need the same retry hardening as labels under heavier write volume
+- whether `transition`, `relation`, or `done` confirmation also need the same retry hardening as labels under heavier write volume. Short bundle agent loops did not reproduce instability
 - whether mainline non-isolated Portal storage can switch defaults without operational surprises
 
 ## Current Judgment
@@ -123,7 +142,7 @@ Current judgment is:
 
 ## Recommended Next Checks
 
-1. Observe repeated scheduler-loop operation on SoloBoard backend for drift or read-after-write gaps.
-2. Observe whether `transition`, `relation`, or `done` confirmation need the same retry treatment as labels.
+1. Observe longer-running scheduler-loop operation on SoloBoard backend for drift or read-after-write gaps.
+2. Keep transition/relation/done confirmation under observation during longer loops; short bundle agent loops did not reproduce instability.
 3. Complete mainline cutover judgment for generic `task kanban:*` and explicit Kanboard compatibility path.
 4. Only after those hold, lock Docker/runtime packaging to SoloBoard.
