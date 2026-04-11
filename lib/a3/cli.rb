@@ -844,6 +844,7 @@ module A3
         repo_sources: {},
         kanban_repo_label_map: {},
         kanban_trigger_labels: [],
+        worker_gateway: "local",
         worker_command_args: []
       }
 
@@ -869,6 +870,7 @@ module A3
         repo_sources: {},
         kanban_repo_label_map: {},
         kanban_trigger_labels: [],
+        worker_gateway: "local",
         worker_command_args: []
       }
 
@@ -997,6 +999,7 @@ module A3
         repo_sources: {},
         kanban_repo_label_map: {},
         kanban_trigger_labels: [],
+        worker_gateway: "local",
         worker_command_args: []
       }
 
@@ -1189,8 +1192,14 @@ module A3
     end
 
     def add_worker_gateway_options(parser, options)
+      parser.on("--worker-gateway VALUE") { |value| options[:worker_gateway] = value }
       parser.on("--worker-command VALUE") { |value| options[:worker_command] = value }
       parser.on("--worker-command-arg VALUE") { |value| options[:worker_command_args] << value }
+      parser.on("--agent-control-plane-url URL") { |value| options[:agent_control_plane_url] = value }
+      parser.on("--agent-runtime-profile VALUE") { |value| options[:agent_runtime_profile] = value }
+      parser.on("--agent-shared-workspace-mode VALUE") { |value| options[:agent_shared_workspace_mode] = value }
+      parser.on("--agent-job-timeout-seconds VALUE") { |value| options[:agent_job_timeout_seconds] = Integer(value) }
+      parser.on("--agent-job-poll-interval-seconds VALUE") { |value| options[:agent_job_poll_interval_seconds] = Float(value) }
     end
 
     def parse_cleanup_list(value)
@@ -1277,11 +1286,29 @@ module A3
     end
 
     def build_worker_gateway(options:, command_runner:)
-      A3::Infra::LocalWorkerGateway.new(
+      gateway = options.fetch(:worker_gateway, "local").to_s
+      return A3::Infra::LocalWorkerGateway.new(
         command_runner: command_runner,
         worker_command: options[:worker_command],
         worker_command_args: options.fetch(:worker_command_args, [])
-      )
+      ) if gateway == "local"
+
+      if gateway == "agent-http"
+        raise ArgumentError, "--agent-control-plane-url is required for --worker-gateway agent-http" unless options[:agent_control_plane_url]
+        raise ArgumentError, "--agent-shared-workspace-mode same-path is required for --worker-gateway agent-http" unless options[:agent_shared_workspace_mode] == "same-path"
+
+        return A3::Infra::AgentWorkerGateway.new(
+          control_plane_client: A3::Infra::AgentControlPlaneClient.new(base_url: options.fetch(:agent_control_plane_url)),
+          worker_command: options[:worker_command],
+          worker_command_args: options.fetch(:worker_command_args, []),
+          runtime_profile: options.fetch(:agent_runtime_profile, "default"),
+          shared_workspace_mode: options.fetch(:agent_shared_workspace_mode),
+          timeout_seconds: options.fetch(:agent_job_timeout_seconds, 1800),
+          poll_interval_seconds: options.fetch(:agent_job_poll_interval_seconds, 1.0)
+        )
+      end
+
+      raise ArgumentError, "Unsupported worker gateway: #{gateway}"
     end
 
     def kanban_bridge_enabled?(options)

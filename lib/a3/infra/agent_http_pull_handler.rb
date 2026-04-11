@@ -20,7 +20,9 @@ module A3
         when ["GET", "/v1/agent/jobs/next"]
           claim_next(query)
         else
-          if method.to_s.upcase == "PUT" && path.match?(%r{\A/v1/agent/artifacts/[^/]+\z})
+          if method.to_s.upcase == "GET" && path.match?(%r{\A/v1/agent/jobs/[^/]+\z})
+            fetch_job(path)
+          elsif method.to_s.upcase == "PUT" && path.match?(%r{\A/v1/agent/artifacts/[^/]+\z})
             upload_artifact(path, query, body)
           elsif method.to_s.upcase == "POST" && path.match?(%r{\A/v1/agent/jobs/[^/]+/result\z})
             record_result(path, body)
@@ -48,6 +50,12 @@ module A3
         return json_response(204, {}) unless record
 
         json_response(200, "job" => record.request.request_form)
+      end
+
+      def fetch_job(path)
+        job_id = path.split("/").last
+        record = @job_store.fetch(job_id)
+        json_response(200, "job" => record.persisted_form)
       end
 
       def record_result(path, body)

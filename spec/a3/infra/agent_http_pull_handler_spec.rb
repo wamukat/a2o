@@ -49,6 +49,24 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
     expect(store.fetch("job-1")).to have_attributes(state: :completed)
   end
 
+  it "fetches a job record by id" do
+    store.enqueue(agent_job_request("job-1"))
+
+    response = handler.handle(
+      method: "GET",
+      path: "/v1/agent/jobs/job-1"
+    )
+
+    expect(response.status).to eq(200)
+    payload = JSON.parse(response.body)
+    expect(payload.fetch("job")).to include(
+      "state" => "queued"
+    )
+    expect(payload.fetch("job").fetch("request")).to include(
+      "job_id" => "job-1"
+    )
+  end
+
   it "rejects local path based result payloads" do
     store.enqueue(agent_job_request("job-1"))
     store.claim_next(agent_name: "portal-dev-env", claimed_at: "2026-04-11T08:00:00Z")
