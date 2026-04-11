@@ -176,7 +176,7 @@ module A3
 
       def completed_run_comment(run:, task:, extra_lines: nil)
         lines = [
-          "A3-v2 実行完了: #{run.phase}",
+          "A3 実行完了: #{run.phase}",
           "run_ref: #{run.ref}",
           "結果: #{run.terminal_outcome}",
           "タスク状態: #{task.status}"

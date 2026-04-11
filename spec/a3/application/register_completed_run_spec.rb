@@ -93,7 +93,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
-      body: a_string_matching(/A3-v2 実行完了: implementation.*要約: implemented redirect handling and verified targeted tests/m)
+      body: a_string_matching(/A3 実行完了: implementation.*要約: implemented redirect handling and verified targeted tests/m)
     )
     result = use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :completed)
 
@@ -162,7 +162,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
-      body: a_string_matching(/A3-v2 実行完了: review.*ブロック要約: review found runner-layout gap in repo-alpha.*失敗コマンド: review_worker.*観測状態: findings remain/m)
+      body: a_string_matching(/A3 実行完了: review.*ブロック要約: review found runner-layout gap in repo-alpha.*失敗コマンド: review_worker.*観測状態: findings remain/m)
     )
     result = use_case.call(task_ref: task.ref, run_ref: review_run.ref, outcome: :blocked)
 
@@ -208,7 +208,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     run_repository.save(merge_run)
 
     expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :done, task_kind: :child)
-    expect(activity_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, body: /A3-v2 実行完了: merge/)
+    expect(activity_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, body: /A3 実行完了: merge/)
     result = use_case.call(task_ref: task.ref, run_ref: merge_run.ref, outcome: :completed)
 
     expect(result.task.status).to eq(:done)
@@ -285,7 +285,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     run_repository.save(run)
 
     expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :in_progress, task_kind: :child)
-    expect(activity_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, body: /A3-v2 実行完了: implementation/)
+    expect(activity_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, body: /A3 実行完了: implementation/)
     result = use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :retryable)
 
     expect(result.task.status).to eq(:in_progress)

@@ -62,7 +62,7 @@ RSpec.describe A3::Application::RegisterStartedRun do
     expect(activity_publisher).to have_received(:publish).with(
       task_ref: "A3-v2#3025",
       external_task_id: 3025,
-      body: /A3-v2 実行開始: implementation/
+      body: /A3 実行開始: implementation/
     )
   end
 
@@ -112,7 +112,7 @@ RSpec.describe A3::Application::RegisterStartedRun do
     expect(activity_publisher).to have_received(:publish).with(
       task_ref: "A3-v2#3022",
       external_task_id: 3022,
-      body: /A3-v2 実行開始: review/
+      body: /A3 実行開始: review/
     )
   end
 end

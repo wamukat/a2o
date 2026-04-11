@@ -32,7 +32,7 @@ module A3
       end
 
       def run_comment_command(task_id:, body:)
-        Tempfile.create(["a3-v2-comment", ".md"], @working_dir || Dir.tmpdir) do |file|
+        Tempfile.create(["a3-comment", ".md"], @working_dir || Dir.tmpdir) do |file|
           file.write(String(body))
           file.flush
           run_command(

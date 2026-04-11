@@ -36,7 +36,7 @@ module A3
 
       def started_run_comment(run:)
         [
-          "A3-v2 実行開始: #{run.phase}",
+          "A3 実行開始: #{run.phase}",
           "run_ref: #{run.ref}",
           "source_ref: #{run.source_descriptor.ref}"
         ].join("\n")
