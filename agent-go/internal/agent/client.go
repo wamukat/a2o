@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -18,9 +19,11 @@ type ControlPlane interface {
 }
 
 type HTTPClient struct {
-	BaseURL    string
-	Token      string
-	HTTPClient *http.Client
+	BaseURL       string
+	Token         string
+	TokenFile     string
+	FallbackToken string
+	HTTPClient    *http.Client
 }
 
 func (c HTTPClient) ClaimNext(agentName string) (*JobRequest, error) {
@@ -34,7 +37,9 @@ func (c HTTPClient) ClaimNext(agentName string) (*JobRequest, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.authorize(req)
+	if err := c.authorize(req); err != nil {
+		return nil, err
+	}
 	resp, err := c.client().Do(req)
 	if err != nil {
 		return nil, err
@@ -75,7 +80,9 @@ func (c HTTPClient) UploadArtifact(upload ArtifactUpload, content []byte) (Artif
 	if err != nil {
 		return ArtifactUpload{}, err
 	}
-	c.authorize(req)
+	if err := c.authorize(req); err != nil {
+		return ArtifactUpload{}, err
+	}
 	resp, err := c.client().Do(req)
 	if err != nil {
 		return ArtifactUpload{}, err
@@ -108,7 +115,9 @@ func (c HTTPClient) SubmitResult(result JobResult) error {
 		return err
 	}
 	req.Header.Set("content-type", "application/json")
-	c.authorize(req)
+	if err := c.authorize(req); err != nil {
+		return err
+	}
 	resp, err := c.client().Do(req)
 	if err != nil {
 		return err
@@ -120,10 +129,33 @@ func (c HTTPClient) SubmitResult(result JobResult) error {
 	return nil
 }
 
-func (c HTTPClient) authorize(req *http.Request) {
-	if c.Token != "" {
-		req.Header.Set("authorization", "Bearer "+c.Token)
+func (c HTTPClient) authorize(req *http.Request) error {
+	token, err := c.authToken()
+	if err != nil {
+		return err
 	}
+	if token != "" {
+		req.Header.Set("authorization", "Bearer "+token)
+	}
+	return nil
+}
+
+func (c HTTPClient) authToken() (string, error) {
+	if c.Token != "" {
+		return c.Token, nil
+	}
+	if c.TokenFile != "" {
+		content, err := os.ReadFile(c.TokenFile)
+		if err != nil {
+			return "", fmt.Errorf("read agent token file: %w", err)
+		}
+		token := strings.TrimSpace(string(content))
+		if token == "" {
+			return "", fmt.Errorf("agent token file is empty: %s", c.TokenFile)
+		}
+		return token, nil
+	}
+	return c.FallbackToken, nil
 }
 
 func (c HTTPClient) client() *http.Client {

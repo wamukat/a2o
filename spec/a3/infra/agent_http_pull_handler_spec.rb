@@ -158,6 +158,40 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
     expect(agent_claim_response.status).to eq(200)
   end
 
+  it "reloads bearer tokens from token files per request" do
+    token_path = File.join(tmpdir, "agent-token")
+    File.write(token_path, "first-token\n")
+    secured_handler = described_class.new(
+      job_store: store,
+      artifact_store: artifact_store,
+      auth_token_file: token_path
+    )
+
+    first_response = secured_handler.handle(
+      method: "GET",
+      path: "/v1/agent/jobs/next",
+      query: {"agent" => "portal-dev-env"},
+      headers: {"authorization" => "Bearer first-token"}
+    )
+    File.write(token_path, "second-token\n")
+    old_token_response = secured_handler.handle(
+      method: "GET",
+      path: "/v1/agent/jobs/next",
+      query: {"agent" => "portal-dev-env"},
+      headers: {"authorization" => "Bearer first-token"}
+    )
+    rotated_token_response = secured_handler.handle(
+      method: "GET",
+      path: "/v1/agent/jobs/next",
+      query: {"agent" => "portal-dev-env"},
+      headers: {"authorization" => "Bearer second-token"}
+    )
+
+    expect(first_response.status).to eq(204)
+    expect(old_token_response.status).to eq(401)
+    expect(rotated_token_response.status).to eq(204)
+  end
+
   it "accepts artifact uploads into the configured artifact store" do
     content = "verification log\n"
     digest = "sha256:#{Digest::SHA256.hexdigest(content)}"

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -94,6 +96,34 @@ func TestHTTPClientSendsBearerToken(t *testing.T) {
 	}
 	if authorizedRequests != 3 {
 		t.Fatalf("authorized requests = %d, want 3", authorizedRequests)
+	}
+}
+
+func TestHTTPClientReloadsBearerTokenFromFile(t *testing.T) {
+	var expectedToken = "first-token"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("authorization") != "Bearer "+expectedToken {
+			t.Fatalf("authorization = %q, want Bearer %s", r.Header.Get("authorization"), expectedToken)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	tokenPath := filepath.Join(t.TempDir(), "agent-token")
+	if err := os.WriteFile(tokenPath, []byte("first-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	client := HTTPClient{BaseURL: server.URL, TokenFile: tokenPath}
+	if _, err := client.ClaimNext("host-local"); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedToken = "second-token"
+	if err := os.WriteFile(tokenPath, []byte("second-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.ClaimNext("host-local"); err != nil {
+		t.Fatal(err)
 	}
 }
 

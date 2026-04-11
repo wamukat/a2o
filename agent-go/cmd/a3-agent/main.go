@@ -50,12 +50,12 @@ func run(args []string) int {
 	}
 	_ = configFlag
 
-	resolvedAgentToken, err := resolveAgentToken(*agentToken, *agentTokenFile, config.AgentToken)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
+	client := agent.HTTPClient{
+		BaseURL:       *controlPlaneURL,
+		Token:         *agentToken,
+		TokenFile:     *agentTokenFile,
+		FallbackToken: config.AgentToken,
 	}
-	client := agent.HTTPClient{BaseURL: *controlPlaneURL, Token: resolvedAgentToken}
 	worker := agent.Worker{
 		AgentName: *agentName,
 		Client:    client,

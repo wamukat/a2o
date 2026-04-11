@@ -7,12 +7,14 @@ module A3
     class AgentHttpPullHandler
       Response = Struct.new(:status, :headers, :body, keyword_init: true)
 
-      def initialize(job_store:, artifact_store: nil, clock: -> { Time.now.utc.iso8601 }, auth_token: nil, control_auth_token: nil)
+      def initialize(job_store:, artifact_store: nil, clock: -> { Time.now.utc.iso8601 }, auth_token: nil, control_auth_token: nil, auth_token_file: nil, control_auth_token_file: nil)
         @job_store = job_store
         @artifact_store = artifact_store
         @clock = clock
         @auth_token = auth_token.to_s
         @control_auth_token = control_auth_token.to_s
+        @auth_token_file = auth_token_file.to_s
+        @control_auth_token_file = control_auth_token_file.to_s
       end
 
       def handle(method:, path:, query: {}, body: nil, headers: {})
@@ -59,9 +61,23 @@ module A3
       end
 
       def expected_token(scope)
-        return @control_auth_token unless scope == :agent || @control_auth_token.empty?
+        return configured_token(@control_auth_token, @control_auth_token_file, label: "agent control token") if scope == :control && control_token_configured?
 
-        @auth_token
+        configured_token(@auth_token, @auth_token_file, label: "agent token")
+      end
+
+      def control_token_configured?
+        !@control_auth_token.empty? || !@control_auth_token_file.empty?
+      end
+
+      def configured_token(token, token_file, label:)
+        return token unless token.empty?
+        return "" if token_file.empty?
+
+        content = File.read(token_file).strip
+        raise A3::Domain::ConfigurationError, "#{label} file is empty: #{token_file}" if content.empty?
+
+        content
       end
 
       def unauthorized_response

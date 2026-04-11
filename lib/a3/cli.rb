@@ -671,7 +671,9 @@ module A3
         job_store: store,
         artifact_store: artifact_store,
         auth_token: options.fetch(:agent_token),
-        control_auth_token: options.fetch(:agent_control_token)
+        control_auth_token: options.fetch(:agent_control_token),
+        auth_token_file: options.fetch(:agent_token_file),
+        control_auth_token_file: options.fetch(:agent_control_token_file)
       )
       server = A3::Infra::AgentHttpPullServer.new(
         handler: handler,
@@ -1005,8 +1007,6 @@ module A3
 
       options[:job_store_path] ||= File.join(options.fetch(:storage_dir), "agent_jobs.json")
       options[:artifact_store_dir] ||= File.join(options.fetch(:storage_dir), "agent_artifacts")
-      options[:agent_token] = agent_auth_token(options)
-      options[:agent_control_token] = agent_control_auth_token(options)
       options
     end
 
