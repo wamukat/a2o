@@ -35,18 +35,26 @@ Use `TARGETS="linux/amd64 darwin/arm64"` to build a subset. Set `PACKAGE_ARCHIVE
 
 ## Local Install
 
+Install from source when Go is available:
+
 ```sh
 ./scripts/install-local.sh
 ```
 
 By default this installs to `$HOME/.local/bin/a3-agent`. Override with `PREFIX=/path` or `BIN_DIR=/path`.
 
+Install from a release archive when Go is not required on the target host:
+
+```sh
+./scripts/install-release.sh dist/a3-agent-0.1.0-linux-amd64.tar.gz
+```
+
 To also install a user service template:
 
 ```sh
 INSTALL_SERVICE=1 \
 CONFIG_PATH="$HOME/.a3/agent-profile.json" \
-./scripts/install-local.sh
+./scripts/install-release.sh dist/a3-agent-0.1.0-linux-amd64.tar.gz
 ```
 
 The installer detects `systemd` on Linux and `launchd` on macOS. Override with `SERVICE_MANAGER=systemd|launchd`, `SERVICE_DIR=/path`, `SERVICE_LABEL=name`, `POLL_INTERVAL=2s`, or `WORKING_DIR=/path`.
