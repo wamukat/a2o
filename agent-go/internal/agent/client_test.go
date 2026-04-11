@@ -1,0 +1,69 @@
+package agent
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+func TestHTTPClientUsesAgentProtocol(t *testing.T) {
+	var uploaded bool
+	var submitted bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/agent/jobs/next":
+			if r.URL.Query().Get("agent") != "host-local" {
+				t.Fatalf("agent query = %q", r.URL.Query().Get("agent"))
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"job": testRequest(t.TempDir())})
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/agent/artifacts/art-log-1":
+			uploaded = true
+			writeJSON(w, http.StatusCreated, map[string]any{"artifact": ArtifactUpload{
+				ArtifactID:     "art-log-1",
+				Role:           "combined-log",
+				Digest:         r.URL.Query().Get("digest"),
+				ByteSize:       3,
+				RetentionClass: "diagnostic",
+			}})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/agent/jobs/job-1/result":
+			submitted = true
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"job":{}}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	}))
+	defer server.Close()
+
+	client := HTTPClient{BaseURL: server.URL}
+	job, err := client.ClaimNext("host-local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job.JobID != "job-1" {
+		t.Fatalf("job id = %s", job.JobID)
+	}
+	_, err = client.UploadArtifact(ArtifactUpload{
+		ArtifactID:     "art-log-1",
+		Role:           "combined-log",
+		Digest:         "sha256:abc",
+		ByteSize:       3,
+		RetentionClass: "diagnostic",
+	}, []byte("log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.SubmitResult(JobResult{JobID: "job-1"}); err != nil {
+		t.Fatal(err)
+	}
+	if !uploaded || !submitted {
+		t.Fatalf("uploaded=%v submitted=%v", uploaded, submitted)
+	}
+}
+
+func writeJSON(w http.ResponseWriter, status int, payload any) {
+	w.Header().Set("content-type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(payload)
+}
