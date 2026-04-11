@@ -844,6 +844,7 @@ module A3
         repo_sources: {},
         kanban_repo_label_map: {},
         kanban_trigger_labels: [],
+        verification_command_runner: "local",
         worker_gateway: "local",
         worker_command_args: []
       }
@@ -854,6 +855,7 @@ module A3
       parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
       parser.on("--preset-dir DIR") { |value| options[:preset_dir] = File.expand_path(value) }
       add_kanban_bridge_options(parser, options)
+      add_verification_command_runner_options(parser, options)
       add_worker_gateway_options(parser, options)
       remaining = parser.parse(argv)
 
@@ -870,6 +872,7 @@ module A3
         repo_sources: {},
         kanban_repo_label_map: {},
         kanban_trigger_labels: [],
+        verification_command_runner: "local",
         worker_gateway: "local",
         worker_command_args: []
       }
@@ -881,6 +884,7 @@ module A3
       parser.on("--preset-dir DIR") { |value| options[:preset_dir] = File.expand_path(value) }
       parser.on("--max-steps VALUE") { |value| options[:max_steps] = Integer(value) }
       add_kanban_bridge_options(parser, options)
+      add_verification_command_runner_options(parser, options)
       add_worker_gateway_options(parser, options)
       remaining = parser.parse(argv)
       options[:manifest_path] = File.expand_path(remaining.fetch(0))
@@ -999,6 +1003,7 @@ module A3
         repo_sources: {},
         kanban_repo_label_map: {},
         kanban_trigger_labels: [],
+        verification_command_runner: "local",
         worker_gateway: "local",
         worker_command_args: []
       }
@@ -1009,6 +1014,7 @@ module A3
       parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
       parser.on("--preset-dir DIR") { |value| options[:preset_dir] = File.expand_path(value) }
       add_kanban_bridge_options(parser, options)
+      add_verification_command_runner_options(parser, options)
       add_worker_gateway_options(parser, options)
       remaining = parser.parse(argv)
 
@@ -1062,7 +1068,7 @@ module A3
         external_task_activity_publisher: bridge.task_activity_publisher,
         external_follow_up_child_writer: bridge.follow_up_child_writer,
         run_id_generator: run_id_generator,
-        command_runner: command_runner,
+        command_runner: build_command_runner(options: options, fallback: command_runner),
         merge_runner: merge_runner,
         worker_gateway: worker_gateway || build_worker_gateway(options: options, command_runner: command_runner)
       )
@@ -1104,7 +1110,7 @@ module A3
         external_task_activity_publisher: bridge.task_activity_publisher,
         external_follow_up_child_writer: bridge.follow_up_child_writer,
         run_id_generator: run_id_generator,
-        command_runner: command_runner,
+        command_runner: build_command_runner(options: options, fallback: command_runner),
         merge_runner: merge_runner,
         worker_gateway: worker_gateway || build_worker_gateway(options: options, command_runner: command_runner)
       )
@@ -1203,6 +1209,10 @@ module A3
       parser.on("--agent-workspace-cleanup-policy VALUE") { |value| options[:agent_workspace_cleanup_policy] = value.to_sym }
       parser.on("--agent-job-timeout-seconds VALUE") { |value| options[:agent_job_timeout_seconds] = Integer(value) }
       parser.on("--agent-job-poll-interval-seconds VALUE") { |value| options[:agent_job_poll_interval_seconds] = Float(value) }
+    end
+
+    def add_verification_command_runner_options(parser, options)
+      parser.on("--verification-command-runner VALUE") { |value| options[:verification_command_runner] = value }
     end
 
     def parse_cleanup_list(value)
@@ -1316,6 +1326,30 @@ module A3
       end
 
       raise ArgumentError, "Unsupported worker gateway: #{gateway}"
+    end
+
+    def build_command_runner(options:, fallback:)
+      runner = options.fetch(:verification_command_runner, "local").to_s
+      return fallback if runner == "local"
+
+      if runner == "agent-http"
+        raise ArgumentError, "--agent-control-plane-url is required for --verification-command-runner agent-http" unless options[:agent_control_plane_url]
+        shared_workspace_mode = options[:agent_shared_workspace_mode]
+        unless %w[same-path agent-materialized].include?(shared_workspace_mode)
+          raise ArgumentError, "--agent-shared-workspace-mode same-path or agent-materialized is required for --verification-command-runner agent-http"
+        end
+
+        return A3::Infra::AgentCommandRunner.new(
+          control_plane_client: A3::Infra::AgentControlPlaneClient.new(base_url: options.fetch(:agent_control_plane_url)),
+          runtime_profile: options.fetch(:agent_runtime_profile, "default"),
+          shared_workspace_mode: shared_workspace_mode,
+          timeout_seconds: options.fetch(:agent_job_timeout_seconds, 1800),
+          poll_interval_seconds: options.fetch(:agent_job_poll_interval_seconds, 1.0),
+          workspace_request_builder: agent_workspace_request_builder(options)
+        )
+      end
+
+      raise ArgumentError, "Unsupported verification command runner: #{runner}"
     end
 
     def agent_workspace_request_builder(options)

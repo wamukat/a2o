@@ -27,7 +27,6 @@ A3 already has two separate contracts:
 - Do not make A3 image contain project-specific build/runtime toolchains.
 - Do not make the agent understand A3 worker phase semantics directly.
 - Do not store host/container local artifact paths in `AgentJobResult`.
-- Do not make `run-verification` use the worker gateway in this slice. Verification currently uses command execution strategy and should be moved to agent jobs separately.
 - Do not introduce async phase completion yet. The first slice keeps the existing synchronous `worker_gateway.run` interface.
 
 ## Current Implementation Facts
@@ -180,6 +179,22 @@ Add a focused smoke that proves the real A3-side materialized bridge:
 
 This smoke uses `sh` as the worker command and does not invoke Portal-specific runtime, Maven, scheduler canaries, or full verification. Its purpose is only to validate the control-plane, Go agent materializer, worker protocol transport, and A3 gateway parsing boundary.
 
+### Agent-Materialized Verification Command Smoke
+
+Status: implemented as `agent-go/scripts/smoke-materialized-command-runner.sh`.
+
+`VerificationExecutionStrategy` can now use `AgentCommandRunner` through CLI option `--verification-command-runner agent-http`. This keeps verification as command execution, not worker protocol execution, while moving the actual process execution to the configured `a3-agent` runtime.
+
+The focused smoke proves:
+
+1. A3 enqueues a verification command job through the HTTP control plane.
+2. Go `a3-agent` materializes the requested repo slot from `source_alias`.
+3. The materialized workspace includes `.a3/workspace.json` and per-slot `.a3/slot.json` metadata needed by Portal verification scripts.
+4. The command exits through the agent result contract and uploads the combined log into A3-managed artifact storage.
+5. `cleanup_after_job` removes the agent-owned Git worktree registration.
+
+This smoke still avoids Maven / NullAway. Portal full verification is the next slice that reuses the same command runner with project runtime dependencies installed on the agent side.
+
 ### CLI Bundle Smoke
 
 Status: implemented as `task a3:portal:bundle:agent-worker-gateway-smoke`.
@@ -216,6 +231,7 @@ Operational constraint: the gateway command blocks while waiting for the agent j
 - Poll timeout: fail with `failing_command=agent_job_wait` and include job id/state diagnostics.
 - Completed failed agent job without worker result: fail from `AgentJobResult` exit status and uploaded log references.
 - Completed successful agent job without worker result: fail as `invalid_worker_result`; command success alone must not complete an A3 worker phase.
+- Verification command agent job failure: fail the verification phase with `failing_command=<verification command>` and include `agent_job_result` upload references in diagnostics.
 
 ## Security Boundary
 

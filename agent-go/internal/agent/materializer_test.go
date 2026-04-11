@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,6 +34,14 @@ func TestWorkspaceMaterializerPreparesAndCleansWorktreeSlots(t *testing.T) {
 	if descriptor["dirty_before"] != false || descriptor["dirty_after"] != false {
 		t.Fatalf("unexpected dirty descriptor: %#v", descriptor)
 	}
+	workspaceMetadata := readJSON(t, filepath.Join(prepared.Root, ".a3", "workspace.json"))
+	if workspaceMetadata["workspace_kind"] != "ticket_workspace" || workspaceMetadata["source_ref"] != "HEAD" {
+		t.Fatalf("unexpected workspace metadata: %#v", workspaceMetadata)
+	}
+	slotMetadata := readJSON(t, filepath.Join(slotPath, ".a3", "slot.json"))
+	if slotMetadata["repo_source_root"] != sourceRoot || slotMetadata["repo_slot"] != "repo_alpha" {
+		t.Fatalf("unexpected slot metadata: %#v", slotMetadata)
+	}
 	if out := git(t, sourceRoot, "worktree", "list", "--porcelain"); !contains(out, slotPath) {
 		t.Fatalf("worktree was not registered: %s", out)
 	}
@@ -46,6 +55,19 @@ func TestWorkspaceMaterializerPreparesAndCleansWorktreeSlots(t *testing.T) {
 	if out := git(t, sourceRoot, "worktree", "list", "--porcelain"); contains(out, slotPath) {
 		t.Fatalf("worktree was not removed: %s", out)
 	}
+}
+
+func readJSON(t *testing.T, path string) map[string]any {
+	t.Helper()
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(content, &payload); err != nil {
+		t.Fatal(err)
+	}
+	return payload
 }
 
 func TestWorkspaceMaterializerFailsBeforeCommandForDirtySource(t *testing.T) {

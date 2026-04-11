@@ -97,4 +97,35 @@ RSpec.describe "A3 CLI worker gateway options" do
       )
     end.to raise_error(ArgumentError, /agent-source-alias/)
   end
+
+  it "builds an agent HTTP verification command runner when required options are provided" do
+    runner = A3::CLI.send(
+      :build_command_runner,
+      options: {
+        verification_command_runner: "agent-http",
+        agent_control_plane_url: "http://127.0.0.1:4567",
+        agent_runtime_profile: "host-local",
+        agent_shared_workspace_mode: "agent-materialized",
+        agent_source_aliases: {
+          "repo_alpha" => "portal-alpha"
+        }
+      },
+      fallback: instance_double(A3::Infra::LocalCommandRunner)
+    )
+
+    expect(runner).to be_a(A3::Infra::AgentCommandRunner)
+  end
+
+  it "requires a control-plane URL for the agent HTTP verification command runner" do
+    expect do
+      A3::CLI.send(
+        :build_command_runner,
+        options: {
+          verification_command_runner: "agent-http",
+          agent_shared_workspace_mode: "same-path"
+        },
+        fallback: instance_double(A3::Infra::LocalCommandRunner)
+      )
+    end.to raise_error(ArgumentError, /agent-control-plane-url/)
+  end
 end

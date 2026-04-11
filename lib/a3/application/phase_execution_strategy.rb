@@ -92,11 +92,10 @@ module A3
       end
 
       def execute(task:, run:, runtime:, workspace:)
-        task
-        remediation = run_remediation(run: run, runtime: runtime, workspace: workspace)
+        remediation = run_remediation(task: task, run: run, runtime: runtime, workspace: workspace)
         return remediation unless remediation.success?
 
-        verification = @command_runner.run(runtime.verification_commands, workspace: workspace)
+        verification = run_verification_commands(task: task, run: run, runtime: runtime, workspace: workspace)
         return verification unless verification.success?
         return verification if runtime.remediation_commands.empty?
 
@@ -107,12 +106,12 @@ module A3
         )
       end
 
-      def run_remediation(run:, runtime:, workspace:)
-        return @command_runner.run(runtime.remediation_commands, workspace: workspace) if runtime.remediation_commands.empty?
+      def run_remediation(task:, run:, runtime:, workspace:)
+        return A3::Application::ExecutionResult.new(success: true, summary: "") if runtime.remediation_commands.empty?
 
         summaries = []
         resolve_remediation_workspaces(run: run, workspace: workspace).each do |target_workspace|
-          result = @command_runner.run(runtime.remediation_commands, workspace: target_workspace)
+          result = @command_runner.run(runtime.remediation_commands, workspace: target_workspace, task: task, run: run)
           return result unless result.success?
 
           summaries << result.summary
@@ -136,6 +135,10 @@ module A3
         return [workspace] if target_slots.empty?
 
         target_slots
+      end
+
+      def run_verification_commands(task:, run:, runtime:, workspace:)
+        @command_runner.run(runtime.verification_commands, workspace: workspace, task: task, run: run)
       end
 
       def blocked_expected_state

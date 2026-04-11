@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -57,11 +58,17 @@ func (m WorkspaceMaterializer) Prepare(request WorkspaceRequest) (PreparedWorksp
 		if err != nil {
 			return PreparedWorkspace{}, err
 		}
+		if err := writeSlotMetadata(slotPath, sourceRoot, request, slotName, slot); err != nil {
+			return PreparedWorkspace{}, err
+		}
 		prepared.SlotDescriptors[slotName] = descriptor
 		prepared.cleanupOperations = append(prepared.cleanupOperations, cleanupOperation{
 			sourceRoot: sourceRoot,
 			slotPath:   slotPath,
 		})
+	}
+	if err := writeWorkspaceMetadata(root, request); err != nil {
+		return PreparedWorkspace{}, err
 	}
 	return prepared, nil
 }
@@ -236,6 +243,71 @@ func slotDirectory(slotName string) string {
 	default:
 		return safeID(slotName)
 	}
+}
+
+func writeWorkspaceMetadata(root string, request WorkspaceRequest) error {
+	metadataDir := filepath.Join(root, ".a3")
+	if err := os.MkdirAll(metadataDir, 0o755); err != nil {
+		return err
+	}
+	requirements := []map[string]string{}
+	slotNames := make([]string, 0, len(request.Slots))
+	for slotName := range request.Slots {
+		slotNames = append(slotNames, slotName)
+	}
+	sort.Strings(slotNames)
+	for _, slotName := range slotNames {
+		requirements = append(requirements, map[string]string{
+			"repo_slot":  slotName,
+			"sync_class": "copy",
+		})
+	}
+	payload := map[string]any{
+		"workspace_kind":    request.WorkspaceKind,
+		"source_type":       "branch_head",
+		"source_ref":        workspaceSourceRef(request),
+		"slot_requirements": requirements,
+	}
+	return writeMetadataJSON(filepath.Join(metadataDir, "workspace.json"), payload)
+}
+
+func writeSlotMetadata(slotPath string, sourceRoot string, request WorkspaceRequest, slotName string, slot WorkspaceSlotRequest) error {
+	metadataDir := filepath.Join(slotPath, ".a3")
+	if err := os.MkdirAll(metadataDir, 0o755); err != nil {
+		return err
+	}
+	payload := map[string]any{
+		"workspace_kind":   request.WorkspaceKind,
+		"repo_slot":        slotName,
+		"repo_source_root": sourceRoot,
+		"sync_class":       "copy",
+		"source_type":      "branch_head",
+		"source_ref":       slot.Ref,
+	}
+	if err := writeMetadataJSON(filepath.Join(metadataDir, "slot.json"), payload); err != nil {
+		return err
+	}
+	return writeMetadataJSON(filepath.Join(metadataDir, "materialized.json"), map[string]any{
+		"workspace_kind": request.WorkspaceKind,
+		"source_type":    "branch_head",
+		"source_ref":     slot.Ref,
+	})
+}
+
+func workspaceSourceRef(request WorkspaceRequest) string {
+	for _, slot := range request.Slots {
+		return slot.Ref
+	}
+	return ""
+}
+
+func writeMetadataJSON(path string, payload map[string]any) error {
+	content, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return err
+	}
+	content = append(content, '\n')
+	return os.WriteFile(path, content, 0o644)
 }
 
 func trimTrailingNewline(value string) string {

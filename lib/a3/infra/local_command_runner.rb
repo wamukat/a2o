@@ -6,7 +6,7 @@ require "a3/infra/workspace_trace_logger"
 module A3
   module Infra
     class LocalCommandRunner
-      def run(commands, workspace:, env: {})
+      def run(commands, workspace:, env: {}, **)
         command_env = default_env.merge(env)
         results = Array(commands).map do |command|
           A3::Infra::WorkspaceTraceLogger.log(

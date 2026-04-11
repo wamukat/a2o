@@ -185,15 +185,21 @@ RSpec.describe "phase execution strategies" do
 
     expect(command_runner).to receive(:run).with(
       runtime.remediation_commands,
-      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-alpha"))
+      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-alpha")),
+      task: task,
+      run: implementation_run
     ).ordered.and_return(remediation_execution)
     expect(command_runner).to receive(:run).with(
       runtime.remediation_commands,
-      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-beta"))
+      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-beta")),
+      task: task,
+      run: implementation_run
     ).ordered.and_return(remediation_execution)
     expect(command_runner).to receive(:run).with(
       runtime.verification_commands,
-      workspace: slot_workspace
+      workspace: slot_workspace,
+      task: task,
+      run: implementation_run
     ).ordered.and_return(verification_execution)
 
     result = strategy.execute(task: task, run: implementation_run, runtime: runtime, workspace: slot_workspace)
@@ -223,13 +229,17 @@ RSpec.describe "phase execution strategies" do
 
     expect(command_runner).to receive(:run).with(
       runtime.remediation_commands,
-      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-alpha"))
+      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-alpha")),
+      task: task,
+      run: implementation_run
     ).ordered.and_return(remediation_failure)
     expect(command_runner).not_to receive(:run).with(
       runtime.remediation_commands,
-      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-beta"))
+      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-beta")),
+      task: task,
+      run: implementation_run
     )
-    expect(command_runner).not_to receive(:run).with(runtime.verification_commands, workspace: slot_workspace)
+    expect(command_runner).not_to receive(:run).with(runtime.verification_commands, workspace: slot_workspace, task: task, run: implementation_run)
 
     result = strategy.execute(task: task, run: implementation_run, runtime: runtime, workspace: slot_workspace)
 
