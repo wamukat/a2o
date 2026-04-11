@@ -8,6 +8,19 @@ module A3
   module Infra
     class FileAgentArtifactStore
       SAFE_ARTIFACT_ID = /\A[A-Za-z0-9._:-]+\z/
+      CleanupResult = Struct.new(:deleted_artifact_ids, :retained_artifact_ids, :missing_blob_artifact_ids, :dry_run, keyword_init: true) do
+        def deleted_count
+          deleted_artifact_ids.size
+        end
+
+        def retained_count
+          retained_artifact_ids.size
+        end
+
+        def missing_blob_count
+          missing_blob_artifact_ids.size
+        end
+      end
 
       def initialize(root_dir)
         @root_dir = root_dir
@@ -47,6 +60,32 @@ module A3
         File.binread(path)
       end
 
+      def cleanup(retention_seconds_by_class:, now: Time.now, dry_run: false)
+        deleted = []
+        retained = []
+        missing_blob = []
+        return CleanupResult.new(deleted_artifact_ids: deleted, retained_artifact_ids: retained, missing_blob_artifact_ids: missing_blob, dry_run: dry_run) unless Dir.exist?(storage_dir)
+
+        metadata_paths.each do |path|
+          artifact_id = artifact_id_from_metadata_path(path)
+          upload = fetch_metadata(artifact_id)
+          blob = blob_path(artifact_id)
+          missing_blob << artifact_id unless File.exist?(blob)
+
+          ttl = retention_seconds_by_class.fetch(upload.retention_class.to_sym, nil)
+          if ttl && expired?(path, blob, now: now, ttl: ttl)
+            deleted << artifact_id
+            delete_artifact_files(path, blob) unless dry_run
+          else
+            retained << artifact_id
+          end
+        rescue A3::Domain::ConfigurationError, JSON::ParserError
+          retained << File.basename(path, ".json")
+        end
+
+        CleanupResult.new(deleted_artifact_ids: deleted, retained_artifact_ids: retained, missing_blob_artifact_ids: missing_blob, dry_run: dry_run)
+      end
+
       private
 
       def storage_dir
@@ -59,6 +98,26 @@ module A3
 
       def blob_path(artifact_id)
         File.join(storage_dir, "#{artifact_id}.blob")
+      end
+
+      def metadata_paths
+        Dir.glob(File.join(storage_dir, "*.json")).sort
+      end
+
+      def artifact_id_from_metadata_path(path)
+        File.basename(path, ".json")
+      end
+
+      def expired?(metadata, blob, now:, ttl:)
+        newest_mtime = [metadata, blob].select { |path| File.exist?(path) }.map { |path| File.mtime(path) }.max
+        return false unless newest_mtime
+
+        newest_mtime <= now - ttl
+      end
+
+      def delete_artifact_files(metadata, blob)
+        FileUtils.rm_f(blob)
+        FileUtils.rm_f(metadata)
       end
 
       def validate_artifact_id!(artifact_id)

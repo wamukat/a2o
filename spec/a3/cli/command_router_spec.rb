@@ -34,6 +34,7 @@ RSpec.describe A3::CLI::CommandRouter do
       expect(described_class.session_kind_for("migrate-scheduler-store")).to eq(:runtime_package)
       expect(described_class.session_kind_for("run-runtime-canary")).to eq(:runtime)
       expect(described_class.session_kind_for("agent-server")).to eq(:agent_control)
+      expect(described_class.session_kind_for("agent-artifact-cleanup")).to eq(:agent_control)
     end
 
     it "returns nil for unknown commands" do

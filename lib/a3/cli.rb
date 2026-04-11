@@ -678,6 +678,23 @@ module A3
       server.start
     end
 
+    def handle_agent_artifact_cleanup(argv, out:)
+      options = parse_agent_artifact_cleanup_options(argv)
+      artifact_store = A3::Infra::FileAgentArtifactStore.new(options.fetch(:artifact_store_dir))
+      result = artifact_store.cleanup(
+        retention_seconds_by_class: options.fetch(:retention_seconds_by_class),
+        dry_run: options.fetch(:dry_run)
+      )
+
+      out.puts("agent_artifact_cleanup=#{options.fetch(:dry_run) ? 'dry_run' : 'completed'}")
+      out.puts("deleted_count=#{result.deleted_count}")
+      out.puts("retained_count=#{result.retained_count}")
+      out.puts("missing_blob_count=#{result.missing_blob_count}")
+      out.puts("deleted_artifact_ids=#{result.deleted_artifact_ids.join(',')}") unless result.deleted_artifact_ids.empty?
+      out.puts("missing_blob_artifact_ids=#{result.missing_blob_artifact_ids.join(',')}") unless result.missing_blob_artifact_ids.empty?
+    end
+
+
     def parse_start_run_options(argv)
       options = {
         storage_backend: :json,
@@ -974,6 +991,33 @@ module A3
       options[:job_store_path] ||= File.join(options.fetch(:storage_dir), "agent_jobs.json")
       options[:artifact_store_dir] ||= File.join(options.fetch(:storage_dir), "agent_artifacts")
       options
+    end
+
+    def parse_agent_artifact_cleanup_options(argv)
+      options = {
+        storage_dir: default_storage_dir,
+        artifact_store_dir: nil,
+        dry_run: false,
+        retention_seconds_by_class: {
+          diagnostic: 7 * 24 * 60 * 60,
+          evidence: 30 * 24 * 60 * 60
+        }
+      }
+
+      parser = OptionParser.new
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--artifact-store-dir DIR") { |value| options[:artifact_store_dir] = File.expand_path(value) }
+      parser.on("--dry-run") { options[:dry_run] = true }
+      parser.on("--diagnostic-ttl-hours HOURS") { |value| options.fetch(:retention_seconds_by_class)[:diagnostic] = ttl_hours(value) }
+      parser.on("--evidence-ttl-hours HOURS") { |value| options.fetch(:retention_seconds_by_class)[:evidence] = ttl_hours(value) }
+      parser.parse(argv)
+
+      options[:artifact_store_dir] ||= File.join(options.fetch(:storage_dir), "agent_artifacts")
+      options
+    end
+
+    def ttl_hours(value)
+      (Float(value) * 60 * 60).to_i
     end
 
 

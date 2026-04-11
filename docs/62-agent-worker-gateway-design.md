@@ -240,6 +240,8 @@ The smoke asserts:
 
 Portal single-repo full verification is covered by `task a3:portal:bundle:agent-full-verification-smoke` for real `member-portal-starters` and `task a3:portal:bundle:agent-ui-verification-smoke` for real `member-portal-ui-app`. Both reuse the same command runner, run remediation plus `task test:nullaway` in the Portal dev-env agent image, upload combined logs, and confirm the task reaches `Merging -> Done`. The UI app path also exercises support starter install into the workspace-local Maven repo before verification. Parent-topology coverage is covered by `task a3:portal:bundle:agent-parent-topology-smoke`: it creates a synthetic `repo:both` parent with two done children, materializes both repo slots from `refs/heads/a3/parent/<parent>`, verifies the parent workspace through `agent-http`, uploads combined logs, and confirms parent verification plus merge reaches `Done`.
 
+Uploaded agent artifacts are retained in the A3-managed artifact store and can be cleaned independently from workspace cleanup. `a3 agent-artifact-cleanup` applies retention by artifact class using metadata/blob mtimes, with separate TTLs for `diagnostic` and `evidence` artifacts and a `--dry-run` mode for operator inspection. The Portal bundle exposes the same command as `task a3:portal:bundle:agent-artifact-cleanup`.
+
 ## Failure Policy
 
 - Missing or unsupported shared workspace mode: fail before enqueue with `observed_state=agent_workspace_unavailable`.
