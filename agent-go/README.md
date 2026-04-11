@@ -1,6 +1,6 @@
 # A3 Agent Go Scaffold
 
-This module contains the cross-platform `a3-agent` scaffold.
+This module contains the `a3-agent` scaffold for macOS, Linux, and WSL2 Ubuntu.
 
 It intentionally depends only on the Go standard library. The Ruby reference agent remains useful for protocol fixtures, but this module is the target for host / dev-env installation.
 
@@ -10,7 +10,7 @@ It intentionally depends only on the Go standard library. The Ruby reference age
 go build -o /tmp/a3-agent ./cmd/a3-agent
 ```
 
-For release-style cross-builds:
+For release-style builds:
 
 ```sh
 VERSION=0.1.0 ./scripts/build-release.sh
@@ -22,7 +22,6 @@ This writes binaries and release archives under `dist/` for:
 - `darwin/arm64`
 - `linux/amd64`
 - `linux/arm64`
-- `windows/amd64`
 
 Release output includes:
 
@@ -32,6 +31,7 @@ Release output includes:
 - `dist/release-manifest.jsonl`
 
 Use `TARGETS="linux/amd64 darwin/arm64"` to build a subset. Set `PACKAGE_ARCHIVES=0` to build binaries only.
+Windows native execution is not a standard target. Windows users run the Linux archive from WSL2 Ubuntu.
 
 ## Local Install
 

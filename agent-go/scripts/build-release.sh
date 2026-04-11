@@ -14,7 +14,6 @@ else
     "darwin/arm64"
     "linux/amd64"
     "linux/arm64"
-    "windows/amd64"
   )
 fi
 
@@ -36,9 +35,6 @@ for target in "${targets[@]}"; do
   goarch="${target##*/}"
   out_dir="${DIST_DIR}/${goos}-${goarch}"
   binary_name="a3-agent"
-  if [[ "${goos}" == "windows" ]]; then
-    binary_name="a3-agent.exe"
-  fi
 
   mkdir -p "${out_dir}"
   echo "building ${goos}/${goarch}"
@@ -50,20 +46,8 @@ for target in "${targets[@]}"; do
 
   archive_name="a3-agent-${VERSION}-${goos}-${goarch}"
   if [[ "${PACKAGE_ARCHIVES}" == "1" ]]; then
-    if [[ "${goos}" == "windows" ]]; then
-      if ! command -v zip >/dev/null 2>&1; then
-        echo "zip is required to package windows archives" >&2
-        exit 2
-      fi
-      archive_path="${DIST_DIR}/${archive_name}.zip"
-      (
-        cd "${out_dir}"
-        zip -q -X "${archive_path}" "${binary_name}"
-      )
-    else
-      archive_path="${DIST_DIR}/${archive_name}.tar.gz"
-      tar -C "${out_dir}" -czf "${archive_path}" "${binary_name}"
-    fi
+    archive_path="${DIST_DIR}/${archive_name}.tar.gz"
+    tar -C "${out_dir}" -czf "${archive_path}" "${binary_name}"
     checksum="$(sha256sum_or_shasum "${archive_path}")"
     printf '%s  %s\n' "${checksum}" "$(basename "${archive_path}")" >> "${DIST_DIR}/checksums.txt"
     printf '{"version":"%s","goos":"%s","goarch":"%s","archive":"%s","sha256":"%s"}\n' \

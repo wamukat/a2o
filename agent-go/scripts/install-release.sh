@@ -10,7 +10,7 @@ CHECKSUM_FILE="${CHECKSUM_FILE:-}"
 VERIFY_CHECKSUMS="${VERIFY_CHECKSUMS:-0}"
 
 if [[ -z "${ARCHIVE_PATH}" ]]; then
-  echo "usage: install-release.sh /path/to/a3-agent-<version>-<os>-<arch>.tar.gz|.zip" >&2
+  echo "usage: install-release.sh /path/to/a3-agent-<version>-<os>-<arch>.tar.gz" >&2
   exit 2
 fi
 if [[ ! -f "${ARCHIVE_PATH}" ]]; then
@@ -65,13 +65,6 @@ case "${ARCHIVE_PATH}" in
   *.tar.gz | *.tgz)
     tar -C "${tmpdir}" -xzf "${ARCHIVE_PATH}"
     ;;
-  *.zip)
-    if ! command -v unzip >/dev/null 2>&1; then
-      echo "unzip is required to install zip archives" >&2
-      exit 2
-    fi
-    unzip -q "${ARCHIVE_PATH}" -d "${tmpdir}"
-    ;;
   *)
     echo "unsupported archive format: ${ARCHIVE_PATH}" >&2
     exit 2
@@ -81,8 +74,6 @@ esac
 binary_source=""
 if [[ -f "${tmpdir}/a3-agent" ]]; then
   binary_source="${tmpdir}/a3-agent"
-elif [[ -f "${tmpdir}/a3-agent.exe" ]]; then
-  binary_source="${tmpdir}/a3-agent.exe"
 else
   echo "archive does not contain a3-agent binary" >&2
   exit 2

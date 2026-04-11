@@ -11,11 +11,11 @@
 
 ## 前提
 
-- `Kanboard baseline` は完了している
-- Redmine backend 実験は破棄済みで、historical baseline backend は Kanboard、current generic default backend は SoloBoard である
+- `Kanboard baseline` は完了しており、以後は文書上の過去証跡としてだけ扱う
+- Redmine backend 実験は破棄済みで、current generic backend は SoloBoard のみである
 - next の backend migration target は SoloBoard であり、Docker/runtime packaging は SoloBoard parity judgment の後に行う
 - 現行 `a3-engine` は旧実装の退避後に新しい current source として利用する
-- packaging freeze 入力として、current generic operator default は SoloBoard、`task a3:portal:cutover:doctor` / `:observe` は current mainline 観測入口、`task a3:portal:bundle:*` は local compose bundle spike、Kanboard は explicit compatibility path として扱う
+- packaging freeze 入力として、current generic operator backend は SoloBoard、`task a3:portal:cutover:doctor` / `:observe` は current mainline 観測入口、`task a3:portal:bundle:*` は local compose bundle spike として扱う
 
 ## 進め方
 
@@ -76,7 +76,7 @@ Cutover target:
 - `scripts/automation/*` と legacy automation skills/runbook は削除済み
 - root `task automation*` は legacy disabled sentinel としてだけ残す
 - current runtime / operator surface は `task a3:*`, `scripts/a3/*.rb`, `a3-engine` を正規とする
-- Kanboard compatibility path は explicit compatibility / historical path として扱い、current generic default は SoloBoard とする
+- Kanboard compatibility path は削除し、current generic backend は SoloBoard のみとする
 
 ## Rename Inventory
 
@@ -681,8 +681,6 @@ Stop:
     - current launchd plist / stdout / stderr
   - `.work/a3/env`
     - current launchd env file
-  - `.work/kanboard`
-    - current Kanboard backend data
 - keep as reusable bootstrap source
   - `.work/a3/repos/portal-dev/*`
     - portal-dev repo mirror。current Portal scheduler の state rootではないが、bootstrap source として維持
@@ -702,7 +700,7 @@ Stop:
 
 ### Current Judgment
 
-- `portal-kanban-scheduler-auto` と `kanboard` は current runtime のため delete 対象にしない
+- `portal-kanban-scheduler-auto` は current runtime のため delete 対象にしない
 - `portal-kanban-scheduler-auto/quarantine/*` は retention policy の対象で、evidence 保持期間を超えたら delete 候補
 - `results/logs/cache` は disposable として扱い、operator cleanup または scheduler idle cleanup の管理下に置く
 - `.work/a3/live-targets/portal-dev/*` は `portal-dev` bootstrap の参照先のため delete 候補にしない
