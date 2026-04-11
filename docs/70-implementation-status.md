@@ -3,7 +3,7 @@
 ## 目的
 
 このドキュメントは、A3 Engine で実装すべき機能の全体像と、各機能の現在の完成状態をチェックリストで管理するためのものです。
-current `a3-v2` を future `a3-engine` base として seed するため、`a3-engine/docs/IMPLEMENTATION_STATUS.md` を取り込んだ current copy として扱う。
+旧 `a3-v2` から current `a3-engine` へ seed 済みの implementation status を管理する。
 
 - 設計方針の正本: `docs/75-engine-redesign.md`
 - cutover / naming plan の正本: `docs/80-a3engine-reseed-and-naming-cutover-plan.md`

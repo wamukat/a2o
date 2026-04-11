@@ -1,9 +1,9 @@
-# A3-v2 Container Distribution and Project Runtime
+# A3 Container Distribution and Project Runtime
 
-対象読者: A3-v2 設計者 / PJ manifest 設計者 / 運用者
+対象読者: A3 設計者 / PJ manifest 設計者 / 運用者
 文書種別: 設計メモ
 
-この文書は、A3-v2 を Docker コンテナとして配布し、案件ごとに利用可能にするための配布モデルと runtime packaging を定義する。
+この文書は、A3 を Docker コンテナとして配布し、案件ごとに利用可能にするための配布モデルと runtime packaging を定義する。
 既存の domain rule や workspace rule を Docker 都合で崩さず、共通 image と案件固有 runtime を分離することを目的とする。
 
 ## 0. 進捗状況
@@ -406,6 +406,38 @@ Portal fresh canary の intake と stabilisation は `A3-v2#3031` / `#3119` / `#
   - root Taskfile の `a3:portal-v2:*`
   - manifest / launcher config に残る `v2` 固有 name
 - cutover 実施時は、この inventory をもとに repo reset, path rename, docs rename, operator entrypoint 更新を 1 つの移行計画として扱う
+
+7. `a3-v2/` directory retirement task
+- 2026-04-11 時点では current 実行経路は `a3-engine` 側へ寄っており、`a3-v2/` は実行上の必須資産ではなく履歴参照資産として扱う
+- 実行順は任意だが、`a3-v2/` を物理削除する前に次を漏れなく棚卸しする
+- current operator surface 確認
+  - root `Taskfile.yml` に `a3:portal-v2:*` など旧実行入口が残っていないこと
+  - `scripts/a3/config/*` に `a3-v2/bin/a3` / `a3-v2/lib` を current command として参照する設定が残っていないこと
+  - `scripts/a3/*` に残る `portal_v2_*` / `a3_v2_*` helper が current runtime で呼ばれていないこと
+  - launchd plist / scheduler package / operator runbook に `portal-v2` / `a3-v2` の current 起動導線が残っていないこと
+- tracked file cleanup
+  - root repo で tracked な `a3-v2/` 配下を削除対象にする
+  - `.agents/skills/a3-v2-checkpoint-review` を削除するか、current `a3-engine` 向け skill へ改名して参照先を更新する
+  - `docs/10-ops/10-04-a3-cutover-decision-ledger.md` の `a3-v2` 絶対 path / historical evidence 参照を、削除後も読める形へ移すか historical removed note に置き換える
+  - `a3-v2/docs/*` のうち current 設計判断に必要な最小限だけを `a3-engine/docs` または root docs へ移し、それ以外は履歴として git history に委ねる
+  - `a3-v2/spec/*` / `a3-v2/lib/*` / `a3-v2/bin/a3` は current implementation source としては維持しない
+- workspace / generated cleanup
+  - `.work/a3-v2/*` は runtime state ではなく旧 workspace artifact として削除対象にする
+  - `/tmp` や launchd working directory に残る `portal-v2` / `a3-v2` 一時ファイル、lock、log があれば cleanup 対象にする
+  - disk cleanup 効果は主に `.work/a3-v2/*` 側にあるため、tracked `a3-v2/` 削除だけで容量回復を期待しない
+- naming cleanup
+  - Kanban activity comment / docs / runbook / operator output で current A3 を `A3-v2` と呼ばない
+  - current A3 は `A3` または `A3Engine` と呼び、必要な場合だけ historical label として `A3-v2` を明示する
+  - `a3-v2-comment` のような一時ファイル prefix も current code には残さない
+- verification
+  - `rg "a3-v2|A3-v2|portal-v2"` を実行し、残存が historical note / archived evidence / deleted reference のいずれかに分類済みであること
+  - `task a3:portal:describe-state` / `task a3:portal:watch-summary` など current operator command が `a3-v2/` なしで動くこと
+  - `a3-engine` focused spec と root project config tests が、`a3-v2/` 削除後も通ること
+- 完了条件
+  - current 実行経路から `a3-v2/` への依存が 0 件である
+  - `a3-v2/` 削除後に参照切れとなる docs / skill / runbook が残っていない
+  - `v2` 呼称が current A3 の正規名称として表示されない
+  - 削除判断と検証結果を commit message または plan note に残す
 
 要するに、`legacy/v1 を削除するか` の判断と `A3Engine を新 repo として作り直すか` の判断は切り離さず、Kanboard baseline 完了後に `A3-v2 -> A3Engine` への naming cutover まで含めて一体で進める。
 
