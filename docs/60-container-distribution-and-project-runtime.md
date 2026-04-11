@@ -1822,6 +1822,22 @@ project-b:
 - local operator 向け `docker compose` テンプレートの提供範囲
 - secret store 連携の標準実装
 
+### 14.1 2026-04-11 full RSpec で観測した別領域 failures
+
+agent runtime profile contract slice の focused verification は成功したが、`bundle exec rspec` 全体では次の既存別領域 failures を観測した。これらは agent profile / materialized gateway の変更範囲ではなく、別途棚卸しして扱う。
+
+- merge planning fixture: `BuildMergePlan` spec が `merge_to_parent requires explicit bootstrap target_ref` で失敗している。manifest / project context fixture が現行の `core.merge_target_ref` 必須化に追従していない可能性が高い。
+- scheduler loop fixture: `ExecuteUntilIdle` specs が `cleanup_terminal_task_workspaces` keyword 不足で失敗している。cleanup runner 注入追加後の spec fixture 更新漏れ。
+- worker phase fixture: parent flow spec が `RunWorkerPhase` の `task_packet_builder` keyword 不足で失敗している。worker task packet builder 必須化後の spec fixture 更新漏れ。
+- phase model fixture: `PlanNextRunnableTask` / `ScheduleNextRun` / `RunnableTaskAssessment` の一部が child/single review phase 廃止後の runnable rule に追従していない。
+- bootstrap container builder fixture: `BaseContainerBuilder` spec が `:storage_dir` 不足で失敗している。container builder assembly context の入力 contract 変更後の fixture 更新漏れ。
+- runtime environment fixture: 一部 spec が `manifest core.merge_target_ref must be provided` で失敗している。runtime config spec / CLI scheduler state spec の manifest fixture が現行 schema に追従していない。
+- runtime operator summary fixture: runtime-only doctor config spec は agent runtime summary key 追加により expected hash 更新が必要だった。agent slice 内で一部修正済みだが、類似 fixture が残っていないか確認する。
+- CLI watch summary fixture: watch summary の表示形式が現行 UI に変わっており、旧 `[*] #3138` 前提の expectation が失敗している。
+- Portal runtime surface fixture: `a3-v2` path / manifest 名 / `python3` command 前提の spec が、現行 `a3-engine` path / runtime manifest / Ruby CLI surface に追従していない。
+
+次に全体 green を狙う場合は、上記を production bug と spec drift に分ける。現時点の優先は fixture drift の棚卸しであり、agent materialized runtime profile の focused path は `go test ./...`、runtime package / doctor focused specs、materialized smokes で確認済みである。
+
 ## 15. この文書の完了条件
 
 - 共通 image と案件 runtime package の責務境界が定義されている
