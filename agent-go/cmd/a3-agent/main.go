@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"html"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,9 +20,6 @@ func main() {
 func run(args []string) int {
 	if len(args) > 0 && args[0] == "doctor" {
 		return runDoctor(args[1:])
-	}
-	if len(args) > 0 && args[0] == "service-template" {
-		return runServiceTemplate(args[1:])
 	}
 
 	configPath := preScanConfigPath(args)
@@ -137,137 +133,6 @@ func resolveAgentToken(directToken, tokenFile, fallbackToken string) (string, er
 		return token, nil
 	}
 	return fallbackToken, nil
-}
-
-func runServiceTemplate(args []string) int {
-	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: a3-agent service-template systemd|launchd -config /path/to/profile.json")
-		return 2
-	}
-	kind := args[0]
-	flags := flag.NewFlagSet("a3-agent service-template", flag.ContinueOnError)
-	configPath := flags.String("config", preScanConfigPath(args[1:]), "runtime profile JSON file")
-	binaryPath := flags.String("binary", "a3-agent", "a3-agent binary path used by the service manager")
-	label := flags.String("label", "dev.a3.agent", "service label/name")
-	pollInterval := flags.String("poll-interval", "2s", "idle poll interval passed to loop mode")
-	workingDir := flags.String("working-dir", "", "optional working directory for the service")
-	if err := flags.Parse(args[1:]); err != nil {
-		return 2
-	}
-	if flags.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, "usage: a3-agent service-template systemd|launchd -config /path/to/profile.json")
-		return 2
-	}
-	options := serviceTemplateOptions{
-		Kind:         kind,
-		Label:        *label,
-		BinaryPath:   *binaryPath,
-		ConfigPath:   *configPath,
-		PollInterval: *pollInterval,
-		WorkingDir:   *workingDir,
-	}
-	output, err := renderServiceTemplate(options)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
-	fmt.Print(output)
-	return 0
-}
-
-type serviceTemplateOptions struct {
-	Kind         string
-	Label        string
-	BinaryPath   string
-	ConfigPath   string
-	PollInterval string
-	WorkingDir   string
-}
-
-func renderServiceTemplate(options serviceTemplateOptions) (string, error) {
-	if options.Label == "" {
-		return "", fmt.Errorf("service label is required")
-	}
-	if options.BinaryPath == "" {
-		return "", fmt.Errorf("binary path is required")
-	}
-	if options.ConfigPath == "" {
-		return "", fmt.Errorf("runtime profile config is required")
-	}
-	if _, err := time.ParseDuration(options.PollInterval); err != nil {
-		return "", fmt.Errorf("invalid poll interval: %w", err)
-	}
-	switch options.Kind {
-	case "systemd":
-		return renderSystemdService(options)
-	case "launchd":
-		return renderLaunchdPlist(options), nil
-	default:
-		return "", fmt.Errorf("unsupported service template: %s", options.Kind)
-	}
-}
-
-func renderSystemdService(options serviceTemplateOptions) (string, error) {
-	for _, value := range []string{options.BinaryPath, options.ConfigPath, options.PollInterval, options.WorkingDir} {
-		if hasWhitespace(value) {
-			return "", fmt.Errorf("systemd template values must not contain whitespace: %q", value)
-		}
-	}
-	var builder strings.Builder
-	builder.WriteString("[Unit]\n")
-	builder.WriteString("Description=A3 Agent (" + options.Label + ")\n")
-	builder.WriteString("After=network-online.target\n")
-	builder.WriteString("Wants=network-online.target\n\n")
-	builder.WriteString("[Service]\n")
-	builder.WriteString("Type=simple\n")
-	if options.WorkingDir != "" {
-		builder.WriteString("WorkingDirectory=" + options.WorkingDir + "\n")
-	}
-	builder.WriteString("ExecStart=" + options.BinaryPath + " -config " + options.ConfigPath + " --loop --poll-interval " + options.PollInterval + "\n")
-	builder.WriteString("Restart=on-failure\n")
-	builder.WriteString("RestartSec=5\n\n")
-	builder.WriteString("[Install]\n")
-	builder.WriteString("WantedBy=default.target\n")
-	return builder.String(), nil
-}
-
-func renderLaunchdPlist(options serviceTemplateOptions) string {
-	args := []string{options.BinaryPath, "-config", options.ConfigPath, "--loop", "--poll-interval", options.PollInterval}
-	var builder strings.Builder
-	builder.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-	builder.WriteString("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n")
-	builder.WriteString("<plist version=\"1.0\">\n")
-	builder.WriteString("<dict>\n")
-	builder.WriteString("  <key>Label</key>\n")
-	builder.WriteString("  <string>" + xmlEscape(options.Label) + "</string>\n")
-	builder.WriteString("  <key>ProgramArguments</key>\n")
-	builder.WriteString("  <array>\n")
-	for _, arg := range args {
-		builder.WriteString("    <string>" + xmlEscape(arg) + "</string>\n")
-	}
-	builder.WriteString("  </array>\n")
-	if options.WorkingDir != "" {
-		builder.WriteString("  <key>WorkingDirectory</key>\n")
-		builder.WriteString("  <string>" + xmlEscape(options.WorkingDir) + "</string>\n")
-	}
-	builder.WriteString("  <key>KeepAlive</key>\n")
-	builder.WriteString("  <dict>\n")
-	builder.WriteString("    <key>SuccessfulExit</key>\n")
-	builder.WriteString("    <false/>\n")
-	builder.WriteString("  </dict>\n")
-	builder.WriteString("  <key>RunAtLoad</key>\n")
-	builder.WriteString("  <true/>\n")
-	builder.WriteString("</dict>\n")
-	builder.WriteString("</plist>\n")
-	return builder.String()
-}
-
-func hasWhitespace(value string) bool {
-	return strings.ContainsAny(value, " \t\r\n")
-}
-
-func xmlEscape(value string) string {
-	return html.EscapeString(value)
 }
 
 func doctorConfig(config agent.RuntimeProfileConfig) error {

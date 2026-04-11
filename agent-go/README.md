@@ -56,17 +56,7 @@ CHECKSUM_FILE=dist/checksums.txt \
 ./scripts/install-release.sh dist/a3-agent-0.1.0-linux-amd64.tar.gz
 ```
 
-To also install a user service template:
-
-```sh
-INSTALL_SERVICE=1 \
-CONFIG_PATH="$HOME/.a3/agent-profile.json" \
-./scripts/install-release.sh dist/a3-agent-0.1.0-linux-amd64.tar.gz
-```
-
-The installer detects `systemd` on Linux and `launchd` on macOS. Override with `SERVICE_MANAGER=systemd|launchd`, `SERVICE_DIR=/path`, `SERVICE_LABEL=name`, `POLL_INTERVAL=2s`, or `WORKING_DIR=/path`.
-
-By default the service file is written but not loaded. Set `ENABLE_SERVICE=1` to run the platform load/enable command after writing the template.
+The installer only installs the binary. It does not install or enable OS service definitions. Standard A3 operation starts the agent manually in loop mode from an operator terminal or from the project dev-env container.
 
 ## Deployment Shapes
 
@@ -173,9 +163,9 @@ The runtime profile file is the host/dev-env side `alias -> local path` contract
 
 The runtime profile rejects remote `http://` control-plane URLs by default. Loopback URLs (`127.0.0.1` / `localhost`) and single-label Docker service names such as `http://a3-runtime:7393` are treated as local topology. Remote deployment is out of scope for the current runtime; `allow_insecure_remote` is only a diagnostic escape hatch and should not appear in the standard runbook.
 
-## Long-Running Mode
+## Manual Loop Mode
 
-For daemon managers or container services, run the same profile in loop mode:
+Run the same profile in loop mode from a terminal while A3 is operating:
 
 ```sh
 a3-agent -config /path/to/agent-profile.json --loop --poll-interval 2s
@@ -187,20 +177,4 @@ Useful flags and environment overrides:
 - `--poll-interval` / `A3_AGENT_POLL_INTERVAL`: idle sleep duration, for example `2s`.
 - `--max-iterations` / `A3_AGENT_MAX_ITERATIONS`: bounded loop count for smoke tests; `0` means unlimited.
 
-Loop mode exits non-zero on control-plane or job execution errors so an external daemon manager can restart or alert. Release archive generation, local service template installation, and shared bearer-token auth are available; deeper policy hardening remains for later slices.
-
-Generate a service-manager template for local installation:
-
-```sh
-a3-agent service-template systemd \
-  -config /etc/a3/agent-profile.json \
-  -binary /usr/local/bin/a3-agent \
-  > ~/.config/systemd/user/a3-agent.service
-
-a3-agent service-template launchd \
-  -config "$HOME/.a3/agent-profile.json" \
-  -binary "$HOME/.local/bin/a3-agent" \
-  > "$HOME/Library/LaunchAgents/dev.a3.agent.plist"
-```
-
-The template command only renders the unit/plist. Installing, loading, and enabling the service remains an operator or installer responsibility.
+Loop mode exits non-zero on control-plane or job execution errors. If an operator wants OS-managed restart later, they can wrap this command outside A3. The current A3 distribution intentionally does not own systemd, launchd, or Windows service registration. Windows users run A3 through WSL2 Ubuntu and use the same manual loop path.
