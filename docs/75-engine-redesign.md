@@ -3,7 +3,7 @@
 ## 目的
 
 このメモは、A3 Engine の再設計方針を整理し、`A3Engine#2520` を具体的な設計タスクとして進めるための土台を残すものです。
-current `a3-v2` を future `a3-engine` base として seed するため、`a3-engine/docs/REDESIGN.md` を取り込んだ current copy として扱う。
+旧 `a3-v2` から current `a3-engine` へ seed 済みの redesign note として扱う。
 
 目標は次のとおりです。
 

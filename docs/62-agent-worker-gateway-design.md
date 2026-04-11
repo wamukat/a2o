@@ -228,7 +228,7 @@ Operational constraint: the gateway command blocks while waiting for the agent j
 
 Status: implemented as `task a3:portal:bundle:agent-verification-smoke`.
 
-This smoke proves the operator CLI path can run `run-verification --verification-command-runner agent-http` through the compose `a3-agent` service. The compose service intentionally uses the Portal dev-env agent image, not the generic Go-only image, because this path executes project commands (`ruby "$A3_ROOT_DIR/scripts/a3/portal_v2_remediation.rb"` and `ruby "$A3_ROOT_DIR/scripts/a3/portal_v2_verification.rb"`). The smoke uses a small generated repo with a Taskfile to avoid Maven/NullAway cost while still exercising the real Portal remediation/verification script shape.
+This smoke proves the operator CLI path can run `run-verification --verification-command-runner agent-http` through the compose `a3-agent` service. The compose service intentionally uses the Portal dev-env agent image, not the generic Go-only image, because this path executes project commands (`ruby "$A3_ROOT_DIR/scripts/a3/portal_remediation.rb"` and `ruby "$A3_ROOT_DIR/scripts/a3/portal_verification.rb"`). The smoke uses a small generated repo with a Taskfile to avoid Maven/NullAway cost while still exercising the real Portal remediation/verification script shape.
 
 The smoke asserts:
 
