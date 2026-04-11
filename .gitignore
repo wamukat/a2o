@@ -4,3 +4,4 @@
 /pkg/
 /tmp/
 /.rspec_status
+/agent-go/dist/

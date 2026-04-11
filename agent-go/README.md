@@ -10,6 +10,28 @@ It intentionally depends only on the Go standard library. The Ruby reference age
 go build -o /tmp/a3-agent ./cmd/a3-agent
 ```
 
+For release-style cross-builds:
+
+```sh
+./scripts/build-release.sh
+```
+
+This writes binaries under `dist/` for:
+
+- `darwin/amd64`
+- `darwin/arm64`
+- `linux/amd64`
+- `linux/arm64`
+- `windows/amd64`
+
+## Local Install
+
+```sh
+./scripts/install-local.sh
+```
+
+By default this installs to `$HOME/.local/bin/a3-agent`. Override with `PREFIX=/path` or `BIN_DIR=/path`.
+
 ## Run Once
 
 ```sh
