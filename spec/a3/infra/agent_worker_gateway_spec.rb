@@ -172,6 +172,53 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     expect(client.records).to be_empty
   end
 
+  it "runs through an HTTP agent server and the Ruby reference agent" do
+    job_store = A3::Infra::JsonAgentJobStore.new(File.join(tmpdir, "agent-jobs.json"))
+    artifact_store = A3::Infra::FileAgentArtifactStore.new(File.join(tmpdir, "agent-artifacts"))
+    handler = A3::Infra::AgentHttpPullHandler.new(
+      job_store: job_store,
+      artifact_store: artifact_store,
+      clock: -> { "2026-04-11T08:00:00Z" }
+    )
+    server = A3::Infra::AgentHttpPullServer.new(handler: handler, port: 0)
+    server_thread = Thread.new { server.start }
+    worker_script = write_worker_script
+
+    gateway = described_class.new(
+      control_plane_client: A3::Infra::AgentControlPlaneClient.new(base_url: "http://127.0.0.1:#{server.bound_port}"),
+      worker_command: RbConfig.ruby,
+      worker_command_args: [worker_script.to_s],
+      runtime_profile: "host-local",
+      shared_workspace_mode: "same-path",
+      timeout_seconds: 10,
+      poll_interval_seconds: 0.05,
+      job_id_generator: -> { "integration-1" }
+    )
+    gateway_thread = Thread.new { run_gateway(gateway) }
+
+    wait_until { job_store.all.any? }
+    agent_client = A3::Agent::HttpControlPlaneClient.new(base_url: "http://127.0.0.1:#{server.bound_port}")
+    agent_result = A3::Agent::RunOnceWorker.new(
+      agent_name: "host-local",
+      control_plane_client: agent_client
+    ).call
+    execution = gateway_thread.value
+
+    expect(agent_result).to be_a(A3::Domain::AgentJobResult)
+    expect(execution).to have_attributes(
+      success: true,
+      summary: "worker completed via http"
+    )
+    completed = job_store.fetch("worker-run-1-implementation-integration-1")
+    expect(completed).to have_attributes(state: :completed)
+    upload = completed.result.log_uploads.find { |entry| entry.role == "combined-log" }
+    expect(upload).not_to be_nil
+    expect(artifact_store.read(upload.artifact_id)).to include("worker script ran")
+  ensure
+    server&.shutdown
+    server_thread&.join(2)
+  end
+
   def gateway_for(client)
     described_class.new(
       control_plane_client: client,
@@ -214,6 +261,44 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
         "finding_key" => "none"
       }
     }
+  end
+
+  def write_worker_script
+    script_path = workspace.root_path.join("worker.rb")
+    script_path.write(<<~RUBY)
+      require "json"
+      puts "worker script ran"
+      request = JSON.parse(File.read(ENV.fetch("A3_WORKER_REQUEST_PATH")))
+      File.write(
+        ENV.fetch("A3_WORKER_RESULT_PATH"),
+        JSON.generate(
+          "success" => true,
+          "summary" => "worker completed via http",
+          "task_ref" => request.fetch("task_ref"),
+          "run_ref" => request.fetch("run_ref"),
+          "phase" => request.fetch("phase"),
+          "rework_required" => false,
+          "changed_files" => {},
+          "review_disposition" => {
+            "kind" => "completed",
+            "repo_scope" => "repo_beta",
+            "summary" => "done",
+            "description" => "done",
+            "finding_key" => "none"
+          }
+        )
+      )
+    RUBY
+    script_path
+  end
+
+  def wait_until(timeout_seconds: 5)
+    deadline = Time.now + timeout_seconds
+    until yield
+      raise "condition was not met within #{timeout_seconds}s" if Time.now >= deadline
+
+      sleep 0.02
+    end
   end
 
   def agent_result(job_id, status, exit_code)

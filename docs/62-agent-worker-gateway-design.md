@@ -149,6 +149,8 @@ Rules:
 
 ### First Smoke
 
+Status: implemented in `spec/a3/infra/agent_worker_gateway_spec.rb`.
+
 Add a focused smoke that proves the full bridge:
 
 1. Start `a3 agent-server` with JSON job store and artifact store.
