@@ -32,6 +32,18 @@ This writes binaries under `dist/` for:
 
 By default this installs to `$HOME/.local/bin/a3-agent`. Override with `PREFIX=/path` or `BIN_DIR=/path`.
 
+To also install a user service template:
+
+```sh
+INSTALL_SERVICE=1 \
+CONFIG_PATH="$HOME/.a3/agent-profile.json" \
+./scripts/install-local.sh
+```
+
+The installer detects `systemd` on Linux and `launchd` on macOS. Override with `SERVICE_MANAGER=systemd|launchd`, `SERVICE_DIR=/path`, `SERVICE_LABEL=name`, `POLL_INTERVAL=2s`, or `WORKING_DIR=/path`.
+
+By default the service file is written but not loaded. Set `ENABLE_SERVICE=1` to run the platform load/enable command after writing the template.
+
 ## Protocol Smoke
 
 To verify the Go agent against the Ruby A3 control plane:
