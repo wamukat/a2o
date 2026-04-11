@@ -687,6 +687,8 @@ module A3
       artifact_store = A3::Infra::FileAgentArtifactStore.new(options.fetch(:artifact_store_dir))
       result = artifact_store.cleanup(
         retention_seconds_by_class: options.fetch(:retention_seconds_by_class),
+        max_count_by_class: options.fetch(:max_count_by_class),
+        max_bytes_by_class: options.fetch(:max_bytes_by_class),
         dry_run: options.fetch(:dry_run)
       )
 
@@ -1007,7 +1009,9 @@ module A3
         retention_seconds_by_class: {
           diagnostic: 7 * 24 * 60 * 60,
           evidence: 30 * 24 * 60 * 60
-        }
+        },
+        max_count_by_class: {},
+        max_bytes_by_class: {}
       }
 
       parser = OptionParser.new
@@ -1016,6 +1020,10 @@ module A3
       parser.on("--dry-run") { options[:dry_run] = true }
       parser.on("--diagnostic-ttl-hours HOURS") { |value| options.fetch(:retention_seconds_by_class)[:diagnostic] = ttl_hours(value) }
       parser.on("--evidence-ttl-hours HOURS") { |value| options.fetch(:retention_seconds_by_class)[:evidence] = ttl_hours(value) }
+      parser.on("--diagnostic-max-count COUNT") { |value| options.fetch(:max_count_by_class)[:diagnostic] = Integer(value) }
+      parser.on("--evidence-max-count COUNT") { |value| options.fetch(:max_count_by_class)[:evidence] = Integer(value) }
+      parser.on("--diagnostic-max-mb MB") { |value| options.fetch(:max_bytes_by_class)[:diagnostic] = megabytes(value) }
+      parser.on("--evidence-max-mb MB") { |value| options.fetch(:max_bytes_by_class)[:evidence] = megabytes(value) }
       parser.parse(argv)
 
       options[:artifact_store_dir] ||= File.join(options.fetch(:storage_dir), "agent_artifacts")
@@ -1026,6 +1034,9 @@ module A3
       (Float(value) * 60 * 60).to_i
     end
 
+    def megabytes(value)
+      (Float(value) * 1024 * 1024).to_i
+    end
 
     def parse_show_runtime_package_options(argv)
       options = {

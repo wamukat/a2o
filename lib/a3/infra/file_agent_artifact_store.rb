@@ -60,10 +60,11 @@ module A3
         File.binread(path)
       end
 
-      def cleanup(retention_seconds_by_class:, now: Time.now, dry_run: false)
+      def cleanup(retention_seconds_by_class:, max_count_by_class: {}, max_bytes_by_class: {}, now: Time.now, dry_run: false)
         deleted = []
         retained = []
         missing_blob = []
+        retained_records = []
         return CleanupResult.new(deleted_artifact_ids: deleted, retained_artifact_ids: retained, missing_blob_artifact_ids: missing_blob, dry_run: dry_run) unless Dir.exist?(storage_dir)
 
         metadata_paths.each do |path|
@@ -78,10 +79,21 @@ module A3
             delete_artifact_files(path, blob) unless dry_run
           else
             retained << artifact_id
+            retained_records << {
+              artifact_id: artifact_id,
+              metadata: path,
+              blob: blob,
+              retention_class: upload.retention_class.to_sym,
+              byte_size: upload.byte_size,
+              mtime: newest_mtime(path, blob)
+            }
           end
         rescue A3::Domain::ConfigurationError, JSON::ParserError
           retained << File.basename(path, ".json")
         end
+
+        enforce_count_retention!(retained_records, max_count_by_class, deleted, retained, dry_run)
+        enforce_byte_retention!(retained_records, max_bytes_by_class, deleted, retained, dry_run)
 
         CleanupResult.new(deleted_artifact_ids: deleted, retained_artifact_ids: retained, missing_blob_artifact_ids: missing_blob, dry_run: dry_run)
       end
@@ -109,10 +121,58 @@ module A3
       end
 
       def expired?(metadata, blob, now:, ttl:)
-        newest_mtime = [metadata, blob].select { |path| File.exist?(path) }.map { |path| File.mtime(path) }.max
-        return false unless newest_mtime
+        mtime = newest_mtime(metadata, blob)
+        return false unless mtime
 
-        newest_mtime <= now - ttl
+        mtime <= now - ttl
+      end
+
+      def newest_mtime(metadata, blob)
+        [metadata, blob].select { |path| File.exist?(path) }.map { |path| File.mtime(path) }.max
+      end
+
+      def enforce_count_retention!(records, max_count_by_class, deleted, retained, dry_run)
+        max_count_by_class.each do |retention_class, max_count|
+          next unless max_count
+
+          class_records = sorted_retained_records(records, retention_class)
+          keep_count = [max_count.to_i, 0].max
+          delete_count = [class_records.size - keep_count, 0].max
+          class_records.first(delete_count).each do |record|
+            delete_retained_record!(record, records, deleted, retained, dry_run)
+          end
+        end
+      end
+
+      def enforce_byte_retention!(records, max_bytes_by_class, deleted, retained, dry_run)
+        max_bytes_by_class.each do |retention_class, max_bytes|
+          next unless max_bytes
+
+          class_records = sorted_retained_records(records, retention_class)
+          total_bytes = class_records.sum { |record| record.fetch(:byte_size).to_i }
+          class_records.each do |record|
+            break if total_bytes <= max_bytes.to_i
+
+            total_bytes -= record.fetch(:byte_size).to_i
+            delete_retained_record!(record, records, deleted, retained, dry_run)
+          end
+        end
+      end
+
+      def sorted_retained_records(records, retention_class)
+        records
+          .select { |record| record.fetch(:retention_class) == retention_class.to_sym }
+          .sort_by { |record| [record.fetch(:mtime) || Time.at(0), record.fetch(:artifact_id)] }
+      end
+
+      def delete_retained_record!(record, records, deleted, retained, dry_run)
+        artifact_id = record.fetch(:artifact_id)
+        return if deleted.include?(artifact_id)
+
+        deleted << artifact_id
+        retained.delete(artifact_id)
+        records.delete(record)
+        delete_artifact_files(record.fetch(:metadata), record.fetch(:blob)) unless dry_run
       end
 
       def delete_artifact_files(metadata, blob)

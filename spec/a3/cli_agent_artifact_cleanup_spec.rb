@@ -40,4 +40,49 @@ RSpec.describe A3::CLI do
       expect { store.read("diagnostic-log") }.to raise_error(A3::Domain::RecordNotFound)
     end
   end
+
+  it "cleans agent artifacts by configured count and size caps" do
+    Dir.mktmpdir do |dir|
+      store = A3::Infra::FileAgentArtifactStore.new(File.join(dir, "agent_artifacts"))
+      write_artifact(store, dir, "diagnostic-1", "111", Time.utc(2026, 4, 11, 8, 0, 0))
+      write_artifact(store, dir, "diagnostic-2", "222", Time.utc(2026, 4, 11, 8, 1, 0))
+      write_artifact(store, dir, "diagnostic-3", "333", Time.utc(2026, 4, 11, 8, 2, 0))
+
+      out = StringIO.new
+      described_class.start(
+        [
+          "agent-artifact-cleanup",
+          "--storage-dir", dir,
+          "--diagnostic-ttl-hours", "24",
+          "--diagnostic-max-count", "2",
+          "--diagnostic-max-mb", "0.000005"
+        ],
+        out: out
+      )
+
+      expect(out.string).to include("agent_artifact_cleanup=completed")
+      expect(out.string).to include("deleted_count=2")
+      expect { store.read("diagnostic-1") }.to raise_error(A3::Domain::RecordNotFound)
+      expect { store.read("diagnostic-2") }.to raise_error(A3::Domain::RecordNotFound)
+      expect(store.read("diagnostic-3")).to eq("333")
+    end
+  end
+
+  def write_artifact(store, dir, artifact_id, content, timestamp)
+    upload = A3::Domain::AgentArtifactUpload.new(
+      artifact_id: artifact_id,
+      role: "combined-log",
+      digest: "sha256:#{Digest::SHA256.hexdigest(content)}",
+      byte_size: content.bytesize,
+      retention_class: :diagnostic,
+      media_type: "text/plain"
+    )
+    store.put(upload, content)
+    File.utime(
+      timestamp,
+      timestamp,
+      File.join(dir, "agent_artifacts", "artifacts", "#{artifact_id}.json"),
+      File.join(dir, "agent_artifacts", "artifacts", "#{artifact_id}.blob")
+    )
+  end
 end

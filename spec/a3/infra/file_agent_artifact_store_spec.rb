@@ -80,6 +80,55 @@ RSpec.describe A3::Infra::FileAgentArtifactStore do
     expect(store.read("diagnostic-log")).to eq("old diagnostic")
   end
 
+  it "caps retained artifacts by count per retention class" do
+    write_artifact("diagnostic-1", "one", timestamp: Time.utc(2026, 4, 11, 8, 0, 0))
+    write_artifact("diagnostic-2", "two", timestamp: Time.utc(2026, 4, 11, 8, 1, 0))
+    write_artifact("diagnostic-3", "three", timestamp: Time.utc(2026, 4, 11, 8, 2, 0))
+
+    result = store.cleanup(
+      retention_seconds_by_class: {diagnostic: 24 * 60 * 60},
+      max_count_by_class: {diagnostic: 2},
+      now: Time.utc(2026, 4, 11, 8, 3, 0)
+    )
+
+    expect(result.deleted_artifact_ids).to eq(["diagnostic-1"])
+    expect(result.retained_artifact_ids).to contain_exactly("diagnostic-2", "diagnostic-3")
+    expect { store.read("diagnostic-1") }.to raise_error(A3::Domain::RecordNotFound)
+  end
+
+  it "caps retained artifacts by total bytes per retention class" do
+    write_artifact("diagnostic-1", "111", timestamp: Time.utc(2026, 4, 11, 8, 0, 0))
+    write_artifact("diagnostic-2", "222", timestamp: Time.utc(2026, 4, 11, 8, 1, 0))
+    write_artifact("diagnostic-3", "333", timestamp: Time.utc(2026, 4, 11, 8, 2, 0))
+
+    result = store.cleanup(
+      retention_seconds_by_class: {diagnostic: 24 * 60 * 60},
+      max_bytes_by_class: {diagnostic: 5},
+      now: Time.utc(2026, 4, 11, 8, 3, 0)
+    )
+
+    expect(result.deleted_artifact_ids).to eq(%w[diagnostic-1 diagnostic-2])
+    expect(result.retained_artifact_ids).to eq(["diagnostic-3"])
+    expect(store.read("diagnostic-3")).to eq("333")
+  end
+
+  it "reports count and byte cap cleanup candidates without deleting in dry-run mode" do
+    write_artifact("diagnostic-1", "111", timestamp: Time.utc(2026, 4, 11, 8, 0, 0))
+    write_artifact("diagnostic-2", "222", timestamp: Time.utc(2026, 4, 11, 8, 1, 0))
+
+    result = store.cleanup(
+      retention_seconds_by_class: {diagnostic: 24 * 60 * 60},
+      max_count_by_class: {diagnostic: 1},
+      max_bytes_by_class: {diagnostic: 2},
+      now: Time.utc(2026, 4, 11, 8, 2, 0),
+      dry_run: true
+    )
+
+    expect(result).to have_attributes(deleted_artifact_ids: %w[diagnostic-1 diagnostic-2], dry_run: true)
+    expect(store.read("diagnostic-1")).to eq("111")
+    expect(store.read("diagnostic-2")).to eq("222")
+  end
+
   def upload_for(artifact_id, content, retention_class: :diagnostic)
     A3::Domain::AgentArtifactUpload.new(
       artifact_id: artifact_id,
@@ -93,5 +142,10 @@ RSpec.describe A3::Infra::FileAgentArtifactStore do
 
   def artifact_file(artifact_id, extension)
     File.join(tmpdir, "artifacts", "#{artifact_id}.#{extension}")
+  end
+
+  def write_artifact(artifact_id, content, retention_class: :diagnostic, timestamp:)
+    store.put(upload_for(artifact_id, content, retention_class: retention_class), content)
+    File.utime(timestamp, timestamp, artifact_file(artifact_id, "json"), artifact_file(artifact_id, "blob"))
   end
 end
