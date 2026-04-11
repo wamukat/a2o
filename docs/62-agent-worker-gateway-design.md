@@ -238,7 +238,7 @@ The smoke asserts:
 4. The Go agent materializes the repo slot, writes `.a3/workspace.json` and `.a3/slot.json`, executes both commands, uploads combined logs, and cleans up the worktree registration.
 5. A3 completes the verification run and transitions the task to `Merging`; the smoke then moves the synthetic task to `Done` as cleanup.
 
-Portal starters full verification is covered by `task a3:portal:bundle:agent-full-verification-smoke`: it reuses the same command runner against real `member-portal-starters`, runs remediation plus `task test:nullaway` in the Portal dev-env agent image, uploads combined logs, and confirms the task reaches `Merging -> Done`. UI app coverage remains a project-specific follow-up canary.
+Portal single-repo full verification is covered by `task a3:portal:bundle:agent-full-verification-smoke` for real `member-portal-starters` and `task a3:portal:bundle:agent-ui-verification-smoke` for real `member-portal-ui-app`. Both reuse the same command runner, run remediation plus `task test:nullaway` in the Portal dev-env agent image, upload combined logs, and confirm the task reaches `Merging -> Done`. The UI app path also exercises support starter install into the workspace-local Maven repo before verification. `repo:both` and parent-topology coverage remain project-specific follow-up canaries.
 
 ## Failure Policy
 
