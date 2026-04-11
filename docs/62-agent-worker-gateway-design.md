@@ -308,7 +308,7 @@ Do not move full Portal execution yet. Split implementation into three commits:
    - Add optional `workspace_request` to `AgentJobRequest` and persisted JSON.
    - Add Go contract structs for `workspace_request`.
    - Add roundtrip tests.
-2. Materializer unit:
+2. Materializer unit: implemented.
    - Add agent-side materializer for `local_git` alias + `worktree_detached`.
    - Materializer API has `prepare` and `cleanup` so tests and smoke can remove worktrees deterministically.
    - Use agent config to resolve source aliases and workspace root.
