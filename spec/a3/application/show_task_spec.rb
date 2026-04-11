@@ -75,7 +75,7 @@ RSpec.describe A3::Application::ShowTask do
     expect(result.topology.children.size).to eq(1)
     expect(result.topology.children.first.ref).to eq("A3-v2#missing-child")
     expect(result.topology.children.first.status).to eq(:missing)
-    expect(result.runnable_assessment.reason).to eq(:runnable)
-    expect(result.runnable_assessment.blocking_task_refs).to eq([])
+    expect(result.runnable_assessment.reason).to eq(:parent_waiting_for_children)
+    expect(result.runnable_assessment.blocking_task_refs).to eq(["A3-v2#missing-child"])
   end
 end

@@ -1838,6 +1838,20 @@ agent runtime profile contract slice の focused verification は成功したが
 
 次に全体 green を狙う場合は、上記を production bug と spec drift に分ける。現時点の優先は fixture drift の棚卸しであり、agent materialized runtime profile の focused path は `go test ./...`、runtime package / doctor focused specs、materialized smokes で確認済みである。
 
+2026-04-11 追跡結果:
+
+- production bug として修正対象に含めたもの:
+  - parent runnable gate は、`child_refs` に含まれる child snapshot が task store に存在しない場合も pending child として扱う。欠落 child を無視すると、parent が child 完了確認なしに `review` へ進むため、topology 不整合を安全側に倒す。
+- fixture drift として修正対象に含めたもの:
+  - `core.merge_target_ref` 必須化後の manifest / project context fixture。
+  - cleanup / task packet / storage_dir contract 追加後の constructor fixture。
+  - single / child の `review` phase 廃止後の runnable / scheduler fixture。
+  - watch-summary の現行 tree UI への expectation。
+  - `a3-v2` path から `a3-engine` runtime surface へ移行済みの script fixture。
+- 設計正本の追従:
+  - `docs/20-core-domain-model.md` の single / child phase order を現行 `implementation -> verification -> merge` に更新する。
+  - `PhasePolicy` から single / child の legacy `review -> verification` transition を削除し、互換逃げ道を残さない。
+
 ## 15. この文書の完了条件
 
 - 共通 image と案件 runtime package の責務境界が定義されている

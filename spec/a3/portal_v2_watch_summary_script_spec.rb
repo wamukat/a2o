@@ -46,7 +46,7 @@ RSpec.describe PortalV2WatchSummary do
     expect(command).to include("a3-engine/bin/a3")
     expect(command).to include("watch-summary")
     expect(command).to include("--kanban-command")
-    expect(command).to include("python3")
+    expect(command).to include("task")
     expect(command).to include("--kanban-project")
     expect(command).to include("Portal")
     expect(command).to include("/tmp/custom-storage")

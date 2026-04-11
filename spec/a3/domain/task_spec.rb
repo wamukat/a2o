@@ -36,6 +36,16 @@ RSpec.describe A3::Domain::Task do
       expect(task.next_phase_for(:implementation)).to eq(:verification)
     end
 
+    it "does not keep a legacy child review transition" do
+      task = described_class.new(
+        ref: "A3-v2#3025",
+        kind: :child,
+        edit_scope: [:repo_alpha]
+      )
+
+      expect(task.next_phase_for(:review)).to be_nil
+    end
+
     it "returns verification after parent review" do
       task = described_class.new(
         ref: "A3-v2#3022",

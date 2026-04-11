@@ -131,16 +131,14 @@ phase は次の 4 つだけを正式採用する。
 ### 6.1 Single の phase order
 
 1. `implementation`
-2. `review`
-3. `verification`
-4. `merge`
+2. `verification`
+3. `merge`
 
 ### 6.2 Child の phase order
 
 1. `implementation`
-2. `review`
-3. `verification`
-4. `merge`
+2. `verification`
+3. `merge`
 
 ただし merge target は `parent integration branch` である。
 

@@ -26,12 +26,19 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
   end
   let(:scheduler_store) { A3::Infra::InMemorySchedulerStore.new }
   let(:quarantine_terminal_task_workspaces) { A3::Application::NullQuarantineTerminalTaskWorkspaces.new }
+  let(:cleanup_terminal_task_workspaces) do
+    instance_double(
+      A3::Application::CleanupTerminalTaskWorkspaces,
+      call: A3::Application::CleanupTerminalTaskWorkspaces::Result.new(cleaned: [], dry_run: false, statuses: [:done], scopes: %i[ticket_workspace runtime_workspace])
+    )
+  end
 
   subject(:use_case) do
     described_class.new(
       execute_next_runnable_task: execute_next_runnable_task,
       cycle_journal: scheduler_cycle_journal,
-      quarantine_terminal_task_workspaces: quarantine_terminal_task_workspaces
+      quarantine_terminal_task_workspaces: quarantine_terminal_task_workspaces,
+      cleanup_terminal_task_workspaces: cleanup_terminal_task_workspaces
     )
   end
 
@@ -95,6 +102,7 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
     let(:state_repository) { A3::Infra::InMemorySchedulerStateRepository.new(scheduler_store) }
     let(:cycle_repository) { A3::Infra::InMemorySchedulerCycleRepository.new(scheduler_store) }
     let(:quarantine_terminal_task_workspaces) { instance_double(A3::Application::QuarantineTerminalTaskWorkspaces) }
+    let(:cleanup_terminal_task_workspaces) { instance_double(A3::Application::CleanupTerminalTaskWorkspaces) }
     let(:prepare_workspace) { instance_double(A3::Application::PrepareWorkspace) }
     let(:worker_gateway) { instance_double("WorkerGateway") }
     let(:command_runner) { instance_double(A3::Infra::LocalCommandRunner) }
@@ -182,7 +190,8 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
         run_repository: run_repository,
         register_completed_run: register_completed_run,
         prepare_workspace: prepare_workspace,
-        worker_gateway: worker_gateway
+        worker_gateway: worker_gateway,
+        task_packet_builder: A3::Application::BuildWorkerTaskPacket.new(external_task_source: A3::Infra::NullExternalTaskSource.new)
       )
       run_verification = A3::Application::RunVerification.new(
         task_repository: task_repository,
@@ -216,7 +225,8 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
       described_class.new(
         execute_next_runnable_task: execute_next,
         cycle_journal: scheduler_cycle_journal,
-        quarantine_terminal_task_workspaces: quarantine_terminal_task_workspaces
+        quarantine_terminal_task_workspaces: quarantine_terminal_task_workspaces,
+        cleanup_terminal_task_workspaces: cleanup_terminal_task_workspaces
       )
     end
 
@@ -226,6 +236,9 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
       task_repository.save(task)
       allow(quarantine_terminal_task_workspaces).to receive(:call).and_return(
         A3::Application::QuarantineTerminalTaskWorkspaces::Result.new(quarantined: [])
+      )
+      allow(cleanup_terminal_task_workspaces).to receive(:call).and_return(
+        A3::Application::CleanupTerminalTaskWorkspaces::Result.new(cleaned: [])
       )
       allow(prepare_workspace).to receive(:call) do |task:, phase:, source_descriptor:, scope_snapshot:, artifact_owner:, bootstrap_marker:|
         A3::Application::PrepareWorkspace::Result.new(

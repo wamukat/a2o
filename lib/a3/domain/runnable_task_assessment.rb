@@ -79,7 +79,7 @@ module A3
         def pending_child_refs(task, tasks)
           task.child_refs.select do |child_ref|
             child = find_task(tasks, child_ref)
-            !child.nil? && child.status != :done
+            child.nil? || child.status != :done
           end.freeze
         end
 

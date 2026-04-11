@@ -94,7 +94,7 @@ RSpec.describe A3::Application::PlanNextRunnableTask do
         ref: "A3-v2#3021",
         kind: :child,
         edit_scope: [:repo_beta],
-        status: :in_review,
+        status: :verifying,
         parent_ref: "A3-v2#3019"
       )
     )
@@ -111,7 +111,7 @@ RSpec.describe A3::Application::PlanNextRunnableTask do
     result = use_case.call
 
     expect(result.task&.ref).to eq("A3-v2#3021")
-    expect(result.phase).to eq(:review)
+    expect(result.phase).to eq(:verification)
     expect(result.assessments.find { |assessment| assessment.task_ref == "A3-v2#3019" }.reason).to eq(:parent_waiting_for_children)
   end
 

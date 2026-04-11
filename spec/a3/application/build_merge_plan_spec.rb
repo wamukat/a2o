@@ -56,7 +56,8 @@ RSpec.describe A3::Application::BuildMergePlan do
       ),
       merge_config: A3::Domain::MergeConfig.new(
         target: :merge_to_parent,
-        policy: :ff_only
+        policy: :ff_only,
+        target_ref: "refs/heads/live"
       )
     )
     task_repository.save(task)

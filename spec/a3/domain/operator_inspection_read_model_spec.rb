@@ -179,8 +179,8 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
       expect(result.topology.children).to contain_exactly(
         have_attributes(ref: "A3-v2#child", status: :missing, current_run_ref: nil)
       )
-      expect(result.runnable_assessment.reason).to eq(:runnable)
-      expect(result.runnable_assessment.blocking_task_refs).to eq([])
+      expect(result.runnable_assessment.reason).to eq(:parent_waiting_for_children)
+      expect(result.runnable_assessment.blocking_task_refs).to eq(["A3-v2#child"])
     end
   end
 

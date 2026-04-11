@@ -28,7 +28,8 @@ RSpec.describe A3::CLI do
             "presets" => ["base"],
             "core" => {
               "merge_target" => "merge_to_parent",
-              "merge_policy" => "ff_only"
+              "merge_policy" => "ff_only",
+              "merge_target_ref" => "refs/heads/live"
             }
           }
         )

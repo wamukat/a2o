@@ -6,6 +6,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder::BaseContainerBuilder do
   it "groups the base repositories and shared runtime values" do
     scheduler_store = A3::Infra::InMemorySchedulerStore.new
     repositories = {
+      storage_dir: "/tmp/a3",
       task_repository: A3::Infra::InMemoryTaskRepository.new,
       run_repository: A3::Infra::InMemoryRunRepository.new,
       scheduler_state_repository: A3::Infra::InMemorySchedulerStateRepository.new(scheduler_store),
@@ -24,6 +25,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder::BaseContainerBuilder do
 
     expect(container).to eq(
       task_repository: context.task_repository,
+      storage_dir: context.storage_dir,
       run_repository: context.run_repository,
       scheduler_state_repository: context.scheduler_state_repository,
       scheduler_cycle_repository: context.scheduler_cycle_repository,

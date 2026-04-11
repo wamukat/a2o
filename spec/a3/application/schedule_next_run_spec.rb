@@ -91,7 +91,7 @@ RSpec.describe A3::Application::ScheduleNextRun do
     expect(result.phase).to eq(:implementation)
   end
 
-  it "starts the next runnable review run against the child work branch with canonical review target" do
+  it "does not schedule legacy child review tasks" do
     task_repository.save(
       build_child_task(
         ref: task.ref,
@@ -108,40 +108,12 @@ RSpec.describe A3::Application::ScheduleNextRun do
     )
     task_repository.save(review_task)
 
-    expect(start_run).to receive(:call).with(
-      task_ref: review_task.ref,
-      phase: :review,
-      source_descriptor: A3::Domain::SourceDescriptor.new(
-        workspace_kind: :runtime_workspace,
-        source_type: :branch_head,
-        ref: "refs/heads/a3/work/A3-v2-3032",
-        task_ref: review_task.ref
-      ),
-      scope_snapshot: A3::Domain::ScopeSnapshot.new(
-        edit_scope: [:repo_alpha],
-        verification_scope: %i[repo_alpha repo_beta],
-        ownership_scope: :task
-      ),
-      review_target: A3::Domain::ReviewTarget.new(
-        base_commit: "refs/heads/a3/work/A3-v2-3032",
-        head_commit: "refs/heads/a3/work/A3-v2-3032",
-        task_ref: review_task.ref,
-        phase_ref: :review
-      ),
-      artifact_owner: A3::Domain::ArtifactOwner.new(
-        owner_ref: review_task.parent_ref,
-        owner_scope: :task,
-        snapshot_version: "refs/heads/a3/work/A3-v2-3032"
-      ),
-      bootstrap_marker: "hooks/prepare-runtime.sh"
-    ).and_return(
-      A3::Application::StartRun::Result.new(task: review_task, run: instance_double(A3::Domain::Run), workspace: instance_double(A3::Domain::PreparedWorkspace))
-    )
+    expect(start_run).not_to receive(:call)
 
     result = use_case.call(project_context: project_context)
 
-    expect(result.task).to eq(review_task)
-    expect(result.phase).to eq(:review)
+    expect(result.task).to be_nil
+    expect(result.phase).to be_nil
   end
 
   it "starts the next runnable parent review run against the parent integration branch" do

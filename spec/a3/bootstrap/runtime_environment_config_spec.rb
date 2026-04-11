@@ -21,7 +21,7 @@ RSpec.describe A3::Bootstrap do
           }
         )
       )
-      File.write(manifest_path, YAML.dump({ "schema_version" => "1", "presets" => ["base"], "core" => { "merge_target" => "merge_to_parent", "merge_policy" => "ff_only" } }))
+      File.write(manifest_path, YAML.dump({ "schema_version" => "1", "presets" => ["base"], "core" => { "merge_target" => "merge_to_parent", "merge_policy" => "ff_only", "merge_target_ref" => "refs/heads/live" } }))
 
       runtime_environment = described_class.runtime_environment_config(
         manifest_path: manifest_path,
