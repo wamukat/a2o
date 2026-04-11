@@ -37,6 +37,7 @@ func run(args []string) int {
 	configFlag := flags.String("config", configPath, "runtime profile JSON file")
 	agentName := flags.String("agent", defaultString("A3_AGENT_NAME", config.AgentName, "local-agent"), "agent name used when polling the A3 control plane")
 	controlPlaneURL := flags.String("control-plane-url", defaultString("A3_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393"), "A3 control plane base URL")
+	agentToken := flags.String("agent-token", defaultString("A3_AGENT_TOKEN", config.AgentToken, ""), "bearer token for the A3 control plane")
 	workspaceRoot := flags.String("workspace-root", defaultString("A3_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root for materialized jobs")
 	loop := flags.Bool("loop", false, "run continuously until interrupted")
 	pollInterval := flags.Duration("poll-interval", envDuration("A3_AGENT_POLL_INTERVAL", time.Second), "idle poll interval for loop mode")
@@ -48,7 +49,7 @@ func run(args []string) int {
 	}
 	_ = configFlag
 
-	client := agent.HTTPClient{BaseURL: *controlPlaneURL}
+	client := agent.HTTPClient{BaseURL: *controlPlaneURL, Token: *agentToken}
 	worker := agent.Worker{
 		AgentName: *agentName,
 		Client:    client,

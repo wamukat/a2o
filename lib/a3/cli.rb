@@ -667,7 +667,11 @@ module A3
       options = parse_agent_server_options(argv)
       store = A3::Infra::JsonAgentJobStore.new(options.fetch(:job_store_path))
       artifact_store = A3::Infra::FileAgentArtifactStore.new(options.fetch(:artifact_store_dir))
-      handler = A3::Infra::AgentHttpPullHandler.new(job_store: store, artifact_store: artifact_store)
+      handler = A3::Infra::AgentHttpPullHandler.new(
+        job_store: store,
+        artifact_store: artifact_store,
+        auth_token: options.fetch(:agent_token)
+      )
       server = A3::Infra::AgentHttpPullServer.new(
         handler: handler,
         host: options.fetch(:host),
@@ -977,7 +981,8 @@ module A3
         host: A3::Infra::AgentHttpPullServer::DEFAULT_HOST,
         port: A3::Infra::AgentHttpPullServer::DEFAULT_PORT,
         job_store_path: nil,
-        artifact_store_dir: nil
+        artifact_store_dir: nil,
+        agent_token: ENV.fetch("A3_AGENT_TOKEN", "")
       }
 
       parser = OptionParser.new
@@ -986,6 +991,7 @@ module A3
       parser.on("--port PORT") { |value| options[:port] = Integer(value) }
       parser.on("--job-store PATH") { |value| options[:job_store_path] = File.expand_path(value) }
       parser.on("--artifact-store-dir DIR") { |value| options[:artifact_store_dir] = File.expand_path(value) }
+      parser.on("--agent-token TOKEN") { |value| options[:agent_token] = value }
       parser.parse(argv)
 
       options[:job_store_path] ||= File.join(options.fetch(:storage_dir), "agent_jobs.json")
@@ -1242,10 +1248,12 @@ module A3
     end
 
     def add_worker_gateway_options(parser, options)
+      options[:agent_token] ||= ENV.fetch("A3_AGENT_TOKEN", "")
       parser.on("--worker-gateway VALUE") { |value| options[:worker_gateway] = value }
       parser.on("--worker-command VALUE") { |value| options[:worker_command] = value }
       parser.on("--worker-command-arg VALUE") { |value| options[:worker_command_args] << value }
       parser.on("--agent-control-plane-url URL") { |value| options[:agent_control_plane_url] = value }
+      parser.on("--agent-token TOKEN") { |value| options[:agent_token] = value }
       parser.on("--agent-runtime-profile VALUE") { |value| options[:agent_runtime_profile] = value }
       parser.on("--agent-shared-workspace-mode VALUE") { |value| options[:agent_shared_workspace_mode] = value }
       parser.on("--agent-source-alias SLOT=ALIAS") { |value| add_named_option(options[:agent_source_aliases] ||= {}, value, option_name: "agent source alias") }
@@ -1358,7 +1366,10 @@ module A3
         end
 
         return A3::Infra::AgentWorkerGateway.new(
-          control_plane_client: A3::Infra::AgentControlPlaneClient.new(base_url: options.fetch(:agent_control_plane_url)),
+          control_plane_client: A3::Infra::AgentControlPlaneClient.new(
+            base_url: options.fetch(:agent_control_plane_url),
+            auth_token: options.fetch(:agent_token, "")
+          ),
           worker_command: options[:worker_command],
           worker_command_args: options.fetch(:worker_command_args, []),
           runtime_profile: options.fetch(:agent_runtime_profile, "default"),
@@ -1384,7 +1395,10 @@ module A3
         end
 
         return A3::Infra::AgentCommandRunner.new(
-          control_plane_client: A3::Infra::AgentControlPlaneClient.new(base_url: options.fetch(:agent_control_plane_url)),
+          control_plane_client: A3::Infra::AgentControlPlaneClient.new(
+            base_url: options.fetch(:agent_control_plane_url),
+            auth_token: options.fetch(:agent_token, "")
+          ),
           runtime_profile: options.fetch(:agent_runtime_profile, "default"),
           shared_workspace_mode: shared_workspace_mode,
           timeout_seconds: options.fetch(:agent_job_timeout_seconds, 1800),

@@ -7,13 +7,16 @@ module A3
     class AgentHttpPullHandler
       Response = Struct.new(:status, :headers, :body, keyword_init: true)
 
-      def initialize(job_store:, artifact_store: nil, clock: -> { Time.now.utc.iso8601 })
+      def initialize(job_store:, artifact_store: nil, clock: -> { Time.now.utc.iso8601 }, auth_token: nil)
         @job_store = job_store
         @artifact_store = artifact_store
         @clock = clock
+        @auth_token = auth_token.to_s
       end
 
-      def handle(method:, path:, query: {}, body: nil)
+      def handle(method:, path:, query: {}, body: nil, headers: {})
+        return json_response(401, "error" => "unauthorized") unless authorized?(headers)
+
         case [method.to_s.upcase, path]
         when ["POST", "/v1/agent/jobs"]
           enqueue(body)
@@ -37,6 +40,13 @@ module A3
       end
 
       private
+
+      def authorized?(headers)
+        return true if @auth_token.empty?
+
+        header_value = headers.fetch("authorization", headers.fetch("Authorization", "")).to_s
+        header_value == "Bearer #{@auth_token}"
+      end
 
       def enqueue(body)
         request = A3::Domain::AgentJobRequest.from_request_form(parse_body(body))

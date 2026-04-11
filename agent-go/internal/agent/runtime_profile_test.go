@@ -11,6 +11,7 @@ func TestLoadRuntimeProfileConfig(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{
   "agent": "dev-env",
   "control_plane_url": "http://a3-runtime:7393",
+  "agent_token": "secret-token",
   "workspace_root": "/work/a3-agent",
   "source_aliases": {
     "member-portal-starters": "/src/member-portal-starters"
@@ -29,6 +30,9 @@ func TestLoadRuntimeProfileConfig(t *testing.T) {
 	}
 	if config.ControlPlaneURL != "http://a3-runtime:7393" {
 		t.Fatalf("control plane url = %s", config.ControlPlaneURL)
+	}
+	if config.AgentToken != "secret-token" {
+		t.Fatalf("agent token = %s", config.AgentToken)
 	}
 	if config.WorkspaceRoot != "/work/a3-agent" {
 		t.Fatalf("workspace root = %s", config.WorkspaceRoot)

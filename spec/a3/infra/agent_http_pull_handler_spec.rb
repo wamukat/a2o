@@ -96,6 +96,29 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
     expect(JSON.parse(response.body).fetch("error")).to include("missing query parameter: agent")
   end
 
+  it "requires a bearer token when configured" do
+    secured_handler = described_class.new(
+      job_store: store,
+      artifact_store: artifact_store,
+      auth_token: "secret-token"
+    )
+
+    unauthorized_response = secured_handler.handle(
+      method: "GET",
+      path: "/v1/agent/jobs/next",
+      query: {"agent" => "portal-dev-env"}
+    )
+    authorized_response = secured_handler.handle(
+      method: "GET",
+      path: "/v1/agent/jobs/next",
+      query: {"agent" => "portal-dev-env"},
+      headers: {"authorization" => "Bearer secret-token"}
+    )
+
+    expect(unauthorized_response.status).to eq(401)
+    expect(authorized_response.status).to eq(204)
+  end
+
   it "accepts artifact uploads into the configured artifact store" do
     content = "verification log\n"
     digest = "sha256:#{Digest::SHA256.hexdigest(content)}"

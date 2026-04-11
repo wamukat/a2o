@@ -9,6 +9,7 @@ import (
 type RuntimeProfileConfig struct {
 	AgentName       string            `json:"agent"`
 	ControlPlaneURL string            `json:"control_plane_url"`
+	AgentToken      string            `json:"agent_token"`
 	WorkspaceRoot   string            `json:"workspace_root"`
 	SourceAliases   map[string]string `json:"source_aliases"`
 }

@@ -62,6 +62,41 @@ func TestHTTPClientUsesAgentProtocol(t *testing.T) {
 	}
 }
 
+func TestHTTPClientSendsBearerToken(t *testing.T) {
+	var authorizedRequests int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("authorization") != "Bearer secret-token" {
+			t.Fatalf("authorization = %q", r.Header.Get("authorization"))
+		}
+		authorizedRequests++
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/agent/jobs/next":
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/agent/artifacts/art-log-1":
+			writeJSON(w, http.StatusCreated, map[string]any{"artifact": ArtifactUpload{ArtifactID: "art-log-1"}})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/agent/jobs/job-1/result":
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+	}))
+	defer server.Close()
+
+	client := HTTPClient{BaseURL: server.URL, Token: "secret-token"}
+	if _, err := client.ClaimNext("host-local"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.UploadArtifact(ArtifactUpload{ArtifactID: "art-log-1"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.SubmitResult(JobResult{JobID: "job-1"}); err != nil {
+		t.Fatal(err)
+	}
+	if authorizedRequests != 3 {
+		t.Fatalf("authorized requests = %d, want 3", authorizedRequests)
+	}
+}
+
 func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(status)

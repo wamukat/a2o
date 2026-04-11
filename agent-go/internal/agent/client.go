@@ -19,6 +19,7 @@ type ControlPlane interface {
 
 type HTTPClient struct {
 	BaseURL    string
+	Token      string
 	HTTPClient *http.Client
 }
 
@@ -29,7 +30,12 @@ func (c HTTPClient) ClaimNext(agentName string) (*JobRequest, error) {
 	}
 	u.Path = "/v1/agent/jobs/next"
 	u.RawQuery = url.Values{"agent": []string{agentName}}.Encode()
-	resp, err := c.client().Get(u.String())
+	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	c.authorize(req)
+	resp, err := c.client().Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -69,6 +75,7 @@ func (c HTTPClient) UploadArtifact(upload ArtifactUpload, content []byte) (Artif
 	if err != nil {
 		return ArtifactUpload{}, err
 	}
+	c.authorize(req)
 	resp, err := c.client().Do(req)
 	if err != nil {
 		return ArtifactUpload{}, err
@@ -96,7 +103,13 @@ func (c HTTPClient) SubmitResult(result JobResult) error {
 	if err != nil {
 		return err
 	}
-	resp, err := c.client().Post(u.String(), "application/json", bytes.NewReader(payload))
+	req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("content-type", "application/json")
+	c.authorize(req)
+	resp, err := c.client().Do(req)
 	if err != nil {
 		return err
 	}
@@ -105,6 +118,12 @@ func (c HTTPClient) SubmitResult(result JobResult) error {
 		return responseError("submit_result", resp)
 	}
 	return nil
+}
+
+func (c HTTPClient) authorize(req *http.Request) {
+	if c.Token != "" {
+		req.Header.Set("authorization", "Bearer "+c.Token)
+	}
 }
 
 func (c HTTPClient) client() *http.Client {

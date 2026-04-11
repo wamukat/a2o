@@ -14,6 +14,7 @@ module A3
         200 => "OK",
         201 => "Created",
         204 => "No Content",
+        401 => "Unauthorized",
         400 => "Bad Request",
         404 => "Not Found",
         500 => "Internal Server Error"
@@ -61,7 +62,8 @@ module A3
           method: method,
           path: uri.path,
           query: parse_query(uri.query),
-          body: body
+          body: body,
+          headers: headers
         )
         write_response(client, handler_response)
       rescue URI::InvalidURIError => e
