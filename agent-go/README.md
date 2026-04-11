@@ -49,6 +49,13 @@ Install from a release archive when Go is not required on the target host:
 ./scripts/install-release.sh dist/a3-agent-0.1.0-linux-amd64.tar.gz
 ```
 
+Verify the release checksum before installing:
+
+```sh
+CHECKSUM_FILE=dist/checksums.txt \
+./scripts/install-release.sh dist/a3-agent-0.1.0-linux-amd64.tar.gz
+```
+
 To also install a user service template:
 
 ```sh
