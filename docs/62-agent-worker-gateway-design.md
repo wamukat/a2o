@@ -197,7 +197,7 @@ This smoke still avoids Maven / NullAway. Portal full verification is the next s
 
 ### CLI Bundle Smoke
 
-Status: implemented as `task a3:portal:bundle:agent-worker-gateway-smoke`.
+Status: implemented as `task a3:portal:bundle:agent-worker-gateway-smoke`. 2026-04-11 の bundle 実行では SoloBoard task `Portal#37` を作成し、worker gateway 経由の implementation result から `Inspection -> Done` まで確認した。
 
 Add a root-level bundle smoke that proves the operator CLI path can use `agent-http`:
 
@@ -226,7 +226,7 @@ Operational constraint: the gateway command blocks while waiting for the agent j
 
 ### CLI Bundle Verification Smoke
 
-Status: implemented as `task a3:portal:bundle:agent-verification-smoke`.
+Status: implemented as `task a3:portal:bundle:agent-verification-smoke`. 2026-04-11 の bundle 実行では、初回 `Portal#38` が synthetic non-Maven fixture に対する Maven bootstrap/prefetch で blocked になったが、root commit `47dda1f` で non-Maven verification slot を skip するよう修正し、再実行した `Portal#39` は `Merging -> Done` まで確認した。
 
 This smoke proves the operator CLI path can run `run-verification --verification-command-runner agent-http` through the compose `a3-agent` service. The compose service intentionally uses the Portal dev-env agent image, not the generic Go-only image, because this path executes project commands (`ruby "$A3_ROOT_DIR/scripts/a3/portal_remediation.rb"` and `ruby "$A3_ROOT_DIR/scripts/a3/portal_verification.rb"`). The smoke uses a small generated repo with a Taskfile to avoid Maven/NullAway cost while still exercising the real Portal remediation/verification script shape.
 
@@ -238,7 +238,7 @@ The smoke asserts:
 4. The Go agent materializes the repo slot, writes `.a3/workspace.json` and `.a3/slot.json`, executes both commands, uploads combined logs, and cleans up the worktree registration.
 5. A3 completes the verification run and transitions the task to `Merging`; the smoke then moves the synthetic task to `Done` as cleanup.
 
-Portal single-repo full verification is covered by `task a3:portal:bundle:agent-full-verification-smoke` for real `member-portal-starters` and `task a3:portal:bundle:agent-ui-verification-smoke` for real `member-portal-ui-app`. Both reuse the same command runner, run remediation plus `task test:nullaway` in the Portal dev-env agent image, upload combined logs, and confirm the task reaches `Merging -> Done`. The UI app path also exercises support starter install into the workspace-local Maven repo before verification. Parent-topology coverage is covered by `task a3:portal:bundle:agent-parent-topology-smoke`: it creates a synthetic `repo:both` parent with two done children, materializes both repo slots from `refs/heads/a3/parent/<parent>`, verifies the parent workspace through `agent-http`, uploads combined logs, and confirms parent verification plus merge reaches `Done`.
+Portal single-repo full verification is covered by `task a3:portal:bundle:agent-full-verification-smoke` for real `member-portal-starters` and `task a3:portal:bundle:agent-ui-verification-smoke` for real `member-portal-ui-app`. Both reuse the same command runner, run remediation plus `task test:nullaway` in the Portal dev-env agent image, upload combined logs, and confirm the task reaches `Merging -> Done`. The UI app path also exercises support starter install into the workspace-local Maven repo before verification. Parent-topology coverage is covered by `task a3:portal:bundle:agent-parent-topology-smoke`: it creates a synthetic `repo:both` parent with two done children, materializes both repo slots from `refs/heads/a3/parent/<parent>`, verifies the parent workspace through `agent-http`, uploads combined logs, and confirms parent verification plus merge reaches `Done`. 2026-04-11 の bundle 実行では `Portal#40` parent と `Portal#41/#42` child でこの経路を確認した。
 
 Uploaded agent artifacts are retained in the A3-managed artifact store and can be cleaned independently from workspace cleanup. `a3 agent-artifact-cleanup` applies retention by artifact class using metadata/blob mtimes, with separate TTLs for `diagnostic` and `evidence` artifacts, optional count caps (`--diagnostic-max-count` / `--evidence-max-count`), optional size caps (`--diagnostic-max-mb` / `--evidence-max-mb`), and a `--dry-run` mode for operator inspection. The Portal bundle exposes the same command as `task a3:portal:bundle:agent-artifact-cleanup`.
 
