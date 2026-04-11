@@ -259,6 +259,8 @@ As a minimum hardening step, the control plane and agents support optional beare
 
 Client-side transport errors are intentionally redacted: Ruby and Go control-plane clients report operation name and HTTP status only, not raw response bodies. This keeps unexpected proxy/server bodies, malformed job payloads, and environment values out of local exception strings while preserving enough status for operator diagnosis.
 
+TLS policy is fail-fast at the URL boundary. Loopback URLs (`127.0.0.1` / `localhost`) and single-label Docker service names such as `http://a3-runtime:7393` are allowed as local topology. Remote `http://` URLs are rejected by default in the Go runtime profile and Ruby `agent-http` gateway setup; use `https://` for remote deployment, or the explicit insecure-remote opt-in only for reviewed exceptions.
+
 ## Agent-Owned Workspace Materialization
 
 Status: design review target.

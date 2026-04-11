@@ -1280,6 +1280,7 @@ module A3
       parser.on("--agent-token-file PATH") { |value| options[:agent_token_file] = File.expand_path(value) }
       parser.on("--agent-control-token TOKEN") { |value| options[:agent_control_token] = value }
       parser.on("--agent-control-token-file PATH") { |value| options[:agent_control_token_file] = File.expand_path(value) }
+      parser.on("--agent-allow-insecure-remote-http") { options[:agent_allow_insecure_remote] = true }
       parser.on("--agent-runtime-profile VALUE") { |value| options[:agent_runtime_profile] = value }
       parser.on("--agent-shared-workspace-mode VALUE") { |value| options[:agent_shared_workspace_mode] = value }
       parser.on("--agent-source-alias SLOT=ALIAS") { |value| add_named_option(options[:agent_source_aliases] ||= {}, value, option_name: "agent source alias") }
@@ -1386,6 +1387,7 @@ module A3
 
       if gateway == "agent-http"
         raise ArgumentError, "--agent-control-plane-url is required for --worker-gateway agent-http" unless options[:agent_control_plane_url]
+        validate_agent_control_plane_url!(options.fetch(:agent_control_plane_url), allow_insecure_remote: options.fetch(:agent_allow_insecure_remote, false))
         shared_workspace_mode = options[:agent_shared_workspace_mode]
         unless %w[same-path agent-materialized].include?(shared_workspace_mode)
           raise ArgumentError, "--agent-shared-workspace-mode same-path or agent-materialized is required for --worker-gateway agent-http"
@@ -1415,6 +1417,7 @@ module A3
 
       if runner == "agent-http"
         raise ArgumentError, "--agent-control-plane-url is required for --verification-command-runner agent-http" unless options[:agent_control_plane_url]
+        validate_agent_control_plane_url!(options.fetch(:agent_control_plane_url), allow_insecure_remote: options.fetch(:agent_allow_insecure_remote, false))
         shared_workspace_mode = options[:agent_shared_workspace_mode]
         unless %w[same-path agent-materialized].include?(shared_workspace_mode)
           raise ArgumentError, "--agent-shared-workspace-mode same-path or agent-materialized is required for --verification-command-runner agent-http"
@@ -1474,6 +1477,23 @@ module A3
         freshness_policy: options.fetch(:agent_workspace_freshness_policy, :reuse_if_clean_and_ref_matches),
         cleanup_policy: options.fetch(:agent_workspace_cleanup_policy, :retain_until_a3_cleanup)
       )
+    end
+
+    def validate_agent_control_plane_url!(raw_url, allow_insecure_remote:)
+      uri = URI(raw_url.to_s)
+      return unless uri.scheme == "http"
+      return if allow_insecure_remote || local_http_host?(uri.host)
+
+      raise ArgumentError, "--agent-control-plane-url uses insecure remote HTTP; use https or set --agent-allow-insecure-remote-http for an explicit local/docker exception"
+    end
+
+    def local_http_host?(host)
+      normalized = host.to_s.downcase.strip
+      return true if normalized.empty? || normalized == "localhost"
+      return true if normalized.match?(/\A127(?:\.\d{1,3}){3}\z/)
+      return true if normalized == "::1"
+
+      !normalized.include?(".")
     end
 
     def kanban_bridge_enabled?(options)

@@ -60,3 +60,30 @@ func TestRuntimeProfileConfigRequiresWorkspaceRootForAliases(t *testing.T) {
 		t.Fatal("expected missing workspace_root failure")
 	}
 }
+
+func TestRuntimeProfileConfigRejectsInsecureRemoteHTTP(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "agent-profile.json")
+	if err := os.WriteFile(path, []byte(`{
+  "control_plane_url": "http://a3.example.com:7393"
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := LoadRuntimeProfileConfig(path); err == nil {
+		t.Fatal("expected insecure remote HTTP failure")
+	}
+}
+
+func TestRuntimeProfileConfigAllowsLocalAndDockerHTTP(t *testing.T) {
+	for _, controlPlaneURL := range []string{
+		"http://127.0.0.1:7393",
+		"http://localhost:7393",
+		"http://a3-runtime:7393",
+		"https://a3.example.com",
+	} {
+		config := RuntimeProfileConfig{ControlPlaneURL: controlPlaneURL}
+		if err := config.Validate(); err != nil {
+			t.Fatalf("Validate(%s) failed: %v", controlPlaneURL, err)
+		}
+	}
+}

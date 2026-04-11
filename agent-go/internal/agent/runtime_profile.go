@@ -3,16 +3,20 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
+	"strings"
 )
 
 type RuntimeProfileConfig struct {
-	AgentName       string            `json:"agent"`
-	ControlPlaneURL string            `json:"control_plane_url"`
-	AgentToken      string            `json:"agent_token"`
-	AgentTokenFile  string            `json:"agent_token_file"`
-	WorkspaceRoot   string            `json:"workspace_root"`
-	SourceAliases   map[string]string `json:"source_aliases"`
+	AgentName           string            `json:"agent"`
+	ControlPlaneURL     string            `json:"control_plane_url"`
+	AgentToken          string            `json:"agent_token"`
+	AgentTokenFile      string            `json:"agent_token_file"`
+	AllowInsecureRemote bool              `json:"allow_insecure_remote"`
+	WorkspaceRoot       string            `json:"workspace_root"`
+	SourceAliases       map[string]string `json:"source_aliases"`
 }
 
 func LoadRuntimeProfileConfig(path string) (RuntimeProfileConfig, error) {
@@ -37,6 +41,9 @@ func LoadRuntimeProfileConfig(path string) (RuntimeProfileConfig, error) {
 }
 
 func (c RuntimeProfileConfig) Validate() error {
+	if err := validateControlPlaneURL(c.ControlPlaneURL, c.AllowInsecureRemote); err != nil {
+		return err
+	}
 	if c.WorkspaceRoot == "" && len(c.SourceAliases) > 0 {
 		return fmt.Errorf("workspace_root is required when source_aliases are configured")
 	}
@@ -49,4 +56,33 @@ func (c RuntimeProfileConfig) Validate() error {
 		}
 	}
 	return nil
+}
+
+func validateControlPlaneURL(rawURL string, allowInsecureRemote bool) error {
+	if rawURL == "" {
+		return nil
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid control_plane_url: %w", err)
+	}
+	if parsed.Scheme != "http" {
+		return nil
+	}
+	if allowInsecureRemote || isLocalHTTPHost(parsed.Hostname()) {
+		return nil
+	}
+	return fmt.Errorf("control_plane_url uses insecure remote HTTP; use https or set allow_insecure_remote for an explicit local/docker exception")
+}
+
+func isLocalHTTPHost(host string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(host))
+	if normalized == "" || normalized == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(normalized)
+	if ip != nil {
+		return ip.IsLoopback()
+	}
+	return !strings.Contains(normalized, ".")
 }

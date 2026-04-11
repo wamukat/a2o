@@ -67,6 +67,39 @@ RSpec.describe "A3 CLI worker gateway options" do
     end.to raise_error(ArgumentError, /agent-control-plane-url/)
   end
 
+  it "rejects insecure remote HTTP for the agent HTTP worker gateway unless explicitly allowed" do
+    expect do
+      A3::CLI.send(
+        :build_worker_gateway,
+        options: {
+          worker_gateway: "agent-http",
+          worker_command: "ruby",
+          worker_command_args: [],
+          agent_control_plane_url: "http://a3.example.com:7393",
+          agent_shared_workspace_mode: "same-path"
+        },
+        command_runner: instance_double(A3::Infra::LocalCommandRunner)
+      )
+    end.to raise_error(ArgumentError, /insecure remote HTTP/)
+  end
+
+  it "allows explicit insecure remote HTTP for the agent HTTP worker gateway" do
+    gateway = A3::CLI.send(
+      :build_worker_gateway,
+      options: {
+        worker_gateway: "agent-http",
+        worker_command: "ruby",
+        worker_command_args: [],
+        agent_control_plane_url: "http://a3.example.com:7393",
+        agent_shared_workspace_mode: "same-path",
+        agent_allow_insecure_remote: true
+      },
+      command_runner: instance_double(A3::Infra::LocalCommandRunner)
+    )
+
+    expect(gateway).to be_a(A3::Infra::AgentWorkerGateway)
+  end
+
   it "requires explicit supported workspace mode for the agent HTTP worker gateway" do
     expect do
       A3::CLI.send(
