@@ -1,55 +1,53 @@
-# A3-v2
+# A3 Engine
 
-対象読者: A3-v2 実装者 / 設計者 / reviewer
+対象読者: A3 実装者 / 設計者 / reviewer / operator
 文書種別: リポジトリ入口
 
-このディレクトリは、A3-v2 の実装と設計資料を集約するための作業場所である。
-既存の `a3-engine` とは分けて扱い、この配下で独立した実装を育てる。
+このディレクトリは current A3 Engine の本体実装と設計資料を集約する。旧 `a3-v2/` source tree は削除済みであり、現在の正本はこの `a3-engine` と workspace root の `scripts/a3` / `Taskfile.yml` である。
 
 ## 方針
 
-- A3-v2 は V1 の局所修正の延長ではなく、新しい製品として設計する
-- DDD を強く意識し、domain knowledge を中心へ集約する
+- A3 は V1 の局所修正の延長ではなく、SoloBoard と `a3-agent` を前提にした current runtime として扱う
+- A3 本体は orchestration / scheduler / state / kanban adapter / agent control plane を持つ
+- project 固有 toolchain は A3 image へ bake せず、host または dev-env container に置いた `a3-agent` が実行する
 - project 固有知識は最小 injection surface と preset/template で表現する
 - workspace / rerun / blocked recovery の複雑性を、domain model と evidence model で抑える
-- ルート名は `a3-v2` のままでよいが、配下では `v2` を重ねず `a3` を使う
 
 ## 読み順
 
-1. [docs/00-design-map.md](/Users/takuma/workspace/mypage-prototype/a3-v2/docs/00-design-map.md)
-2. [docs/05-engineering-rulebook.md](/Users/takuma/workspace/mypage-prototype/a3-v2/docs/05-engineering-rulebook.md)
-3. [docs/10-bounded-context-and-language.md](/Users/takuma/workspace/mypage-prototype/a3-v2/docs/10-bounded-context-and-language.md)
-4. [docs/20-core-domain-model.md](/Users/takuma/workspace/mypage-prototype/a3-v2/docs/20-core-domain-model.md)
-5. [docs/30-workspace-and-repo-slot-model.md](/Users/takuma/workspace/mypage-prototype/a3-v2/docs/30-workspace-and-repo-slot-model.md)
-6. [docs/40-project-surface-and-presets.md](/Users/takuma/workspace/mypage-prototype/a3-v2/docs/40-project-surface-and-presets.md)
-7. [docs/50-evidence-and-rerun-diagnosis.md](/Users/takuma/workspace/mypage-prototype/a3-v2/docs/50-evidence-and-rerun-diagnosis.md)
-8. [docs/60-container-distribution-and-project-runtime.md](/Users/takuma/workspace/mypage-prototype/a3-v2/docs/60-container-distribution-and-project-runtime.md)
+1. [docs/00-design-map.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/00-design-map.md)
+2. [docs/05-engineering-rulebook.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/05-engineering-rulebook.md)
+3. [docs/10-bounded-context-and-language.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/10-bounded-context-and-language.md)
+4. [docs/20-core-domain-model.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/20-core-domain-model.md)
+5. [docs/30-workspace-and-repo-slot-model.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/30-workspace-and-repo-slot-model.md)
+6. [docs/40-project-surface-and-presets.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/40-project-surface-and-presets.md)
+7. [docs/50-evidence-and-rerun-diagnosis.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/50-evidence-and-rerun-diagnosis.md)
+8. [docs/60-container-distribution-and-project-runtime.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/60-container-distribution-and-project-runtime.md)
+9. [docs/70-implementation-status.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/70-implementation-status.md)
 
-## ソースツリー
+## 配布 / runtime
 
-- `bin/a3`
-- `lib/a3/`
-  - `domain/`
-  - `application/`
-  - `infra/`
-  - `adapters/`
-  - `cli/`
-- `spec/`
+current packaging は `docker:a3 + docker:soloboard + a3-agent` の compose 形状を標準にする。SoloBoard は A3 image に内包せず、compose 上の bundled kanban service として扱う。project command は host または dev-env container に install した `a3-agent` が pull 実行する。
 
-配下の命名では `a3_v2` や `v2` を使わず、実装上の中心モジュール名は `A3` とする。
+代表入口:
 
-## 対応チケット
+- `task a3:portal:bundle:up`
+- `task a3:portal:bundle:bootstrap`
+- `task a3:portal:bundle:doctor`
+- `task a3:portal:bundle:agent-loop`
+- `task a3:portal:bundle:observe`
 
-- `A3-v2#3022` DDD-based foundations umbrella
-- `A3-v2#3023` bounded contexts and ubiquitous language
-- `A3-v2#3024` core domain model and state transitions
-- `A3-v2#3025` workspace and repo-slot lifecycle model
-- `A3-v2#3026` minimal project surface and presets
-- `A3-v2#3027` evidence and rerun diagnosis model
-- `A3-v2#3028` Ruby skeleton with DDD layer boundaries
+`task a3:portal:bundle:run-once` は legacy direct-path diagnosis 用であり、通常検証には使わない。
+
+## 実装位置
+
+- A3 本体実装: `lib/a3/`, `bin/a3`, `spec/`
+- Go agent: `agent-go/`
+- Docker runtime assets: `docker/`
+- 設計 / 進捗正本: `docs/60-container-distribution-and-project-runtime.md`, `docs/70-implementation-status.md`
 
 ## 参照元
 
 - [A3-2 Product Specification](/Users/takuma/workspace/mypage-prototype/docs/10-ops/10-08-a3-2-product-spec.md)
 - [A3 Parent-Child Stabilization Plan](/Users/takuma/workspace/mypage-prototype/docs/10-ops/10-06-a3-parent-child-stabilization-plan.md)
-- [Issue Workspace Worktree Migration Design](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/issue-workspace-worktree-migration-design.md)
+- [A3 Cutover Decision Ledger](/Users/takuma/workspace/mypage-prototype/docs/10-ops/10-04-a3-cutover-decision-ledger.md)

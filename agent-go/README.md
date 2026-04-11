@@ -61,6 +61,26 @@ The installer detects `systemd` on Linux and `launchd` on macOS. Override with `
 
 By default the service file is written but not loaded. Set `ENABLE_SERVICE=1` to run the platform load/enable command after writing the template.
 
+## Deployment Shapes
+
+`a3-agent` is the project-runtime side of the A3 distribution. A3 and SoloBoard can run in Docker while the agent runs either on the host or inside a project dev-env container.
+
+Supported shapes:
+
+- Host agent
+  - Install the release archive on the host.
+  - Point `workspace_root` and `source_aliases` at host paths.
+  - Use loopback control-plane URL such as `http://127.0.0.1:7393`.
+- Dev-env container agent
+  - Copy or install the release archive into the project dev-env image.
+  - Point `workspace_root` and `source_aliases` at paths inside that container.
+  - Use the compose service name for the A3 control plane, for example `http://a3-runtime:7393`.
+- CI runner agent
+  - Install from release archive during the job setup step.
+  - Use a job-local `workspace_root` and token files mounted from CI secrets.
+
+In all shapes, the runtime profile is the local contract. A3 job payloads carry repo slots and source aliases; they do not carry host-specific source paths. Logs and artifacts are uploaded to the A3-managed artifact store and must not be returned as host-local paths in `JobResult`.
+
 ## Protocol Smoke
 
 To verify the Go agent against the Ruby A3 control plane:
