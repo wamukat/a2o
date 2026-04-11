@@ -147,7 +147,7 @@ Rules:
 - `agent-http` treats `--worker-command` as an executable and `--worker-command-arg` as argv entries; shell expressions must be passed explicitly as `--worker-command sh --worker-command-arg -lc --worker-command-arg '...'`
 - invalid combinations fail during CLI option validation
 
-### First Smoke
+### Same-Path Gateway Smoke
 
 Status: implemented in `spec/a3/infra/agent_worker_gateway_spec.rb`.
 
@@ -161,6 +161,24 @@ Add a focused smoke that proves the full bridge:
 6. Assert uploaded combined log artifact exists.
 
 This is intentionally smaller than Portal full verification. Portal full verification should be a later slice after the gateway contract is stable.
+
+### Agent-Materialized Gateway Smoke
+
+Status: implemented as `agent-go/scripts/smoke-materialized-agent-gateway.sh`.
+
+Add a focused smoke that proves the real A3-side materialized bridge:
+
+1. Start `a3 agent-server` with JSON job store and artifact store.
+2. Prepare a tiny clean local Git source repository.
+3. Run `AgentWorkerGateway#run` in `agent-materialized` mode in a background Ruby process.
+4. Run one Go `a3-agent` process with `--workspace-root` and `--source-alias`.
+5. Assert the gateway exits successfully from `AgentJobResult.worker_protocol_result`.
+6. Assert the worker payload intentionally lied about `changed_files`, and A3 replaced it with descriptor-derived canonical `changed_files`.
+7. Assert descriptor evidence for source alias, checkout mode, requested ref, access, dirty state, and changed files.
+8. Assert the reserved `worker-result` artifact exists.
+9. Assert `cleanup_after_job` removed the materialized workspace and did not leave a Git worktree registration.
+
+This smoke uses `sh` as the worker command and does not invoke Portal-specific runtime, Maven, scheduler canaries, or full verification. Its purpose is only to validate the control-plane, Go agent materializer, worker protocol transport, and A3 gateway parsing boundary.
 
 ### CLI Bundle Smoke
 
@@ -322,6 +340,13 @@ Do not move full Portal execution yet. Split implementation into three commits:
    - `AgentWorkerGateway` can accept an injected `workspace_request_builder` and enqueue `workspace_request` + `worker_protocol_request`.
    - The mode is not exposed through CLI/runtime config yet.
    - Successful implementation uses agent-returned slot `changed_files` evidence as canonical input after validating it against `workspace_request`.
+6. CLI bridge for materialized mode: implemented.
+   - A3 CLI accepts `--agent-shared-workspace-mode agent-materialized`.
+   - A3 CLI accepts `--agent-source-alias SLOT=ALIAS`.
+   - Runtime job payload carries aliases only; agent filesystem paths stay in agent runtime configuration.
+7. End-to-end gateway materialized smoke: implemented.
+   - `agent-go/scripts/smoke-materialized-agent-gateway.sh` proves the real `AgentWorkerGateway` path against the Ruby control plane and Go agent.
+   - The smoke intentionally mismatches worker-reported `changed_files` and verifies A3 canonicalizes from `AgentWorkspaceDescriptor`.
 
 The next implementation step is runtime package wiring beyond the explicit CLI bridge. Directly deriving `workspace_request` from A3-local `PreparedWorkspace#slot_paths` would weaken the host/dev-env boundary; source aliases and agent workspace roots must come from runtime configuration.
 

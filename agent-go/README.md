@@ -50,6 +50,14 @@ To verify agent-owned workspace materialization and worker protocol transport:
 
 This starts the same Ruby control plane, creates a tiny clean Git source repo, enqueues one implementation job with `workspace_request` and `worker_protocol_request`, runs the Go agent with `--workspace-root` and `--source-alias`, and checks that the worker result is returned both as inline result JSON and as an uploaded `worker-result` artifact.
 
+To verify the A3-side `AgentWorkerGateway` materialized path end to end:
+
+```sh
+./scripts/smoke-materialized-agent-gateway.sh
+```
+
+This starts the Ruby control plane, runs the Ruby `AgentWorkerGateway` in `agent-materialized` mode, runs the Go agent against a local Git source alias, and checks that the gateway completes from the returned worker protocol result while canonicalizing implementation `changed_files` from the agent workspace descriptor.
+
 ## Run Once
 
 ```sh
