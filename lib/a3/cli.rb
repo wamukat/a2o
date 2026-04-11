@@ -1198,6 +1198,9 @@ module A3
       parser.on("--agent-control-plane-url URL") { |value| options[:agent_control_plane_url] = value }
       parser.on("--agent-runtime-profile VALUE") { |value| options[:agent_runtime_profile] = value }
       parser.on("--agent-shared-workspace-mode VALUE") { |value| options[:agent_shared_workspace_mode] = value }
+      parser.on("--agent-source-alias SLOT=ALIAS") { |value| add_named_option(options[:agent_source_aliases] ||= {}, value, option_name: "agent source alias") }
+      parser.on("--agent-workspace-freshness-policy VALUE") { |value| options[:agent_workspace_freshness_policy] = value.to_sym }
+      parser.on("--agent-workspace-cleanup-policy VALUE") { |value| options[:agent_workspace_cleanup_policy] = value.to_sym }
       parser.on("--agent-job-timeout-seconds VALUE") { |value| options[:agent_job_timeout_seconds] = Integer(value) }
       parser.on("--agent-job-poll-interval-seconds VALUE") { |value| options[:agent_job_poll_interval_seconds] = Float(value) }
     end
@@ -1295,20 +1298,37 @@ module A3
 
       if gateway == "agent-http"
         raise ArgumentError, "--agent-control-plane-url is required for --worker-gateway agent-http" unless options[:agent_control_plane_url]
-        raise ArgumentError, "--agent-shared-workspace-mode same-path is required for --worker-gateway agent-http" unless options[:agent_shared_workspace_mode] == "same-path"
+        shared_workspace_mode = options[:agent_shared_workspace_mode]
+        unless %w[same-path agent-materialized].include?(shared_workspace_mode)
+          raise ArgumentError, "--agent-shared-workspace-mode same-path or agent-materialized is required for --worker-gateway agent-http"
+        end
 
         return A3::Infra::AgentWorkerGateway.new(
           control_plane_client: A3::Infra::AgentControlPlaneClient.new(base_url: options.fetch(:agent_control_plane_url)),
           worker_command: options[:worker_command],
           worker_command_args: options.fetch(:worker_command_args, []),
           runtime_profile: options.fetch(:agent_runtime_profile, "default"),
-          shared_workspace_mode: options.fetch(:agent_shared_workspace_mode),
+          shared_workspace_mode: shared_workspace_mode,
           timeout_seconds: options.fetch(:agent_job_timeout_seconds, 1800),
-          poll_interval_seconds: options.fetch(:agent_job_poll_interval_seconds, 1.0)
+          poll_interval_seconds: options.fetch(:agent_job_poll_interval_seconds, 1.0),
+          workspace_request_builder: agent_workspace_request_builder(options)
         )
       end
 
       raise ArgumentError, "Unsupported worker gateway: #{gateway}"
+    end
+
+    def agent_workspace_request_builder(options)
+      return nil unless options[:agent_shared_workspace_mode] == "agent-materialized"
+
+      source_aliases = options.fetch(:agent_source_aliases, {})
+      raise ArgumentError, "--agent-source-alias is required for --agent-shared-workspace-mode agent-materialized" if source_aliases.empty?
+
+      A3::Infra::AgentWorkspaceRequestBuilder.new(
+        source_aliases: source_aliases,
+        freshness_policy: options.fetch(:agent_workspace_freshness_policy, :reuse_if_clean_and_ref_matches),
+        cleanup_policy: options.fetch(:agent_workspace_cleanup_policy, :retain_until_a3_cleanup)
+      )
     end
 
     def kanban_bridge_enabled?(options)

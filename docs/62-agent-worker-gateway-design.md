@@ -323,7 +323,7 @@ Do not move full Portal execution yet. Split implementation into three commits:
    - The mode is not exposed through CLI/runtime config yet.
    - Successful implementation uses agent-returned slot `changed_files` evidence as canonical input after validating it against `workspace_request`.
 
-The next implementation step is runtime-profile wiring for `workspace_request_builder`. Directly deriving `workspace_request` from A3-local `PreparedWorkspace#slot_paths` would weaken the host/dev-env boundary; source aliases and agent workspace roots must come from runtime configuration.
+The next implementation step is runtime package wiring beyond the explicit CLI bridge. Directly deriving `workspace_request` from A3-local `PreparedWorkspace#slot_paths` would weaken the host/dev-env boundary; source aliases and agent workspace roots must come from runtime configuration.
 
 ### Worker Loop Integration With Agent-Owned Workspace
 
@@ -345,6 +345,17 @@ The worker protocol needs one additional transport slice before the materialized
 Configured `artifact_rules` in materialized mode are evaluated relative to the prepared workspace root after worker-result capture. Cleanup must occur only after worker-result capture, configured artifact uploads, and result submission attempts complete. For the first smoke, use a cleanup policy that allows deterministic test cleanup while still preserving enough uploaded evidence for A3 to parse the worker result.
 
 `AgentWorkerGateway` materialized mode parses completed worker results through `AgentJobResult.worker_protocol_result`. For successful implementation, A3 derives canonical `changed_files` from `AgentWorkspaceDescriptor.slot_descriptors[*].changed_files`, validates the descriptor against `workspace_request`, records worker-payload mismatches in diagnostics, and writes the descriptor-derived value to the final response bundle. A3 treats agent `runtime_path` values as diagnostics only and does not read them.
+
+The first operator-facing bridge is explicit CLI configuration, not implicit inference from `--repo-source`:
+
+- A3 CLI accepts `--agent-shared-workspace-mode agent-materialized` only with `--agent-source-alias SLOT=ALIAS`.
+- A3 job payload contains only `source.alias`, never the agent filesystem path.
+- The agent process independently resolves `ALIAS=PATH` through its own `a3-agent --source-alias` / runtime profile configuration.
+- Implementation requires `edit_scope` slots as `read_write`.
+- Review uses `edit_scope ∪ verification_scope`; edit slots are `read_write`, verification-only slots are `read_only`.
+- Verification requires `verification_scope` slots as `read_only`.
+- Freshness defaults to `reuse_if_clean_and_ref_matches`.
+- Cleanup defaults to `retain_until_a3_cleanup`; `cleanup_after_job` is available for smoke/dev.
 
 ### Non-Goals For This Slice
 
