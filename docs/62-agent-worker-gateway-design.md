@@ -220,9 +220,25 @@ Add a root-level bundle smoke that proves the operator CLI path can use `agent-h
    - the task reached `Inspection` after the single implementation step
    - combined log artifact exists
 
-This smoke must remain separate from Portal full verification. It validates the control-plane/agent/worker-gateway CLI wiring only; Maven, Java, Ruby worker scripts, NullAway, and full Portal verification stay in later slices. The generic compose `a3-agent` image is a Go single-binary image and must not gain Ruby or Portal-specific runtime just for this smoke.
+This smoke must remain separate from Portal full verification. It validates the control-plane/agent/worker-gateway CLI wiring only; Maven, Java, Ruby worker scripts, NullAway, and full Portal verification stay in later slices. The generic `docker/a3-agent` image is a Go single-binary image with only generic materialization dependencies such as `git`; project runtime dependencies belong in a project/dev-env agent image such as `docker/a3-portal-agent`.
 
 Operational constraint: the gateway command blocks while waiting for the agent job, so the smoke must run the gateway in the background, then run one or more `a3-agent` single-job executions, then wait for the gateway process and fail with captured `server_log`, `gateway_log`, and `agent_log` if it does not exit. Use a dedicated smoke storage directory under `/workspace/.work/...`, not the regular bundle canary storage, because the first slice requires the A3-prepared workspace path to be visible at the same path from both `a3-runtime` and `a3-agent`.
+
+### CLI Bundle Verification Smoke
+
+Status: implemented as `task a3:portal:bundle:agent-verification-smoke`.
+
+This smoke proves the operator CLI path can run `run-verification --verification-command-runner agent-http` through the compose `a3-agent` service. The compose service intentionally uses the Portal dev-env agent image, not the generic Go-only image, because this path executes project commands (`ruby "$A3_ROOT_DIR/scripts/a3/portal_v2_remediation.rb"` and `ruby "$A3_ROOT_DIR/scripts/a3/portal_v2_verification.rb"`). The smoke uses a small generated repo with a Taskfile to avoid Maven/NullAway cost while still exercising the real Portal remediation/verification script shape.
+
+The smoke asserts:
+
+1. A SoloBoard task reaches `Inspection` after a local implementation worker phase.
+2. A verification run is started with the canonical `refs/heads/a3/work/<task>` source ref.
+3. Remediation and verification are both enqueued as agent command jobs.
+4. The Go agent materializes the repo slot, writes `.a3/workspace.json` and `.a3/slot.json`, executes both commands, uploads combined logs, and cleans up the worktree registration.
+5. A3 completes the verification run and transitions the task to `Merging`; the smoke then moves the synthetic task to `Done` as cleanup.
+
+Portal full verification remains a later slice: it must reuse the same command runner against real `member-portal-starters` / `member-portal-ui-app` repos and a dev-env agent image that has the required Java/Maven/Node toolchain.
 
 ## Failure Policy
 
