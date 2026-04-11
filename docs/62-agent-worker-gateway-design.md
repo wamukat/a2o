@@ -16,7 +16,7 @@ A3 already has two separate contracts:
   - validates worker result schema and canonicalizes implementation `changed_files`
 - agent pull transport
   - stores `AgentJobRequest`
-  - lets a remote `a3-agent` claim and execute a command
+  - lets a local host/dev-env `a3-agent` claim and execute a command
   - uploads logs/artifacts to A3-managed artifact storage
   - records `AgentJobResult`
 
@@ -93,7 +93,7 @@ This endpoint is required for the first synchronous gateway slice. Without it, `
 5. Read `.a3/worker-result.json`.
 6. Build the final `ExecutionResult` using the same worker response validation as `LocalWorkerGateway`.
 
-The first slice only supports an explicit `same-path` shared workspace profile. The A3 process cannot prove that a remote/container agent sees the same path unless the runtime profile declares that contract. Therefore `agent-http` must require an explicit opt-in such as `--agent-shared-workspace-mode same-path`; without it the gateway fails before enqueueing. Later slices may add mount mapping or agent-side workspace materialization.
+The first slice only supports an explicit `same-path` shared workspace profile. The A3 process cannot prove that a host/container agent sees the same path unless the local runtime profile declares that contract. Therefore `agent-http` must require an explicit opt-in such as `--agent-shared-workspace-mode same-path`; without it the gateway fails before enqueueing. Later slices may add mount mapping or agent-side workspace materialization.
 
 ### Result Semantics
 
@@ -253,13 +253,13 @@ Uploaded agent artifacts are retained in the A3-managed artifact store and can b
 
 ## Security Boundary
 
-The first HTTP pull transport remains dev/local oriented. It exposes job request details, including environment values, through the local control-plane API, so non-local deployment still requires TLS, authorization scope, response redaction, and token rotation policy.
+The HTTP pull transport is local-first. It is designed for A3, SoloBoard, and `a3-agent` running on the same host or in the same compose/dev-env network. It is not a central A3 server protocol for remote multi-agent pools.
 
-As a minimum hardening step, the control plane and agents support optional bearer tokens. A3 `agent-server` accepts an agent token (`--agent-token`, `--agent-token-file`, `A3_AGENT_TOKEN`, `A3_AGENT_TOKEN_FILE`) for agent-side pull/upload/result endpoints and an optional control token (`--agent-control-token`, `--agent-control-token-file`, `A3_AGENT_CONTROL_TOKEN`, `A3_AGENT_CONTROL_TOKEN_FILE`) for A3-side enqueue/fetch endpoints. If no control token is configured, control endpoints fall back to the agent token for local/backward-compatible operation. Go `a3-agent` reads profile `agent_token_file` / `agent_token`, `A3_AGENT_TOKEN_FILE`, `A3_AGENT_TOKEN`, `-agent-token-file`, or `-agent-token`; A3-side `agent-http` gateway clients use the control token options and fall back to agent token options when no control token is configured. When configured, all pull API calls must include `Authorization: Bearer <token>`. Prefer token files for service manager / container operation so the token is not exposed through process arguments. Long-running `a3-agent` and `a3 agent-server` reload token files for each request, so rotation can be performed by atomically replacing the token file without restarting the process.
+As a minimum local hardening step, the control plane and agents support optional bearer tokens. A3 `agent-server` accepts an agent token (`--agent-token`, `--agent-token-file`, `A3_AGENT_TOKEN`, `A3_AGENT_TOKEN_FILE`) for agent-side pull/upload/result endpoints and an optional control token (`--agent-control-token`, `--agent-control-token-file`, `A3_AGENT_CONTROL_TOKEN`, `A3_AGENT_CONTROL_TOKEN_FILE`) for A3-side enqueue/fetch endpoints. If no control token is configured, control endpoints fall back to the agent token for local/backward-compatible operation. Go `a3-agent` reads profile `agent_token_file` / `agent_token`, `A3_AGENT_TOKEN_FILE`, `A3_AGENT_TOKEN`, `-agent-token-file`, or `-agent-token`; A3-side `agent-http` gateway clients use the control token options and fall back to agent token options when no control token is configured. When configured, all pull API calls must include `Authorization: Bearer <token>`. Prefer token files for service manager / container operation so the token is not exposed through process arguments. Long-running `a3-agent` and `a3 agent-server` reload token files for each request, so local token replacement can be performed by atomically replacing the token file without restarting the process.
 
 Client-side transport errors are intentionally redacted: Ruby and Go control-plane clients report operation name and HTTP status only, not raw response bodies. This keeps unexpected proxy/server bodies, malformed job payloads, and environment values out of local exception strings while preserving enough status for operator diagnosis.
 
-TLS policy is fail-fast at the URL boundary. Loopback URLs (`127.0.0.1` / `localhost`) and single-label Docker service names such as `http://a3-runtime:7393` are allowed as local topology. Remote `http://` URLs are rejected by default in the Go runtime profile and Ruby `agent-http` gateway setup; use `https://` for remote deployment, or the explicit insecure-remote opt-in only for reviewed exceptions.
+Transport policy is fail-fast at the URL boundary. Loopback URLs (`127.0.0.1` / `localhost`) and single-label Docker service names such as `http://a3-runtime:7393` are allowed as local topology. Remote `http://` URLs are rejected by default in the Go runtime profile and Ruby `agent-http` gateway setup. Remote deployment, TLS termination, remote worker identity, capability scheduling, and cross-machine artifact routing are out of scope for the current runtime; the explicit insecure-remote opt-in is diagnostic-only.
 
 ## Agent-Owned Workspace Materialization
 
@@ -446,5 +446,5 @@ The first is `slot -> alias` and is safe for A3 job construction. The second is 
 ## Review Questions
 
 - Is synchronous polling acceptable for the first slice, or should phase completion become async before worker gateway integration?
-- Is shared workspace path equivalence acceptable for compose/dev-env MVP, with remote workspace materialization deferred?
+- Is shared workspace path equivalence acceptable for compose/dev-env MVP, with agent-owned materialization handling local host/container differences?
 - Is extracting `WorkerProtocol` the right boundary, or should `LocalWorkerGateway` expose a smaller internal result parser instead?

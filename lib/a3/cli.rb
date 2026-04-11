@@ -1484,7 +1484,7 @@ module A3
       return unless uri.scheme == "http"
       return if allow_insecure_remote || local_http_host?(uri.host)
 
-      raise ArgumentError, "--agent-control-plane-url uses insecure remote HTTP; use https or set --agent-allow-insecure-remote-http for an explicit local/docker exception"
+      raise ArgumentError, "--agent-control-plane-url uses remote HTTP; current A3 supports local topology only, use loopback/compose service URL or set --agent-allow-insecure-remote-http for an explicit diagnostic exception"
     end
 
     def local_http_host?(host)

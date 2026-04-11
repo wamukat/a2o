@@ -67,7 +67,7 @@ RSpec.describe "A3 CLI worker gateway options" do
     end.to raise_error(ArgumentError, /agent-control-plane-url/)
   end
 
-  it "rejects insecure remote HTTP for the agent HTTP worker gateway unless explicitly allowed" do
+  it "rejects remote HTTP for the agent HTTP worker gateway unless explicitly allowed" do
     expect do
       A3::CLI.send(
         :build_worker_gateway,
@@ -80,10 +80,10 @@ RSpec.describe "A3 CLI worker gateway options" do
         },
         command_runner: instance_double(A3::Infra::LocalCommandRunner)
       )
-    end.to raise_error(ArgumentError, /insecure remote HTTP/)
+    end.to raise_error(ArgumentError, /local topology/)
   end
 
-  it "allows explicit insecure remote HTTP for the agent HTTP worker gateway" do
+  it "allows explicit diagnostic remote HTTP for the agent HTTP worker gateway" do
     gateway = A3::CLI.send(
       :build_worker_gateway,
       options: {

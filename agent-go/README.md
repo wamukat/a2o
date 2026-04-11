@@ -70,7 +70,7 @@ By default the service file is written but not loaded. Set `ENABLE_SERVICE=1` to
 
 ## Deployment Shapes
 
-`a3-agent` is the project-runtime side of the A3 distribution. A3 and SoloBoard can run in Docker while the agent runs either on the host or inside a project dev-env container.
+`a3-agent` is the project-runtime side of the A3 distribution. A3 is a local-first runtime: A3, SoloBoard, and the agent run on the same host or inside the same local Docker compose/dev-env network. The current data model is not a central A3 server with remote multi-agent workers.
 
 Supported shapes:
 
@@ -87,6 +87,13 @@ Supported shapes:
   - Use a job-local `workspace_root` and token files mounted from CI secrets.
 
 In all shapes, the runtime profile is the local contract. A3 job payloads carry repo slots and source aliases; they do not carry host-specific source paths. Logs and artifacts are uploaded to the A3-managed artifact store and must not be returned as host-local paths in `JobResult`.
+
+Out of scope for the current runtime:
+
+- central A3 server operation
+- remote worker pools across multiple machines
+- multi-tenant agent registry / capability scheduling
+- remote artifact routing outside the local A3-managed artifact store
 
 ## Protocol Smoke
 
@@ -164,7 +171,7 @@ The runtime profile file is the host/dev-env side `alias -> local path` contract
 
 `agent_token` is optional for local-only development. When the A3 control plane is started with `--agent-token` / `--agent-token-file` or `A3_AGENT_TOKEN` / `A3_AGENT_TOKEN_FILE`, the Go agent must provide the same agent token through `A3_AGENT_TOKEN`, `-agent-token`, `agent_token_file`, `A3_AGENT_TOKEN_FILE`, `-agent-token-file`, or the inline profile `agent_token`. A3-side enqueue/fetch clients may use a separate control token (`--agent-control-token-file` or `A3_AGENT_CONTROL_TOKEN_FILE`) while the Go agent continues to use only the agent token. Prefer token files for service manager / container operation so tokens are not exposed through process arguments.
 
-The runtime profile rejects remote `http://` control-plane URLs by default. Loopback URLs (`127.0.0.1` / `localhost`) and single-label Docker service names such as `http://a3-runtime:7393` are treated as local topology. Use `https://` for remote deployment, or set `allow_insecure_remote` only for an explicitly reviewed exception.
+The runtime profile rejects remote `http://` control-plane URLs by default. Loopback URLs (`127.0.0.1` / `localhost`) and single-label Docker service names such as `http://a3-runtime:7393` are treated as local topology. Remote deployment is out of scope for the current runtime; `allow_insecure_remote` is only a diagnostic escape hatch and should not appear in the standard runbook.
 
 ## Long-Running Mode
 
