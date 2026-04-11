@@ -53,12 +53,29 @@ RSpec.describe A3::Domain::AgentJobRequest do
   end
 
   it "round-trips from the request form" do
+    workspace_request = A3::Domain::AgentWorkspaceRequest.new(
+      mode: :agent_materialized,
+      workspace_kind: :ticket_workspace,
+      workspace_id: "Portal-42-ticket",
+      freshness_policy: :reuse_if_clean_and_ref_matches,
+      cleanup_policy: :retain_until_a3_cleanup,
+      slots: {
+        repo_alpha: {
+          source: { kind: "local_git", alias: "member-portal-starters" },
+          ref: "refs/heads/a3/work/Portal-42",
+          checkout: "worktree_detached",
+          access: "read_write",
+          required: true
+        }
+      }
+    )
     request = described_class.new(
       job_id: "job-portal-42-implementation",
       task_ref: "Portal#42",
       phase: "implementation",
       runtime_profile: "host-local",
       source_descriptor: A3::Domain::SourceDescriptor.implementation(task_ref: "Portal#42", ref: "feature/a3"),
+      workspace_request: workspace_request,
       working_dir: ".",
       command: "ruby",
       args: ["scripts/a3/worker.rb"],
@@ -67,6 +84,7 @@ RSpec.describe A3::Domain::AgentJobRequest do
       artifact_rules: []
     )
 
+    expect(request.request_form.fetch("workspace_request")).to eq(workspace_request.request_form)
     expect(described_class.from_request_form(request.request_form)).to eq(request)
   end
 

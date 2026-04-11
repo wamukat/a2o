@@ -5,15 +5,16 @@ module A3
     class AgentJobRequest
       PHASES = %i[implementation review verification merge].freeze
 
-      attr_reader :job_id, :task_ref, :phase, :runtime_profile, :source_descriptor,
+      attr_reader :job_id, :task_ref, :phase, :runtime_profile, :source_descriptor, :workspace_request,
                   :working_dir, :command, :args, :env, :timeout_seconds, :artifact_rules
 
-      def initialize(job_id:, task_ref:, phase:, runtime_profile:, source_descriptor:, working_dir:, command:, args:, env:, timeout_seconds:, artifact_rules:)
+      def initialize(job_id:, task_ref:, phase:, runtime_profile:, source_descriptor:, working_dir:, command:, args:, env:, timeout_seconds:, artifact_rules:, workspace_request: nil)
         @job_id = required_string(job_id, "job_id")
         @task_ref = required_string(task_ref, "task_ref")
         @phase = normalize_phase(phase)
         @runtime_profile = required_string(runtime_profile, "runtime_profile")
         @source_descriptor = source_descriptor
+        @workspace_request = normalize_workspace_request(workspace_request)
         @working_dir = required_string(working_dir, "working_dir")
         @command = required_string(command, "command")
         @args = Array(args).map(&:to_s).freeze
@@ -36,7 +37,8 @@ module A3
           args: record.fetch("args"),
           env: record.fetch("env"),
           timeout_seconds: record.fetch("timeout_seconds"),
-          artifact_rules: record.fetch("artifact_rules")
+          artifact_rules: record.fetch("artifact_rules"),
+          workspace_request: record["workspace_request"] && AgentWorkspaceRequest.from_request_form(record["workspace_request"])
         )
       end
 
@@ -47,13 +49,14 @@ module A3
           "phase" => phase.to_s,
           "runtime_profile" => runtime_profile,
           "source_descriptor" => source_descriptor.persisted_form,
+          "workspace_request" => workspace_request&.request_form,
           "working_dir" => working_dir,
           "command" => command,
           "args" => args,
           "env" => env,
           "timeout_seconds" => timeout_seconds,
           "artifact_rules" => artifact_rules
-        }
+        }.compact
       end
 
       def ==(other)
@@ -97,6 +100,13 @@ module A3
 
       def validate_timeout!
         raise ConfigurationError, "timeout_seconds must be positive" unless timeout_seconds.positive?
+      end
+
+      def normalize_workspace_request(value)
+        return nil if value.nil?
+        return value if value.is_a?(AgentWorkspaceRequest)
+
+        AgentWorkspaceRequest.from_request_form(value)
       end
     end
   end

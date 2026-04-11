@@ -203,6 +203,133 @@ Operational constraint: the gateway command blocks while waiting for the agent j
 
 The first HTTP pull transport is dev/local only. It exposes job request details, including environment values, through the local control-plane API and does not include authentication. Auth, authorization, TLS, and response redaction are separate hardening slices before non-local deployment.
 
+## Agent-Owned Workspace Materialization
+
+Status: design review target.
+
+The first `AgentWorkerGateway` slice still uses A3-prepared workspaces and a `same-path` mount. That is intentionally temporary. The target architecture is that the agent runtime owns checkout/worktree creation, dirty check, cleanup, and quarantine on the filesystem where commands run.
+
+### Current Gap
+
+`AgentJobRequest` currently contains:
+
+- `source_descriptor`
+- `working_dir`
+- `command`
+- `args`
+- `env`
+- `artifact_rules`
+
+This is enough for a same-path command job, but not enough for agent-owned materialization. The agent cannot know:
+
+- which repo slots are required
+- where each repo source comes from
+- which ref should be checked out per slot
+- whether the workspace should be reused or forced fresh
+- whether a slot is editable or read-only
+- how to report dirty state per slot before and after execution
+- how cleanup/quarantine should be handled
+
+### Proposed Contract Addition
+
+Add an optional `workspace_request` object to `AgentJobRequest`.
+
+```json
+{
+  "workspace_request": {
+    "mode": "agent_materialized",
+    "workspace_kind": "ticket_workspace",
+    "workspace_id": "Portal-123-ticket",
+    "freshness_policy": "reuse_if_clean_and_ref_matches",
+    "cleanup_policy": "retain_until_a3_cleanup",
+    "slots": {
+      "repo_alpha": {
+        "source": {
+          "kind": "local_git",
+          "alias": "member-portal-starters"
+        },
+        "ref": "refs/heads/a3/work/Portal-123",
+        "checkout": "worktree_detached",
+        "access": "read_write",
+        "required": true
+      }
+    }
+  }
+}
+```
+
+Rules:
+
+- `workspace_request` is optional while same-path gateway remains supported.
+- If absent, agents keep current behavior and execute `working_dir` directly.
+- If present with `mode=agent_materialized`, `working_dir` is deprecated and ignored for materialization. The agent places `workspace_id` under its configured runtime-profile workspace root.
+- The agent must materialize all `required=true` slots before running the command.
+- For `local_git` sources, `source.alias` resolves through the agent runtime profile to a scratch parent repository. The agent must create the slot as a leaf worktree using `git worktree add --force --detach`.
+- The agent must write worker protocol env paths under the materialized workspace root.
+- A3 must verify `AgentWorkspaceDescriptor` against `workspace_request` after job completion.
+- Job payload must not choose arbitrary agent filesystem roots. The writable workspace root is agent configuration, not A3 job input.
+
+### Workspace Descriptor Shape
+
+`AgentWorkspaceDescriptor.slot_descriptors` should include enough evidence for A3 to validate the workspace:
+
+```json
+{
+  "repo_alpha": {
+    "runtime_path": "/agent/workspaces/Portal-123-ticket/repo-alpha",
+    "source_kind": "local_git",
+    "source_alias": "member-portal-starters",
+    "checkout": "worktree_detached",
+    "requested_ref": "refs/heads/a3/work/Portal-123",
+    "resolved_head": "abc123",
+    "dirty_before": false,
+    "dirty_after": true,
+    "access": "read_write"
+  }
+}
+```
+
+Validation rules:
+
+- every required slot in `workspace_request.slots` must appear in `slot_descriptors`
+- descriptor `runtime_path` must be non-empty
+- descriptor `resolved_head` must be non-empty for git-backed slots
+- `dirty_before` must be `false` unless the job explicitly allows dirty input
+- source kind / source alias / requested ref / access must match the request
+
+Dirty input policy for the first materializer slice: the agent hard-fails before command execution if a prepared/reused workspace has dirty input. It returns `JobResult.status=failed` with workspace descriptor evidence. A3 should not rely on running the command and deciding later.
+
+### First Implementation Slice
+
+Do not move full Portal execution yet. Split implementation into three commits:
+
+1. Contract only: implemented.
+   - Add Ruby domain model for `AgentWorkspaceRequest`.
+   - Add optional `workspace_request` to `AgentJobRequest` and persisted JSON.
+   - Add Go contract structs for `workspace_request`.
+   - Add roundtrip tests.
+2. Materializer unit:
+   - Add agent-side materializer for `local_git` alias + `worktree_detached`.
+   - Materializer API has `prepare` and `cleanup` so tests and smoke can remove worktrees deterministically.
+   - Use agent config to resolve source aliases and workspace root.
+3. HTTP smoke:
+   - Add an HTTP smoke where `AgentJobRequest` has `workspace_request`, the agent creates the worktree, runs `sh`, writes a worker result, and returns `AgentWorkspaceDescriptor`.
+
+The next implementation step is only the contract-only commit.
+
+### Non-Goals For This Slice
+
+- Do not run Maven/Portal verification.
+- Do not support remote Git auth.
+- Do not support clone/fetch from arbitrary network remotes.
+- Do not support production cleanup/quarantine execution yet; only add enough materializer cleanup API for tests and smoke to remove created worktrees.
+- Do not remove same-path gateway until agent materialization is proven through canary.
+
+### Open Review Questions
+
+- How should runtime profile config be distributed to host-installed agents?
+- Should `command_working_dir` be added later, or is workspace root sufficient for all worker protocol commands?
+
 ## Review Questions
 
 - Is synchronous polling acceptable for the first slice, or should phase completion become async before worker gateway integration?
