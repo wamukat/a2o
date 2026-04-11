@@ -22,7 +22,7 @@ module A3
         authorize(http_request)
         http_request.body = JSON.generate(request.request_form)
         response = Net::HTTP.start(uri.hostname, uri.port) { |http| http.request(http_request) }
-        raise "enqueue failed: HTTP #{response.code} #{response.body}" unless response.code == "201"
+        raise response_error("enqueue", response) unless response.code == "201"
 
         A3::Domain::AgentJobRecord.from_persisted_form(JSON.parse(response.body).fetch("job"))
       end
@@ -32,7 +32,7 @@ module A3
         request = Net::HTTP::Get.new(uri)
         authorize(request)
         response = Net::HTTP.start(uri.hostname, uri.port) { |http| http.request(request) }
-        raise "fetch failed: HTTP #{response.code} #{response.body}" unless response.code == "200"
+        raise response_error("fetch", response) unless response.code == "200"
 
         A3::Domain::AgentJobRecord.from_persisted_form(JSON.parse(response.body).fetch("job"))
       end
@@ -48,6 +48,10 @@ module A3
 
       def authorize(request)
         request["authorization"] = "Bearer #{@auth_token}" unless @auth_token.empty?
+      end
+
+      def response_error(operation, response)
+        "#{operation} failed: HTTP #{response.code}"
       end
     end
   end

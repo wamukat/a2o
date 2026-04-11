@@ -46,6 +46,24 @@ RSpec.describe A3::Infra::AgentControlPlaneClient do
     secured_thread&.join(2)
   end
 
+  it "redacts failed response bodies from raised errors" do
+    secured_handler = A3::Infra::AgentHttpPullHandler.new(
+      job_store: job_store,
+      control_auth_token: "control-token"
+    )
+    secured_server = A3::Infra::AgentHttpPullServer.new(handler: secured_handler, port: 0)
+    secured_thread = Thread.new { secured_server.start }
+
+    client = described_class.new(base_url: "http://127.0.0.1:#{secured_server.bound_port}")
+
+    expect do
+      client.enqueue(agent_job_request("job-1"))
+    end.to raise_error(RuntimeError, /\Aenqueue failed: HTTP 401\z/)
+  ensure
+    secured_server&.shutdown
+    secured_thread&.join(2)
+  end
+
   def agent_job_request(job_id)
     A3::Domain::AgentJobRequest.new(
       job_id: job_id,

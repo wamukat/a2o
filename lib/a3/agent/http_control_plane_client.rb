@@ -20,7 +20,7 @@ module A3
         response = Net::HTTP.start(uri.hostname, uri.port) { |http| http.request(request) }
         return nil if response.code == "204"
 
-        raise "claim_next failed: HTTP #{response.code} #{response.body}" unless response.code == "200"
+        raise response_error("claim_next", response) unless response.code == "200"
 
         A3::Domain::AgentJobRequest.from_request_form(JSON.parse(response.body).fetch("job"))
       end
@@ -32,7 +32,7 @@ module A3
         authorize(request)
         request.body = content
         response = Net::HTTP.start(uri.hostname, uri.port) { |http| http.request(request) }
-        raise "upload_artifact failed: HTTP #{response.code} #{response.body}" unless response.code == "201"
+        raise response_error("upload_artifact", response) unless response.code == "201"
 
         A3::Domain::AgentArtifactUpload.from_persisted_form(JSON.parse(response.body).fetch("artifact"))
       end
@@ -44,7 +44,7 @@ module A3
         authorize(request)
         request.body = JSON.generate(result.result_form)
         response = Net::HTTP.start(uri.hostname, uri.port) { |http| http.request(request) }
-        raise "submit_result failed: HTTP #{response.code} #{response.body}" unless response.code == "200"
+        raise response_error("submit_result", response) unless response.code == "200"
 
         true
       end
@@ -60,6 +60,10 @@ module A3
 
       def authorize(request)
         request["authorization"] = "Bearer #{@auth_token}" unless @auth_token.empty?
+      end
+
+      def response_error(operation, response)
+        "#{operation} failed: HTTP #{response.code}"
       end
     end
   end

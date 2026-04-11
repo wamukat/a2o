@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -124,6 +125,26 @@ func TestHTTPClientReloadsBearerTokenFromFile(t *testing.T) {
 	}
 	if _, err := client.ClaimNext("host-local"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestHTTPClientRedactsErrorResponseBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"secret-token leaked"}`))
+	}))
+	defer server.Close()
+
+	client := HTTPClient{BaseURL: server.URL}
+	_, err := client.ClaimNext("host-local")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if strings.Contains(err.Error(), "secret-token") || strings.Contains(err.Error(), "leaked") {
+		t.Fatalf("error leaked response body: %s", err)
+	}
+	if !strings.Contains(err.Error(), "HTTP 401") {
+		t.Fatalf("error = %s", err)
 	}
 }
 

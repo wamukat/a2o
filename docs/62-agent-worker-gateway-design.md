@@ -257,6 +257,8 @@ The first HTTP pull transport remains dev/local oriented. It exposes job request
 
 As a minimum hardening step, the control plane and agents support optional bearer tokens. A3 `agent-server` accepts an agent token (`--agent-token`, `--agent-token-file`, `A3_AGENT_TOKEN`, `A3_AGENT_TOKEN_FILE`) for agent-side pull/upload/result endpoints and an optional control token (`--agent-control-token`, `--agent-control-token-file`, `A3_AGENT_CONTROL_TOKEN`, `A3_AGENT_CONTROL_TOKEN_FILE`) for A3-side enqueue/fetch endpoints. If no control token is configured, control endpoints fall back to the agent token for local/backward-compatible operation. Go `a3-agent` reads profile `agent_token_file` / `agent_token`, `A3_AGENT_TOKEN_FILE`, `A3_AGENT_TOKEN`, `-agent-token-file`, or `-agent-token`; A3-side `agent-http` gateway clients use the control token options and fall back to agent token options when no control token is configured. When configured, all pull API calls must include `Authorization: Bearer <token>`. Prefer token files for service manager / container operation so the token is not exposed through process arguments. Long-running `a3-agent` and `a3 agent-server` reload token files for each request, so rotation can be performed by atomically replacing the token file without restarting the process.
 
+Client-side transport errors are intentionally redacted: Ruby and Go control-plane clients report operation name and HTTP status only, not raw response bodies. This keeps unexpected proxy/server bodies, malformed job payloads, and environment values out of local exception strings while preserving enough status for operator diagnosis.
+
 ## Agent-Owned Workspace Materialization
 
 Status: design review target.

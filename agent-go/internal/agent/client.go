@@ -166,6 +166,6 @@ func (c HTTPClient) client() *http.Client {
 }
 
 func responseError(operation string, resp *http.Response) error {
-	body, _ := io.ReadAll(resp.Body)
-	return fmt.Errorf("%s failed: HTTP %d %s", operation, resp.StatusCode, strings.TrimSpace(string(body)))
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return fmt.Errorf("%s failed: HTTP %d", operation, resp.StatusCode)
 }
