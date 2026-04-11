@@ -1,10 +1,10 @@
-# A3-v2 Bounded Context and Ubiquitous Language
+# A3 Bounded Context and Ubiquitous Language
 
-対象読者: A3-v2 設計者 / 実装者 / reviewer
+対象読者: A3 設計者 / 実装者 / reviewer
 文書種別: 設計メモ
-対応 ticket: `A3-v2#3023`
+対応 ticket: `A3-v2#3023` (historical ref)
 
-この文書は、A3-v2 の用語と bounded context を先に固定するためのもの。
+この文書は、A3 の用語と bounded context を先に固定するためのもの。
 後続の core domain model、workspace model、evidence model、Ruby 実装は、この文書の語彙と境界を前提にする。
 
 ## 1. 目的
@@ -15,15 +15,15 @@
 
 ## 2. 設計姿勢
 
-A3-v2 では、用語を「コードの都合」ではなく「ドメインの意味」で定義する。
+A3 では、用語を「コードの都合」ではなく「ドメインの意味」で定義する。
 
 - 先に意味を固定し、その後で class/module/file 名を合わせる
 - phase ごとの便宜的な救済分岐を domain language に持ち込まない
-- V1 の `inspection` や `integration_judgment` のような語は、必要なら移行メモにだけ残し、V2 の主要語彙には採用しない
+- 旧 A3 の `inspection` や `integration_judgment` のような語は、必要なら移行メモにだけ残し、A3 の主要語彙には採用しない
 
 ## 3. Context Map
 
-現時点では、A3-v2 の主要 context を次の 4 つに分ける。
+現時点では、A3 の主要 context を次の 4 つに分ける。
 
 ### 3.1 Task Execution Context
 

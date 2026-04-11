@@ -1,10 +1,10 @@
-# A3-v2 Project Surface and Presets
+# A3 Project Surface and Presets
 
-対象読者: A3-v2 設計者 / PJ manifest 設計者 / 実装者
+対象読者: A3 設計者 / PJ manifest 設計者 / 実装者
 文書種別: 設計メモ
-対応 ticket: `A3-v2#3026`
+対応 ticket: `A3-v2#3026` (historical ref)
 
-この文書は、A3-v2 における PJ 固有知識の表現面を最小集合に絞り、
+この文書は、A3 における PJ 固有知識の表現面を最小集合に絞り、
 巨大な product surface にならないようにするためのもの。
 
 ## 1. 目的

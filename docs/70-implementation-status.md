@@ -3,7 +3,7 @@
 ## 目的
 
 このドキュメントは、A3 Engine で実装すべき機能の全体像と、各機能の現在の完成状態をチェックリストで管理するためのものです。
-旧 `a3-v2` から current `a3-engine` へ seed 済みの implementation status を管理する。
+旧 `a3-v2` から current `a3-engine` へ seed 済みの implementation status を管理する。2026-04-11 時点で `a3-v2/` source tree と legacy automation scripts は削除済みであり、現行正本は `a3-engine` と root `scripts/a3` である。
 
 - 設計方針の正本: `docs/75-engine-redesign.md`
 - cutover / naming plan の正本: `docs/80-a3engine-reseed-and-naming-cutover-plan.md`
@@ -12,10 +12,10 @@
 
 ## 読み方
 
-- この文書は reseed 前の `a3-engine` 実装証跡を future base 側へ持ち込むための seeded status である
+- この文書は reseed 前の `a3-engine` 実装証跡を current base 側へ持ち込むための seeded status である
 - `a3_engine/*` や `scripts/a3/run.py` などの Python path / command は、cutover 前の implementation provenance を保持するために残している
 - current operator entrypoint や live runtime の正本は `docs/60-container-distribution-and-project-runtime.md` と root の `task a3:*` / `scripts/a3/*.rb` を参照する
-- cutover 実行 slice が進んだら、この文書中の evidence も新 `/a3-engine` surface に合わせて更新する
+- cutover 実行 slice は進行済みであり、この文書中の Python path / old command は provenance としてだけ残す。current operator surface は root `task a3:*` / `scripts/a3/*.rb` と `/a3-engine` 側 docs を参照する
 
 ## ステータスの見方
 
@@ -186,8 +186,8 @@
   根拠: root `Taskfile.yml`
 
 - [x] root docs/skills migration
-  現状: root `README.md` / `AGENTS.md` / legacy automation skills を A3 前提の責務分担へ追従済み。
-  根拠: root `README.md`, root `AGENTS.md`, `.agents/skills/automation-*.md`
+  現状: root `README.md` / `AGENTS.md` を A3 前提の責務分担へ追従済み。legacy automation skills は削除済みで、現行運用 skill は kanban / scheduler / pre-commit 系に寄せた。
+  根拠: root `README.md`, root `AGENTS.md`, `.agents/skills/*`
 
 ## 直近の優先実装順
 

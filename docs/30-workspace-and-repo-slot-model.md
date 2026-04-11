@@ -1,10 +1,10 @@
-# A3-v2 Workspace and Repo-Slot Model
+# A3 Workspace and Repo-Slot Model
 
-対象読者: A3-v2 設計者 / 実装者
+対象読者: A3 設計者 / 実装者
 文書種別: 設計メモ
-対応 ticket: `A3-v2#3025`
+対応 ticket: `A3-v2#3025` (historical ref)
 
-この文書は、A3-v2 の workspace topology、repo slot、同期方針、freshness、retention/GC を固定するためのもの。
+この文書は、A3 の workspace topology、repo slot、同期方針、freshness、retention/GC を固定するためのもの。
 V1 の `support clone + bridge healing` を不要化し、phase ごとの path ぶれや存在判定漏れを防ぐ。
 
 ## 1. 目的
@@ -46,7 +46,7 @@ ticket-workspace/
 
 ### 3.2 Runtime Workspace
 
-A3-v2 では execution 専用の runtime workspace を持ちうるが、phase ごとに topology を変えない。
+A3 では execution 専用の runtime workspace を持ちうるが、phase ごとに topology を変えない。
 
 - ticket workspace
   - source-of-truth を保持する作業面

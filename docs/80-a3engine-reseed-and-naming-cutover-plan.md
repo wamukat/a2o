@@ -2,8 +2,8 @@
 
 ## 目的
 
-この文書は、current A3-v2 を新しい `A3Engine` として入れ直し、`v2` 呼称を廃止する cutover の実行計画を整理するためのものです。
-current `a3-v2` を future `a3-engine` base として seed するため、`a3-engine/docs/a3engine-reseed-and-naming-cutover-plan.md` を取り込んだ current copy として扱う。
+この文書は、旧 A3-v2 を current `A3Engine` として入れ直し、`v2` 呼称を廃止する cutover の実行計画と残件を整理するためのものです。
+2026-04-11 時点で、current source は `a3-engine` 側へ seed 済みであり、`a3-v2/` source tree と legacy automation scripts は削除済みである。
 
 - 対象読者: 製品開発者
 - 文書種別: 設計 / 手順
@@ -14,31 +14,32 @@ current `a3-v2` を future `a3-engine` base として seed するため、`a3-en
 - `Kanboard baseline` は完了している
 - Redmine backend 実験は破棄済みで、historical baseline backend は Kanboard、current generic default backend は SoloBoard である
 - next の backend migration target は SoloBoard であり、Docker/runtime packaging は SoloBoard parity judgment の後に行う
-- 現行 `a3-engine` は、そのまま上書きせず `a3-engine-legacy` として退避してから新しい `a3-engine` を作る
+- 現行 `a3-engine` は旧実装の退避後に新しい current source として利用する
 - packaging freeze 入力として、current generic operator default は SoloBoard、`task a3:portal:cutover:doctor` / `:observe` は current mainline 観測入口、`task a3:portal:bundle:*` は local compose bundle spike、Kanboard は explicit compatibility path として扱う
 
 ## 進め方
 
-1. 現行 `a3-engine` を `a3-engine-legacy` に rename して退避する
-2. current A3-v2 を新しい `a3-engine` として seed する
-3. `v2` / `a3-v2` / `A3-v2` を runtime / docs / kanban / operator surface から除去する
-4. cutover 完了後に `a3-engine-legacy` の archive / 削除判断を行う
+1. 完了: 現行 `a3-engine` を旧実装から current source へ切り替えた
+2. 完了: 旧 `a3-v2` source を新しい `a3-engine` として seed した
+3. 進行中: `v2` / `a3-v2` / `A3-v2` を runtime / docs / kanban / operator surface から除去する
+4. 進行中: current docs に残る旧名称は historical ref / migration note に限定する
+5. 次段: SoloBoard + A3 runtime + `a3-agent` の配布導線、service 化、retention hardening を閉じる
 
 ## 実施項目
 
-### 1. Legacy 退避
+### 1. Legacy 退避 (完了)
 
 - 現行 `/a3-engine` を `/a3-engine-legacy` へ rename する
 - root Taskfile, launcher, script が旧 path を直参照していないことを先に確認する
 - rename 後も設計確認に必要な文書へ到達できることを確認する
 
-### 2. New Seed
+### 2. New Seed (完了)
 
-- current A3-v2 の内容を新しい `/a3-engine` へ配置する
+- 旧 A3-v2 の内容を新しい `/a3-engine` へ配置済み
 - `bin`, `lib`, `docs`, `spec`, `config` など、A3 本体として必要な構成を整理する
 - root 側から見た正規 entrypoint が新 `/a3-engine` を向くことを確認する
 
-### 3. Naming Cutover
+### 3. Naming Cutover (進行中)
 
 - repo / directory 名
   - `a3-v2`
@@ -60,7 +61,7 @@ Cutover target:
 - current scheduler label の正規名称は `dev.a3.portal.scheduler` とする
 - `portal-v2` / `a3-v2` を含む command / path / label は compatibility 名として残さない
 
-### 4. Legacy Judgment
+### 4. Legacy Judgment (進行中)
 
 - `a3-engine-legacy` に残すもの
   - cutover 直後の rollback に必要な最小限の退避資産
@@ -68,6 +69,14 @@ Cutover target:
   - 履歴喪失前に別保管すべき設計文書
 - 削除対象
   - 正規運用から外れ、参照先としても不要になった互換資産
+
+2026-04-11 時点の判断:
+
+- `a3-v2/` source tree と `.agents/skills/a3-v2-checkpoint-review` は削除済み
+- `scripts/automation/*` と legacy automation skills/runbook は削除済み
+- root `task automation*` は legacy disabled sentinel としてだけ残す
+- current runtime / operator surface は `task a3:*`, `scripts/a3/*.rb`, `a3-engine` を正規とする
+- Kanboard compatibility path は explicit compatibility / historical path として扱い、current generic default は SoloBoard とする
 
 ## Rename Inventory
 
@@ -235,7 +244,7 @@ Checkpoint:
 
 ### Phase 3. New Seed
 
-- current A3-v2 の内容を新 `/a3-engine` として配置する
+- 旧 A3-v2 の内容を新 `/a3-engine` として配置済み
 - `bin`, `lib`, `docs`, `spec`, `config` の必要構成を揃える
 - root 側の実行入口から、新 `/a3-engine` を参照できるようにする
 
@@ -593,12 +602,14 @@ Stop:
 - archive 整理の残件
 - historical docs の wording cleanup
 - current 導線に影響しない軽微な rename 漏れ
+- historical `A3-v2#...` ticket ref
 
 ### Not Allowed As Residual
 
 - current operator surface に残る旧名称依存
 - current runtime storage / launch target の未整理
 - cutover acceptance を再判定させるレベルの不整合
+- `a3-v2/` source tree や legacy automation scripts を current 実行経路として復活させること
 
 ### Tracking
 
@@ -624,11 +635,11 @@ Stop:
 - `.work/a3/*`
   - current scheduler / state / workspaces / results / logs / repos / live-targets のうち、runtime 継続に必須なものと再生成可能なものを分ける
 - `.work/a3-v2/*`
-  - historical runtime state / old scheduler store / direct repo sources / quarantine を archive 対象とするか即 delete 対象とするか判断する
+  - historical runtime state / old scheduler store / direct repo sources / quarantine は current runtime では使わない。disk pressure 時は delete 対象とし、必要な historical evidence は git history / docs に委ねる
 - `.work/cache/*`
   - `m2-seed` などの bootstrap cache を、再生成前提で delete 可能にするか、size cap を持つ shared cache として残すかを決める
 - `.work/automation/*`
-  - legacy automation logs / issue workspace / codex-home を current A3 導線から切り離し、archive/delete policy を決める
+  - legacy automation logs / issue workspace / codex-home は current A3 導線から切り離し済み。残存していれば delete 対象とする
 - project-local build outputs under current workspaces
   - `target/`, local `.work/m2/repository`, generated reports を task terminal cleanup の対象に含めるか、rerun/recovery 用 evidence として一定期間保持するかを決める
 - non-current side systems
@@ -640,7 +651,7 @@ Stop:
 - blocked diagnosis / rerun investigation に必要な最小証跡は何か
 - `results`, `logs`, `quarantine`, `workspaces`, `m2 cache` に age / size / count のどの retention rule を掛けるべきか
 - terminal task 完了時に即削除するものと、operator 明示 command でだけ削除するものをどう分けるか
-- `.work/a3-v2/*` や legacy automation 資産を、cutover sign-off 後に archive へ移すか delete するか
+- `.work/a3-v2/*` や legacy automation 資産の残骸が残っていないか、disk pressure 時に再棚卸しする必要があるか
 - disk pressure を検知したときの fail-fast / warning / auto-cleanup のどこまでを A3 本体責務にするか
 
 ### Expected Outputs
@@ -649,14 +660,14 @@ Stop:
 - `.work` cleanup command inventory
 - retention policy の設計メモ
 - follow-up task refs
-  - terminal cleanup 実装
-  - historical `.work/a3-v2/*` archive/delete
+  - artifact store / logs / blocked diagnosis evidence retention の長時間運用検証
+  - historical `.work/a3-v2/*` / `.work/automation/*` 残骸の delete 確認
   - cache/log size cap
 - current 進捗メモ
   - root cleanup は current scheduler quarantine (`.work/a3/portal-kanban-scheduler-auto/quarantine/*`) と legacy results/logs に age+count+size retention を掛けられる状態まで進めた
   - disposable cache (`.work/cache/m2-seed`) と quarantined build outputs (`target/`, `.work/m2/repository`, generated reports) も age+size で候補化できる
   - scheduler-loop は idle 到達後に quarantine と terminal workspace cleanup を自動実行する
-  - 次段の未完は `.work` 全体棚卸し
+  - 次段の未完は artifact/log/evidence retention と `.work` 全体の長時間運用検証
 
 ### Current `.work` Inventory Snapshot
 
@@ -724,32 +735,31 @@ Stop:
 
 ### Step 1. Legacy Rename
 
-- `/a3-engine` を `/a3-engine-legacy` に rename する
-- `a3-engine-legacy` で docs が読めることを確認する
-- root から旧 path を前提にした実行が残っていないか spot check する
+- 完了済み。旧実装の退避と current `a3-engine` seed は実施済み
+- root から旧 path を前提にした current 実行が残っていないかは継続 spot check 対象
 
 Go:
 
-- `/a3-engine-legacy` が存在する
-- rollback で `/a3-engine` に戻せる
+- current `a3-engine` が存在する
+- root operator surface が current `a3-engine` を参照する
 
 Stop:
 
-- rename 直後に docs / path 参照が壊れる
+- current operator surface から `a3-v2/` を要求する参照が見つかる
 
 Rollback:
 
-- `/a3-engine-legacy` を `/a3-engine` に戻す
+- rollback は想定しない。旧資産は git history / cutover evidence から辿る
 
 ### Step 2. New Seed
 
-- current A3-v2 から新 `/a3-engine` を作る
-- `docs`, `bin`, `lib`, `spec`, `config` の必要構成を揃える
+- 完了済み。旧 A3-v2 由来の current source は `/a3-engine` 側へ配置済み
+- `docs`, `bin`, `lib`, `spec`, `config` の必要構成を current source として維持する
 - root から新 `/a3-engine` の主要 entrypoint を解決できるか確認する
 
 Go:
 
-- 新 `/a3-engine` が存在する
+- current `/a3-engine` が存在する
 - 主要 entrypoint の path 解決が通る
 
 Stop:
@@ -759,7 +769,7 @@ Stop:
 
 Rollback:
 
-- 新 `/a3-engine` を退避または削除し、`/a3-engine-legacy` を `/a3-engine` に戻す
+- rollback は想定しない。破損時は current `/a3-engine` を通常の git revert / fix-forward で修正する
 
 ### Step 3. Surface Rename
 
@@ -806,7 +816,8 @@ Rollback:
 
 ## 完了条件
 
-- `a3-engine -> a3-engine-legacy` 退避手順と rollback 条件が文書化されている
-- current A3-v2 から新 `/a3-engine` を作る手順が文書化されている
-- `v2` 呼称廃止の rename inventory が揃っている
-- cutover 前に退避すべき文書と archive / 削除対象が区別されている
+- current `/a3-engine` が正規 source として使われている
+- `v2` 呼称廃止の rename inventory が揃い、current 実行経路から旧名称が除去されている
+- `a3-v2/` source tree と legacy automation scripts が current 資産として残っていない
+- current docs に残る `A3-v2` は historical ticket ref / migration note に限定されている
+- 次段の配布計画が SoloBoard + A3 runtime + `a3-agent` 前提へ整理されている
