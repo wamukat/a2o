@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -47,6 +48,89 @@ func TestWorkerUploadsLogsArtifactsAndResult(t *testing.T) {
 	}
 }
 
+func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	request := testRequest(".")
+	request.Phase = "implementation"
+	request.SourceDescriptor.WorkspaceKind = "ticket_workspace"
+	request.WorkspaceRequest = ptr(testWorkspaceRequest("member-portal-starters"))
+	request.WorkspaceRequest.CleanupPolicy = "cleanup_after_job"
+	request.WorkerProtocolRequest = map[string]any{
+		"task_ref": "Portal#42",
+		"phase":    "implementation",
+	}
+	client := &fakeClient{request: &request}
+
+	result, idle, err := Worker{
+		AgentName: "host-local",
+		Client:    client,
+		Executor:  workerProtocolExecutor{},
+		Materializer: WorkspaceMaterializer{
+			WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+			SourceAliases: map[string]string{
+				"member-portal-starters": sourceRoot,
+			},
+		},
+		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+	}.RunOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idle {
+		t.Fatal("expected job result, got idle")
+	}
+	if result.WorkspaceDescriptor.WorkspaceID != "Portal-42-ticket" {
+		t.Fatalf("unexpected workspace descriptor: %#v", result.WorkspaceDescriptor)
+	}
+	if result.WorkerProtocolResult["status"] != "succeeded" {
+		t.Fatalf("missing worker protocol result: %#v", result.WorkerProtocolResult)
+	}
+	if roles := uploadRoles(client.uploads); !bytes.Equal([]byte(roles), []byte("combined-log,worker-result")) {
+		t.Fatalf("unexpected upload roles: %s", roles)
+	}
+	if _, err := os.Stat(filepath.Join(tmp, "agent-workspaces", "Portal-42-ticket")); !os.IsNotExist(err) {
+		t.Fatalf("workspace was not cleaned up: %v", err)
+	}
+}
+
+func TestWorkerSubmitsFailedResultWhenMaterializationFails(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	if err := os.WriteFile(filepath.Join(sourceRoot, "dirty.txt"), []byte("dirty\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	request := testRequest(".")
+	request.SourceDescriptor.WorkspaceKind = "ticket_workspace"
+	request.WorkspaceRequest = ptr(testWorkspaceRequest("member-portal-starters"))
+	client := &fakeClient{request: &request}
+
+	result, idle, err := Worker{
+		AgentName: "host-local",
+		Client:    client,
+		Executor:  failingExecutor{},
+		Materializer: WorkspaceMaterializer{
+			WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+			SourceAliases: map[string]string{
+				"member-portal-starters": sourceRoot,
+			},
+		},
+		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+	}.RunOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idle {
+		t.Fatal("expected failed job result, got idle")
+	}
+	if result.Status != "failed" || result.ExitCode == nil || *result.ExitCode != 1 {
+		t.Fatalf("unexpected failed result: %#v", result)
+	}
+	if client.result == nil || client.result.Status != "failed" {
+		t.Fatalf("failed result was not submitted: %#v", client.result)
+	}
+}
+
 func TestWorkerReturnsIdleWithoutJob(t *testing.T) {
 	_, idle, err := Worker{
 		AgentName: "host-local",
@@ -70,6 +154,42 @@ func (fakeExecutor) Execute(JobRequest) ExecutionResult {
 		ExitCode:    &code,
 		CombinedLog: []byte("all checks passed\n"),
 	}
+}
+
+type workerProtocolExecutor struct{}
+
+func (workerProtocolExecutor) Execute(request JobRequest) ExecutionResult {
+	content, err := os.ReadFile(request.Env["A3_WORKER_REQUEST_PATH"])
+	if err != nil {
+		code := 1
+		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(content, &payload); err != nil {
+		code := 1
+		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
+	}
+	result := map[string]any{
+		"status":   "succeeded",
+		"task_ref": payload["task_ref"],
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		code := 1
+		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
+	}
+	if err := os.WriteFile(request.Env["A3_WORKER_RESULT_PATH"], encoded, 0o600); err != nil {
+		code := 1
+		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
+	}
+	code := 0
+	return ExecutionResult{Status: "succeeded", ExitCode: &code, CombinedLog: []byte("worker protocol ok\n")}
+}
+
+type failingExecutor struct{}
+
+func (failingExecutor) Execute(JobRequest) ExecutionResult {
+	panic("executor must not run")
 }
 
 type fakeClient struct {
@@ -130,4 +250,19 @@ func TestSafeID(t *testing.T) {
 	if bytes.ContainsAny([]byte(got), "#/ ") {
 		t.Fatalf("unsafe id: %s", got)
 	}
+}
+
+func ptr[T any](value T) *T {
+	return &value
+}
+
+func uploadRoles(uploads []ArtifactUpload) string {
+	roles := make([]byte, 0)
+	for index, upload := range uploads {
+		if index > 0 {
+			roles = append(roles, ',')
+		}
+		roles = append(roles, upload.Role...)
+	}
+	return string(roles)
 }

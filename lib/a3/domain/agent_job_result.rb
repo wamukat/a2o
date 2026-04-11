@@ -1,14 +1,18 @@
 # frozen_string_literal: true
 
+require "json"
+
 module A3
   module Domain
     class AgentJobResult
       STATUSES = %i[succeeded failed timed_out cancelled stale].freeze
+      MAX_WORKER_PROTOCOL_PAYLOAD_BYTES = 1024 * 1024
 
       attr_reader :job_id, :status, :exit_code, :started_at, :finished_at, :summary,
                   :log_uploads, :artifact_uploads, :workspace_descriptor, :heartbeat
+      attr_reader :worker_protocol_result
 
-      def initialize(job_id:, status:, exit_code:, started_at:, finished_at:, summary:, log_uploads:, artifact_uploads:, workspace_descriptor:, heartbeat:)
+      def initialize(job_id:, status:, exit_code:, started_at:, finished_at:, summary:, log_uploads:, artifact_uploads:, workspace_descriptor:, heartbeat:, worker_protocol_result: nil)
         @job_id = required_string(job_id, "job_id")
         @status = normalize_status(status)
         @exit_code = exit_code.nil? ? nil : Integer(exit_code)
@@ -18,6 +22,7 @@ module A3
         @log_uploads = normalize_uploads(log_uploads)
         @artifact_uploads = normalize_uploads(artifact_uploads)
         @workspace_descriptor = workspace_descriptor
+        @worker_protocol_result = normalize_optional_json_object(worker_protocol_result, "worker_protocol_result")
         @heartbeat = heartbeat&.to_s
         validate_exit_code!
         freeze
@@ -35,6 +40,7 @@ module A3
           log_uploads: record.fetch("log_uploads"),
           artifact_uploads: record.fetch("artifact_uploads"),
           workspace_descriptor: AgentWorkspaceDescriptor.from_persisted_form(record.fetch("workspace_descriptor")),
+          worker_protocol_result: record["worker_protocol_result"],
           heartbeat: record["heartbeat"]
         )
       end
@@ -50,6 +56,7 @@ module A3
           "log_uploads" => log_uploads.map(&:persisted_form),
           "artifact_uploads" => artifact_uploads.map(&:persisted_form),
           "workspace_descriptor" => workspace_descriptor.persisted_form,
+          "worker_protocol_result" => worker_protocol_result,
           "heartbeat" => heartbeat
         }.compact
       end
@@ -93,6 +100,16 @@ module A3
         Array(value).map do |upload|
           upload.is_a?(AgentArtifactUpload) ? upload : AgentArtifactUpload.from_persisted_form(upload)
         end.freeze
+      end
+
+      def normalize_optional_json_object(value, name)
+        return nil if value.nil?
+        raise ConfigurationError, "#{name} must be a JSON object" unless value.is_a?(Hash)
+
+        encoded = JSON.generate(value)
+        raise ConfigurationError, "#{name} exceeds #{MAX_WORKER_PROTOCOL_PAYLOAD_BYTES} bytes" if encoded.bytesize > MAX_WORKER_PROTOCOL_PAYLOAD_BYTES
+
+        JSON.parse(encoded).freeze
       end
 
       def validate_exit_code!

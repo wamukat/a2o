@@ -87,10 +87,18 @@ RSpec.describe A3::Domain::AgentJobResult do
       ],
       artifact_uploads: [],
       workspace_descriptor: workspace_descriptor,
+      worker_protocol_result: {
+        status: "succeeded",
+        task_ref: "Portal#42"
+      },
       heartbeat: nil
     )
 
     expect(described_class.from_result_form(result.result_form)).to eq(result)
+    expect(result.result_form.fetch("worker_protocol_result")).to eq(
+      "status" => "succeeded",
+      "task_ref" => "Portal#42"
+    )
   end
 
   it "rejects local path-only log and artifact result fields" do

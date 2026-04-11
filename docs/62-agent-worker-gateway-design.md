@@ -312,10 +312,32 @@ Do not move full Portal execution yet. Split implementation into three commits:
    - Add agent-side materializer for `local_git` alias + `worktree_detached`.
    - Materializer API has `prepare` and `cleanup` so tests and smoke can remove worktrees deterministically.
    - Use agent config to resolve source aliases and workspace root.
-3. HTTP smoke:
-   - Add an HTTP smoke where `AgentJobRequest` has `workspace_request`, the agent creates the worktree, runs `sh`, writes a worker result, and returns `AgentWorkspaceDescriptor`.
+3. Worker protocol transport contract:
+   - Add an agent-owned way to carry the worker request into the materialized workspace.
+   - Add an agent-owned way to carry the worker result back to A3 without relying on same-path filesystem reads.
+4. HTTP smoke:
+   - Add an HTTP smoke where `AgentJobRequest` has `workspace_request`, the agent creates the worktree, writes worker protocol files under the materialized workspace root, runs `sh`, uploads the worker result evidence, and returns `AgentWorkspaceDescriptor`.
 
-The next implementation step is only the contract-only commit.
+The next implementation step is the worker protocol transport contract and worker-loop integration design. Directly wiring the materializer into the worker loop is not sufficient because the current worker protocol still assumes A3 can write `.a3/worker-request.json` and read `.a3/worker-result.json` through a shared path.
+
+### Worker Loop Integration With Agent-Owned Workspace
+
+The Go agent worker loop should have two execution modes:
+
+- If `workspace_request` is absent, keep the existing command job behavior. Execute `working_dir` directly, upload artifacts from `working_dir`, and report a single `primary` slot descriptor.
+- If `workspace_request.mode=agent_materialized`, prepare the workspace through the agent-side materializer before command execution. The command working directory becomes the prepared workspace root, and artifact rules are evaluated relative to that root.
+
+Materialization failure is a completed failed job, not a claimed job that never reports. The agent must submit `JobResult.status=failed`, `exit_code=1`, a diagnostic combined log, and any available workspace descriptor evidence.
+
+The worker protocol needs one additional transport slice before the materialized mode can replace `same-path`:
+
+- A3 must not pre-write `.a3/worker-request.json` into an A3-local workspace when the agent owns the workspace.
+- The job request must carry the worker protocol request payload, or a named artifact the agent can fetch, so the agent can write `.a3/worker-request.json` under the prepared workspace root immediately before command execution.
+- The agent must set `A3_WORKER_REQUEST_PATH`, `A3_WORKER_RESULT_PATH`, and `A3_WORKSPACE_ROOT` to paths under the prepared workspace root, overriding any stale values in `env`.
+- The agent must return `.a3/worker-result.json` to A3 as first-class evidence after command execution. A3 must build the final phase `ExecutionResult` from that worker result, not from generic command success.
+- The first implementation returns the worker result in two forms: a bounded inline `worker_protocol_result` field in `AgentJobResult` for synchronous phase parsing, and an uploaded artifact with reserved role `worker-result` for durable evidence. The initial inline payload limit is 1 MiB; invalid or oversized worker result JSON is still uploaded as evidence, but omitted from the inline field.
+
+Configured `artifact_rules` in materialized mode are evaluated relative to the prepared workspace root after worker-result capture. Cleanup must occur only after worker-result capture, configured artifact uploads, and result submission attempts complete. For the first smoke, use a cleanup policy that allows deterministic test cleanup while still preserving enough uploaded evidence for A3 to parse the worker result.
 
 ### Non-Goals For This Slice
 
@@ -329,6 +351,7 @@ The next implementation step is only the contract-only commit.
 
 - How should runtime profile config be distributed to host-installed agents?
 - Should `command_working_dir` be added later, or is workspace root sufficient for all worker protocol commands?
+- Is the initial 1 MiB worker protocol payload limit sufficient, or should the control-plane add separate body limits per endpoint?
 
 ## Review Questions
 

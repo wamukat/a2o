@@ -8,18 +8,19 @@ type SourceDescriptor struct {
 }
 
 type JobRequest struct {
-	JobID            string              `json:"job_id"`
-	TaskRef          string              `json:"task_ref"`
-	Phase            string              `json:"phase"`
-	RuntimeProfile   string              `json:"runtime_profile"`
-	SourceDescriptor SourceDescriptor    `json:"source_descriptor"`
-	WorkspaceRequest *WorkspaceRequest   `json:"workspace_request,omitempty"`
-	WorkingDir       string              `json:"working_dir"`
-	Command          string              `json:"command"`
-	Args             []string            `json:"args"`
-	Env              map[string]string   `json:"env"`
-	TimeoutSeconds   int                 `json:"timeout_seconds"`
-	ArtifactRules    []map[string]string `json:"artifact_rules"`
+	JobID                 string              `json:"job_id"`
+	TaskRef               string              `json:"task_ref"`
+	Phase                 string              `json:"phase"`
+	RuntimeProfile        string              `json:"runtime_profile"`
+	SourceDescriptor      SourceDescriptor    `json:"source_descriptor"`
+	WorkspaceRequest      *WorkspaceRequest   `json:"workspace_request,omitempty"`
+	WorkerProtocolRequest map[string]any      `json:"worker_protocol_request,omitempty"`
+	WorkingDir            string              `json:"working_dir"`
+	Command               string              `json:"command"`
+	Args                  []string            `json:"args"`
+	Env                   map[string]string   `json:"env"`
+	TimeoutSeconds        int                 `json:"timeout_seconds"`
+	ArtifactRules         []map[string]string `json:"artifact_rules"`
 }
 
 type WorkspaceRequest struct {
@@ -62,14 +63,15 @@ type WorkspaceDescriptor struct {
 }
 
 type JobResult struct {
-	JobID               string              `json:"job_id"`
-	Status              string              `json:"status"`
-	ExitCode            *int                `json:"exit_code,omitempty"`
-	StartedAt           string              `json:"started_at"`
-	FinishedAt          string              `json:"finished_at"`
-	Summary             string              `json:"summary"`
-	LogUploads          []ArtifactUpload    `json:"log_uploads"`
-	ArtifactUploads     []ArtifactUpload    `json:"artifact_uploads"`
-	WorkspaceDescriptor WorkspaceDescriptor `json:"workspace_descriptor"`
-	Heartbeat           string              `json:"heartbeat,omitempty"`
+	JobID                string              `json:"job_id"`
+	Status               string              `json:"status"`
+	ExitCode             *int                `json:"exit_code,omitempty"`
+	StartedAt            string              `json:"started_at"`
+	FinishedAt           string              `json:"finished_at"`
+	Summary              string              `json:"summary"`
+	LogUploads           []ArtifactUpload    `json:"log_uploads"`
+	ArtifactUploads      []ArtifactUpload    `json:"artifact_uploads"`
+	WorkspaceDescriptor  WorkspaceDescriptor `json:"workspace_descriptor"`
+	WorkerProtocolResult map[string]any      `json:"worker_protocol_result,omitempty"`
+	Heartbeat            string              `json:"heartbeat,omitempty"`
 }

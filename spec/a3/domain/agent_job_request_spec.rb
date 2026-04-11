@@ -76,6 +76,11 @@ RSpec.describe A3::Domain::AgentJobRequest do
       runtime_profile: "host-local",
       source_descriptor: A3::Domain::SourceDescriptor.implementation(task_ref: "Portal#42", ref: "feature/a3"),
       workspace_request: workspace_request,
+      worker_protocol_request: {
+        task_ref: "Portal#42",
+        run_ref: "run-42",
+        phase: "implementation"
+      },
       working_dir: ".",
       command: "ruby",
       args: ["scripts/a3/worker.rb"],
@@ -85,6 +90,11 @@ RSpec.describe A3::Domain::AgentJobRequest do
     )
 
     expect(request.request_form.fetch("workspace_request")).to eq(workspace_request.request_form)
+    expect(request.request_form.fetch("worker_protocol_request")).to eq(
+      "task_ref" => "Portal#42",
+      "run_ref" => "run-42",
+      "phase" => "implementation"
+    )
     expect(described_class.from_request_form(request.request_form)).to eq(request)
   end
 
