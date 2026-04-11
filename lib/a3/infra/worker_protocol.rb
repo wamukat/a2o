@@ -19,43 +19,47 @@ module A3
         }
       end
 
-      def write_request(skill:, workspace:, task:, run:, phase_runtime:, task_packet:)
+      def request_form(skill:, workspace:, task:, run:, phase_runtime:, task_packet:)
         review_target = run.evidence.review_target
+        {
+          "task_ref" => task.ref,
+          "run_ref" => run.ref,
+          "phase" => run.phase.to_s,
+          "skill" => skill,
+          "workspace_kind" => workspace.workspace_kind.to_s,
+          "source_descriptor" => {
+            "workspace_kind" => run.source_descriptor.workspace_kind.to_s,
+            "source_type" => run.source_descriptor.source_type.to_s,
+            "ref" => run.source_descriptor.ref,
+            "task_ref" => run.source_descriptor.task_ref
+          },
+          "scope_snapshot" => {
+            "edit_scope" => run.scope_snapshot.edit_scope.map(&:to_s),
+            "verification_scope" => run.scope_snapshot.verification_scope.map(&:to_s),
+            "ownership_scope" => run.scope_snapshot.ownership_scope.to_s
+          },
+          "artifact_owner" => {
+            "owner_ref" => run.artifact_owner.owner_ref,
+            "owner_scope" => run.artifact_owner.owner_scope.to_s,
+            "snapshot_version" => run.artifact_owner.snapshot_version
+          },
+          "task_packet" => task_packet.request_form,
+          "review_target" => review_target && {
+            "base_commit" => review_target.base_commit,
+            "head_commit" => review_target.head_commit,
+            "task_ref" => review_target.task_ref,
+            "phase_ref" => review_target.phase_ref.to_s
+          },
+          "phase_runtime" => phase_runtime.worker_request_form,
+          "slot_paths" => workspace.slot_paths.transform_keys(&:to_s).transform_values(&:to_s)
+        }
+      end
+
+      def write_request(skill:, workspace:, task:, run:, phase_runtime:, task_packet:)
         metadata_dir = workspace.root_path.join(".a3")
         FileUtils.mkdir_p(metadata_dir)
         metadata_dir.join("worker-request.json").write(
-          JSON.pretty_generate(
-            "task_ref" => task.ref,
-            "run_ref" => run.ref,
-            "phase" => run.phase.to_s,
-            "skill" => skill,
-            "workspace_kind" => workspace.workspace_kind.to_s,
-            "source_descriptor" => {
-              "workspace_kind" => run.source_descriptor.workspace_kind.to_s,
-              "source_type" => run.source_descriptor.source_type.to_s,
-              "ref" => run.source_descriptor.ref,
-              "task_ref" => run.source_descriptor.task_ref
-            },
-            "scope_snapshot" => {
-              "edit_scope" => run.scope_snapshot.edit_scope.map(&:to_s),
-              "verification_scope" => run.scope_snapshot.verification_scope.map(&:to_s),
-              "ownership_scope" => run.scope_snapshot.ownership_scope.to_s
-            },
-            "artifact_owner" => {
-              "owner_ref" => run.artifact_owner.owner_ref,
-              "owner_scope" => run.artifact_owner.owner_scope.to_s,
-              "snapshot_version" => run.artifact_owner.snapshot_version
-            },
-            "task_packet" => task_packet.request_form,
-            "review_target" => review_target && {
-              "base_commit" => review_target.base_commit,
-              "head_commit" => review_target.head_commit,
-              "task_ref" => review_target.task_ref,
-              "phase_ref" => review_target.phase_ref.to_s
-            },
-            "phase_runtime" => phase_runtime.worker_request_form,
-            "slot_paths" => workspace.slot_paths.transform_values(&:to_s)
-          )
+          JSON.pretty_generate(request_form(skill: skill, workspace: workspace, task: task, run: run, phase_runtime: phase_runtime, task_packet: task_packet))
         )
       end
 

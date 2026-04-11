@@ -172,6 +172,93 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     expect(client.records).to be_empty
   end
 
+  it "requires a workspace request builder for agent materialized mode" do
+    gateway = described_class.new(
+      control_plane_client: client,
+      worker_command: "ruby",
+      worker_command_args: ["worker.rb"],
+      runtime_profile: "host-local",
+      shared_workspace_mode: "agent-materialized"
+    )
+
+    execution = run_gateway(gateway)
+
+    expect(execution).to have_attributes(
+      success: false,
+      failing_command: "agent_worker_gateway_config",
+      observed_state: "agent_worker_gateway_invalid_config"
+    )
+    expect(client.records).to be_empty
+  end
+
+  it "enqueues worker protocol payload without writing local worker files in agent materialized mode" do
+    client.on_fetch = lambda do |job_id|
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: {
+            "success" => true,
+            "summary" => "review completed",
+            "task_ref" => task.ref,
+            "run_ref" => review_run.ref,
+            "phase" => "review",
+            "rework_required" => false
+          }
+        )
+      )
+    end
+    gateway = materialized_gateway
+
+    execution = gateway.run(
+      skill: phase_runtime.review_skill,
+      workspace: workspace,
+      task: task,
+      run: review_run,
+      phase_runtime: phase_runtime,
+      task_packet: task_packet
+    )
+
+    request = client.records.values.first.request
+    expect(request.workspace_request).to eq(materialized_workspace_request)
+    expect(request.worker_protocol_request).to include(
+      "task_ref" => task.ref,
+      "run_ref" => review_run.ref,
+      "phase" => "review",
+      "skill" => phase_runtime.review_skill
+    )
+    expect(workspace.root_path.join(".a3", "worker-request.json")).not_to exist
+    expect(execution).to have_attributes(
+      success: true,
+      summary: "review completed"
+    )
+  end
+
+  it "fails closed for successful implementation in agent materialized mode until changed files evidence is designed" do
+    client.on_fetch = lambda do |job_id|
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: worker_success
+        )
+      )
+    end
+    gateway = materialized_gateway
+
+    execution = run_gateway(gateway)
+
+    expect(execution).to have_attributes(
+      success: false,
+      failing_command: "agent_materialized_changed_files",
+      observed_state: "agent_materialized_changed_files_unavailable"
+    )
+  end
+
   it "runs through an HTTP agent server and the Ruby reference agent" do
     job_store = A3::Infra::JsonAgentJobStore.new(File.join(tmpdir, "agent-jobs.json"))
     artifact_store = A3::Infra::FileAgentArtifactStore.new(File.join(tmpdir, "agent-artifacts"))
@@ -233,6 +320,21 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     )
   end
 
+  def materialized_gateway
+    described_class.new(
+      control_plane_client: client,
+      worker_command: "ruby",
+      worker_command_args: ["worker.rb"],
+      runtime_profile: "host-local",
+      shared_workspace_mode: "agent-materialized",
+      timeout_seconds: 30,
+      poll_interval_seconds: 0,
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_seconds) {},
+      workspace_request_builder: ->(**) { materialized_workspace_request }
+    )
+  end
+
   def run_gateway(gateway)
     gateway.run(
       skill: phase_runtime.implementation_skill,
@@ -261,6 +363,48 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
         "finding_key" => "none"
       }
     }
+  end
+
+  def review_run
+    A3::Domain::Run.new(
+      ref: "run-review-1",
+      task_ref: task.ref,
+      phase: :review,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: source_descriptor,
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_beta],
+        verification_scope: [:repo_beta],
+        ownership_scope: :child
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: task.ref,
+        owner_scope: :child,
+        snapshot_version: "head-1"
+      )
+    )
+  end
+
+  def materialized_workspace_request
+    A3::Domain::AgentWorkspaceRequest.new(
+      mode: :agent_materialized,
+      workspace_kind: :runtime_workspace,
+      workspace_id: "Portal-42-runtime",
+      freshness_policy: :reuse_if_clean_and_ref_matches,
+      cleanup_policy: :retain_until_a3_cleanup,
+      slots: {
+        repo_beta: {
+          source: {
+            kind: "local_git",
+            alias: "member-portal-starters"
+          },
+          ref: "abc123",
+          checkout: "worktree_detached",
+          access: "read_write",
+          required: true
+        }
+      }
+    )
   end
 
   def write_worker_script
@@ -301,7 +445,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     end
   end
 
-  def agent_result(job_id, status, exit_code)
+  def agent_result(job_id, status, exit_code, worker_protocol_result: nil)
     A3::Domain::AgentJobResult.new(
       job_id: job_id,
       status: status,
@@ -312,6 +456,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       log_uploads: [],
       artifact_uploads: [],
       workspace_descriptor: workspace_descriptor,
+      worker_protocol_result: worker_protocol_result,
       heartbeat: "2026-04-11T08:00:01Z"
     )
   end
