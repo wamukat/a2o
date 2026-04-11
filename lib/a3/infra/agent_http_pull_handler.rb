@@ -7,27 +7,36 @@ module A3
     class AgentHttpPullHandler
       Response = Struct.new(:status, :headers, :body, keyword_init: true)
 
-      def initialize(job_store:, artifact_store: nil, clock: -> { Time.now.utc.iso8601 }, auth_token: nil)
+      def initialize(job_store:, artifact_store: nil, clock: -> { Time.now.utc.iso8601 }, auth_token: nil, control_auth_token: nil)
         @job_store = job_store
         @artifact_store = artifact_store
         @clock = clock
         @auth_token = auth_token.to_s
+        @control_auth_token = control_auth_token.to_s
       end
 
       def handle(method:, path:, query: {}, body: nil, headers: {})
-        return json_response(401, "error" => "unauthorized") unless authorized?(headers)
-
         case [method.to_s.upcase, path]
         when ["POST", "/v1/agent/jobs"]
+          return unauthorized_response unless authorized?(headers, :control)
+
           enqueue(body)
         when ["GET", "/v1/agent/jobs/next"]
+          return unauthorized_response unless authorized?(headers, :agent)
+
           claim_next(query)
         else
           if method.to_s.upcase == "GET" && path.match?(%r{\A/v1/agent/jobs/[^/]+\z})
+            return unauthorized_response unless authorized?(headers, :control)
+
             fetch_job(path)
           elsif method.to_s.upcase == "PUT" && path.match?(%r{\A/v1/agent/artifacts/[^/]+\z})
+            return unauthorized_response unless authorized?(headers, :agent)
+
             upload_artifact(path, query, body)
           elsif method.to_s.upcase == "POST" && path.match?(%r{\A/v1/agent/jobs/[^/]+/result\z})
+            return unauthorized_response unless authorized?(headers, :agent)
+
             record_result(path, body)
           else
             json_response(404, "error" => "not_found")
@@ -41,11 +50,22 @@ module A3
 
       private
 
-      def authorized?(headers)
-        return true if @auth_token.empty?
+      def authorized?(headers, scope)
+        expected = expected_token(scope)
+        return true if expected.empty?
 
         header_value = headers.fetch("authorization", headers.fetch("Authorization", "")).to_s
-        header_value == "Bearer #{@auth_token}"
+        header_value == "Bearer #{expected}"
+      end
+
+      def expected_token(scope)
+        return @control_auth_token unless scope == :agent || @control_auth_token.empty?
+
+        @auth_token
+      end
+
+      def unauthorized_response
+        json_response(401, "error" => "unauthorized")
       end
 
       def enqueue(body)

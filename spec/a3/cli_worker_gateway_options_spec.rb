@@ -146,6 +146,42 @@ RSpec.describe "A3 CLI worker gateway options" do
     end
   end
 
+  it "resolves a scoped control-plane auth token from a control token file" do
+    Dir.mktmpdir do |dir|
+      agent_token_path = File.join(dir, "agent-token")
+      control_token_path = File.join(dir, "control-token")
+      File.write(agent_token_path, "agent-token\n")
+      File.write(control_token_path, "control-token\n")
+
+      token = A3::CLI.send(
+        :agent_control_auth_token,
+        agent_token: "",
+        agent_token_file: agent_token_path,
+        agent_control_token: "",
+        agent_control_token_file: control_token_path
+      )
+
+      expect(token).to eq("control-token")
+    end
+  end
+
+  it "falls back to the agent auth token when no scoped control token is configured" do
+    Dir.mktmpdir do |dir|
+      agent_token_path = File.join(dir, "agent-token")
+      File.write(agent_token_path, "agent-token\n")
+
+      token = A3::CLI.send(
+        :agent_control_auth_token,
+        agent_token: "",
+        agent_token_file: agent_token_path,
+        agent_control_token: "",
+        agent_control_token_file: ""
+      )
+
+      expect(token).to eq("agent-token")
+    end
+  end
+
   it "requires a control-plane URL for the agent HTTP verification command runner" do
     expect do
       A3::CLI.send(

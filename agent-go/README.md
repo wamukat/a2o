@@ -135,7 +135,7 @@ The current command runs a single poll cycle:
 
 The runtime profile file is the host/dev-env side `alias -> local path` contract. A3 job payloads still carry only `slot -> alias`; they do not carry these local paths.
 
-`agent_token` is optional for local-only development. When the A3 control plane is started with `--agent-token` or `A3_AGENT_TOKEN`, the Go agent must provide the same token through `A3_AGENT_TOKEN`, `-agent-token`, `agent_token_file`, `A3_AGENT_TOKEN_FILE`, `-agent-token-file`, or the inline profile `agent_token`. Prefer token files for service manager / container operation so the token is not exposed through process arguments.
+`agent_token` is optional for local-only development. When the A3 control plane is started with `--agent-token` / `--agent-token-file` or `A3_AGENT_TOKEN` / `A3_AGENT_TOKEN_FILE`, the Go agent must provide the same agent token through `A3_AGENT_TOKEN`, `-agent-token`, `agent_token_file`, `A3_AGENT_TOKEN_FILE`, `-agent-token-file`, or the inline profile `agent_token`. A3-side enqueue/fetch clients may use a separate control token (`--agent-control-token-file` or `A3_AGENT_CONTROL_TOKEN_FILE`) while the Go agent continues to use only the agent token. Prefer token files for service manager / container operation so tokens are not exposed through process arguments.
 
 ## Long-Running Mode
 

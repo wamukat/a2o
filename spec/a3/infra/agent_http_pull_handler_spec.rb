@@ -119,6 +119,45 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
     expect(authorized_response.status).to eq(204)
   end
 
+  it "separates control-plane and agent bearer token scopes when both are configured" do
+    secured_handler = described_class.new(
+      job_store: store,
+      artifact_store: artifact_store,
+      auth_token: "agent-token",
+      control_auth_token: "control-token"
+    )
+
+    agent_enqueue_response = secured_handler.handle(
+      method: "POST",
+      path: "/v1/agent/jobs",
+      body: JSON.generate(agent_job_request("job-1").request_form),
+      headers: {"authorization" => "Bearer agent-token"}
+    )
+    control_enqueue_response = secured_handler.handle(
+      method: "POST",
+      path: "/v1/agent/jobs",
+      body: JSON.generate(agent_job_request("job-1").request_form),
+      headers: {"authorization" => "Bearer control-token"}
+    )
+    control_claim_response = secured_handler.handle(
+      method: "GET",
+      path: "/v1/agent/jobs/next",
+      query: {"agent" => "portal-dev-env"},
+      headers: {"authorization" => "Bearer control-token"}
+    )
+    agent_claim_response = secured_handler.handle(
+      method: "GET",
+      path: "/v1/agent/jobs/next",
+      query: {"agent" => "portal-dev-env"},
+      headers: {"authorization" => "Bearer agent-token"}
+    )
+
+    expect(agent_enqueue_response.status).to eq(401)
+    expect(control_enqueue_response.status).to eq(201)
+    expect(control_claim_response.status).to eq(401)
+    expect(agent_claim_response.status).to eq(200)
+  end
+
   it "accepts artifact uploads into the configured artifact store" do
     content = "verification log\n"
     digest = "sha256:#{Digest::SHA256.hexdigest(content)}"
