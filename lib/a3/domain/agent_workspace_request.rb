@@ -79,6 +79,8 @@ module A3
           "ref" => required_string(record.fetch("ref"), "slot ref"),
           "checkout" => required_string(record.fetch("checkout"), "slot checkout"),
           "access" => required_string(record.fetch("access"), "slot access"),
+          "sync_class" => required_string(record.fetch("sync_class"), "slot sync_class"),
+          "ownership" => required_string(record.fetch("ownership"), "slot ownership"),
           "required" => normalize_required(record.fetch("required"))
         }.freeze
       end
@@ -103,8 +105,10 @@ module A3
         slots.each do |slot_name, descriptor|
           source = descriptor.fetch("source")
           raise ConfigurationError, "unsupported source kind for #{slot_name}: #{source.fetch('kind')}" unless source.fetch("kind") == "local_git"
-          raise ConfigurationError, "unsupported checkout for #{slot_name}: #{descriptor.fetch('checkout')}" unless descriptor.fetch("checkout") == "worktree_detached"
+          raise ConfigurationError, "unsupported checkout for #{slot_name}: #{descriptor.fetch('checkout')}" unless descriptor.fetch("checkout") == "worktree_branch"
           raise ConfigurationError, "unsupported access for #{slot_name}: #{descriptor.fetch('access')}" unless %w[read_write read_only].include?(descriptor.fetch("access"))
+          raise ConfigurationError, "unsupported sync_class for #{slot_name}: #{descriptor.fetch('sync_class')}" unless %w[eager lazy_but_guaranteed].include?(descriptor.fetch("sync_class"))
+          raise ConfigurationError, "unsupported ownership for #{slot_name}: #{descriptor.fetch('ownership')}" unless %w[edit_target support].include?(descriptor.fetch("ownership"))
         end
       end
     end

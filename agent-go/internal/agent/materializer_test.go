@@ -35,7 +35,7 @@ func TestWorkspaceMaterializerPreparesAndCleansWorktreeSlots(t *testing.T) {
 		t.Fatalf("unexpected dirty descriptor: %#v", descriptor)
 	}
 	workspaceMetadata := readJSON(t, filepath.Join(prepared.Root, ".a3", "workspace.json"))
-	if workspaceMetadata["workspace_kind"] != "ticket_workspace" || workspaceMetadata["source_ref"] != "HEAD" {
+	if workspaceMetadata["workspace_kind"] != "ticket_workspace" || workspaceMetadata["source_ref"] != "refs/heads/a3/work/Portal-42" {
 		t.Fatalf("unexpected workspace metadata: %#v", workspaceMetadata)
 	}
 	slotMetadata := readJSON(t, filepath.Join(slotPath, ".a3", "slot.json"))
@@ -88,6 +88,25 @@ func TestWorkspaceMaterializerFailsBeforeCommandForDirtySource(t *testing.T) {
 	}
 }
 
+func TestWorkspaceMaterializerRejectsMissingSlotMetadata(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"member-portal-starters": sourceRoot,
+		},
+	}
+	request := testWorkspaceRequest("member-portal-starters")
+	slot := request.Slots["repo_alpha"]
+	slot.SyncClass = ""
+	request.Slots["repo_alpha"] = slot
+
+	if _, err := materializer.Prepare(request); err == nil || !strings.Contains(err.Error(), "unsupported sync_class") {
+		t.Fatalf("expected unsupported sync_class failure, got %v", err)
+	}
+}
+
 func testWorkspaceRequest(sourceAlias string) WorkspaceRequest {
 	return WorkspaceRequest{
 		Mode:            "agent_materialized",
@@ -101,10 +120,12 @@ func testWorkspaceRequest(sourceAlias string) WorkspaceRequest {
 					Kind:  "local_git",
 					Alias: sourceAlias,
 				},
-				Ref:      "HEAD",
-				Checkout: "worktree_detached",
-				Access:   "read_write",
-				Required: true,
+				Ref:       "refs/heads/a3/work/Portal-42",
+				Checkout:  "worktree_branch",
+				Access:    "read_write",
+				SyncClass: "eager",
+				Ownership: "edit_target",
+				Required:  true,
 			},
 		},
 	}
@@ -124,6 +145,7 @@ func createGitSource(t *testing.T, root string, name string) string {
 	}
 	git(t, sourceRoot, "add", "README.md")
 	git(t, sourceRoot, "commit", "-q", "-m", "initial commit")
+	git(t, sourceRoot, "branch", "a3/work/Portal-42", "HEAD")
 	return sourceRoot
 }
 

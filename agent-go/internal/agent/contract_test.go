@@ -30,8 +30,10 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 						"alias": "member-portal-starters"
 					},
 					"ref": "refs/heads/a3/work/Portal-42",
-					"checkout": "worktree_detached",
+					"checkout": "worktree_branch",
 					"access": "read_write",
+					"sync_class": "eager",
+					"ownership": "edit_target",
 					"required": true
 				}
 			}
@@ -59,7 +61,7 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 		t.Fatalf("worker protocol request was not decoded: %#v", request.WorkerProtocolRequest)
 	}
 	slot := request.WorkspaceRequest.Slots["repo_alpha"]
-	if slot.Source.Alias != "member-portal-starters" || slot.Checkout != "worktree_detached" {
+	if slot.Source.Alias != "member-portal-starters" || slot.Checkout != "worktree_branch" || slot.SyncClass != "eager" || slot.Ownership != "edit_target" {
 		t.Fatalf("unexpected slot request: %#v", slot)
 	}
 

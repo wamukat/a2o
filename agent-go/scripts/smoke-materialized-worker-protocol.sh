@@ -44,6 +44,8 @@ printf 'materialized source\n' > "${SOURCE_ROOT}/README.md"
 git -C "${SOURCE_ROOT}" add README.md
 git -C "${SOURCE_ROOT}" commit -q -m "initial source"
 SOURCE_HEAD="$(git -C "${SOURCE_ROOT}" rev-parse HEAD)"
+SOURCE_REF="refs/heads/a3/work/Portal-42"
+git -C "${SOURCE_ROOT}" branch "a3/work/Portal-42" "${SOURCE_HEAD}"
 
 ruby -I "${ROOT_DIR}/lib" "${ROOT_DIR}/bin/a3" agent-server \
   --storage-dir "${STORAGE_DIR}" \
@@ -59,9 +61,9 @@ for _ in $(seq 1 50); do
 done
 
 JOB_PATH="${TMP_DIR}/job.json"
-JOB_PATH="${JOB_PATH}" SOURCE_HEAD="${SOURCE_HEAD}" ruby -rjson -e '
+JOB_PATH="${JOB_PATH}" SOURCE_REF="${SOURCE_REF}" ruby -rjson -e '
   job_path = ENV.fetch("JOB_PATH")
-  source_head = ENV.fetch("SOURCE_HEAD")
+  source_ref = ENV.fetch("SOURCE_REF")
   command = <<~SH
     set -eu
     test -f repo-alpha/README.md
@@ -82,7 +84,7 @@ JOB_PATH="${JOB_PATH}" SOURCE_HEAD="${SOURCE_HEAD}" ruby -rjson -e '
       "source_descriptor" => {
         "workspace_kind" => "ticket_workspace",
         "source_type" => "branch_head",
-        "ref" => source_head,
+        "ref" => source_ref,
         "task_ref" => "Portal#42"
       },
       "workspace_request" => {
@@ -97,9 +99,11 @@ JOB_PATH="${JOB_PATH}" SOURCE_HEAD="${SOURCE_HEAD}" ruby -rjson -e '
               "kind" => "local_git",
               "alias" => "member-portal-starters"
             },
-            "ref" => source_head,
-            "checkout" => "worktree_detached",
+            "ref" => source_ref,
+            "checkout" => "worktree_branch",
             "access" => "read_write",
+            "sync_class" => "eager",
+            "ownership" => "edit_target",
             "required" => true
           }
         }
@@ -156,7 +160,7 @@ grep -q "agent completed job-materialized-1 status=succeeded" "${TMP_DIR}/agent.
 JOB_RESULT_PATH="${TMP_DIR}/job-result.json"
 curl -fsS "${BASE_URL}/v1/agent/jobs/job-materialized-1" > "${JOB_RESULT_PATH}"
 
-JOB_RESULT_PATH="${JOB_RESULT_PATH}" SOURCE_HEAD="${SOURCE_HEAD}" SOURCE_ROOT="${SOURCE_ROOT}" WORKSPACE_ROOT="${WORKSPACE_ROOT}" ruby -rjson -e '
+JOB_RESULT_PATH="${JOB_RESULT_PATH}" SOURCE_REF="${SOURCE_REF}" SOURCE_ROOT="${SOURCE_ROOT}" WORKSPACE_ROOT="${WORKSPACE_ROOT}" ruby -rjson -e '
   job = JSON.parse(File.read(ENV.fetch("JOB_RESULT_PATH"))).fetch("job")
   result = job.fetch("result")
   raise "job was not completed" unless job.fetch("state") == "completed"
@@ -167,8 +171,10 @@ JOB_RESULT_PATH="${JOB_RESULT_PATH}" SOURCE_HEAD="${SOURCE_HEAD}" SOURCE_ROOT="$
   raise "missing worker-result artifact" unless uploads.any? { |upload| upload.fetch("role") == "worker-result" }
   slot = result.fetch("workspace_descriptor").fetch("slot_descriptors").fetch("repo_alpha")
   raise "source alias mismatch" unless slot.fetch("source_alias") == "member-portal-starters"
-  raise "checkout mismatch" unless slot.fetch("checkout") == "worktree_detached"
-  raise "requested ref mismatch" unless slot.fetch("requested_ref") == ENV.fetch("SOURCE_HEAD")
+  raise "checkout mismatch" unless slot.fetch("checkout") == "worktree_branch"
+  raise "requested ref mismatch" unless slot.fetch("requested_ref") == ENV.fetch("SOURCE_REF")
+  raise "sync class mismatch" unless slot.fetch("sync_class") == "eager"
+  raise "ownership mismatch" unless slot.fetch("ownership") == "edit_target"
   runtime_path = slot.fetch("runtime_path")
   raise "runtime path outside workspace root" unless runtime_path.start_with?(ENV.fetch("WORKSPACE_ROOT"))
   changed_files = slot.fetch("changed_files")

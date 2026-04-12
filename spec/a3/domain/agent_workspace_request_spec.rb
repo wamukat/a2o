@@ -17,8 +17,10 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
             alias: "member-portal-starters"
           },
           ref: "refs/heads/a3/work/Portal-42",
-          checkout: "worktree_detached",
+          checkout: "worktree_branch",
           access: "read_write",
+          sync_class: "eager",
+          ownership: "edit_target",
           required: true
         }
       }
@@ -37,8 +39,10 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
             "alias" => "member-portal-starters"
           },
           "ref" => "refs/heads/a3/work/Portal-42",
-          "checkout" => "worktree_detached",
+          "checkout" => "worktree_branch",
           "access" => "read_write",
+          "sync_class" => "eager",
+          "ownership" => "edit_target",
           "required" => true
         }
       }
@@ -60,10 +64,33 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
             ref: "refs/heads/a3/work/Portal-42",
             checkout: "clone",
             access: "read_write",
+            sync_class: "eager",
+            ownership: "edit_target",
             required: true
           }
         }
       )
     end.to raise_error(A3::Domain::ConfigurationError, /unsupported source kind/)
+  end
+
+  it "requires explicit slot sync class and ownership metadata" do
+    expect do
+      described_class.new(
+        mode: :agent_materialized,
+        workspace_kind: :ticket_workspace,
+        workspace_id: "Portal-42-ticket",
+        freshness_policy: :reuse_if_clean_and_ref_matches,
+        cleanup_policy: :retain_until_a3_cleanup,
+        slots: {
+          repo_alpha: {
+            source: { kind: "local_git", alias: "member-portal-starters" },
+            ref: "refs/heads/a3/work/Portal-42",
+            checkout: "worktree_branch",
+            access: "read_write",
+            required: true
+          }
+        }
+      )
+    end.to raise_error(KeyError, /sync_class/)
   end
 end

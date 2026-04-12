@@ -527,8 +527,10 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
             alias: "member-portal-starters"
           },
           ref: "abc123",
-          checkout: "worktree_detached",
+          checkout: "worktree_branch",
           access: "read_write",
+          sync_class: "eager",
+          ownership: "edit_target",
           required: true
         }
       }
@@ -623,12 +625,14 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       "runtime_path" => "/agent/workspaces/Portal-42-runtime/repo-beta",
       "source_kind" => "local_git",
       "source_alias" => "member-portal-starters",
-      "checkout" => "worktree_detached",
+      "checkout" => "worktree_branch",
       "requested_ref" => "abc123",
       "resolved_head" => "abc123",
       "dirty_before" => false,
       "dirty_after" => true,
-      "access" => "read_write"
+      "access" => "read_write",
+      "sync_class" => "eager",
+      "ownership" => "edit_target"
     }
   end
 end

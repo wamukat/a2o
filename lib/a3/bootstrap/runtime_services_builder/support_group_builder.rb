@@ -7,7 +7,11 @@ module A3
     class RuntimeServicesBuilder
       class SupportGroupBuilder
         def self.build(repositories:, run_id_generator:, storage_dir:, repo_sources:, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
-          start_phase = A3::Application::StartPhase.new(run_id_generator: run_id_generator)
+          workspace_plan_builder = A3::Application::BuildWorkspacePlan.new(repo_slots: repo_sources.keys)
+          start_phase = A3::Application::StartPhase.new(
+            workspace_plan_builder: workspace_plan_builder,
+            run_id_generator: run_id_generator
+          )
           integration_ref_readiness_checker = A3::Infra::IntegrationRefReadinessChecker.new(repo_sources: repo_sources)
           parent_review_disposition_handler = build_parent_review_disposition_handler(external_follow_up_child_writer)
           register_started_run = A3::Application::RegisterStartedRun.new(
@@ -31,7 +35,10 @@ module A3
             base_dir: storage_dir,
             repo_sources: repo_sources
           )
-          prepare_workspace = A3::Application::PrepareWorkspace.new(provisioner: workspace_provisioner)
+          prepare_workspace = A3::Application::PrepareWorkspace.new(
+            workspace_plan_builder: workspace_plan_builder,
+            provisioner: workspace_provisioner
+          )
 
           {
             start_phase: start_phase,

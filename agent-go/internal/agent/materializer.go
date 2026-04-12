@@ -46,8 +46,14 @@ func (m WorkspaceMaterializer) Prepare(request WorkspaceRequest) (PreparedWorksp
 		if slot.Source.Kind != "local_git" {
 			return PreparedWorkspace{}, fmt.Errorf("unsupported source kind for %s: %s", slotName, slot.Source.Kind)
 		}
-		if slot.Checkout != "worktree_detached" {
+		if slot.Checkout != "worktree_branch" {
 			return PreparedWorkspace{}, fmt.Errorf("unsupported checkout for %s: %s", slotName, slot.Checkout)
+		}
+		if !validSyncClass(slot.SyncClass) {
+			return PreparedWorkspace{}, fmt.Errorf("unsupported sync_class for %s: %s", slotName, slot.SyncClass)
+		}
+		if !validOwnership(slot.Ownership) {
+			return PreparedWorkspace{}, fmt.Errorf("unsupported ownership for %s: %s", slotName, slot.Ownership)
 		}
 		sourceRoot, err := m.sourceRoot(slot.Source.Alias)
 		if err != nil {
@@ -71,6 +77,14 @@ func (m WorkspaceMaterializer) Prepare(request WorkspaceRequest) (PreparedWorksp
 		return PreparedWorkspace{}, err
 	}
 	return prepared, nil
+}
+
+func validSyncClass(value string) bool {
+	return value == "eager" || value == "lazy_but_guaranteed"
+}
+
+func validOwnership(value string) bool {
+	return value == "edit_target" || value == "support"
 }
 
 func (m WorkspaceMaterializer) Cleanup(prepared PreparedWorkspace) error {
@@ -177,7 +191,7 @@ func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot
 	if err := os.RemoveAll(slotPath); err != nil {
 		return nil, err
 	}
-	if err := runGit(sourceRoot, "worktree", "add", "--force", "--detach", slotPath, slot.Ref); err != nil {
+	if err := runGit(sourceRoot, "worktree", "add", "--force", slotPath, slot.Ref); err != nil {
 		return nil, err
 	}
 	head, err := gitOutput(slotPath, "rev-parse", "HEAD")
@@ -198,6 +212,8 @@ func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot
 		"dirty_before":  false,
 		"dirty_after":   dirtyAfter,
 		"access":        slot.Access,
+		"sync_class":    slot.SyncClass,
+		"ownership":     slot.Ownership,
 	}, nil
 }
 

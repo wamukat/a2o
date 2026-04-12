@@ -63,8 +63,10 @@ RSpec.describe A3::Domain::AgentJobRequest do
         repo_alpha: {
           source: { kind: "local_git", alias: "member-portal-starters" },
           ref: "refs/heads/a3/work/Portal-42",
-          checkout: "worktree_detached",
+          checkout: "worktree_branch",
           access: "read_write",
+          sync_class: "eager",
+          ownership: "edit_target",
           required: true
         }
       }

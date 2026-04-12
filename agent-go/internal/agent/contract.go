@@ -33,11 +33,13 @@ type WorkspaceRequest struct {
 }
 
 type WorkspaceSlotRequest struct {
-	Source   WorkspaceSourceRequest `json:"source"`
-	Ref      string                 `json:"ref"`
-	Checkout string                 `json:"checkout"`
-	Access   string                 `json:"access"`
-	Required bool                   `json:"required"`
+	Source    WorkspaceSourceRequest `json:"source"`
+	Ref       string                 `json:"ref"`
+	Checkout  string                 `json:"checkout"`
+	Access    string                 `json:"access"`
+	SyncClass string                 `json:"sync_class"`
+	Ownership string                 `json:"ownership"`
+	Required  bool                   `json:"required"`
 }
 
 type WorkspaceSourceRequest struct {

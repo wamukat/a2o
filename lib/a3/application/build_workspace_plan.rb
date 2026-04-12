@@ -3,7 +3,8 @@
 module A3
   module Application
     class BuildWorkspacePlan
-      def initialize(workspace_policy: A3::Domain::WorkspacePolicy.new)
+      def initialize(workspace_policy: nil, repo_slots: nil)
+        workspace_policy ||= A3::Domain::WorkspacePolicy.new(repo_slots: repo_slots)
         @workspace_policy = workspace_policy
       end
 

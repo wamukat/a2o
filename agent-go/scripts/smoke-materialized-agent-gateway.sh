@@ -39,9 +39,11 @@ cleanup() {
 trap 'dump_logs; cleanup' EXIT
 
 SOURCE_ROOT="${TMP_DIR}/sources/member-portal-starters"
+LOCAL_SOURCE_ROOT="${TMP_DIR}/local-sources/member-portal-starters"
 WORKSPACE_ROOT="${TMP_DIR}/agent-workspaces"
 STORAGE_DIR="${TMP_DIR}/storage"
 LOCAL_WORKSPACE="${TMP_DIR}/gateway-local-workspace"
+LOCAL_SLOT_PATH="${LOCAL_WORKSPACE}/repo-beta"
 
 mkdir -p "${SOURCE_ROOT}"
 git -C "${SOURCE_ROOT}" init -q
@@ -51,6 +53,12 @@ printf 'materialized gateway source\n' > "${SOURCE_ROOT}/README.md"
 git -C "${SOURCE_ROOT}" add README.md
 git -C "${SOURCE_ROOT}" commit -q -m "initial source"
 SOURCE_HEAD="$(git -C "${SOURCE_ROOT}" rev-parse HEAD)"
+SOURCE_REF="refs/heads/a3/work/Portal-42"
+git -C "${SOURCE_ROOT}" branch "a3/work/Portal-42" "${SOURCE_HEAD}"
+mkdir -p "$(dirname "${LOCAL_SOURCE_ROOT}")" "${LOCAL_WORKSPACE}"
+git clone -q "${SOURCE_ROOT}" "${LOCAL_SOURCE_ROOT}"
+git -C "${LOCAL_SOURCE_ROOT}" branch "a3/work/Portal-42" "origin/a3/work/Portal-42"
+git -C "${LOCAL_SOURCE_ROOT}" worktree add -q "${LOCAL_SLOT_PATH}" "a3/work/Portal-42"
 
 ruby -I "${ROOT_DIR}/lib" "${ROOT_DIR}/bin/a3" agent-server \
   --storage-dir "${STORAGE_DIR}" \
@@ -72,16 +80,17 @@ require "fileutils"
 require "a3"
 
 base_url = ENV.fetch("BASE_URL")
-source_head = ENV.fetch("SOURCE_HEAD")
+source_ref = ENV.fetch("SOURCE_REF")
 local_workspace = Pathname(ENV.fetch("LOCAL_WORKSPACE"))
+local_slot_path = Pathname(ENV.fetch("LOCAL_SLOT_PATH"))
 FileUtils.mkdir_p(local_workspace)
 
-source_descriptor = A3::Domain::SourceDescriptor.implementation(task_ref: "Portal#42", ref: source_head)
+source_descriptor = A3::Domain::SourceDescriptor.implementation(task_ref: "Portal#42", ref: source_ref)
 workspace = A3::Domain::PreparedWorkspace.new(
   workspace_kind: :ticket_workspace,
   root_path: local_workspace,
   source_descriptor: source_descriptor,
-  slot_paths: {}
+  slot_paths: { repo_beta: local_slot_path }
 )
 task = A3::Domain::Task.new(
   ref: "Portal#42",
@@ -103,7 +112,7 @@ run = A3::Domain::Run.new(
   artifact_owner: A3::Domain::ArtifactOwner.new(
     owner_ref: task.ref,
     owner_scope: :child,
-    snapshot_version: source_head
+    snapshot_version: source_ref
   )
 )
 task_packet = A3::Domain::WorkerTaskPacket.new(
@@ -173,7 +182,7 @@ raise "missing canonical mismatch diagnostics" unless execution.diagnostics.fetc
 puts "gateway materialized execution ok"
 RUBY
 
-BASE_URL="${BASE_URL}" SOURCE_HEAD="${SOURCE_HEAD}" LOCAL_WORKSPACE="${LOCAL_WORKSPACE}" \
+BASE_URL="${BASE_URL}" SOURCE_REF="${SOURCE_REF}" LOCAL_WORKSPACE="${LOCAL_WORKSPACE}" LOCAL_SLOT_PATH="${LOCAL_SLOT_PATH}" \
   ruby -I "${ROOT_DIR}/lib" "${TMP_DIR}/gateway.rb" > "${TMP_DIR}/gateway.log" 2>&1 &
 GATEWAY_PID="$!"
 
@@ -220,7 +229,7 @@ grep -q "agent completed ${JOB_ID} status=succeeded" "${TMP_DIR}/agent.log"
 JOB_RESULT_PATH="${TMP_DIR}/job-result.json"
 curl -fsS "${BASE_URL}/v1/agent/jobs/${JOB_ID}" > "${JOB_RESULT_PATH}"
 
-JOB_RESULT_PATH="${JOB_RESULT_PATH}" SOURCE_HEAD="${SOURCE_HEAD}" SOURCE_ROOT="${SOURCE_ROOT}" WORKSPACE_ROOT="${WORKSPACE_ROOT}" ruby -rjson -e '
+JOB_RESULT_PATH="${JOB_RESULT_PATH}" SOURCE_REF="${SOURCE_REF}" SOURCE_ROOT="${SOURCE_ROOT}" WORKSPACE_ROOT="${WORKSPACE_ROOT}" ruby -rjson -e '
   job = JSON.parse(File.read(ENV.fetch("JOB_RESULT_PATH"))).fetch("job")
   result = job.fetch("result")
   raise "job was not completed" unless job.fetch("state") == "completed"
@@ -231,9 +240,11 @@ JOB_RESULT_PATH="${JOB_RESULT_PATH}" SOURCE_HEAD="${SOURCE_HEAD}" SOURCE_ROOT="$
   raise "missing worker-result artifact" unless uploads.any? { |upload| upload.fetch("role") == "worker-result" }
   slot = result.fetch("workspace_descriptor").fetch("slot_descriptors").fetch("repo_beta")
   raise "source alias mismatch" unless slot.fetch("source_alias") == "member-portal-starters"
-  raise "checkout mismatch" unless slot.fetch("checkout") == "worktree_detached"
-  raise "requested ref mismatch" unless slot.fetch("requested_ref") == ENV.fetch("SOURCE_HEAD")
+  raise "checkout mismatch" unless slot.fetch("checkout") == "worktree_branch"
+  raise "requested ref mismatch" unless slot.fetch("requested_ref") == ENV.fetch("SOURCE_REF")
   raise "access mismatch" unless slot.fetch("access") == "read_write"
+  raise "sync class mismatch" unless slot.fetch("sync_class") == "eager"
+  raise "ownership mismatch" unless slot.fetch("ownership") == "edit_target"
   raise "dirty_before should be false" unless slot.fetch("dirty_before") == false
   raise "dirty_after should be true" unless slot.fetch("dirty_after") == true
   raise "changed_files evidence mismatch" unless slot.fetch("changed_files") == ["changed.txt"]

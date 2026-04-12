@@ -51,6 +51,8 @@ printf 'materialized command source\n' > "${SOURCE_ROOT}/README.md"
 git -C "${SOURCE_ROOT}" add README.md
 git -C "${SOURCE_ROOT}" commit -q -m "initial source"
 SOURCE_HEAD="$(git -C "${SOURCE_ROOT}" rev-parse HEAD)"
+SOURCE_REF="refs/heads/a3/work/Portal-42"
+git -C "${SOURCE_ROOT}" branch "a3/work/Portal-42" "${SOURCE_HEAD}"
 
 ruby -I "${ROOT_DIR}/lib" "${ROOT_DIR}/bin/a3" agent-server \
   --storage-dir "${STORAGE_DIR}" \
@@ -71,11 +73,11 @@ require "pathname"
 require "a3"
 
 base_url = ENV.fetch("BASE_URL")
-source_head = ENV.fetch("SOURCE_HEAD")
+source_ref = ENV.fetch("SOURCE_REF")
 local_workspace = Pathname(ENV.fetch("LOCAL_WORKSPACE"))
 FileUtils.mkdir_p(local_workspace)
 
-source_descriptor = A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Portal#42", ref: source_head)
+source_descriptor = A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Portal#42", ref: source_ref)
 workspace = A3::Domain::PreparedWorkspace.new(
   workspace_kind: :runtime_workspace,
   root_path: local_workspace,
@@ -103,7 +105,7 @@ run = A3::Domain::Run.new(
   artifact_owner: A3::Domain::ArtifactOwner.new(
     owner_ref: task.ref,
     owner_scope: :task,
-    snapshot_version: source_head
+    snapshot_version: source_ref
   )
 )
 runner = A3::Infra::AgentCommandRunner.new(
@@ -133,7 +135,7 @@ abort(result.summary) unless result.success?
 puts result.summary
 RUBY
 
-BASE_URL="${BASE_URL}" SOURCE_HEAD="${SOURCE_HEAD}" LOCAL_WORKSPACE="${LOCAL_WORKSPACE}" JOB_ID="${JOB_ID}" \
+BASE_URL="${BASE_URL}" SOURCE_REF="${SOURCE_REF}" LOCAL_WORKSPACE="${LOCAL_WORKSPACE}" JOB_ID="${JOB_ID}" \
   ruby -I "${ROOT_DIR}/lib" "${TMP_DIR}/runner.rb" > "${TMP_DIR}/runner.log" 2>&1 &
 RUNNER_PID="$!"
 

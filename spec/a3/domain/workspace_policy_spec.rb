@@ -34,6 +34,26 @@ RSpec.describe A3::Domain::WorkspacePolicy do
     )
   end
 
+  it "uses the configured repo slot universe instead of filtering by scope" do
+    policy = described_class.new(repo_slots: %i[repo_alpha repo_beta])
+    ui_only_scope = A3::Domain::ScopeSnapshot.new(
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      ownership_scope: :task
+    )
+
+    plan = policy.build_plan(
+      phase: :implementation,
+      source_descriptor: implementation_source_descriptor,
+      scope_snapshot: ui_only_scope
+    )
+
+    expect(plan.slot_requirements).to contain_exactly(
+      have_attributes(repo_slot: :repo_alpha, sync_class: :lazy_but_guaranteed),
+      have_attributes(repo_slot: :repo_beta, sync_class: :eager)
+    )
+  end
+
   it "rejects a source descriptor whose workspace kind does not match the phase policy" do
     runtime_source_descriptor = implementation_source_descriptor.with_workspace_kind(:runtime_workspace)
 

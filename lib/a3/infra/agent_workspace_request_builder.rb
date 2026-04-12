@@ -5,6 +5,7 @@ module A3
     class AgentWorkspaceRequestBuilder
       def initialize(source_aliases:, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup)
         @source_aliases = source_aliases.transform_keys(&:to_sym).transform_values(&:to_s).freeze
+        @repo_slots = @source_aliases.keys.sort.freeze
         @freshness_policy = freshness_policy.to_sym
         @cleanup_policy = cleanup_policy.to_sym
         validate_policy!(:freshness_policy, @freshness_policy, A3::Domain::AgentWorkspaceRequest::FRESHNESS_POLICIES)
@@ -12,7 +13,8 @@ module A3
       end
 
       def call(workspace:, task:, run:)
-        slots = required_slots_for(run).each_with_object({}) do |slot_name, request_slots|
+        validate_phase!(run.phase)
+        slots = @repo_slots.each_with_object({}) do |slot_name, request_slots|
           alias_name = @source_aliases[slot_name]
           raise A3::Domain::ConfigurationError, "missing agent source alias for #{slot_name}" if alias_name.to_s.empty?
 
@@ -22,8 +24,10 @@ module A3
               alias: alias_name
             },
             ref: run.source_descriptor.ref,
-            checkout: "worktree_detached",
+            checkout: "worktree_branch",
             access: access_for(slot_name, run),
+            sync_class: sync_class_for(slot_name, run),
+            ownership: ownership_for(slot_name, run),
             required: true
           }
         end
@@ -40,23 +44,24 @@ module A3
 
       private
 
-      def required_slots_for(run)
-        case run.phase.to_sym
-        when :implementation
-          run.scope_snapshot.edit_scope
-        when :review
-          (run.scope_snapshot.edit_scope + run.scope_snapshot.verification_scope).uniq
-        when :verification
-          run.scope_snapshot.verification_scope
-        else
-          raise A3::Domain::ConfigurationError, "agent materialized workspace is not supported for phase #{run.phase}"
-        end
+      def validate_phase!(phase)
+        return if %i[implementation review verification].include?(phase.to_sym)
+
+        raise A3::Domain::ConfigurationError, "agent materialized workspace is not supported for phase #{phase}"
       end
 
       def access_for(slot_name, run)
         return "read_write" if %i[implementation review].include?(run.phase.to_sym) && run.scope_snapshot.edit_scope.include?(slot_name)
 
         "read_only"
+      end
+
+      def sync_class_for(slot_name, run)
+        run.scope_snapshot.edit_scope.include?(slot_name) ? "eager" : "lazy_but_guaranteed"
+      end
+
+      def ownership_for(slot_name, run)
+        run.scope_snapshot.edit_scope.include?(slot_name) ? "edit_target" : "support"
       end
 
       def workspace_id_for(task:, run:)

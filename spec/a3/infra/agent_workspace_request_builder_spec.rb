@@ -21,16 +21,25 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     )
   end
 
-  it "builds implementation slots from edit scope with read-write access" do
+  it "builds all configured slots and marks edit scope with read-write access" do
     request = builder.call(workspace: workspace, task: task, run: run(:implementation))
 
     expect(request.workspace_kind).to eq(:ticket_workspace)
     expect(request.workspace_id).to eq("Portal-42-implementation-run-implementation")
-    expect(request.slots.keys).to eq(["repo_alpha"])
+    expect(request.slots.keys).to eq(%w[repo_alpha repo_beta])
     expect(request.slots.fetch("repo_alpha")).to include(
       "ref" => "refs/heads/a3/work/Portal-42",
-      "checkout" => "worktree_detached",
+      "checkout" => "worktree_branch",
       "access" => "read_write",
+      "sync_class" => "eager",
+      "ownership" => "edit_target",
+      "required" => true
+    )
+    expect(request.slots.fetch("repo_beta")).to include(
+      "checkout" => "worktree_branch",
+      "access" => "read_only",
+      "sync_class" => "lazy_but_guaranteed",
+      "ownership" => "support",
       "required" => true
     )
     expect(request.slots.fetch("repo_alpha").fetch("source")).to eq(
@@ -73,13 +82,18 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     expect(request.workspace_id).to eq("Portal-134-children-Portal-135-implementation-run-implementation")
   end
 
-  it "builds verification slots from verification scope with read-only access" do
+  it "keeps support slots present for verification even when the scope is narrow" do
     request = builder.call(workspace: workspace, task: task, run: run(:verification))
 
-    expect(request.slots.keys).to eq(["repo_beta"])
+    expect(request.slots.keys).to eq(%w[repo_alpha repo_beta])
+    expect(request.slots.fetch("repo_alpha")).to include(
+      "access" => "read_only",
+      "sync_class" => "eager"
+    )
     expect(request.slots.fetch("repo_beta")).to include(
       "ref" => "refs/heads/a3/work/Portal-42",
-      "access" => "read_only"
+      "access" => "read_only",
+      "sync_class" => "lazy_but_guaranteed"
     )
   end
 
@@ -93,12 +107,12 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     )
   end
 
-  it "fails when a required slot alias is missing" do
+  it "uses the configured source alias keys as the required slot universe" do
     builder = described_class.new(source_aliases: { repo_alpha: "portal-alpha" })
 
-    expect do
-      builder.call(workspace: workspace, task: task, run: run(:verification))
-    end.to raise_error(A3::Domain::ConfigurationError, /missing agent source alias for repo_beta/)
+    request = builder.call(workspace: workspace, task: task, run: run(:verification))
+
+    expect(request.slots.keys).to eq(["repo_alpha"])
   end
 
   it "fails for unsupported merge phase" do
