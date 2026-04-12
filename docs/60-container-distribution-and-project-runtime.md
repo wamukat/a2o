@@ -1835,6 +1835,7 @@ Docker 側の掃除:
 - disk pressure が主因なら、まず artifact cleanup dry-run と Docker build cache prune を優先し、volume 削除は最後の手段にする
 - 2026-04-12 の `ITERATIONS=1 INTERVAL_SECONDS=1 task a3:portal:bundle:observe` では host disk 空き約 88GiB、Docker reclaimable 約 3.7GiB、bundle state は `active_runs=0`, `queued_tasks=0`, `blocked_tasks=0` だった
 - 同日の `ITERATIONS=3 INTERVAL_SECONDS=30 task a3:portal:bundle:observe` でも全 iteration で bundle doctor / watch-summary / describe-state が成功し、host disk 空き約 89GiB、Docker reclaimable 約 3.7GiB、`active_runs=0`, `queued_tasks=0`, `blocked_tasks=0` を維持した
+- 同日の `task a3:portal:bundle:archive-state` では active storage を `/var/lib/a3/archive/portal-soloboard-bundle-canary-20260412T023635Z` へ退避し、直後の `task a3:portal:bundle:describe-state` / `task a3:portal:bundle:watch-summary` で新しい active storage が `active_runs=0`, `queued_tasks=0`, `blocked_tasks=0` の idle として読めることを確認した
 
 ### 6.2.1 terminal worktree cleanup 実装計画
 
