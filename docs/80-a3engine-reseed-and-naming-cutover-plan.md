@@ -17,13 +17,24 @@
 - 現行 `a3-engine` は旧実装の退避後に新しい current source として利用する
 - packaging freeze 入力として、current generic operator backend は SoloBoard、`task a3:portal:cutover:doctor` / `:observe` は current mainline 観測入口、`task a3:portal:runtime:*` は Docker 上 A3 runtime + SoloBoard の標準入口として扱う。旧 `task a3:portal:bundle:*` は短期 maintenance alias とする
 
+## A-AI 非依存コンセプト
+
+A3 は特定 AI の wrapper ではなく、kanban task、workspace、phase、evidence、merge を管理する汎用 automation engine として完成させる。Codex は A3 に内蔵された実行方式ではなく、Portal project が選択している executor command profile の一例に限定する。
+
+- A3 Engine core は `codex`、`model`、`reasoning_effort`、`--model`、`model_reasoning_effort` を解釈しない
+- AI 実行差分は `scripts/a3/config/<project>/launcher.json` の `executor.kind = command` と argv template に閉じ込める
+- worker が知る contract は stdin bundle、`{{result_path}}`、`{{schema_path}}`、exit code、result JSON validation だけとする
+- Codex 以外の A-AI CLI は、同じ command/result contract を満たせば A3 Engine 変更なしで差し替えられる
+- provider adapter class は v1 completion の前提にしない。command template では auth / streaming / result 回収差分を吸収できない事実が出た場合だけ後続で検討する
+
 ## 進め方
 
 1. 完了: 現行 `a3-engine` を旧実装から current source へ切り替えた
 2. 完了: 旧 `a3-v2` source を新しい `a3-engine` として seed した
 3. 進行中: `v2` / `a3-v2` / `A3-v2` を runtime / docs / kanban / operator surface から除去する
 4. 進行中: current docs に残る旧名称は historical ref / migration note に限定する
-5. 次段: SoloBoard + A3 runtime + `a3-agent` の配布導線、service 化、retention hardening を閉じる
+5. 進行中: executor を Codex 固定から command template contract へ移行する
+6. 次段: SoloBoard + A3 runtime + `a3-agent` の配布導線、service 化、retention hardening を閉じる
 
 ## 実施項目
 
