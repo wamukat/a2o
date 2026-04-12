@@ -7,7 +7,7 @@ require "a3/infra/workspace_trace_logger"
 module A3
   module Infra
     class AgentWorkerGateway
-      def initialize(control_plane_client:, worker_command:, worker_command_args: [], runtime_profile:, shared_workspace_mode:, timeout_seconds: 1800, poll_interval_seconds: 1.0, job_id_generator: -> { SecureRandom.uuid }, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, worker_protocol: A3::Infra::WorkerProtocol.new, workspace_request_builder: nil)
+      def initialize(control_plane_client:, worker_command:, worker_command_args: [], runtime_profile:, shared_workspace_mode:, timeout_seconds: 1800, poll_interval_seconds: 1.0, job_id_generator: -> { SecureRandom.uuid }, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, worker_protocol: A3::Infra::WorkerProtocol.new, workspace_request_builder: nil, env: {})
         @control_plane_client = control_plane_client
         @worker_command = worker_command.to_s
         @worker_command_args = Array(worker_command_args).map(&:to_s).freeze
@@ -20,6 +20,7 @@ module A3
         @monotonic_clock = monotonic_clock
         @worker_protocol = worker_protocol
         @workspace_request_builder = workspace_request_builder
+        @env = env.transform_keys(&:to_s).transform_values(&:to_s).freeze
       end
 
       def run(skill:, workspace:, task:, run:, phase_runtime:, task_packet:)
@@ -126,7 +127,7 @@ module A3
           working_dir: workspace.root_path.to_s,
           command: @worker_command,
           args: @worker_command_args,
-          env: @worker_protocol.env_for(workspace),
+          env: @worker_protocol.env_for(workspace).merge(@env),
           timeout_seconds: @timeout_seconds,
           artifact_rules: []
         )
@@ -231,7 +232,7 @@ module A3
             errors << "#{slot_name}.changed_files must be an array of strings"
             next
           end
-          canonical_changed_files[slot_name] = changed_files.sort.uniq unless changed_files.empty?
+          canonical_changed_files[slot_name] = changed_files.sort.uniq
         end
         return canonical_changed_files if errors.empty?
 

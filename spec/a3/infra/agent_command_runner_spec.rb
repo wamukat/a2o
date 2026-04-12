@@ -110,6 +110,24 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     )
   end
 
+  it "passes explicit agent env overrides to command jobs" do
+    client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :succeeded, 0)) }
+    runner = described_class.new(
+      control_plane_client: client,
+      runtime_profile: "docker-dev-env",
+      shared_workspace_mode: "same-path",
+      env: { A3_ROOT_DIR: "/host/a3" },
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_) {}
+    )
+
+    result = runner.run(["ruby \"$A3_ROOT_DIR/scripts/a3/portal_verification.rb\""], workspace: workspace, task: task, run: run)
+
+    request = client.records.values.first.request
+    expect(result.success?).to eq(true)
+    expect(request.env.fetch("A3_ROOT_DIR")).to eq("/host/a3")
+  end
+
   def agent_result(job_id, status, exit_code)
     A3::Domain::AgentJobResult.new(
       job_id: job_id,

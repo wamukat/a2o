@@ -1283,6 +1283,7 @@ module A3
       parser.on("--agent-allow-insecure-remote-http") { options[:agent_allow_insecure_remote] = true }
       parser.on("--agent-runtime-profile VALUE") { |value| options[:agent_runtime_profile] = value }
       parser.on("--agent-shared-workspace-mode VALUE") { |value| options[:agent_shared_workspace_mode] = value }
+      parser.on("--agent-env KEY=VALUE") { |value| add_named_option(options[:agent_env] ||= {}, value, option_name: "agent env") }
       parser.on("--agent-source-alias SLOT=ALIAS") { |value| add_named_option(options[:agent_source_aliases] ||= {}, value, option_name: "agent source alias") }
       parser.on("--agent-workspace-freshness-policy VALUE") { |value| options[:agent_workspace_freshness_policy] = value.to_sym }
       parser.on("--agent-workspace-cleanup-policy VALUE") { |value| options[:agent_workspace_cleanup_policy] = value.to_sym }
@@ -1404,7 +1405,8 @@ module A3
           shared_workspace_mode: shared_workspace_mode,
           timeout_seconds: options.fetch(:agent_job_timeout_seconds, 1800),
           poll_interval_seconds: options.fetch(:agent_job_poll_interval_seconds, 1.0),
-          workspace_request_builder: agent_workspace_request_builder(options)
+          workspace_request_builder: agent_workspace_request_builder(options),
+          env: options.fetch(:agent_env, {})
         )
       end
 
@@ -1432,7 +1434,8 @@ module A3
           shared_workspace_mode: shared_workspace_mode,
           timeout_seconds: options.fetch(:agent_job_timeout_seconds, 1800),
           poll_interval_seconds: options.fetch(:agent_job_poll_interval_seconds, 1.0),
-          workspace_request_builder: agent_workspace_request_builder(options)
+          workspace_request_builder: agent_workspace_request_builder(options),
+          env: options.fetch(:agent_env, {})
         )
       end
 

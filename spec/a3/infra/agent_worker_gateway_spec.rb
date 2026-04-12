@@ -264,6 +264,68 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     expect(execution.diagnostics.fetch("canonical_changed_files")).to eq("repo_beta" => ["changed.txt"])
   end
 
+  it "keeps empty materialized changed_files evidence for no-op implementation slots" do
+    client.on_fetch = lambda do |job_id|
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: worker_success.merge("changed_files" => { "repo_beta" => [] }),
+          workspace_descriptor: workspace_descriptor(
+            "repo_beta" => materialized_slot_descriptor
+          )
+        )
+      )
+    end
+    gateway = materialized_gateway
+
+    execution = run_gateway(gateway)
+
+    expect(execution).to have_attributes(
+      success: true,
+      summary: "worker completed"
+    )
+    expect(execution.response_bundle.fetch("changed_files")).to eq("repo_beta" => [])
+  end
+
+  it "passes explicit agent env overrides to worker jobs" do
+    client.on_fetch = lambda do |job_id|
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: worker_success.merge("changed_files" => { "repo_beta" => [] }),
+          workspace_descriptor: workspace_descriptor(
+            "repo_beta" => materialized_slot_descriptor
+          )
+        )
+      )
+    end
+    gateway = described_class.new(
+      control_plane_client: client,
+      worker_command: "ruby",
+      worker_command_args: ["worker.rb"],
+      runtime_profile: "host-local",
+      shared_workspace_mode: "agent-materialized",
+      timeout_seconds: 30,
+      poll_interval_seconds: 0,
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_seconds) {},
+      workspace_request_builder: ->(**) { materialized_workspace_request },
+      env: { A3_ROOT_DIR: "/host/a3" }
+    )
+
+    run_gateway(gateway)
+
+    request = client.records.values.first.request
+    expect(request.env).to include("A3_ROOT_DIR" => "/host/a3")
+    expect(request.env).to include("A3_WORKER_REQUEST_PATH")
+  end
+
   it "rejects materialized implementation when required changed files evidence is missing" do
     client.on_fetch = lambda do |job_id|
       client.complete(

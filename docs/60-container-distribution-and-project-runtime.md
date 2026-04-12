@@ -176,6 +176,8 @@ manual loop の標準 profile 例:
 
 host 上で agent を動かす場合、`control_plane_url` は `http://127.0.0.1:<published-port>` のような loopback URL にする。project dev-env container 内で agent を動かす場合、`http://a3-runtime:<port>` のような compose service name を使う。`source_aliases` は agent が実際に見える local path であり、A3 job payload の repo slot から直接 host path を推測しない。
 
+host-local agent へ worker / verification / remediation job を委譲する場合、A3 runtime container 内の `A3_ROOT_DIR=/workspace` をそのまま渡してはいけない。host agent は host filesystem 上で command を実行するため、A3 runtime は `--agent-env A3_ROOT_DIR=<host workspace root>` を明示し、`ruby "$A3_ROOT_DIR/scripts/a3/portal_verification.rb"` のような project helper が host 側で解決できる状態にする。
+
 #### 0.1.1a.1 Final validation variation matrix
 
 A3 完成前の最終確認では、毎回重い実 Portal full verification を実行しない。通常は軽量な protocol / topology / retention smoke を回し、完成判定または大きな runtime 変更時だけ実 Portal source の heavy canary を実行する。

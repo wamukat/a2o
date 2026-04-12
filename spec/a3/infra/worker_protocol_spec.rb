@@ -111,6 +111,55 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
+  it "normalizes project repo labels in review_disposition repo_scope" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => true,
+        "summary" => "worker completed",
+        "task_ref" => task.ref,
+        "run_ref" => implementation_run.ref,
+        "phase" => "implementation",
+        "rework_required" => false,
+        "changed_files" => { "repo_alpha" => ["marker.txt"], "repo_beta" => ["marker.txt"] },
+        "review_disposition" => {
+          "kind" => "completed",
+          "repo_scope" => "repo:both",
+          "summary" => "self-review clean",
+          "description" => "No findings.",
+          "finding_key" => "none"
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: implementation_run.ref,
+      expected_phase: :implementation,
+      canonical_changed_files: { "repo_alpha" => ["marker.txt"], "repo_beta" => ["marker.txt"] }
+    )
+
+    expect(result).to have_attributes(success?: true)
+    expect(result.response_bundle.fetch("review_disposition").fetch("repo_scope")).to eq("both")
+  end
+
+  def implementation_run
+    A3::Domain::Run.new(
+      ref: "run-implementation-1",
+      task_ref: task.ref,
+      phase: :implementation,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: source_descriptor,
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_alpha, :repo_beta],
+        verification_scope: [:repo_alpha, :repo_beta],
+        ownership_scope: :task
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: task.ref,
+        owner_scope: :task,
+        snapshot_version: "head-1"
+      )
+    )
+  end
+
   def source_descriptor
     A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: task.ref, ref: "abc123")
   end

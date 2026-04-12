@@ -181,6 +181,7 @@ module A3
       end
 
       def validate_worker_response(worker_response, expected_task_ref:, expected_run_ref:, expected_phase:)
+        normalize_worker_response!(worker_response)
         implementation_phase = expected_phase.to_s == "implementation"
         parent_review = expected_phase.to_s == "review"
         errors = []
@@ -259,6 +260,17 @@ module A3
           errors << "changed_files must be present for implementation success"
         end
         errors
+      end
+
+      def normalize_worker_response!(worker_response)
+        disposition = worker_response["review_disposition"]
+        return unless disposition.is_a?(Hash)
+
+        disposition["repo_scope"] = {
+          "repo:starters" => "repo_alpha",
+          "repo:ui-app" => "repo_beta",
+          "repo:both" => "both"
+        }.fetch(disposition["repo_scope"], disposition["repo_scope"])
       end
 
       def changed_files_from_workspace(workspace)

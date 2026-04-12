@@ -7,8 +7,8 @@ require "open3"
 module A3
   module Infra
     class LocalWorkspaceChangePublisher
-      COMMITTER_NAME = "A3-v2".freeze
-      COMMITTER_EMAIL = "a3-v2@local".freeze
+      COMMITTER_NAME = "A3".freeze
+      COMMITTER_EMAIL = "a3@local".freeze
 
       def publish(run:, workspace:, execution:, remediation_commands: [])
         return skipped_result("phase #{run.phase} does not publish workspace changes") unless run.phase.to_sym == :implementation
@@ -39,7 +39,7 @@ module A3
             slot_path,
             "-c", "user.name=#{COMMITTER_NAME}",
             "-c", "user.email=#{COMMITTER_EMAIL}",
-            "commit", "-m", "A3-v2 direct canary update for #{run.task_ref}"
+            "commit", "-m", "A3 direct canary update for #{run.task_ref}"
           )
           after_head = rev_parse(slot_path, "HEAD")
           run_git!(slot_path, "update-ref", source_ref, after_head, before_head)

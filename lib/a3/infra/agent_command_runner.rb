@@ -5,7 +5,7 @@ require "securerandom"
 module A3
   module Infra
     class AgentCommandRunner
-      def initialize(control_plane_client:, runtime_profile:, shared_workspace_mode:, timeout_seconds: 1800, poll_interval_seconds: 1.0, job_id_generator: -> { SecureRandom.uuid }, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, workspace_request_builder: nil)
+      def initialize(control_plane_client:, runtime_profile:, shared_workspace_mode:, timeout_seconds: 1800, poll_interval_seconds: 1.0, job_id_generator: -> { SecureRandom.uuid }, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, workspace_request_builder: nil, env: {})
         @control_plane_client = control_plane_client
         @runtime_profile = runtime_profile.to_s
         @shared_workspace_mode = shared_workspace_mode.to_s
@@ -15,6 +15,7 @@ module A3
         @sleeper = sleeper
         @monotonic_clock = monotonic_clock
         @workspace_request_builder = workspace_request_builder
+        @env = env.transform_keys(&:to_s).transform_values(&:to_s).freeze
       end
 
       def run(commands, workspace:, env: {}, task: nil, run: nil, **)
@@ -53,7 +54,7 @@ module A3
           working_dir: workspace.root_path.to_s,
           command: "sh",
           args: ["-lc", command.to_s],
-          env: default_env.merge(env),
+          env: default_env.merge(@env).merge(env),
           timeout_seconds: @timeout_seconds,
           artifact_rules: []
         )

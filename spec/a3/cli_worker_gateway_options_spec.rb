@@ -30,6 +30,26 @@ RSpec.describe "A3 CLI worker gateway options" do
     expect(gateway).to be_a(A3::Infra::AgentWorkerGateway)
   end
 
+  it "passes explicit agent env options to an agent HTTP worker gateway" do
+    gateway = A3::CLI.send(
+      :build_worker_gateway,
+      options: {
+        worker_gateway: "agent-http",
+        worker_command: "ruby",
+        worker_command_args: ["worker.rb"],
+        agent_control_plane_url: "http://127.0.0.1:4567",
+        agent_runtime_profile: "host-local",
+        agent_shared_workspace_mode: "same-path",
+        agent_env: {
+          "A3_ROOT_DIR" => "/host/a3"
+        }
+      },
+      command_runner: instance_double(A3::Infra::LocalCommandRunner)
+    )
+
+    expect(gateway.instance_variable_get(:@env)).to eq("A3_ROOT_DIR" => "/host/a3")
+  end
+
   it "builds an agent materialized HTTP worker gateway with explicit source aliases" do
     gateway = A3::CLI.send(
       :build_worker_gateway,
@@ -147,6 +167,24 @@ RSpec.describe "A3 CLI worker gateway options" do
     )
 
     expect(runner).to be_a(A3::Infra::AgentCommandRunner)
+  end
+
+  it "passes explicit agent env options to an agent HTTP verification command runner" do
+    runner = A3::CLI.send(
+      :build_command_runner,
+      options: {
+        verification_command_runner: "agent-http",
+        agent_control_plane_url: "http://127.0.0.1:4567",
+        agent_runtime_profile: "host-local",
+        agent_shared_workspace_mode: "same-path",
+        agent_env: {
+          "A3_ROOT_DIR" => "/host/a3"
+        }
+      },
+      fallback: instance_double(A3::Infra::LocalCommandRunner)
+    )
+
+    expect(runner.instance_variable_get(:@env)).to eq("A3_ROOT_DIR" => "/host/a3")
   end
 
   it "resolves the agent auth token from a token file when no direct token is configured" do
