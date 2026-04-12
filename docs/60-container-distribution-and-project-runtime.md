@@ -250,11 +250,18 @@ disk pressure 時の cleanup 判断:
 
 この分類により、「operator が日常的に使う入口」は root Taskfile と bundle task に寄せ、A3 CLI の低レベル command は smoke harness / diagnosis / recovery の実装面として扱う。
 
-命名上の残課題: `bundle` は実装由来の呼称であり、operator には「Docker 上 A3 runtime + SoloBoard + host/dev-env agent を使う local runtime」という意味が伝わりにくい。最終 validation が `A3 Engine on Docker` + `A3 Agents on Local` に固定されるタイミングで、root Taskfile の public entrypoint は `a3:portal:bundle:*` から `a3:portal:docker-runtime:*` または `a3:portal:local-runtime:*` へ rename する。移行時は短期間だけ旧名を maintenance alias として残し、docs / operator logs / watch-summary の表記から `bundle` を順次外す。候補名は次の整理で決める。
+命名上の残課題: `bundle` は実装由来の呼称であり、operator には「Docker 上 A3 runtime + SoloBoard + host/dev-env agent を使う local runtime」という意味が伝わりにくい。A3 Engine 自体は Docker 上で動かすことを主眼に置くため、operator-facing な `runtime` は自動的に `A3 Engine on Docker` を指すものとして扱う。したがって root Taskfile の public entrypoint は `a3:portal:bundle:*` から `a3:portal:runtime:*` へ rename する。移行時は短期間だけ旧名を maintenance alias として残し、docs / operator logs / watch-summary の表記から `bundle` を順次外す。
 
-- `a3:portal:docker-runtime:*`: A3 Engine と SoloBoard が Docker compose 上で動くことを明示できる
-- `a3:portal:local-runtime:*`: central server ではなく local-first runtime であることを強調できる
-- `a3:portal:runtime:*`: 最終的に Docker 以外の起動方式も含めるなら最も短いが、現時点では意味が広すぎる
+命名判断:
+
+- 採用: `a3:portal:runtime:*`
+  - operator には A3 の通常実行環境として見せる
+  - 現行 scope では Docker compose 上の A3 runtime / SoloBoard を指す
+  - `host-agent` / `local-agent` は agent 側 task 名で明示する
+- 不採用: `a3:portal:docker-runtime:*`
+  - 正確だが、A3 の標準 runtime が Docker であるという前提を毎回名前に出しすぎる
+- 不採用: `a3:portal:local-runtime:*`
+  - local-first であることは表せるが、A3 Engine が Docker 上で動く点が曖昧になる
 
 ### 0.1.2 2026-04-08 v1 / legacy 破棄可否の現状判定
 
