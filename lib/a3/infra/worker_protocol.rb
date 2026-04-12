@@ -269,7 +269,9 @@ module A3
         disposition["repo_scope"] = {
           "repo:starters" => "repo_alpha",
           "repo:ui-app" => "repo_beta",
-          "repo:both" => "both"
+          "repo:both" => "both",
+          "repo_alpha,repo_beta" => "both",
+          "repo_beta,repo_alpha" => "both"
         }.fetch(disposition["repo_scope"], disposition["repo_scope"])
       end
 
