@@ -163,10 +163,11 @@ domain は、少なくとも次を判定できる必要がある。
 ### 7.2 representative rules
 
 - `single`
-  - `implementation completed` -> `review`
-  - `review completed` -> `verification`
+  - `implementation completed` -> `verification`
   - `verification completed` -> `merge`
 - `child`
+  - `implementation completed` -> `verification`
+  - `verification completed` -> `merge`
   - `merge completed` -> terminal `done`
 - `parent`
   - `review completed` -> `verification`
