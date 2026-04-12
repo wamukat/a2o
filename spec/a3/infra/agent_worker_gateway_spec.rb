@@ -206,7 +206,10 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
             "run_ref" => review_run.ref,
             "phase" => "review",
             "rework_required" => false
-          }
+          },
+          workspace_descriptor: workspace_descriptor(
+            "repo_beta" => materialized_slot_descriptor_without_changed_files
+          )
         )
       )
     end
@@ -234,6 +237,92 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       success: true,
       summary: "review completed"
     )
+  end
+
+  it "rejects materialized review when workspace descriptor metadata does not match the request" do
+    client.on_fetch = lambda do |job_id|
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: {
+            "success" => true,
+            "summary" => "review completed",
+            "task_ref" => task.ref,
+            "run_ref" => review_run.ref,
+            "phase" => "review",
+            "rework_required" => false
+          },
+          workspace_descriptor: workspace_descriptor(
+            "repo_beta" => materialized_slot_descriptor_without_changed_files.merge(
+              "branch_ref" => "refs/heads/a3/work/wrong"
+            )
+          )
+        )
+      )
+    end
+    gateway = materialized_gateway
+
+    execution = gateway.run(
+      skill: phase_runtime.review_skill,
+      workspace: workspace,
+      task: task,
+      run: review_run,
+      phase_runtime: phase_runtime,
+      task_packet: task_packet
+    )
+
+    expect(execution).to have_attributes(
+      success: false,
+      failing_command: "agent_materialized_changed_files",
+      observed_state: "agent_materialized_changed_files_invalid"
+    )
+    expect(execution.diagnostics.fetch("validation_errors")).to include("repo_beta.branch_ref must match workspace_request")
+  end
+
+  it "rejects materialized verification when workspace descriptor metadata does not match the request" do
+    client.on_fetch = lambda do |job_id|
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: {
+            "success" => true,
+            "summary" => "verification completed",
+            "task_ref" => task.ref,
+            "run_ref" => verification_run.ref,
+            "phase" => "verification",
+            "rework_required" => false
+          },
+          workspace_descriptor: workspace_descriptor(
+            "repo_beta" => materialized_slot_descriptor_without_changed_files.merge(
+              "ownership" => "support"
+            )
+          )
+        )
+      )
+    end
+    gateway = materialized_gateway
+
+    execution = gateway.run(
+      skill: "verification",
+      workspace: workspace,
+      task: task,
+      run: verification_run,
+      phase_runtime: phase_runtime,
+      task_packet: task_packet
+    )
+
+    expect(execution).to have_attributes(
+      success: false,
+      failing_command: "agent_materialized_changed_files",
+      observed_state: "agent_materialized_changed_files_invalid"
+    )
+    expect(execution.diagnostics.fetch("validation_errors")).to include("repo_beta.ownership must match workspace_request")
   end
 
   it "accepts successful implementation in agent materialized mode using descriptor changed files as canonical evidence" do
@@ -513,6 +602,26 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     )
   end
 
+  def verification_run
+    A3::Domain::Run.new(
+      ref: "run-verification-1",
+      task_ref: task.ref,
+      phase: :verification,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: source_descriptor,
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_beta],
+        verification_scope: [:repo_beta],
+        ownership_scope: :child
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: task.ref,
+        owner_scope: :child,
+        snapshot_version: "head-1"
+      )
+    )
+  end
+
   def materialized_workspace_request
     A3::Domain::AgentWorkspaceRequest.new(
       mode: :agent_materialized,
@@ -526,7 +635,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
             kind: "local_git",
             alias: "member-portal-starters"
           },
-          ref: "abc123",
+          ref: "refs/heads/a3/work/Portal-42",
           checkout: "worktree_branch",
           access: "read_write",
           sync_class: "eager",
@@ -601,7 +710,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
   end
 
   def source_descriptor
-    A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: task.ref, ref: "abc123")
+    A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: task.ref, ref: "refs/heads/a3/work/Portal-42")
   end
 
   def workspace_descriptor(slot_descriptors = {})
@@ -626,7 +735,8 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       "source_kind" => "local_git",
       "source_alias" => "member-portal-starters",
       "checkout" => "worktree_branch",
-      "requested_ref" => "abc123",
+      "requested_ref" => "refs/heads/a3/work/Portal-42",
+      "branch_ref" => "refs/heads/a3/work/Portal-42",
       "resolved_head" => "abc123",
       "dirty_before" => false,
       "dirty_after" => true,

@@ -55,6 +55,9 @@ func (m WorkspaceMaterializer) Prepare(request WorkspaceRequest) (PreparedWorksp
 		if !validOwnership(slot.Ownership) {
 			return PreparedWorkspace{}, fmt.Errorf("unsupported ownership for %s: %s", slotName, slot.Ownership)
 		}
+		if _, err := branchNameForRef(slot.Ref); err != nil {
+			return PreparedWorkspace{}, fmt.Errorf("unsupported branch ref for %s: %s", slotName, slot.Ref)
+		}
 		sourceRoot, err := m.sourceRoot(slot.Source.Alias)
 		if err != nil {
 			return PreparedWorkspace{}, err
@@ -191,10 +194,18 @@ func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot
 	if err := os.RemoveAll(slotPath); err != nil {
 		return nil, err
 	}
-	if err := runGit(sourceRoot, "worktree", "add", "--force", slotPath, slot.Ref); err != nil {
+	branchName, err := branchNameForRef(slot.Ref)
+	if err != nil {
+		return nil, err
+	}
+	if err := runGit(sourceRoot, "worktree", "add", "--force", slotPath, branchName); err != nil {
 		return nil, err
 	}
 	head, err := gitOutput(slotPath, "rev-parse", "HEAD")
+	if err != nil {
+		return nil, err
+	}
+	actualRef, err := gitOutput(slotPath, "symbolic-ref", "--quiet", "HEAD")
 	if err != nil {
 		return nil, err
 	}
@@ -208,6 +219,7 @@ func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot
 		"source_alias":  slot.Source.Alias,
 		"checkout":      slot.Checkout,
 		"requested_ref": slot.Ref,
+		"branch_ref":    actualRef,
 		"resolved_head": head,
 		"dirty_before":  false,
 		"dirty_after":   dirtyAfter,
@@ -215,6 +227,14 @@ func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot
 		"sync_class":    slot.SyncClass,
 		"ownership":     slot.Ownership,
 	}, nil
+}
+
+func branchNameForRef(ref string) (string, error) {
+	const prefix = "refs/heads/"
+	if !strings.HasPrefix(ref, prefix) || len(ref) == len(prefix) {
+		return "", fmt.Errorf("expected refs/heads/*")
+	}
+	return strings.TrimPrefix(ref, prefix), nil
 }
 
 func gitPatch(root string) (string, error) {

@@ -95,10 +95,21 @@ module A3
         return completed if completed.is_a?(A3::Application::ExecutionResult)
         return agent_result_execution(completed.result) unless completed.result.succeeded?
 
+        descriptor_validation = materialized_changed_files_evidence(
+          workspace_request: request.workspace_request,
+          result: completed.result,
+          require_changed_files: false
+        )
+        return descriptor_validation if descriptor_validation.is_a?(A3::Application::ExecutionResult)
+
         worker_response = completed.result.worker_protocol_result
         canonical_changed_files = nil
         if run.phase.to_sym == :implementation && worker_response&.fetch("success", nil) == true
-          evidence = materialized_changed_files_evidence(workspace_request: request.workspace_request, result: completed.result)
+          evidence = materialized_changed_files_evidence(
+            workspace_request: request.workspace_request,
+            result: completed.result,
+            require_changed_files: true
+          )
           return evidence if evidence.is_a?(A3::Application::ExecutionResult)
 
           patch_result = apply_materialized_patches(workspace: workspace, workspace_request: request.workspace_request, result: completed.result)
@@ -205,7 +216,7 @@ module A3
         )
       end
 
-      def materialized_changed_files_evidence(workspace_request:, result:)
+      def materialized_changed_files_evidence(workspace_request:, result:, require_changed_files: true)
         errors = []
         slots = result.workspace_descriptor.slot_descriptors
         canonical_changed_files = {}
@@ -223,7 +234,10 @@ module A3
             "source_alias" => source.fetch("alias"),
             "checkout" => request_slot.fetch("checkout"),
             "requested_ref" => request_slot.fetch("ref"),
-            "access" => request_slot.fetch("access")
+            "branch_ref" => request_slot.fetch("ref"),
+            "access" => request_slot.fetch("access"),
+            "sync_class" => request_slot.fetch("sync_class"),
+            "ownership" => request_slot.fetch("ownership")
           }.each do |key, expected|
             errors << "#{slot_name}.#{key} must match workspace_request" unless descriptor[key] == expected
           end
@@ -231,12 +245,14 @@ module A3
           errors << "#{slot_name}.resolved_head must be present" unless descriptor["resolved_head"].is_a?(String) && !descriptor["resolved_head"].empty?
           errors << "#{slot_name}.dirty_before must be false" unless descriptor["dirty_before"] == false
           errors << "#{slot_name}.dirty_after must be true or false" unless [true, false].include?(descriptor["dirty_after"])
-          changed_files = descriptor["changed_files"]
-          unless changed_files.is_a?(Array) && changed_files.all? { |entry| entry.is_a?(String) }
-            errors << "#{slot_name}.changed_files must be an array of strings"
-            next
+          if require_changed_files
+            changed_files = descriptor["changed_files"]
+            unless changed_files.is_a?(Array) && changed_files.all? { |entry| entry.is_a?(String) }
+              errors << "#{slot_name}.changed_files must be an array of strings"
+              next
+            end
+            canonical_changed_files[slot_name] = changed_files.sort.uniq
           end
-          canonical_changed_files[slot_name] = changed_files.sort.uniq
         end
         return canonical_changed_files if errors.empty?
 

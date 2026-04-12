@@ -343,6 +343,7 @@ Rules:
     "source_alias": "member-portal-starters",
     "checkout": "worktree_branch",
     "requested_ref": "refs/heads/a3/work/Portal-123",
+    "branch_ref": "refs/heads/a3/work/Portal-123",
     "resolved_head": "abc123",
     "dirty_before": false,
     "dirty_after": true,

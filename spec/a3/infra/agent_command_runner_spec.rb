@@ -21,7 +21,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
   end
 
   let(:client) { FakeAgentCommandClient.new(records: {}, base_url: "http://127.0.0.1:7393") }
-  let(:source_descriptor) { A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Portal#42", ref: "abc123") }
+  let(:source_descriptor) { A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Portal#42", ref: "refs/heads/a3/work/Portal-42") }
   let(:workspace) do
     A3::Domain::PreparedWorkspace.new(
       workspace_kind: :runtime_workspace,
@@ -39,7 +39,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
       workspace_kind: :runtime_workspace,
       source_descriptor: source_descriptor,
       scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], ownership_scope: :task),
-      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: task.ref, owner_scope: :task, snapshot_version: "abc123")
+      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: task.ref, owner_scope: :task, snapshot_version: "refs/heads/a3/work/Portal-42")
     )
   end
 

@@ -93,4 +93,27 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       )
     end.to raise_error(KeyError, /sync_class/)
   end
+
+  it "rejects non-branch refs for worktree branch checkout" do
+    expect do
+      described_class.new(
+        mode: :agent_materialized,
+        workspace_kind: :ticket_workspace,
+        workspace_id: "Portal-42-ticket",
+        freshness_policy: :reuse_if_clean_and_ref_matches,
+        cleanup_policy: :retain_until_a3_cleanup,
+        slots: {
+          repo_alpha: {
+            source: { kind: "local_git", alias: "member-portal-starters" },
+            ref: "abc123",
+            checkout: "worktree_branch",
+            access: "read_write",
+            sync_class: "eager",
+            ownership: "edit_target",
+            required: true
+          }
+        }
+      )
+    end.to raise_error(A3::Domain::ConfigurationError, /unsupported branch ref/)
+  end
 end

@@ -31,6 +31,9 @@ func TestWorkspaceMaterializerPreparesAndCleansWorktreeSlots(t *testing.T) {
 	if descriptor["source_alias"] != "member-portal-starters" {
 		t.Fatalf("unexpected descriptor: %#v", descriptor)
 	}
+	if descriptor["branch_ref"] != "refs/heads/a3/work/Portal-42" {
+		t.Fatalf("unexpected branch descriptor: %#v", descriptor)
+	}
 	if descriptor["dirty_before"] != false || descriptor["dirty_after"] != false {
 		t.Fatalf("unexpected dirty descriptor: %#v", descriptor)
 	}
@@ -104,6 +107,25 @@ func TestWorkspaceMaterializerRejectsMissingSlotMetadata(t *testing.T) {
 
 	if _, err := materializer.Prepare(request); err == nil || !strings.Contains(err.Error(), "unsupported sync_class") {
 		t.Fatalf("expected unsupported sync_class failure, got %v", err)
+	}
+}
+
+func TestWorkspaceMaterializerRejectsNonBranchRefs(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"member-portal-starters": sourceRoot,
+		},
+	}
+	request := testWorkspaceRequest("member-portal-starters")
+	slot := request.Slots["repo_alpha"]
+	slot.Ref = "HEAD"
+	request.Slots["repo_alpha"] = slot
+
+	if _, err := materializer.Prepare(request); err == nil || !strings.Contains(err.Error(), "unsupported branch ref") {
+		t.Fatalf("expected unsupported branch ref failure, got %v", err)
 	}
 }
 
