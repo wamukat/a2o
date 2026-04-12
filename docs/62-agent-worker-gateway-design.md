@@ -267,6 +267,8 @@ Status: design review target.
 
 The first `AgentWorkerGateway` slice still uses A3-prepared workspaces and a `same-path` mount. That is intentionally temporary. The target architecture is that the agent runtime owns checkout/worktree creation, dirty check, cleanup, and quarantine on the filesystem where commands run.
 
+The same ownership applies to project repo mutation. In Docker + host/dev-env agent mode, A3 Engine is a control plane only: it creates `workspace_request` / future publish-merge requests, validates returned descriptors and artifacts, and updates task/run state. It must not create, checkout, commit, merge, publish, cleanup, or quarantine project-repo worktrees on behalf of the agent. Ruby `local_*` Git adapters are legacy direct/local compatibility surfaces, not the primary Docker distribution path.
+
 ### Current Gap
 
 `AgentJobRequest` currently contains:
@@ -307,8 +309,10 @@ Add an optional `workspace_request` object to `AgentJobRequest`.
           "alias": "member-portal-starters"
         },
         "ref": "refs/heads/a3/work/Portal-123",
-        "checkout": "worktree_detached",
+        "checkout": "worktree_branch",
         "access": "read_write",
+        "sync_class": "eager",
+        "ownership": "edit_target",
         "required": true
       }
     }
@@ -322,7 +326,7 @@ Rules:
 - If absent, agents keep current behavior and execute `working_dir` directly.
 - If present with `mode=agent_materialized`, `working_dir` is deprecated and ignored for materialization. The agent places `workspace_id` under its configured runtime-profile workspace root.
 - The agent must materialize all `required=true` slots before running the command.
-- For `local_git` sources, `source.alias` resolves through the agent runtime profile to a scratch parent repository. The agent must create the slot as a leaf worktree using `git worktree add --force --detach`.
+- For `local_git` sources, `source.alias` resolves through the agent runtime profile to a local project repo. The agent must create the slot as a dedicated branch worktree using `git worktree add --force <slot_path> <branch>`.
 - The agent must write worker protocol env paths under the materialized workspace root.
 - A3 must verify `AgentWorkspaceDescriptor` against `workspace_request` after job completion.
 - Job payload must not choose arbitrary agent filesystem roots. The writable workspace root is agent configuration, not A3 job input.
@@ -337,12 +341,14 @@ Rules:
     "runtime_path": "/agent/workspaces/Portal-123-ticket/repo-alpha",
     "source_kind": "local_git",
     "source_alias": "member-portal-starters",
-    "checkout": "worktree_detached",
+    "checkout": "worktree_branch",
     "requested_ref": "refs/heads/a3/work/Portal-123",
     "resolved_head": "abc123",
     "dirty_before": false,
     "dirty_after": true,
-    "access": "read_write"
+    "access": "read_write",
+    "sync_class": "eager",
+    "ownership": "edit_target"
   }
 }
 ```
@@ -367,7 +373,7 @@ Do not move full Portal execution yet. Split implementation into three commits:
    - Add Go contract structs for `workspace_request`.
    - Add roundtrip tests.
 2. Materializer unit: implemented.
-   - Add agent-side materializer for `local_git` alias + `worktree_detached`.
+   - Add agent-side materializer for `local_git` alias + `worktree_branch`.
    - Materializer API has `prepare` and `cleanup` so tests and smoke can remove worktrees deterministically.
    - Use agent config to resolve source aliases and workspace root.
 3. Worker protocol transport contract: implemented.
