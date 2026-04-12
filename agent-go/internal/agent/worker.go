@@ -25,6 +25,10 @@ type WorkspacePublisher interface {
 	Publish(prepared PreparedWorkspace, request WorkspaceRequest, workerProtocolResult map[string]any) error
 }
 
+type WorkspaceMerger interface {
+	Merge(request MergeRequest) (WorkspaceDescriptor, ExecutionResult)
+}
+
 const maxWorkerProtocolPayloadBytes = 1024 * 1024
 
 type Worker struct {
@@ -86,6 +90,9 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 
 	now := w.now()
 	startedAt := now.Format(time.RFC3339)
+	if request.MergeRequest != nil {
+		return w.runMergeJob(*request, startedAt)
+	}
 	runRequest, prepared, workspaceDescriptor, err := w.prepareRequest(*request)
 	if err != nil {
 		result, idle, submitErr := w.submitFailure(*request, workspaceDescriptor, startedAt, fmt.Sprintf("A3 agent workspace preparation failed: %v\n", err))
@@ -146,6 +153,44 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 		return &result, false, submitErr
 	}
 	return &result, false, cleanupErr
+}
+
+func (w Worker) runMergeJob(request JobRequest, startedAt string) (*JobResult, bool, error) {
+	descriptor, execution := w.mergeRequest(*request.MergeRequest)
+	finishedAt := w.now().Format(time.RFC3339)
+	descriptor.RuntimeProfile = request.RuntimeProfile
+	descriptor.SourceDescriptor = request.SourceDescriptor
+	if descriptor.WorkspaceKind == "" {
+		descriptor.WorkspaceKind = request.SourceDescriptor.WorkspaceKind
+	}
+	logUpload, err := w.upload("combined-log", safeID(request.JobID+"-combined-log"), "diagnostic", "text/plain", execution.CombinedLog)
+	if err != nil {
+		return nil, false, err
+	}
+	result := JobResult{
+		JobID:               request.JobID,
+		Status:              execution.Status,
+		ExitCode:            execution.ExitCode,
+		StartedAt:           startedAt,
+		FinishedAt:          finishedAt,
+		Summary:             fmt.Sprintf("merge %s", execution.Status),
+		LogUploads:          []ArtifactUpload{logUpload},
+		ArtifactUploads:     []ArtifactUpload{},
+		WorkspaceDescriptor: descriptor,
+		Heartbeat:           finishedAt,
+	}
+	submitErr := w.Client.SubmitResult(result)
+	if submitErr != nil {
+		return &result, false, submitErr
+	}
+	return &result, false, nil
+}
+
+func (w Worker) mergeRequest(request MergeRequest) (WorkspaceDescriptor, ExecutionResult) {
+	if merger, ok := w.Materializer.(WorkspaceMerger); ok {
+		return merger.Merge(request)
+	}
+	return WorkspaceDescriptor{WorkspaceID: request.WorkspaceID, SlotDescriptors: map[string]map[string]any{}}, failedMergeExecution(fmt.Errorf("workspace merger is not configured"))
 }
 
 func (w Worker) publishPrepared(prepared PreparedWorkspace, request WorkspaceRequest, workerProtocolResult map[string]any) error {

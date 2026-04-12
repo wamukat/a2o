@@ -261,4 +261,28 @@ RSpec.describe A3::Application::RunMerge do
     )
     expect(result.run.terminal_outcome).to eq(:completed)
   end
+
+  it "skips Engine workspace preparation when the merge runner is agent-owned" do
+    agent_merge_runner = instance_double("AgentMergeRunner", agent_owned?: true)
+    use_case = described_class.new(
+      task_repository: task_repository,
+      run_repository: run_repository,
+      register_completed_run: register_completed_run,
+      build_merge_plan: build_merge_plan,
+      merge_runner: agent_merge_runner,
+      prepare_workspace: prepare_workspace
+    )
+    expect(prepare_workspace).not_to receive(:call)
+    allow(agent_merge_runner).to receive(:run).with(
+      an_instance_of(A3::Domain::MergePlan),
+      workspace: an_instance_of(A3::Domain::PreparedWorkspace)
+    ).and_return(
+      A3::Application::ExecutionResult.new(success: true, summary: "agent merged ok")
+    )
+
+    result = use_case.call(task_ref: task.ref, run_ref: run.ref, project_context: project_context)
+
+    expect(result.task.status).to eq(:done)
+    expect(result.run.phase_records.last.execution_record&.summary).to eq("agent merged ok")
+  end
 end

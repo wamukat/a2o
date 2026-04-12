@@ -176,6 +176,10 @@ module A3
         @merge_runner.run(@merge_plan, workspace: workspace)
       end
 
+      def requires_workspace?
+        !(@merge_runner.respond_to?(:agent_owned?) && @merge_runner.agent_owned?)
+      end
+
       def blocked_expected_state
         "merge succeeds"
       end

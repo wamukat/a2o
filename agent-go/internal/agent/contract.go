@@ -14,6 +14,7 @@ type JobRequest struct {
 	RuntimeProfile        string              `json:"runtime_profile"`
 	SourceDescriptor      SourceDescriptor    `json:"source_descriptor"`
 	WorkspaceRequest      *WorkspaceRequest   `json:"workspace_request,omitempty"`
+	MergeRequest          *MergeRequest       `json:"merge_request,omitempty"`
 	WorkerProtocolRequest map[string]any      `json:"worker_protocol_request,omitempty"`
 	WorkingDir            string              `json:"working_dir"`
 	Command               string              `json:"command"`
@@ -21,6 +22,19 @@ type JobRequest struct {
 	Env                   map[string]string   `json:"env"`
 	TimeoutSeconds        int                 `json:"timeout_seconds"`
 	ArtifactRules         []map[string]string `json:"artifact_rules"`
+}
+
+type MergeRequest struct {
+	WorkspaceID string                      `json:"workspace_id"`
+	Policy      string                      `json:"policy"`
+	Slots       map[string]MergeSlotRequest `json:"slots"`
+}
+
+type MergeSlotRequest struct {
+	Source       WorkspaceSourceRequest `json:"source"`
+	SourceRef    string                 `json:"source_ref"`
+	TargetRef    string                 `json:"target_ref"`
+	BootstrapRef string                 `json:"bootstrap_ref,omitempty"`
 }
 
 type WorkspaceRequest struct {

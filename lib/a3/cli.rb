@@ -871,6 +871,7 @@ module A3
         kanban_repo_label_map: {},
         kanban_trigger_labels: [],
         verification_command_runner: "local",
+        merge_runner: "local",
         worker_gateway: "local",
         worker_command_args: []
       }
@@ -882,6 +883,7 @@ module A3
       parser.on("--preset-dir DIR") { |value| options[:preset_dir] = File.expand_path(value) }
       add_kanban_bridge_options(parser, options)
       add_verification_command_runner_options(parser, options)
+      add_merge_runner_options(parser, options)
       add_worker_gateway_options(parser, options)
       remaining = parser.parse(argv)
 
@@ -899,6 +901,7 @@ module A3
         kanban_repo_label_map: {},
         kanban_trigger_labels: [],
         verification_command_runner: "local",
+        merge_runner: "local",
         worker_gateway: "local",
         worker_command_args: []
       }
@@ -911,6 +914,7 @@ module A3
       parser.on("--max-steps VALUE") { |value| options[:max_steps] = Integer(value) }
       add_kanban_bridge_options(parser, options)
       add_verification_command_runner_options(parser, options)
+      add_merge_runner_options(parser, options)
       add_worker_gateway_options(parser, options)
       remaining = parser.parse(argv)
       options[:manifest_path] = File.expand_path(remaining.fetch(0))
@@ -1074,6 +1078,7 @@ module A3
         kanban_repo_label_map: {},
         kanban_trigger_labels: [],
         verification_command_runner: "local",
+        merge_runner: "local",
         worker_gateway: "local",
         worker_command_args: []
       }
@@ -1085,6 +1090,7 @@ module A3
       parser.on("--preset-dir DIR") { |value| options[:preset_dir] = File.expand_path(value) }
       add_kanban_bridge_options(parser, options)
       add_verification_command_runner_options(parser, options)
+      add_merge_runner_options(parser, options)
       add_worker_gateway_options(parser, options)
       remaining = parser.parse(argv)
 
@@ -1139,7 +1145,7 @@ module A3
         external_follow_up_child_writer: bridge.follow_up_child_writer,
         run_id_generator: run_id_generator,
         command_runner: build_command_runner(options: options, fallback: command_runner),
-        merge_runner: merge_runner,
+        merge_runner: build_merge_runner(options: options, fallback: merge_runner),
         worker_gateway: worker_gateway || build_worker_gateway(options: options, command_runner: command_runner)
       )
     end
@@ -1181,7 +1187,7 @@ module A3
         external_follow_up_child_writer: bridge.follow_up_child_writer,
         run_id_generator: run_id_generator,
         command_runner: build_command_runner(options: options, fallback: command_runner),
-        merge_runner: merge_runner,
+        merge_runner: build_merge_runner(options: options, fallback: merge_runner),
         worker_gateway: worker_gateway || build_worker_gateway(options: options, command_runner: command_runner)
       )
     end
@@ -1293,6 +1299,10 @@ module A3
 
     def add_verification_command_runner_options(parser, options)
       parser.on("--verification-command-runner VALUE") { |value| options[:verification_command_runner] = value }
+    end
+
+    def add_merge_runner_options(parser, options)
+      parser.on("--merge-runner VALUE") { |value| options[:merge_runner] = value }
     end
 
     def parse_cleanup_list(value)
@@ -1440,6 +1450,31 @@ module A3
       end
 
       raise ArgumentError, "Unsupported verification command runner: #{runner}"
+    end
+
+    def build_merge_runner(options:, fallback:)
+      runner = options.fetch(:merge_runner, "local").to_s
+      return fallback if runner == "local"
+
+      if runner == "agent-http"
+        raise ArgumentError, "--agent-control-plane-url is required for --merge-runner agent-http" unless options[:agent_control_plane_url]
+        validate_agent_control_plane_url!(options.fetch(:agent_control_plane_url), allow_insecure_remote: options.fetch(:agent_allow_insecure_remote, false))
+        source_aliases = options.fetch(:agent_source_aliases, {})
+        raise ArgumentError, "--agent-source-alias is required for --merge-runner agent-http" if source_aliases.empty?
+
+        return A3::Infra::AgentMergeRunner.new(
+          control_plane_client: A3::Infra::AgentControlPlaneClient.new(
+            base_url: options.fetch(:agent_control_plane_url),
+            auth_token: agent_control_auth_token(options)
+          ),
+          runtime_profile: options.fetch(:agent_runtime_profile, "default"),
+          source_aliases: source_aliases,
+          timeout_seconds: options.fetch(:agent_job_timeout_seconds, 1800),
+          poll_interval_seconds: options.fetch(:agent_job_poll_interval_seconds, 1.0)
+        )
+      end
+
+      raise ArgumentError, "Unsupported merge runner: #{runner}"
     end
 
     def agent_auth_token(options)

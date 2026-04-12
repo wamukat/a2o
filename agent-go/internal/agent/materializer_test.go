@@ -255,6 +255,166 @@ func TestPublishWorkspaceChangesRollsBackCurrentSlotOnStageFailure(t *testing.T)
 	}
 }
 
+func TestWorkspaceMaterializerMergesBranchRefs(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "repo-alpha")
+	if err := os.WriteFile(filepath.Join(sourceRoot, "feature.txt"), []byte("feature\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "feature.txt")
+	git(t, sourceRoot, "commit", "-q", "-m", "feature")
+	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", "HEAD")
+	git(t, sourceRoot, "branch", "a3/live", "HEAD~1")
+	before := git(t, sourceRoot, "rev-parse", "refs/heads/a3/live")
+	source := git(t, sourceRoot, "rev-parse", "refs/heads/a3/work/Portal-42")
+
+	descriptor, execution := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": sourceRoot,
+		},
+	}.Merge(MergeRequest{
+		WorkspaceID: "merge-Portal-42",
+		Policy:      "ff_only",
+		Slots: map[string]MergeSlotRequest{
+			"repo_alpha": {
+				Source: WorkspaceSourceRequest{
+					Kind:  "local_git",
+					Alias: "repo-alpha",
+				},
+				SourceRef: "refs/heads/a3/work/Portal-42",
+				TargetRef: "refs/heads/a3/live",
+			},
+		},
+	})
+
+	if execution.Status != "succeeded" {
+		t.Fatalf("merge failed: %#v", execution)
+	}
+	if head := git(t, sourceRoot, "rev-parse", "refs/heads/a3/live"); head != source {
+		t.Fatalf("target branch was not advanced: got=%s want=%s", head, source)
+	}
+	slot := descriptor.SlotDescriptors["repo_alpha"]
+	if slot["merge_before_head"] != trimTrailingNewline(before) || slot["merge_after_head"] != trimTrailingNewline(source) {
+		t.Fatalf("unexpected merge descriptor: %#v", slot)
+	}
+	if slot["merge_status"] != "merged" || slot["project_repo_mutator"] != "a3-agent" {
+		t.Fatalf("missing agent merge evidence: %#v", slot)
+	}
+	if out := git(t, sourceRoot, "worktree", "list", "--porcelain"); strings.Contains(out, "merge-Portal-42") {
+		t.Fatalf("merge worktree leaked: %s", out)
+	}
+}
+
+func TestWorkspaceMaterializerRejectsUnknownMergePolicy(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "repo-alpha")
+
+	_, execution := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": sourceRoot,
+		},
+	}.Merge(MergeRequest{
+		WorkspaceID: "merge-Portal-42",
+		Policy:      "surprising_policy",
+		Slots: map[string]MergeSlotRequest{
+			"repo_alpha": {
+				Source: WorkspaceSourceRequest{
+					Kind:  "local_git",
+					Alias: "repo-alpha",
+				},
+				SourceRef: "refs/heads/a3/work/Portal-42",
+				TargetRef: "refs/heads/a3/live",
+			},
+		},
+	})
+
+	if execution.Status != "failed" || !strings.Contains(string(execution.CombinedLog), "unsupported merge policy") {
+		t.Fatalf("expected unsupported policy failure, got %#v", execution)
+	}
+}
+
+func TestWorkspaceMaterializerRemovesBootstrappedTargetRefOnMergeFailure(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "repo-alpha")
+	if err := os.WriteFile(filepath.Join(sourceRoot, "feature.txt"), []byte("feature\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "feature.txt")
+	git(t, sourceRoot, "commit", "-q", "-m", "feature")
+	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", "HEAD")
+
+	_, execution := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": sourceRoot,
+		},
+	}.Merge(MergeRequest{
+		WorkspaceID: "merge-Portal-42",
+		Policy:      "ff_only",
+		Slots: map[string]MergeSlotRequest{
+			"repo_alpha": {
+				Source: WorkspaceSourceRequest{
+					Kind:  "local_git",
+					Alias: "repo-alpha",
+				},
+				SourceRef:    "refs/heads/missing-source",
+				TargetRef:    "refs/heads/a3/live",
+				BootstrapRef: "HEAD~1",
+			},
+		},
+	})
+
+	if execution.Status != "failed" {
+		t.Fatalf("expected merge failure, got %#v", execution)
+	}
+	if out, err := gitMaybe(sourceRoot, "rev-parse", "--verify", "refs/heads/a3/live"); err == nil {
+		t.Fatalf("bootstrapped target ref was not removed: %s", out)
+	}
+}
+
+func TestWorkspaceMaterializerRollsBackBootstrappedTargetRefWhenLaterSlotIsInvalid(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "repo-alpha")
+
+	_, execution := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": sourceRoot,
+		},
+	}.Merge(MergeRequest{
+		WorkspaceID: "merge-Portal-42",
+		Policy:      "ff_only",
+		Slots: map[string]MergeSlotRequest{
+			"repo_alpha": {
+				Source: WorkspaceSourceRequest{
+					Kind:  "local_git",
+					Alias: "repo-alpha",
+				},
+				SourceRef:    "refs/heads/a3/work/Portal-42",
+				TargetRef:    "refs/heads/a3/live",
+				BootstrapRef: "HEAD",
+			},
+			"repo_beta": {
+				Source: WorkspaceSourceRequest{
+					Kind:  "unsupported",
+					Alias: "repo-alpha",
+				},
+				SourceRef: "refs/heads/a3/work/Portal-42",
+				TargetRef: "refs/heads/a3/live-beta",
+			},
+		},
+	})
+
+	if execution.Status != "failed" {
+		t.Fatalf("expected merge failure, got %#v", execution)
+	}
+	if out, err := gitMaybe(sourceRoot, "rev-parse", "--verify", "refs/heads/a3/live"); err == nil {
+		t.Fatalf("bootstrapped target ref was not removed after plan validation failure: %s", out)
+	}
+}
+
 func testWorkspaceRequest(sourceAlias string) WorkspaceRequest {
 	return WorkspaceRequest{
 		Mode:            "agent_materialized",
@@ -309,6 +469,12 @@ func git(t *testing.T, root string, args ...string) string {
 		t.Fatalf("git %v failed: %v: %s", args, err, out)
 	}
 	return string(out)
+}
+
+func gitMaybe(root string, args ...string) (string, error) {
+	cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
 }
 
 func contains(value, needle string) bool {

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -32,6 +33,19 @@ type publishPlan struct {
 	declared    []string
 	skipped     bool
 	noChanges   bool
+}
+
+type mergePlan struct {
+	slotName    string
+	sourceRoot  string
+	worktree    string
+	sourceRef   string
+	targetRef   string
+	beforeHead  string
+	afterHead   string
+	descriptor  map[string]any
+	initialized bool
+	createdRef  bool
 }
 
 func (m WorkspaceMaterializer) Prepare(request WorkspaceRequest) (PreparedWorkspace, error) {
@@ -96,6 +110,223 @@ func validSyncClass(value string) bool {
 
 func validOwnership(value string) bool {
 	return value == "edit_target" || value == "support"
+}
+
+func (m WorkspaceMaterializer) Merge(request MergeRequest) (WorkspaceDescriptor, ExecutionResult) {
+	descriptor := WorkspaceDescriptor{
+		WorkspaceKind:    "runtime_workspace",
+		RuntimeProfile:   "",
+		WorkspaceID:      request.WorkspaceID,
+		SourceDescriptor: SourceDescriptor{WorkspaceKind: "runtime_workspace", SourceType: "branch_head"},
+		SlotDescriptors:  map[string]map[string]any{},
+	}
+	plans, err := m.prepareMergePlans(request, descriptor.SlotDescriptors)
+	if err != nil {
+		return descriptor, failedMergeExecution(err)
+	}
+	if err := executeMergePlans(plans, request.Policy); err != nil {
+		return descriptor, failedMergeExecution(err)
+	}
+	return descriptor, ExecutionResult{Status: "succeeded", ExitCode: intPtr(0), CombinedLog: []byte("A3 agent merge completed\n")}
+}
+
+func (m WorkspaceMaterializer) prepareMergePlans(request MergeRequest, descriptors map[string]map[string]any) ([]mergePlan, error) {
+	if request.WorkspaceID == "" {
+		return nil, fmt.Errorf("merge workspace_id is required")
+	}
+	if request.Policy == "" {
+		return nil, fmt.Errorf("merge policy is required")
+	}
+	if !validMergePolicy(request.Policy) {
+		return nil, fmt.Errorf("unsupported merge policy: %s", request.Policy)
+	}
+	root, err := m.workspaceRoot(request.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return nil, err
+	}
+	slotNames := make([]string, 0, len(request.Slots))
+	for slotName := range request.Slots {
+		slotNames = append(slotNames, slotName)
+	}
+	sort.Strings(slotNames)
+	plans := make([]mergePlan, 0, len(slotNames))
+	for _, slotName := range slotNames {
+		slot := request.Slots[slotName]
+		if slot.Source.Kind != "local_git" {
+			rollbackMergePlans(plans)
+			return nil, fmt.Errorf("unsupported merge source kind for %s: %s", slotName, slot.Source.Kind)
+		}
+		if _, err := branchNameForRef(slot.TargetRef); err != nil {
+			rollbackMergePlans(plans)
+			return nil, fmt.Errorf("unsupported merge target ref for %s: %s", slotName, slot.TargetRef)
+		}
+		sourceRoot, err := m.sourceRoot(slot.Source.Alias)
+		if err != nil {
+			rollbackMergePlans(plans)
+			return nil, err
+		}
+		if dirty, err := gitDirty(sourceRoot); err != nil {
+			rollbackMergePlans(plans)
+			return nil, err
+		} else if dirty {
+			rollbackMergePlans(plans)
+			return nil, fmt.Errorf("source alias %s is dirty before merge", slot.Source.Alias)
+		}
+		beforeHead, createdRef, err := ensureMergeTargetRef(sourceRoot, slot.TargetRef, slot.BootstrapRef)
+		if err != nil {
+			rollbackMergePlans(plans)
+			return nil, err
+		}
+		worktree := filepath.Join(root, slotDirectory(slotName))
+		if err := os.RemoveAll(worktree); err != nil {
+			rollbackMergePlans(append(plans, mergePlan{
+				sourceRoot: sourceRoot,
+				targetRef:  slot.TargetRef,
+				beforeHead: beforeHead,
+				createdRef: createdRef,
+			}))
+			return nil, err
+		}
+		descriptor := map[string]any{
+			"runtime_path":         worktree,
+			"source_kind":          slot.Source.Kind,
+			"source_alias":         slot.Source.Alias,
+			"merge_source_ref":     slot.SourceRef,
+			"merge_target_ref":     slot.TargetRef,
+			"merge_before_head":    beforeHead,
+			"merge_policy":         request.Policy,
+			"merge_status":         "prepared",
+			"dirty_before":         false,
+			"workspace_ownership":  "agent",
+			"project_repo_mutator": "a3-agent",
+		}
+		descriptors[slotName] = descriptor
+		plans = append(plans, mergePlan{
+			slotName:   slotName,
+			sourceRoot: sourceRoot,
+			worktree:   worktree,
+			sourceRef:  slot.SourceRef,
+			targetRef:  slot.TargetRef,
+			beforeHead: beforeHead,
+			descriptor: descriptor,
+			createdRef: createdRef,
+		})
+	}
+	return plans, nil
+}
+
+func executeMergePlans(plans []mergePlan, policy string) error {
+	merged := []mergePlan{}
+	for _, plan := range plans {
+		current := plan
+		if err := runGit(current.sourceRoot, "worktree", "add", "--force", current.worktree, branchNameMust(current.targetRef)); err != nil {
+			return errors.Join(err, rollbackMergePlans(append(merged, current)))
+		}
+		current.initialized = true
+		if err := runGit(current.worktree, mergeGitArgs(policy, current.sourceRef)...); err != nil {
+			return errors.Join(err, rollbackMergePlans(append(merged, current)))
+		}
+		afterHead, err := gitOutput(current.worktree, "rev-parse", "HEAD")
+		if err != nil {
+			return errors.Join(err, rollbackMergePlans(append(merged, current)))
+		}
+		current.afterHead = afterHead
+		current.descriptor["merge_after_head"] = afterHead
+		current.descriptor["resolved_head"] = afterHead
+		current.descriptor["merge_status"] = "merged"
+		merged = append(merged, current)
+	}
+	if err := cleanupMergeWorktrees(merged); err != nil {
+		return err
+	}
+	return nil
+}
+
+func rollbackMergePlans(plans []mergePlan) error {
+	var rollbackErr error
+	for index := len(plans) - 1; index >= 0; index-- {
+		plan := plans[index]
+		if plan.initialized {
+			rollbackErr = errors.Join(rollbackErr, runGit(plan.worktree, "merge", "--abort"))
+			rollbackErr = errors.Join(rollbackErr, runGit(plan.worktree, "reset", "--hard", plan.beforeHead))
+			rollbackErr = errors.Join(rollbackErr, runGit(plan.sourceRoot, "worktree", "remove", "--force", plan.worktree))
+		}
+		if plan.createdRef {
+			rollbackErr = errors.Join(rollbackErr, runGit(plan.sourceRoot, "update-ref", "-d", plan.targetRef))
+		} else {
+			rollbackErr = errors.Join(rollbackErr, runGit(plan.sourceRoot, "update-ref", plan.targetRef, plan.beforeHead))
+		}
+		if plan.descriptor != nil {
+			plan.descriptor["merge_status"] = "rolled_back"
+			delete(plan.descriptor, "merge_after_head")
+			delete(plan.descriptor, "resolved_head")
+		}
+	}
+	return rollbackErr
+}
+
+func cleanupMergeWorktrees(plans []mergePlan) error {
+	var cleanupErr error
+	for _, plan := range plans {
+		if plan.initialized {
+			cleanupErr = errors.Join(cleanupErr, runGit(plan.sourceRoot, "worktree", "remove", "--force", plan.worktree))
+		}
+	}
+	return cleanupErr
+}
+
+func ensureMergeTargetRef(root, targetRef, bootstrapRef string) (string, bool, error) {
+	head, err := gitOutput(root, "rev-parse", targetRef)
+	if err == nil {
+		return head, false, nil
+	}
+	if bootstrapRef == "" {
+		return "", false, fmt.Errorf("merge target ref %s is missing and bootstrap_ref is not provided", targetRef)
+	}
+	bootstrapHead, err := gitOutput(root, "rev-parse", bootstrapRef)
+	if err != nil {
+		return "", false, err
+	}
+	if err := runGit(root, "update-ref", targetRef, bootstrapHead); err != nil {
+		return "", false, err
+	}
+	return bootstrapHead, true, nil
+}
+
+func mergeGitArgs(policy, sourceRef string) []string {
+	switch policy {
+	case "ff_only":
+		return []string{"merge", "--ff-only", sourceRef}
+	case "ff_or_merge":
+		return []string{"merge", "--no-edit", sourceRef}
+	case "no_ff":
+		return []string{"merge", "--no-ff", "--no-edit", sourceRef}
+	default:
+		return []string{"merge", "--ff-only", sourceRef}
+	}
+}
+
+func validMergePolicy(policy string) bool {
+	return policy == "ff_only" || policy == "ff_or_merge" || policy == "no_ff"
+}
+
+func branchNameMust(ref string) string {
+	name, err := branchNameForRef(ref)
+	if err != nil {
+		return ref
+	}
+	return name
+}
+
+func failedMergeExecution(err error) ExecutionResult {
+	return ExecutionResult{Status: "failed", ExitCode: intPtr(1), CombinedLog: []byte("A3 agent merge failed: " + err.Error() + "\n")}
+}
+
+func intPtr(value int) *int {
+	return &value
 }
 
 func (m WorkspaceMaterializer) Cleanup(prepared PreparedWorkspace) error {

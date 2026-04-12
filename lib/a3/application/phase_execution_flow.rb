@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "tmpdir"
 require "a3/infra/workspace_trace_logger"
 
 module A3
@@ -23,7 +24,7 @@ module A3
         task ||= @task_repository.fetch(task_ref)
         run ||= @run_repository.fetch(run_ref)
         runtime = project_context.resolve_phase_runtime(task: task, phase: run.phase)
-        prepared_workspace = @orchestrator.prepare(task: task, run: run, runtime: runtime)
+        prepared_workspace = prepare_for_strategy(strategy: strategy, task: task, run: run, runtime: runtime)
         A3::Infra::WorkspaceTraceLogger.log(
           workspace_root: prepared_workspace.workspace.root_path,
           event: "phase_execution.execute.start",
@@ -86,6 +87,23 @@ module A3
       end
 
       private
+
+      def prepare_for_strategy(strategy:, task:, run:, runtime:)
+        return @orchestrator.prepare(task: task, run: run, runtime: runtime) unless strategy.respond_to?(:requires_workspace?) && !strategy.requires_workspace?
+
+        Struct.new(:workspace).new(
+          A3::Domain::PreparedWorkspace.new(
+            workspace_kind: run.workspace_kind,
+            root_path: File.join(Dir.tmpdir, "a3-control-plane-workspace", safe_trace_id(run.ref)),
+            source_descriptor: run.source_descriptor,
+            slot_paths: {}
+          )
+        )
+      end
+
+      def safe_trace_id(value)
+        value.to_s.gsub(/[^A-Za-z0-9._:-]/, "-")
+      end
 
       def default_execution_record(execution:, runtime:)
         A3::Domain::PhaseExecutionRecord.from_execution_result(

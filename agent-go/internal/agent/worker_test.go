@@ -189,6 +189,55 @@ func TestWorkerSubmitsFailedResultWhenMaterializationFails(t *testing.T) {
 	}
 }
 
+func TestWorkerRunsNativeMergeJobs(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	if err := os.WriteFile(filepath.Join(sourceRoot, "feature.txt"), []byte("feature\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "feature.txt")
+	git(t, sourceRoot, "commit", "-q", "-m", "feature")
+	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", "HEAD")
+	git(t, sourceRoot, "branch", "a3/live", "HEAD~1")
+	request := testRequest(".")
+	request.Phase = "merge"
+	request.MergeRequest = &MergeRequest{
+		WorkspaceID: "merge-Portal-42",
+		Policy:      "ff_only",
+		Slots: map[string]MergeSlotRequest{
+			"repo_alpha": {
+				Source:    WorkspaceSourceRequest{Kind: "local_git", Alias: "member-portal-starters"},
+				SourceRef: "refs/heads/a3/work/Portal-42",
+				TargetRef: "refs/heads/a3/live",
+			},
+		},
+	}
+	client := &fakeClient{request: &request}
+
+	result, idle, err := Worker{
+		AgentName: "host-local",
+		Client:    client,
+		Executor:  failingExecutor{},
+		Materializer: WorkspaceMaterializer{
+			WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+			SourceAliases: map[string]string{
+				"member-portal-starters": sourceRoot,
+			},
+		},
+		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+	}.RunOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idle || result.Status != "succeeded" {
+		t.Fatalf("expected merge success, idle=%v result=%#v", idle, result)
+	}
+	slot := result.WorkspaceDescriptor.SlotDescriptors["repo_alpha"]
+	if slot["merge_status"] != "merged" || slot["project_repo_mutator"] != "a3-agent" {
+		t.Fatalf("missing merge evidence: %#v", slot)
+	}
+}
+
 func TestWorkerReturnsIdleWithoutJob(t *testing.T) {
 	_, idle, err := Worker{
 		AgentName: "host-local",

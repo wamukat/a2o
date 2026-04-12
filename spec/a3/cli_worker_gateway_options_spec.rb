@@ -169,6 +169,36 @@ RSpec.describe "A3 CLI worker gateway options" do
     expect(runner).to be_a(A3::Infra::AgentCommandRunner)
   end
 
+  it "builds an agent HTTP merge runner when required options are provided" do
+    runner = A3::CLI.send(
+      :build_merge_runner,
+      options: {
+        merge_runner: "agent-http",
+        agent_control_plane_url: "http://127.0.0.1:4567",
+        agent_runtime_profile: "host-local",
+        agent_source_aliases: {
+          "repo_alpha" => "portal-alpha"
+        }
+      },
+      fallback: instance_double(A3::Infra::LocalMergeRunner)
+    )
+
+    expect(runner).to be_a(A3::Infra::AgentMergeRunner)
+  end
+
+  it "requires source aliases for the agent HTTP merge runner" do
+    expect do
+      A3::CLI.send(
+        :build_merge_runner,
+        options: {
+          merge_runner: "agent-http",
+          agent_control_plane_url: "http://127.0.0.1:4567"
+        },
+        fallback: instance_double(A3::Infra::LocalMergeRunner)
+      )
+    end.to raise_error(ArgumentError, /agent-source-alias/)
+  end
+
   it "passes explicit agent env options to an agent HTTP verification command runner" do
     runner = A3::CLI.send(
       :build_command_runner,
