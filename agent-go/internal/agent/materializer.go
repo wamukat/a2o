@@ -79,9 +79,6 @@ func (m WorkspaceMaterializer) Cleanup(prepared PreparedWorkspace) error {
 		if err := runGit(operation.sourceRoot, "worktree", "remove", "--force", operation.slotPath); err != nil && firstErr == nil {
 			firstErr = err
 		}
-		if err := runGit(operation.sourceRoot, "worktree", "prune"); err != nil && firstErr == nil {
-			firstErr = err
-		}
 	}
 	if err := os.RemoveAll(prepared.Root); err != nil && firstErr == nil {
 		firstErr = err
@@ -99,11 +96,16 @@ func RefreshWorkspaceEvidence(prepared PreparedWorkspace) error {
 		if err != nil {
 			return err
 		}
+		patch, err := gitPatch(runtimePath)
+		if err != nil {
+			return err
+		}
 		dirtyAfter, err := gitDirty(runtimePath)
 		if err != nil {
 			return err
 		}
 		descriptor["changed_files"] = changedFiles
+		descriptor["patch"] = patch
 		descriptor["dirty_after"] = dirtyAfter
 	}
 	return nil
@@ -175,9 +177,6 @@ func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot
 	if err := os.RemoveAll(slotPath); err != nil {
 		return nil, err
 	}
-	if err := runGit(sourceRoot, "worktree", "prune"); err != nil {
-		return nil, err
-	}
 	if err := runGit(sourceRoot, "worktree", "add", "--force", "--detach", slotPath, slot.Ref); err != nil {
 		return nil, err
 	}
@@ -200,6 +199,13 @@ func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot
 		"dirty_after":   dirtyAfter,
 		"access":        slot.Access,
 	}, nil
+}
+
+func gitPatch(root string) (string, error) {
+	if err := runGit(root, "add", "-N", "--", ".", ":(exclude).a3"); err != nil {
+		return "", err
+	}
+	return gitOutput(root, "diff", "--binary", "HEAD", "--", ".", ":(exclude).a3")
 }
 
 func gitDirty(root string) (bool, error) {

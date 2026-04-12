@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "open3"
 require "securerandom"
 require "a3/infra/workspace_trace_logger"
 
@@ -99,6 +100,9 @@ module A3
         if run.phase.to_sym == :implementation && worker_response&.fetch("success", nil) == true
           evidence = materialized_changed_files_evidence(workspace_request: request.workspace_request, result: completed.result)
           return evidence if evidence.is_a?(A3::Application::ExecutionResult)
+
+          patch_result = apply_materialized_patches(workspace: workspace, workspace_request: request.workspace_request, result: completed.result)
+          return patch_result if patch_result.is_a?(A3::Application::ExecutionResult)
 
           canonical_changed_files = evidence
         end
@@ -250,6 +254,38 @@ module A3
             "agent_job_result" => result.result_form
           }
         )
+      end
+
+      def apply_materialized_patches(workspace:, workspace_request:, result:)
+        result.workspace_descriptor.slot_descriptors.each do |slot_name, descriptor|
+          request_slot = workspace_request.slots[slot_name] || workspace_request.slots[slot_name.to_sym]
+          next unless request_slot&.fetch("required")
+          next unless request_slot.fetch("access") == "read_write"
+
+          patch = descriptor["patch"].to_s
+          next if patch.empty?
+
+          slot_path = workspace.slot_paths.fetch(slot_name.to_sym)
+          stdout, stderr, status = Open3.capture3("git", "-C", slot_path.to_s, "apply", "--whitespace=nowarn", "-", stdin_data: patch)
+          next if status.success?
+
+          return A3::Application::ExecutionResult.new(
+            success: false,
+            summary: "agent materialized implementation patch apply failed",
+            failing_command: "agent_materialized_patch_apply",
+            observed_state: "agent_materialized_patch_apply_failed",
+            diagnostics: {
+              "slot" => slot_name,
+              "stdout" => stdout,
+              "stderr" => stderr,
+              "control_plane_url" => control_plane_url
+            },
+            response_bundle: {
+              "agent_job_result" => result.result_form
+            }
+          )
+        end
+        nil
       end
 
       def unsupported_workspace_result

@@ -290,6 +290,40 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     expect(execution.response_bundle.fetch("changed_files")).to eq("repo_beta" => [])
   end
 
+  it "applies materialized implementation patches to the local publication workspace" do
+    initialize_git_repo(workspace.slot_paths.fetch(:repo_beta))
+    client.on_fetch = lambda do |job_id|
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: worker_success.merge("changed_files" => { "repo_beta" => ["marker.txt"] }),
+          workspace_descriptor: workspace_descriptor(
+            "repo_beta" => materialized_slot_descriptor("marker.txt").merge(
+              "patch" => <<~PATCH
+                diff --git a/marker.txt b/marker.txt
+                new file mode 100644
+                index 0000000..ce01362
+                --- /dev/null
+                +++ b/marker.txt
+                @@ -0,0 +1 @@
+                +hello
+              PATCH
+            )
+          )
+        )
+      )
+    end
+    gateway = materialized_gateway
+
+    execution = run_gateway(gateway)
+
+    expect(execution).to have_attributes(success: true)
+    expect(workspace.slot_paths.fetch(:repo_beta).join("marker.txt").read).to eq("hello\n")
+  end
+
   it "passes explicit agent env overrides to worker jobs" do
     client.on_fetch = lambda do |job_id|
       client.complete(
@@ -537,6 +571,15 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
 
       sleep 0.02
     end
+  end
+
+  def initialize_git_repo(path)
+    system("git", "-C", path.to_s, "init", "-q")
+    system("git", "-C", path.to_s, "config", "user.name", "A3 Test")
+    system("git", "-C", path.to_s, "config", "user.email", "a3-test@example.invalid")
+    path.join("README.md").write("baseline\n")
+    system("git", "-C", path.to_s, "add", "README.md")
+    system("git", "-C", path.to_s, "commit", "-q", "-m", "baseline")
   end
 
   def agent_result(job_id, status, exit_code, worker_protocol_result: nil, workspace_descriptor: self.workspace_descriptor)
