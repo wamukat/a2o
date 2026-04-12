@@ -117,10 +117,10 @@ RSpec.describe A3Diagnostics do
     end
   end
 
-  it "inspects runtime env and supports vendor rg fallback" do
+  it "inspects runtime env and supports generic AI CLI vendor rg fallback" do
     Dir.mktmpdir("a3-diagnostics-") do |dir|
       root = Pathname(dir)
-      vendor_rg = root.join(".codex", "vendor", "ripgrep", "rg")
+      vendor_rg = root.join(".ai-cli", "vendor", "ripgrep", "rg")
       vendor_rg.dirname.mkpath
       vendor_rg.write("#!/bin/sh\n")
       File.chmod(0o755, vendor_rg)

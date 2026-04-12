@@ -123,18 +123,18 @@ RSpec.describe A3Reconcile do
     end
   end
 
-  it "resolves vendor rg when allowed" do
+  it "resolves generic AI CLI vendor rg when allowed" do
     Dir.mktmpdir("a3-reconcile-") do |dir|
       root = Pathname(dir)
       launcher_config = root.join("launcher.json")
       env_file = root.join("portal.env")
-      codex_home = root.join(".codex")
-      vendor_dir = codex_home.join("vendor", "ripgrep")
+      ai_cli_home = root.join(".ai-cli-home")
+      vendor_dir = ai_cli_home.join("vendor", "ripgrep")
       vendor_dir.mkpath
       vendor_rg = vendor_dir.join("rg")
       vendor_rg.write("#!/bin/sh\nexit 0\n")
       File.chmod(0o755, vendor_rg)
-      env_file.write("CODEX_HOME=#{codex_home}\nPATH=/usr/bin:/bin\n")
+      env_file.write("AI_CLI_HOME=#{ai_cli_home}\nPATH=/usr/bin:/bin\n")
       launcher_config.write(
         JSON.pretty_generate(
           "runtime_env" => { "required_bins" => ["rg"], "path_entries" => [], "allow_executor_vendor_rg_fallback" => true },
@@ -155,22 +155,22 @@ RSpec.describe A3Reconcile do
   end
 
 
-  it "ignores unrelated codex exec processes when checking portal liveness" do
-    allow(IO).to receive(:popen).and_return("codex exec --json -\n")
+  it "ignores unrelated AI executor processes when checking portal liveness" do
+    allow(IO).to receive(:popen).and_return("ai-runner --json -\n")
 
     expect(described_class.live_portal_processes("portal")).to eq([])
   end
 
-  it "recognizes current portal-v2 scheduler shot processes" do
+  it "recognizes current portal scheduler shot processes" do
     allow(IO).to receive(:popen).and_return(<<~PS)
-      ruby scripts/a3/portal_v2_scheduler_launcher.rb --run-shot
+      ruby scripts/a3/portal_scheduler_launcher.rb --run-shot
       ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/portal-kanban-scheduler-auto scripts/a3/config/portal/a3-runtime-manifest.yml
     PS
 
     matches = described_class.live_portal_processes("portal")
     expect(matches).to eq(
       [
-        "ruby scripts/a3/portal_v2_scheduler_launcher.rb --run-shot",
+        "ruby scripts/a3/portal_scheduler_launcher.rb --run-shot",
         "ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/portal-kanban-scheduler-auto scripts/a3/config/portal/a3-runtime-manifest.yml"
       ]
     )

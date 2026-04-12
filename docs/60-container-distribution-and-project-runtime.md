@@ -1603,10 +1603,28 @@ adapter は、command template contract だけでは provider ごとの auth / s
   - `scripts/a3/config/portal/launcher.json` の `runtime_env.required_bins` には、current Portal profile の実行前提として `codex` が残る
   - これは A3 Engine core の依存ではなく、Portal project が選んだ executor command profile の依存である。別 A-AI CLI へ切り替える場合は command profile と required bin を差し替える
 - test fixture dependency:
-  - `a3-engine/spec/a3/a3_v2_stdin_bundle_worker_script_spec.rb` が fake `codex` と Codex CLI option を前提にしている
+  - `scripts/a3/diagnostics.rb` の generic vendor `rg` fallback は `AI_CLI_HOME` / `.ai-cli` を参照する。関連 spec も `.codex` 前提から generic path へ更新済み
+  - stale な `a3-engine/spec/a3/a3_v2_stdin_bundle_worker_script_spec.rb` は deleted legacy root script を要求しており、current runtime の検証対象から外す。残す場合も fake `codex` と Codex CLI option 前提の fixture は generic command runner fixture へ置き換える
   - `a3-engine/spec/a3/**/*_spec.rb` の blocked / inspection / show output fixture に `failing_command: "codex exec --json -"` が残っている。これは観測例の fixture であり runtime dependency ではないが、command template 移行時に汎用 command 表記へ更新する
 - document / operation wording:
   - `docs/10-ops/10-02-codex-reporting-style.md` などの「Codex 実行者」は human/operator role 名として残っている。AI executor の hard dependency ではないため、今回の runtime 汎用化 blocker にはしない
+
+#### 0.4.6.10 特定 AI 非依存の解決方針
+
+A3 v1 は「特定 AI CLI adapter を内蔵する system」ではなく、「project が指定した one-shot command を、A3 が phase / workspace / kanban / evidence の文脈で呼び出す system」として固定する。
+
+- hard dependency として禁止するもの:
+  - A3 Engine core が `codex`, `--model`, `model_reasoning_effort` を意味解釈すること
+  - A3 domain event / run / evidence / kanban payload に provider 固有 model 名を正規項目として持つこと
+  - config 不備時に A3 が暗黙で `codex exec --json` へ fallback すること
+- project profile として許容するもの:
+  - Portal の現行検証 profile が `codex exec --json ...` を command argv として指定すること
+  - `runtime_env.required_bins` に、その project profile が実際に必要とする executable を列挙すること
+  - 別 A-AI へ切り替える際に `launcher.json` の command / env / required bins を差し替えること
+- 完成前に確認すること:
+  - root worker は `executor.kind=command` と placeholder 展開だけを扱い、provider 固有 resolver を持たない
+  - diagnostics / reconcile / launcher tests は generic command runner と generic AI CLI vendor path を前提にする
+  - final scheduler validation は現行 Portal profile として Codex CLI を使ってよいが、結果報告では「A3 core 依存」ではなく「Portal profile dependency」として扱う
 
 - parity backlog の項目は「後で改善」ではなく、Portal live canary の blocker として扱う
 - v1 で一度解決した性質は、v2 で未実装なら bug と同列に扱う
