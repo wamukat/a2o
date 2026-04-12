@@ -169,6 +169,18 @@ RSpec.describe "A3 CLI worker gateway options" do
     expect(runner).to be_a(A3::Infra::AgentCommandRunner)
   end
 
+  it "uses the fallback verification command runner when not configured" do
+    fallback = instance_double(A3::Infra::LocalCommandRunner)
+
+    runner = A3::CLI.send(
+      :build_command_runner,
+      options: { verification_command_runner: nil },
+      fallback: fallback
+    )
+
+    expect(runner).to eq(fallback)
+  end
+
   it "builds an agent HTTP merge runner when required options are provided" do
     runner = A3::CLI.send(
       :build_merge_runner,

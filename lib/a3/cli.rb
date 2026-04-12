@@ -1425,7 +1425,8 @@ module A3
     end
 
     def build_command_runner(options:, fallback:)
-      runner = options.fetch(:verification_command_runner, "local").to_s
+      runner = options[:verification_command_runner].to_s
+      return fallback if runner.empty?
       return fallback if runner == "local"
 
       if runner == "agent-http"
