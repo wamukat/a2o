@@ -209,6 +209,29 @@ disk pressure 時の cleanup 判断:
 - SoloBoard は bundled kanban だが A3 state store ではない。board/lane/tag/ticket/comment/relation は kanban surface として adapter 経由で扱う
 - remote agent / central A3 server / multi-machine worker pool は現行スコープ外。remote TLS や remote agent authorization scope は今回の完成条件に含めない
 
+#### 0.1.1b Operator command surface inventory
+
+2026-04-12 の棚卸しでは、A3 CLI command と root `task a3:*` / `task soloboard:*` entrypoint を突き合わせ、通常 operator surface と低レベル internal surface を分けた。
+
+通常 operator が使う入口:
+
+- SoloBoard bootstrap / doctor / smoke: `task soloboard:doctor`, `task soloboard:bootstrap`, `task soloboard:smoke`, generic `task kanban:*`
+- bundle lifecycle / observation: `task a3:portal:bundle:up`, `:doctor`, `:bootstrap`, `:watch-summary`, `:describe-state`, `:observe`, `:archive-state`, `:down`, `:logs`
+- agent 正規経路 smoke: `task a3:portal:bundle:agent-smoke`, `:agent-worker-gateway-smoke`, `:agent-verification-smoke`, `:agent-parent-topology-smoke`, `:agent-full-verification-smoke`, `:agent-ui-verification-smoke`, `:agent-real-parent-full-verification-smoke`
+- cleanup / retention: `task a3:portal:cleanup`, `task a3:portal:bundle:agent-artifact-cleanup`
+- runtime inspection: `show-project-surface`, `show-project-context`, `show-phase-runtime-config`, `show-runtime-package`, `doctor-runtime`, `migrate-scheduler-store`, `show-scheduler-state`, `show-scheduler-history`
+- recovery inspection: `show-task`, `show-run`, `show-blocked-diagnosis`, `plan-rerun`, `recover-rerun`, `diagnose-blocked`, `repair-runs`, `cleanup-terminal-workspaces`, `quarantine-terminal-workspaces`
+
+2026-04-12 の scratch 実測:
+
+- `show-project-surface`, `show-project-context`, `show-phase-runtime-config`, `show-runtime-package`, `migrate-scheduler-store`, `show-scheduler-state`, `show-scheduler-history` は `/var/lib/a3/operator-surface-scratch-20260412` で成功し、scratch は削除済みである
+- archived `Portal#43` blocked run を `/var/lib/a3/recovery-surface-scratch-portal-43-20260412` に複製し、`show-task`, `plan-rerun`, `recover-rerun`, `diagnose-blocked`, `show-blocked-diagnosis` を実行できることを確認した。`diagnose-blocked` は scratch にのみ診断を追記し、archive 正本は変更していない。scratch は削除済みである
+- low-level phase execution commands (`run-worker-phase`, `run-verification`, `run-merge`) は direct operator command として個別実行するより、agent smoke / parent topology smoke / live repo full verification smoke の中で確認する
+- low-level run mutation commands (`start-run`, `complete-run`, `prepare-workspace`, `execute-next-runnable-task`, `execute-until-idle`, `run-runtime-canary`) は runtime internals / smoke harness 用であり、通常 operator runbook の入口にはしない
+- `pause-scheduler` / `resume-scheduler` は root の `task a3:portal:scheduler:pause/resume/control` から扱う。bundle 標準は operator terminal での manual loop 起動/停止であり、OS service 化は current scope 外である
+
+この分類により、「operator が日常的に使う入口」は root Taskfile と bundle task に寄せ、A3 CLI の低レベル command は smoke harness / diagnosis / recovery の実装面として扱う。
+
 ### 0.1.2 2026-04-08 v1 / legacy 破棄可否の現状判定
 
 live canary と scheduler surface の検証結果に加え、workspace root の operator surface / Python utility の棚卸しと Ruby migration を進めた結果、A3 は `legacy scheduler や root Python thin tooling がないと Portal canary を進められない` 段階を抜けた。2026-04-11 時点では `a3-v2/` source tree と legacy automation scripts も削除済みであり、現時点の未完は runtime の正当性よりも、配布・agent 運用・retention hardening の整理である。
