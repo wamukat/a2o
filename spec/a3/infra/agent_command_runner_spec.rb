@@ -108,6 +108,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
       "source" => {"kind" => "local_git", "alias" => "member-portal-starters"},
       "access" => "read_only"
     )
+    expect(runner.agent_owned_workspace?).to eq(true)
   end
 
   it "passes explicit agent env overrides to command jobs" do

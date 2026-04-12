@@ -191,6 +191,14 @@ RSpec.describe "phase execution strategies" do
     expect(strategy.blocked_extra_diagnostics(result)).to eq({})
   end
 
+  it "does not require an Engine workspace when verification is agent materialized" do
+    command_runner = instance_double("CommandRunner")
+    allow(command_runner).to receive(:agent_owned_workspace?).and_return(true)
+    strategy = A3::Application::VerificationExecutionStrategy.new(command_runner: command_runner)
+
+    expect(strategy.requires_workspace?).to eq(false)
+  end
+
   it "verification remediation runs in each verification slot before workspace-level verification" do
     slot_workspace = A3::Domain::PreparedWorkspace.new(
       workspace_kind: :ticket_workspace,

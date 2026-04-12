@@ -18,6 +18,10 @@ module A3
         @env = env.transform_keys(&:to_s).transform_values(&:to_s).freeze
       end
 
+      def agent_owned_workspace?
+        @shared_workspace_mode == "agent-materialized"
+      end
+
       def run(commands, workspace:, env: {}, task: nil, run: nil, **)
         return invalid_configuration_result("agent command runner requires task and run context") unless task && run
         return invalid_configuration_result("agent-materialized command runner requires workspace_request_builder") if @shared_workspace_mode == "agent-materialized" && !@workspace_request_builder

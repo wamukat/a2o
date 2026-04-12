@@ -162,6 +162,10 @@ module A3
         "verification commands pass"
       end
 
+      def requires_workspace?
+        !(@command_runner.respond_to?(:agent_owned_workspace?) && @command_runner.agent_owned_workspace?)
+      end
+
       def blocked_default_failing_command
         "verification"
       end
