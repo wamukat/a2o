@@ -123,7 +123,7 @@
   さらに `ITERATIONS=6 INTERVAL_SECONDS=30 task a3:portal:bundle:observe` で bundle doctor / watch-summary / show-state / disk usage を約 3 分間反復観測し、全 iteration で active / queued / blocked が 0 の idle 状態を確認した。legacy direct `a3:portal:bundle:run-once` は docker:a3 内で project verification を実行しうるため、diagnostic canary `Portal#43` で失敗条件を確認したうえで明示 opt-in guard に下げ、通常検証は agent smoke 群に固定した。加えて `task a3:portal:bundle:agent-loop` を追加し、`Portal#44/#45/#46/#47/#48` の 1 周 smoke と、`Portal#49/#50/#51/#52/#53`、`Portal#54/#55/#56/#57/#58` の 2 周反復 smoke を実行した。worker gateway / verification / parent topology は全件 `Done` へ到達し、各周回後の watch/state は active / queued / blocked 0 だった。
   残課題:
   - current A3 がまだ使っていない command surface を parity 確認する
-  - repeated scheduler-loop と長時間運用で read-after-write 揺れが追加 hardening を要しないか確認する。短時間の idle repeated observation と agent 正規経路の 2 周 mutation loop は完了済みで、残りはより長い時間窓の常駐 loop 観測である
+  - repeated scheduler-loop と長時間運用で read-after-write 揺れが追加 hardening を要しないか確認する。短時間の idle repeated observation、agent 正規経路の 2 周 mutation loop、2026-04-12 の 3 iteration bundle observe は完了済みで、残りは failure recovery と blocked diagnosis evidence retention を含む長い時間窓の常駐 loop 観測である
   - Kanboard compatibility path は削除する。current kanban runtime は SoloBoard のみとし、過去の Kanboard baseline は文書上の証跡としてだけ残す
   - 実 Portal source の `repo:both` parent/full verification canary を A3 完成条件として通す
   - A3 image から project 固有 JDK / Maven / verification runtime を剥がした状態で bundle doctor / smoke を継続確認する
