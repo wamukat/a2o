@@ -25,7 +25,10 @@ module A3
           run: run,
           workspace: workspace,
           execution: execution,
-          remediation_commands: runtime.remediation_commands
+          # Publication runs in the A3 control-plane runtime and must stay
+          # project-runtime free. Remediation belongs to verification, where
+          # the configured command runner can target the host/dev-env agent.
+          remediation_commands: []
         )
         return publication unless publication.success?
 

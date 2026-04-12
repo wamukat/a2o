@@ -108,7 +108,7 @@ RSpec.describe "phase execution strategies" do
     expect(strategy.verification_summary(result)).to be_nil
   end
 
-  it "passes remediation commands to workspace publication" do
+  it "keeps workspace publication free of project remediation commands" do
     worker_gateway = instance_double("WorkerGateway")
     workspace_change_publisher = instance_double(A3::Infra::LocalWorkspaceChangePublisher)
     strategy = A3::Application::WorkerPhaseExecutionStrategy.new(
@@ -135,7 +135,7 @@ RSpec.describe "phase execution strategies" do
       run: implementation_run,
       workspace: workspace,
       execution: have_attributes(summary: "implementation completed"),
-      remediation_commands: ["commands/apply-remediation"]
+      remediation_commands: []
     )
     expect(result.summary).to include("published workspace changes for repo_alpha")
   end

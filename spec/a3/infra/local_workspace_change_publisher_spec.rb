@@ -74,7 +74,7 @@ RSpec.describe A3::Infra::LocalWorkspaceChangePublisher do
       expect(result).to be_success
       expect(result.summary).to include("published workspace changes")
       expect(after_head).not_to eq(before_head)
-      expect(`git -C #{source_root} show --stat --oneline #{after_head}`).to include("A3-v2 direct canary update for Portal#3050")
+      expect(`git -C #{source_root} show --stat --oneline #{after_head}`).to include("A3 direct canary update for Portal#3050")
     end
   end
 
