@@ -479,6 +479,45 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     expect(workspace.slot_paths.fetch(:repo_beta).join("marker.txt")).not_to exist
   end
 
+  it "fails closed instead of applying patches when agent publish policy is missing" do
+    client.on_fetch = lambda do |job_id|
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: worker_success.merge("changed_files" => { "repo_beta" => ["marker.txt"] }),
+          workspace_descriptor: workspace_descriptor(
+            "repo_beta" => materialized_slot_descriptor("marker.txt").merge(
+              "patch" => "diff --git a/marker.txt b/marker.txt\n"
+            )
+          )
+        )
+      )
+    end
+    gateway = described_class.new(
+      control_plane_client: client,
+      worker_command: "ruby",
+      worker_command_args: ["worker.rb"],
+      runtime_profile: "host-local",
+      shared_workspace_mode: "agent-materialized",
+      timeout_seconds: 30,
+      poll_interval_seconds: 0,
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_seconds) {},
+      workspace_request_builder: ->(**) { materialized_workspace_request(publish: false) }
+    )
+
+    execution = run_gateway(gateway)
+
+    expect(execution).to have_attributes(
+      success: false,
+      failing_command: "agent_materialized_publish_policy",
+      observed_state: "agent_materialized_publish_policy_missing"
+    )
+  end
+
   it "passes explicit agent env overrides to worker jobs" do
     client.on_fetch = lambda do |job_id|
       client.complete(

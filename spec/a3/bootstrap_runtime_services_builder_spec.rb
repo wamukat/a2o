@@ -15,7 +15,7 @@ RSpec.describe A3::Bootstrap::RuntimeServicesBuilder do
         repositories: repositories,
         run_id_generator: -> { "run-1" },
         command_runner: instance_double(A3::Infra::LocalCommandRunner),
-        merge_runner: instance_double(A3::Infra::LocalMergeRunner),
+        merge_runner: instance_double(A3::Infra::DisabledMergeRunner),
         worker_gateway: instance_double(A3::Infra::LocalWorkerGateway),
         storage_dir: dir,
         repo_sources: { repo_beta: File.join(dir, "repo") }

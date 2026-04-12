@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "fileutils"
-require "open3"
 require "securerandom"
 require "a3/infra/workspace_trace_logger"
 
@@ -30,6 +29,14 @@ module A3
         return run_agent_materialized(skill: skill, workspace: workspace, task: task, run: run, phase_runtime: phase_runtime, task_packet: task_packet) if @shared_workspace_mode == "agent-materialized"
 
         unsupported_workspace_result
+      end
+
+      def agent_owned_publication?
+        @shared_workspace_mode == "agent-materialized"
+      end
+
+      def agent_owned_workspace?
+        @shared_workspace_mode == "agent-materialized"
       end
 
       private
@@ -115,10 +122,7 @@ module A3
           publish_result = materialized_publish_evidence(workspace_request: request.workspace_request, result: completed.result)
           return publish_result if publish_result.is_a?(A3::Application::ExecutionResult)
 
-          unless request.workspace_request.publish_policy
-            patch_result = apply_materialized_patches(workspace: workspace, workspace_request: request.workspace_request, result: completed.result)
-            return patch_result if patch_result.is_a?(A3::Application::ExecutionResult)
-          end
+          return missing_agent_publish_policy_result(completed.result) unless request.workspace_request.publish_policy
 
           canonical_changed_files = evidence
         end
@@ -318,38 +322,6 @@ module A3
         )
       end
 
-      def apply_materialized_patches(workspace:, workspace_request:, result:)
-        result.workspace_descriptor.slot_descriptors.each do |slot_name, descriptor|
-          request_slot = workspace_request.slots[slot_name] || workspace_request.slots[slot_name.to_sym]
-          next unless request_slot&.fetch("required")
-          next unless request_slot.fetch("access") == "read_write"
-
-          patch = descriptor["patch"].to_s
-          next if patch.empty?
-
-          slot_path = workspace.slot_paths.fetch(slot_name.to_sym)
-          stdout, stderr, status = Open3.capture3("git", "-C", slot_path.to_s, "apply", "--whitespace=nowarn", "-", stdin_data: patch)
-          next if status.success?
-
-          return A3::Application::ExecutionResult.new(
-            success: false,
-            summary: "agent materialized implementation patch apply failed",
-            failing_command: "agent_materialized_patch_apply",
-            observed_state: "agent_materialized_patch_apply_failed",
-            diagnostics: {
-              "slot" => slot_name,
-              "stdout" => stdout,
-              "stderr" => stderr,
-              "control_plane_url" => control_plane_url
-            },
-            response_bundle: {
-              "agent_job_result" => result.result_form
-            }
-          )
-        end
-        nil
-      end
-
       def unsupported_workspace_result
         A3::Application::ExecutionResult.new(
           success: false,
@@ -369,6 +341,22 @@ module A3
           summary: message,
           failing_command: "agent_worker_gateway_config",
           observed_state: "agent_worker_gateway_invalid_config"
+        )
+      end
+
+      def missing_agent_publish_policy_result(result)
+        A3::Application::ExecutionResult.new(
+          success: false,
+          summary: "agent materialized implementation requires publish_policy",
+          failing_command: "agent_materialized_publish_policy",
+          observed_state: "agent_materialized_publish_policy_missing",
+          diagnostics: {
+            "agent_job_result" => result.result_form,
+            "control_plane_url" => control_plane_url
+          },
+          response_bundle: {
+            "agent_job_result" => result.result_form
+          }
         )
       end
 

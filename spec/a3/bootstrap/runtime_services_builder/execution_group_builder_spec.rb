@@ -21,7 +21,7 @@ RSpec.describe A3::Bootstrap::RuntimeServicesBuilder::ExecutionGroupBuilder do
         repositories: repositories,
         support_group: support_group,
         command_runner: instance_double(A3::Infra::LocalCommandRunner),
-        merge_runner: instance_double(A3::Infra::LocalMergeRunner),
+        merge_runner: instance_double(A3::Infra::DisabledMergeRunner),
         worker_gateway: instance_double(A3::Infra::LocalWorkerGateway),
         external_task_source: A3::Infra::NullExternalTaskSource.new
       )

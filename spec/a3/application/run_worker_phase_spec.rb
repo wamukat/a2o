@@ -20,6 +20,12 @@ RSpec.describe A3::Application::RunWorkerPhase do
   let(:prepare_workspace) { instance_double(A3::Application::PrepareWorkspace) }
   let(:worker_gateway) { instance_double("WorkerGateway") }
   let(:task_packet_builder) { ->(task:) { { "task_ref" => task.ref } } }
+  let(:workspace_change_publisher) do
+    instance_double(
+      "WorkspaceChangePublisher",
+      publish: A3::Application::ExecutionResult.new(success: true, summary: "no workspace changes to publish", diagnostics: { "published_slots" => [] })
+    )
+  end
 
   subject(:use_case) do
     described_class.new(
@@ -28,7 +34,8 @@ RSpec.describe A3::Application::RunWorkerPhase do
       register_completed_run: register_completed_run,
       prepare_workspace: prepare_workspace,
       worker_gateway: worker_gateway,
-      task_packet_builder: task_packet_builder
+      task_packet_builder: task_packet_builder,
+      workspace_change_publisher: workspace_change_publisher
     )
   end
 
@@ -199,6 +206,31 @@ RSpec.describe A3::Application::RunWorkerPhase do
       implementation_skill: "skills/implementation/base.md",
       merge_target: :merge_to_parent
     )
+  end
+
+  it "skips Engine workspace preparation when the worker gateway owns workspace materialization" do
+    allow(worker_gateway).to receive(:agent_owned_workspace?).and_return(true)
+    allow(worker_gateway).to receive(:agent_owned_publication?).and_return(true)
+    expect(prepare_workspace).not_to receive(:call)
+    allow(worker_gateway).to receive(:run).with(
+      hash_including(
+        skill: "skills/implementation/base.md",
+        workspace: have_attributes(workspace_kind: :ticket_workspace, slot_paths: {}),
+        task: task,
+        run: run,
+        phase_runtime: project_context.resolve_phase_runtime(task: task, phase: run.phase),
+        task_packet: { "task_ref" => task.ref }
+      )
+    ).and_return(
+      A3::Application::ExecutionResult.new(success: true, summary: "agent implementation completed")
+    )
+
+    result = use_case.call(task_ref: task.ref, run_ref: run.ref, project_context: project_context)
+
+    expect(result.task.status).to eq(:verifying)
+    expect(result.run.terminal_outcome).to eq(:completed)
+    expect(result.workspace.slot_paths).to eq({})
+    expect(result.run.phase_records.last.execution_record&.summary).to eq("agent implementation completed")
   end
 
   it "records blocked diagnosis when the worker gateway fails" do

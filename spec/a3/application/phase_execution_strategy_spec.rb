@@ -110,7 +110,7 @@ RSpec.describe "phase execution strategies" do
 
   it "keeps workspace publication free of project remediation commands" do
     worker_gateway = instance_double("WorkerGateway")
-    workspace_change_publisher = instance_double(A3::Infra::LocalWorkspaceChangePublisher)
+    workspace_change_publisher = instance_double(A3::Infra::DisabledWorkspaceChangePublisher)
     strategy = A3::Application::WorkerPhaseExecutionStrategy.new(
       worker_gateway: worker_gateway,
       task_packet_builder: task_packet_builder,
@@ -138,6 +138,29 @@ RSpec.describe "phase execution strategies" do
       remediation_commands: []
     )
     expect(result.summary).to include("published workspace changes for repo_alpha")
+  end
+
+  it "fails closed when a non-agent implementation would require Engine-side publication" do
+    worker_gateway = instance_double("WorkerGateway")
+    strategy = A3::Application::WorkerPhaseExecutionStrategy.new(
+      worker_gateway: worker_gateway,
+      task_packet_builder: task_packet_builder
+    )
+    allow(worker_gateway).to receive(:run).and_return(
+      A3::Application::ExecutionResult.new(
+        success: true,
+        summary: "implementation completed",
+        response_bundle: { "changed_files" => { "repo_alpha" => ["keep.txt"] } }
+      )
+    )
+
+    result = strategy.execute(task: task, run: implementation_run, runtime: runtime, workspace: workspace)
+
+    expect(result).to have_attributes(
+      success?: false,
+      failing_command: "workspace_change_publication",
+      observed_state: "engine_workspace_mutation_disabled"
+    )
   end
 
   it "verification strategy exposes execution summary as verification summary and diagnostics on blocked" do

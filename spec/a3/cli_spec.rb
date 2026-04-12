@@ -34,7 +34,7 @@ RSpec.describe A3::CLI do
       out: out,
       run_id_generator: kind_of(Proc),
       command_runner: an_instance_of(A3::Infra::LocalCommandRunner),
-      merge_runner: an_instance_of(A3::Infra::LocalMergeRunner)
+      merge_runner: an_instance_of(A3::Infra::DisabledMergeRunner)
     )
   end
 

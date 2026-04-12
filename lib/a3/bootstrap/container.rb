@@ -3,7 +3,7 @@
 module A3
   module Bootstrap
     class Container
-      def self.build(storage_backend:, storage_dir:, run_id_generator:, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::LocalMergeRunner.new, worker_gateway: nil, repo_sources: {}, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
+      def self.build(storage_backend:, storage_dir:, run_id_generator:, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::DisabledMergeRunner.new, worker_gateway: nil, repo_sources: {}, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
         new(
           **repositories_for(storage_backend: storage_backend, storage_dir: storage_dir),
           run_id_generator: run_id_generator,
@@ -19,7 +19,7 @@ module A3
         ).build
       end
 
-      def self.json(storage_dir:, run_id_generator:, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::LocalMergeRunner.new, worker_gateway: nil, repo_sources: {}, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
+      def self.json(storage_dir:, run_id_generator:, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::DisabledMergeRunner.new, worker_gateway: nil, repo_sources: {}, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
         build(
           storage_backend: :json,
           storage_dir: storage_dir,
@@ -35,7 +35,7 @@ module A3
         )
       end
 
-      def self.sqlite(storage_dir:, run_id_generator:, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::LocalMergeRunner.new, worker_gateway: nil, repo_sources: {}, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
+      def self.sqlite(storage_dir:, run_id_generator:, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::DisabledMergeRunner.new, worker_gateway: nil, repo_sources: {}, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
         build(
           storage_backend: :sqlite,
           storage_dir: storage_dir,

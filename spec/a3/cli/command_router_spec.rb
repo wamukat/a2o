@@ -59,7 +59,7 @@ RSpec.describe A3::CLI::CommandRouter do
         out: out,
         run_id_generator: -> { "run-1" },
         command_runner: A3::Infra::LocalCommandRunner.new,
-        merge_runner: A3::Infra::LocalMergeRunner.new,
+        merge_runner: A3::Infra::DisabledMergeRunner.new,
         worker_gateway: nil
       )
 
@@ -83,7 +83,7 @@ RSpec.describe A3::CLI::CommandRouter do
         out: out,
         run_id_generator: -> { "run-1" },
         command_runner: A3::Infra::LocalCommandRunner.new,
-        merge_runner: A3::Infra::LocalMergeRunner.new,
+        merge_runner: A3::Infra::DisabledMergeRunner.new,
         worker_gateway: nil
       )
 
@@ -107,7 +107,7 @@ RSpec.describe A3::CLI::CommandRouter do
         out: out,
         run_id_generator: -> { "run-1" },
         command_runner: A3::Infra::LocalCommandRunner.new,
-        merge_runner: A3::Infra::LocalMergeRunner.new,
+        merge_runner: A3::Infra::DisabledMergeRunner.new,
         worker_gateway: nil
       )
 

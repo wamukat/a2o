@@ -106,7 +106,7 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
     let(:prepare_workspace) { instance_double(A3::Application::PrepareWorkspace) }
     let(:worker_gateway) { instance_double("WorkerGateway") }
     let(:command_runner) { instance_double(A3::Infra::LocalCommandRunner) }
-    let(:merge_runner) { instance_double(A3::Infra::LocalMergeRunner) }
+    let(:merge_runner) { instance_double("MergeRunner") }
     let(:run_id_sequence) { ["run-review", "run-verification", "run-merge"].dup }
     let(:run_id_generator) { -> { run_id_sequence.shift } }
 

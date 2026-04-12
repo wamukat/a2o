@@ -3,7 +3,7 @@
 module A3
   module Application
     class WorkerPhaseExecutionStrategy
-      def initialize(worker_gateway:, task_packet_builder:, workspace_change_publisher: A3::Infra::LocalWorkspaceChangePublisher.new)
+      def initialize(worker_gateway:, task_packet_builder:, workspace_change_publisher: A3::Infra::DisabledWorkspaceChangePublisher.new)
         @worker_gateway = worker_gateway
         @task_packet_builder = task_packet_builder
         @workspace_change_publisher = workspace_change_publisher
@@ -20,6 +20,8 @@ module A3
         )
         execution = append_worker_response_bundle(execution)
         return execution unless execution.success?
+        return execution unless run.phase.to_sym == :implementation
+        return execution if agent_owned_publication?
 
         publication = @workspace_change_publisher.publish(
           run: run,
@@ -49,6 +51,10 @@ module A3
         "worker phase succeeds"
       end
 
+      def requires_workspace?
+        !agent_owned_workspace?
+      end
+
       def blocked_default_failing_command
         "worker_gateway"
       end
@@ -62,6 +68,14 @@ module A3
       end
 
       private
+
+      def agent_owned_workspace?
+        @worker_gateway.respond_to?(:agent_owned_workspace?) && @worker_gateway.agent_owned_workspace?
+      end
+
+      def agent_owned_publication?
+        @worker_gateway.respond_to?(:agent_owned_publication?) && @worker_gateway.agent_owned_publication?
+      end
 
       def append_worker_response_bundle(execution)
         return execution unless execution.response_bundle

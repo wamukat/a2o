@@ -14,7 +14,7 @@ module A3
     extend HandlerSupport
     module_function
 
-    def start(argv, out: $stdout, run_id_generator: -> { SecureRandom.uuid }, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::LocalMergeRunner.new, worker_gateway: nil)
+    def start(argv, out: $stdout, run_id_generator: -> { SecureRandom.uuid }, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::DisabledMergeRunner.new, worker_gateway: nil)
       command = argv.shift
       dispatched = CommandRouter.dispatch(
         self,
@@ -870,9 +870,9 @@ module A3
         repo_sources: {},
         kanban_repo_label_map: {},
         kanban_trigger_labels: [],
-        verification_command_runner: "local",
-        merge_runner: "local",
-        worker_gateway: "local",
+        verification_command_runner: nil,
+        merge_runner: nil,
+        worker_gateway: nil,
         worker_command_args: []
       }
 
@@ -900,9 +900,9 @@ module A3
         repo_sources: {},
         kanban_repo_label_map: {},
         kanban_trigger_labels: [],
-        verification_command_runner: "local",
-        merge_runner: "local",
-        worker_gateway: "local",
+        verification_command_runner: nil,
+        merge_runner: nil,
+        worker_gateway: nil,
         worker_command_args: []
       }
 
@@ -1077,9 +1077,9 @@ module A3
         repo_sources: {},
         kanban_repo_label_map: {},
         kanban_trigger_labels: [],
-        verification_command_runner: "local",
-        merge_runner: "local",
-        worker_gateway: "local",
+        verification_command_runner: nil,
+        merge_runner: nil,
+        worker_gateway: nil,
         worker_command_args: []
       }
 
@@ -1389,7 +1389,8 @@ module A3
     end
 
     def build_worker_gateway(options:, command_runner:)
-      gateway = options.fetch(:worker_gateway, "local").to_s
+      gateway = options[:worker_gateway].to_s
+      return A3::Infra::DisabledWorkerGateway.new if gateway.empty?
       return A3::Infra::LocalWorkerGateway.new(
         command_runner: command_runner,
         worker_command: options[:worker_command],
@@ -1453,7 +1454,8 @@ module A3
     end
 
     def build_merge_runner(options:, fallback:)
-      runner = options.fetch(:merge_runner, "local").to_s
+      runner = options[:merge_runner].to_s
+      return fallback if runner.empty?
       return fallback if runner == "local"
 
       if runner == "agent-http"

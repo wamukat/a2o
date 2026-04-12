@@ -64,16 +64,7 @@ RSpec.describe A3::Application::StartRun do
       edit_scope: [:repo_alpha]
     )
     task_repository.save(task)
-    expect(prepare_workspace).to receive(:call).with(
-      task: task,
-      phase: :implementation,
-      source_descriptor: source_descriptor,
-      scope_snapshot: scope_snapshot,
-      artifact_owner: an_instance_of(A3::Domain::ArtifactOwner),
-      bootstrap_marker: "workspace-hook:v1"
-    ).and_return(
-      A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
-    )
+    expect(prepare_workspace).not_to receive(:call)
 
     result = use_case.call(
       task_ref: task.ref,
@@ -93,7 +84,11 @@ RSpec.describe A3::Application::StartRun do
     expect(result.run.phase).to eq(:implementation)
     expect(result.task.current_run_ref).to eq("run-1")
     expect(result.task.status).to eq(:in_progress)
-    expect(result.workspace).to eq(prepared_workspace)
+    expect(result.workspace).to have_attributes(
+      workspace_kind: :ticket_workspace,
+      source_descriptor: result.run.source_descriptor,
+      slot_paths: {}
+    )
     expect(run_repository.fetch("run-1")).to eq(result.run)
   end
 
@@ -109,25 +104,8 @@ RSpec.describe A3::Application::StartRun do
       ref: "refs/heads/a3/parent/A3-v2-3022",
       task_ref: task.ref
     )
-    runtime_workspace = A3::Domain::PreparedWorkspace.new(
-      workspace_kind: :runtime_workspace,
-      root_path: "/tmp/a3-v2/workspaces/A3-v2-3022/runtime_workspace",
-      source_descriptor: runtime_source_descriptor,
-      slot_paths: {
-        repo_alpha: "/tmp/a3-v2/workspaces/A3-v2-3022/runtime_workspace/repo-alpha"
-      }
-    )
     task_repository.save(task)
-    expect(prepare_workspace).to receive(:call).with(
-      task: task,
-      phase: :review,
-      source_descriptor: an_instance_of(A3::Domain::SourceDescriptor),
-      scope_snapshot: an_instance_of(A3::Domain::ScopeSnapshot),
-      artifact_owner: an_instance_of(A3::Domain::ArtifactOwner),
-      bootstrap_marker: "workspace-hook:v2"
-    ).and_return(
-      A3::Application::PrepareWorkspace::Result.new(workspace: runtime_workspace)
-    )
+    expect(prepare_workspace).not_to receive(:call)
 
     result = use_case.call(
       task_ref: task.ref,
@@ -154,67 +132,51 @@ RSpec.describe A3::Application::StartRun do
 
     expect(result.task.status).to eq(:in_review)
     expect(result.run.phase).to eq(:review)
-    expect(result.workspace).to eq(runtime_workspace)
+    expect(result.workspace).to have_attributes(
+      workspace_kind: :runtime_workspace,
+      source_descriptor: result.run.source_descriptor,
+      slot_paths: {}
+    )
   end
 
-  it "rejects a prepared workspace that does not match the started run source descriptor" do
+  it "does not materialize project workspaces while starting a run" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3022",
       kind: :parent,
       edit_scope: [:repo_beta, :repo_alpha]
     )
     task_repository.save(task)
-    mismatched_workspace = A3::Domain::PreparedWorkspace.new(
-      workspace_kind: :runtime_workspace,
-      root_path: "/tmp/a3-v2/workspaces/A3-v2-3022/runtime_workspace",
+    expect(prepare_workspace).not_to receive(:call)
+
+    result = use_case.call(
+      task_ref: task.ref,
+      phase: :review,
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
-        source_type: :detached_commit,
-        ref: "head999",
+        source_type: :integration_record,
+        ref: "refs/heads/a3/parent/A3-v2-3022",
         task_ref: task.ref
       ),
-      slot_paths: {
-        repo_alpha: "/tmp/a3-v2/workspaces/A3-v2-3022/runtime_workspace/repo-alpha"
-      }
-    )
-
-    expect(prepare_workspace).to receive(:call).and_return(
-      A3::Application::PrepareWorkspace::Result.new(workspace: mismatched_workspace)
-    )
-
-    expect do
-      use_case.call(
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_beta, :repo_alpha],
+        verification_scope: [:repo_beta, :repo_alpha],
+        ownership_scope: :parent
+      ),
+      review_target: A3::Domain::ReviewTarget.new(
+        base_commit: "base123",
+        head_commit: "head456",
         task_ref: task.ref,
-        phase: :review,
-      source_descriptor: A3::Domain::SourceDescriptor.new(
-          workspace_kind: :runtime_workspace,
-          source_type: :integration_record,
-          ref: "refs/heads/a3/parent/A3-v2-3022",
-          task_ref: task.ref
-        ),
-        scope_snapshot: A3::Domain::ScopeSnapshot.new(
-          edit_scope: [:repo_beta, :repo_alpha],
-          verification_scope: [:repo_beta, :repo_alpha],
-          ownership_scope: :parent
-        ),
-        review_target: A3::Domain::ReviewTarget.new(
-          base_commit: "base123",
-          head_commit: "head456",
-          task_ref: task.ref,
-          phase_ref: :review
-        ),
-        artifact_owner: A3::Domain::ArtifactOwner.new(
-          owner_ref: task.ref,
-          owner_scope: :parent,
-          snapshot_version: "head456"
-        ),
-        bootstrap_marker: "workspace-hook:v2"
-      )
-    end.to raise_error(
-      A3::Domain::ConfigurationError,
-      /prepared workspace source descriptor does not match started run source descriptor/
+        phase_ref: :review
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: task.ref,
+        owner_scope: :parent,
+        snapshot_version: "head456"
+      ),
+      bootstrap_marker: "workspace-hook:v2"
     )
-    expect(task_repository.fetch(task.ref).current_run_ref).to be_nil
-    expect { run_repository.fetch("run-1") }.to raise_error(A3::Domain::RecordNotFound)
+
+    expect(result.workspace.root_path.to_s).to include("a3-control-plane-workspace")
+    expect(result.workspace.slot_paths).to eq({})
   end
 end

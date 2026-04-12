@@ -53,7 +53,7 @@ RSpec.describe A3::Bootstrap::Container do
         run_repository: run_repository,
         run_id_generator: -> { "run-1" },
         command_runner: A3::Infra::LocalCommandRunner.new,
-        merge_runner: A3::Infra::LocalMergeRunner.new,
+        merge_runner: A3::Infra::DisabledMergeRunner.new,
         worker_gateway: nil,
         storage_dir: dir,
         repo_sources: {}

@@ -3,14 +3,14 @@
 require "spec_helper"
 
 RSpec.describe "A3 CLI worker gateway options" do
-  it "defaults to the local worker gateway" do
+  it "defaults to a disabled worker gateway" do
     gateway = A3::CLI.send(
       :build_worker_gateway,
       options: { worker_command_args: [] },
       command_runner: instance_double(A3::Infra::LocalCommandRunner)
     )
 
-    expect(gateway).to be_a(A3::Infra::LocalWorkerGateway)
+    expect(gateway).to be_a(A3::Infra::DisabledWorkerGateway)
   end
 
   it "builds an agent HTTP worker gateway when required options are provided" do
@@ -180,7 +180,7 @@ RSpec.describe "A3 CLI worker gateway options" do
           "repo_alpha" => "portal-alpha"
         }
       },
-      fallback: instance_double(A3::Infra::LocalMergeRunner)
+      fallback: instance_double(A3::Infra::DisabledMergeRunner)
     )
 
     expect(runner).to be_a(A3::Infra::AgentMergeRunner)
@@ -194,7 +194,7 @@ RSpec.describe "A3 CLI worker gateway options" do
           merge_runner: "agent-http",
           agent_control_plane_url: "http://127.0.0.1:4567"
         },
-        fallback: instance_double(A3::Infra::LocalMergeRunner)
+        fallback: instance_double(A3::Infra::DisabledMergeRunner)
       )
     end.to raise_error(ArgumentError, /agent-source-alias/)
   end
