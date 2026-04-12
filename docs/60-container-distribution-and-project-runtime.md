@@ -250,6 +250,12 @@ disk pressure 時の cleanup 判断:
 
 この分類により、「operator が日常的に使う入口」は root Taskfile と bundle task に寄せ、A3 CLI の低レベル command は smoke harness / diagnosis / recovery の実装面として扱う。
 
+命名上の残課題: `bundle` は実装由来の呼称であり、operator には「Docker 上 A3 runtime + SoloBoard + host/dev-env agent を使う local runtime」という意味が伝わりにくい。最終 validation が `A3 Engine on Docker` + `A3 Agents on Local` に固定されるタイミングで、root Taskfile の public entrypoint は `a3:portal:bundle:*` から `a3:portal:docker-runtime:*` または `a3:portal:local-runtime:*` へ rename する。移行時は短期間だけ旧名を maintenance alias として残し、docs / operator logs / watch-summary の表記から `bundle` を順次外す。候補名は次の整理で決める。
+
+- `a3:portal:docker-runtime:*`: A3 Engine と SoloBoard が Docker compose 上で動くことを明示できる
+- `a3:portal:local-runtime:*`: central server ではなく local-first runtime であることを強調できる
+- `a3:portal:runtime:*`: 最終的に Docker 以外の起動方式も含めるなら最も短いが、現時点では意味が広すぎる
+
 ### 0.1.2 2026-04-08 v1 / legacy 破棄可否の現状判定
 
 live canary と scheduler surface の検証結果に加え、workspace root の operator surface / Python utility の棚卸しと Ruby migration を進めた結果、A3 は `legacy scheduler や root Python thin tooling がないと Portal canary を進められない` 段階を抜けた。2026-04-11 時点では `a3-v2/` source tree と legacy automation scripts も削除済みであり、現時点の未完は runtime の正当性よりも、配布・agent 運用・retention hardening の整理である。
