@@ -3,11 +3,12 @@
 module A3
   module Infra
     class AgentWorkspaceRequestBuilder
-      def initialize(source_aliases:, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup)
+      def initialize(source_aliases:, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, support_ref: nil)
         @source_aliases = source_aliases.transform_keys(&:to_sym).transform_values(&:to_s).freeze
         @repo_slots = @source_aliases.keys.sort.freeze
         @freshness_policy = freshness_policy.to_sym
         @cleanup_policy = cleanup_policy.to_sym
+        @support_ref = support_ref.to_s.strip
         validate_policy!(:freshness_policy, @freshness_policy, A3::Domain::AgentWorkspaceRequest::FRESHNESS_POLICIES)
         validate_policy!(:cleanup_policy, @cleanup_policy, A3::Domain::AgentWorkspaceRequest::CLEANUP_POLICIES)
       end
@@ -23,7 +24,7 @@ module A3
               kind: "local_git",
               alias: alias_name
             },
-            ref: run.source_descriptor.ref,
+            ref: ref_for(slot_name, run),
             checkout: "worktree_branch",
             access: access_for(slot_name, run),
             sync_class: sync_class_for(slot_name, run),
@@ -63,6 +64,13 @@ module A3
 
       def ownership_for(slot_name, run)
         run.scope_snapshot.edit_scope.include?(slot_name) ? "edit_target" : "support"
+      end
+
+      def ref_for(slot_name, run)
+        return run.source_descriptor.ref if ownership_for(slot_name, run) == "edit_target"
+        return @support_ref unless @support_ref.empty?
+
+        raise A3::Domain::ConfigurationError, "agent support slot #{slot_name} requires --agent-support-ref"
       end
 
       def publish_policy_for(task:, run:)

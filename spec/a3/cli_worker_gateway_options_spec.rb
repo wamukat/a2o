@@ -64,12 +64,15 @@ RSpec.describe "A3 CLI worker gateway options" do
           "repo_alpha" => "portal-alpha",
           "repo_beta" => "portal-beta"
         },
+        agent_support_ref: "refs/heads/feature/prototype",
         agent_workspace_cleanup_policy: :cleanup_after_job
       },
       command_runner: instance_double(A3::Infra::LocalCommandRunner)
     )
 
     expect(gateway).to be_a(A3::Infra::AgentWorkerGateway)
+    builder = gateway.instance_variable_get(:@workspace_request_builder)
+    expect(builder.instance_variable_get(:@support_ref)).to eq("refs/heads/feature/prototype")
   end
 
   it "requires a control-plane URL for the agent HTTP worker gateway" do

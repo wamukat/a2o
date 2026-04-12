@@ -1291,6 +1291,7 @@ module A3
       parser.on("--agent-shared-workspace-mode VALUE") { |value| options[:agent_shared_workspace_mode] = value }
       parser.on("--agent-env KEY=VALUE") { |value| add_named_option(options[:agent_env] ||= {}, value, option_name: "agent env") }
       parser.on("--agent-source-alias SLOT=ALIAS") { |value| add_named_option(options[:agent_source_aliases] ||= {}, value, option_name: "agent source alias") }
+      parser.on("--agent-support-ref REF") { |value| options[:agent_support_ref] = value }
       parser.on("--agent-workspace-freshness-policy VALUE") { |value| options[:agent_workspace_freshness_policy] = value.to_sym }
       parser.on("--agent-workspace-cleanup-policy VALUE") { |value| options[:agent_workspace_cleanup_policy] = value.to_sym }
       parser.on("--agent-job-timeout-seconds VALUE") { |value| options[:agent_job_timeout_seconds] = Integer(value) }
@@ -1516,7 +1517,8 @@ module A3
       A3::Infra::AgentWorkspaceRequestBuilder.new(
         source_aliases: source_aliases,
         freshness_policy: options.fetch(:agent_workspace_freshness_policy, :reuse_if_clean_and_ref_matches),
-        cleanup_policy: options.fetch(:agent_workspace_cleanup_policy, :retain_until_a3_cleanup)
+        cleanup_policy: options.fetch(:agent_workspace_cleanup_policy, :retain_until_a3_cleanup),
+        support_ref: options[:agent_support_ref]
       )
     end
 

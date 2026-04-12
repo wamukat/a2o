@@ -22,7 +22,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
   end
 
   it "builds all configured slots and marks edit scope with read-write access" do
-    request = builder.call(workspace: workspace, task: task, run: run(:implementation))
+    request = support_ref_builder.call(workspace: workspace, task: task, run: run(:implementation))
 
     expect(request.workspace_kind).to eq(:ticket_workspace)
     expect(request.workspace_id).to eq("Portal-42-implementation-run-implementation")
@@ -81,13 +81,41 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       )
     )
 
-    request = builder.call(workspace: workspace, task: parented_task, run: parented_run)
+    request = support_ref_builder.call(workspace: workspace, task: parented_task, run: parented_run)
 
     expect(request.workspace_id).to eq("Portal-134-children-Portal-135-implementation-run-implementation")
   end
 
+  it "uses the support ref for non-edit slots" do
+    builder = described_class.new(
+      source_aliases: {
+        repo_alpha: "portal-alpha",
+        repo_beta: "portal-beta"
+      },
+      support_ref: "refs/heads/feature/prototype"
+    )
+
+    request = builder.call(workspace: workspace, task: task, run: run(:implementation))
+
+    expect(request.slots.fetch("repo_alpha")).to include(
+      "ref" => "refs/heads/a3/work/Portal-42",
+      "ownership" => "edit_target"
+    )
+    expect(request.slots.fetch("repo_beta")).to include(
+      "ref" => "refs/heads/feature/prototype",
+      "ownership" => "support",
+      "access" => "read_only"
+    )
+  end
+
   it "keeps support slots present for verification even when the scope is narrow" do
-    request = builder.call(workspace: workspace, task: task, run: run(:verification))
+    request = described_class.new(
+      source_aliases: {
+        repo_alpha: "portal-alpha",
+        repo_beta: "portal-beta"
+      },
+      support_ref: "refs/heads/feature/prototype"
+    ).call(workspace: workspace, task: task, run: run(:verification))
 
     expect(request.publish_policy).to be_nil
     expect(request.slots.keys).to eq(%w[repo_alpha repo_beta])
@@ -96,14 +124,26 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       "sync_class" => "eager"
     )
     expect(request.slots.fetch("repo_beta")).to include(
-      "ref" => "refs/heads/a3/work/Portal-42",
+      "ref" => "refs/heads/feature/prototype",
       "access" => "read_only",
       "sync_class" => "lazy_but_guaranteed"
     )
   end
 
+  it "fails closed when support slots are requested without a support ref" do
+    expect do
+      builder.call(workspace: workspace, task: task, run: run(:implementation))
+    end.to raise_error(A3::Domain::ConfigurationError, /support slot repo_beta requires --agent-support-ref/)
+  end
+
   it "builds review slots from edit and verification scopes with edit slots writable" do
-    request = builder.call(workspace: workspace, task: task, run: run(:review))
+    request = described_class.new(
+      source_aliases: {
+        repo_alpha: "portal-alpha",
+        repo_beta: "portal-beta"
+      },
+      support_ref: "refs/heads/feature/prototype"
+    ).call(workspace: workspace, task: task, run: run(:review))
 
     expect(request.slots.keys).to eq(%w[repo_alpha repo_beta])
     expect(request.slots.transform_values { |slot| slot.fetch("access") }).to eq(
@@ -138,6 +178,16 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
         repo_alpha: "portal-alpha",
         repo_beta: "portal-beta"
       }
+    )
+  end
+
+  def support_ref_builder
+    described_class.new(
+      source_aliases: {
+        repo_alpha: "portal-alpha",
+        repo_beta: "portal-beta"
+      },
+      support_ref: "refs/heads/feature/prototype"
     )
   end
 
