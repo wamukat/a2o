@@ -1824,6 +1824,15 @@ artifact store の掃除:
 - 2026-04-12 の `task a3:portal:bundle:agent-artifact-cleanup -- --dry-run` では `deleted_count=0`, `retained_count=0`, `missing_blob_count=0` を確認した
 - 2026-04-12 の post-archive recovery smoke では `task a3:portal:bundle:doctor`, `task a3:portal:bundle:bootstrap`, `task a3:portal:bundle:smoke`, `task a3:portal:bundle:agent-artifact-cleanup -- --dry-run` が成功した。`bundle:smoke` が作成した `Portal#93/#94` は確認後に `Done` へ transition 済みである
 - 同日の bundled agent smoke sweep 後にも `task a3:portal:bundle:agent-artifact-cleanup -- --dry-run` は `deleted_count=0`, `retained_count=0`, `missing_blob_count=0` を返し、artifact cleanup 対象が残っていないことを確認した
+- 同日の cap 指定 dry-run (`--diagnostic-max-count 1 --evidence-max-count 1 --diagnostic-max-mb 1 --evidence-max-mb 1`) でも `deleted_count=0`, `retained_count=0`, `missing_blob_count=0` を確認した
+
+blocked diagnosis / recovery surface の確認:
+
+- archived state `/var/lib/a3/archive/portal-soloboard-bundle-canary-20260411T142541Z` には `Portal#43` の blocked diagnosis が保持されている
+- archive を scratch copy (`/var/lib/a3/diagnostic-scratch-portal-43-20260412`) に複製し、`show-run` と `show-blocked-diagnosis` で run `572a705b-3d81-4409-b370-38cc34963b18` を表示できることを確認した
+- `show-blocked-diagnosis` は `failing_command=ruby "$A3_ROOT_DIR/scripts/a3/portal_remediation.rb"`、`observed=exit 1`、`summary=... failed`、diagnostic stderr の `JAVA_HOME environment variable is not defined correctly` まで表示できた
+- 同 scratch で `doctor-runtime` は `runtime_doctor=ok`、`repair-runs` dry-run は `actions=0`、`show-state` は `active_runs=0`, `queued_tasks=0`, `blocked_tasks=1` を返した
+- 同 scratch で `cleanup-terminal-workspaces --dry-run --status blocked,done --scope ticket_workspace,runtime_workspace` は `cleaned=0`、`quarantine-terminal-workspaces` は `quarantined 0 workspace(s)` を返した。archive 正本は保持し、scratch copy は確認後に削除した
 
 Docker 側の掃除:
 
@@ -1841,6 +1850,7 @@ Docker 側の掃除:
 - 同日の `ITERATIONS=3 INTERVAL_SECONDS=30 task a3:portal:bundle:observe` でも全 iteration で bundle doctor / watch-summary / describe-state が成功し、host disk 空き約 89GiB、Docker reclaimable 約 3.7GiB、`active_runs=0`, `queued_tasks=0`, `blocked_tasks=0` を維持した
 - 同日の `task a3:portal:bundle:archive-state` では active storage を `/var/lib/a3/archive/portal-soloboard-bundle-canary-20260412T023635Z` へ退避し、直後の `task a3:portal:bundle:describe-state` / `task a3:portal:bundle:watch-summary` で新しい active storage が `active_runs=0`, `queued_tasks=0`, `blocked_tasks=0` の idle として読めることを確認した
 - 同日の bundled agent smoke sweep 後の `ITERATIONS=1 INTERVAL_SECONDS=1 task a3:portal:bundle:observe` でも bundle doctor / watch-summary / describe-state が成功し、host disk 空き約 88GiB、Docker reclaimable 約 3.7GiB、`active_runs=0`, `queued_tasks=0`, `blocked_tasks=0` を確認した
+- 同日の diagnostic surface 確認後に `ITERATIONS=4 INTERVAL_SECONDS=45 task a3:portal:bundle:observe` を実行し、全 iteration で bundle doctor / watch-summary / describe-state が成功した。host disk 空きは約 89GiB、Docker reclaimable は約 3.7GiB のまま維持され、各 iteration の state は `active_runs=0`, `queued_tasks=0`, `blocked_tasks=0` だった
 
 ### 6.2.1 terminal worktree cleanup 実装計画
 
