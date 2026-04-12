@@ -242,7 +242,25 @@ func executeMergePlans(plans []mergePlan, policy string) error {
 	if err := cleanupMergeWorktrees(merged); err != nil {
 		return err
 	}
-	return nil
+	return refreshMergedSourceWorktrees(merged)
+}
+
+func refreshMergedSourceWorktrees(plans []mergePlan) error {
+	var refreshErr error
+	seen := map[string]bool{}
+	for _, plan := range plans {
+		key := plan.sourceRoot + "\x00" + plan.targetRef
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		currentRef, err := gitOutput(plan.sourceRoot, "symbolic-ref", "-q", "HEAD")
+		if err != nil || currentRef != plan.targetRef {
+			continue
+		}
+		refreshErr = errors.Join(refreshErr, runGit(plan.sourceRoot, "reset", "--hard", plan.targetRef))
+	}
+	return refreshErr
 }
 
 func rollbackMergePlans(plans []mergePlan) error {

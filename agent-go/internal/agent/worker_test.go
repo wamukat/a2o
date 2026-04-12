@@ -65,7 +65,7 @@ func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T)
 	result, idle, err := Worker{
 		AgentName: "host-local",
 		Client:    client,
-		Executor:  workerProtocolExecutor{},
+		Executor:  workerProtocolExecutor{requireSlotPaths: true},
 		Materializer: WorkspaceMaterializer{
 			WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 			SourceAliases: map[string]string{
@@ -294,6 +294,7 @@ func (fakeExecutor) Execute(JobRequest) ExecutionResult {
 
 type workerProtocolExecutor struct {
 	omitChangedFiles bool
+	requireSlotPaths bool
 }
 
 func (executor workerProtocolExecutor) Execute(request JobRequest) ExecutionResult {
@@ -306,6 +307,13 @@ func (executor workerProtocolExecutor) Execute(request JobRequest) ExecutionResu
 	if err := json.Unmarshal(content, &payload); err != nil {
 		code := 1
 		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
+	}
+	if executor.requireSlotPaths {
+		slotPaths, ok := payload["slot_paths"].(map[string]any)
+		if !ok || slotPaths["repo_alpha"] == "" {
+			code := 1
+			return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte("missing materialized slot_paths")}
+		}
 	}
 	result := map[string]any{
 		"status":   "succeeded",

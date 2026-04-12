@@ -236,7 +236,7 @@ func (w Worker) prepareRequest(request JobRequest) (JobRequest, *PreparedWorkspa
 	runRequest := request
 	runRequest.WorkingDir = prepared.Root
 	runRequest.Env = workerProtocolEnv(request.Env, prepared.Root, request.WorkerProtocolRequest != nil)
-	if err := writeWorkerProtocolRequest(prepared.Root, request.WorkerProtocolRequest); err != nil {
+	if err := writeWorkerProtocolRequest(prepared.Root, workerProtocolRequestWithMaterializedSlots(request.WorkerProtocolRequest, prepared.SlotDescriptors)); err != nil {
 		return request, &prepared, requestedWorkspaceDescriptor(request, prepared.SlotDescriptors), err
 	}
 	descriptor := requestedWorkspaceDescriptor(request, prepared.SlotDescriptors)
@@ -413,6 +413,28 @@ func writeWorkerProtocolRequest(workspaceRoot string, payload map[string]any) er
 		return fmt.Errorf("worker protocol request exceeds %d bytes", maxWorkerProtocolPayloadBytes)
 	}
 	return os.WriteFile(workerRequestPath(workspaceRoot), append(content, '\n'), 0o600)
+}
+
+func workerProtocolRequestWithMaterializedSlots(payload map[string]any, slotDescriptors map[string]map[string]any) map[string]any {
+	if payload == nil {
+		return nil
+	}
+	enriched := map[string]any{}
+	for key, value := range payload {
+		enriched[key] = value
+	}
+	slotPaths := map[string]string{}
+	for slotName, descriptor := range slotDescriptors {
+		runtimePath, ok := descriptor["runtime_path"].(string)
+		if !ok || runtimePath == "" {
+			continue
+		}
+		slotPaths[slotName] = runtimePath
+	}
+	if len(slotPaths) > 0 {
+		enriched["slot_paths"] = slotPaths
+	}
+	return enriched
 }
 
 func workerProtocolEnv(base map[string]string, workspaceRoot string, hasWorkerProtocolRequest bool) map[string]string {
