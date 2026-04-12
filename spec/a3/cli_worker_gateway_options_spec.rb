@@ -72,7 +72,33 @@ RSpec.describe "A3 CLI worker gateway options" do
 
     expect(gateway).to be_a(A3::Infra::AgentWorkerGateway)
     builder = gateway.instance_variable_get(:@workspace_request_builder)
-    expect(builder.instance_variable_get(:@support_ref)).to eq("refs/heads/feature/prototype")
+    expect(builder.instance_variable_get(:@support_refs)).to include(default: "refs/heads/feature/prototype")
+  end
+
+  it "builds an agent materialized HTTP worker gateway with slot-specific support refs" do
+    gateway = A3::CLI.send(
+      :build_worker_gateway,
+      options: {
+        worker_gateway: "agent-http",
+        worker_command: "sh",
+        worker_command_args: ["-lc", "worker"],
+        agent_control_plane_url: "http://127.0.0.1:4567",
+        agent_runtime_profile: "host-local",
+        agent_shared_workspace_mode: "agent-materialized",
+        agent_source_aliases: {
+          "repo_alpha" => "portal-alpha",
+          "repo_beta" => "portal-beta"
+        },
+        agent_support_refs: {
+          "repo_beta" => "refs/heads/support/beta"
+        }
+      },
+      command_runner: instance_double(A3::Infra::LocalCommandRunner)
+    )
+
+    expect(gateway).to be_a(A3::Infra::AgentWorkerGateway)
+    builder = gateway.instance_variable_get(:@workspace_request_builder)
+    expect(builder.instance_variable_get(:@support_refs)).to include(repo_beta: "refs/heads/support/beta")
   end
 
   it "requires a control-plane URL for the agent HTTP worker gateway" do

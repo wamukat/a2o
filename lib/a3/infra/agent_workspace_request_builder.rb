@@ -3,12 +3,12 @@
 module A3
   module Infra
     class AgentWorkspaceRequestBuilder
-      def initialize(source_aliases:, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, support_ref: nil)
+      def initialize(source_aliases:, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, support_ref: nil, support_refs: {})
         @source_aliases = source_aliases.transform_keys(&:to_sym).transform_values(&:to_s).freeze
         @repo_slots = @source_aliases.keys.sort.freeze
         @freshness_policy = freshness_policy.to_sym
         @cleanup_policy = cleanup_policy.to_sym
-        @support_ref = support_ref.to_s.strip
+        @support_refs = normalize_support_refs(support_ref: support_ref, support_refs: support_refs)
         validate_policy!(:freshness_policy, @freshness_policy, A3::Domain::AgentWorkspaceRequest::FRESHNESS_POLICIES)
         validate_policy!(:cleanup_policy, @cleanup_policy, A3::Domain::AgentWorkspaceRequest::CLEANUP_POLICIES)
       end
@@ -24,7 +24,7 @@ module A3
               kind: "local_git",
               alias: alias_name
             },
-            ref: ref_for(slot_name, run),
+            ref: ref_for(slot_name, task, run),
             checkout: "worktree_branch",
             access: access_for(slot_name, run),
             sync_class: sync_class_for(slot_name, run),
@@ -66,11 +66,33 @@ module A3
         run.scope_snapshot.edit_scope.include?(slot_name) ? "edit_target" : "support"
       end
 
-      def ref_for(slot_name, run)
+      def ref_for(slot_name, task, run)
         return run.source_descriptor.ref if ownership_for(slot_name, run) == "edit_target"
-        return @support_ref unless @support_ref.empty?
+        return parent_integration_ref_for(task) if parent_integration_support_ref?(task)
+        return @support_refs.fetch(slot_name) if @support_refs.key?(slot_name)
+        return @support_refs.fetch(:default) if @support_refs.key?(:default)
 
         raise A3::Domain::ConfigurationError, "agent support slot #{slot_name} requires --agent-support-ref"
+      end
+
+      def parent_integration_support_ref?(task)
+        task.kind.to_sym == :parent || !task.parent_ref.to_s.empty?
+      end
+
+      def parent_integration_ref_for(task)
+        owner_ref = task.parent_ref || task.ref
+        "refs/heads/a3/parent/#{owner_ref.tr('#', '-')}"
+      end
+
+      def normalize_support_refs(support_ref:, support_refs:)
+        normalized = support_refs.to_h.each_with_object({}) do |(slot, ref), refs|
+          key = slot.to_s == "*" ? :default : slot.to_sym
+          value = ref.to_s.strip
+          refs[key] = value unless value.empty?
+        end
+        default_ref = support_ref.to_s.strip
+        normalized[:default] = default_ref unless default_ref.empty?
+        normalized.freeze
       end
 
       def publish_policy_for(task:, run:)

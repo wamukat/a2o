@@ -84,9 +84,17 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     request = support_ref_builder.call(workspace: workspace, task: parented_task, run: parented_run)
 
     expect(request.workspace_id).to eq("Portal-134-children-Portal-135-implementation-run-implementation")
+    expect(request.slots.fetch("repo_alpha")).to include(
+      "ref" => "refs/heads/a3/work/Portal-135",
+      "ownership" => "edit_target"
+    )
+    expect(request.slots.fetch("repo_beta")).to include(
+      "ref" => "refs/heads/a3/parent/Portal-134",
+      "ownership" => "support"
+    )
   end
 
-  it "uses the support ref for non-edit slots" do
+  it "uses the default support ref for standalone non-edit slots" do
     builder = described_class.new(
       source_aliases: {
         repo_alpha: "portal-alpha",
@@ -106,6 +114,72 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       "ownership" => "support",
       "access" => "read_only"
     )
+  end
+
+  it "uses the parent integration ref for parent support slots" do
+    parent_task = A3::Domain::Task.new(
+      ref: "Portal#173",
+      kind: :parent,
+      edit_scope: [:repo_alpha],
+      verification_scope: %i[repo_alpha repo_beta]
+    )
+    parent_run = A3::Domain::Run.new(
+      ref: "run-verification",
+      task_ref: parent_task.ref,
+      phase: :verification,
+      workspace_kind: workspace.workspace_kind,
+      source_descriptor: A3::Domain::SourceDescriptor.implementation(
+        task_ref: parent_task.ref,
+        ref: "refs/heads/a3/parent/Portal-173"
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: parent_task.edit_scope,
+        verification_scope: parent_task.verification_scope,
+        ownership_scope: :parent
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: parent_task.ref,
+        owner_scope: :task,
+        snapshot_version: "refs/heads/a3/parent/Portal-173"
+      )
+    )
+
+    request = described_class.new(
+      source_aliases: {
+        repo_alpha: "portal-alpha",
+        repo_beta: "portal-beta"
+      },
+      support_ref: "refs/heads/feature/prototype"
+    ).call(workspace: workspace, task: parent_task, run: parent_run)
+
+    expect(request.slots.fetch("repo_alpha")).to include(
+      "ref" => "refs/heads/a3/parent/Portal-173",
+      "ownership" => "edit_target"
+    )
+    expect(request.slots.fetch("repo_beta")).to include(
+      "ref" => "refs/heads/a3/parent/Portal-173",
+      "ownership" => "support"
+    )
+  end
+
+  it "uses slot-specific support refs when multiple support repositories are configured" do
+    multi_support_builder = described_class.new(
+      source_aliases: {
+        repo_alpha: "portal-alpha",
+        repo_beta: "portal-beta",
+        repo_gamma: "portal-gamma"
+      },
+      support_refs: {
+        "repo_beta" => "refs/heads/support/beta",
+        "repo_gamma" => "refs/heads/support/gamma"
+      }
+    )
+
+    request = multi_support_builder.call(workspace: workspace, task: task, run: run(:implementation))
+
+    expect(request.slots.fetch("repo_alpha")).to include("ref" => "refs/heads/a3/work/Portal-42")
+    expect(request.slots.fetch("repo_beta")).to include("ref" => "refs/heads/support/beta")
+    expect(request.slots.fetch("repo_gamma")).to include("ref" => "refs/heads/support/gamma")
   end
 
   it "keeps support slots present for verification even when the scope is narrow" do
