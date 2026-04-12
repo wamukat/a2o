@@ -39,6 +39,40 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     )
   end
 
+  it "uses parent-owned workspace ids for child tasks with a parent ref" do
+    parented_task = A3::Domain::Task.new(
+      ref: "Portal#135",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      parent_ref: "Portal#134"
+    )
+    parented_run = A3::Domain::Run.new(
+      ref: "run-implementation",
+      task_ref: parented_task.ref,
+      phase: :implementation,
+      workspace_kind: workspace.workspace_kind,
+      source_descriptor: A3::Domain::SourceDescriptor.implementation(
+        task_ref: parented_task.ref,
+        ref: "refs/heads/a3/work/Portal-135"
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: parented_task.edit_scope,
+        verification_scope: parented_task.verification_scope,
+        ownership_scope: :child
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: parented_task.parent_ref,
+        owner_scope: :task,
+        snapshot_version: "refs/heads/a3/work/Portal-135"
+      )
+    )
+
+    request = builder.call(workspace: workspace, task: parented_task, run: parented_run)
+
+    expect(request.workspace_id).to eq("Portal-134-children-Portal-135-implementation-run-implementation")
+  end
+
   it "builds verification slots from verification scope with read-only access" do
     request = builder.call(workspace: workspace, task: task, run: run(:verification))
 

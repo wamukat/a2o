@@ -60,6 +60,10 @@ module A3
       end
 
       def workspace_id_for(task:, run:)
+        if task.kind.to_sym == :child && task.parent_ref
+          return "#{safe_id(task.parent_ref)}-children-#{safe_id(task.ref)}-#{safe_id(run.phase)}-#{safe_id(run.ref)}"
+        end
+
         "#{safe_id(task.ref)}-#{safe_id(run.phase)}-#{safe_id(run.ref)}"
       end
 

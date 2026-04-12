@@ -17,7 +17,8 @@ module A3
       end
 
       def call(task:, workspace_plan:, artifact_owner:, bootstrap_marker:)
-        root_path = workspace_root(task.ref, workspace_plan.workspace_kind)
+        ensure_parent_workspace_slots!(task: task, workspace_plan: workspace_plan, artifact_owner: artifact_owner)
+        root_path = workspace_root(task, workspace_plan.workspace_kind, artifact_owner)
         A3::Infra::WorkspaceTraceLogger.log(
           workspace_root: root_path,
           event: "workspace_provision.start",
@@ -55,7 +56,7 @@ module A3
       end
 
       def quarantine_task(task_ref:)
-        source_root = workspaces_root.join(slugify(task_ref))
+        source_root = task_workspace_root(task_ref)
         return nil unless source_root.exist?
 
         quarantine_root = base_dir.join("quarantine", slugify(task_ref))
@@ -72,9 +73,9 @@ module A3
 
       def cleanup_task(task_ref:, scopes:, dry_run: false)
         task_slug = slugify(task_ref)
-        task_root = workspaces_root.join(task_slug)
+        task_root = task_workspace_root(task_ref)
         cleaned_paths = Array(scopes).map(&:to_sym).each_with_object([]) do |scope, paths|
-          path = cleanup_scope_path(task_slug, scope)
+          path = cleanup_scope_path(task_root, scope)
           next unless path&.exist?
 
           remove_path!(path, dry_run: dry_run)
@@ -93,8 +94,45 @@ module A3
         base_dir.join("workspaces")
       end
 
-      def workspace_root(task_ref, workspace_kind)
-        workspaces_root.join(slugify(task_ref), workspace_kind.to_s)
+      def task_workspace_root(task_ref)
+        task_slug = slugify(task_ref)
+        direct = workspaces_root.join(task_slug)
+        return direct if direct.exist?
+
+        child_roots = workspaces_root.glob("*/children/#{task_slug}")
+        child_roots.first || direct
+      end
+
+      def workspace_root(task, workspace_kind, artifact_owner)
+        if child_owned_by_parent?(task, artifact_owner)
+          workspaces_root.join(slugify(artifact_owner.owner_ref), "children", slugify(task.ref), workspace_kind.to_s)
+        else
+          workspaces_root.join(slugify(task.ref), workspace_kind.to_s)
+        end
+      end
+
+      def ensure_parent_workspace_slots!(task:, workspace_plan:, artifact_owner:)
+        return unless child_owned_by_parent?(task, artifact_owner)
+
+        parent_source_ref = parent_integration_ref(artifact_owner.owner_ref)
+        parent_plan = A3::Domain::WorkspacePlan.new(
+          workspace_kind: :runtime_workspace,
+          source_descriptor: A3::Domain::SourceDescriptor.new(
+            workspace_kind: :runtime_workspace,
+            source_type: :integration_record,
+            ref: parent_source_ref,
+            task_ref: artifact_owner.owner_ref
+          ),
+          slot_requirements: workspace_plan.slot_requirements
+        )
+        parent_root = workspaces_root.join(slugify(artifact_owner.owner_ref), "runtime_workspace")
+        parent_owner = A3::Domain::ArtifactOwner.new(
+          owner_ref: artifact_owner.owner_ref,
+          owner_scope: :parent,
+          snapshot_version: parent_source_ref
+        )
+        materialize_slot_paths(parent_root, artifact_owner.owner_ref, parent_plan, parent_owner, nil)
+        write_metadata(parent_root, artifact_owner.owner_ref, parent_plan)
       end
 
       def materialize_slot_paths(root_path, task_ref, workspace_plan, artifact_owner, bootstrap_marker)
@@ -287,7 +325,7 @@ module A3
       end
 
       def create_git_branch_if_missing?(workspace_plan)
-        workspace_plan.source_descriptor.source_type.to_sym == :branch_head
+        %i[branch_head integration_record].include?(workspace_plan.source_descriptor.source_type.to_sym)
       end
 
       def reset_branch_target_for(workspace_plan)
@@ -299,6 +337,16 @@ module A3
       def force_fresh_ticket_workspace?(workspace_plan)
         workspace_plan.workspace_kind.to_sym == :ticket_workspace &&
           workspace_plan.source_descriptor.source_type.to_sym == :branch_head
+      end
+
+      def child_owned_by_parent?(task, artifact_owner)
+        task.kind.to_sym == :child &&
+          artifact_owner.owner_ref &&
+          artifact_owner.owner_ref != task.ref
+      end
+
+      def parent_integration_ref(parent_ref)
+        "refs/heads/a3/parent/#{slugify(parent_ref)}"
       end
 
       def git_worktree_slots(source_root)
@@ -349,12 +397,12 @@ module A3
         end
       end
 
-      def cleanup_scope_path(task_slug, scope)
+      def cleanup_scope_path(task_root, scope)
         case scope
         when :ticket_workspace, :runtime_workspace
-          workspaces_root.join(task_slug, scope.to_s)
+          task_root.join(scope.to_s)
         when :quarantine
-          base_dir.join("quarantine", task_slug)
+          base_dir.join("quarantine", task_root.basename.to_s)
         else
           raise A3::Domain::ConfigurationError, "Unknown cleanup scope: #{scope}"
         end

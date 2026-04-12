@@ -90,6 +90,18 @@ module A3
               )
             end
 
+            parent_sync = sync_parent_owned_workspace_slot(entry)
+            unless parent_sync[:success]
+              rollback_failures = rollback_published_updates(published)
+              raise MergePublicationError.new(
+                failure_result(
+                  parent_sync,
+                  entry.fetch(:merge_slot),
+                  extra_diagnostics: rollback_failure_diagnostics(rollback_failures)
+                )
+              )
+            end
+
             published << entry
           end
           sync_root_repositories(published)
@@ -190,6 +202,13 @@ module A3
         end
       end
 
+      def sync_parent_owned_workspace_slot(entry)
+        parent_slot = parent_workspace_slot_for(entry.fetch(:slot_path), entry.fetch(:target_ref))
+        return { success: true } unless parent_slot
+
+        run_git(parent_slot, "checkout", "--detach", entry.fetch(:target_ref))
+      end
+
       def merge_command(merge_plan)
         case merge_plan.merge_policy
         when :ff_only
@@ -254,6 +273,27 @@ module A3
         return nil unless clean_worktree?(repo_root)
 
         { repo_root: repo_root }
+      end
+
+      def parent_workspace_slot_for(slot_path, target_ref)
+        prefix = "refs/heads/a3/parent/"
+        return nil unless target_ref.start_with?(prefix)
+
+        parent_slug = target_ref.delete_prefix(prefix)
+        normalized = File.expand_path(slot_path.to_s)
+        marker = File.join("workspaces", parent_slug, "children")
+        marker_index = normalized.index(marker)
+        return nil unless marker_index
+
+        relative = normalized[(marker_index + marker.length + 1)..]
+        parts = relative.to_s.split(File::SEPARATOR)
+        return nil if parts.length < 3
+
+        repo_dir = parts.last
+        parent_slot = File.join(normalized[0...marker_index], "workspaces", parent_slug, "runtime_workspace", repo_dir)
+        return nil unless File.directory?(parent_slot)
+
+        parent_slot
       end
 
       def repo_source_root_for(slot_path)

@@ -304,6 +304,52 @@ RSpec.describe A3::Infra::LocalMergeRunner do
     end
   end
 
+  it "keeps the parent-owned workspace slot synchronized after child merge publication" do
+    Dir.mktmpdir do |dir|
+      repo_alpha_repo = File.join(dir, "repo-alpha")
+      create_work_branch_git_repo(repo_alpha_repo)
+      parent_slot = File.join(dir, "workspaces", "Portal-134", "runtime_workspace", "repo-alpha")
+      child_slot = File.join(dir, "workspaces", "Portal-134", "children", "Portal-135", "runtime_workspace", "repo-alpha")
+      FileUtils.mkdir_p(File.dirname(parent_slot))
+      FileUtils.mkdir_p(File.dirname(child_slot))
+      `git -C #{Shellwords.escape(repo_alpha_repo)} branch a3/parent/Portal-134 live`
+      `git -C #{Shellwords.escape(repo_alpha_repo)} worktree add --detach #{Shellwords.escape(parent_slot)} refs/heads/a3/parent/Portal-134`
+      `git -C #{Shellwords.escape(repo_alpha_repo)} worktree add --detach #{Shellwords.escape(child_slot)} refs/heads/a3/work/A3-v2-3025`
+      parent_before = `git -C #{Shellwords.escape(parent_slot)} rev-parse HEAD`.strip
+      child_head = `git -C #{Shellwords.escape(child_slot)} rev-parse HEAD`.strip
+
+      workspace = A3::Domain::PreparedWorkspace.new(
+        workspace_kind: :runtime_workspace,
+        root_path: File.join(dir, "workspaces", "Portal-134", "children", "Portal-135", "runtime_workspace"),
+        source_descriptor: A3::Domain::SourceDescriptor.new(
+          workspace_kind: :runtime_workspace,
+          source_type: :branch_head,
+          ref: "refs/heads/a3/work/A3-v2-3025",
+          task_ref: "Portal#135"
+        ),
+        slot_paths: { repo_alpha: child_slot }
+      )
+      plan = A3::Domain::MergePlan.new(
+        task_ref: "Portal#135",
+        run_ref: "run-merge-1",
+        merge_source: A3::Domain::MergeSource.new(source_ref: "refs/heads/a3/work/A3-v2-3025"),
+        integration_target: A3::Domain::IntegrationTarget.new(
+          target_ref: "refs/heads/a3/parent/Portal-134",
+          bootstrap_ref: "refs/heads/live"
+        ),
+        merge_policy: :ff_only,
+        merge_slots: [:repo_alpha]
+      )
+
+      result = runner.run(plan, workspace: workspace)
+
+      expect(result.success?).to be(true)
+      expect(parent_before).not_to eq(child_head)
+      expect(`git -C #{Shellwords.escape(parent_slot)} rev-parse HEAD`.strip).to eq(child_head)
+      expect(`git -C #{Shellwords.escape(repo_alpha_repo)} rev-parse refs/heads/a3/parent/Portal-134`.strip).to eq(child_head)
+    end
+  end
+
   it "bootstraps a missing parent integration ref from a configured live target branch" do
     Dir.mktmpdir do |dir|
       repo_alpha_repo = File.join(dir, "repo-alpha")

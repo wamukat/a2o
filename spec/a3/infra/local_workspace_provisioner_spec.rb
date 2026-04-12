@@ -633,4 +633,47 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     expect(second_slot.join("LOCAL_ONLY.txt")).not_to exist
     expect(second_slot.join("FRESH.md")).to exist
   end
+
+  it "places child ticket workspaces under the parent workspace and bootstraps parent integration slots as worktrees" do
+    repo_root = Pathname(File.join(tmpdir, "repo-alpha"))
+    create_git_repo_source(tmpdir, name: "repo-alpha")
+    task = A3::Domain::Task.new(
+      ref: "Portal#135",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      parent_ref: "Portal#134"
+    )
+    workspace_plan = A3::Domain::WorkspacePlan.new(
+      workspace_kind: :ticket_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :ticket_workspace,
+        source_type: :branch_head,
+        ref: "refs/heads/a3/work/Portal-135",
+        task_ref: task.ref
+      ),
+      slot_requirements: [
+        A3::Domain::SlotRequirement.new(repo_slot: :repo_alpha, sync_class: :eager)
+      ]
+    )
+    provisioner = described_class.new(base_dir: tmpdir, repo_sources: { repo_alpha: repo_root.to_s })
+
+    workspace = provisioner.call(
+      task: task,
+      workspace_plan: workspace_plan,
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: "Portal#134",
+        owner_scope: :task,
+        snapshot_version: "refs/heads/a3/work/Portal-135"
+      ),
+      bootstrap_marker: nil
+    )
+
+    parent_root = Pathname(tmpdir).join("workspaces", "Portal-134", "runtime_workspace")
+    parent_slot = parent_root.join("repo-alpha")
+    expect(workspace.root_path).to eq(Pathname(tmpdir).join("workspaces", "Portal-134", "children", "Portal-135", "ticket_workspace"))
+    expect(workspace.slot_paths.fetch(:repo_alpha)).to eq(workspace.root_path.join("repo-alpha"))
+    expect(parent_slot).to exist
+    expect(`git -C #{repo_root} worktree list --porcelain`).to include(parent_slot.to_s)
+    expect(`git -C #{repo_root} rev-parse refs/heads/a3/parent/Portal-134`.strip).to eq(`git -C #{parent_slot} rev-parse HEAD`.strip)
+  end
 end
