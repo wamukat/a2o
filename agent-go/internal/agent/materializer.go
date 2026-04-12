@@ -205,7 +205,12 @@ func gitPatch(root string) (string, error) {
 	if err := runGit(root, "add", "-N", "--", ".", ":(exclude).a3"); err != nil {
 		return "", err
 	}
-	return gitOutput(root, "diff", "--binary", "HEAD", "--", ".", ":(exclude).a3")
+	cmd := exec.Command("git", "-C", root, "diff", "--binary", "HEAD", "--", ".", ":(exclude).a3")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", gitError([]string{"diff", "--binary", "HEAD", "--", ".", ":(exclude).a3"}, err)
+	}
+	return string(out), nil
 }
 
 func gitDirty(root string) (bool, error) {
