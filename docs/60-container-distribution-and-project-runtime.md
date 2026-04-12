@@ -1820,6 +1820,7 @@ artifact store の掃除:
 - disk pressure がある場合は TTL に加え、`--diagnostic-max-count`, `--evidence-max-count`, `--diagnostic-max-mb`, `--evidence-max-mb` を使って diagnostic/evidence 別に上限を切る
 - artifact cleanup は A3-managed artifact store だけを対象にし、SoloBoard の ticket/comment/relation data は削除しない
 - 2026-04-12 の `task a3:portal:bundle:agent-artifact-cleanup -- --dry-run` では `deleted_count=0`, `retained_count=0`, `missing_blob_count=0` を確認した
+- 2026-04-12 の post-archive recovery smoke では `task a3:portal:bundle:doctor`, `task a3:portal:bundle:bootstrap`, `task a3:portal:bundle:smoke`, `task a3:portal:bundle:agent-artifact-cleanup -- --dry-run` が成功した。`bundle:smoke` が作成した `Portal#93/#94` は確認後に `Done` へ transition 済みである
 
 Docker 側の掃除:
 
