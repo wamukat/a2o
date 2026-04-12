@@ -21,6 +21,7 @@ module A3
         elsif reset_branch_to
           reset_branch_ref!(source_root, ref, reset_to: reset_branch_to)
         end
+        ensure_worktrees_dir!(source_root)
         run_git!(source_root, "worktree", "add", "--force", "--detach", destination.to_s, ref)
         ensure_safe_directory!(destination)
         assert_same_repository!(destination, source_root, label: "destination")
@@ -108,6 +109,10 @@ module A3
         common_dir = stdout.strip
         common_dir = File.expand_path(common_dir, root.to_s) unless Pathname(common_dir).absolute?
         normalize_path(common_dir)
+      end
+
+      def ensure_worktrees_dir!(root)
+        FileUtils.mkdir_p(File.join(git_common_dir(root), "worktrees"))
       end
 
       def run_git!(root, *args)
