@@ -26,6 +26,10 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
 
     expect(request.workspace_kind).to eq(:ticket_workspace)
     expect(request.workspace_id).to eq("Portal-42-implementation-run-implementation")
+    expect(request.publish_policy).to eq(
+      "mode" => "commit_declared_changes_on_success",
+      "commit_message" => "A3 implementation update for Portal#42"
+    )
     expect(request.slots.keys).to eq(%w[repo_alpha repo_beta])
     expect(request.slots.fetch("repo_alpha")).to include(
       "ref" => "refs/heads/a3/work/Portal-42",
@@ -85,6 +89,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
   it "keeps support slots present for verification even when the scope is narrow" do
     request = builder.call(workspace: workspace, task: task, run: run(:verification))
 
+    expect(request.publish_policy).to be_nil
     expect(request.slots.keys).to eq(%w[repo_alpha repo_beta])
     expect(request.slots.fetch("repo_alpha")).to include(
       "access" => "read_only",

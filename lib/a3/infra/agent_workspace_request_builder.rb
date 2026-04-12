@@ -38,6 +38,7 @@ module A3
           workspace_id: workspace_id_for(task: task, run: run),
           freshness_policy: @freshness_policy,
           cleanup_policy: @cleanup_policy,
+          publish_policy: publish_policy_for(task: task, run: run),
           slots: slots
         )
       end
@@ -62,6 +63,15 @@ module A3
 
       def ownership_for(slot_name, run)
         run.scope_snapshot.edit_scope.include?(slot_name) ? "edit_target" : "support"
+      end
+
+      def publish_policy_for(task:, run:)
+        return nil unless run.phase.to_sym == :implementation
+
+        {
+          mode: "commit_declared_changes_on_success",
+          commit_message: "A3 implementation update for #{task.ref}"
+        }
       end
 
       def workspace_id_for(task:, run:)

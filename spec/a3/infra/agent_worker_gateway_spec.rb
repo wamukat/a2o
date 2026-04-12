@@ -225,7 +225,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     )
 
     request = client.records.values.first.request
-    expect(request.workspace_request).to eq(materialized_workspace_request)
+    expect(request.workspace_request).to eq(materialized_workspace_request(publish: false))
     expect(request.worker_protocol_request).to include(
       "task_ref" => task.ref,
       "run_ref" => review_run.ref,
@@ -335,7 +335,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
           0,
           worker_protocol_result: worker_success.merge("changed_files" => { "repo_beta" => ["worker-claimed.txt"] }),
           workspace_descriptor: workspace_descriptor(
-            "repo_beta" => materialized_slot_descriptor("changed.txt")
+            "repo_beta" => materialized_published_slot_descriptor("changed.txt")
           )
         )
       )
@@ -363,7 +363,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
           0,
           worker_protocol_result: worker_success.merge("changed_files" => { "repo_beta" => [] }),
           workspace_descriptor: workspace_descriptor(
-            "repo_beta" => materialized_slot_descriptor
+            "repo_beta" => materialized_no_change_slot_descriptor
           )
         )
       )
@@ -379,7 +379,73 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     expect(execution.response_bundle.fetch("changed_files")).to eq("repo_beta" => [])
   end
 
-  it "applies materialized implementation patches to the local publication workspace" do
+  it "rejects materialized implementation when publish head does not match resolved head" do
+    client.on_fetch = lambda do |job_id|
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: worker_success.merge("changed_files" => { "repo_beta" => ["changed.txt"] }),
+          workspace_descriptor: workspace_descriptor(
+            "repo_beta" => materialized_published_slot_descriptor("changed.txt").merge("resolved_head" => "wrong-head")
+          )
+        )
+      )
+    end
+    gateway = materialized_gateway
+
+    execution = run_gateway(gateway)
+
+    expect(execution).to have_attributes(
+      success: false,
+      failing_command: "agent_materialized_publish_evidence",
+      observed_state: "agent_materialized_publish_evidence_invalid"
+    )
+    expect(execution.diagnostics.fetch("validation_errors")).to include("repo_beta.publish_after_head must match resolved_head")
+  end
+
+  it "requires skipped publish evidence for support slots in publish policy requests" do
+    client.on_fetch = lambda do |job_id|
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: worker_success.merge("changed_files" => { "repo_beta" => ["changed.txt"] }),
+          workspace_descriptor: workspace_descriptor(
+            "repo_alpha" => materialized_support_slot_descriptor,
+            "repo_beta" => materialized_published_slot_descriptor("changed.txt")
+          )
+        )
+      )
+    end
+    gateway = described_class.new(
+      control_plane_client: client,
+      worker_command: "ruby",
+      worker_command_args: ["worker.rb"],
+      runtime_profile: "host-local",
+      shared_workspace_mode: "agent-materialized",
+      timeout_seconds: 30,
+      poll_interval_seconds: 0,
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_seconds) {},
+      workspace_request_builder: ->(**) { materialized_workspace_request_with_support_slot }
+    )
+
+    execution = run_gateway(gateway)
+
+    expect(execution).to have_attributes(
+      success: false,
+      failing_command: "agent_materialized_publish_evidence",
+      observed_state: "agent_materialized_publish_evidence_invalid"
+    )
+    expect(execution.diagnostics.fetch("validation_errors")).to include("repo_alpha.publish_status must be skipped for non-edit slots")
+  end
+
+  it "does not apply materialized implementation patches to the local publication workspace when agent publish evidence exists" do
     initialize_git_repo(workspace.slot_paths.fetch(:repo_beta))
     client.on_fetch = lambda do |job_id|
       client.complete(
@@ -390,7 +456,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
           0,
           worker_protocol_result: worker_success.merge("changed_files" => { "repo_beta" => ["marker.txt"] }),
           workspace_descriptor: workspace_descriptor(
-            "repo_beta" => materialized_slot_descriptor("marker.txt").merge(
+            "repo_beta" => materialized_published_slot_descriptor("marker.txt").merge(
               "patch" => <<~PATCH
                 diff --git a/marker.txt b/marker.txt
                 new file mode 100644
@@ -410,7 +476,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     execution = run_gateway(gateway)
 
     expect(execution).to have_attributes(success: true)
-    expect(workspace.slot_paths.fetch(:repo_beta).join("marker.txt").read).to eq("hello\n")
+    expect(workspace.slot_paths.fetch(:repo_beta).join("marker.txt")).not_to exist
   end
 
   it "passes explicit agent env overrides to worker jobs" do
@@ -423,7 +489,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
           0,
           worker_protocol_result: worker_success.merge("changed_files" => { "repo_beta" => [] }),
           workspace_descriptor: workspace_descriptor(
-            "repo_beta" => materialized_slot_descriptor
+            "repo_beta" => materialized_no_change_slot_descriptor
           )
         )
       )
@@ -548,7 +614,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       poll_interval_seconds: 0,
       job_id_generator: -> { "job-1" },
       sleeper: ->(_seconds) {},
-      workspace_request_builder: ->(**) { materialized_workspace_request }
+      workspace_request_builder: ->(**kwargs) { materialized_workspace_request(publish: kwargs.fetch(:run).phase.to_sym == :implementation) }
     )
   end
 
@@ -622,14 +688,58 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     )
   end
 
-  def materialized_workspace_request
+  def materialized_workspace_request(publish: true)
     A3::Domain::AgentWorkspaceRequest.new(
       mode: :agent_materialized,
       workspace_kind: :runtime_workspace,
       workspace_id: "Portal-42-runtime",
       freshness_policy: :reuse_if_clean_and_ref_matches,
       cleanup_policy: :retain_until_a3_cleanup,
+      publish_policy: publish ? {
+        mode: "commit_declared_changes_on_success",
+        commit_message: "A3 implementation update for #{task.ref}"
+      } : nil,
       slots: {
+        repo_beta: {
+          source: {
+            kind: "local_git",
+            alias: "member-portal-starters"
+          },
+          ref: "refs/heads/a3/work/Portal-42",
+          checkout: "worktree_branch",
+          access: "read_write",
+          sync_class: "eager",
+          ownership: "edit_target",
+          required: true
+        }
+      }
+    )
+  end
+
+  def materialized_workspace_request_with_support_slot
+    A3::Domain::AgentWorkspaceRequest.new(
+      mode: :agent_materialized,
+      workspace_kind: :runtime_workspace,
+      workspace_id: "Portal-42-runtime",
+      freshness_policy: :reuse_if_clean_and_ref_matches,
+      cleanup_policy: :retain_until_a3_cleanup,
+      publish_policy: {
+        mode: "commit_declared_changes_on_success",
+        commit_message: "A3 implementation update for #{task.ref}"
+      },
+      slots: {
+        repo_alpha: {
+          source: {
+            kind: "local_git",
+            alias: "member-portal-ui-app"
+          },
+          ref: "refs/heads/a3/work/Portal-42",
+          checkout: "worktree_branch",
+          access: "read_only",
+          sync_class: "lazy_but_guaranteed",
+          ownership: "support",
+          required: true
+        },
         repo_beta: {
           source: {
             kind: "local_git",
@@ -726,6 +836,35 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
   def materialized_slot_descriptor(*changed_files)
     materialized_slot_descriptor_without_changed_files.merge(
       "changed_files" => changed_files
+    )
+  end
+
+  def materialized_published_slot_descriptor(*changed_files)
+    materialized_slot_descriptor(*changed_files).merge(
+      "resolved_head" => "def456",
+      "publish_status" => "committed",
+      "published" => true,
+      "publish_before_head" => "abc123",
+      "publish_after_head" => "def456",
+      "published_changed_files" => changed_files
+    )
+  end
+
+  def materialized_no_change_slot_descriptor
+    materialized_slot_descriptor.merge(
+      "publish_status" => "no_changes",
+      "published" => false,
+      "published_changed_files" => []
+    )
+  end
+
+  def materialized_support_slot_descriptor
+    materialized_slot_descriptor.merge(
+      "source_alias" => "member-portal-ui-app",
+      "access" => "read_only",
+      "sync_class" => "lazy_but_guaranteed",
+      "ownership" => "support",
+      "dirty_after" => false
     )
   end
 

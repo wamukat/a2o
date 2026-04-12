@@ -26,6 +26,14 @@ type cleanupOperation struct {
 	slotPath   string
 }
 
+type publishPlan struct {
+	slotName    string
+	runtimePath string
+	declared    []string
+	skipped     bool
+	noChanges   bool
+}
+
 func (m WorkspaceMaterializer) Prepare(request WorkspaceRequest) (PreparedWorkspace, error) {
 	root, err := m.workspaceRoot(request.WorkspaceID)
 	if err != nil {
@@ -117,15 +125,204 @@ func RefreshWorkspaceEvidence(prepared PreparedWorkspace) error {
 		if err != nil {
 			return err
 		}
-		dirtyAfter, err := gitDirty(runtimePath)
+		dirtyAfter, err := gitDirtyIgnoringMetadata(runtimePath)
 		if err != nil {
 			return err
 		}
-		descriptor["changed_files"] = changedFiles
+		if publishedChangedFiles, ok := descriptor["published_changed_files"].([]string); ok {
+			descriptor["changed_files"] = publishedChangedFiles
+		} else {
+			descriptor["changed_files"] = changedFiles
+		}
 		descriptor["patch"] = patch
 		descriptor["dirty_after"] = dirtyAfter
 	}
 	return nil
+}
+
+func PublishWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceRequest, workerProtocolResult map[string]any) error {
+	policy := request.PublishPolicy
+	if policy == nil {
+		return nil
+	}
+	if policy.Mode != "commit_declared_changes_on_success" {
+		return fmt.Errorf("unsupported publish policy mode: %s", policy.Mode)
+	}
+	if workerProtocolResult == nil || workerProtocolResult["success"] != true {
+		return nil
+	}
+	declaredChangedFiles, err := declaredChangedFilesBySlot(workerProtocolResult)
+	if err != nil {
+		return err
+	}
+	slotNames := make([]string, 0, len(request.Slots))
+	for slotName := range request.Slots {
+		slotNames = append(slotNames, slotName)
+	}
+	sort.Strings(slotNames)
+	plans := make([]publishPlan, 0, len(slotNames))
+	for _, slotName := range slotNames {
+		slot := request.Slots[slotName]
+		descriptor := prepared.SlotDescriptors[slotName]
+		if descriptor == nil {
+			return fmt.Errorf("workspace descriptor missing slot %s", slotName)
+		}
+		runtimePath, ok := descriptor["runtime_path"].(string)
+		if !ok || runtimePath == "" {
+			return fmt.Errorf("slot descriptor runtime_path is required for %s", slotName)
+		}
+		actual, err := gitChangedPaths(runtimePath)
+		if err != nil {
+			return err
+		}
+		declared := normalizePathList(declaredChangedFiles[slotName])
+		if slot.Access != "read_write" || slot.Ownership != "edit_target" {
+			if len(actual) > 0 {
+				return fmt.Errorf("slot %s has changes but is not an edit target: %v", slotName, actual)
+			}
+			plans = append(plans, publishPlan{slotName: slotName, runtimePath: runtimePath, skipped: true})
+			continue
+		}
+		if !sameStrings(actual, declared) {
+			return fmt.Errorf("slot %s changed files do not match worker result: actual=%v declared=%v", slotName, actual, declared)
+		}
+		if len(declared) == 0 {
+			plans = append(plans, publishPlan{slotName: slotName, runtimePath: runtimePath, declared: declared, noChanges: true})
+			continue
+		}
+		plans = append(plans, publishPlan{slotName: slotName, runtimePath: runtimePath, declared: declared})
+	}
+	return executePublishPlans(prepared, plans, strings.TrimSpace(policy.CommitMessage))
+}
+
+func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commitMessage string) error {
+	if commitMessage == "" {
+		commitMessage = "A3 agent implementation update"
+	}
+	published := []publishPlan{}
+	beforeHeads := map[string]string{}
+	for _, plan := range plans {
+		descriptor := prepared.SlotDescriptors[plan.slotName]
+		descriptor["published_changed_files"] = plan.declared
+		if plan.skipped {
+			descriptor["publish_status"] = "skipped"
+			descriptor["published"] = false
+			descriptor["published_changed_files"] = []string{}
+			continue
+		}
+		if plan.noChanges {
+			descriptor["publish_status"] = "no_changes"
+			descriptor["published"] = false
+			continue
+		}
+		beforeHead, err := gitOutput(plan.runtimePath, "rev-parse", "HEAD")
+		if err != nil {
+			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
+			return err
+		}
+		beforeHeads[plan.slotName] = beforeHead
+		if err := stageDeclaredPaths(plan.runtimePath, plan.declared); err != nil {
+			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
+			return err
+		}
+		if err := runGit(plan.runtimePath, "-c", "user.name=A3 Agent", "-c", "user.email=a3-agent@example.invalid", "commit", "-m", commitMessage); err != nil {
+			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
+			return err
+		}
+		afterHead, err := gitOutput(plan.runtimePath, "rev-parse", "HEAD")
+		if err != nil {
+			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
+			return err
+		}
+		descriptor["publish_status"] = "committed"
+		descriptor["published"] = true
+		descriptor["publish_before_head"] = beforeHead
+		descriptor["publish_after_head"] = afterHead
+		descriptor["resolved_head"] = afterHead
+		published = append(published, plan)
+	}
+	return nil
+}
+
+func rollbackPublishedPlans(prepared PreparedWorkspace, plans []publishPlan, beforeHeads map[string]string) {
+	for index := len(plans) - 1; index >= 0; index-- {
+		plan := plans[index]
+		descriptor := prepared.SlotDescriptors[plan.slotName]
+		beforeHead := beforeHeads[plan.slotName]
+		if beforeHead != "" {
+			_ = runGit(plan.runtimePath, "reset", "--hard", beforeHead)
+			_ = runGit(plan.runtimePath, "clean", "-fd", "--", ".", ":(exclude).a3")
+			descriptor["resolved_head"] = beforeHead
+		}
+		clearPublishEvidence(descriptor)
+	}
+}
+
+func clearPublishEvidence(descriptor map[string]any) {
+	delete(descriptor, "publish_status")
+	delete(descriptor, "published")
+	delete(descriptor, "publish_before_head")
+	delete(descriptor, "publish_after_head")
+	delete(descriptor, "published_changed_files")
+}
+
+func declaredChangedFilesBySlot(workerProtocolResult map[string]any) (map[string][]string, error) {
+	raw, ok := workerProtocolResult["changed_files"]
+	if !ok || raw == nil {
+		return map[string][]string{}, nil
+	}
+	rawMap, ok := raw.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("worker result changed_files must be an object")
+	}
+	result := map[string][]string{}
+	for slotName, value := range rawMap {
+		rawList, ok := value.([]any)
+		if !ok {
+			return nil, fmt.Errorf("worker result changed_files.%s must be an array", slotName)
+		}
+		paths := make([]string, 0, len(rawList))
+		for _, rawPath := range rawList {
+			path, ok := rawPath.(string)
+			if !ok || path == "" {
+				return nil, fmt.Errorf("worker result changed_files.%s entries must be non-empty strings", slotName)
+			}
+			paths = append(paths, path)
+		}
+		result[slotName] = normalizePathList(paths)
+	}
+	return result, nil
+}
+
+func normalizePathList(paths []string) []string {
+	normalized := make([]string, 0, len(paths))
+	for _, path := range paths {
+		if path == "" {
+			continue
+		}
+		normalized = append(normalized, filepath.Clean(path))
+	}
+	sort.Strings(normalized)
+	return uniqueStrings(normalized)
+}
+
+func sameStrings(left, right []string) bool {
+	left = normalizePathList(left)
+	right = normalizePathList(right)
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func stageDeclaredPaths(root string, paths []string) error {
+	args := append([]string{"add", "--"}, paths...)
+	return runGit(root, args...)
 }
 
 func gitChangedPaths(root string) ([]string, error) {
@@ -251,6 +448,14 @@ func gitPatch(root string) (string, error) {
 
 func gitDirty(root string) (bool, error) {
 	out, err := gitOutput(root, "status", "--porcelain", "--untracked-files=all")
+	if err != nil {
+		return false, err
+	}
+	return out != "", nil
+}
+
+func gitDirtyIgnoringMetadata(root string) (bool, error) {
+	out, err := gitOutput(root, "status", "--porcelain", "--untracked-files=all", "--", ".", ":(exclude).a3")
 	if err != nil {
 		return false, err
 	}

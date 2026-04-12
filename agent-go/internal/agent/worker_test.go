@@ -90,14 +90,65 @@ func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T)
 	if got := stringSlice(slot["changed_files"]); !bytes.Equal([]byte(join(got)), []byte("changed.txt")) {
 		t.Fatalf("unexpected changed files: %#v", slot["changed_files"])
 	}
-	if slot["dirty_after"] != true {
-		t.Fatalf("expected dirty_after=true: %#v", slot)
+	if slot["dirty_after"] != false {
+		t.Fatalf("expected dirty_after=false after publish: %#v", slot)
+	}
+	if slot["publish_status"] != "committed" || slot["published"] != true {
+		t.Fatalf("expected committed publish evidence: %#v", slot)
+	}
+	if slot["publish_before_head"] == slot["publish_after_head"] {
+		t.Fatalf("expected publish head to advance: %#v", slot)
+	}
+	if head := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "a3/work/Portal-42")); head != slot["publish_after_head"] {
+		t.Fatalf("source branch was not advanced: head=%s slot=%#v", head, slot)
 	}
 	if roles := uploadRoles(client.uploads); !bytes.Equal([]byte(roles), []byte("combined-log,worker-result")) {
 		t.Fatalf("unexpected upload roles: %s", roles)
 	}
 	if _, err := os.Stat(filepath.Join(tmp, "agent-workspaces", "Portal-42-ticket")); !os.IsNotExist(err) {
 		t.Fatalf("workspace was not cleaned up: %v", err)
+	}
+}
+
+func TestWorkerRejectsPublishWhenWorkerResultOmitsChangedFiles(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	request := testRequest(".")
+	request.Phase = "implementation"
+	request.SourceDescriptor.WorkspaceKind = "ticket_workspace"
+	request.WorkspaceRequest = ptr(testWorkspaceRequest("member-portal-starters"))
+	request.WorkerProtocolRequest = map[string]any{
+		"task_ref": "Portal#42",
+		"phase":    "implementation",
+	}
+	client := &fakeClient{request: &request}
+
+	result, idle, err := Worker{
+		AgentName: "host-local",
+		Client:    client,
+		Executor:  workerProtocolExecutor{omitChangedFiles: true},
+		Materializer: WorkspaceMaterializer{
+			WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+			SourceAliases: map[string]string{
+				"member-portal-starters": sourceRoot,
+			},
+		},
+		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+	}.RunOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idle {
+		t.Fatal("expected failed job result, got idle")
+	}
+	if result.Status != "failed" {
+		t.Fatalf("expected publish failure, got %#v", result)
+	}
+	if result.WorkerProtocolResult["failing_command"] != "agent_workspace_publish" {
+		t.Fatalf("unexpected failure payload: %#v", result.WorkerProtocolResult)
+	}
+	if head := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "a3/work/Portal-42")); head == "" || head != result.WorkspaceDescriptor.SlotDescriptors["repo_alpha"]["resolved_head"] {
+		t.Fatalf("source branch should not advance on publish failure: head=%s descriptor=%#v", head, result.WorkspaceDescriptor.SlotDescriptors["repo_alpha"])
 	}
 }
 
@@ -192,9 +243,11 @@ func (fakeExecutor) Execute(JobRequest) ExecutionResult {
 	}
 }
 
-type workerProtocolExecutor struct{}
+type workerProtocolExecutor struct {
+	omitChangedFiles bool
+}
 
-func (workerProtocolExecutor) Execute(request JobRequest) ExecutionResult {
+func (executor workerProtocolExecutor) Execute(request JobRequest) ExecutionResult {
 	content, err := os.ReadFile(request.Env["A3_WORKER_REQUEST_PATH"])
 	if err != nil {
 		code := 1
@@ -207,7 +260,13 @@ func (workerProtocolExecutor) Execute(request JobRequest) ExecutionResult {
 	}
 	result := map[string]any{
 		"status":   "succeeded",
+		"success":  true,
 		"task_ref": payload["task_ref"],
+	}
+	if !executor.omitChangedFiles {
+		result["changed_files"] = map[string]any{
+			"repo_alpha": []string{"changed.txt"},
+		}
 	}
 	encoded, err := json.Marshal(result)
 	if err != nil {

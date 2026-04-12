@@ -112,8 +112,13 @@ module A3
           )
           return evidence if evidence.is_a?(A3::Application::ExecutionResult)
 
-          patch_result = apply_materialized_patches(workspace: workspace, workspace_request: request.workspace_request, result: completed.result)
-          return patch_result if patch_result.is_a?(A3::Application::ExecutionResult)
+          publish_result = materialized_publish_evidence(workspace_request: request.workspace_request, result: completed.result)
+          return publish_result if publish_result.is_a?(A3::Application::ExecutionResult)
+
+          unless request.workspace_request.publish_policy
+            patch_result = apply_materialized_patches(workspace: workspace, workspace_request: request.workspace_request, result: completed.result)
+            return patch_result if patch_result.is_a?(A3::Application::ExecutionResult)
+          end
 
           canonical_changed_files = evidence
         end
@@ -261,6 +266,47 @@ module A3
           summary: "agent materialized implementation changed_files evidence is invalid",
           failing_command: "agent_materialized_changed_files",
           observed_state: "agent_materialized_changed_files_invalid",
+          diagnostics: {
+            "validation_errors" => errors,
+            "agent_job_result" => result.result_form,
+            "control_plane_url" => control_plane_url
+          },
+          response_bundle: {
+            "agent_job_result" => result.result_form
+          }
+        )
+      end
+
+      def materialized_publish_evidence(workspace_request:, result:)
+        return nil unless workspace_request.publish_policy
+
+        errors = []
+        result.workspace_descriptor.slot_descriptors.each do |slot_name, descriptor|
+          request_slot = workspace_request.slots[slot_name] || workspace_request.slots[slot_name.to_sym]
+          next unless request_slot&.fetch("required")
+
+          if request_slot.fetch("access") == "read_write" && request_slot.fetch("ownership") == "edit_target"
+            status = descriptor["publish_status"]
+            errors << "#{slot_name}.publish_status must be committed or no_changes" unless %w[committed no_changes].include?(status)
+            errors << "#{slot_name}.published must be true or false" unless [true, false].include?(descriptor["published"])
+            if status == "committed"
+              errors << "#{slot_name}.published must be true when committed" unless descriptor["published"] == true
+              errors << "#{slot_name}.publish_before_head must be present" unless descriptor["publish_before_head"].is_a?(String) && !descriptor["publish_before_head"].empty?
+              errors << "#{slot_name}.publish_after_head must be present" unless descriptor["publish_after_head"].is_a?(String) && !descriptor["publish_after_head"].empty?
+              errors << "#{slot_name}.publish_after_head must differ from publish_before_head" if descriptor["publish_after_head"] == descriptor["publish_before_head"]
+              errors << "#{slot_name}.publish_after_head must match resolved_head" unless descriptor["publish_after_head"] == descriptor["resolved_head"]
+            end
+          elsif descriptor["publish_status"] != "skipped"
+            errors << "#{slot_name}.publish_status must be skipped for non-edit slots"
+          end
+        end
+        return nil if errors.empty?
+
+        A3::Application::ExecutionResult.new(
+          success: false,
+          summary: "agent materialized publish evidence is invalid",
+          failing_command: "agent_materialized_publish_evidence",
+          observed_state: "agent_materialized_publish_evidence_invalid",
           diagnostics: {
             "validation_errors" => errors,
             "agent_job_result" => result.result_form,

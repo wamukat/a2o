@@ -147,7 +147,7 @@ worker_command = <<~SH
   printf "changed by gateway worker\\n" > repo-beta/changed.txt
   mkdir -p "$(dirname "$A3_WORKER_RESULT_PATH")"
   cat > "$A3_WORKER_RESULT_PATH" <<JSON
-  {"success":true,"summary":"materialized gateway worker completed","task_ref":"Portal#42","run_ref":"run-1","phase":"implementation","rework_required":false,"changed_files":{"repo_beta":["worker-claimed.txt"]},"review_disposition":{"kind":"completed","repo_scope":"repo_beta","summary":"done","description":"done","finding_key":"none"}}
+  {"success":true,"summary":"materialized gateway worker completed","task_ref":"Portal#42","run_ref":"run-1","phase":"implementation","rework_required":false,"changed_files":{"repo_beta":["changed.txt"]},"review_disposition":{"kind":"completed","repo_scope":"repo_beta","summary":"done","description":"done","finding_key":"none"}}
   JSON
   echo "materialized gateway worker ok"
 SH
@@ -177,8 +177,7 @@ execution = gateway.run(
 )
 raise "gateway failed: #{execution.inspect}" unless execution.success
 raise "canonical changed_files mismatch: #{execution.response_bundle.inspect}" unless execution.response_bundle.fetch("changed_files") == { "repo_beta" => ["changed.txt"] }
-raise "missing worker mismatch diagnostics" unless execution.diagnostics.fetch("worker_changed_files") == { "repo_beta" => ["worker-claimed.txt"] }
-raise "missing canonical mismatch diagnostics" unless execution.diagnostics.fetch("canonical_changed_files") == { "repo_beta" => ["changed.txt"] }
+raise "unexpected changed_files mismatch diagnostics" if execution.diagnostics.key?("worker_changed_files")
 puts "gateway materialized execution ok"
 RUBY
 
@@ -246,8 +245,12 @@ JOB_RESULT_PATH="${JOB_RESULT_PATH}" SOURCE_REF="${SOURCE_REF}" SOURCE_ROOT="${S
   raise "sync class mismatch" unless slot.fetch("sync_class") == "eager"
   raise "ownership mismatch" unless slot.fetch("ownership") == "edit_target"
   raise "dirty_before should be false" unless slot.fetch("dirty_before") == false
-  raise "dirty_after should be true" unless slot.fetch("dirty_after") == true
+  raise "dirty_after should be false after publish" unless slot.fetch("dirty_after") == false
   raise "changed_files evidence mismatch" unless slot.fetch("changed_files") == ["changed.txt"]
+  raise "publish status mismatch" unless slot.fetch("publish_status") == "committed"
+  raise "published flag mismatch" unless slot.fetch("published") == true
+  source_head = `git -C "#{ENV.fetch("SOURCE_ROOT")}" rev-parse a3/work/Portal-42`.strip
+  raise "source branch was not advanced by agent publish" unless source_head == slot.fetch("publish_after_head")
   runtime_path = slot.fetch("runtime_path")
   raise "runtime path outside workspace root" unless runtime_path.start_with?(ENV.fetch("WORKSPACE_ROOT"))
   raise "materialized workspace was not cleaned" if File.exist?(File.join(ENV.fetch("WORKSPACE_ROOT"), "Portal-42-implementation-run-1"))

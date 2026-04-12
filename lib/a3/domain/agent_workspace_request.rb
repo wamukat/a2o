@@ -7,15 +7,17 @@ module A3
       WORKSPACE_KINDS = %i[ticket_workspace runtime_workspace].freeze
       FRESHNESS_POLICIES = %i[reuse_if_clean_and_ref_matches force_fresh].freeze
       CLEANUP_POLICIES = %i[retain_until_a3_cleanup cleanup_after_job].freeze
+      PUBLISH_POLICY_MODES = %w[commit_declared_changes_on_success].freeze
 
-      attr_reader :mode, :workspace_kind, :workspace_id, :freshness_policy, :cleanup_policy, :slots
+      attr_reader :mode, :workspace_kind, :workspace_id, :freshness_policy, :cleanup_policy, :publish_policy, :slots
 
-      def initialize(mode:, workspace_kind:, workspace_id:, freshness_policy:, cleanup_policy:, slots:)
+      def initialize(mode:, workspace_kind:, workspace_id:, freshness_policy:, cleanup_policy:, slots:, publish_policy: nil)
         @mode = normalize_symbol(mode, "mode", MODES)
         @workspace_kind = normalize_symbol(workspace_kind, "workspace_kind", WORKSPACE_KINDS)
         @workspace_id = required_string(workspace_id, "workspace_id")
         @freshness_policy = normalize_symbol(freshness_policy, "freshness_policy", FRESHNESS_POLICIES)
         @cleanup_policy = normalize_symbol(cleanup_policy, "cleanup_policy", CLEANUP_POLICIES)
+        @publish_policy = normalize_publish_policy(publish_policy)
         @slots = normalize_slots(slots)
         validate_slots!
         freeze
@@ -28,12 +30,13 @@ module A3
           workspace_id: record.fetch("workspace_id"),
           freshness_policy: record.fetch("freshness_policy"),
           cleanup_policy: record.fetch("cleanup_policy"),
+          publish_policy: record["publish_policy"],
           slots: record.fetch("slots")
         )
       end
 
       def request_form
-        {
+        form = {
           "mode" => mode.to_s,
           "workspace_kind" => workspace_kind.to_s,
           "workspace_id" => workspace_id,
@@ -41,6 +44,8 @@ module A3
           "cleanup_policy" => cleanup_policy.to_s,
           "slots" => slots
         }
+        form["publish_policy"] = publish_policy if publish_policy
+        form
       end
 
       def ==(other)
@@ -70,6 +75,19 @@ module A3
           slot_name = required_string(slot, "slot name")
           normalized[slot_name] = normalize_slot_descriptor(descriptor)
         end.freeze
+      end
+
+      def normalize_publish_policy(value)
+        return nil if value.nil?
+
+        record = value.transform_keys(&:to_s)
+        mode = required_string(record.fetch("mode"), "publish policy mode")
+        raise ConfigurationError, "unsupported agent workspace publish_policy mode: #{mode}" unless PUBLISH_POLICY_MODES.include?(mode)
+
+        {
+          "mode" => mode,
+          "commit_message" => required_string(record.fetch("commit_message"), "publish policy commit_message")
+        }.freeze
       end
 
       def normalize_slot_descriptor(descriptor)

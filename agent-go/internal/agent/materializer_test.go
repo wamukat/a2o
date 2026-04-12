@@ -129,6 +129,132 @@ func TestWorkspaceMaterializerRejectsNonBranchRefs(t *testing.T) {
 	}
 }
 
+func TestPublishWorkspaceChangesValidatesAllSlotsBeforeCommitting(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	betaRoot := createGitSource(t, tmp, "repo-beta")
+	request := testWorkspaceRequest("repo-alpha")
+	request.Slots["repo_beta"] = WorkspaceSlotRequest{
+		Source: WorkspaceSourceRequest{
+			Kind:  "local_git",
+			Alias: "repo-beta",
+		},
+		Ref:       "refs/heads/a3/work/Portal-42",
+		Checkout:  "worktree_branch",
+		Access:    "read_write",
+		SyncClass: "eager",
+		Ownership: "edit_target",
+		Required:  true,
+	}
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": alphaRoot,
+			"repo-beta":  betaRoot,
+		},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alphaHead := git(t, alphaRoot, "rev-parse", "a3/work/Portal-42")
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-alpha", "alpha.txt"), []byte("alpha\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-beta", "beta.txt"), []byte("beta\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err = PublishWorkspaceChanges(prepared, request, map[string]any{
+		"success": true,
+		"changed_files": map[string]any{
+			"repo_alpha": []any{"alpha.txt"},
+			"repo_beta":  []any{},
+		},
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "repo_beta changed files do not match worker result") {
+		t.Fatalf("expected repo_beta changed files mismatch, got %v", err)
+	}
+	if head := git(t, alphaRoot, "rev-parse", "a3/work/Portal-42"); head != alphaHead {
+		t.Fatalf("repo_alpha branch advanced before all slots validated: before=%s after=%s", alphaHead, head)
+	}
+}
+
+func TestPublishWorkspaceChangesRollsBackAlreadyCommittedSlots(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	request := testWorkspaceRequest("repo-alpha")
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": alphaRoot,
+		},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alphaHead := git(t, alphaRoot, "rev-parse", "a3/work/Portal-42")
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-alpha", "alpha.txt"), []byte("alpha\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prepared.SlotDescriptors["repo_beta"] = map[string]any{}
+
+	err = executePublishPlans(prepared, []publishPlan{
+		{slotName: "repo_alpha", runtimePath: filepath.Join(prepared.Root, "repo-alpha"), declared: []string{"alpha.txt"}},
+		{slotName: "repo_beta", runtimePath: filepath.Join(prepared.Root, "missing-repo"), declared: []string{"beta.txt"}},
+	}, "test rollback")
+
+	if err == nil || !strings.Contains(err.Error(), "rev-parse") {
+		t.Fatalf("expected publish failure after first commit, got %v", err)
+	}
+	if head := git(t, alphaRoot, "rev-parse", "a3/work/Portal-42"); head != alphaHead {
+		t.Fatalf("repo_alpha branch was not rolled back: before=%s after=%s", alphaHead, head)
+	}
+	if resolved := prepared.SlotDescriptors["repo_alpha"]["resolved_head"]; resolved != trimTrailingNewline(alphaHead) {
+		t.Fatalf("repo_alpha descriptor resolved_head was not restored: %#v", prepared.SlotDescriptors["repo_alpha"])
+	}
+	if _, ok := prepared.SlotDescriptors["repo_beta"]["published_changed_files"]; ok {
+		t.Fatalf("rollback did not clear current failed slot evidence: %#v", prepared.SlotDescriptors["repo_beta"])
+	}
+}
+
+func TestPublishWorkspaceChangesRollsBackCurrentSlotOnStageFailure(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	request := testWorkspaceRequest("repo-alpha")
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": alphaRoot,
+		},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alphaPath := filepath.Join(prepared.Root, "repo-alpha")
+	if err := os.WriteFile(filepath.Join(alphaPath, "alpha.txt"), []byte("alpha\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err = executePublishPlans(prepared, []publishPlan{
+		{slotName: "repo_alpha", runtimePath: alphaPath, declared: []string{"missing.txt"}},
+	}, "test rollback current")
+
+	if err == nil || !strings.Contains(err.Error(), "add") {
+		t.Fatalf("expected stage failure, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(alphaPath, "alpha.txt")); !os.IsNotExist(err) {
+		t.Fatalf("rollback did not clean current slot untracked file: %v", err)
+	}
+	descriptor := prepared.SlotDescriptors["repo_alpha"]
+	if _, ok := descriptor["publish_status"]; ok {
+		t.Fatalf("rollback did not clear publish evidence: %#v", descriptor)
+	}
+}
+
 func testWorkspaceRequest(sourceAlias string) WorkspaceRequest {
 	return WorkspaceRequest{
 		Mode:            "agent_materialized",
@@ -136,6 +262,10 @@ func testWorkspaceRequest(sourceAlias string) WorkspaceRequest {
 		WorkspaceID:     "Portal-42-ticket",
 		FreshnessPolicy: "reuse_if_clean_and_ref_matches",
 		CleanupPolicy:   "retain_until_a3_cleanup",
+		PublishPolicy: &WorkspacePublishPolicy{
+			Mode:          "commit_declared_changes_on_success",
+			CommitMessage: "A3 implementation update for Portal#42",
+		},
 		Slots: map[string]WorkspaceSlotRequest{
 			"repo_alpha": {
 				Source: WorkspaceSourceRequest{

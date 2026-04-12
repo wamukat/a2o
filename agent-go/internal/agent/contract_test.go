@@ -23,6 +23,10 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 			"workspace_id": "Portal-42-ticket",
 			"freshness_policy": "reuse_if_clean_and_ref_matches",
 			"cleanup_policy": "retain_until_a3_cleanup",
+			"publish_policy": {
+				"mode": "commit_declared_changes_on_success",
+				"commit_message": "A3 implementation update for Portal#42"
+			},
 			"slots": {
 				"repo_alpha": {
 					"source": {
@@ -56,6 +60,9 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 	}
 	if request.WorkspaceRequest == nil {
 		t.Fatal("workspace request was not decoded")
+	}
+	if request.WorkspaceRequest.PublishPolicy == nil || request.WorkspaceRequest.PublishPolicy.Mode != "commit_declared_changes_on_success" {
+		t.Fatalf("workspace publish policy was not decoded: %#v", request.WorkspaceRequest.PublishPolicy)
 	}
 	if request.WorkerProtocolRequest["task_ref"] != "Portal#42" {
 		t.Fatalf("worker protocol request was not decoded: %#v", request.WorkerProtocolRequest)

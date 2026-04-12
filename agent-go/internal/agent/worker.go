@@ -21,6 +21,10 @@ type WorkspacePreparer interface {
 	Cleanup(prepared PreparedWorkspace) error
 }
 
+type WorkspacePublisher interface {
+	Publish(prepared PreparedWorkspace, request WorkspaceRequest, workerProtocolResult map[string]any) error
+}
+
 const maxWorkerProtocolPayloadBytes = 1024 * 1024
 
 type Worker struct {
@@ -93,12 +97,6 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 	}
 
 	execution := w.executor().Execute(runRequest)
-	if prepared != nil {
-		if err := RefreshWorkspaceEvidence(*prepared); err != nil {
-			return nil, false, err
-		}
-		workspaceDescriptor = requestedWorkspaceDescriptor(runRequest, prepared.SlotDescriptors)
-	}
 	finishedAt := w.now().Format(time.RFC3339)
 	logUpload, err := w.upload("combined-log", safeID(request.JobID+"-combined-log"), "diagnostic", "text/plain", execution.CombinedLog)
 	if err != nil {
@@ -107,6 +105,26 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 	artifactUploads, workerProtocolResult, err := w.uploadArtifactsAndWorkerResult(runRequest)
 	if err != nil {
 		return nil, false, err
+	}
+	if prepared != nil && request.WorkspaceRequest != nil {
+		if err := w.publishPrepared(*prepared, *request.WorkspaceRequest, workerProtocolResult); err != nil {
+			if refreshErr := RefreshWorkspaceEvidence(*prepared); refreshErr == nil {
+				workspaceDescriptor = requestedWorkspaceDescriptor(runRequest, prepared.SlotDescriptors)
+			}
+			result := postExecutionFailureResult(*request, workspaceDescriptor, startedAt, finishedAt, logUpload, artifactUploads, "A3 agent workspace publish failed", "agent_workspace_publish", err)
+			submitErr := w.Client.SubmitResult(result)
+			cleanupErr := w.cleanupPrepared(*request, prepared)
+			if submitErr != nil {
+				return &result, false, submitErr
+			}
+			return &result, false, cleanupErr
+		}
+	}
+	if prepared != nil {
+		if err := RefreshWorkspaceEvidence(*prepared); err != nil {
+			return nil, false, err
+		}
+		workspaceDescriptor = requestedWorkspaceDescriptor(runRequest, prepared.SlotDescriptors)
 	}
 
 	result := JobResult{
@@ -128,6 +146,35 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 		return &result, false, submitErr
 	}
 	return &result, false, cleanupErr
+}
+
+func (w Worker) publishPrepared(prepared PreparedWorkspace, request WorkspaceRequest, workerProtocolResult map[string]any) error {
+	if publisher, ok := w.Materializer.(WorkspacePublisher); ok {
+		return publisher.Publish(prepared, request, workerProtocolResult)
+	}
+	return PublishWorkspaceChanges(prepared, request, workerProtocolResult)
+}
+
+func postExecutionFailureResult(request JobRequest, descriptor WorkspaceDescriptor, startedAt, finishedAt string, logUpload ArtifactUpload, artifactUploads []ArtifactUpload, summary, failingCommand string, cause error) JobResult {
+	code := 1
+	return JobResult{
+		JobID:               request.JobID,
+		Status:              "failed",
+		ExitCode:            &code,
+		StartedAt:           startedAt,
+		FinishedAt:          finishedAt,
+		Summary:             summary,
+		LogUploads:          []ArtifactUpload{logUpload},
+		ArtifactUploads:     artifactUploads,
+		WorkspaceDescriptor: descriptor,
+		WorkerProtocolResult: map[string]any{
+			"success":         false,
+			"failing_command": failingCommand,
+			"observed_state":  "failed",
+			"error":           cause.Error(),
+		},
+		Heartbeat: finishedAt,
+	}
 }
 
 func (w Worker) prepareRequest(request JobRequest) (JobRequest, *PreparedWorkspace, WorkspaceDescriptor, error) {

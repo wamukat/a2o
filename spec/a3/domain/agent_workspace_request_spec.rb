@@ -10,6 +10,10 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       workspace_id: "Portal-42-ticket",
       freshness_policy: :reuse_if_clean_and_ref_matches,
       cleanup_policy: :retain_until_a3_cleanup,
+      publish_policy: {
+        mode: "commit_declared_changes_on_success",
+        commit_message: "A3 implementation update for Portal#42"
+      },
       slots: {
         repo_alpha: {
           source: {
@@ -32,6 +36,10 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       "workspace_id" => "Portal-42-ticket",
       "freshness_policy" => "reuse_if_clean_and_ref_matches",
       "cleanup_policy" => "retain_until_a3_cleanup",
+      "publish_policy" => {
+        "mode" => "commit_declared_changes_on_success",
+        "commit_message" => "A3 implementation update for Portal#42"
+      },
       "slots" => {
         "repo_alpha" => {
           "source" => {
@@ -115,5 +123,32 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
         }
       )
     end.to raise_error(A3::Domain::ConfigurationError, /unsupported branch ref/)
+  end
+
+  it "rejects unsupported publish policy modes" do
+    expect do
+      described_class.new(
+        mode: :agent_materialized,
+        workspace_kind: :ticket_workspace,
+        workspace_id: "Portal-42-ticket",
+        freshness_policy: :reuse_if_clean_and_ref_matches,
+        cleanup_policy: :retain_until_a3_cleanup,
+        publish_policy: {
+          mode: "apply_patch_in_engine",
+          commit_message: "wrong"
+        },
+        slots: {
+          repo_alpha: {
+            source: { kind: "local_git", alias: "member-portal-starters" },
+            ref: "refs/heads/a3/work/Portal-42",
+            checkout: "worktree_branch",
+            access: "read_write",
+            sync_class: "eager",
+            ownership: "edit_target",
+            required: true
+          }
+        }
+      )
+    end.to raise_error(A3::Domain::ConfigurationError, /unsupported agent workspace publish_policy mode/)
   end
 end

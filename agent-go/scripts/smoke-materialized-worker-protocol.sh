@@ -70,7 +70,7 @@ JOB_PATH="${JOB_PATH}" SOURCE_REF="${SOURCE_REF}" ruby -rjson -e '
     printf "changed by worker\n" > repo-alpha/changed.txt
     mkdir -p "$(dirname "$A3_WORKER_RESULT_PATH")"
     cat > "$A3_WORKER_RESULT_PATH" <<JSON
-    {"success":true,"summary":"materialized worker completed","task_ref":"Portal#42","run_ref":"run-42","phase":"implementation","rework_required":false,"changed_files":{}}
+    {"success":true,"summary":"materialized worker completed","task_ref":"Portal#42","run_ref":"run-42","phase":"implementation","rework_required":false,"changed_files":{"repo_alpha":["changed.txt"]}}
     JSON
     echo "materialized worker protocol ok"
   SH
@@ -93,6 +93,10 @@ JOB_PATH="${JOB_PATH}" SOURCE_REF="${SOURCE_REF}" ruby -rjson -e '
         "workspace_id" => "Portal-42-ticket",
         "freshness_policy" => "reuse_if_clean_and_ref_matches",
         "cleanup_policy" => "cleanup_after_job",
+        "publish_policy" => {
+          "mode" => "commit_declared_changes_on_success",
+          "commit_message" => "A3 implementation update for Portal#42"
+        },
         "slots" => {
           "repo_alpha" => {
             "source" => {
@@ -179,7 +183,12 @@ JOB_RESULT_PATH="${JOB_RESULT_PATH}" SOURCE_REF="${SOURCE_REF}" SOURCE_ROOT="${S
   raise "runtime path outside workspace root" unless runtime_path.start_with?(ENV.fetch("WORKSPACE_ROOT"))
   changed_files = slot.fetch("changed_files")
   raise "changed_files evidence mismatch: #{changed_files.inspect}" unless changed_files == ["changed.txt"]
-  raise "dirty_after should be true" unless slot.fetch("dirty_after") == true
+  raise "dirty_after should be false after publish" unless slot.fetch("dirty_after") == false
+  raise "publish status mismatch" unless slot.fetch("publish_status") == "committed"
+  raise "published flag mismatch" unless slot.fetch("published") == true
+  raise "publish_after_head missing" unless slot.fetch("publish_after_head").is_a?(String) && !slot.fetch("publish_after_head").empty?
+  source_head = `git -C "#{ENV.fetch("SOURCE_ROOT")}" rev-parse a3/work/Portal-42`.strip
+  raise "source branch was not advanced by agent publish" unless source_head == slot.fetch("publish_after_head")
   raise "materialized workspace was not cleaned" if File.exist?(File.join(ENV.fetch("WORKSPACE_ROOT"), "Portal-42-ticket"))
   worktree_list = `git -C "#{ENV.fetch("SOURCE_ROOT")}" worktree list --porcelain`
   raise "worktree registration leaked" if worktree_list.include?(runtime_path)

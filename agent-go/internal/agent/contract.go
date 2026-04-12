@@ -29,7 +29,13 @@ type WorkspaceRequest struct {
 	WorkspaceID     string                          `json:"workspace_id"`
 	FreshnessPolicy string                          `json:"freshness_policy"`
 	CleanupPolicy   string                          `json:"cleanup_policy"`
+	PublishPolicy   *WorkspacePublishPolicy         `json:"publish_policy,omitempty"`
 	Slots           map[string]WorkspaceSlotRequest `json:"slots"`
+}
+
+type WorkspacePublishPolicy struct {
+	Mode          string `json:"mode"`
+	CommitMessage string `json:"commit_message"`
 }
 
 type WorkspaceSlotRequest struct {
