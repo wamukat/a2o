@@ -114,7 +114,7 @@ func gitChangedPaths(root string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var paths []string
+	paths := []string{}
 	for _, line := range strings.FieldsFunc(out, func(char rune) bool { return char == '\n' || char == '\r' }) {
 		if len(line) < 4 {
 			continue
