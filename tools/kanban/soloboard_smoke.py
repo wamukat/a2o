@@ -13,7 +13,7 @@ A3_ENGINE_DIR = Path(__file__).resolve().parents[2]
 ROOT_DIR = A3_ENGINE_DIR.parent
 CLI = [sys.executable, str(A3_ENGINE_DIR / "tools" / "kanban" / "cli.py"), "--backend", "soloboard"]
 BOOTSTRAP = A3_ENGINE_DIR / "tools" / "kanban" / "bootstrap_soloboard.py"
-BOOTSTRAP_CONFIG = ROOT_DIR / "scripts" / "a3-projects" / "portal" / "inject" / "soloboard-bootstrap.json"
+BOOTSTRAP_CONFIG = ROOT_DIR / "scripts" / "a3-projects" / "portal" / "inject" / "config" / "kanban" / "soloboard-bootstrap.json"
 
 
 def run_cli(*args: str) -> object:
