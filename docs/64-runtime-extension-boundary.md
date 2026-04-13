@@ -63,7 +63,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 | `scripts/a3/launchd.rb` | Optional host service helper | Deleted with macOS LaunchAgent service entrypoints | This was not an `a3-agent` scheduler registration feature. It only supported root `a3:portal:scheduler:install/uninstall/reload/status` and was not required by the Docker A3 + host-local agent flow. |
 | `scripts/a3/assert_a3_live_write_enabled.rb` | A3-owned safety guard, unreferenced | Deleted from root | It contained no Portal knowledge, but no current command used it. Reintroduce only as an A3-owned guard if a current A3 command needs it. |
 | `scripts/a3/a3_stdin_bundle_worker.rb` | Transitional worker bridge | Extract generic command-template worker into A3, keep Portal config outside | It still hardcodes `scripts/a3/config/portal/launcher.json`. The worker concept is generic, but the current file is not yet release-clean. |
-| `scripts/a3/a3_direct_canary_worker.rb` | Test/canary harness | Move into A3 tests or delete after canary replacement | It is not an operator surface and should not be a root release dependency. |
+| `scripts/a3/a3_direct_canary_worker.rb` | Test/smoke harness | Keep only while current parent-topology smoke still depends on it; then move into A3 tests or delete | Legacy direct run-once entrypoints were retired. This file remains a smoke dependency, not an operator surface. |
 | `scripts/a3/agent_host_bundle_smoke.sh` | A3 runtime smoke harness | Move into A3 engine smoke tests after Portal-specific assumptions are parameterized | It validates host-local agent coupling, but references the Portal compose bundle and synthetic repo shape. |
 | `scripts/a3/agent_parent_topology_bundle_smoke.sh` | A3 runtime smoke harness with Portal mode | Split: generic topology smoke into A3, Portal full verification mode into project package | It mixes generic parent/child topology with real Portal repo verification. |
 
@@ -95,8 +95,8 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 | `scripts/a3/runtime_agent_scheduler_run_once.sh` | Portal runtime canary launcher | Keep project-injected | It binds Docker A3 runtime, SoloBoard port, Portal manifest, host agent profile, and Portal worker script. |
 | `scripts/a3/runtime_agent_scheduler_ref_candidates.py` | Portal runtime diagnostic helper | Keep project-injected, delete when no longer used | It queries Portal labels and repo mappings directly. |
 | `scripts/a3/bootstrap_portal_dev_repos.rb` | Portal-dev maintenance bootstrap | Keep until portal-dev is retired | It materializes local Portal dev repos and branches; not A3 release logic. |
-| `scripts/a3/bootstrap_a3_direct_repo_sources.rb` | Direct canary source bootstrap | Retire or move into A3 test fixture after direct canary path is removed | It references `member-portal-starters` and `member-portal-ui-app`, so current file is project-specific. |
-| `scripts/a3/ensure_a3_direct_repo_sources.rb` | Direct canary source bootstrap wrapper | Retire with `bootstrap_a3_direct_repo_sources.rb` | Same dependency and lifecycle as the direct canary source bootstrap. |
+| `scripts/a3/bootstrap_a3_direct_repo_sources.rb` | Direct canary source bootstrap | Deleted with legacy direct canary source preparation | It referenced `member-portal-starters` and `member-portal-ui-app` and was only needed by retired direct canary preparation. |
+| `scripts/a3/ensure_a3_direct_repo_sources.rb` | Direct canary source bootstrap wrapper | Deleted with `bootstrap_a3_direct_repo_sources.rb` | Same dependency and lifecycle as the direct canary source bootstrap. |
 
 ### Migration order
 
