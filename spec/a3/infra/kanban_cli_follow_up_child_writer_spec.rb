@@ -37,7 +37,8 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
       Details:
       legacy malformed params should redirect
     DESC
-    allow(Open3).to receive(:capture3).and_return(
+    captured_argv = []
+    responses = [
       ["[]", "", success_status], # task-find
       [JSON.generate({ "id" => 3200, "ref" => "Portal#3200", "title" => "Follow-up for Portal#3140 (repo_beta): redirect regression", "description" => description }), "", success_status],
       ["{}", "", success_status], # label-ensure repo
@@ -48,7 +49,11 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
       ["{}", "", success_status], # label-add follow-up
       ["[]", "", success_status], # relation list
       ["{}", "", success_status] # relation create
-    )
+    ]
+    allow(Open3).to receive(:capture3) do |*args|
+      captured_argv << args
+      responses.shift
+    end
 
     result = writer.call(
       parent_task_ref: "Portal#3140",
@@ -60,6 +65,9 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
     expect(result.success?).to be(true)
     expect(result.child_refs).to eq(["Portal#3200"])
     expect(result.child_fingerprints).to eq(["Portal#3140|run-parent-review-1|repo_beta|finding-1"])
+    task_create_argv = captured_argv.find { |args| args.include?("task-create") }
+    expect(task_create_argv).to include("--description-file")
+    expect(task_create_argv).not_to include("--description")
   end
 
   it "blocks when an existing fingerprinted child has mismatched canonical payload" do
