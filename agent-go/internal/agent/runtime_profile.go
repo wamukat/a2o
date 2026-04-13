@@ -17,6 +17,7 @@ type RuntimeProfileConfig struct {
 	AllowInsecureRemote bool              `json:"allow_insecure_remote"`
 	WorkspaceRoot       string            `json:"workspace_root"`
 	SourceAliases       map[string]string `json:"source_aliases"`
+	RequiredBins        []string          `json:"required_bins"`
 }
 
 func LoadRuntimeProfileConfig(path string) (RuntimeProfileConfig, error) {

@@ -13,11 +13,12 @@ func TestLoadRuntimeProfileConfig(t *testing.T) {
   "control_plane_url": "http://a3-runtime:7393",
   "agent_token": "secret-token",
   "agent_token_file": "/run/secrets/a3-agent-token",
-  "workspace_root": "/work/a3-agent",
-  "source_aliases": {
-    "member-portal-starters": "/src/member-portal-starters"
-  }
-}`), 0o644); err != nil {
+		"workspace_root": "/work/a3-agent",
+		"source_aliases": {
+			"member-portal-starters": "/src/member-portal-starters"
+		},
+		"required_bins": ["git", "task"]
+	}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -43,6 +44,9 @@ func TestLoadRuntimeProfileConfig(t *testing.T) {
 	}
 	if config.SourceAliases["member-portal-starters"] != "/src/member-portal-starters" {
 		t.Fatalf("source aliases = %#v", config.SourceAliases)
+	}
+	if len(config.RequiredBins) != 2 || config.RequiredBins[0] != "git" {
+		t.Fatalf("required bins = %#v", config.RequiredBins)
 	}
 }
 

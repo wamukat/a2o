@@ -439,6 +439,18 @@ The runtime package surface exposes two separate command shapes:
 
 The first part, `slot -> alias`, is A3 job construction data. The second part, `alias -> local path`, is host/dev-env environment data but is still configured in Engine-side project config and transmitted per job as `agent_environment`. A3 doctor validates schema, alias coverage, and policy values; Engine-issued agent doctor jobs validate local filesystem accessibility from the agent runtime.
 
+For direct preflight without an agent-local profile file, `a3-agent doctor` accepts the same agent-visible environment shape:
+
+```text
+a3-agent doctor \
+  --control-plane-url http://a3-runtime:7393 \
+  --workspace-root /path/from/agent/workspaces \
+  --source-path member-portal-starters=/path/from/agent/member-portal-starters \
+  --required-bin git
+```
+
+`-config <agent-runtime-profile.json>` remains as a compatibility input, but the release-facing path should prefer Engine-managed config rendered into doctor flags and job payload.
+
 ### Non-Goals For This Slice
 
 - Do not run Maven/Portal verification.

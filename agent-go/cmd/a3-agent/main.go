@@ -96,18 +96,27 @@ func runDoctor(args []string) int {
 	}
 	flags := flag.NewFlagSet("a3-agent doctor", flag.ContinueOnError)
 	configFlag := flags.String("config", configPath, "runtime profile JSON file")
+	agentName := flags.String("agent", defaultString("A3_AGENT_NAME", config.AgentName, "local-agent"), "agent name")
+	controlPlaneURL := flags.String("control-plane-url", defaultString("A3_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393"), "A3 control plane base URL")
+	workspaceRoot := flags.String("workspace-root", defaultString("A3_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root for materialized jobs")
+	sourceAliases := sourceAliasFlag(mergeSourceAliases(config.SourceAliases, parseSourceAliases(os.Getenv("A3_AGENT_SOURCE_ALIASES"))))
+	flags.Var(&sourceAliases, "source-path", "source alias mapping for materialized jobs, in name=path form; repeatable")
+	flags.Var(&sourceAliases, "source-alias", "compatibility alias for --source-path")
+	requiredBins := stringSliceFlag(config.RequiredBins)
+	flags.Var(&requiredBins, "required-bin", "required executable visible to the agent runtime; repeatable")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
-	if *configFlag == "" {
-		fmt.Fprintln(os.Stderr, "runtime profile config is required")
-		return 1
-	}
+	_ = configFlag
+	config.AgentName = *agentName
+	config.ControlPlaneURL = *controlPlaneURL
+	config.WorkspaceRoot = *workspaceRoot
+	config.SourceAliases = map[string]string(sourceAliases)
+	config.RequiredBins = []string(requiredBins)
 	if err := doctorConfig(config); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	sourceAliases := sourceAliasFlag(config.SourceAliases)
 	fmt.Printf("agent_doctor=ok profile=%s control_plane_url=%s workspace_root=%s source_aliases=%s\n",
 		defaultIfEmpty(config.AgentName, "local-agent"),
 		defaultIfEmpty(config.ControlPlaneURL, "http://127.0.0.1:7393"),
@@ -141,6 +150,15 @@ func doctorConfig(config agent.RuntimeProfileConfig) error {
 	}
 	if len(config.SourceAliases) == 0 {
 		return fmt.Errorf("source_aliases are required")
+	}
+	for _, requiredBin := range config.RequiredBins {
+		requiredBin = strings.TrimSpace(requiredBin)
+		if requiredBin == "" {
+			continue
+		}
+		if _, err := exec.LookPath(requiredBin); err != nil {
+			return fmt.Errorf("required bin %s is not available: %w", requiredBin, err)
+		}
 	}
 	for alias, path := range config.SourceAliases {
 		if alias == "" || path == "" {
@@ -209,6 +227,24 @@ func (f *sourceAliasFlag) Set(value string) error {
 		*f = sourceAliasFlag{}
 	}
 	(*f)[key] = path
+	return nil
+}
+
+type stringSliceFlag []string
+
+func (f *stringSliceFlag) String() string {
+	if f == nil {
+		return ""
+	}
+	return strings.Join(*f, ",")
+}
+
+func (f *stringSliceFlag) Set(value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fmt.Errorf("value must not be empty")
+	}
+	*f = append(*f, value)
 	return nil
 }
 

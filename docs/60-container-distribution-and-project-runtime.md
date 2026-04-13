@@ -2054,7 +2054,7 @@ runtime package と agent environment config の責務は分ける。
 - Engine-issued agent doctor job: local git path の存在、git worktree 性、dirty 状態、workspace root の書き込み可否を agent 側で検査する。
 - `a3-agent` launch args: Engine/control-plane URL と token のみに最小化する。repo path や workspace root は agent の local profile file ではなく Engine-provided job/doctor payload で受け取る。
 
-2026-04-14 実装状態: `AgentJobRequest` / Go `JobRequest` に optional `agent_environment` を追加し、`workspace_root`、`source_paths`、`env`、`required_bins` を job payload として渡せるようにした。`AgentWorkerGateway`、`AgentCommandRunner`、`AgentMergeRunner` は同 payload を enqueue し、Go agent は `agent_environment.workspace_root` と `agent_environment.source_paths` がある場合、それを優先して workspace materialization / merge / cleanup に使う。agent 側 local profile file は後方互換の fallback として残るが、標準導線は Engine-managed job payload へ寄せる。
+2026-04-14 実装状態: `AgentJobRequest` / Go `JobRequest` に optional `agent_environment` を追加し、`workspace_root`、`source_paths`、`env`、`required_bins` を job payload として渡せるようにした。`AgentWorkerGateway`、`AgentCommandRunner`、`AgentMergeRunner` は同 payload を enqueue し、Go agent は `agent_environment.workspace_root` と `agent_environment.source_paths` がある場合、それを優先して workspace materialization / merge / cleanup に使う。`a3-agent doctor` は `--workspace-root`、`--source-path ALIAS=PATH`、`--required-bin VALUE` を受け付け、agent-local profile file なしで Engine-managed agent environment 相当を検査できる。agent 側 local profile file は後方互換の fallback として残るが、標準導線は Engine-managed job payload / doctor flags へ寄せる。
 
 A3 が発行する `workspace_request.slots` は runtime package の全 repo source slot を常に含める。
 `repo:ui-app` / `repo:starters` / `repo:both` は access / sync class / ownership を決める入力であり、slot membership の filter ではない。

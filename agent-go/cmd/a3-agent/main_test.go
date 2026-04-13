@@ -40,18 +40,7 @@ func TestMergeSourceAliases(t *testing.T) {
 
 func TestRunDoctorValidatesRuntimeProfile(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := filepath.Join(tmp, "source")
-	if err := os.MkdirAll(sourceRoot, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	runGit(t, sourceRoot, "init", "-q")
-	runGit(t, sourceRoot, "config", "user.name", "A3 Test")
-	runGit(t, sourceRoot, "config", "user.email", "a3-test@example.com")
-	if err := os.WriteFile(filepath.Join(sourceRoot, "README.md"), []byte("source\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	runGit(t, sourceRoot, "add", "README.md")
-	runGit(t, sourceRoot, "commit", "-q", "-m", "initial commit")
+	sourceRoot := createDoctorGitSource(t, tmp)
 	configPath := filepath.Join(tmp, "agent-profile.json")
 	if err := os.WriteFile(configPath, []byte(`{
   "agent": "dev-env",
@@ -66,6 +55,38 @@ func TestRunDoctorValidatesRuntimeProfile(t *testing.T) {
 
 	if code := run([]string{"doctor", "-config", configPath}); code != 0 {
 		t.Fatalf("doctor exit code = %d", code)
+	}
+}
+
+func TestRunDoctorAcceptsEngineManagedEnvironmentFlags(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createDoctorGitSource(t, tmp)
+
+	code := run([]string{
+		"doctor",
+		"--agent", "dev-env",
+		"--control-plane-url", "http://a3-runtime:7393",
+		"--workspace-root", filepath.Join(tmp, "workspaces"),
+		"--source-path", "member-portal-starters=" + sourceRoot,
+		"--required-bin", "git",
+	})
+	if code != 0 {
+		t.Fatalf("doctor exit code = %d", code)
+	}
+}
+
+func TestRunDoctorRejectsMissingRequiredBin(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createDoctorGitSource(t, tmp)
+
+	code := run([]string{
+		"doctor",
+		"--workspace-root", filepath.Join(tmp, "workspaces"),
+		"--source-path", "member-portal-starters=" + sourceRoot,
+		"--required-bin", "a3-missing-required-bin-for-test",
+	})
+	if code == 0 {
+		t.Fatal("doctor should fail when a required bin is missing")
 	}
 }
 
@@ -97,6 +118,23 @@ func TestResolveAgentTokenPrefersDirectToken(t *testing.T) {
 	if token != "direct-token" {
 		t.Fatalf("token = %q", token)
 	}
+}
+
+func createDoctorGitSource(t *testing.T, root string) string {
+	t.Helper()
+	sourceRoot := filepath.Join(root, "source")
+	if err := os.MkdirAll(sourceRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, sourceRoot, "init", "-q")
+	runGit(t, sourceRoot, "config", "user.name", "A3 Test")
+	runGit(t, sourceRoot, "config", "user.email", "a3-test@example.com")
+	if err := os.WriteFile(filepath.Join(sourceRoot, "README.md"), []byte("source\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, sourceRoot, "add", "README.md")
+	runGit(t, sourceRoot, "commit", "-q", "-m", "initial commit")
+	return sourceRoot
 }
 
 func runGit(t *testing.T, root string, args ...string) {
