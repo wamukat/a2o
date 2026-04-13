@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 require "tmpdir"
-require_relative "../../../scripts/a3/portal_v2_scheduler_launcher"
+require_relative "../../../scripts/a3-projects/portal/portal_scheduler_launcher"
 
-RSpec.describe PortalV2SchedulerLauncher do
+RSpec.describe PortalSchedulerLauncher do
   it "builds execute-until-idle command with portal trigger labels" do
     config = described_class::SchedulerConfig.new(storage_dir: Pathname("/tmp/storage"), max_steps: 16)
 
@@ -20,7 +20,7 @@ RSpec.describe PortalV2SchedulerLauncher do
   end
 
   it "dispatches detached run-shot process" do
-    allow(described_class).to receive(:build_run_shot_command).and_return(["ruby", "/repo/scripts/a3/portal_v2_scheduler_launcher.rb", "--run-shot"])
+    allow(described_class).to receive(:build_run_shot_command).and_return(["ruby", "/repo/scripts/a3-projects/portal/portal_scheduler_launcher.rb", "--run-shot"])
     allow(Process).to receive(:spawn).and_return(43_210)
     allow(Process).to receive(:detach)
 
@@ -30,7 +30,7 @@ RSpec.describe PortalV2SchedulerLauncher do
     expect(Process).to have_received(:spawn).with(
       { "PATH" => "/bin" },
       "ruby",
-      "/repo/scripts/a3/portal_v2_scheduler_launcher.rb",
+      "/repo/scripts/a3-projects/portal/portal_scheduler_launcher.rb",
       "--run-shot",
       chdir: described_class::ROOT_DIR.to_s,
       in: File::NULL,

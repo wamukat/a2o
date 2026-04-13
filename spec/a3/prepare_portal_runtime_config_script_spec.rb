@@ -2,7 +2,7 @@
 
 require "json"
 require "tmpdir"
-require_relative "../../../scripts/a3/prepare_portal_runtime_config"
+require_relative "../../../scripts/a3-projects/portal/prepare_portal_runtime_config"
 
 RSpec.describe PreparePortalRuntimeConfig do
   it "injects local env file without mutating tracked base config" do

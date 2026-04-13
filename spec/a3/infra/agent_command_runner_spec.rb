@@ -96,7 +96,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
       sleeper: ->(_) {}
     )
 
-    result = runner.run(["ruby \"$A3_ROOT_DIR/scripts/a3/portal_v2_verification.rb\""], workspace: workspace, task: task, run: run)
+    result = runner.run(["ruby \"$A3_ROOT_DIR/scripts/a3-projects/portal/portal_verification.rb\""], workspace: workspace, task: task, run: run)
 
     request = client.records.values.first.request
     expect(result.success?).to eq(true)
@@ -122,7 +122,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
       sleeper: ->(_) {}
     )
 
-    result = runner.run(["ruby \"$A3_ROOT_DIR/scripts/a3/portal_verification.rb\""], workspace: workspace, task: task, run: run)
+    result = runner.run(["ruby \"$A3_ROOT_DIR/scripts/a3-projects/portal/portal_verification.rb\""], workspace: workspace, task: task, run: run)
 
     request = client.records.values.first.request
     expect(result.success?).to eq(true)

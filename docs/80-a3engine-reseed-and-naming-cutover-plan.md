@@ -101,7 +101,7 @@ Cutover target:
 
 - `a3-v2/bin/a3`
 - root Taskfile の `a3:portal-v2:*`
-- `scripts/a3/config/portal/a3-v2-runtime-manifest.yml`
+- `scripts/a3-projects/portal/config/portal/a3-runtime-manifest.yml`
 - `scripts/a3/config/*` に残る `a3-v2` 名
 
 ### Storage / Runtime State
@@ -125,7 +125,7 @@ Cutover target:
   - `a3:portal-v2:*`
   - `a3-v2/bin/a3`
   - `.work/a3-v2/*`
-  - `scripts/a3/config/portal/a3-v2-runtime-manifest.yml`
+  - `scripts/a3-projects/portal/config/portal/a3-runtime-manifest.yml`
 - root `scripts/a3/*`
   - `portal_v2_scheduler_launcher.rb`
   - `portal_v2_watch_summary.rb`
@@ -135,10 +135,10 @@ Cutover target:
   - retired live-write guard script
   - `a3_direct_canary_worker.rb`
   - `a3_stdin_bundle_worker.rb`
-- root `scripts/a3/config/portal/*`
+- root `scripts/a3-projects/portal/config/portal/*`
   - `a3-v2-runtime-manifest.yml`
   - `launcher.json` の operator guidance
-- root `scripts/a3/config/portal-dev/launcher.json`
+- root `scripts/a3-projects/portal/config/portal-dev/launcher.json`
   - `task a3:portal-v2:scheduler:*` 参照
 - root `scripts/a3/run.rb`
   - legacy disabled message の `task a3:portal-v2:*`, `a3-v2/bin/a3`

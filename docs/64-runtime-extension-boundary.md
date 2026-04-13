@@ -64,37 +64,37 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 | `scripts/a3/assert_a3_live_write_enabled.rb` | A3-owned safety guard, unreferenced | Deleted from root | It contained no Portal knowledge, but no current command used it. Reintroduce only as an A3-owned guard if a current A3 command needs it. |
 | `scripts/a3/a3_stdin_bundle_worker.rb` | Thin project wrapper | Generic worker moved to `a3-engine/lib/a3/operator/stdin_bundle_worker.rb`; root wrapper injects Portal launcher config | The engine worker reads executor command templates and repo-scope aliases from project config. Portal labels such as `repo:starters` / `repo:ui-app` must not be hardcoded in A3 core. |
 | `scripts/a3/a3_direct_canary_worker.rb` | Thin smoke wrapper | Generic worker moved to `a3-engine/lib/a3/operator/direct_canary_worker.rb`; root file remains only to bind current parent-topology smoke to the release repo | Legacy direct run-once entrypoints were retired. The remaining root file is not an operator surface and contains no Portal-specific logic. |
-| `scripts/a3/agent_host_bundle_smoke.sh` | A3 runtime smoke harness | Move into A3 engine smoke tests after Portal-specific assumptions are parameterized | It validates host-local agent coupling, but references the Portal compose bundle and synthetic repo shape. |
-| `scripts/a3/agent_parent_topology_bundle_smoke.sh` | A3 runtime smoke harness with Portal mode | Split: generic topology smoke into A3, Portal full verification mode into project package | It mixes generic parent/child topology with real Portal repo verification. |
+| `scripts/a3-projects/portal/agent_host_bundle_smoke.sh` | Portal runtime smoke harness | Moved out of `scripts/a3`; keep project-injected until generic smoke is parameterized into A3 Engine tests | It validates host-local agent coupling, but references the Portal compose bundle and synthetic repo shape. |
+| `scripts/a3-projects/portal/agent_parent_topology_bundle_smoke.sh` | Portal runtime smoke harness with Portal mode | Moved out of `scripts/a3`; split later if a generic topology smoke is promoted into A3 Engine tests | It mixes generic parent/child topology with real Portal repo verification. |
 
 ### Keep as project-injected Portal glue
 
-- `scripts/a3/config/portal/**`
-- `scripts/a3/config/portal-dev/**`
-- `scripts/a3/portal_remediation.rb`
-- `scripts/a3/portal_verification.rb`
-- `scripts/a3/bootstrap-task-maven-local-repo.sh`
-- `scripts/a3/bootstrap-phase-support-maven.sh`
-- `scripts/a3/runtime_agent_scheduler_run_once.sh`
+- `scripts/a3-projects/portal/config/portal/**`
+- `scripts/a3-projects/portal/config/portal-dev/**`
+- `scripts/a3-projects/portal/portal_remediation.rb`
+- `scripts/a3-projects/portal/portal_verification.rb`
+- `scripts/a3-projects/portal/bootstrap-task-maven-local-repo.sh`
+- `scripts/a3-projects/portal/bootstrap-phase-support-maven.sh`
+- `scripts/a3-projects/portal/runtime_agent_scheduler_run_once.sh`
 - Portal-specific scheduler launcher / watch-summary wrappers while root Taskfile remains the Portal operator entrypoint.
 
 | Root file | Classification | Action | Reason / dependency |
 | --- | --- | --- | --- |
-| `scripts/a3/config/portal/**` | Project package | Keep root until project package format exists | Contains Portal board, labels, repo aliases, command templates, verification/remediation hooks, and runtime manifest. |
-| `scripts/a3/config/portal-dev/**` | Maintenance-only project package | Keep until portal-dev surface is retired | Used for isolated maintenance compatibility. Do not promote into A3 release assets. |
-| `scripts/a3/portal_runtime_surface.rb` | Portal root glue | Keep until Taskfile/runtime package is moved | Defines Portal-specific manifest, storage, and scheduler launcher paths. |
-| `scripts/a3/portal_scheduler_launcher.rb` | Portal root glue | Keep as Portal operator entrypoint for now | It binds Portal storage, trigger labels, repo labels, worker script, and scheduler settings. |
-| `scripts/a3/portal_watch_summary.rb` | Portal root glue | Keep as Portal operator entrypoint for now | It binds Portal storage and kanban labels around A3 watch-summary. Generic watch formatting should live in A3, but Portal runtime binding stays injected. |
+| `scripts/a3-projects/portal/config/portal/**` | Project package | Moved out of `scripts/a3`; keep root project package until external package loading exists | Contains Portal board, labels, repo aliases, command templates, verification/remediation hooks, and runtime manifest. |
+| `scripts/a3-projects/portal/config/portal-dev/**` | Maintenance-only project package | Moved out of `scripts/a3`; keep until portal-dev surface is retired | Used for isolated maintenance compatibility. Do not promote into A3 release assets. |
+| `scripts/a3-projects/portal/portal_runtime_surface.rb` | Portal root glue | Moved out of `scripts/a3`; keep until Taskfile/runtime package is moved | Defines Portal-specific manifest, storage, and scheduler launcher paths. |
+| `scripts/a3-projects/portal/portal_scheduler_launcher.rb` | Portal root glue | Moved out of `scripts/a3`; keep as Portal operator entrypoint for now | It binds Portal storage, trigger labels, repo labels, worker script, and scheduler settings. |
+| `scripts/a3-projects/portal/portal_watch_summary.rb` | Portal root glue | Moved out of `scripts/a3`; keep as Portal operator entrypoint for now | It binds Portal storage and kanban labels around A3 watch-summary. Generic watch formatting should live in A3, but Portal runtime binding stays injected. |
 | `scripts/a3/prepare_portal_scheduler_launchd_config.rb` | Portal root glue | Deleted with macOS LaunchAgent service entrypoints | It only wrote the deleted Portal scheduler LaunchAgent plist. |
-| `scripts/a3/prepare_portal_runtime_config.rb` | Portal root glue | Keep until Portal config is a project package | It materializes project-injected shell env and working directory overrides for `doctor-env`, cleanup, and reconcile without tying the path to macOS LaunchAgent service support. |
-| `scripts/a3/portal_verification.rb` | Project verification hook | Keep project-injected | Encodes Portal completion gates, repo slot commands, Maven local repo bootstrap, knowledge build, and parent/child verification rules. |
-| `scripts/a3/portal_remediation.rb` | Project remediation hook | Keep project-injected | Encodes Portal remediation command (`task fmt:apply`) and slot expectations. |
-| `scripts/a3/bootstrap-task-maven-local-repo.sh` | Project toolchain bootstrap | Keep project-injected | Maven local repository materialization is required for Portal's starter artifact flow. It is not a simple cache; it can contain starter build artifacts consumed by `ui-app`. |
-| `scripts/a3/bootstrap-phase-support-maven.sh` | Project support-repo bootstrap | Keep project-injected | Installs the support `member-portal-starters` artifact into the issue-local Maven repo before `ui-app` verification. |
-| `scripts/a3/rebuild-maven-seed-cache.sh` | Project/operator cache helper | Keep project-injected | It prepares a Portal Maven seed cache from the operator environment. A3 may define cache injection contracts, but not own Portal dependency contents. |
-| `scripts/a3/runtime_agent_scheduler_run_once.sh` | Portal runtime canary launcher | Keep project-injected | It binds Docker A3 runtime, SoloBoard port, Portal manifest, host agent profile, and Portal worker script. |
-| `scripts/a3/runtime_agent_scheduler_ref_candidates.py` | Portal runtime diagnostic helper | Keep project-injected, delete when no longer used | It queries Portal labels and repo mappings directly. |
-| `scripts/a3/bootstrap_portal_dev_repos.rb` | Portal-dev maintenance bootstrap | Keep until portal-dev is retired | It materializes local Portal dev repos and branches; not A3 release logic. |
+| `scripts/a3-projects/portal/prepare_portal_runtime_config.rb` | Portal root glue | Keep until Portal config is loaded as an external project package | It materializes project-injected shell env and working directory overrides for `doctor-env`, cleanup, and reconcile without tying the path to macOS LaunchAgent service support. |
+| `scripts/a3-projects/portal/portal_verification.rb` | Project verification hook | Keep project-injected | Encodes Portal completion gates, repo slot commands, Maven local repo bootstrap, knowledge build, and parent/child verification rules. |
+| `scripts/a3-projects/portal/portal_remediation.rb` | Project remediation hook | Keep project-injected | Encodes Portal remediation command (`task fmt:apply`) and slot expectations. |
+| `scripts/a3-projects/portal/bootstrap-task-maven-local-repo.sh` | Project toolchain bootstrap | Keep project-injected | Maven local repository materialization is required for Portal's starter artifact flow. It is not a simple cache; it can contain starter build artifacts consumed by `ui-app`. |
+| `scripts/a3-projects/portal/bootstrap-phase-support-maven.sh` | Project support-repo bootstrap | Keep project-injected | Installs the support `member-portal-starters` artifact into the issue-local Maven repo before `ui-app` verification. |
+| `scripts/a3-projects/portal/rebuild-maven-seed-cache.sh` | Project/operator cache helper | Keep project-injected | It prepares a Portal Maven seed cache from the operator environment. A3 may define cache injection contracts, but not own Portal dependency contents. |
+| `scripts/a3-projects/portal/runtime_agent_scheduler_run_once.sh` | Portal runtime canary launcher | Keep project-injected | It binds Docker A3 runtime, SoloBoard port, Portal manifest, host agent profile, and Portal worker script. |
+| `scripts/a3-projects/portal/runtime_agent_scheduler_ref_candidates.py` | Portal runtime diagnostic helper | Keep project-injected, delete when no longer used | It queries Portal labels and repo mappings directly. |
+| `scripts/a3-projects/portal/bootstrap_portal_dev_repos.rb` | Portal-dev maintenance bootstrap | Keep until portal-dev is retired | It materializes local Portal dev repos and branches; not A3 release logic. |
 | `scripts/a3/bootstrap_a3_direct_repo_sources.rb` | Direct canary source bootstrap | Deleted with legacy direct canary source preparation | It referenced `member-portal-starters` and `member-portal-ui-app` and was only needed by retired direct canary preparation. |
 | `scripts/a3/ensure_a3_direct_repo_sources.rb` | Direct canary source bootstrap wrapper | Deleted with `bootstrap_a3_direct_repo_sources.rb` | Same dependency and lifecycle as the direct canary source bootstrap. |
 
@@ -103,7 +103,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 1. Native A3 CLI parity: move `cleanup`, `diagnostics`, `reconcile`, and `rerun_*` behind `a3-engine/bin/a3` commands, preserving root Taskfile behavior through thin wrappers only.
 2. Worker bridge extraction: split `a3_stdin_bundle_worker.rb` into a generic command-template worker in `a3-engine` plus Portal launcher config in project package.
 3. Smoke split: move synthetic host-agent and parent-topology smoke into A3 tests; keep real Portal full verification as project canary.
-4. Portal package extraction: move `scripts/a3/config/portal/**` and Portal hooks into an external project package format once A3 can load project packages explicitly.
+4. Portal package extraction: move `scripts/a3-projects/portal/**` into an external project package format once A3 can load project packages explicitly.
 
 ### Review checklist
 

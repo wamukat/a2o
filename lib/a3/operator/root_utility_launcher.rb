@@ -10,7 +10,7 @@ require "time"
 module A3RootUtilityLauncher
   PrepareRuntimeConfigFailed = Class.new(StandardError)
   ROOT_DIR = Pathname(ENV.fetch("A3_ROOT_DIR", Dir.pwd)).expand_path.freeze
-  CONFIG_DIR = ROOT_DIR.join("scripts", "a3", "config").freeze
+  CONFIG_DIR = ROOT_DIR.join(ENV.fetch("A3_ROOT_CONFIG_DIR", "scripts/a3/config")).freeze
   RUNTIME_CONFIG = ROOT_DIR.join(ENV.fetch("A3_ROOT_RUNTIME_CONFIG_PATH", ".work/a3/config/runtime.json")).freeze
   CLEANUP_SCRIPT = ROOT_DIR.join("scripts", "a3", "cleanup.rb").freeze
   DIAGNOSTICS_SCRIPT = ROOT_DIR.join("scripts", "a3", "diagnostics.rb").freeze
