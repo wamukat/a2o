@@ -112,7 +112,10 @@ RSpec.describe A3::Infra::WorkerProtocol do
   end
 
   it "normalizes project repo labels in review_disposition repo_scope" do
-    result = described_class.new.build_execution_result(
+    result = described_class.new(
+      repo_scope_aliases: { "repo:both" => "both" },
+      review_disposition_repo_scopes: %w[repo_alpha repo_beta both]
+    ).build_execution_result(
       {
         "success" => true,
         "summary" => "worker completed",
@@ -138,6 +141,35 @@ RSpec.describe A3::Infra::WorkerProtocol do
 
     expect(result).to have_attributes(success?: true)
     expect(result.response_bundle.fetch("review_disposition").fetch("repo_scope")).to eq("both")
+  end
+
+  it "does not hardcode project repo labels when normalizing review_disposition repo_scope" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => true,
+        "summary" => "worker completed",
+        "task_ref" => task.ref,
+        "run_ref" => implementation_run.ref,
+        "phase" => "implementation",
+        "rework_required" => false,
+        "changed_files" => { "repo_alpha" => ["marker.txt"], "repo_beta" => ["marker.txt"] },
+        "review_disposition" => {
+          "kind" => "completed",
+          "repo_scope" => "repo:both",
+          "summary" => "self-review clean",
+          "description" => "No findings.",
+          "finding_key" => "none"
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: implementation_run.ref,
+      expected_phase: :implementation,
+      canonical_changed_files: { "repo_alpha" => ["marker.txt"], "repo_beta" => ["marker.txt"] }
+    )
+
+    expect(result).to have_attributes(success?: false)
+    expect(result.diagnostics.fetch("validation_errors")).to include("review_disposition.repo_scope must be one of repo_beta")
   end
 
   def implementation_run

@@ -5,11 +5,12 @@ module A3
     class KanbanCliFollowUpChildWriter
       Result = Struct.new(:success?, :child_refs, :child_fingerprints, :summary, :diagnostics, keyword_init: true)
 
-      FOLLOW_UP_LABEL = "a3-v2:follow-up-child"
-
-      def initialize(command_argv:, project:, working_dir: nil)
+      def initialize(command_argv:, project:, repo_label_map:, repo_scope_expansions: {}, follow_up_label: nil, working_dir: nil)
         @project = project.to_s
         @client = KanbanCliCommandClient.new(command_argv: command_argv, project: @project, working_dir: working_dir)
+        @repo_labels_by_scope = repo_labels_by_scope(repo_label_map)
+        @repo_scope_expansions = normalize_repo_scope_expansions(repo_scope_expansions)
+        @follow_up_label = normalize_optional_label(follow_up_label, "follow_up_label")
       end
 
       def call(parent_task_ref:, parent_external_task_id:, review_run_ref:, disposition:)
@@ -33,9 +34,8 @@ module A3
       private
 
       def repo_scopes_for(repo_scope)
-        return %i[repo_alpha repo_beta] if repo_scope.to_sym == :both
-
-        [repo_scope.to_sym]
+        scope_key = repo_scope.to_s
+        @repo_scope_expansions.fetch(scope_key, [scope_key]).map(&:to_sym)
       end
 
       def ensure_child(parent_task_ref:, parent_external_task_id:, review_run_ref:, disposition:, repo_scope:)
@@ -51,7 +51,7 @@ module A3
         ensure_canonical_payload!(child, canonical: task_payload, parent_external_task_id: parent_external_task_id) if existing
         ensure_label(child.fetch("id"), task_payload.fetch("repo_label"))
         ensure_label(child.fetch("id"), "trigger:auto-implement")
-        ensure_label(child.fetch("id"), FOLLOW_UP_LABEL)
+        ensure_label(child.fetch("id"), @follow_up_label) if @follow_up_label
         ensure_relation(parent_external_task_id, child.fetch("id"))
         { "ref" => child.fetch("ref"), "fingerprint" => fingerprint, "id" => child.fetch("id") }
       end
@@ -73,7 +73,9 @@ module A3
       end
 
       def canonical_task_payload(parent_task_ref:, disposition:, repo_scope:, fingerprint:)
-        repo_label = repo_scope == :repo_alpha ? "repo:starters" : "repo:ui-app"
+        repo_label = @repo_labels_by_scope.fetch(repo_scope) do
+          raise A3::Domain::ConfigurationError, "missing kanban repo label for follow-up child repo_scope #{repo_scope}"
+        end
         {
           "title" => "Follow-up for #{parent_task_ref} (#{repo_scope}): #{disposition.summary}",
           "description" => <<~DESC.strip,
@@ -91,6 +93,50 @@ module A3
         }
       end
 
+      def repo_labels_by_scope(repo_label_map)
+        raise A3::Domain::ConfigurationError, "repo_label_map must be an object" unless repo_label_map.is_a?(Hash)
+
+        repo_label_map.each_with_object({}) do |(label, scopes), labels_by_scope|
+          unless label.is_a?(String) && !label.empty?
+            raise A3::Domain::ConfigurationError, "repo_label_map labels must be non-empty strings"
+          end
+          normalized_scopes = Array(scopes).map(&:to_s).reject(&:empty?)
+          next if normalized_scopes.size > 1
+
+          normalized_scopes.each do |scope|
+            scope_key = scope.to_s.to_sym
+            if labels_by_scope.key?(scope_key) && labels_by_scope.fetch(scope_key) != label
+              raise A3::Domain::ConfigurationError, "multiple kanban repo labels configured for #{scope_key}"
+            end
+
+            labels_by_scope[scope_key] = label
+          end
+        end
+      end
+
+      def normalize_repo_scope_expansions(repo_scope_expansions)
+        raise A3::Domain::ConfigurationError, "repo_scope_expansions must be an object" unless repo_scope_expansions.is_a?(Hash)
+
+        repo_scope_expansions.each_with_object({}) do |(scope, expanded_scopes), normalized|
+          unless scope.is_a?(String) && !scope.empty?
+            raise A3::Domain::ConfigurationError, "repo_scope_expansions keys must be non-empty strings"
+          end
+          expanded = Array(expanded_scopes).map(&:to_s).reject(&:empty?)
+          raise A3::Domain::ConfigurationError, "repo_scope_expansions.#{scope} must contain at least one scope" if expanded.empty?
+
+          normalized[scope] = expanded
+        end
+      end
+
+      def normalize_optional_label(label, field_name)
+        return nil if label.nil? || label.to_s.strip.empty?
+
+        normalized = label.to_s
+        raise A3::Domain::ConfigurationError, "#{field_name} must not contain newlines" if normalized.match?(/[\r\n]/)
+
+        normalized
+      end
+
       def create_child(task_payload)
         @client.run_json_command(
           "task-create",
@@ -105,7 +151,8 @@ module A3
         actual_title = task.fetch("title")
         actual_description = task.fetch("description", "")
         labels = Array(@client.load_task_labels(task.fetch("id"), include_project: true)).map { |item| item["title"] }.sort
-        expected_labels = [canonical.fetch("repo_label"), "trigger:auto-implement", FOLLOW_UP_LABEL]
+        expected_labels = [canonical.fetch("repo_label"), "trigger:auto-implement"]
+        expected_labels << @follow_up_label if @follow_up_label
         expected_labels.sort!
         relation_exists = Array(
           @client.run_json_command("task-relation-list", "--project", @project, "--task-id", parent_external_task_id.to_s)

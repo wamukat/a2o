@@ -4,7 +4,6 @@ module A3
   module Domain
     class ReviewDisposition
       KINDS = %i[completed follow_up_child blocked].freeze
-      REPO_SCOPES = %i[repo_alpha repo_beta both unresolved].freeze
 
       attr_reader :kind, :repo_scope, :summary, :description, :finding_key
 
@@ -48,7 +47,7 @@ module A3
 
       def valid?
         KINDS.include?(kind) &&
-          REPO_SCOPES.include?(repo_scope) &&
+          !repo_scope.to_s.strip.empty? &&
           !summary.strip.empty? &&
           !description.strip.empty? &&
           !finding_key.strip.empty?

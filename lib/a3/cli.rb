@@ -1269,6 +1269,7 @@ module A3
       parser.on("--kanban-status VALUE") { |value| options[:kanban_status] = value }
       parser.on("--kanban-working-dir DIR") { |value| options[:kanban_working_dir] = File.expand_path(value) }
       parser.on("--kanban-blocked-label VALUE") { |value| options[:kanban_blocked_label] = value }
+      parser.on("--kanban-follow-up-label VALUE") { |value| options[:kanban_follow_up_label] = value }
       parser.on("--kanban-trigger-label VALUE") { |value| options[:kanban_trigger_labels] << value }
       parser.on("--kanban-repo-label VALUE") { |value| add_kanban_repo_label_option(options, value) }
     end
@@ -1311,7 +1312,7 @@ module A3
     end
 
     def default_storage_dir
-      File.expand_path("tmp/a3-v2", Dir.pwd)
+      File.expand_path("tmp/a3", Dir.pwd)
     end
 
     def add_kanban_repo_label_option(options, value)
@@ -1319,6 +1320,37 @@ module A3
       raise ArgumentError, "kanban repo label must be LABEL=SCOPE[,SCOPE]" unless label && scopes
 
       options[:kanban_repo_label_map][label] = scopes.split(",").map(&:strip).reject(&:empty?)
+    end
+
+    def repo_scope_aliases_from_kanban_label_map(repo_label_map)
+      repo_label_map.each_with_object({}) do |(label, scopes), aliases|
+        normalized_scopes = Array(scopes).map(&:to_s).reject(&:empty?)
+        aliases[label] =
+          if normalized_scopes.size == 1
+            normalized_scopes.first
+          else
+            label.to_s.include?(":") ? label.to_s.split(":", 2).last : label.to_s
+          end
+      end
+    end
+
+    def review_disposition_repo_scopes_from_kanban_label_map(repo_label_map)
+      scopes = repo_label_map.flat_map do |label, values|
+        normalized_values = Array(values).map(&:to_s).reject(&:empty?)
+        alias_scope = repo_scope_aliases_from_kanban_label_map({ label => normalized_values }).fetch(label, nil)
+        normalized_values + Array(alias_scope)
+      end.uniq
+      scopes.empty? ? nil : scopes
+    end
+
+    def repo_scope_expansions_from_kanban_label_map(repo_label_map)
+      repo_label_map.each_with_object({}) do |(label, scopes), expansions|
+        normalized_scopes = Array(scopes).map(&:to_s).reject(&:empty?)
+        next unless normalized_scopes.size > 1
+
+        alias_scope = repo_scope_aliases_from_kanban_label_map({ label => normalized_scopes }).fetch(label)
+        expansions[alias_scope] = normalized_scopes
+      end
     end
 
     def build_external_task_bridge(options)
@@ -1359,6 +1391,9 @@ module A3
           follow_up_child_writer: A3::Infra::KanbanCliFollowUpChildWriter.new(
             command_argv: command_argv,
             project: project,
+            repo_label_map: options.fetch(:kanban_repo_label_map),
+            repo_scope_expansions: repo_scope_expansions_from_kanban_label_map(options.fetch(:kanban_repo_label_map)),
+            follow_up_label: options[:kanban_follow_up_label],
             working_dir: working_dir
           ),
           task_snapshot_reader: A3::Infra::KanbanCliTaskSnapshotReader.new(
@@ -1395,7 +1430,11 @@ module A3
       return A3::Infra::LocalWorkerGateway.new(
         command_runner: command_runner,
         worker_command: options[:worker_command],
-        worker_command_args: options.fetch(:worker_command_args, [])
+        worker_command_args: options.fetch(:worker_command_args, []),
+        worker_protocol: A3::Infra::WorkerProtocol.new(
+          repo_scope_aliases: repo_scope_aliases_from_kanban_label_map(options.fetch(:kanban_repo_label_map, {})),
+          review_disposition_repo_scopes: review_disposition_repo_scopes_from_kanban_label_map(options.fetch(:kanban_repo_label_map, {}))
+        )
       ) if gateway == "local"
 
       if gateway == "agent-http"
@@ -1417,6 +1456,10 @@ module A3
           shared_workspace_mode: shared_workspace_mode,
           timeout_seconds: options.fetch(:agent_job_timeout_seconds, 1800),
           poll_interval_seconds: options.fetch(:agent_job_poll_interval_seconds, 1.0),
+          worker_protocol: A3::Infra::WorkerProtocol.new(
+            repo_scope_aliases: repo_scope_aliases_from_kanban_label_map(options.fetch(:kanban_repo_label_map, {})),
+            review_disposition_repo_scopes: review_disposition_repo_scopes_from_kanban_label_map(options.fetch(:kanban_repo_label_map, {}))
+          ),
           workspace_request_builder: agent_workspace_request_builder(options),
           env: options.fetch(:agent_env, {})
         )

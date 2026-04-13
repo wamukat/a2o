@@ -79,7 +79,7 @@ RSpec.describe A3::CLI do
 
     options = described_class.send(:parse_start_run_options, ["A3-v2#3025", "implementation"])
 
-    expect(options.fetch(:storage_dir)).to eq("/tmp/current/tmp/a3-v2")
+    expect(options.fetch(:storage_dir)).to eq("/tmp/current/tmp/a3")
   end
 
   it "uses a shared default storage dir for execute-until-idle parsing" do
@@ -87,7 +87,7 @@ RSpec.describe A3::CLI do
 
     options = described_class.send(:parse_execute_until_idle_options, ["/tmp/runtime/manifest.yml"])
 
-    expect(options.fetch(:storage_dir)).to eq("/tmp/current/tmp/a3-v2")
+    expect(options.fetch(:storage_dir)).to eq("/tmp/current/tmp/a3")
   end
 
   it "keeps explicit storage-dir overrides after centralizing defaults" do

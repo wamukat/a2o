@@ -7,6 +7,8 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
     described_class.new(
       command_argv: %w[task kanban:api --],
       project: "Portal",
+      repo_label_map: { "repo:starters" => ["repo_alpha"], "repo:ui-app" => ["repo_beta"] },
+      follow_up_label: "a3:follow-up-child",
       working_dir: "/tmp"
     )
   end
@@ -90,7 +92,7 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
     DESC
     allow(Open3).to receive(:capture3).and_return(
       [JSON.generate([{ "id" => 3200, "ref" => "Portal#3200", "title" => "Follow-up for Portal#3140 (repo_beta): redirect regression", "description" => description }]), "", success_status],
-      [JSON.generate([{ "title" => "a3-v2:follow-up-child" }, { "title" => "repo:ui-app" }, { "title" => "trigger:auto-implement" }]), "", success_status],
+      [JSON.generate([{ "title" => "a3:follow-up-child" }, { "title" => "repo:ui-app" }, { "title" => "trigger:auto-implement" }]), "", success_status],
       ["[]", "", success_status]
     )
 
@@ -103,5 +105,29 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
 
     expect(result.success?).to be(false)
     expect(result.summary).to eq("follow-up child creation failed")
+  end
+
+  it "fails closed when no repo label is configured for the disposition scope" do
+    writer = described_class.new(
+      command_argv: %w[task kanban:api --],
+      project: "Portal",
+      repo_label_map: { "repo:starters" => ["repo_alpha"] },
+      follow_up_label: "a3:follow-up-child",
+      working_dir: "/tmp"
+    )
+    allow(Open3).to receive(:capture3).and_return(
+      ["[]", "", success_status] # task-find
+    )
+
+    result = writer.call(
+      parent_task_ref: "Portal#3140",
+      parent_external_task_id: 3140,
+      review_run_ref: "run-parent-review-1",
+      disposition: disposition
+    )
+
+    expect(result.success?).to be(false)
+    expect(result.summary).to eq("follow-up child creation failed")
+    expect(result.diagnostics.fetch("error")).to include("missing kanban repo label")
   end
 end

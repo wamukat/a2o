@@ -7,6 +7,11 @@ require "open3"
 module A3
   module Infra
     class WorkerProtocol
+      def initialize(repo_scope_aliases: {}, review_disposition_repo_scopes: nil)
+        @repo_scope_aliases = normalize_repo_scope_aliases(repo_scope_aliases)
+        @review_disposition_repo_scopes = normalize_configured_review_disposition_repo_scopes(review_disposition_repo_scopes)
+      end
+
       def result_path(workspace)
         workspace.root_path.join(".a3", "worker-result.json")
       end
@@ -110,6 +115,7 @@ module A3
         end
         validation_errors = validate_worker_response(
           worker_response,
+          workspace: workspace,
           expected_task_ref: expected_task_ref,
           expected_run_ref: expected_run_ref,
           expected_phase: expected_phase
@@ -180,7 +186,7 @@ module A3
         worker_response.merge("changed_files" => canonical_changed_files)
       end
 
-      def validate_worker_response(worker_response, expected_task_ref:, expected_run_ref:, expected_phase:)
+      def validate_worker_response(worker_response, workspace:, expected_task_ref:, expected_run_ref:, expected_phase:)
         normalize_worker_response!(worker_response)
         implementation_phase = expected_phase.to_s == "implementation"
         parent_review = expected_phase.to_s == "review"
@@ -208,7 +214,7 @@ module A3
           end
           if parent_review
             valid_kinds = %w[completed follow_up_child blocked]
-            valid_repo_scopes = %w[repo_alpha repo_beta both unresolved]
+            valid_repo_scopes = valid_review_disposition_repo_scopes(workspace, include_unresolved: true)
             unless valid_kinds.include?(disposition["kind"])
               errors << "review_disposition.kind must be one of #{valid_kinds.join(', ')}"
             end
@@ -216,7 +222,7 @@ module A3
               errors << "review_disposition.repo_scope must be one of #{valid_repo_scopes.join(', ')}"
             end
           elsif implementation_phase
-            valid_repo_scopes = %w[repo_alpha repo_beta both]
+            valid_repo_scopes = valid_review_disposition_repo_scopes(workspace, include_unresolved: false)
             errors << "review_disposition.kind must be completed for implementation evidence" unless disposition["kind"] == "completed"
             unless valid_repo_scopes.include?(disposition["repo_scope"])
               errors << "review_disposition.repo_scope must be one of #{valid_repo_scopes.join(', ')}"
@@ -266,13 +272,39 @@ module A3
         disposition = worker_response["review_disposition"]
         return unless disposition.is_a?(Hash)
 
-        disposition["repo_scope"] = {
-          "repo:starters" => "repo_alpha",
-          "repo:ui-app" => "repo_beta",
-          "repo:both" => "both",
-          "repo_alpha,repo_beta" => "both",
-          "repo_beta,repo_alpha" => "both"
-        }.fetch(disposition["repo_scope"], disposition["repo_scope"])
+        disposition["repo_scope"] = @repo_scope_aliases.fetch(disposition["repo_scope"], disposition["repo_scope"])
+      end
+
+      def normalize_repo_scope_aliases(repo_scope_aliases)
+        raise A3::Domain::ConfigurationError, "repo_scope_aliases must be an object" unless repo_scope_aliases.is_a?(Hash)
+
+        repo_scope_aliases.each_with_object({}) do |(from, to), normalized|
+          unless from.is_a?(String) && !from.empty? && to.is_a?(String) && !to.empty?
+            raise A3::Domain::ConfigurationError, "repo_scope_aliases keys and values must be non-empty strings"
+          end
+
+          normalized[from] = to
+        end
+      end
+
+      def normalize_configured_review_disposition_repo_scopes(scopes)
+        return nil if scopes.nil?
+        unless scopes.is_a?(Array) && scopes.all? { |scope| scope.is_a?(String) && !scope.empty? }
+          raise A3::Domain::ConfigurationError, "review_disposition_repo_scopes must be an array of non-empty strings"
+        end
+
+        scopes.uniq
+      end
+
+      def valid_review_disposition_repo_scopes(workspace, include_unresolved:)
+        scopes = @review_disposition_repo_scopes || inferred_review_disposition_repo_scopes(workspace)
+        scopes = scopes.reject { |scope| scope == "unresolved" } unless include_unresolved
+        scopes = scopes + ["unresolved"] if include_unresolved
+        scopes.uniq
+      end
+
+      def inferred_review_disposition_repo_scopes(workspace)
+        workspace.slot_paths.keys.map(&:to_s).reject(&:empty?).uniq
       end
 
       def changed_files_from_workspace(workspace)
