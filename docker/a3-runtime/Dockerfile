@@ -1,3 +1,18 @@
+ARG GO_VERSION=1.26.2
+
+FROM golang:${GO_VERSION}-bookworm AS agent-builder
+
+ARG A3_AGENT_VERSION=dev
+
+WORKDIR /src/agent-go
+
+COPY agent-go/go.mod ./go.mod
+COPY agent-go/cmd ./cmd
+COPY agent-go/internal ./internal
+COPY agent-go/scripts ./scripts
+
+RUN DIST_DIR=/opt/a3/agents VERSION="${A3_AGENT_VERSION}" ./scripts/build-release.sh
+
 FROM ruby:3.1-slim
 
 ARG GO_TASK_VERSION=3.41.0
@@ -45,9 +60,12 @@ RUN cd /tmp/a3-engine \
     && bundle _${BUNDLER_VERSION}_ install \
     && rm -rf /usr/local/bundle/cache/*.gem
 
+COPY --from=agent-builder /opt/a3/agents /opt/a3/agents
+
 RUN ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a3
 
 ENV A3_ROOT_DIR=/workspace
+ENV A3_AGENT_PACKAGE_DIR=/opt/a3/agents
 ENV RUBYLIB=/tmp/a3-engine/lib
 
 CMD ["sleep", "infinity"]

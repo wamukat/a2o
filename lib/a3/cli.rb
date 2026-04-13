@@ -658,6 +658,37 @@ module A3
       exit(exit_code)
     end
 
+    def handle_agent(argv, out:)
+      subject = argv.shift
+      action = argv.shift
+      unless subject == "package" && %w[list export verify].include?(action)
+        raise ArgumentError, "usage: a3 agent package list|export|verify"
+      end
+
+      options = parse_agent_package_options(argv)
+      store = A3::Infra::AgentPackageStore.new(package_dir: options.fetch(:package_dir))
+
+      case action
+      when "list"
+        packages = store.list
+        out.puts("agent_package_dir=#{store.package_dir}")
+        packages.each do |package|
+          out.puts("target=#{package.target} version=#{package.version} archive=#{package.archive} sha256=#{package.sha256}")
+        end
+      when "verify"
+        results = store.verify(target: options[:target])
+        results.each do |result|
+          out.puts("target=#{result.fetch(:target)} archive=#{result.fetch(:archive)} ok=#{result.fetch(:ok)} sha256=#{result.fetch(:actual_sha256)}")
+        end
+        raise A3::Domain::ConfigurationError, "agent package verification failed" unless results.all? { |result| result.fetch(:ok) }
+      when "export"
+        target = options.fetch(:target) { raise ArgumentError, "--target is required for agent package export" }
+        output = options.fetch(:output) { raise ArgumentError, "--output is required for agent package export" }
+        result = store.export(target: target, output: output)
+        out.puts("agent_package_exported target=#{result.fetch(:target)} output=#{result.fetch(:output)} archive=#{result.fetch(:archive)} sha256=#{result.fetch(:sha256)}")
+      end
+    end
+
     def handle_agent_server(argv, out:)
       options = parse_agent_server_options(argv)
       store = A3::Infra::JsonAgentJobStore.new(options.fetch(:job_store_path))
@@ -698,6 +729,17 @@ module A3
       out.puts("missing_blob_artifact_ids=#{result.missing_blob_artifact_ids.join(',')}") unless result.missing_blob_artifact_ids.empty?
     end
 
+    def parse_agent_package_options(argv)
+      options = {
+        package_dir: ENV.fetch("A3_AGENT_PACKAGE_DIR", A3::Infra::AgentPackageStore::DEFAULT_PACKAGE_DIR)
+      }
+      parser = OptionParser.new
+      parser.on("--package-dir DIR") { |value| options[:package_dir] = File.expand_path(value) }
+      parser.on("--target TARGET") { |value| options[:target] = value.to_s.tr("/", "-") }
+      parser.on("--output PATH") { |value| options[:output] = File.expand_path(value) }
+      parser.parse!(argv)
+      options
+    end
 
     def parse_start_run_options(argv)
       options = {
