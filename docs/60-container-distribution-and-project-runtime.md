@@ -6,6 +6,10 @@
 この文書は、A3 を Docker コンテナとして配布し、案件ごとに利用可能にするための配布モデルと runtime packaging を定義する。
 既存の domain rule や workspace rule を Docker 都合で崩さず、共通 image と案件固有 runtime を分離することを目的とする。
 
+## Runtime Naming Boundary
+
+Current public surface では `scheduler` ではなく `runtime run-once` / `runtime run loop` を使う。`scheduler` は internal cycle/state/store 互換名、maintenance-only command、または historical evidence の文脈に限定する。詳細な分類は [66-runtime-naming-boundary.md](66-runtime-naming-boundary.md) を正本とする。
+
 ## 0. 進捗状況
 
 この文書は設計メモであると同時に、container distribution / project runtime 領域の実装進捗の正本でもある。
