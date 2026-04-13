@@ -451,6 +451,14 @@ a3-agent doctor \
 
 `-config <agent-runtime-profile.json>` remains as a compatibility input, but the release-facing path should prefer Engine-managed config rendered into doctor flags and job payload.
 
+Focused release-package validation:
+
+```text
+agent-go/scripts/validation-release-package-doctor.sh
+```
+
+This builds the host-target release archive, verifies it through `a3 agent package verify`, exports it through `a3 agent package export`, and runs the exported `a3-agent doctor` against a temporary local git source without using an agent-local profile file.
+
 ### Non-Goals For This Slice
 
 - Do not run Maven/Portal verification.
