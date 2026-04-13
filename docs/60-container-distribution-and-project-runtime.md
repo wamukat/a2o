@@ -1141,7 +1141,7 @@ cleanup は「registered worktree を source repo から外す責務」と「調
 
 ### 0.4.5 Kanban backend cutover plan
 
-2026-04-10 時点で、A3 Engine の historical kanban backend baseline は `Kanboard` だった。`Portal` 上の Kanboard baseline canary は `Portal#3170/#3171/#3172`, `Portal#3173/#3174/#3175`, `Portal#3179`, `Portal#3180` で完了しており、backend 非依存 contract の過去証跡として文書に保持する。2026-04-12 の判断で current runtime の Kanboard compatibility path は削除し、`task kanban:*` と `scripts/kanban/kanban_cli.py` は SoloBoard 専用に固定する。
+2026-04-10 時点で、A3 Engine の historical kanban backend baseline は `Kanboard` だった。`Portal` 上の Kanboard baseline canary は `Portal#3170/#3171/#3172`, `Portal#3173/#3174/#3175`, `Portal#3179`, `Portal#3180` で完了しており、backend 非依存 contract の過去証跡として文書に保持する。2026-04-12 の判断で current runtime の Kanboard compatibility path は削除し、`task kanban:*` と `a3-engine/tools/kanban/kanban_cli.py` は SoloBoard 専用に固定する。
 
 Kanboard baseline の current evidence:
 
@@ -1182,14 +1182,14 @@ Kanboard baseline の current evidence:
 
 #### 0.4.5.1 SoloBoard 固定化と対応計画
 
-2026-04-12 時点の方針では、A3 の bundled kanban は `SoloBoard` のみとする。判断根拠は、workspace root の `task kanban:api -- ...` と `scripts/kanban/kanban_cli.py` が提供する current surface を SoloBoard が満たせることを local spike と isolated canary で確認し、Kanboard compatibility path を残す価値よりも誤操作・保守ノイズのリスクが上回ると判断した点にある。実運用で踏んでいる contract は `task-snapshot-list`, `task-get`, `task-label-list`, `task-transition`, `task-label-add`, `task-label-remove`, `task-comment-create`, `task-relation-list`, `task-relation-create`, `task-create`, `label-ensure` に集中しており、A3 domain rule は SoloBoard の API shape へ直接依存させない。
+2026-04-12 時点の方針では、A3 の bundled kanban は `SoloBoard` のみとする。判断根拠は、workspace root の `task kanban:api -- ...` と `a3-engine/tools/kanban/kanban_cli.py` が提供する current surface を SoloBoard が満たせることを local spike と isolated canary で確認し、Kanboard compatibility path を残す価値よりも誤操作・保守ノイズのリスクが上回ると判断した点にある。実運用で踏んでいる contract は `task-snapshot-list`, `task-get`, `task-label-list`, `task-transition`, `task-label-add`, `task-label-remove`, `task-comment-create`, `task-relation-list`, `task-relation-create`, `task-create`, `label-ensure` に集中しており、A3 domain rule は SoloBoard の API shape へ直接依存させない。
 
 SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/child`, `transition` を持ち、A3 Engine が現在使っている operator surface の主要部分を受け止められる。さらに `GET /api/tickets/{ticketId}/comments`, `GET /api/tickets/{ticketId}/relations`, `PATCH /api/tickets/{ticketId}/transition`, `ref` / `shortRef` が OpenAPI に入っており、A3 adapter で必要だった補助 API も揃い始めている。したがって、今後の主戦場は「kanban backend を増やすこと」ではなく、SoloBoard 固定の compose bundle と bootstrap / doctor / smoke / long-running observation を安定化することである。
 
 対応計画:
 
 - step 1: `task kanban:api -- ...` の current contract を固定し、A3 Engine が実際に使う command/output shape を regression test で保護する
-- step 2: `scripts/kanban/kanban_cli.py` の SoloBoard adapter 境界を維持し、A3 domain rule が SoloBoard API shape に漏れないことを regression test で保護する
+- step 2: `a3-engine/tools/kanban/kanban_cli.py` の SoloBoard adapter 境界を維持し、A3 domain rule が SoloBoard API shape に漏れないことを regression test で保護する
 - step 3: `project -> board`, `status -> lane`, `done flag -> isCompleted` を adapter 規約として固定し、canonical ref `Portal#123` を維持する
 - step 4: relation は現行利用が濃い `subtask` と blocking 系を優先し、workspace 実使用の薄い relation kind は必要になるまで広げない
 - step 5: `Taskfile` / bootstrap / doctor / up/down を SoloBoard runtime に差し替えて canary し、operator surface が維持されることを確認する
@@ -1203,7 +1203,7 @@ SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/
 
 2026-04-10 の追加実装で、workspace root では次を current progress として確認した。
 
-- `scripts/kanban/kanban_cli.py` に backend adapter 境界を入れ、`soloboard` backend で `task-get`, `task-list`, `task-snapshot-list`, `task-comment-list/create`, `task-transition`, `task-label-add/remove`, `task-relation-list/create/delete`, `task-create`, `task-update`, `label-ensure` を実行できる
+- `a3-engine/tools/kanban/kanban_cli.py` に backend adapter 境界を入れ、`soloboard` backend で `task-get`, `task-list`, `task-snapshot-list`, `task-comment-list/create`, `task-transition`, `task-label-add/remove`, `task-relation-list/create/delete`, `task-create`, `task-update`, `label-ensure` を実行できる
 - `task soloboard:doctor`, `task soloboard:api`, `task soloboard:bootstrap` を追加し、SoloBoard runtime 単体でも operator surface を踏める
 - `task soloboard:smoke` を追加し、current kanban compatibility surface を SoloBoard に対して一通り打つ parity smoke を実行できる
 - `task kanban:up/down/logs/url/doctor/api/bootstrap:*` は SoloBoard 専用 entrypoint とし、`KANBAN_BACKEND=kanboard` / `kanboard:*` は削除する

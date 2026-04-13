@@ -17,7 +17,7 @@ These belong in `a3-engine`:
 - Go `a3-agent` source, build scripts, installer scripts, and release packaging.
 - Generic runtime Docker assets, for example `docker/a3-runtime/Dockerfile`.
 - Generic compose templates for A3 runtime + bundled kanban, when they do not encode a product repo layout.
-- Kanban adapter contracts and generic protocol expectations.
+- Kanban adapter contracts and generic protocol helpers, including `tools/kanban/cli.py`.
 - Workspace / branch / merge / artifact / cleanup contracts that are independent of a project.
 
 ### Project-injected
@@ -38,7 +38,7 @@ The root workspace may keep thin glue only while this repository is used as a Po
 - `Taskfile.yml` entries that bind A3 Engine, SoloBoard, and Portal repos together.
 - `scripts/a3/config/<project>/...` project manifests until they are moved into a project package format.
 - Short shell/Ruby launchers that pass project-injected config to `a3-engine`.
-- `scripts/kanban/*` local kanban CLI and SoloBoard bootstrap helpers used by root `task kanban:*`.
+- `scripts/kanban/*` thin wrappers and project-local SoloBoard bootstrap helpers used by root `task kanban:*`.
 
 Root glue must not become an A3 release dependency. Any root script that is required by a generic A3 install is a migration candidate into `a3-engine`.
 
@@ -62,11 +62,12 @@ Root glue must not become an A3 release dependency. Any root script that is requ
 
 ### Kanban helper location
 
-SoloBoard-specific helper scripts belong under `scripts/kanban`, not a separate `scripts/soloboard` directory. The abstraction boundary is:
+The generic kanban command contract belongs under `a3-engine/tools/kanban`. Root `scripts/kanban` is project/workspace glue. The abstraction boundary is:
 
-- `scripts/kanban/cli.py` and `scripts/kanban/kanban_cli.py`: kanban CLI / adapter entrypoint.
-- `scripts/kanban/bootstrap_soloboard.py`: SoloBoard backend bootstrap implementation.
-- `scripts/kanban/soloboard_smoke.py`: SoloBoard compatibility smoke.
+- `a3-engine/tools/kanban/cli.py` and `a3-engine/tools/kanban/kanban_cli.py`: generic kanban CLI / adapter entrypoint used by A3 Engine.
+- `scripts/kanban/cli.py`: thin wrapper for workspace Taskfile compatibility.
+- `scripts/kanban/bootstrap_soloboard.py`: project/workspace bootstrap for Portal / OIDC / A3Engine boards and tags.
+- `scripts/kanban/soloboard_smoke.py`: local compatibility smoke for the workspace SoloBoard instance.
 - `scripts/kanban/soloboard_doctor.sh` and `scripts/kanban/soloboard_wait_ready.sh`: local SoloBoard runtime helpers.
 
 Do not add a new top-level script namespace for a kanban backend unless it owns an independently shipped tool. Backend-specific helpers stay below `scripts/kanban`.
@@ -77,5 +78,6 @@ When adding a new script or config:
 
 1. If it is needed by a generic A3 installation, add it to `a3-engine`.
 2. If it mentions Portal / OIDC / repo names / project task commands, keep it outside A3 core and inject it through project config.
-3. If it is a kanban backend helper, place it under `scripts/kanban` and keep A3 domain code dependent only on the kanban command contract.
-4. If the only purpose is historical compatibility, delete it unless a current task or test proves it is still required.
+3. If it is a generic kanban command helper used by A3 Engine or `a3-agent`, place it under `a3-engine/tools/kanban`.
+4. If it is a project-specific kanban bootstrap or local operator helper, keep it under root `scripts/kanban`.
+5. If the only purpose is historical compatibility, delete it unless a current task or test proves it is still required.

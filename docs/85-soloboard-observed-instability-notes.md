@@ -15,7 +15,7 @@ The goal is to distinguish:
 This note covers the current local SoloBoard spike at `http://127.0.0.1:3460` and the A3-facing compatibility surface implemented by:
 
 - `Taskfile.yml`
-- `scripts/kanban/kanban_cli.py`
+- `a3-engine/tools/kanban/kanban_cli.py`
 - `scripts/kanban/bootstrap_soloboard.py`
 - `scripts/kanban/soloboard_smoke.py`
 
