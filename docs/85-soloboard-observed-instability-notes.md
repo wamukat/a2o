@@ -16,8 +16,8 @@ This note covers the current local SoloBoard spike at `http://127.0.0.1:3460` an
 
 - `Taskfile.yml`
 - `a3-engine/tools/kanban/kanban_cli.py`
-- `scripts/kanban/bootstrap_soloboard.py`
-- `scripts/kanban/soloboard_smoke.py`
+- `a3-engine/tools/kanban/soloboard_smoke.py`
+- `scripts/a3-projects/portal/bootstrap_soloboard.py`
 
 ## Confirmed Observations
 
