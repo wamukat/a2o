@@ -3,9 +3,17 @@
 require "json"
 require "tmpdir"
 require "fileutils"
-require_relative "../../../scripts/a3/cleanup"
+require "open3"
+require "a3/operator/cleanup"
 
 RSpec.describe A3Cleanup do
+  it "keeps the root cleanup wrapper executable" do
+    stdout, _stderr, status = Open3.capture3("ruby", "scripts/a3/cleanup.rb", "--help", chdir: Pathname(__dir__).join("..", "..", "..").expand_path.to_s)
+
+    expect(status).to be_success
+    expect(stdout).to include("usage: cleanup.rb")
+  end
+
   it "applies launcher env files when loading task snapshots" do
     Dir.mktmpdir("a3-cleanup-") do |dir|
       root = Pathname(dir)
