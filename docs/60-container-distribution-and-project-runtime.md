@@ -696,10 +696,10 @@ Portal fresh canary の intake と stabilisation は `A3-v2#3031` / `#3119` / `#
 Portal fresh rerun (`Portal#3140` / `Portal#3141`) で、A3-v2 internal storage の parent/child topology が脱落し、親が子完了前に `review -> verification` へ進んだ。これは個別不具合というより、external task sync と runnable gate の設計前提がずれていることを示している。
 
 - 実装事実
-  - [kanban_cli_task_source.rb](/Users/takuma/workspace/mypage-prototype/a3-v2/lib/a3/infra/kanban_cli_task_source.rb) は、読み込んだ snapshot 集合だけから `child_refs_by_parent` を組み立てる
+  - historical `a3-v2/lib/a3/infra/kanban_cli_task_source.rb` は、読み込んだ snapshot 集合だけから `child_refs_by_parent` を組み立てる
   - Portal scheduler launcher は `--kanban-status To do` を固定で渡している
-  - [sync_external_tasks.rb](/Users/takuma/workspace/mypage-prototype/a3-v2/lib/a3/application/sync_external_tasks.rb) は active task について imported task と existing task を reconcile するが、import 側 topology が欠けていると fresh rerun 中の parent/child graph を正しく再構成できない
-  - [runnable_task_assessment.rb](/Users/takuma/workspace/mypage-prototype/a3-v2/lib/a3/domain/runnable_task_assessment.rb) の parent gate は `task.child_refs` を唯一の根拠としている
+  - historical `a3-v2/lib/a3/application/sync_external_tasks.rb` は active task について imported task と existing task を reconcile するが、import 側 topology が欠けていると fresh rerun 中の parent/child graph を正しく再構成できない
+  - historical `a3-v2/lib/a3/domain/runnable_task_assessment.rb` の parent gate は `task.child_refs` を唯一の根拠としている
 - 判断
   - `status filter 済み snapshot から topology を導出する` 設計は unsafe
   - topology の正本は `To do` snapshot ではなく、status に依存しない relation graph でなければならない
@@ -788,7 +788,7 @@ Portal scheduler の live 運用で露出した問題は、A3-v2 固有の新規
   - v2 は初期状態で `KANBOARD_API_TOKEN` / `KANBOARD_BASE_URL` を launchd env file へ出しておらず、常駐 scheduler が起動直後に落ちる後退が発生した
 - build / gate lane の分離
   - v1 は少なくとも `build` と `gate` の 2 lane で 1 本ずつ進行でき、gate 実行中でも別 lane の build candidate を流せた
-  - v2 は [execute_next_runnable_task.rb](/Users/takuma/workspace/mypage-prototype/a3-v2/lib/a3/application/execute_next_runnable_task.rb) が `next runnable` を 1 件選び、その phase 実行を同期で待つため、実質 single-lane になっている
+  - v2 は historical `a3-v2/lib/a3/application/execute_next_runnable_task.rb` が `next runnable` を 1 件選び、その phase 実行を同期で待つため、実質 single-lane になっている
   - その結果、`Portal#2982` が `verification` 実行中の間、`Portal#2987` は runnable 候補でも着手されず待機した
 - cleanup / quarantine の deterministic 契約
   - root utility は `task a3:portal:cleanup` で issue/runtime/results/logs の cleanup 分類を持つ
@@ -821,7 +821,7 @@ Portal scheduler の v2 は、単一の bug を潰せば済む段階ではない
 | 項目 | v1 | v2 現状 | 観測済みの症状 | 回復方針 |
 | --- | --- | --- | --- | --- |
 | scheduler shot 分離 | legacy scheduler は detached shot を起動し、自身は待たない | current Portal scheduler launcher が detached shot を起動し、shot 本体で `execute-until-idle` を実行する | current behavior は改善済み。compatibility launcher config は fail-fast sentinel にし、active shot は current launcher/process だけを参照先として扱う | launchd scheduler は detached shot だけ起動し、shot 完了待ちをしない |
-| lane model | `build` / `gate` で少なくとも 1 本ずつ進行できる | lane 概念が無く、[execute_next_runnable_task.rb](/Users/takuma/workspace/mypage-prototype/a3-v2/lib/a3/application/execute_next_runnable_task.rb) が runnable 1 件を同期実行 | `Portal#2982` verification 中に `Portal#2987` が着手されない | lane-aware selection と lane ごとの shot 分離を入れる |
+| lane model | `build` / `gate` で少なくとも 1 本ずつ進行できる | lane 概念が無く、historical `a3-v2/lib/a3/application/execute_next_runnable_task.rb` が runnable 1 件を同期実行 | `Portal#2982` verification 中に `Portal#2987` が着手されない | lane-aware selection と lane ごとの shot 分離を入れる |
 | pause semantics | 新規 shot 停止に加え、current cycle が次 task に入る前にも効く | pause は state flag を立てるだけで、起動済み `execute-until-idle` は次 task に進みうる | pause 後も `2986/2987` が進んだ | cycle ごとに `paused?` を再確認し、current execution 後は `stop_reason=paused` で抜ける |
 | stale run repair | `task a3:portal:reconcile-active-runs` が active run / worker run / live process を突き合わせ、`--apply` で修復 | 同等 surface が未整備 | stale blocked / stale active を手動 cleanup で都度対処 | `show-state` + `repair-runs` 相当の operator command を戻す |
 | describe-state / observability | `task a3:portal:describe-state` / `task a3:portal:watch` が running/recent/scheduler/result を一括表示 | `show-scheduler-state` は pause 中心、watch-summary は storage-first | launchd failure が `idle` に見える、live process と storage state がずれる | `show-state` を v1 相当へ拡張し、watch-summary は state inspection の表層にする |
@@ -1686,7 +1686,7 @@ adapter は、command template contract だけでは provider ごとの auth / s
   - invalid config fallback の `["codex", "exec", "--json"]` は廃止し、`["executor", "command"]` として設定不備を明示する
   - `scripts/a3-projects/portal/config/portal/launcher.json` と `scripts/a3-projects/portal/config/portal-dev/launcher.json` は `kind: command` と command argv template へ移行済み
   - diagnostics operator の `.codex/vendor/ripgrep/rg` と Volta 配下 Codex vendor `rg` fallback は削除済み。残す vendor fallback は `AI_CLI_HOME` / `.ai-cli` の generic path のみとする
-  - `scripts/a3-projects/portal/config/portal/launcher.json` の `/Users/takuma/.codex/notify.sh` 通知 hook は削除済み
+  - `scripts/a3-projects/portal/config/portal/launcher.json` の `$CODEX_HOME/notify.sh` 通知 hook は削除済み
 - 残存する project profile 依存:
   - Portal の current executor command profile は、実際の最終検証用 runner として `codex exec --json ...` を指定している
   - `scripts/a3-projects/portal/config/portal/launcher.json` の `runtime_env.required_bins` には、current Portal profile の実行前提として `codex` が残る
