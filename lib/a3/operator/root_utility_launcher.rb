@@ -6,18 +6,18 @@ require "optparse"
 require "pathname"
 require "tempfile"
 require "time"
+require "a3/operator/cleanup"
+require "a3/operator/diagnostics"
+require "a3/operator/reconcile"
+require "a3/operator/rerun_quarantine"
+require "a3/operator/rerun_readiness"
 
 module A3RootUtilityLauncher
   PrepareRuntimeConfigFailed = Class.new(StandardError)
   ROOT_DIR = Pathname(ENV.fetch("A3_ROOT_DIR", Dir.pwd)).expand_path.freeze
   CONFIG_DIR = ROOT_DIR.join(ENV.fetch("A3_ROOT_CONFIG_DIR", "scripts/a3/config")).freeze
   RUNTIME_CONFIG = ROOT_DIR.join(ENV.fetch("A3_ROOT_RUNTIME_CONFIG_PATH", ".work/a3/config/runtime.json")).freeze
-  CLEANUP_SCRIPT = ROOT_DIR.join("scripts", "a3", "cleanup.rb").freeze
-  DIAGNOSTICS_SCRIPT = ROOT_DIR.join("scripts", "a3", "diagnostics.rb").freeze
   PREPARE_RUNTIME_CONFIG_SCRIPT = ROOT_DIR.join(ENV.fetch("A3_ROOT_PREPARE_RUNTIME_CONFIG_SCRIPT", "scripts/a3/prepare_runtime_config.rb")).freeze
-  RECONCILE_SCRIPT = ROOT_DIR.join("scripts", "a3", "reconcile.rb").freeze
-  RERUN_QUARANTINE_SCRIPT = ROOT_DIR.join("scripts", "a3", "rerun_quarantine.rb").freeze
-  RERUN_READINESS_SCRIPT = ROOT_DIR.join("scripts", "a3", "rerun_readiness.rb").freeze
   LEGACY_A3ENGINE_DISABLED_MESSAGE = ENV.fetch("A3_ROOT_LEGACY_DISABLED_MESSAGE", "Legacy A3Engine commands are disabled. Use canonical A3 root entrypoints or root local utility commands only.").freeze
   LEGACY_A3ENGINE_COMMANDS = %w[
     validate-manifest
@@ -172,25 +172,12 @@ module A3RootUtilityLauncher
     raise SystemExit, LEGACY_A3ENGINE_DISABLED_MESSAGE if LEGACY_A3ENGINE_COMMANDS.include?(argv.first)
   end
 
-  def run_simple_script(script_path, argv)
-    status = system("ruby", script_path.to_s, *argv, chdir: ROOT_DIR.to_s)
-    return 1 if status.nil?
-
-    $?.exitstatus || (status ? 0 : 1)
-  end
-
   def run_diagnostics_command(argv)
-    stdout, stderr, status = Open3.capture3("ruby", DIAGNOSTICS_SCRIPT.to_s, *argv, chdir: ROOT_DIR.to_s)
-    print stdout unless stdout.empty?
-    warn stderr unless stderr.empty?
-    status.exitstatus || 1
+    A3Diagnostics.main(argv)
   end
 
   def run_reconcile_command(argv)
-    stdout, stderr, status = Open3.capture3("ruby", RECONCILE_SCRIPT.to_s, *argv, chdir: ROOT_DIR.to_s)
-    print stdout unless stdout.empty?
-    warn stderr unless stderr.empty?
-    status.exitstatus || 1
+    A3Reconcile.main(argv)
   end
 
   def run_prepare_runtime_config
@@ -418,7 +405,7 @@ module A3RootUtilityLauncher
         cleanup_command.concat(["--max-build-output-bytes", options.fetch("max_build_output_bytes").to_s])
       end
       cleanup_command << "--apply" if options.fetch("apply")
-      run_simple_script(CLEANUP_SCRIPT, cleanup_command)
+      A3Cleanup.main(cleanup_command)
     when "reconcile-active-runs"
       reconcile_command = [
         "--project",
@@ -459,7 +446,7 @@ module A3RootUtilityLauncher
       options.fetch("path").each do |path|
         quarantine_command.concat(["--path", path])
       end
-      run_simple_script(RERUN_QUARANTINE_SCRIPT, quarantine_command)
+      A3RerunQuarantine.main(quarantine_command)
     when "check-rerun-readiness"
       readiness_command = [
         "--project",
@@ -476,7 +463,7 @@ module A3RootUtilityLauncher
         resolve_kanban_project(options.fetch("project"))
       ]
       readiness_command << "--allow-blocked-label" if options.fetch("allow_blocked_label")
-      run_simple_script(RERUN_READINESS_SCRIPT, readiness_command)
+      A3RerunReadiness.main(readiness_command, default_kanban_working_dir: ROOT_DIR)
     when "doctor-env"
       run_diagnostics_command(
         [

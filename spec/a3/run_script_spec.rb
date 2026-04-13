@@ -157,13 +157,12 @@ RSpec.describe A3RootUtilityLauncher do
   end
 
   it "uses project defaults for cleanup" do
-    allow(described_class).to receive(:run_simple_script).and_return(0)
+    allow(A3Cleanup).to receive(:main).and_return(0)
 
     rc = described_class.main(["cleanup", "--project", "portal-dev"])
 
     expect(rc).to eq(0)
-    expect(described_class).to have_received(:run_simple_script).with(
-      described_class::CLEANUP_SCRIPT,
+    expect(A3Cleanup).to have_received(:main).with(
       [
         "--project", "portal-dev",
         "--kanban-project", "Portal",
@@ -183,7 +182,7 @@ RSpec.describe A3RootUtilityLauncher do
   end
 
   it "passes explicit cleanup count budgets through to the root script" do
-    allow(described_class).to receive(:run_simple_script).and_return(0)
+    allow(A3Cleanup).to receive(:main).and_return(0)
 
     rc = described_class.main(
       [
@@ -196,8 +195,7 @@ RSpec.describe A3RootUtilityLauncher do
     )
 
     expect(rc).to eq(0)
-    expect(described_class).to have_received(:run_simple_script).with(
-      described_class::CLEANUP_SCRIPT,
+    expect(A3Cleanup).to have_received(:main).with(
       [
         "--project", "portal-dev",
         "--kanban-project", "Portal",
@@ -220,7 +218,7 @@ RSpec.describe A3RootUtilityLauncher do
   end
 
   it "passes explicit cleanup size budgets through to the root script" do
-    allow(described_class).to receive(:run_simple_script).and_return(0)
+    allow(A3Cleanup).to receive(:main).and_return(0)
 
     rc = described_class.main(
       [
@@ -234,8 +232,7 @@ RSpec.describe A3RootUtilityLauncher do
     )
 
     expect(rc).to eq(0)
-    expect(described_class).to have_received(:run_simple_script).with(
-      described_class::CLEANUP_SCRIPT,
+    expect(A3Cleanup).to have_received(:main).with(
       [
         "--project", "portal-dev",
         "--kanban-project", "Portal",
@@ -259,7 +256,7 @@ RSpec.describe A3RootUtilityLauncher do
   end
 
   it "passes build output cleanup options through to the root script" do
-    allow(described_class).to receive(:run_simple_script).and_return(0)
+    allow(A3Cleanup).to receive(:main).and_return(0)
 
     rc = described_class.main(
       [
@@ -271,8 +268,7 @@ RSpec.describe A3RootUtilityLauncher do
     )
 
     expect(rc).to eq(0)
-    expect(described_class).to have_received(:run_simple_script).with(
-      described_class::CLEANUP_SCRIPT,
+    expect(A3Cleanup).to have_received(:main).with(
       [
         "--project", "portal-dev",
         "--kanban-project", "Portal",
@@ -313,13 +309,12 @@ RSpec.describe A3RootUtilityLauncher do
   end
 
   it "uses project defaults for quarantine-rerun-artifacts" do
-    allow(described_class).to receive(:run_simple_script).and_return(0)
+    allow(A3RerunQuarantine).to receive(:main).and_return(0)
 
     rc = described_class.main(["quarantine-rerun-artifacts", "--project", "portal-dev", "--task-ref", "Portal#2700"])
 
     expect(rc).to eq(0)
-    expect(described_class).to have_received(:run_simple_script).with(
-      described_class::RERUN_QUARANTINE_SCRIPT,
+    expect(A3RerunQuarantine).to have_received(:main).with(
       [
         "--project", "portal-dev",
         "--root-dir", described_class::ROOT_DIR.to_s,
@@ -329,13 +324,12 @@ RSpec.describe A3RootUtilityLauncher do
   end
 
   it "uses project defaults for check-rerun-readiness" do
-    allow(described_class).to receive(:run_simple_script).and_return(0)
+    allow(A3RerunReadiness).to receive(:main).and_return(0)
 
     rc = described_class.main(["check-rerun-readiness", "--project", "portal-dev", "--task-ref", "Portal#2700"])
 
     expect(rc).to eq(0)
-    expect(described_class).to have_received(:run_simple_script).with(
-      described_class::RERUN_READINESS_SCRIPT,
+    expect(A3RerunReadiness).to have_received(:main).with(
       [
         "--project", "portal-dev",
         "--root-dir", described_class::ROOT_DIR.to_s,
@@ -343,7 +337,8 @@ RSpec.describe A3RootUtilityLauncher do
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "active-runs.json").to_s,
         "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "worker-runs.json").to_s,
         "--kanban-project", "Portal"
-      ]
+      ],
+      default_kanban_working_dir: described_class::ROOT_DIR
     )
   end
 

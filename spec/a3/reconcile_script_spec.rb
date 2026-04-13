@@ -1,19 +1,12 @@
 # frozen_string_literal: true
 
 require "json"
+require "stringio"
 require "tmpdir"
-require "open3"
 require "a3/operator/reconcile"
 
 RSpec.describe A3Reconcile do
-  it "keeps the root reconcile wrapper executable" do
-    stdout, _stderr, status = Open3.capture3("ruby", "scripts/a3/reconcile.rb", "--help", chdir: Pathname(__dir__).join("..", "..", "..").expand_path.to_s)
-
-    expect(status).to be_success
-    expect(stdout).to include("usage: reconcile.rb")
-  end
-
-  it "delegates inspect through the root reconcile wrapper" do
+  it "inspects active runs through the engine reconcile operator" do
     Dir.mktmpdir("a3-reconcile-wrapper-") do |dir|
       root = Pathname(dir)
       active_runs = root.join("active-runs.json")
@@ -21,18 +14,31 @@ RSpec.describe A3Reconcile do
       active_runs.write(JSON.generate({ "active_task_refs" => [] }))
       worker_runs.write(JSON.generate({ "runs" => {} }))
 
-      stdout, _stderr, status = Open3.capture3(
-        "ruby", "scripts/a3/reconcile.rb",
-        "--project", "portal",
-        "--active-runs-file", active_runs.to_s,
-        "--worker-runs-file", worker_runs.to_s,
-        "--live-process-pattern", "unlikely-a3-test-process-pattern",
-        chdir: Pathname(__dir__).join("..", "..", "..").expand_path.to_s
-      )
+      stdout = capture_stdout do
+        expect(
+          described_class.main(
+            [
+              "--project", "portal",
+              "--active-runs-file", active_runs.to_s,
+              "--worker-runs-file", worker_runs.to_s,
+              "--live-process-pattern", "unlikely-a3-test-process-pattern"
+            ]
+          )
+        ).to eq(0)
+      end
 
-      expect(status).to be_success
       expect(JSON.parse(stdout).fetch("active_refs_before")).to eq([])
     end
+  end
+
+  def capture_stdout
+    original_stdout = $stdout
+    output = StringIO.new
+    $stdout = output
+    yield
+    output.string
+  ensure
+    $stdout = original_stdout
   end
 
   it "flags terminal and missing runs as stale" do

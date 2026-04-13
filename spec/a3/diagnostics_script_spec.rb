@@ -1,20 +1,13 @@
 # frozen_string_literal: true
 
 require "json"
+require "stringio"
 require "tmpdir"
 require "time"
-require "open3"
 require "a3/operator/diagnostics"
 
 RSpec.describe A3Diagnostics do
-  it "keeps the root diagnostics wrapper executable" do
-    stdout, _stderr, status = Open3.capture3("ruby", "scripts/a3/diagnostics.rb", "--help", chdir: Pathname(__dir__).join("..", "..", "..").expand_path.to_s)
-
-    expect(status).to be_success
-    expect(stdout).to include("usage: diagnostics.rb")
-  end
-
-  it "delegates describe-state through the root diagnostics wrapper" do
+  it "describes state through the engine diagnostics operator" do
     Dir.mktmpdir("a3-diagnostics-wrapper-") do |dir|
       root = Pathname(dir)
       active_runs = root.join("active-runs.json")
@@ -22,18 +15,32 @@ RSpec.describe A3Diagnostics do
       active_runs.write(JSON.generate({ "active_task_refs" => [] }))
       worker_runs.write(JSON.generate({ "runs" => {} }))
 
-      stdout, _stderr, status = Open3.capture3(
-        "ruby", "scripts/a3/diagnostics.rb", "describe-state",
-        "--project", "portal",
-        "--root-dir", root.to_s,
-        "--active-runs-file", active_runs.to_s,
-        "--worker-runs-file", worker_runs.to_s,
-        chdir: Pathname(__dir__).join("..", "..", "..").expand_path.to_s
-      )
+      stdout = capture_stdout do
+        expect(
+          described_class.main(
+            [
+              "describe-state",
+              "--project", "portal",
+              "--root-dir", root.to_s,
+              "--active-runs-file", active_runs.to_s,
+              "--worker-runs-file", worker_runs.to_s
+            ]
+          )
+        ).to eq(0)
+      end
 
-      expect(status).to be_success
       expect(JSON.parse(stdout).fetch("active_refs")).to eq([])
     end
+  end
+
+  def capture_stdout
+    original_stdout = $stdout
+    output = StringIO.new
+    $stdout = output
+    yield
+    output.string
+  ensure
+    $stdout = original_stdout
   end
 
   it "includes active and recent runs in describe-state" do

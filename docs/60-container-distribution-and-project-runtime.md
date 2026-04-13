@@ -767,13 +767,13 @@ Portal scheduler の live 運用で露出した問題は、A3-v2 固有の新規
   - current Portal scheduler launcher は detached shot を起動し、shot 本体は `execute-until-idle` を別 process で実行している
   - 2026-04-08 時点で shot 分離自体は parity 回復済み。compatibility launcher config は legacy scheduler を再起動させない fail-fast sentinel とし、残差は他の root local utility の脱v1へ移っている
 - stale run reconcile と active run repair
-  - root utility は [reconcile.rb](/Users/takuma/workspace/mypage-prototype/scripts/a3/reconcile.rb) で live process / worker run / active run の不整合を検出し、`--apply` で修復できる
+  - root utility は `scripts/a3/run.rb reconcile-active-runs` で live process / worker run / active run の不整合を検出し、`--apply` で修復できる
   - v2 には同等の operator surface が未整備で、stale blocked / stale active の復旧が場当たりになりやすい
 - run-once 前後の safety rail
   - v1 の `execute-run-once` は stale run reconcile、explicit rerun 準備、touched runtime workspace cleanup を前後に挟んでいた
   - v2 の `execute-until-idle` は core loop を直に呼んでおり、この保全レイヤをまだ持っていない
 - describe-state 相当の統合観測
-  - root utility は [diagnostics.rb](/Users/takuma/workspace/mypage-prototype/scripts/a3/diagnostics.rb) で live process / running_runs / recent_runs / scheduler files / latest results を一度に見られる
+  - root utility は `scripts/a3/run.rb describe-state` / `watch` で live process / running_runs / recent_runs / scheduler files / latest results を一度に見られる
   - v2 の `show-scheduler-state` は pause 状態中心で、live shot failure や stale process の把握に必要な粒度が不足している
 - watch-summary の live observability
   - v1 は worker run/log ベースで live 実行状況を追えた
@@ -787,7 +787,7 @@ Portal scheduler の live 運用で露出した問題は、A3-v2 固有の新規
   - v2 は [execute_next_runnable_task.rb](/Users/takuma/workspace/mypage-prototype/a3-v2/lib/a3/application/execute_next_runnable_task.rb) が `next runnable` を 1 件選び、その phase 実行を同期で待つため、実質 single-lane になっている
   - その結果、`Portal#2982` が `verification` 実行中の間、`Portal#2987` は runnable 候補でも着手されず待機した
 - cleanup / quarantine の deterministic 契約
-  - root utility は [cleanup.rb](/Users/takuma/workspace/mypage-prototype/scripts/a3/cleanup.rb) で issue/runtime/results/logs の cleanup 分類を持つ
+  - root utility は `scripts/a3/run.rb cleanup` で issue/runtime/results/logs の cleanup 分類を持つ
   - v2 は terminal cleanup command を持つが、registered worktree removal と plain-copy quarantine の責務分離が未完成で、`repo-beta` の registered worktree 残存や `repo-alpha` plain directory 残骸が出た
 
 判断:
@@ -819,12 +819,12 @@ Portal scheduler の v2 は、単一の bug を潰せば済む段階ではない
 | scheduler shot 分離 | legacy scheduler は detached shot を起動し、自身は待たない | current Portal scheduler launcher が detached shot を起動し、shot 本体で `execute-until-idle` を実行する | current behavior は改善済み。compatibility launcher config は fail-fast sentinel にし、active shot は current launcher/process だけを参照先として扱う | launchd scheduler は detached shot だけ起動し、shot 完了待ちをしない |
 | lane model | `build` / `gate` で少なくとも 1 本ずつ進行できる | lane 概念が無く、[execute_next_runnable_task.rb](/Users/takuma/workspace/mypage-prototype/a3-v2/lib/a3/application/execute_next_runnable_task.rb) が runnable 1 件を同期実行 | `Portal#2982` verification 中に `Portal#2987` が着手されない | lane-aware selection と lane ごとの shot 分離を入れる |
 | pause semantics | 新規 shot 停止に加え、current cycle が次 task に入る前にも効く | pause は state flag を立てるだけで、起動済み `execute-until-idle` は次 task に進みうる | pause 後も `2986/2987` が進んだ | cycle ごとに `paused?` を再確認し、current execution 後は `stop_reason=paused` で抜ける |
-| stale run repair | [reconcile.rb](/Users/takuma/workspace/mypage-prototype/scripts/a3/reconcile.rb) が active run / worker run / live process を突き合わせ、`--apply` で修復 | 同等 surface が未整備 | stale blocked / stale active を手動 cleanup で都度対処 | `show-state` + `repair-runs` 相当の operator command を戻す |
-| describe-state / observability | [diagnostics.rb](/Users/takuma/workspace/mypage-prototype/scripts/a3/diagnostics.rb) が running/recent/scheduler/result を一括表示 | `show-scheduler-state` は pause 中心、watch-summary は storage-first | launchd failure が `idle` に見える、live process と storage state がずれる | `show-state` を v1 相当へ拡張し、watch-summary は state inspection の表層にする |
+| stale run repair | `scripts/a3/run.rb reconcile-active-runs` が active run / worker run / live process を突き合わせ、`--apply` で修復 | 同等 surface が未整備 | stale blocked / stale active を手動 cleanup で都度対処 | `show-state` + `repair-runs` 相当の operator command を戻す |
+| describe-state / observability | `scripts/a3/run.rb describe-state` / `watch` が running/recent/scheduler/result を一括表示 | `show-scheduler-state` は pause 中心、watch-summary は storage-first | launchd failure が `idle` に見える、live process と storage state がずれる | `show-state` を v1 相当へ拡張し、watch-summary は state inspection の表層にする |
 | watch-summary の live 性 | worker run / current command / live process を見せる | storage の `tasks/runs` 中心。overlay を後付けで追加中 | stale status に引きずられやすい | watch-summary の正本を `state inspection + storage` の合成に寄せる |
 | launchd env completeness | launcher config から Kanban 接続情報を env file へ出す | 初期実装で `KANBOARD_*` を出していなかった | scheduler が `KANBOARD_API_TOKEN is required` で即死 | env completeness を runtime contract として spec 化し、prepare script を正本化する |
 | merge publish モデル | operator が見る root repo と live branch の整合を崩しにくい運用 surface | merge は temporary branch 化したが、publish はまだ `update-ref` ベース | `member-portal-starters` で `feature/prototype` が進んだのに staged diff が残る | live branch 反映も checkout-based publish へ寄せ、root repo dirty を構造的に防ぐ |
-| terminal cleanup | [cleanup.rb](/Users/takuma/workspace/mypage-prototype/scripts/a3/cleanup.rb) が issue/runtime/results/logs を分類 | registered worktree removal と quarantine plain copy の責務が未分離 | `repo-beta` registered worktree 残存、`repo-alpha` plain dir 残骸 | cleanup contract を 6.2.1 の計画どおり本実装する |
+| terminal cleanup | `scripts/a3/run.rb cleanup` が issue/runtime/results/logs を分類 | registered worktree removal と quarantine plain copy の責務が未分離 | `repo-beta` registered worktree 残存、`repo-alpha` plain dir 残骸 | cleanup contract を 6.2.1 の計画どおり本実装する |
 
 #### 0.4.4.2 現時点の blocker 分類
 
@@ -1681,14 +1681,14 @@ adapter は、command template contract だけでは provider ごとの auth / s
   - `scripts/a3/a3_stdin_bundle_worker.rb` の `codex_command` は `executor_command` へ置き換え、A3 worker は command template と placeholder 展開だけを扱う
   - invalid config fallback の `["codex", "exec", "--json"]` は廃止し、`["executor", "command"]` として設定不備を明示する
   - `scripts/a3-projects/portal/config/portal/launcher.json` と `scripts/a3-projects/portal/config/portal-dev/launcher.json` は `kind: command` と command argv template へ移行済み
-  - `scripts/a3/diagnostics.rb` の `.codex/vendor/ripgrep/rg` と Volta 配下 Codex vendor `rg` fallback は削除済み。残す vendor fallback は `AI_CLI_HOME` / `.ai-cli` の generic path のみとする
+  - diagnostics operator の `.codex/vendor/ripgrep/rg` と Volta 配下 Codex vendor `rg` fallback は削除済み。残す vendor fallback は `AI_CLI_HOME` / `.ai-cli` の generic path のみとする
   - `scripts/a3-projects/portal/config/portal/launcher.json` の `/Users/takuma/.codex/notify.sh` 通知 hook は削除済み
 - 残存する project profile 依存:
   - Portal の current executor command profile は、実際の最終検証用 runner として `codex exec --json ...` を指定している
   - `scripts/a3-projects/portal/config/portal/launcher.json` の `runtime_env.required_bins` には、current Portal profile の実行前提として `codex` が残る
   - これは A3 Engine core の依存ではなく、Portal project が選んだ executor command profile の依存である。別 A-AI CLI へ切り替える場合は command profile と required bin を差し替える
 - test fixture dependency:
-  - `scripts/a3/diagnostics.rb` の generic vendor `rg` fallback は `AI_CLI_HOME` / `.ai-cli` を参照する。関連 spec も `.codex` 前提から generic path へ更新済み
+  - diagnostics operator の generic vendor `rg` fallback は `AI_CLI_HOME` / `.ai-cli` を参照する。関連 spec も `.codex` 前提から generic path へ更新済み
   - stale な deleted legacy root script 参照 spec は削除済み。stdin bundle worker / direct canary worker の current spec は engine library を直接対象にする
   - `a3-engine/spec/a3/**/*_spec.rb` の blocked / inspection / show output fixture に `failing_command: "codex exec --json -"` が残っている。これは観測例の fixture であり runtime dependency ではないが、command template 移行時に汎用 command 表記へ更新する
 - document / operation wording:
