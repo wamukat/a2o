@@ -3,9 +3,9 @@
 require "json"
 require "tmpdir"
 require "fileutils"
-require_relative "../../../scripts/a3/portal_v2_verification"
+require_relative "../../../scripts/a3/portal_verification"
 
-RSpec.describe PortalV2Verification do
+RSpec.describe PortalVerification do
   def write_taskfile(slot_path)
     File.write(slot_path.join("Taskfile.yml"), "version: '3'\n")
   end
@@ -50,7 +50,7 @@ RSpec.describe PortalV2Verification do
           "bash",
           described_class::ROOT_DIR.join("scripts", "a3", "bootstrap-phase-support-maven.sh").to_s,
           "member-portal-ui-app",
-          "member-portal-starters"
+          repo_alpha.to_s
         ],
         cwd: repo_beta,
         env: expected_env
@@ -118,7 +118,7 @@ RSpec.describe PortalV2Verification do
           "bash",
           described_class::ROOT_DIR.join("scripts", "a3", "bootstrap-phase-support-maven.sh").to_s,
           "member-portal-ui-app",
-          "member-portal-starters"
+          repo_beta.to_s
         ],
         cwd: repo_alpha,
         env: expected_env
