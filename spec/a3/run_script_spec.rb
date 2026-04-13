@@ -28,6 +28,102 @@ RSpec.describe A3RootUtilityLauncher do
     expect(stderr).to include(described_class::LEGACY_A3ENGINE_DISABLED_MESSAGE)
   end
 
+  it "delegates operational commands through the root run wrapper" do
+    Dir.mktmpdir("a3-run-wrapper-") do |temp_dir|
+      root = Pathname(temp_dir)
+      active_runs = root.join("active-runs.json")
+      worker_runs = root.join("worker-runs.json")
+      active_runs.write(JSON.generate({ "active_task_refs" => [] }))
+      worker_runs.write(JSON.generate({ "runs" => {} }))
+
+      stdout, _stderr, status = Open3.capture3(
+        "ruby", "scripts/a3/run.rb", "describe-state",
+        "--project", "portal-dev",
+        "--active-runs-file", active_runs.to_s,
+        "--worker-runs-file", worker_runs.to_s,
+        chdir: described_class::ROOT_DIR.to_s
+      )
+
+      expect(status.success?).to eq(true)
+      expect(JSON.parse(stdout).fetch("active_refs")).to eq([])
+    end
+  end
+
+  it "delegates cleanup through the root run wrapper" do
+    Dir.mktmpdir("a3-run-cleanup-wrapper-") do |temp_dir|
+      root = Pathname(temp_dir)
+      fake_bin = root.join("bin")
+      fake_task = fake_bin.join("task")
+      active_runs = root.join("active-runs.json")
+      worker_runs = root.join("worker-runs.json")
+      launcher = root.join("launcher.json")
+      fake_bin.mkpath
+      fake_task.write("#!/bin/sh\nprintf '[]\\n'\n")
+      File.chmod(0o755, fake_task)
+      active_runs.write(JSON.generate({ "active_task_refs" => [] }))
+      worker_runs.write(JSON.generate({ "runs" => {} }))
+      launcher.write(JSON.generate({ "shell" => { "inherit_env" => true, "env_files" => [], "env_overrides" => {} } }))
+
+      stdout, _stderr, status = Open3.capture3(
+        { "PATH" => "#{fake_bin}:#{ENV.fetch('PATH', '')}" },
+        "ruby", "scripts/a3/run.rb", "cleanup",
+        "--project", "portal-dev",
+        "--active-runs-file", active_runs.to_s,
+        "--worker-runs-file", worker_runs.to_s,
+        "--launcher-config", launcher.to_s,
+        chdir: described_class::ROOT_DIR.to_s
+      )
+
+      expect(status.success?).to eq(true)
+      expect(JSON.parse(stdout).fetch("mode")).to eq("cleanup")
+    end
+  end
+
+  it "delegates reconcile through the root run wrapper" do
+    Dir.mktmpdir("a3-run-reconcile-wrapper-") do |temp_dir|
+      root = Pathname(temp_dir)
+      active_runs = root.join("active-runs.json")
+      worker_runs = root.join("worker-runs.json")
+      active_runs.write(JSON.generate({ "active_task_refs" => [] }))
+      worker_runs.write(JSON.generate({ "runs" => {} }))
+
+      stdout, _stderr, status = Open3.capture3(
+        "ruby", "scripts/a3/run.rb", "reconcile-active-runs",
+        "--project", "portal-dev",
+        "--active-runs-file", active_runs.to_s,
+        "--worker-runs-file", worker_runs.to_s,
+        chdir: described_class::ROOT_DIR.to_s
+      )
+
+      expect(status.success?).to eq(true)
+      expect(JSON.parse(stdout).fetch("applied")).to eq(false)
+    end
+  end
+
+  it "delegates doctor-env through the root run wrapper with explicit launcher config" do
+    Dir.mktmpdir("a3-run-doctor-wrapper-") do |temp_dir|
+      launcher = Pathname(temp_dir).join("launcher.json")
+      launcher.write(
+        JSON.generate(
+          "scheduler" => { "backend" => "manual" },
+          "kanban" => { "backend" => "subprocess-cli" },
+          "shell" => { "inherit_env" => true, "env_files" => [], "env_overrides" => {} },
+          "runtime_env" => { "required_bins" => [], "path_entries" => [] }
+        )
+      )
+
+      stdout, _stderr, status = Open3.capture3(
+        "ruby", "scripts/a3/run.rb", "doctor-env",
+        "--project", "portal-dev",
+        "--launcher-config", launcher.to_s,
+        chdir: described_class::ROOT_DIR.to_s
+      )
+
+      expect(status.success?).to eq(true)
+      expect(JSON.parse(stdout).fetch("launcher_config")).to eq(launcher.to_s)
+    end
+  end
+
   it "round-trips pause and resume scheduler state" do
     Dir.mktmpdir("a3-run-pause-roundtrip-") do |temp_dir|
       root = Pathname(temp_dir)
@@ -347,7 +443,7 @@ RSpec.describe A3RootUtilityLauncher do
   end
 
   it "propagates portal runtime config prepare failures for portal doctor-env" do
-    allow(described_class).to receive(:run_prepare_portal_runtime_config).and_return(7)
+    allow(described_class).to receive(:run_prepare_runtime_config).and_return(7)
 
     rc = described_class.main(["doctor-env", "--project", "portal"])
 
@@ -355,7 +451,7 @@ RSpec.describe A3RootUtilityLauncher do
   end
 
   it "uses internally materialized runtime config for portal doctor-env" do
-    allow(described_class).to receive(:run_prepare_portal_runtime_config).and_return(0)
+    allow(described_class).to receive(:run_prepare_runtime_config).and_return(0)
     allow(described_class).to receive(:run_diagnostics_command).and_return(0)
 
     rc = described_class.main(["doctor-env", "--project", "portal"])
@@ -364,7 +460,7 @@ RSpec.describe A3RootUtilityLauncher do
     expect(described_class).to have_received(:run_diagnostics_command).with(
       [
         "doctor-env",
-        "--launcher-config", described_class::PORTAL_RUNTIME_CONFIG.to_s
+        "--launcher-config", described_class::RUNTIME_CONFIG.to_s
       ]
     )
   end

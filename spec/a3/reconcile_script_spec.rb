@@ -197,7 +197,10 @@ RSpec.describe A3Reconcile do
       ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/portal-kanban-scheduler-auto scripts/a3/config/portal/a3-runtime-manifest.yml
     PS
 
-    matches = described_class.live_scheduler_processes("portal")
+    matches = described_class.live_scheduler_processes(
+      "portal",
+      patterns: ["scripts/a3/portal_scheduler_launcher.rb --run-shot", "portal-kanban-scheduler-auto"]
+    )
     expect(matches).to eq(
       [
         "ruby scripts/a3/portal_scheduler_launcher.rb --run-shot",

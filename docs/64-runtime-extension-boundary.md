@@ -53,7 +53,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 
 | Root file | Classification | Action | Reason / dependency |
 | --- | --- | --- | --- |
-| `scripts/a3/run.rb` | A3-owned operator facade | Migrate into `a3-engine` CLI, then leave root wrapper or Taskfile-only alias | It dispatches generic state / cleanup / reconcile / rerun operations. It currently also knows root config paths, so move only after project config package path is injectable. |
+| `scripts/a3/run.rb` | A3-owned operator facade | Engine logic migrated to `a3-engine/lib/a3/operator/root_utility_launcher.rb`; root file is a thin wrapper | It dispatches generic state / cleanup / reconcile / rerun operations. Root injects `A3_ROOT_DIR` and project config paths remain outside the A3 release boundary. |
 | `scripts/a3/cleanup.rb` | A3-owned runtime hygiene | Engine logic migrated to `a3-engine/lib/a3/operator/cleanup.rb`; root file is a thin wrapper | Cleanup policy for issue workspace, runtime results, logs, quarantine, and disposable caches is generic A3 behavior. Project-specific storage roots remain arguments/config. |
 | `scripts/a3/diagnostics.rb` | A3-owned observability | Engine logic migrated to `a3-engine/lib/a3/operator/diagnostics.rb`; root file is a thin wrapper | Live process / worker run / result / scheduler diagnostics are generic. Project names, storage dirs, and launcher paths remain injected. |
 | `scripts/a3/reconcile.rb` | A3-owned stale run recovery | Engine logic migrated to `a3-engine/lib/a3/operator/reconcile.rb`; root file is a thin wrapper | Active-run reconciliation is core scheduler behavior. Project storage and command patterns remain injected. |

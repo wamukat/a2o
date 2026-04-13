@@ -174,7 +174,6 @@ module A3Reconcile
     effective_patterns = Array(patterns).map(&:to_s).map(&:strip).reject(&:empty?)
     if effective_patterns.empty?
       effective_patterns = [
-        "scripts/a3/#{project}_scheduler_launcher.rb --run-shot",
         "#{project}-kanban-scheduler-auto"
       ]
     end
