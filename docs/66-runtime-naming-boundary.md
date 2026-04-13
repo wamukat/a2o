@@ -7,8 +7,8 @@
 
 ## 方針
 
-- 利用者向けの入口名は `runtime run-once` / `runtime run loop` に寄せる。
-- `scheduler` は「旧来の自動実行サービス」ではなく、現時点では内部 cycle/state/store の互換名として扱う。
+- 利用者向けの入口名は `runtime run-once` / `runtime loop` に寄せる。
+- `scheduler` は OS service 名ではなく、Engine-managed runtime loop の内部 cycle/state/store 名として扱う。
 - root `task --list` に出る公開IFへ `scheduler` を再導入しない。
 - 内部 class / command / storage 名の一括改名は、migration plan と state compatibility test が揃うまで行わない。
 
@@ -19,8 +19,13 @@
 - `task a3:portal:runtime:describe-state`
 - Docker 上の A3 runtime command
 - Go release binary としての `a3-agent`
+- Engine image 同梱 agent package: `a3 agent package list/export/verify`
 
 公開ドキュメントでは、継続実行の概念を説明する場合も `runtime run loop` と呼ぶ。OS service 化は current release scope 外であり、`scheduler service` とは呼ばない。
+
+完成形では A3 Engine container が runtime loop process を持ち、kanban selection / run state / agent job queue を管理する。`a3-agent` は scheduler を持たず、host/project-dev-env 上で job を poll/execution する worker である。
+
+agent 環境用設定は Engine 側 project config に置く。ただし、その値は agent から見た path / URL として扱い、Engine container path として解釈しない。Engine は設定の schema と job payload 生成を担当し、実 path / toolchain の到達性確認は agent doctor job が担当する。
 
 ## 内部互換として残す名前
 
