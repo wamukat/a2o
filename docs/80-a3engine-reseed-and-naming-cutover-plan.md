@@ -133,8 +133,7 @@ Cutover target:
   - `prepare_portal_v2_launchd_config.rb`
   - retired direct repo source bootstrap scripts
   - retired live-write guard script
-  - `a3_direct_canary_worker.rb`
-  - `a3_stdin_bundle_worker.rb`
+  - retired root worker wrappers (`a3_direct_canary_worker.rb`, `a3_stdin_bundle_worker.rb`)
 - root `scripts/a3-projects/portal/config/portal/*`
   - `a3-v2-runtime-manifest.yml`
   - `launcher.json` の operator guidance

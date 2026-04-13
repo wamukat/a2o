@@ -101,7 +101,7 @@
 
 - [x] executor adapter abstraction
   現状: `ai-cli` naming と implementation-specific detail は historical v2 status 上の整理として完了済み。current runtime ではさらに、A3 Engine core が provider adapter / model / reasoning option を意味解釈しない方針へ更新した。Portal profile は当面 `codex exec --json ...` を command argv として使うが、これは project-selected executor command であり A3 core dependency ではない。root thin worker は `executor.kind=command`、stdin bundle、result/schema file、placeholder 展開だけを扱い、config 不備時の `codex exec --json` fallback は持たない。
-  根拠: `a3_engine/executor.py`, `scripts/a3/a3_stdin_bundle_worker.rb`, `scripts/a3-projects/portal/config/portal/launcher.json`, `docs/60-container-distribution-and-project-runtime.md` の `0.4.6`
+  根拠: `a3_engine/executor.py`, `a3-engine/bin/a3 worker:stdin-bundle`, `scripts/a3-projects/portal/config/portal/launcher.json`, `docs/60-container-distribution-and-project-runtime.md` の `0.4.6`
 
 - [x] scheduler adapter abstraction
   現状: scheduler descriptor / launcher plan はある。

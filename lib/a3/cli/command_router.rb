@@ -59,7 +59,9 @@ module A3
         "agent-artifact-cleanup" => Definition.new(handler: :handle_agent_artifact_cleanup, session_kind: :agent_control),
         "run-verification" => Definition.new(handler: :handle_run_verification, needs_worker_gateway: true, session_kind: :runtime),
         "run-worker-phase" => Definition.new(handler: :handle_run_worker_phase, needs_worker_gateway: true, session_kind: :runtime),
-        "run-merge" => Definition.new(handler: :handle_run_merge, needs_worker_gateway: true, session_kind: :runtime)
+        "run-merge" => Definition.new(handler: :handle_run_merge, needs_worker_gateway: true, session_kind: :runtime),
+        "worker:stdin-bundle" => Definition.new(handler: :handle_worker_stdin_bundle),
+        "worker:direct-canary" => Definition.new(handler: :handle_worker_direct_canary)
       }.freeze
 
       module_function

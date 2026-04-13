@@ -663,6 +663,22 @@ module A3
       end
     end
 
+    def handle_worker_stdin_bundle(_argv, out:)
+      require "a3/operator/stdin_bundle_worker"
+
+      exit_code = Object.new.send(:main)
+      out.flush
+      exit(exit_code)
+    end
+
+    def handle_worker_direct_canary(_argv, out:)
+      require "a3/operator/direct_canary_worker"
+
+      exit_code = A3DirectCanaryWorker.main
+      out.flush
+      exit(exit_code)
+    end
+
     def handle_agent_server(argv, out:)
       options = parse_agent_server_options(argv)
       store = A3::Infra::JsonAgentJobStore.new(options.fetch(:job_store_path))

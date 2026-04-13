@@ -1477,7 +1477,7 @@ v1 では provider adapter を先に増やさず、A3 Engine が扱う executor 
 - 正本:
   - `scripts/a3-projects/portal/config/<project>/launcher.json`
 - 解釈責務:
-  - thin worker (`scripts/a3/a3_stdin_bundle_worker.rb`)
+  - A3 worker entrypoint (`a3-engine/bin/a3 worker:stdin-bundle`)
 - 非責務:
   - `Task`, `Run`, `Evidence`, `Workspace` などの A3 domain
   - Kanban task packet
@@ -1653,7 +1653,7 @@ runtime 開始時に次を validate する。
 #### 0.4.6.7 implementation plan
 
 1. `scripts/a3-projects/portal/config/portal/launcher.json` と `portal-dev/launcher.json` を `kind: command` へ移行する
-2. `scripts/a3/a3_stdin_bundle_worker.rb` の `codex_command` / `model` / `reasoning_effort` resolver を `executor_command` / command template resolver へ置き換える
+2. `a3-engine/bin/a3 worker:stdin-bundle` の `codex_command` / `model` / `reasoning_effort` resolver を `executor_command` / command template resolver へ置き換える
 3. invalid config fallback の `["codex", "exec", "--json"]` を廃止し、設定不備は worker failure として明示する
 4. current `a3-engine` / root tests に次を追加・更新する
    - default command
@@ -1678,7 +1678,7 @@ adapter は、command template contract だけでは provider ごとの auth / s
 2026-04-12 時点で、完成前に扱うべき Codex CLI 依存は次の通り。
 
 - 回収済み:
-  - `scripts/a3/a3_stdin_bundle_worker.rb` の `codex_command` は `executor_command` へ置き換え、A3 worker は command template と placeholder 展開だけを扱う
+  - `a3-engine/bin/a3 worker:stdin-bundle` の `codex_command` は `executor_command` へ置き換え、A3 worker は command template と placeholder 展開だけを扱う
   - invalid config fallback の `["codex", "exec", "--json"]` は廃止し、`["executor", "command"]` として設定不備を明示する
   - `scripts/a3-projects/portal/config/portal/launcher.json` と `scripts/a3-projects/portal/config/portal-dev/launcher.json` は `kind: command` と command argv template へ移行済み
   - diagnostics operator の `.codex/vendor/ripgrep/rg` と Volta 配下 Codex vendor `rg` fallback は削除済み。残す vendor fallback は `AI_CLI_HOME` / `.ai-cli` の generic path のみとする

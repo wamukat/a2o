@@ -1,11 +1,35 @@
 # frozen_string_literal: true
 
 require "tmpdir"
+require "json"
 require "yaml"
 
 RSpec.describe A3::CLI do
   let(:worker_gateway) { instance_double("WorkerGateway") }
   let(:command_runner) { instance_double(A3::Infra::LocalCommandRunner) }
+
+  def successful_worker_result(changed_files: { "repo_alpha" => ["src/main.rb"] })
+    A3::Application::ExecutionResult.new(
+      success: true,
+      summary: "implementation completed",
+      response_bundle: {
+        "success" => true,
+        "summary" => "implementation completed",
+        "changed_files" => changed_files
+      }
+    )
+  end
+
+  def write_changed_files(workspace, changed_files)
+    changed_files.each do |slot_name, paths|
+      repo_root = workspace.slot_paths.fetch(slot_name.to_sym)
+      paths.each do |path|
+        target = repo_root.join(path)
+        target.dirname.mkpath
+        target.write("changed by test\n")
+      end
+    end
+  end
 
   it "executes the next runnable implementation task end-to-end through sqlite backend" do
     Dir.mktmpdir do |dir|
@@ -36,12 +60,11 @@ RSpec.describe A3::CLI do
           parent_ref: "A3-v2#3022"
         )
       )
-      allow(worker_gateway).to receive(:run).and_return(
-        A3::Application::ExecutionResult.new(
-          success: true,
-          summary: "implementation completed"
-        )
-      )
+      allow(worker_gateway).to receive(:run) do |workspace:, **_kwargs|
+        changed_files = { "repo_alpha" => ["src/main.rb"] }
+        write_changed_files(workspace, changed_files)
+        successful_worker_result(changed_files: changed_files)
+      end
 
       out = StringIO.new
       with_env(fake_cli.fetch(:env)) do
@@ -66,7 +89,7 @@ RSpec.describe A3::CLI do
       end
 
       expect(out.string).to include("executed next runnable A3-v2#3030 at implementation")
-      expect(task_repository.fetch("A3-v2#3030").status).to eq(:verifying)
+      expect(task_repository.fetch("A3-v2#3030").status).to eq(:blocked)
     end
   end
 
@@ -102,7 +125,7 @@ RSpec.describe A3::CLI do
     end
   end
 
-  it "imports a To do kanban task and transitions it to In progress before execution" do
+  it "imports a To do kanban task and transitions it to In progress before local publication blocks" do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)
       seed_context(dir)
@@ -120,12 +143,11 @@ RSpec.describe A3::CLI do
           }
         ]
       )
-      allow(worker_gateway).to receive(:run).and_return(
-        A3::Application::ExecutionResult.new(
-          success: true,
-          summary: "implementation completed"
-        )
-      )
+      allow(worker_gateway).to receive(:run) do |workspace:, **_kwargs|
+        changed_files = { "repo_beta" => ["src/main.rb"] }
+        write_changed_files(workspace, changed_files)
+        successful_worker_result(changed_files: changed_files)
+      end
 
       out = StringIO.new
       with_env(fake_cli.fetch(:env)) do
@@ -153,9 +175,9 @@ RSpec.describe A3::CLI do
       transitions = read_fake_kanban_transitions(fake_cli.fetch(:transitions_path))
 
       expect(out.string).to include("executed next runnable Sample#3046 at implementation")
-      expect(task_repository.fetch("Sample#3046").status).to eq(:verifying)
+      expect(task_repository.fetch("Sample#3046").status).to eq(:blocked)
       expect(transitions.fetch(0).fetch("argv")).to include("task-transition", "--task-id", "3046", "--status", "In progress")
-      expect(transitions.fetch(1).fetch("argv")).to include("task-transition", "--task-id", "3046", "--status", "Inspection")
+      expect(transitions.fetch(1).fetch("argv")).to include("task-label-add", "--task-id", "3046", "--label", "blocked")
     end
   end
 
@@ -173,7 +195,7 @@ RSpec.describe A3::CLI do
             "description" => "Run the direct canary implementation path.",
             "status" => "To do",
             "labels" => ["repo:both", "trigger:auto-implement"],
-            "parent_ref" => "A3-v2#3022"
+            "parent_ref" => nil
           }
         ]
       )
@@ -181,24 +203,33 @@ RSpec.describe A3::CLI do
       task_repository.save(
         A3::Domain::Task.new(
           ref: "A3-v2#3030",
-          kind: :child,
+          kind: :single,
           edit_scope: [:repo_alpha],
           verification_scope: %i[repo_alpha repo_beta],
           status: :todo,
-          parent_ref: "A3-v2#3022"
+          parent_ref: nil
         )
       )
 
-      expect(command_runner).to receive(:run).with(
-        ["ruby scripts/a3/a3_direct_canary_worker.rb"],
-        workspace: an_instance_of(A3::Domain::PreparedWorkspace),
-        env: hash_including("A3_WORKER_REQUEST_PATH", "A3_WORKER_RESULT_PATH", "A3_WORKSPACE_ROOT")
-      ).and_return(
-        A3::Application::ExecutionResult.new(
-          success: true,
-          summary: "implementation completed"
+      allow(command_runner).to receive(:run) do |_commands, workspace:, **_kwargs|
+        request = JSON.parse(workspace.root_path.join(".a3", "worker-request.json").read)
+        changed_files = { "repo_alpha" => ["src/main.rb"] }
+        write_changed_files(workspace, changed_files)
+        workspace.root_path.join(".a3", "worker-result.json").write(
+          JSON.generate(
+            "task_ref" => request.fetch("task_ref"),
+            "run_ref" => request.fetch("run_ref"),
+            "phase" => request.fetch("phase"),
+            "success" => true,
+            "summary" => "implementation completed",
+            "failing_command" => nil,
+            "observed_state" => nil,
+            "rework_required" => false,
+            "changed_files" => changed_files
+          )
         )
-      )
+        A3::Application::ExecutionResult.new(success: true, summary: "implementation completed")
+      end
 
       out = StringIO.new
       with_env(fake_cli.fetch(:env)) do
@@ -211,7 +242,10 @@ RSpec.describe A3::CLI do
             *repo_source_args(repo_sources),
             "--preset-dir", File.join(dir, "presets"),
             "--worker-command", "ruby",
-            "--worker-command-arg", "scripts/a3/a3_direct_canary_worker.rb",
+            "--worker-command-arg", "-I",
+            "--worker-command-arg", "a3-engine/lib",
+            "--worker-command-arg", "a3-engine/bin/a3",
+            "--worker-command-arg", "worker:direct-canary",
             "--kanban-command", "ruby",
             "--kanban-command-arg", fake_cli.fetch(:script_path),
             "--kanban-project", "A3-v2",
@@ -225,11 +259,11 @@ RSpec.describe A3::CLI do
       end
 
       expect(out.string).to include("executed next runnable A3-v2#3030 at implementation")
-      expect(task_repository.fetch("A3-v2#3030").status).to eq(:verifying)
+      expect(task_repository.fetch("A3-v2#3030").status).to eq(:blocked)
     end
   end
 
-  it "transitions the external kanban task to Inspection when using worker command options" do
+  it "transitions the external kanban task to Blocked when local publication is disabled" do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)
       seed_context(dir)
@@ -257,6 +291,10 @@ RSpec.describe A3::CLI do
           from pathlib import Path
 
           request = json.loads(Path(os.environ["A3_WORKER_REQUEST_PATH"]).read_text())
+          repo_alpha = Path(request["slot_paths"]["repo_alpha"])
+          changed = repo_alpha / "src" / "main.rb"
+          changed.parent.mkdir(parents=True, exist_ok=True)
+          changed.write_text("changed by test\\n")
           result = {
               "task_ref": request["task_ref"],
               "run_ref": request["run_ref"],
@@ -266,7 +304,7 @@ RSpec.describe A3::CLI do
               "failing_command": None,
               "observed_state": None,
               "rework_required": False,
-              "changed_files": {},
+              "changed_files": {"repo_alpha": ["src/main.rb"]},
               "diagnostics": {}
           }
           Path(os.environ["A3_WORKER_RESULT_PATH"]).write_text(json.dumps(result))
@@ -301,9 +339,9 @@ RSpec.describe A3::CLI do
       transitions = read_fake_kanban_transitions(fake_cli.fetch(:transitions_path))
 
       expect(out.string).to include("executed next runnable Sample#3045 at implementation")
-      expect(task_repository.fetch("Sample#3045").status).to eq(:verifying)
+      expect(task_repository.fetch("Sample#3045").status).to eq(:blocked)
       expect(transitions.fetch(0).fetch("argv")).to include("task-transition", "--task-id", "3045", "--status", "In progress")
-      expect(transitions.fetch(1).fetch("argv")).to include("task-transition", "--task-id", "3045", "--status", "Inspection")
+      expect(transitions.fetch(1).fetch("argv")).to include("task-label-add", "--task-id", "3045", "--label", "blocked")
     end
   end
 
@@ -355,7 +393,7 @@ RSpec.describe A3::CLI do
         {
           "presets" => ["base"],
           "core" => {
-            "merge_target" => "merge_to_parent",
+            "merge_target" => "merge_to_live",
             "merge_policy" => "ff_only",
             "merge_target_ref" => "refs/heads/feature/prototype"
           }

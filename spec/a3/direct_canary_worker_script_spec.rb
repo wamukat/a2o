@@ -5,6 +5,10 @@ require "tmpdir"
 require_relative "../../lib/a3/operator/direct_canary_worker"
 
 RSpec.describe A3DirectCanaryWorker do
+  SPEC_ROOT_DIR = Pathname(__dir__).join("..", "..", "..").expand_path
+  CLI_ENTRYPOINT = SPEC_ROOT_DIR.join("a3-engine", "bin", "a3")
+  CLI_LIB_DIR = SPEC_ROOT_DIR.join("a3-engine", "lib")
+
   def base_request(phase: "implementation")
     {
       "task_ref" => "Portal#3157",
@@ -91,7 +95,10 @@ RSpec.describe A3DirectCanaryWorker do
           "A3_DIRECT_CANARY_DIFF_TASK_REFS" => "Portal#3157"
         },
         "ruby",
-        described_class.method(:main).source_location.first
+        "-I",
+        CLI_LIB_DIR.to_s,
+        CLI_ENTRYPOINT.to_s,
+        "worker:direct-canary"
       )
 
       expect(completed).to eq(true)
