@@ -129,6 +129,95 @@ func TestWorkspaceMaterializerRejectsNonBranchRefs(t *testing.T) {
 	}
 }
 
+func TestWorkspaceMaterializerBootstrapsMissingWorktreeBranchAtMaterialization(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	git(t, sourceRoot, "branch", "feature/prototype", "HEAD")
+	liveHead := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "HEAD"))
+	request := testWorkspaceRequest("member-portal-starters")
+	slot := request.Slots["repo_alpha"]
+	slot.Ref = "refs/heads/a3/work/Portal-99"
+	slot.BootstrapRef = "refs/heads/feature/prototype"
+	request.Slots["repo_alpha"] = slot
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"member-portal-starters": sourceRoot,
+		},
+	}
+
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	descriptor := prepared.SlotDescriptors["repo_alpha"]
+	if descriptor["bootstrapped_ref"] != true || descriptor["bootstrap_head"] != liveHead {
+		t.Fatalf("unexpected bootstrap descriptor: %#v", descriptor)
+	}
+	if head := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "refs/heads/a3/work/Portal-99")); head != liveHead {
+		t.Fatalf("branch was not bootstrapped from live head: got=%s want=%s", head, liveHead)
+	}
+	if err := materializer.Cleanup(prepared); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWorkspaceMaterializerRequiresBootstrapForMissingWorktreeBranch(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	request := testWorkspaceRequest("member-portal-starters")
+	slot := request.Slots["repo_alpha"]
+	slot.Ref = "refs/heads/a3/work/Portal-99"
+	request.Slots["repo_alpha"] = slot
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"member-portal-starters": sourceRoot,
+		},
+	}
+
+	if _, err := materializer.Prepare(request); err == nil || !strings.Contains(err.Error(), "bootstrap_ref is not provided") {
+		t.Fatalf("expected missing bootstrap_ref failure, got %v", err)
+	}
+}
+
+func TestWorkspaceMaterializerBootstrapsMissingParentThenChildBranch(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	git(t, sourceRoot, "branch", "feature/prototype", "HEAD")
+	liveHead := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "HEAD"))
+	request := testWorkspaceRequest("member-portal-starters")
+	slot := request.Slots["repo_alpha"]
+	slot.Ref = "refs/heads/a3/work/Portal-204"
+	slot.BootstrapRef = "refs/heads/a3/parent/Portal-203"
+	slot.BootstrapBaseRef = "refs/heads/feature/prototype"
+	request.Slots["repo_alpha"] = slot
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"member-portal-starters": sourceRoot,
+		},
+	}
+
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	descriptor := prepared.SlotDescriptors["repo_alpha"]
+	if descriptor["bootstrapped_ref"] != true || descriptor["bootstrapped_base_ref"] != true {
+		t.Fatalf("unexpected chained bootstrap descriptor: %#v", descriptor)
+	}
+	if parentHead := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "refs/heads/a3/parent/Portal-203")); parentHead != liveHead {
+		t.Fatalf("parent branch was not bootstrapped from live head: got=%s want=%s", parentHead, liveHead)
+	}
+	if childHead := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "refs/heads/a3/work/Portal-204")); childHead != liveHead {
+		t.Fatalf("child branch was not bootstrapped from parent head: got=%s want=%s", childHead, liveHead)
+	}
+	if err := materializer.Cleanup(prepared); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPublishWorkspaceChangesValidatesAllSlotsBeforeCommitting(t *testing.T) {
 	tmp := t.TempDir()
 	alphaRoot := createGitSource(t, tmp, "repo-alpha")

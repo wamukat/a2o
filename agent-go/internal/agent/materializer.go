@@ -644,22 +644,33 @@ func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot
 	if err != nil {
 		return nil, err
 	}
+	bootstrapHead, bootstrappedRef, bootstrappedBaseRef, err := ensureWorkspaceSlotRef(sourceRoot, slot.Ref, slot.BootstrapRef, slot.BootstrapBaseRef)
+	if err != nil {
+		return nil, err
+	}
 	if err := runGit(sourceRoot, "worktree", "add", "--force", slotPath, branchName); err != nil {
+		_ = rollbackWorkspaceSlotRefs(sourceRoot, slot.Ref, slot.BootstrapRef, bootstrappedRef, bootstrappedBaseRef)
 		return nil, err
 	}
 	head, err := gitOutput(slotPath, "rev-parse", "HEAD")
 	if err != nil {
+		_ = runGit(sourceRoot, "worktree", "remove", "--force", slotPath)
+		_ = rollbackWorkspaceSlotRefs(sourceRoot, slot.Ref, slot.BootstrapRef, bootstrappedRef, bootstrappedBaseRef)
 		return nil, err
 	}
 	actualRef, err := gitOutput(slotPath, "symbolic-ref", "--quiet", "HEAD")
 	if err != nil {
+		_ = runGit(sourceRoot, "worktree", "remove", "--force", slotPath)
+		_ = rollbackWorkspaceSlotRefs(sourceRoot, slot.Ref, slot.BootstrapRef, bootstrappedRef, bootstrappedBaseRef)
 		return nil, err
 	}
 	dirtyAfter, err := gitDirty(slotPath)
 	if err != nil {
+		_ = runGit(sourceRoot, "worktree", "remove", "--force", slotPath)
+		_ = rollbackWorkspaceSlotRefs(sourceRoot, slot.Ref, slot.BootstrapRef, bootstrappedRef, bootstrappedBaseRef)
 		return nil, err
 	}
-	return map[string]any{
+	descriptor := map[string]any{
 		"runtime_path":  slotPath,
 		"source_kind":   slot.Source.Kind,
 		"source_alias":  slot.Source.Alias,
@@ -672,7 +683,72 @@ func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot
 		"access":        slot.Access,
 		"sync_class":    slot.SyncClass,
 		"ownership":     slot.Ownership,
-	}, nil
+	}
+	if slot.BootstrapRef != "" {
+		descriptor["bootstrap_ref"] = slot.BootstrapRef
+	}
+	if slot.BootstrapBaseRef != "" {
+		descriptor["bootstrap_base_ref"] = slot.BootstrapBaseRef
+	}
+	if bootstrappedRef {
+		descriptor["bootstrapped_ref"] = true
+		descriptor["bootstrap_head"] = bootstrapHead
+	}
+	if bootstrappedBaseRef {
+		descriptor["bootstrapped_base_ref"] = true
+	}
+	return descriptor, nil
+}
+
+func ensureWorkspaceSlotRef(root, targetRef, bootstrapRef, bootstrapBaseRef string) (string, bool, bool, error) {
+	if _, err := branchNameForRef(targetRef); err != nil {
+		return "", false, false, err
+	}
+	head, err := gitOutput(root, "rev-parse", targetRef)
+	if err == nil {
+		return head, false, false, nil
+	}
+	if bootstrapRef == "" {
+		return "", false, false, fmt.Errorf("workspace ref %s is missing and bootstrap_ref is not provided", targetRef)
+	}
+	if _, err := branchNameForRef(bootstrapRef); err != nil {
+		return "", false, false, fmt.Errorf("unsupported workspace bootstrap ref %s: %w", bootstrapRef, err)
+	}
+	bootstrapHead, err := gitOutput(root, "rev-parse", bootstrapRef)
+	if err != nil {
+		if bootstrapBaseRef == "" {
+			return "", false, false, err
+		}
+		if _, branchErr := branchNameForRef(bootstrapBaseRef); branchErr != nil {
+			return "", false, false, fmt.Errorf("unsupported workspace bootstrap base ref %s: %w", bootstrapBaseRef, branchErr)
+		}
+		bootstrapHead, err = gitOutput(root, "rev-parse", bootstrapBaseRef)
+		if err != nil {
+			return "", false, false, err
+		}
+		if err := runGit(root, "update-ref", bootstrapRef, bootstrapHead); err != nil {
+			return "", false, false, err
+		}
+		if err := runGit(root, "update-ref", targetRef, bootstrapHead); err != nil {
+			return "", false, true, err
+		}
+		return bootstrapHead, true, true, nil
+	}
+	if err := runGit(root, "update-ref", targetRef, bootstrapHead); err != nil {
+		return "", false, false, err
+	}
+	return bootstrapHead, true, false, nil
+}
+
+func rollbackWorkspaceSlotRefs(root, targetRef, bootstrapRef string, createdTargetRef, createdBootstrapRef bool) error {
+	var rollbackErr error
+	if createdTargetRef {
+		rollbackErr = errors.Join(rollbackErr, runGit(root, "update-ref", "-d", targetRef))
+	}
+	if createdBootstrapRef && bootstrapRef != "" {
+		rollbackErr = errors.Join(rollbackErr, runGit(root, "update-ref", "-d", bootstrapRef))
+	}
+	return rollbackErr
 }
 
 func branchNameForRef(ref string) (string, error) {

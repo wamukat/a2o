@@ -86,10 +86,13 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     expect(request.workspace_id).to eq("Portal-134-children-Portal-135-implementation-run-implementation")
     expect(request.slots.fetch("repo_alpha")).to include(
       "ref" => "refs/heads/a3/work/Portal-135",
+      "bootstrap_ref" => "refs/heads/a3/parent/Portal-134",
+      "bootstrap_base_ref" => "refs/heads/feature/prototype",
       "ownership" => "edit_target"
     )
     expect(request.slots.fetch("repo_beta")).to include(
       "ref" => "refs/heads/a3/parent/Portal-134",
+      "bootstrap_ref" => "refs/heads/feature/prototype",
       "ownership" => "support"
     )
   end
@@ -154,10 +157,12 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
 
     expect(request.slots.fetch("repo_alpha")).to include(
       "ref" => "refs/heads/a3/parent/Portal-173",
+      "bootstrap_ref" => "refs/heads/feature/prototype",
       "ownership" => "edit_target"
     )
     expect(request.slots.fetch("repo_beta")).to include(
       "ref" => "refs/heads/a3/parent/Portal-173",
+      "bootstrap_ref" => "refs/heads/feature/prototype",
       "ownership" => "support"
     )
   end

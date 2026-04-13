@@ -34,6 +34,7 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 						"alias": "member-portal-starters"
 					},
 					"ref": "refs/heads/a3/work/Portal-42",
+					"bootstrap_ref": "refs/heads/feature/prototype",
 					"checkout": "worktree_branch",
 					"access": "read_write",
 					"sync_class": "eager",
@@ -70,6 +71,9 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 	slot := request.WorkspaceRequest.Slots["repo_alpha"]
 	if slot.Source.Alias != "member-portal-starters" || slot.Checkout != "worktree_branch" || slot.SyncClass != "eager" || slot.Ownership != "edit_target" {
 		t.Fatalf("unexpected slot request: %#v", slot)
+	}
+	if slot.BootstrapRef != "refs/heads/feature/prototype" {
+		t.Fatalf("workspace bootstrap ref was not decoded: %#v", slot)
 	}
 
 	encoded, err := json.Marshal(request)

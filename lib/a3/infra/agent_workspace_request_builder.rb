@@ -25,12 +25,14 @@ module A3
               alias: alias_name
             },
             ref: ref_for(slot_name, task, run),
+            bootstrap_ref: bootstrap_ref_for(slot_name, task, run),
+            bootstrap_base_ref: bootstrap_base_ref_for(slot_name, task, run),
             checkout: "worktree_branch",
             access: access_for(slot_name, run),
             sync_class: sync_class_for(slot_name, run),
             ownership: ownership_for(slot_name, run),
             required: true
-          }
+          }.compact
         end
 
         A3::Domain::AgentWorkspaceRequest.new(
@@ -75,6 +77,24 @@ module A3
         raise A3::Domain::ConfigurationError, "agent support slot #{slot_name} requires --agent-support-ref"
       end
 
+      def bootstrap_ref_for(slot_name, task, run)
+        if ownership_for(slot_name, run) == "edit_target"
+          return parent_integration_ref_for(task) if task.kind.to_sym == :child && task.parent_ref
+
+          return support_ref_for(slot_name) if task.kind.to_sym == :single || task.kind.to_sym == :parent
+        end
+
+        return support_ref_for(slot_name) if parent_integration_support_ref?(task)
+
+        nil
+      end
+
+      def bootstrap_base_ref_for(slot_name, task, run)
+        return support_ref_for(slot_name) if ownership_for(slot_name, run) == "edit_target" && task.kind.to_sym == :child && task.parent_ref
+
+        nil
+      end
+
       def parent_integration_support_ref?(task)
         task.kind.to_sym == :parent || !task.parent_ref.to_s.empty?
       end
@@ -82,6 +102,13 @@ module A3
       def parent_integration_ref_for(task)
         owner_ref = task.parent_ref || task.ref
         "refs/heads/a3/parent/#{owner_ref.tr('#', '-')}"
+      end
+
+      def support_ref_for(slot_name)
+        return @support_refs.fetch(slot_name) if @support_refs.key?(slot_name)
+        return @support_refs.fetch(:default) if @support_refs.key?(:default)
+
+        nil
       end
 
       def normalize_support_refs(support_ref:, support_refs:)

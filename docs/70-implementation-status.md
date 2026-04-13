@@ -169,10 +169,12 @@
   根拠: `python3 scripts/a3/run.py execute-phase --project portal-dev --phase inspection --labels trigger:auto-parent,repo:ui-app`
 
 - [ ] parent/child branch topology
-  現状: `portal-dev` bootstrap では `a3/issue` / `a3/parent` を materialize できるが、Portal live runtime / canary では child `work_branch_ref` と parent `integration_branch_ref` の分離がまだ全面適用されていない。
+  現状: agent-materialized workspace は `worktree_branch` を使うが、2026-04-13 の final canary で scheduler 起動時に batch 内の全 `a3/work/*` / `a3/parent/*` ref を一括 `update-ref` していたため、`Portal#203` / `Portal#205` の parent branch が先行 single merge (`Portal#201` / `Portal#202`) 後の live head ではなく、batch 開始時点の live head から始まる defect を確認した。
   残課題:
   - Portal live manifest / launcher で new child + new parent を distinct branch refs で materialize する
   - child implementation / verification を shared issue branch ではなく child work branch に閉じる
+  - `workspace_request.slots[*].bootstrap_ref` / `bootstrap_base_ref` を使い、single は live target、parent は live target、child は parent integration branch から materialize 時に missing branch を作る。最初の child で parent integration branch も未作成の場合は live target から parent integration branch を作ってから child work branch を切る
+  - scheduler の batch 事前 ref 作成を default off にし、phase-local bootstrap を正規経路にする
   - live Portal parent-child canary で separated branch model を完走させる
   根拠: `scripts/a3/bootstrap_portal_dev_repos.py`, `scripts/a3/config/portal-dev/project.json`
 

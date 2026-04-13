@@ -92,7 +92,7 @@ module A3
 
       def normalize_slot_descriptor(descriptor)
         record = descriptor.transform_keys(&:to_s)
-        {
+        normalized = {
           "source" => normalize_source(record.fetch("source")),
           "ref" => required_string(record.fetch("ref"), "slot ref"),
           "checkout" => required_string(record.fetch("checkout"), "slot checkout"),
@@ -100,7 +100,12 @@ module A3
           "sync_class" => required_string(record.fetch("sync_class"), "slot sync_class"),
           "ownership" => required_string(record.fetch("ownership"), "slot ownership"),
           "required" => normalize_required(record.fetch("required"))
-        }.freeze
+        }
+        bootstrap_ref = record["bootstrap_ref"].to_s.strip
+        normalized["bootstrap_ref"] = bootstrap_ref unless bootstrap_ref.empty?
+        bootstrap_base_ref = record["bootstrap_base_ref"].to_s.strip
+        normalized["bootstrap_base_ref"] = bootstrap_base_ref unless bootstrap_base_ref.empty?
+        normalized.freeze
       end
 
       def normalize_source(source)
@@ -125,6 +130,12 @@ module A3
           raise ConfigurationError, "unsupported source kind for #{slot_name}: #{source.fetch('kind')}" unless source.fetch("kind") == "local_git"
           raise ConfigurationError, "unsupported checkout for #{slot_name}: #{descriptor.fetch('checkout')}" unless descriptor.fetch("checkout") == "worktree_branch"
           raise ConfigurationError, "unsupported branch ref for #{slot_name}: #{descriptor.fetch('ref')}" unless descriptor.fetch("ref").start_with?("refs/heads/")
+          if descriptor.key?("bootstrap_ref") && !descriptor.fetch("bootstrap_ref").start_with?("refs/heads/")
+            raise ConfigurationError, "unsupported bootstrap ref for #{slot_name}: #{descriptor.fetch('bootstrap_ref')}"
+          end
+          if descriptor.key?("bootstrap_base_ref") && !descriptor.fetch("bootstrap_base_ref").start_with?("refs/heads/")
+            raise ConfigurationError, "unsupported bootstrap base ref for #{slot_name}: #{descriptor.fetch('bootstrap_base_ref')}"
+          end
           raise ConfigurationError, "unsupported access for #{slot_name}: #{descriptor.fetch('access')}" unless %w[read_write read_only].include?(descriptor.fetch("access"))
           raise ConfigurationError, "unsupported sync_class for #{slot_name}: #{descriptor.fetch('sync_class')}" unless %w[eager lazy_but_guaranteed].include?(descriptor.fetch("sync_class"))
           raise ConfigurationError, "unsupported ownership for #{slot_name}: #{descriptor.fetch('ownership')}" unless %w[edit_target support].include?(descriptor.fetch("ownership"))
