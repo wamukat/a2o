@@ -48,7 +48,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 
 ### Move toward `a3-engine`
 
-- Generic launcher surfaces currently in `scripts/a3/run.rb`, `cleanup.rb`, `diagnostics.rb`, `reconcile.rb`, `rerun_*`, and `launchd.rb` should be retired or migrated into A3 CLI commands.
+- Generic launcher surfaces currently in `scripts/a3/run.rb`, `cleanup.rb`, `diagnostics.rb`, `reconcile.rb`, and `rerun_*` should be retired or migrated into A3 CLI commands.
 - Generic smoke harness pieces should either become A3 Engine tests or be deleted after host-local scheduler validation is stable.
 
 | Root file | Classification | Action | Reason / dependency |
@@ -60,7 +60,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 | `scripts/a3/rerun_workspace_support.rb` | A3-owned workspace support library | Migrate with cleanup/rerun commands | It defines generic issue workspace and quarantine path policy. |
 | `scripts/a3/rerun_quarantine.rb` | A3-owned rerun recovery | Migrate with cleanup/rerun commands | Quarantine mechanics are generic; allowed project build outputs must remain configurable. |
 | `scripts/a3/rerun_readiness.rb` | A3-owned rerun recovery | Migrate with cleanup/rerun commands | Rerun readiness checks are generic runtime state inspection. |
-| `scripts/a3/launchd.rb` | Optional host service helper | Do not expand; migrate or delete after service policy is finalized | User policy is manual terminal startup by default. Keep only if macOS service support remains a deliberate optional install path. |
+| `scripts/a3/launchd.rb` | Optional host service helper | Deleted with macOS LaunchAgent service entrypoints | This was not an `a3-agent` scheduler registration feature. It only supported root `a3:portal:scheduler:install/uninstall/reload/status` and was not required by the Docker A3 + host-local agent flow. |
 | `scripts/a3/assert_a3_live_write_enabled.rb` | A3-owned safety guard, unreferenced | Deleted from root | It contained no Portal knowledge, but no current command used it. Reintroduce only as an A3-owned guard if a current A3 command needs it. |
 | `scripts/a3/a3_stdin_bundle_worker.rb` | Transitional worker bridge | Extract generic command-template worker into A3, keep Portal config outside | It still hardcodes `scripts/a3/config/portal/launcher.json`. The worker concept is generic, but the current file is not yet release-clean. |
 | `scripts/a3/a3_direct_canary_worker.rb` | Test/canary harness | Move into A3 tests or delete after canary replacement | It is not an operator surface and should not be a root release dependency. |
@@ -85,7 +85,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 | `scripts/a3/portal_runtime_surface.rb` | Portal root glue | Keep until Taskfile/runtime package is moved | Defines Portal-specific manifest, storage, launchd plist, and scheduler launcher paths. |
 | `scripts/a3/portal_scheduler_launcher.rb` | Portal root glue | Keep as Portal operator entrypoint for now | It binds Portal storage, trigger labels, repo labels, worker script, and scheduler settings. |
 | `scripts/a3/portal_watch_summary.rb` | Portal root glue | Keep as Portal operator entrypoint for now | It adds Portal launchd/scheduler summary around A3 state. Generic watch formatting should live in A3, but Portal runtime binding stays injected. |
-| `scripts/a3/prepare_portal_scheduler_launchd_config.rb` | Portal root glue | Keep only while optional launchd support remains | It writes Portal-specific launchd config. Remove with launchd if service startup is dropped. |
+| `scripts/a3/prepare_portal_scheduler_launchd_config.rb` | Portal root glue | Deleted with macOS LaunchAgent service entrypoints | It only wrote the deleted Portal scheduler LaunchAgent plist. |
 | `scripts/a3/prepare_portal_launchd_config.rb` | Portal-dev maintenance glue | Keep only while `portal-dev` maintenance entrypoints remain | It is not A3 release material. |
 | `scripts/a3/portal_verification.rb` | Project verification hook | Keep project-injected | Encodes Portal completion gates, repo slot commands, Maven local repo bootstrap, knowledge build, and parent/child verification rules. |
 | `scripts/a3/portal_remediation.rb` | Project remediation hook | Keep project-injected | Encodes Portal remediation command (`task fmt:apply`) and slot expectations. |
@@ -103,8 +103,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 1. Native A3 CLI parity: move `cleanup`, `diagnostics`, `reconcile`, and `rerun_*` behind `a3-engine/bin/a3` commands, preserving root Taskfile behavior through thin wrappers only.
 2. Worker bridge extraction: split `a3_stdin_bundle_worker.rb` into a generic command-template worker in `a3-engine` plus Portal launcher config in project package.
 3. Smoke split: move synthetic host-agent and parent-topology smoke into A3 tests; keep real Portal full verification as project canary.
-4. Service policy cleanup: either migrate `launchd.rb` as an optional host helper or delete launchd support if manual terminal startup remains the only supported operation.
-5. Portal package extraction: move `scripts/a3/config/portal/**` and Portal hooks into an external project package format once A3 can load project packages explicitly.
+4. Portal package extraction: move `scripts/a3/config/portal/**` and Portal hooks into an external project package format once A3 can load project packages explicitly.
 
 ### Review checklist
 
