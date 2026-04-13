@@ -3,7 +3,7 @@
 require "json"
 require "open3"
 require "tmpdir"
-require_relative "../../../scripts/a3-projects/portal/bootstrap_portal_dev_repos"
+require_relative "../../../scripts/a3-projects/portal/support/bootstrap_portal_dev_repos"
 
 RSpec.describe BootstrapPortalDevRepos do
   def run_capture(*args, cwd:)

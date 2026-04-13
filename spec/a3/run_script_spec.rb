@@ -9,10 +9,10 @@ RUN_SCRIPT_SPEC_ROOT_DIR = Pathname(__dir__).join("..", "..", "..").expand_path
 ENV["A3_ROOT_DIR"] ||= RUN_SCRIPT_SPEC_ROOT_DIR.to_s
 ENV["A3_ROOT_DEFAULT_PROJECT"] ||= "portal"
 ENV["A3_ROOT_RUNTIME_CONFIG_PATH"] ||= ".work/a3/config/portal-runtime.json"
-ENV["A3_ROOT_CONFIG_DIR"] ||= "scripts/a3-projects/portal/config"
-ENV["A3_ROOT_PREPARE_RUNTIME_CONFIG_SCRIPT"] ||= "scripts/a3-projects/portal/prepare_portal_runtime_config.rb"
+ENV["A3_ROOT_CONFIG_DIR"] ||= "scripts/a3-projects/portal/inject/config"
+ENV["A3_ROOT_PREPARE_RUNTIME_CONFIG_SCRIPT"] ||= "scripts/a3-projects/portal/support/prepare_portal_runtime_config.rb"
 ENV["A3_ROOT_RUNTIME_CONFIG_PROJECTS"] ||= "portal"
-ENV["A3_ROOT_RECONCILE_LIVE_PROCESS_PATTERN"] ||= "scripts/a3-projects/portal/portal_scheduler_launcher.rb --run-shot"
+ENV["A3_ROOT_RECONCILE_LIVE_PROCESS_PATTERN"] ||= "scripts/a3-projects/portal/support/runtime_agent_run_once.sh"
 ENV["A3_ROOT_LEGACY_DISABLED_MESSAGE"] ||= "Legacy A3Engine-v1 commands are disabled."
 
 require "a3/operator/root_utility_launcher"
@@ -324,7 +324,7 @@ RSpec.describe A3RootUtilityLauncher do
         "--project", "portal-dev",
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "active-runs.json").to_s,
         "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "worker-runs.json").to_s,
-        "--live-process-pattern", "scripts/a3-projects/portal/portal_scheduler_launcher.rb --run-shot",
+        "--live-process-pattern", "scripts/a3-projects/portal/support/runtime_agent_run_once.sh",
         "--live-process-pattern", "portal-dev-kanban-scheduler-auto",
         "--launcher-config", described_class::CONFIG_DIR.join("portal-dev", "launcher.json").to_s,
         "--status", "To do",

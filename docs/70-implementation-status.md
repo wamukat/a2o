@@ -87,7 +87,7 @@
 
 - [x] watch loop / Portal live cutover integration
   現状: `portal` live launcher config は `execute-run-once` を呼ぶ launchd package を持ち、root から manual run と launchd install / uninstall / reload / status を操作できる。launchd helper は macOS 専用で、非 macOS では fail-fast する。
-  根拠: `scripts/a3-projects/portal/config/portal/launcher.json`, root `Taskfile.yml`, retired launchd surface notes
+  根拠: `scripts/a3-projects/portal/inject/config/portal/launcher.json`, root `Taskfile.yml`, retired launchd surface notes
 
 ## Runtime / Launcher
 
@@ -101,7 +101,7 @@
 
 - [x] executor adapter abstraction
   現状: `ai-cli` naming と implementation-specific detail は historical v2 status 上の整理として完了済み。current runtime ではさらに、A3 Engine core が provider adapter / model / reasoning option を意味解釈しない方針へ更新した。Portal profile は当面 `codex exec --json ...` を command argv として使うが、これは project-selected executor command であり A3 core dependency ではない。root thin worker は `executor.kind=command`、stdin bundle、result/schema file、placeholder 展開だけを扱い、config 不備時の `codex exec --json` fallback は持たない。
-  根拠: `a3_engine/executor.py`, `a3-engine/bin/a3 worker:stdin-bundle`, `scripts/a3-projects/portal/config/portal/launcher.json`, `docs/60-container-distribution-and-project-runtime.md` の `0.4.6`
+  根拠: `a3_engine/executor.py`, `a3-engine/bin/a3 worker:stdin-bundle`, `scripts/a3-projects/portal/inject/config/portal/launcher.json`, `docs/60-container-distribution-and-project-runtime.md` の `0.4.6`
 
 - [x] scheduler adapter abstraction
   現状: scheduler descriptor / launcher plan はある。
@@ -144,7 +144,7 @@
 
 - [x] isolated repo bootstrap
   現状: source repo の current `HEAD` を isolated local `main` に materialize できる。
-  根拠: `scripts/a3-projects/portal/bootstrap_portal_dev_repos.rb`, related Portal project package tests
+  根拠: `scripts/a3-projects/portal/support/bootstrap_portal_dev_repos.rb`, related Portal project package tests
 
 - [x] source `HEAD` materialization
   現状: source repo の current `HEAD` を isolated local `main` に配置できる。
@@ -154,7 +154,7 @@
 
 - [x] prerequisite command-surface guard
   現状: `Taskfile.yml` / `mvnw` / `pom.xml` 欠落を preflight で止められる。
-  根拠: `scripts/a3-projects/portal/config/portal-dev/project.json`, `a3_engine/preflight.py`
+  根拠: `scripts/a3-projects/portal/inject/config/portal-dev/project.json`, `a3_engine/preflight.py`
 
 - [x] implementation execution
   現状: `repo:ui-app` implementation を isolated repo 上で end-to-end 実行確認済み。
@@ -176,7 +176,7 @@
   - `workspace_request.slots[*].bootstrap_ref` / `bootstrap_base_ref` を使い、single は live target、parent は live target、child は parent integration branch から materialize 時に missing branch を作る。最初の child で parent integration branch も未作成の場合は live target から parent integration branch を作ってから child work branch を切る
   - scheduler の batch 事前 ref 作成を default off にし、phase-local bootstrap を正規経路にする
   - live Portal parent-child canary で separated branch model を完走させる
-  根拠: `scripts/a3-projects/portal/bootstrap_portal_dev_repos.rb`, `scripts/a3-projects/portal/config/portal-dev/project.json`
+  根拠: `scripts/a3-projects/portal/support/bootstrap_portal_dev_repos.rb`, `scripts/a3-projects/portal/inject/config/portal-dev/project.json`
 
 - [x] merge execution
   現状: `repo:ui-app` の child merge / parent merge を isolated repo 上で end-to-end 実行確認済み。
@@ -184,7 +184,7 @@
 
 - [x] live repo handoff / promotion
   現状: merge 結果を launcher-config 管理の disposable live target へ dry-run / apply でき、canonical branch / clean-worktree guard を通す。
-  根拠: `a3_engine/promotion_executor.py`, `tests/test_promotion_executor.py`, `scripts/a3-projects/portal/config/portal-dev/launcher.json`
+  根拠: `a3_engine/promotion_executor.py`, `tests/test_promotion_executor.py`, `scripts/a3-projects/portal/inject/config/portal-dev/launcher.json`
 
 ## Root Integration
 

@@ -3,7 +3,7 @@
 require "json"
 require "tmpdir"
 require "fileutils"
-require_relative "../../../scripts/a3-projects/portal/portal_verification"
+require_relative "../../../scripts/a3-projects/portal/inject/portal_verification"
 
 RSpec.describe PortalVerification do
   def write_taskfile(slot_path)

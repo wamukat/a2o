@@ -227,7 +227,7 @@ manual loop の標準 profile 例:
 
 host 上で agent を動かす場合、`control_plane_url` は `http://127.0.0.1:<published-port>` のような loopback URL にする。project dev-env container 内で agent を動かす場合、`http://a3-runtime:<port>` のような compose service name を使う。`source_aliases` は agent が実際に見える local path であり、A3 job payload の repo slot から直接 host path を推測しない。
 
-host-local agent へ worker / verification / remediation job を委譲する場合、A3 runtime container 内の `A3_ROOT_DIR=/workspace` をそのまま渡してはいけない。host agent は host filesystem 上で command を実行するため、A3 runtime は `--agent-env A3_ROOT_DIR=<host workspace root>` を明示し、`ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/portal_verification.rb"` のような project helper が host 側で解決できる状態にする。
+host-local agent へ worker / verification / remediation job を委譲する場合、A3 runtime container 内の `A3_ROOT_DIR=/workspace` をそのまま渡してはいけない。host agent は host filesystem 上で command を実行するため、A3 runtime は `--agent-env A3_ROOT_DIR=<host workspace root>` を明示し、`ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/inject/portal_verification.rb"` のような project helper が host 側で解決できる状態にする。
 
 #### 0.1.1a.1 Final validation variation matrix
 
@@ -350,10 +350,10 @@ live canary と scheduler surface の検証結果に加え、workspace root の 
   - legacy automation 向け skill / runbook / redesign メモ
   - root surface では `task automation*` を fail-fast sentinel とし、実行系 / mutation 系 entrypoint は残さない
 - `keep`
-  - `scripts/a3-projects/portal/config/portal-dev/*`
+  - `scripts/a3-projects/portal/inject/config/portal-dev/*`
   - `portal-dev` root local utility
-  - `scripts/a3-projects/portal/bootstrap_portal_dev_repos.rb`
-  - `scripts/a3-projects/portal/prepare_portal_runtime_config.rb`
+  - `scripts/a3-projects/portal/support/bootstrap_portal_dev_repos.rb`
+  - `scripts/a3-projects/portal/support/prepare_portal_runtime_config.rb`
 
 判断理由は次のとおりである。
 
@@ -363,7 +363,7 @@ live canary と scheduler surface の検証結果に加え、workspace root の 
   - `a3-v2/` と `scripts/automation/*` は current operator surface では実行しないため、git history へ委ねて物理削除した
 - `keep`
   - `portal-dev` root local utility / config と `bootstrap_portal_dev_repos.rb` は synthetic stale cleanup / maintenance utility / related spec からまだ参照される
-  - `scripts/a3-projects/portal/prepare_portal_runtime_config.rb` は `portal` doctor-env / cleanup / reconcile の internal helper と related spec からまだ参照される
+  - `scripts/a3-projects/portal/support/prepare_portal_runtime_config.rb` は `portal` doctor-env / cleanup / reconcile の internal helper と related spec からまだ参照される
 
 この時点で `A3-v2#3160` の acceptance は満たしており、compatibility 資産の扱いは「retire したもの」「delete 済みのもの」「current root utility を支えるため keep するもの」に分かれた。2026-04-12 の判断で旧 backend compatibility path も current runtime から物理削除する。以後の残件は、A3 / SoloBoard / a3-agent 配布導線を固定し、実 Portal source の `repo:both` parent/full verification canary を完了条件として通すことである。
 
@@ -1465,7 +1465,7 @@ A3 Engine は control plane であり、Docker + host/dev-env agent mode では 
 
 ### 0.4.6 2026-04-12 executor command template の汎用化方針
 
-Portal runtime は `scripts/a3-projects/portal/config/portal/launcher.json` を executor 正本として読み続ける。ただし、A3 Engine が `codex exec --json`、`--model`、`model_reasoning_effort` のような Codex CLI 固有語彙を解釈する形は v1 完成条件として不十分である。
+Portal runtime は `scripts/a3-projects/portal/inject/config/portal/launcher.json` を executor 正本として読み続ける。ただし、A3 Engine が `codex exec --json`、`--model`、`model_reasoning_effort` のような Codex CLI 固有語彙を解釈する形は v1 完成条件として不十分である。
 
 v1 では provider adapter を先に増やさず、A3 Engine が扱う executor contract を「command template + prompt/result/schema transport」に絞る。Codex を使うか、別の A-AI CLI を使うか、どの model / reasoning option を渡すかは project launcher config の command 配列へ閉じ込める。
 
@@ -1479,7 +1479,7 @@ v1 では provider adapter を先に増やさず、A3 Engine が扱う executor 
 #### 0.4.6.2 正本と責務
 
 - 正本:
-  - `scripts/a3-projects/portal/config/<project>/launcher.json`
+  - `scripts/a3-projects/portal/inject/config/<project>/launcher.json`
 - 解釈責務:
   - A3 worker entrypoint (`a3-engine/bin/a3 worker:stdin-bundle`)
 - 非責務:
@@ -1656,7 +1656,7 @@ runtime 開始時に次を validate する。
 
 #### 0.4.6.7 implementation plan
 
-1. `scripts/a3-projects/portal/config/portal/launcher.json` と `portal-dev/launcher.json` を `kind: command` へ移行する
+1. `scripts/a3-projects/portal/inject/config/portal/launcher.json` と `portal-dev/launcher.json` を `kind: command` へ移行する
 2. `a3-engine/bin/a3 worker:stdin-bundle` の `codex_command` / `model` / `reasoning_effort` resolver を `executor_command` / command template resolver へ置き換える
 3. invalid config fallback の `["codex", "exec", "--json"]` を廃止し、設定不備は worker failure として明示する
 4. current `a3-engine` / root tests に次を追加・更新する
@@ -1684,12 +1684,12 @@ adapter は、command template contract だけでは provider ごとの auth / s
 - 回収済み:
   - `a3-engine/bin/a3 worker:stdin-bundle` の `codex_command` は `executor_command` へ置き換え、A3 worker は command template と placeholder 展開だけを扱う
   - invalid config fallback の `["codex", "exec", "--json"]` は廃止し、`["executor", "command"]` として設定不備を明示する
-  - `scripts/a3-projects/portal/config/portal/launcher.json` と `scripts/a3-projects/portal/config/portal-dev/launcher.json` は `kind: command` と command argv template へ移行済み
+  - `scripts/a3-projects/portal/inject/config/portal/launcher.json` と `scripts/a3-projects/portal/inject/config/portal-dev/launcher.json` は `kind: command` と command argv template へ移行済み
   - diagnostics operator の `.codex/vendor/ripgrep/rg` と Volta 配下 Codex vendor `rg` fallback は削除済み。残す vendor fallback は `AI_CLI_HOME` / `.ai-cli` の generic path のみとする
-  - `scripts/a3-projects/portal/config/portal/launcher.json` の `$CODEX_HOME/notify.sh` 通知 hook は削除済み
+  - `scripts/a3-projects/portal/inject/config/portal/launcher.json` の `$CODEX_HOME/notify.sh` 通知 hook は削除済み
 - 残存する project profile 依存:
   - Portal の current executor command profile は、実際の最終検証用 runner として `codex exec --json ...` を指定している
-  - `scripts/a3-projects/portal/config/portal/launcher.json` の `runtime_env.required_bins` には、current Portal profile の実行前提として `codex` が残る
+  - `scripts/a3-projects/portal/inject/config/portal/launcher.json` の `runtime_env.required_bins` には、current Portal profile の実行前提として `codex` が残る
   - これは A3 Engine core の依存ではなく、Portal project が選んだ executor command profile の依存である。別 A-AI CLI へ切り替える場合は command profile と required bin を差し替える
 - test fixture dependency:
   - diagnostics operator の generic vendor `rg` fallback は `AI_CLI_HOME` / `.ai-cli` を参照する。関連 spec も `.codex` 前提から generic path へ更新済み
@@ -2077,7 +2077,7 @@ blocked diagnosis / recovery surface の確認:
 
 - archived state `/var/lib/a3/archive/portal-soloboard-bundle-canary-20260411T142541Z` には `Portal#43` の blocked diagnosis が保持されている
 - archive を scratch copy (`/var/lib/a3/diagnostic-scratch-portal-43-20260412`) に複製し、`show-run` と `show-blocked-diagnosis` で run `572a705b-3d81-4409-b370-38cc34963b18` を表示できることを確認した
-- `show-blocked-diagnosis` は `failing_command=ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/portal_remediation.rb"`、`observed=exit 1`、`summary=... failed`、diagnostic stderr の `JAVA_HOME environment variable is not defined correctly` まで表示できた
+- `show-blocked-diagnosis` は `failing_command=ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/inject/portal_remediation.rb"`、`observed=exit 1`、`summary=... failed`、diagnostic stderr の `JAVA_HOME environment variable is not defined correctly` まで表示できた
 - 同 scratch で `doctor-runtime` は `runtime_doctor=ok`、`repair-runs` dry-run は `actions=0`、`show-state` は `active_runs=0`, `queued_tasks=0`, `blocked_tasks=1` を返した
 - 同 scratch で `cleanup-terminal-workspaces --dry-run --status blocked,done --scope ticket_workspace,runtime_workspace` は `cleaned=0`、`quarantine-terminal-workspaces` は `quarantined 0 workspace(s)` を返した。archive 正本は保持し、scratch copy は確認後に削除した
 
