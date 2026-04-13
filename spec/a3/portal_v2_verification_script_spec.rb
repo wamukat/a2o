@@ -91,6 +91,25 @@ RSpec.describe PortalVerification do
     end
   end
 
+  it "fails when ui-app verification cannot find the materialized starters support slot" do
+    Dir.mktmpdir("portal-v2-verification-") do |tmpdir|
+      workspace_root = Pathname(tmpdir)
+      repo_beta = workspace_root.join("repo-beta")
+      FileUtils.mkdir_p(repo_beta)
+      write_taskfile(repo_beta)
+      write_slot_metadata(repo_beta, "member-portal-ui-app")
+      write_workspace_metadata(workspace_root, "refs/heads/a3/work/Portal-3153")
+
+      allow(described_class).to receive(:bootstrap_maven_repo)
+      allow(described_class).to receive(:prefetch_mockito_agent)
+      allow(described_class).to receive(:run_command)
+
+      expect do
+        described_class.run_slot_commands(workspace_root, base_env: {})
+      end.to raise_error(RuntimeError, /missing materialized support slot for member-portal-starters/)
+    end
+  end
+
   it "runs parent inspection commands per repo" do
     Dir.mktmpdir("portal-v2-verification-") do |tmpdir|
       workspace_root = Pathname(tmpdir)
