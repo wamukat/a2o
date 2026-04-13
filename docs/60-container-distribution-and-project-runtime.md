@@ -233,6 +233,27 @@ docker run --rm \
 - Agent は profile file を自前で持つ必要はない。agent 起動に必要な最小入力は Engine/control-plane URL と token であり、repo path / workspace root / env / command は Engine から job payload として受け取る。
 - Secret value は Engine から job payload へ入れない。Engine は required secret name を管理し、agent は local env / mounted file / project dev-env secret store から値を注入する。
 
+この方針で不要になるもの:
+
+- agent-local profile file: repo path / workspace root / command policy を agent 側 file として配布しない。Engine-managed agent environment config へ移す。
+- old agent doctor config path: agent-local profile file を読む doctor command は標準導線から外し、Engine-issued agent environment doctor job に置き換える。
+- host Ruby launcher: 利用者 host に Ruby interpreter や Ruby `a3` executable を要求しない。Engine 操作は container 内 `/usr/local/bin/a3`、agent は Go binary に寄せる。
+- Docker-distributed agent image: `docker/a3-agent` / `docker/a3-portal-agent` のような agent 専用 image は release surface に戻さない。必要なら project dev-env image が Engine image から export した Go binary を取り込む。
+- OS service templates: `systemd` / `launchd` / Windows Service 登録は標準配布範囲外とする。operator が必要に応じて外側で wrapper 化する。
+- project runtime baked into A3 image: Portal 固有 JDK / Maven / Node / verification runtime / bootstrap data を A3 Engine image へ焼き込まない。
+- Engine-side project repo mutation path: Engine が host project repo に対して worktree / branch / commit / merge / cleanup を直接実行する経路は主経路に戻さない。agent job 経由の publish / merge / cleanup に一本化する。
+- duplicated project bootstrap scripts: SoloBoard board/lane/tag bootstrap の generic script は A3 Engine 側へ置き、project 側には bootstrap config だけを残す。
+- validation-only bundle artifacts: 過去の compose bundle / dev-env agent validation 用 artifact、scratch、generated dist archive は release source として扱わず、必要な証跡だけ docs/history に残して削除対象にする。
+
+整理の進め方:
+
+- 実装削除前に `current surface`, `transitional internal`, `historical evidence`, `delete` の 4 分類へ棚卸しする。
+- `current surface` は Engine image / Go `a3-agent` / project injection config のいずれかへ配置先を決める。
+- `transitional internal` は fail-closed にし、公開 Taskfile / runbook / README から見えない状態にする。
+- `historical evidence` は文書だけに残し、実行可能 script / task / compose file としては残さない。
+- `delete` は git history に委ね、workspace root や project injection package に runtime から参照されない file を残さない。
+- 削除後は `rg` で旧入口名、old profile command、obsolete compose/image path、personal absolute path を検索し、公開 docs / Taskfile / scripts に残っていないことを確認する。
+
 標準導入順は次のとおりである。
 
 1. runtime 起動
