@@ -344,16 +344,16 @@ RSpec.describe A3RootUtilityLauncher do
     )
   end
 
-  it "propagates portal launchd prepare failures for portal doctor-env" do
-    allow(described_class).to receive(:run_prepare_portal_launchd_config).and_return(7)
+  it "propagates portal runtime config prepare failures for portal doctor-env" do
+    allow(described_class).to receive(:run_prepare_portal_runtime_config).and_return(7)
 
     rc = described_class.main(["doctor-env", "--project", "portal"])
 
     expect(rc).to eq(7)
   end
 
-  it "uses internally materialized launchd config for portal doctor-env" do
-    allow(described_class).to receive(:run_prepare_portal_launchd_config).and_return(0)
+  it "uses internally materialized runtime config for portal doctor-env" do
+    allow(described_class).to receive(:run_prepare_portal_runtime_config).and_return(0)
     allow(described_class).to receive(:run_diagnostics_command).and_return(0)
 
     rc = described_class.main(["doctor-env", "--project", "portal"])
@@ -362,7 +362,7 @@ RSpec.describe A3RootUtilityLauncher do
     expect(described_class).to have_received(:run_diagnostics_command).with(
       [
         "doctor-env",
-        "--launcher-config", described_class::PORTAL_LAUNCHD_CONFIG.to_s
+        "--launcher-config", described_class::PORTAL_RUNTIME_CONFIG.to_s
       ]
     )
   end

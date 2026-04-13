@@ -2,11 +2,11 @@
 
 require "json"
 require "tmpdir"
-require_relative "../../../scripts/a3/prepare_portal_launchd_config"
+require_relative "../../../scripts/a3/prepare_portal_runtime_config"
 
-RSpec.describe PreparePortalLaunchdConfig do
+RSpec.describe PreparePortalRuntimeConfig do
   it "injects local env file without mutating tracked base config" do
-    Dir.mktmpdir("a3-portal-launchd-config-") do |dir|
+    Dir.mktmpdir("a3-portal-runtime-config-") do |dir|
       root = Pathname(dir)
       base_config = root.join("scripts", "a3", "config", "portal", "launcher.json")
       base_config.dirname.mkpath
@@ -15,10 +15,10 @@ RSpec.describe PreparePortalLaunchdConfig do
           {
             "executor" => { "kind" => "ai-cli", "implementation" => "openai-codex" },
             "scheduler" => {
-              "backend" => "launchd",
+              "backend" => "manual",
               "job_name" => "dev.a3.portal.watch",
               "interval_seconds" => 60,
-              "command_argv" => ["/bin/sh", "-lc", "echo 'Legacy Portal A3 scheduler is disabled. Use task a3:portal-v2:scheduler:*.' >&2; exit 1"],
+              "command_argv" => ["/bin/sh", "-lc", "echo disabled >&2; exit 1"],
               "working_directory" => "../../../../"
             },
             "runtime_env" => { "required_bins" => ["python3"] },
@@ -31,10 +31,10 @@ RSpec.describe PreparePortalLaunchdConfig do
           }
         )
       )
-      output_config = root.join(".work", "a3", "config", "portal-launchd.json")
-      env_file = root.join(".work", "a3", "env", "portal-launchd.env")
+      output_config = root.join(".work", "a3", "config", "portal-runtime.json")
+      env_file = root.join(".work", "a3", "env", "portal-runtime.env")
 
-      payload = described_class.prepare_portal_launchd_config(
+      payload = described_class.prepare_portal_runtime_config(
         base_config: base_config,
         output_config: output_config,
         env_file: env_file,

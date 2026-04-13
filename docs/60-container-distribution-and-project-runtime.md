@@ -349,7 +349,7 @@ live canary と scheduler surface の検証結果に加え、workspace root の 
   - `scripts/a3/config/portal-dev/*`
   - `portal-dev` root local utility
   - `scripts/a3/bootstrap_portal_dev_repos.rb`
-  - `scripts/a3/prepare_portal_launchd_config.rb`
+  - `scripts/a3/prepare_portal_runtime_config.rb`
 
 判断理由は次のとおりである。
 
@@ -359,7 +359,7 @@ live canary と scheduler surface の検証結果に加え、workspace root の 
   - `a3-v2/` と `scripts/automation/*` は current operator surface では実行しないため、git history へ委ねて物理削除した
 - `keep`
   - `portal-dev` root local utility / config と `bootstrap_portal_dev_repos.rb` は synthetic stale cleanup / maintenance utility / related spec からまだ参照される
-  - `scripts/a3/prepare_portal_launchd_config.rb` は `portal` doctor-env の internal helper と related spec からまだ参照される
+  - `scripts/a3/prepare_portal_runtime_config.rb` は `portal` doctor-env / cleanup / reconcile の internal helper と related spec からまだ参照される
 
 この時点で `A3-v2#3160` の acceptance は満たしており、compatibility 資産の扱いは「retire したもの」「delete 済みのもの」「current root utility を支えるため keep するもの」に分かれた。2026-04-12 の判断で Kanboard compatibility path も current runtime から物理削除する。以後の残件は、A3 / SoloBoard / a3-agent 配布導線を固定し、実 Portal source の `repo:both` parent/full verification canary を完了条件として通すことである。
 
