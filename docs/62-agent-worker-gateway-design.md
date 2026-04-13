@@ -455,9 +455,12 @@ Focused release-package validation:
 
 ```text
 agent-go/scripts/validation-release-package-doctor.sh
+agent-go/scripts/validation-runtime-image-agent-export.sh
 ```
 
-This builds the host-target release archive, verifies it through `a3 agent package verify`, exports it through `a3 agent package export`, and runs the exported `a3-agent doctor` against a temporary local git source without using an agent-local profile file.
+The first command builds the host-target release archive, verifies it through `a3 agent package verify`, exports it through `a3 agent package export`, and runs the exported `a3-agent doctor` against a temporary local git source without using an agent-local profile file.
+
+The second command rebuilds/recreates the Docker A3 runtime image, verifies the image-bundled `/opt/a3/agents` package, exports `a3-agent` from inside the runtime container, copies it to the host, and runs the same profile-free doctor validation. This is the release-facing check that the Docker-distributed Engine can supply a usable host/dev-env agent binary.
 
 ### Non-Goals For This Slice
 
