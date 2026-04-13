@@ -284,7 +284,7 @@ disk pressure 時の cleanup 判断:
 - SoloBoard bootstrap / doctor / smoke: `task soloboard:doctor`, `task soloboard:bootstrap`, `task soloboard:smoke`, generic `task kanban:*`
 - runtime lifecycle / observation: `task a3:portal:runtime:up`, `:doctor`, `:bootstrap`, `:watch-summary`, `:describe-state`, `:observe`, `:archive-state`, `:down`, `:logs`
 - agent 正規経路 smoke: `task a3:portal:runtime:host-agent-smoke`, `:host-agent-parent-topology-smoke`, `:scheduler:run-once`
-- cleanup / retention: `task a3:portal:cleanup`, `task a3:portal:runtime:agent-artifact-cleanup`
+- cleanup / retention: `task a3:portal:runtime:agent-artifact-cleanup`; root-local cleanup は maintenance-only internal task とする
 - runtime inspection: `show-project-surface`, `show-project-context`, `show-phase-runtime-config`, `show-runtime-package`, `doctor-runtime`, `migrate-scheduler-store`, `show-scheduler-state`, `show-scheduler-history`
 - recovery inspection: `show-task`, `show-run`, `show-blocked-diagnosis`, `plan-rerun`, `recover-rerun`, `diagnose-blocked`, `repair-runs`, `cleanup-terminal-workspaces`, `quarantine-terminal-workspaces`
 
@@ -294,7 +294,7 @@ disk pressure 時の cleanup 判断:
 - archived `Portal#43` blocked run を `/var/lib/a3/recovery-surface-scratch-portal-43-20260412` に複製し、`show-task`, `plan-rerun`, `recover-rerun`, `diagnose-blocked`, `show-blocked-diagnosis` を実行できることを確認した。`diagnose-blocked` は scratch にのみ診断を追記し、archive 正本は変更していない。scratch は削除済みである
 - low-level phase execution commands (`run-worker-phase`, `run-verification`, `run-merge`) は direct operator command として個別実行するより、agent smoke / parent topology smoke / live repo full verification smoke の中で確認する
 - low-level run mutation commands (`start-run`, `complete-run`, `prepare-workspace`, `execute-next-runnable-task`, `execute-until-idle`, `run-runtime-canary`) は runtime internals / smoke harness 用であり、通常 operator runbook の入口にはしない
-- `pause-scheduler` / `resume-scheduler` は root の `task a3:portal:scheduler:pause/resume/control` から扱う。bundle 標準は operator terminal での manual loop 起動/停止であり、OS service 化は current scope 外である。macOS LaunchAgent 用の `a3:portal:scheduler:install/uninstall/reload/status` と `scripts/a3/launchd.rb` は削除済みで、`a3-agent` の scheduler 登録機能としては扱わない
+- scheduler の通常入口は `task a3:portal:runtime:scheduler:run-once` とし、root-local `pause-scheduler` / `resume-scheduler` / `show-scheduler-state` task は maintenance-only internal surface として通常 `task --list` から隠す。bundle 標準は operator terminal での manual loop 起動/停止であり、OS service 化は current scope 外である。macOS LaunchAgent 用の `a3:portal:scheduler:install/uninstall/reload/status` と `scripts/a3/launchd.rb` は削除済みで、`a3-agent` の scheduler 登録機能としては扱わない
 
 この分類により、「operator が日常的に使う入口」は root Taskfile と bundle task に寄せ、A3 CLI の低レベル command は smoke harness / diagnosis / recovery の実装面として扱う。
 
@@ -1208,7 +1208,7 @@ SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/
 - `task soloboard:smoke` を追加し、current kanban compatibility surface を SoloBoard に対して一通り打つ parity smoke を実行できる
 - `task kanban:up/down/logs/url/doctor/api/bootstrap:*` は SoloBoard 専用 entrypoint とし、`KANBAN_BACKEND=kanboard` / `kanboard:*` は削除する
 - `task a3:portal:cutover:doctor` を追加し、SoloBoard backend で `kanban:doctor -> watch-summary -> describe-state -> kanban:smoke` を一連で観測できるようにした。旧 compatibility path の比較入口は削除する
-- `task a3:portal-soloboard:scheduler:run-once`, `task a3:portal-soloboard:watch-summary`, `task a3:portal-soloboard:describe-state`, `task a3:portal-soloboard:scheduler:control` を追加し、current `.work/a3/portal-kanban-scheduler-auto` と衝突しない isolated storage (`.work/a3/portal-soloboard-canary`) で one-shot canary を流せる
+- historical isolated canary 用に `task a3:portal-soloboard:scheduler:run-once`, `task a3:portal-soloboard:watch-summary`, `task a3:portal-soloboard:describe-state`, `task a3:portal-soloboard:scheduler:control` を保持しているが、2026-04-13 の release boundary 整理で maintenance-only internal task とし、通常 operator surface からは外した
 - historical evidence として、retired `task a3:portal-soloboard:direct-canary:run-once` で isolated single full-phase canary を流し、`Portal#17` が `implementation -> verification -> merge -> Done` まで完走した
 - historical evidence として、retired `task a3:portal-soloboard:parent-child:direct-canary:run-once` と isolated `watch-summary` / `describe-state` で `Portal#18/#19/#20` が `Done` まで完走した。direct canary run entrypoint は後続整理で削除済みである
 - isolated canary の no-op 実行では `executed 0 task(s); idle=true stop_reason=idle` を確認し、さらに `plan-next-runnable-task` で SoloBoard 上の labeled `To do` task が `next runnable ... at implementation` と選抜されるところまで確認した
