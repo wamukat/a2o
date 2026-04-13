@@ -48,7 +48,7 @@ RSpec.describe PortalVerification do
       expect(described_class).to have_received(:run_command).with(
         [
           "bash",
-          described_class::ROOT_DIR.join("scripts", "a3", "bootstrap-phase-support-maven.sh").to_s,
+          described_class::ROOT_DIR.join("scripts", "a3-projects", "portal", "bootstrap-phase-support-maven.sh").to_s,
           "member-portal-ui-app",
           repo_alpha.to_s
         ],
@@ -135,7 +135,7 @@ RSpec.describe PortalVerification do
       expect(described_class).to have_received(:run_command).with(
         [
           "bash",
-          described_class::ROOT_DIR.join("scripts", "a3", "bootstrap-phase-support-maven.sh").to_s,
+          described_class::ROOT_DIR.join("scripts", "a3-projects", "portal", "bootstrap-phase-support-maven.sh").to_s,
           "member-portal-ui-app",
           repo_beta.to_s
         ],
