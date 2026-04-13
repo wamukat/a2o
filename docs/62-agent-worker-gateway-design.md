@@ -197,7 +197,7 @@ This smoke still avoids Maven / NullAway. Portal full verification is the next s
 
 ### CLI Bundle Smoke
 
-Status: implemented as `task a3:portal:runtime:agent-worker-gateway-smoke`. 2026-04-11 の runtime 実行では SoloBoard task `Portal#37` を作成し、worker gateway 経由の implementation result から `Inspection -> Done` まで確認した。旧 `task a3:portal:bundle:agent-worker-gateway-smoke` は短期互換 alias である。
+Status: historical Docker dev-env smoke was implemented as `task a3:portal:runtime:agent-worker-gateway-smoke`. 2026-04-13 の配布整理で Docker agent image と同 task は削除し、現行確認は host-local `a3-agent` と scheduler run-once に寄せる。
 
 Add a root-level bundle smoke that proves the operator CLI path can use `agent-http`:
 
@@ -220,13 +220,13 @@ Add a root-level bundle smoke that proves the operator CLI path can use `agent-h
    - the task reached `Inspection` after the single implementation step
    - combined log artifact exists
 
-This smoke must remain separate from Portal full verification. It validates the control-plane/agent/worker-gateway CLI wiring only; Maven, Java, Ruby worker scripts, NullAway, and full Portal verification stay in later slices. The generic `docker/a3-agent` image is a Go single-binary image with only generic materialization dependencies such as `git`; project runtime dependencies belong in a project/dev-env agent image such as `docker/a3-portal-agent`.
+This smoke must remain separate from Portal full verification. It validates the control-plane/agent/worker-gateway CLI wiring only; Maven, Java, Ruby worker scripts, NullAway, and full Portal verification stay in later slices. Docker-distributed agent images are no longer part of the release surface; the Go `a3-agent` is installed as a release binary on the host or inside a project-owned dev-env.
 
 Operational constraint: the gateway command blocks while waiting for the agent job, so the smoke must run the gateway in the background, then run one or more `a3-agent` single-job executions, then wait for the gateway process and fail with captured `server_log`, `gateway_log`, and `agent_log` if it does not exit. Use a dedicated smoke storage directory under `/workspace/.work/...`, not the regular bundle canary storage, because the first slice requires the A3-prepared workspace path to be visible at the same path from both `a3-runtime` and `a3-agent`.
 
 ### CLI Bundle Verification Smoke
 
-Status: implemented as `task a3:portal:runtime:agent-verification-smoke`. 2026-04-11 の runtime 実行では、初回 `Portal#38` が synthetic non-Maven fixture に対する Maven bootstrap/prefetch で blocked になったが、root commit `47dda1f` で non-Maven verification slot を skip するよう修正し、再実行した `Portal#39` は `Merging -> Done` まで確認した。旧 `task a3:portal:bundle:agent-verification-smoke` は短期互換 alias である。
+Status: historical Docker dev-env verification smoke was implemented as `task a3:portal:runtime:agent-verification-smoke`. 2026-04-13 の配布整理で同 task は削除し、host-local `a3-agent` 経路を正規確認にする。
 
 This smoke proves the operator CLI path can run `run-verification --verification-command-runner agent-http` through the compose `a3-agent` service. The compose service intentionally uses the Portal dev-env agent image, not the generic Go-only image, because this path executes project commands (`ruby "$A3_ROOT_DIR/scripts/a3/portal_remediation.rb"` and `ruby "$A3_ROOT_DIR/scripts/a3/portal_verification.rb"`). The smoke uses a small generated repo with a Taskfile to avoid Maven/NullAway cost while still exercising the real Portal remediation/verification script shape.
 
@@ -238,7 +238,7 @@ The smoke asserts:
 4. The Go agent materializes the repo slot, writes `.a3/workspace.json` and `.a3/slot.json`, executes both commands, uploads combined logs, and cleans up the worktree registration.
 5. A3 completes the verification run and transitions the task to `Merging`; the smoke then moves the synthetic task to `Done` as cleanup.
 
-Portal single-repo full verification is covered by `task a3:portal:runtime:agent-full-verification-smoke` for real `member-portal-starters` and `task a3:portal:runtime:agent-ui-verification-smoke` for real `member-portal-ui-app`. Both reuse the same command runner, run remediation plus `task test:nullaway` in the Portal dev-env agent image, upload combined logs, and confirm the task reaches `Merging -> Done`. The UI app path also exercises support starter install into the workspace-local Maven repo before verification. Parent-topology coverage is covered by `task a3:portal:runtime:agent-parent-topology-smoke`: it creates a synthetic `repo:both` parent with two done children, materializes both repo slots from `refs/heads/a3/parent/<parent>`, verifies the parent workspace through `agent-http`, uploads combined logs, and confirms parent verification plus merge reaches `Done`. 2026-04-11 の runtime 実行では `Portal#40` parent と `Portal#41/#42` child でこの経路を確認した。旧 `task a3:portal:bundle:*` は短期互換 alias である。
+Portal single-repo / parent full verification is now covered by host-local `a3-agent` scheduler and parent-topology smoke. Historical Docker dev-env tasks (`agent-full-verification-smoke`, `agent-ui-verification-smoke`, `agent-parent-topology-smoke`) were removed from the release surface after proving the protocol path.
 
 Uploaded agent artifacts are retained in the A3-managed artifact store and can be cleaned independently from workspace cleanup. `a3 agent-artifact-cleanup` applies retention by artifact class using metadata/blob mtimes, with separate TTLs for `diagnostic` and `evidence` artifacts, optional count caps (`--diagnostic-max-count` / `--evidence-max-count`), optional size caps (`--diagnostic-max-mb` / `--evidence-max-mb`), and a `--dry-run` mode for operator inspection. The Portal runtime exposes the same command as `task a3:portal:runtime:agent-artifact-cleanup`.
 
