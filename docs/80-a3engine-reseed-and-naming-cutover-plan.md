@@ -11,8 +11,8 @@
 
 ## 前提
 
-- `Kanboard baseline` は完了しており、以後は文書上の過去証跡としてだけ扱う
-- Redmine backend 実験は破棄済みで、current generic backend は SoloBoard のみである
+- 旧 backend baseline は完了しており、以後は文書上の過去証跡としてだけ扱う
+- 旧 backend 実験は破棄済みで、current generic backend は SoloBoard のみである
 - next の backend migration target は SoloBoard であり、Docker/runtime packaging は SoloBoard parity judgment の後に行う
 - 現行 `a3-engine` は旧実装の退避後に新しい current source として利用する
 - packaging freeze 入力として、current generic operator backend は SoloBoard、`task a3:portal:cutover:doctor` / `:observe` は current mainline 観測入口、`task a3:portal:runtime:*` は Docker 上 A3 runtime + SoloBoard の標準入口として扱う。旧 `task a3:portal:bundle:*` は短期 maintenance alias とする
@@ -87,7 +87,7 @@ Cutover target:
 - `scripts/automation/*` と legacy automation skills/runbook は削除済み
 - root `task automation*` は legacy disabled sentinel としてだけ残す
 - current runtime / operator surface は `task a3:*`, `scripts/a3/*.rb`, `a3-engine` を正規とする
-- Kanboard compatibility path は削除し、current generic backend は SoloBoard のみとする
+- 旧 backend compatibility path は削除し、current generic backend は SoloBoard のみとする
 
 ## Rename Inventory
 
@@ -225,7 +225,7 @@ Cutover target:
 - rollback 条件は少なくとも次を満たすまで保持する
   - root entrypoint が新 `/a3-engine` を安定参照できる
   - `v2` 呼称の rename inventory が主要 surface で反映済みである
-  - Kanboard / operator surface の正規導線が新名称に揃っている
+  - kanban / operator surface の正規導線が新名称に揃っている
 
 ## Execution Order
 
@@ -652,7 +652,7 @@ Stop:
 - project-local build outputs under current workspaces
   - `target/`, local `.work/m2/repository`, generated reports を task terminal cleanup の対象に含めるか、rerun/recovery 用 evidence として一定期間保持するかを決める
 - non-current side systems
-  - `.work/plane-selfhost`, `.work/planka`, `.work/redmine` のような current Portal canary と無関係な runtime を、保守対象か disposable cache かで分類する
+  - current Portal canary と無関係な side-system runtime を、保守対象か disposable cache かで分類する
 
 ### Planning Questions
 

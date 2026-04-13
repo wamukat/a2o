@@ -133,7 +133,7 @@ RSpec.describe A3Reconcile do
       root = Pathname(dir)
       launcher_config = root.join("launcher.json")
       env_file = root.join("portal.env")
-      env_file.write("KANBOARD_API_TOKEN=test-token\nPATH=/usr/bin:/bin\n")
+      env_file.write("KANBAN_API_TOKEN=test-token\nPATH=/usr/bin:/bin\n")
       launcher_config.write(
         JSON.pretty_generate(
           "executor" => { "kind" => "ai-cli", "implementation" => "openai-codex" },
@@ -154,7 +154,7 @@ RSpec.describe A3Reconcile do
 
       expect(received[:argv]).to eq(["task", "kanban:api", "--", "task-transition", "--task-id", "2561", "--status", "To do"])
       expect(received[:kwargs][:chdir]).to eq(root.to_s)
-      expect(received[:env]["KANBOARD_API_TOKEN"]).to eq("test-token")
+      expect(received[:env]["KANBAN_API_TOKEN"]).to eq("test-token")
       expect(received[:env]["JAVA_HOME"]).to eq("/opt/jdk-25")
     end
   end

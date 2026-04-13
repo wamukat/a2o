@@ -13,7 +13,7 @@ RSpec.describe A3Cleanup do
       launcher = root.join(".work", "a3", "config", "portal-launchd.json")
       FileUtils.mkdir_p(env_file.dirname)
       FileUtils.mkdir_p(launcher.dirname)
-      File.write(env_file, "KANBOARD_API_TOKEN=test-token\n")
+      File.write(env_file, "KANBAN_API_TOKEN=test-token\n")
       File.write(launcher, JSON.generate({ "shell" => { "env_files" => [env_file.to_s], "env_overrides" => { "FOO" => "bar" } } }))
 
       captured_env = nil
@@ -25,7 +25,7 @@ RSpec.describe A3Cleanup do
       snapshots = described_class.load_task_snapshots(root_dir: root, project: "portal", launcher_config: launcher)
 
       expect(snapshots).to eq([{ "ref" => "Portal#1", "status" => "Done", "labels" => [] }])
-      expect(captured_env["KANBOARD_API_TOKEN"]).to eq("test-token")
+      expect(captured_env["KANBAN_API_TOKEN"]).to eq("test-token")
       expect(captured_env["FOO"]).to eq("bar")
     end
   end

@@ -128,7 +128,7 @@
   残課題:
   - current A3 がまだ使っていない command surface を parity 確認する。standalone SoloBoard smoke、bundled agent smoke sweep、archived blocked diagnosis の診断/cleanup/repair dry-run surface、runtime inspection surface、rerun recovery surface は再確認済みで、残りは smoke harness 専用 command を通常 operator runbook へ露出しない整理に限られる
   - repeated scheduler-loop と長時間運用で read-after-write 揺れが追加 hardening を要しないか確認する。短時間の idle repeated observation、agent 正規経路の 2 周 mutation loop、2026-04-12 の 3 iteration runtime observe、runtime archive-state による active storage 退避、post-archive idle 確認、post-archive recovery smoke、runtime agent smoke sweep 後の idle observe、diagnostic surface 確認後の 4 iteration observe は完了済みで、残りは必要なら overnight 相当の常駐 loop 観測に限られる
-  - Kanboard compatibility path は削除する。current kanban runtime は SoloBoard のみとし、過去の Kanboard baseline は文書上の証跡としてだけ残す
+  - 旧 backend compatibility path は削除する。current kanban runtime は SoloBoard のみとし、過去の旧 backend baseline は文書上の証跡としてだけ残す
   - host local `a3-agent` と Docker 上 A3 runtime の protocol smoke を root task として固定し、final validation matrix の `T0` から `T5` を host-local agent 主経路の軽量 smoke として通す
   - 実 Portal source の `repo:both` parent/full verification canary は完成判定または release candidate 判定で実行する。毎回の回帰 smoke にはしない
   - `bundle` という operator-facing task 名は実装由来で分かりにくいため、A3 Engine on Docker を標準 runtime とする前提で `a3:portal:runtime:*` へ rename 済み。旧 `a3:portal:bundle:*` は短期 maintenance alias とし、現在の runbook / watch-summary では `runtime:*` を正規入口として扱う

@@ -144,5 +144,5 @@ Current judgment is:
 
 1. Observe longer-running scheduler-loop operation on SoloBoard backend for drift or read-after-write gaps.
 2. Keep transition/relation/done confirmation under observation during longer loops; short bundle agent loops did not reproduce instability.
-3. Complete mainline cutover judgment for generic `task kanban:*`; Kanboard compatibility entrypoints are removed from current runtime.
+3. Complete mainline cutover judgment for generic `task kanban:*`; legacy backend compatibility entrypoints are removed from current runtime.
 4. Only after those hold, lock Docker/runtime packaging to SoloBoard.

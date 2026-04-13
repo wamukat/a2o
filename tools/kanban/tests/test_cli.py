@@ -37,7 +37,7 @@ def patched_env(values: dict[str, str | None]):
 class SoloBoardCliTest(unittest.TestCase):
     def test_resolve_backend_rejects_non_soloboard(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "Unsupported kanban backend"):
-            kanban_cli.resolve_backend_kind("kanboard")
+            kanban_cli.resolve_backend_kind("unsupported-backend")
 
     def test_resolve_base_url_uses_soloboard_default(self) -> None:
         with patched_env({"SOLOBOARD_BASE_URL": None, "KANBAN_BACKEND": None}):
@@ -101,7 +101,7 @@ class SoloBoardCliTest(unittest.TestCase):
         args = parser.parse_args(["--backend", "soloboard", "task-get", "--task", "Portal#1"])
         self.assertEqual("soloboard", args.backend)
         with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
-            parser.parse_args(["--backend", "kanboard", "task-get", "--task", "Portal#1"])
+            parser.parse_args(["--backend", "unsupported-backend", "task-get", "--task", "Portal#1"])
 
     def test_trace_log_writes_timestamped_jsonl(self) -> None:
         path = Path(".work/kanban/test-trace.log")
