@@ -50,7 +50,6 @@ module A3
         "show-runtime-package" => Definition.new(handler: :handle_show_runtime_package, session_kind: :runtime_package),
         "doctor-runtime" => Definition.new(handler: :handle_doctor_runtime, session_kind: :runtime_package),
         "migrate-scheduler-store" => Definition.new(handler: :handle_migrate_scheduler_store, session_kind: :runtime_package),
-        "run-runtime-canary" => Definition.new(handler: :handle_run_runtime_canary, needs_worker_gateway: true, session_kind: :runtime),
         "show-merge-plan" => Definition.new(handler: :handle_show_merge_plan, session_kind: :runtime),
         "show-task" => Definition.new(handler: :handle_show_task, session_kind: :storage),
         "show-run" => Definition.new(handler: :handle_show_run, session_kind: :storage_runtime_package),
@@ -61,8 +60,7 @@ module A3
         "run-worker-phase" => Definition.new(handler: :handle_run_worker_phase, needs_worker_gateway: true, session_kind: :runtime),
         "run-merge" => Definition.new(handler: :handle_run_merge, needs_worker_gateway: true, session_kind: :runtime),
         "root-utility" => Definition.new(handler: :handle_root_utility),
-        "worker:stdin-bundle" => Definition.new(handler: :handle_worker_stdin_bundle),
-        "worker:direct-canary" => Definition.new(handler: :handle_worker_direct_canary)
+        "worker:stdin-bundle" => Definition.new(handler: :handle_worker_stdin_bundle)
       }.freeze
 
       module_function

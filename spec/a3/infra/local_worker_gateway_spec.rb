@@ -165,11 +165,11 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     gateway = described_class.new(
       command_runner: command_runner,
       worker_command: "ruby",
-      worker_command_args: ["-I", "a3-engine/lib", "a3-engine/bin/a3", "worker:direct-canary"]
+      worker_command_args: ["-I", "a3-engine/lib", "a3-engine/bin/a3", "worker:stdin-bundle"]
     )
 
     expect(command_runner).to receive(:run).with(
-      ["ruby -I a3-engine/lib a3-engine/bin/a3 worker:direct-canary"],
+      ["ruby -I a3-engine/lib a3-engine/bin/a3 worker:stdin-bundle"],
       workspace: workspace,
       env: {
         "A3_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,

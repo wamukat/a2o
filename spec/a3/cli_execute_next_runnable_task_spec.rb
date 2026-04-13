@@ -41,8 +41,8 @@ RSpec.describe A3::CLI do
           {
             "id" => 3030,
             "ref" => "A3-v2#3030",
-            "title" => "Direct canary implementation",
-            "description" => "Run the direct canary implementation path.",
+            "title" => "Direct implementation",
+            "description" => "Run the direct implementation path.",
             "status" => "To do",
             "labels" => ["repo:both", "trigger:auto-implement"],
             "parent_ref" => "A3-v2#3022"
@@ -135,8 +135,8 @@ RSpec.describe A3::CLI do
           {
             "id" => 3046,
             "ref" => "Sample#3046",
-            "title" => "UI canary task",
-            "description" => "Run the ui-app direct canary.",
+            "title" => "UI implementation task",
+            "description" => "Run the ui-app direct implementation path.",
             "status" => "To do",
             "labels" => ["repo:ui-app", "trigger:auto-implement"],
             "parent_ref" => nil
@@ -191,8 +191,8 @@ RSpec.describe A3::CLI do
           {
             "id" => 3030,
             "ref" => "A3-v2#3030",
-            "title" => "Direct canary implementation",
-            "description" => "Run the direct canary implementation path.",
+            "title" => "Direct implementation",
+            "description" => "Run the direct implementation path.",
             "status" => "To do",
             "labels" => ["repo:both", "trigger:auto-implement"],
             "parent_ref" => nil
@@ -245,7 +245,7 @@ RSpec.describe A3::CLI do
             "--worker-command-arg", "-I",
             "--worker-command-arg", "a3-engine/lib",
             "--worker-command-arg", "a3-engine/bin/a3",
-            "--worker-command-arg", "worker:direct-canary",
+            "--worker-command-arg", "worker:stdin-bundle",
             "--kanban-command", "ruby",
             "--kanban-command-arg", fake_cli.fetch(:script_path),
             "--kanban-project", "A3-v2",
@@ -273,8 +273,8 @@ RSpec.describe A3::CLI do
           {
             "id" => 3045,
             "ref" => "Sample#3045",
-            "title" => "Both repo canary task",
-            "description" => "Run the both-repo direct canary.",
+            "title" => "Both repo implementation task",
+            "description" => "Run the both-repo direct implementation path.",
             "status" => "To do",
             "labels" => ["repo:both", "trigger:auto-implement"],
             "parent_ref" => nil

@@ -145,7 +145,7 @@ module A3
         out.puts("runtime_package_doctor_command=#{result.recovery.runtime_package_doctor_command}") if result.recovery.runtime_package_doctor_command
         out.puts("runtime_package_migration_command=#{result.recovery.runtime_package_migration_command}") if result.recovery.runtime_package_migration_command
         out.puts("runtime_package_runtime_command=#{result.recovery.runtime_package_runtime_command}") if result.recovery.runtime_package_runtime_command
-        out.puts("runtime_package_runtime_canary_command=#{result.recovery.runtime_package_runtime_canary_command}") if result.recovery.runtime_package_runtime_canary_command
+        out.puts("runtime_package_runtime_validation_command=#{result.recovery.runtime_package_runtime_validation_command}") if result.recovery.runtime_package_runtime_validation_command
         out.puts("runtime_package_startup_sequence=#{result.recovery.runtime_package_startup_sequence}") if result.recovery.runtime_package_startup_sequence
         out.puts("runtime_package_startup_blockers=#{result.recovery.runtime_package_startup_blockers}") if result.recovery.runtime_package_startup_blockers
         out.puts("runtime_package_persistent_state_model=#{result.recovery.runtime_package_persistent_state_model}") if result.recovery.runtime_package_persistent_state_model
@@ -642,27 +642,6 @@ module A3
       end
     end
 
-    def handle_run_runtime_canary(argv, out:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:)
-      with_runtime_session(
-        argv: argv,
-        parse_with: :parse_execute_until_idle_options,
-        run_id_generator: run_id_generator,
-        command_runner: command_runner,
-        merge_runner: merge_runner,
-        worker_gateway: worker_gateway
-      ) do |session|
-        result = A3::Application::RunRuntimeCanary.new(
-          runtime_package: session.runtime_package,
-          execute_until_idle: session.container.fetch(:execute_until_idle)
-        ).call(
-          project_context: session.project_context,
-          max_steps: session.options.fetch(:max_steps)
-        )
-
-        RuntimeOutputFormatter.canary_lines(result: result, runtime_package: session.runtime_package).each { |line| out.puts(line) }
-      end
-    end
-
     def handle_worker_stdin_bundle(_argv, out:)
       require "a3/operator/stdin_bundle_worker"
 
@@ -675,14 +654,6 @@ module A3
       require "a3/operator/root_utility_launcher"
 
       exit_code = A3RootUtilityLauncher.main(argv)
-      out.flush
-      exit(exit_code)
-    end
-
-    def handle_worker_direct_canary(_argv, out:)
-      require "a3/operator/direct_canary_worker"
-
-      exit_code = A3DirectCanaryWorker.main
       out.flush
       exit(exit_code)
     end

@@ -32,7 +32,7 @@ RSpec.describe A3::Application::ResolveRunRecovery do
       operator_guidance: nil,
       next_command: nil,
       migration_command_summary: nil,
-      runtime_canary_command_summary: nil,
+      runtime_validation_command_summary: nil,
       startup_sequence: nil,
       startup_blockers: nil,
       distribution_summary: {
@@ -43,7 +43,7 @@ RSpec.describe A3::Application::ResolveRunRecovery do
         "repository_metadata_model" => "repository_metadata=runtime_package_scoped source_descriptor_ref_resolution=required review_target_resolution=evidence_driven",
         "branch_resolution_model" => "authoritative_branch_resolution=runtime_package_scoped integration_target_resolution=runtime_package_scoped branch_integration_inputs=required",
         "credential_boundary_model" => "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
-        "observability_boundary_model" => "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence canary_output=stdout_only workspace_debug_reference=path_only",
+        "observability_boundary_model" => "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence validation_output=stdout_only workspace_debug_reference=path_only",
         "deployment_shape" => "runtime_package=single_project writable_state=isolated scheduler_instance=single_project state_boundary=project secret_boundary=project",
         "networking_boundary" => "outbound=git,issue_api,package_registry,llm_gateway,verification_service secret_source=secret_store token_scope=project",
         "upgrade_contract" => "image_upgrade=independent manifest_schema_version=1 preset_schema_version=1 state_migration=explicit",
@@ -157,7 +157,7 @@ RSpec.describe A3::Application::ResolveRunRecovery do
       operator_guidance: "startup blocked by scheduler_store_migration; apply scheduler store migration before startup; run bin/a3 doctor-runtime /tmp/manifest.yml",
       next_command: "bin/a3 migrate-scheduler-store /tmp/manifest.yml",
       migration_command_summary: "bin/a3 migrate-scheduler-store /tmp/manifest.yml",
-      runtime_canary_command_summary: "bin/a3 doctor-runtime /tmp/manifest.yml && bin/a3 migrate-scheduler-store /tmp/manifest.yml && bin/a3 execute-until-idle /tmp/manifest.yml",
+      runtime_validation_command_summary: "bin/a3 doctor-runtime /tmp/manifest.yml && bin/a3 migrate-scheduler-store /tmp/manifest.yml && bin/a3 execute-until-idle /tmp/manifest.yml",
       startup_sequence: "doctor=bin/a3 doctor-runtime /tmp/manifest.yml migrate=bin/a3 migrate-scheduler-store /tmp/manifest.yml runtime=bin/a3 execute-until-idle /tmp/manifest.yml",
       startup_blockers: "scheduler_store_migration",
       distribution_summary: {
@@ -168,7 +168,7 @@ RSpec.describe A3::Application::ResolveRunRecovery do
         "repository_metadata_model" => "repository_metadata=runtime_package_scoped source_descriptor_ref_resolution=required review_target_resolution=evidence_driven",
         "branch_resolution_model" => "authoritative_branch_resolution=runtime_package_scoped integration_target_resolution=runtime_package_scoped branch_integration_inputs=required",
         "credential_boundary_model" => "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
-        "observability_boundary_model" => "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence canary_output=stdout_only workspace_debug_reference=path_only",
+        "observability_boundary_model" => "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence validation_output=stdout_only workspace_debug_reference=path_only",
         "deployment_shape" => "runtime_package=single_project writable_state=isolated scheduler_instance=single_project state_boundary=project secret_boundary=project",
         "networking_boundary" => "outbound=git,issue_api,package_registry,llm_gateway,verification_service secret_source=secret_store token_scope=project",
         "upgrade_contract" => "image_upgrade=independent manifest_schema_version=1 preset_schema_version=1 state_migration=explicit",
@@ -200,14 +200,14 @@ RSpec.describe A3::Application::ResolveRunRecovery do
       runtime_package_next_execution_mode_command: "bin/a3 doctor-runtime /tmp/manifest.yml",
       runtime_package_next_command: "bin/a3 migrate-scheduler-store /tmp/manifest.yml",
       runtime_package_migration_command: "bin/a3 migrate-scheduler-store /tmp/manifest.yml",
-      runtime_package_runtime_canary_command: "bin/a3 doctor-runtime /tmp/manifest.yml && bin/a3 migrate-scheduler-store /tmp/manifest.yml && bin/a3 execute-until-idle /tmp/manifest.yml",
+      runtime_package_runtime_validation_command: "bin/a3 doctor-runtime /tmp/manifest.yml && bin/a3 migrate-scheduler-store /tmp/manifest.yml && bin/a3 execute-until-idle /tmp/manifest.yml",
       runtime_package_startup_sequence: "doctor=bin/a3 doctor-runtime /tmp/manifest.yml migrate=bin/a3 migrate-scheduler-store /tmp/manifest.yml runtime=bin/a3 execute-until-idle /tmp/manifest.yml",
       runtime_package_startup_blockers: "scheduler_store_migration",
       runtime_package_retention_policy: "terminal_workspace_cleanup=retention_policy_controlled blocked_evidence_retention=independent_from_scheduler_cleanup image_upgrade_cleanup_trigger=none",
       runtime_package_materialization_model: "repo_slot_namespace=task_workspace_fixed implementation_workspace=ticket_workspace review_workspace=runtime_workspace verification_workspace=runtime_workspace merge_workspace=runtime_workspace missing_repo_rescue=forbidden source_descriptor_alignment=required_before_phase_start",
       runtime_package_runtime_configuration_model: "manifest_path=required preset_dir=required storage_backend=required state_root=required workspace_root=required artifact_root=required repo_source_strategy=required repository_metadata=required authoritative_branch_resolution=required integration_target_resolution=required secret_reference=required",
       runtime_package_credential_boundary_model: "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
-      runtime_package_observability_boundary_model: "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence canary_output=stdout_only workspace_debug_reference=path_only"
+      runtime_package_observability_boundary_model: "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence validation_output=stdout_only workspace_debug_reference=path_only"
     )
   end
 end

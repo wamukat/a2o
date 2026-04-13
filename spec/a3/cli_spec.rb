@@ -218,11 +218,11 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("runtime_summary.startup_readiness=ready")
       expect(out.string).to include("runtime_summary.recommended_execution_mode=one_shot_cli")
       expect(out.string).to include("runtime_summary.recommended_execution_mode_reason=runtime contract satisfied; use one_shot_cli to validate execution or start scheduler processing")
-      expect(out.string).to include("runtime_summary.recommended_execution_mode_command=#{descriptor.operator_summary.fetch('runtime_canary_command')}")
+      expect(out.string).to include("runtime_summary.recommended_execution_mode_command=#{descriptor.operator_summary.fetch('runtime_validation_command')}")
       expect(out.string).to include("runtime_summary.doctor_command=#{descriptor.operator_summary.fetch('doctor_command')}")
       expect(out.string).to include("runtime_summary.migration_command=#{descriptor.operator_summary.fetch('migration_command')}")
       expect(out.string).to include("runtime_summary.runtime_command=#{descriptor.operator_summary.fetch('runtime_command')}")
-      expect(out.string).to include("runtime_summary.runtime_canary_command=#{descriptor.operator_summary.fetch('runtime_canary_command')}")
+      expect(out.string).to include("runtime_summary.runtime_validation_command=#{descriptor.operator_summary.fetch('runtime_validation_command')}")
       expect(out.string).to include("runtime_summary.next_command=#{descriptor.operator_summary.fetch('runtime_command')}")
       expect(out.string).to include("runtime_summary.startup_sequence=#{descriptor.operator_summary.fetch('startup_sequence')}")
       expect(out.string).to include("runtime_summary.operator_action=#{descriptor.operator_summary.fetch('operator_action')}")
@@ -322,7 +322,7 @@ RSpec.describe A3::CLI do
     expect(out.string).to include('runtime_summary.preset_schema_contract=required_preset_schema_version=1 preset_schema_versions=')
     expect(out.string).to include('runtime_summary.runtime_contract=manifest_schema_version=1 required_manifest_schema_version=1 required_preset_schema_version=1 preset_schema_versions= repo_source_strategy=explicit_map repo_source_slots=repo_alpha,repo_beta secret_delivery_mode=environment_variable secret_reference=A3_SECRET scheduler_store_migration_state=not_required')
     expect(out.string).to include('runtime_summary.credential_boundary_model=secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only')
-    expect(out.string).to include('runtime_summary.observability_boundary_model=operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence canary_output=stdout_only workspace_debug_reference=path_only')
+    expect(out.string).to include('runtime_summary.observability_boundary_model=operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence validation_output=stdout_only workspace_debug_reference=path_only')
     expect(out.string).to include('runtime_summary.repo_source_action=provide writable repo sources for repo_alpha,repo_beta')
     expect(out.string).to include('runtime_summary.preset_schema_action=no preset schema action required')
     expect(out.string).to include('runtime_summary.secret_delivery_action=provide secrets via environment variable A3_SECRET')
@@ -334,7 +334,7 @@ RSpec.describe A3::CLI do
     expect(out.string).to include('runtime_summary.doctor_command=bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
     expect(out.string).to include('runtime_summary.migration_command=bin/a3 migrate-scheduler-store /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
     expect(out.string).to include('runtime_summary.runtime_command=bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
-    expect(out.string).to include('runtime_summary.runtime_canary_command=bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state && bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
+    expect(out.string).to include('runtime_summary.runtime_validation_command=bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state && bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
     expect(out.string).to include('runtime_summary.startup_sequence=doctor=bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state migrate=skip runtime=bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
     expect(out.string).to include('runtime_summary.operator_action=provide writable repo sources for repo_alpha,repo_beta; provide secrets via environment variable A3_SECRET; scheduler store migration not required')
     expect(out.string).to include('distribution_summary.image_ref=a3-engine:a3:v2.1.0')
@@ -349,7 +349,7 @@ RSpec.describe A3::CLI do
     expect(out.string).to include('distribution_summary.secret_reference=A3_SECRET')
     expect(out.string).to include('distribution_summary.secret_contract=secret_delivery_mode=environment_variable secret_reference=A3_SECRET')
     expect(out.string).to include('distribution_summary.credential_boundary_model=secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only')
-    expect(out.string).to include('distribution_summary.observability_boundary_model=operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence canary_output=stdout_only workspace_debug_reference=path_only')
+    expect(out.string).to include('distribution_summary.observability_boundary_model=operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence validation_output=stdout_only workspace_debug_reference=path_only')
     expect(out.string).to include('distribution_summary.scheduler_store_migration_state=not_required')
     expect(out.string).to include('distribution_summary.migration_contract=scheduler_store_migration_state=not_required')
     expect(out.string).to include('writable_roots=/tmp/runtime/state,/tmp/runtime/state/workspaces,/tmp/runtime/state/artifacts')
@@ -394,240 +394,6 @@ RSpec.describe A3::CLI do
     expect(out.string).to include("migration_state=applied")
     expect(out.string).to include("migration_marker_path=/tmp/runtime/state/.a3/scheduler-store-migration.applied")
     expect(out.string).to include("message=scheduler store migration marker written")
-  end
-
-  it "runs runtime canary through the shared runtime session helper" do
-    out = StringIO.new
-    runtime_package = instance_double(
-      A3::Domain::RuntimePackageDescriptor,
-      image_version: "a3:v2.1.0",
-      project_runtime_root: Pathname("/tmp/runtime"),
-      storage_backend: :sqlite,
-      writable_roots: [
-        Pathname("/tmp/runtime/state"),
-        Pathname("/tmp/runtime/state/workspaces"),
-        Pathname("/tmp/runtime/state/artifacts")
-      ],
-      operator_summary: {
-        "schema_contract" => "manifest_schema_version=1 required_manifest_schema_version=1",
-        "preset_schema_contract" => "required_preset_schema_version=1 preset_schema_versions=",
-        "repo_source_contract" => "repo_source_strategy=explicit_map repo_source_slots=repo_alpha",
-        "secret_contract" => "secret_delivery_mode=environment_variable secret_reference=A3_SECRET",
-        "migration_contract" => "scheduler_store_migration_state=not_required",
-        "runtime_contract" => "manifest_schema_version=1 required_manifest_schema_version=1 required_preset_schema_version=1 preset_schema_versions= repo_source_strategy=explicit_map repo_source_slots=repo_alpha secret_delivery_mode=environment_variable secret_reference=A3_SECRET scheduler_store_migration_state=not_required",
-        "credential_boundary_model" => "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
-        "observability_boundary_model" => "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence canary_output=stdout_only workspace_debug_reference=path_only",
-        "repo_source_action" => "provide writable repo sources for repo_alpha,repo_beta",
-        "preset_schema_action" => "no preset schema action required",
-        "secret_delivery_action" => "provide secrets via environment variable A3_SECRET",
-        "scheduler_store_migration_action" => "scheduler store migration not required",
-        "startup_checklist" => "provide writable repo sources for repo_alpha,repo_beta; provide secrets via environment variable A3_SECRET; scheduler store migration not required",
-        "execution_modes" => "one_shot_cli=bin/a3 doctor-runtime ... | bin/a3 migrate-scheduler-store ... | bin/a3 execute-until-idle ... ; scheduler_loop=bin/a3 execute-until-idle ... ; doctor_inspect=bin/a3 doctor-runtime ...",
-        "execution_mode_contract" => "one_shot_cli=operator_driven_doctor_migration_runtime ; scheduler_loop=continuous_runnable_processing_after_runtime_ready ; doctor_inspect=configuration_and_mount_validation_only",
-        "doctor_command" => "bin/a3 doctor-runtime ...",
-        "migration_command" => "bin/a3 migrate-scheduler-store ...",
-        "runtime_command" => "bin/a3 execute-until-idle ...",
-        "operator_action" => "provide writable repo sources for repo_alpha,repo_beta; provide secrets via environment variable A3_SECRET; scheduler store migration not required"
-      }
-    )
-    session = Struct.new(:options, :container, :project_context, :runtime_package, keyword_init: true).new(
-      options: {
-        manifest_path: "/tmp/runtime/manifest.yml",
-        preset_dir: "/tmp/runtime/presets",
-        storage_backend: :sqlite,
-        storage_dir: "/tmp/runtime/state",
-        max_steps: 5
-      },
-      container: {
-        execute_until_idle: instance_double(A3::Application::ExecuteUntilIdle)
-      },
-      project_context: Object.new,
-      runtime_package: runtime_package
-    )
-    allow(described_class).to receive(:with_runtime_session).and_yield(session)
-    result = A3::Application::RunRuntimeCanary::Result.new(
-      status: :completed,
-      doctor_result: Struct.new(
-        :contract_health,
-        :mount_summary,
-        :repo_source_strategy,
-        :repo_source_slots,
-        :repo_source_paths,
-        :repo_source_summary,
-        :startup_readiness,
-        :startup_blockers,
-        :execution_modes_summary,
-        :execution_mode_contract_summary,
-        :distribution_summary,
-        :recommended_execution_mode,
-        :recommended_execution_mode_reason,
-        :recommended_execution_mode_command,
-        :operator_guidance,
-        :next_command,
-        :doctor_command_summary,
-        :migration_command_summary,
-        :runtime_command_summary,
-        :startup_sequence,
-        :runtime_canary_command_summary,
-        :checks
-      ).new(
-        "repo_sources=ok secret_delivery=ok scheduler_store_migration=ok",
-        {
-          "state_root" => "/tmp/runtime/state",
-          "logs_root" => "/tmp/runtime/state/logs",
-          "workspace_root" => "/tmp/runtime/state/workspaces",
-          "artifact_root" => "/tmp/runtime/state/artifacts",
-          "migration_marker_path" => "/tmp/runtime/state/.a3/scheduler-store-migration.applied"
-        },
-        :explicit_map,
-        [:repo_alpha],
-        { repo_alpha: "/tmp/repos/repo-alpha" },
-        {
-          "strategy" => :explicit_map,
-          "slots" => [:repo_alpha],
-          "sources" => { repo_alpha: "/tmp/repos/repo-alpha" }
-        },
-        :ready,
-        "none",
-        "one_shot_cli=bin/a3 doctor-runtime ... | bin/a3 migrate-scheduler-store ... | bin/a3 execute-until-idle ... ; scheduler_loop=bin/a3 execute-until-idle ... ; doctor_inspect=bin/a3 doctor-runtime ...",
-        "one_shot_cli=operator_driven_doctor_migration_runtime ; scheduler_loop=continuous_runnable_processing_after_runtime_ready ; doctor_inspect=configuration_and_mount_validation_only",
-        {
-          "image_ref" => "a3-engine:a3:v2.1.0",
-          "runtime_entrypoint" => "bin/a3",
-          "doctor_entrypoint" => "bin/a3 doctor-runtime",
-          "migration_entrypoint" => "bin/a3 migrate-scheduler-store",
-          "manifest_schema_version" => "1",
-          "required_manifest_schema_version" => "1",
-          "schema_contract" => "manifest_schema_version=1 required_manifest_schema_version=1",
-          "preset_chain" => [],
-          "preset_schema_versions" => {},
-          "required_preset_schema_version" => "1",
-          "preset_schema_contract" => "required_preset_schema_version=1 preset_schema_versions=",
-          "secret_delivery_mode" => :environment_variable,
-          "secret_reference" => "A3_SECRET",
-          "secret_contract" => "secret_delivery_mode=environment_variable secret_reference=A3_SECRET",
-          "scheduler_store_migration_state" => :not_required,
-          "migration_contract" => "scheduler_store_migration_state=not_required",
-          "persistent_state_model" => "scheduler_state_root=/tmp/runtime/state/scheduler task_repository_root=/tmp/runtime/state/tasks run_repository_root=/tmp/runtime/state/runs evidence_root=/tmp/runtime/state/evidence blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses artifact_owner_cache_root=/tmp/runtime/state/artifact_owner_cache logs_root=/tmp/runtime/state/logs workspace_root=/tmp/runtime/state/workspaces artifact_root=/tmp/runtime/state/artifacts",
-          "retention_policy" => "terminal_workspace_cleanup=retention_policy_controlled blocked_evidence_retention=independent_from_scheduler_cleanup image_upgrade_cleanup_trigger=none",
-          "materialization_model" => "repo_slot_namespace=task_workspace_fixed implementation_workspace=ticket_workspace review_workspace=runtime_workspace verification_workspace=runtime_workspace merge_workspace=runtime_workspace missing_repo_rescue=forbidden source_descriptor_alignment=required_before_phase_start",
-          "runtime_configuration_model" => "manifest_path=required preset_dir=required storage_backend=required state_root=required workspace_root=required artifact_root=required repo_source_strategy=required repository_metadata=required authoritative_branch_resolution=required integration_target_resolution=required secret_reference=required",
-        "repository_metadata_model" => "repository_metadata=runtime_package_scoped source_descriptor_ref_resolution=required review_target_resolution=evidence_driven",
-        "branch_resolution_model" => "authoritative_branch_resolution=runtime_package_scoped integration_target_resolution=runtime_package_scoped branch_integration_inputs=required",
-        "credential_boundary_model" => "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
-        "observability_boundary_model" => "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence canary_output=stdout_only workspace_debug_reference=path_only",
-        "deployment_shape" => "runtime_package=single_project writable_state=isolated scheduler_instance=single_project state_boundary=project secret_boundary=project",
-          "networking_boundary" => "outbound=git,issue_api,package_registry,llm_gateway,verification_service secret_source=secret_store token_scope=project",
-          "upgrade_contract" => "image_upgrade=independent manifest_schema_version=1 preset_schema_version=1 state_migration=explicit",
-          "fail_fast_policy" => "manifest_schema_mismatch=fail_fast preset_schema_conflict=fail_fast writable_mount_missing=fail_fast secret_missing=fail_fast scheduler_store_migration_pending=fail_fast"
-        },
-        :one_shot_cli,
-        "runtime contract satisfied; use one_shot_cli to validate execution or start scheduler processing",
-        "bin/a3 doctor-runtime ... && bin/a3 execute-until-idle ...",
-        "startup ready; runtime package contract satisfied; run bin/a3 execute-until-idle ...",
-        "bin/a3 execute-until-idle ...",
-        "bin/a3 doctor-runtime ...",
-        "bin/a3 migrate-scheduler-store ...",
-        "bin/a3 execute-until-idle ...",
-        "doctor=bin/a3 doctor-runtime ... migrate=skip runtime=bin/a3 execute-until-idle ...",
-        "bin/a3 doctor-runtime ... && bin/a3 execute-until-idle ...",
-        [Struct.new(:name, :status, :path, :detail).new(:manifest_path, :ok, "/tmp/runtime/manifest.yml", "file exists")]
-      ),
-      migration_result: Struct.new(:status, :marker_path).new(:applied, Pathname("/tmp/runtime/state/.a3/scheduler-store-migration.applied")),
-      scheduler_result: Struct.new(:executed_count, :idle_reached, :stop_reason, :quarantined_count).new(4, true, :idle, 1),
-      operator_action: :start_continuous_processing,
-      operator_action_command: "bin/a3 execute-until-idle ...",
-      next_execution_mode: :scheduler_loop,
-      next_execution_mode_reason: "runtime canary completed with a ready runtime; continue scheduler loop for ongoing runnable processing",
-      next_execution_mode_command: "bin/a3 execute-until-idle ..."
-    )
-    allow(A3::Application::RunRuntimeCanary).to receive(:new).and_return(
-      instance_double(A3::Application::RunRuntimeCanary, call: result)
-    )
-
-    described_class.start(
-      ["run-runtime-canary", "/tmp/runtime/manifest.yml", "--preset-dir", "/tmp/runtime/presets", "--storage-backend", "sqlite", "--storage-dir", "/tmp/runtime/state", "--max-steps", "5"],
-      out: out
-    )
-
-    expect(out.string).to include("runtime_canary=completed")
-    expect(out.string).to include("image_version=a3:v2.1.0")
-    expect(out.string).to include("project_runtime_root=/tmp/runtime")
-    expect(out.string).to include("storage_backend=sqlite")
-    expect(out.string).to include("writable_roots=/tmp/runtime/state,/tmp/runtime/state/workspaces,/tmp/runtime/state/artifacts")
-    expect(out.string).to include("runtime_summary.contract_health=repo_sources=ok secret_delivery=ok scheduler_store_migration=ok")
-    expect(out.string).to include("runtime_summary.mount=state_root=/tmp/runtime/state logs_root=/tmp/runtime/state/logs workspace_root=/tmp/runtime/state/workspaces artifact_root=/tmp/runtime/state/artifacts migration_marker_path=/tmp/runtime/state/.a3/scheduler-store-migration.applied")
-    expect(out.string).to include("runtime_summary.repo_sources=strategy=explicit_map slots=repo_alpha paths=repo_alpha=/tmp/repos/repo-alpha")
-    expect(out.string).to include("runtime_summary.distribution=image_ref=a3-engine:a3:v2.1.0 runtime_entrypoint=bin/a3 doctor_entrypoint=bin/a3 doctor-runtime")
-    expect(out.string).to include("runtime_summary.execution_modes=one_shot_cli=bin/a3 doctor-runtime ... | bin/a3 migrate-scheduler-store ... | bin/a3 execute-until-idle ... ; scheduler_loop=bin/a3 execute-until-idle ... ; doctor_inspect=bin/a3 doctor-runtime ...")
-    expect(out.string).to include("runtime_summary.execution_mode_contract=one_shot_cli=operator_driven_doctor_migration_runtime ; scheduler_loop=continuous_runnable_processing_after_runtime_ready ; doctor_inspect=configuration_and_mount_validation_only")
-    expect(out.string).to include("runtime_summary.persistent_state_model=scheduler_state_root=/tmp/runtime/state/scheduler task_repository_root=/tmp/runtime/state/tasks run_repository_root=/tmp/runtime/state/runs evidence_root=/tmp/runtime/state/evidence blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses artifact_owner_cache_root=/tmp/runtime/state/artifact_owner_cache logs_root=/tmp/runtime/state/logs workspace_root=/tmp/runtime/state/workspaces artifact_root=/tmp/runtime/state/artifacts")
-    expect(out.string).to include("runtime_summary.retention_policy=terminal_workspace_cleanup=retention_policy_controlled blocked_evidence_retention=independent_from_scheduler_cleanup image_upgrade_cleanup_trigger=none")
-    expect(out.string).to include("runtime_summary.materialization_model=repo_slot_namespace=task_workspace_fixed implementation_workspace=ticket_workspace review_workspace=runtime_workspace verification_workspace=runtime_workspace merge_workspace=runtime_workspace missing_repo_rescue=forbidden source_descriptor_alignment=required_before_phase_start")
-    expect(out.string).to include("runtime_summary.runtime_configuration_model=manifest_path=required preset_dir=required storage_backend=required state_root=required workspace_root=required artifact_root=required repo_source_strategy=required repository_metadata=required authoritative_branch_resolution=required integration_target_resolution=required secret_reference=required")
-    expect(out.string).to include("runtime_summary.deployment_shape=runtime_package=single_project writable_state=isolated scheduler_instance=single_project state_boundary=project secret_boundary=project")
-    expect(out.string).to include("runtime_summary.networking_boundary=outbound=git,issue_api,package_registry,llm_gateway,verification_service secret_source=secret_store token_scope=project")
-    expect(out.string).to include("runtime_summary.upgrade_contract=image_upgrade=independent manifest_schema_version=1 preset_schema_version=1 state_migration=explicit")
-    expect(out.string).to include("runtime_summary.fail_fast_policy=manifest_schema_mismatch=fail_fast preset_schema_conflict=fail_fast writable_mount_missing=fail_fast secret_missing=fail_fast scheduler_store_migration_pending=fail_fast")
-    expect(out.string).to include("runtime_summary.credential_boundary_model=secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only")
-    expect(out.string).to include("runtime_summary.observability_boundary_model=operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence canary_output=stdout_only workspace_debug_reference=path_only")
-    expect(out.string).to include("distribution_summary.image_ref=a3-engine:a3:v2.1.0")
-    expect(out.string).to include("distribution_summary.runtime_entrypoint=bin/a3")
-    expect(out.string).to include("distribution_summary.doctor_entrypoint=bin/a3 doctor-runtime")
-    expect(out.string).to include("distribution_summary.migration_entrypoint=bin/a3 migrate-scheduler-store")
-    expect(out.string).to include("distribution_summary.manifest_schema_version=1")
-    expect(out.string).to include("distribution_summary.required_manifest_schema_version=1")
-    expect(out.string).to include("distribution_summary.schema_contract=manifest_schema_version=1 required_manifest_schema_version=1")
-    expect(out.string).to include("distribution_summary.preset_chain=")
-    expect(out.string).to include("distribution_summary.preset_schema_versions=")
-    expect(out.string).to include("distribution_summary.required_preset_schema_version=1")
-    expect(out.string).to include("distribution_summary.preset_schema_contract=required_preset_schema_version=1 preset_schema_versions=")
-    expect(out.string).to include("distribution_summary.secret_delivery_mode=environment_variable")
-    expect(out.string).to include("distribution_summary.secret_reference=A3_SECRET")
-    expect(out.string).to include("distribution_summary.secret_contract=secret_delivery_mode=environment_variable secret_reference=A3_SECRET")
-    expect(out.string).to include("distribution_summary.credential_boundary_model=secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only")
-    expect(out.string).to include("distribution_summary.observability_boundary_model=operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence canary_output=stdout_only workspace_debug_reference=path_only")
-    expect(out.string).to include("distribution_summary.scheduler_store_migration_state=not_required")
-    expect(out.string).to include("distribution_summary.migration_contract=scheduler_store_migration_state=not_required")
-    expect(out.string).to include("mount_summary.state_root=/tmp/runtime/state")
-    expect(out.string).to include("mount_summary.logs_root=/tmp/runtime/state/logs")
-    expect(out.string).to include("mount_summary.workspace_root=/tmp/runtime/state/workspaces")
-    expect(out.string).to include("mount_summary.artifact_root=/tmp/runtime/state/artifacts")
-    expect(out.string).to include("mount_summary.migration_marker_path=/tmp/runtime/state/.a3/scheduler-store-migration.applied")
-    expect(out.string).to include("repo_source_strategy=explicit_map")
-    expect(out.string).to include("repo_source_slots=repo_alpha")
-    expect(out.string).to include("repo_source_paths=repo_alpha=/tmp/repos/repo-alpha")
-    expect(out.string).to include("repo_source_details=explicit_map:repo_alpha")
-    expect(out.string).to include("runtime_summary.schema_contract=manifest_schema_version=1 required_manifest_schema_version=1")
-    expect(out.string).to include("runtime_summary.preset_schema_contract=required_preset_schema_version=1 preset_schema_versions=")
-    expect(out.string).to include("runtime_summary.repo_source_contract=repo_source_strategy=explicit_map repo_source_slots=repo_alpha")
-    expect(out.string).to include("runtime_summary.secret_contract=secret_delivery_mode=environment_variable secret_reference=A3_SECRET")
-    expect(out.string).to include("runtime_summary.migration_contract=scheduler_store_migration_state=not_required")
-    expect(out.string).to include("runtime_summary.runtime_contract=manifest_schema_version=1 required_manifest_schema_version=1 required_preset_schema_version=1 preset_schema_versions= repo_source_strategy=explicit_map repo_source_slots=repo_alpha secret_delivery_mode=environment_variable secret_reference=A3_SECRET scheduler_store_migration_state=not_required")
-    expect(out.string).to include("runtime_summary.repo_source_action=provide writable repo sources for repo_alpha,repo_beta")
-    expect(out.string).to include("runtime_summary.preset_schema_action=no preset schema action required")
-    expect(out.string).to include("runtime_summary.secret_delivery_action=provide secrets via environment variable A3_SECRET")
-    expect(out.string).to include("runtime_summary.scheduler_store_migration_action=scheduler store migration not required")
-    expect(out.string).to include("runtime_summary.startup_checklist=provide writable repo sources for repo_alpha,repo_beta; provide secrets via environment variable A3_SECRET; scheduler store migration not required")
-    expect(out.string).to include("runtime_summary.recommended_execution_mode=one_shot_cli")
-    expect(out.string).to include("runtime_summary.recommended_execution_mode_reason=runtime contract satisfied; use one_shot_cli to validate execution or start scheduler processing")
-    expect(out.string).to include("runtime_summary.recommended_execution_mode_command=bin/a3 doctor-runtime ... && bin/a3 execute-until-idle ...")
-    expect(out.string).to include("operator_action=start_continuous_processing")
-    expect(out.string).to include("operator_action_command=bin/a3 execute-until-idle ...")
-    expect(out.string).to include("next_execution_mode=scheduler_loop")
-    expect(out.string).to include("next_execution_mode_reason=runtime canary completed with a ready runtime; continue scheduler loop for ongoing runnable processing")
-    expect(out.string).to include("next_execution_mode_command=bin/a3 execute-until-idle ...")
-    expect(out.string).to include("runtime_summary.startup_readiness=ready")
-    expect(out.string).to include("runtime_summary.operator_guidance=startup ready; runtime package contract satisfied; run bin/a3 execute-until-idle ...")
-    expect(out.string).to include("runtime_summary.doctor_command=bin/a3 doctor-runtime ...")
-    expect(out.string).to include("runtime_summary.migration_command=bin/a3 migrate-scheduler-store ...")
-    expect(out.string).to include("runtime_summary.runtime_command=bin/a3 execute-until-idle ...")
-    expect(out.string).to include("runtime_summary.startup_sequence=doctor=bin/a3 doctor-runtime ... migrate=skip runtime=bin/a3 execute-until-idle ...")
-    expect(out.string).to include("runtime_summary.runtime_canary_command=bin/a3 doctor-runtime ... && bin/a3 execute-until-idle ...")
-    expect(out.string).to include("check.manifest_path=ok path=/tmp/runtime/manifest.yml detail=file exists")
-    expect(out.string).to include("migration_status=applied")
-    expect(out.string).to include("executed=4")
-    expect(out.string).to include("idle=true")
   end
 
   it "routes manifest project-context commands through the shared manifest session helper" do
@@ -1025,14 +791,14 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("runtime_package_migration_command=bin/a3 migrate-scheduler-store #{manifest_path} --preset-dir #{preset_dir} --storage-backend sqlite --storage-dir #{dir}")
       expect(out.string).to include("runtime_package_doctor_command=bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend sqlite --storage-dir #{dir}")
       expect(out.string).to include("runtime_package_runtime_command=bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend sqlite --storage-dir #{dir}")
-      expect(out.string).to include("runtime_package_runtime_canary_command=bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend sqlite --storage-dir #{dir}")
+      expect(out.string).to include("runtime_package_runtime_validation_command=bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend sqlite --storage-dir #{dir}")
       expect(out.string).to include("runtime_package_startup_sequence=doctor=bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend sqlite --storage-dir #{dir} migrate=blocked runtime=blocked")
       expect(out.string).to include("runtime_package_startup_blockers=secret_delivery")
       expect(out.string).to include("runtime_package_persistent_state_model=scheduler_state_root=#{File.join(dir, 'scheduler')} task_repository_root=#{File.join(dir, 'tasks')} run_repository_root=#{File.join(dir, 'runs')} evidence_root=#{File.join(dir, 'evidence')} blocked_diagnosis_root=#{File.join(dir, 'blocked_diagnoses')} artifact_owner_cache_root=#{File.join(dir, 'artifact_owner_cache')} logs_root=#{File.join(dir, 'logs')} workspace_root=#{File.join(dir, 'workspaces')} artifact_root=#{File.join(dir, 'artifacts')}")
       expect(out.string).to include("runtime_package_retention_policy=terminal_workspace_cleanup=retention_policy_controlled blocked_evidence_retention=independent_from_scheduler_cleanup image_upgrade_cleanup_trigger=none")
       expect(out.string).to include("runtime_package_materialization_model=repo_slot_namespace=task_workspace_fixed implementation_workspace=ticket_workspace review_workspace=runtime_workspace verification_workspace=runtime_workspace merge_workspace=runtime_workspace missing_repo_rescue=forbidden source_descriptor_alignment=required_before_phase_start")
       expect(out.string).to include("runtime_package_runtime_configuration_model=manifest_path=required preset_dir=required storage_backend=required state_root=required workspace_root=required artifact_root=required repo_source_strategy=required repository_metadata=required authoritative_branch_resolution=required integration_target_resolution=required secret_reference=required")
-      expect(out.string).to include("runtime_package_observability_boundary_model=operator_logs_root=#{File.join(dir, 'logs')} blocked_diagnosis_root=#{File.join(dir, 'blocked_diagnoses')} evidence_root=#{File.join(dir, 'evidence')} canary_output=stdout_only workspace_debug_reference=path_only")
+      expect(out.string).to include("runtime_package_observability_boundary_model=operator_logs_root=#{File.join(dir, 'logs')} blocked_diagnosis_root=#{File.join(dir, 'blocked_diagnoses')} evidence_root=#{File.join(dir, 'evidence')} validation_output=stdout_only workspace_debug_reference=path_only")
       expect(out.string).to include("runtime_package_deployment_shape=runtime_package=single_project writable_state=isolated scheduler_instance=single_project state_boundary=project secret_boundary=project")
       expect(out.string).to include("runtime_package_networking_boundary=outbound=git,issue_api,package_registry,llm_gateway,verification_service secret_source=secret_store token_scope=project")
       expect(out.string).to include("runtime_package_upgrade_contract=image_upgrade=independent manifest_schema_version=1 preset_schema_version=1 state_migration=explicit")

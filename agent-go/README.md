@@ -85,32 +85,6 @@ Out of scope for the current runtime:
 - multi-tenant agent registry / capability scheduling
 - remote artifact routing outside the local A3-managed artifact store
 
-## Protocol Smoke
-
-To verify the Go agent against the Ruby A3 control plane:
-
-```sh
-./scripts/smoke-ruby-control-plane.sh
-```
-
-This starts `a3 agent-server`, enqueues one verification job, runs the Go agent once, and checks that combined logs and matched artifacts were uploaded to the A3-managed artifact store.
-
-To verify agent-owned workspace materialization and worker protocol transport:
-
-```sh
-./scripts/smoke-materialized-worker-protocol.sh
-```
-
-This starts the same Ruby control plane, creates a tiny clean Git source repo, enqueues one implementation job with `workspace_request` and `worker_protocol_request`, runs the Go agent with `--workspace-root` and `--source-alias`, and checks that the worker result is returned both as inline result JSON and as an uploaded `worker-result` artifact.
-
-To verify the A3-side `AgentWorkerGateway` materialized path end to end:
-
-```sh
-./scripts/smoke-materialized-agent-gateway.sh
-```
-
-This starts the Ruby control plane, runs the Ruby `AgentWorkerGateway` in `agent-materialized` mode, runs the Go agent against a local Git source alias, and checks that the gateway completes from the returned worker protocol result while canonicalizing implementation `changed_files` from the agent workspace descriptor.
-
 ## Run Once
 
 Create a runtime profile for the host or dev-env where commands will run:
@@ -175,6 +149,6 @@ Useful flags and environment overrides:
 
 - `--loop`: keep polling until the process is interrupted or fails.
 - `--poll-interval` / `A3_AGENT_POLL_INTERVAL`: idle sleep duration, for example `2s`.
-- `--max-iterations` / `A3_AGENT_MAX_ITERATIONS`: bounded loop count for smoke tests; `0` means unlimited.
+- `--max-iterations` / `A3_AGENT_MAX_ITERATIONS`: bounded loop count for manual verification; `0` means unlimited.
 
 Loop mode exits non-zero on control-plane or job execution errors. If an operator wants OS-managed restart later, they can wrap this command outside A3. The current A3 distribution intentionally does not own systemd, launchd, or Windows service registration. Windows users run A3 through WSL2 Ubuntu and use the same manual loop path.

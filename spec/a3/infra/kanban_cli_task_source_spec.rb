@@ -146,14 +146,14 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
           "id" => 5001,
           "ref" => "Sample#5001",
           "status" => "To do",
-          "labels" => ["repo:ui-app", "trigger:auto-scheduler-canary"],
+          "labels" => ["repo:ui-app", "trigger:auto-scheduler-validation"],
           "parent_ref" => nil
         },
         {
           "id" => 5002,
           "ref" => "Sample#5002",
           "status" => "Done",
-          "labels" => ["repo:ui-app", "trigger:auto-scheduler-canary"],
+          "labels" => ["repo:ui-app", "trigger:auto-scheduler-validation"],
           "parent_ref" => nil
         }
       ]
@@ -165,7 +165,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
       repo_label_map: {
         "repo:ui-app" => [:repo_beta]
       },
-      trigger_labels: ["trigger:auto-scheduler-canary"],
+      trigger_labels: ["trigger:auto-scheduler-validation"],
       status: "To do",
       working_dir: @tmp_dir
     )
@@ -318,7 +318,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
           "id" => 5001,
           "ref" => "Sample#5001",
           "status" => "In review",
-          "labels" => ["repo:ui-app", "trigger:auto-scheduler-canary"],
+          "labels" => ["repo:ui-app", "trigger:auto-scheduler-validation"],
           "parent_ref" => nil
         }
       ]
@@ -330,7 +330,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
       repo_label_map: {
         "repo:ui-app" => [:repo_beta]
       },
-      trigger_labels: ["trigger:auto-scheduler-canary"],
+      trigger_labels: ["trigger:auto-scheduler-validation"],
       status: "To do",
       working_dir: @tmp_dir
     )
@@ -394,7 +394,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
           "id" => 5400,
           "ref" => "Sample#5400",
           "status" => "To do",
-          "labels" => ["repo:ui-app", "trigger:auto-scheduler-canary", "blocked"],
+          "labels" => ["repo:ui-app", "trigger:auto-scheduler-validation", "blocked"],
           "parent_ref" => nil
         }
       ]
@@ -406,7 +406,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
       repo_label_map: {
         "repo:ui-app" => [:repo_beta]
       },
-      trigger_labels: ["trigger:auto-scheduler-canary"],
+      trigger_labels: ["trigger:auto-scheduler-validation"],
       status: "Blocked",
       working_dir: @tmp_dir
     )
@@ -427,7 +427,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
           "id" => 5401,
           "ref" => "Sample#5401",
           "status" => "To do",
-          "labels" => ["repo:ui-app", "trigger:auto-scheduler-canary", "blocked"],
+          "labels" => ["repo:ui-app", "trigger:auto-scheduler-validation", "blocked"],
           "parent_ref" => nil
         }
       ]
@@ -439,7 +439,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
       repo_label_map: {
         "repo:ui-app" => [:repo_beta]
       },
-      trigger_labels: ["trigger:auto-scheduler-canary"],
+      trigger_labels: ["trigger:auto-scheduler-validation"],
       status: "To do",
       working_dir: @tmp_dir
     )

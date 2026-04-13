@@ -31,7 +31,7 @@
 - Storage / lock / migration artifact: `scheduler_journal.json`, `scheduler-shot.lock`, scheduler store migration marker
 - Root-local hidden maintenance task: `a3:portal:scheduler:*`
 - Compatibility env fallback: `A3_RUNTIME_SCHEDULER_*`
-- Historical isolated canary task: `a3:portal-soloboard:scheduler:*`
+- Historical isolated validation task: `a3:portal-soloboard:scheduler:*`
 
 これらは現在の persisted state と operator recovery に結びついているため、公開IF整理とは別スライスで扱う。
 
@@ -46,4 +46,4 @@
 
 ## Historical 記述の扱い
 
-過去の A3-v2 / legacy scheduler / canary evidence を説明する文脈では、事実として `scheduler` を残してよい。ただし、current operator surface と混同しないよう、近傍で historical / maintenance-only / internal のいずれかを明示する。
+過去の A3-v2 / legacy scheduler / validation evidence を説明する文脈では、事実として `scheduler` を残してよい。ただし、current operator surface と混同しないよう、近傍で historical / maintenance-only / internal のいずれかを明示する。

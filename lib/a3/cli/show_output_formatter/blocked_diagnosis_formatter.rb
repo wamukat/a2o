@@ -44,7 +44,7 @@ module A3
             output << "runtime_package_doctor_command=#{recovery.runtime_package_doctor_command}" if recovery.runtime_package_doctor_command
             output << "runtime_package_migration_command=#{recovery.runtime_package_migration_command}" if recovery.runtime_package_migration_command
             output << "runtime_package_runtime_command=#{recovery.runtime_package_runtime_command}" if recovery.runtime_package_runtime_command
-            output << "runtime_package_runtime_canary_command=#{recovery.runtime_package_runtime_canary_command}" if recovery.runtime_package_runtime_canary_command
+            output << "runtime_package_runtime_validation_command=#{recovery.runtime_package_runtime_validation_command}" if recovery.runtime_package_runtime_validation_command
             output << "runtime_package_startup_sequence=#{recovery.runtime_package_startup_sequence}" if recovery.runtime_package_startup_sequence
             output << "runtime_package_startup_blockers=#{recovery.runtime_package_startup_blockers}" if recovery.runtime_package_startup_blockers
             output << "runtime_package_persistent_state_model=#{recovery.runtime_package_persistent_state_model}" if recovery.runtime_package_persistent_state_model

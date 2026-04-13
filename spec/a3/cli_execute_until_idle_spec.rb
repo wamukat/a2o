@@ -199,28 +199,28 @@ RSpec.describe A3::CLI do
           {
             "id" => 5001,
             "ref" => "Sample#5001",
-            "title" => "Filtered ui-app canary",
-            "description" => "Run the filtered ui-app canary path.",
+            "title" => "Filtered ui-app validation",
+            "description" => "Run the filtered ui-app validation path.",
             "status" => "To do",
-            "labels" => ["repo:ui-app", "trigger:auto-scheduler-canary"],
+            "labels" => ["repo:ui-app", "trigger:auto-scheduler-validation"],
             "parent_ref" => nil
           },
           {
             "id" => 5002,
             "ref" => "Sample#5002",
-            "title" => "Filtered both-repo canary",
-            "description" => "Run the filtered both-repo canary path.",
+            "title" => "Filtered both-repo validation",
+            "description" => "Run the filtered both-repo validation path.",
             "status" => "To do",
-            "labels" => ["repo:both", "trigger:auto-scheduler-canary"],
+            "labels" => ["repo:both", "trigger:auto-scheduler-validation"],
             "parent_ref" => nil
           },
           {
             "id" => 5003,
             "ref" => "Sample#5003",
-            "title" => "Completed canary",
+            "title" => "Completed validation",
             "description" => "Already completed and should be ignored.",
             "status" => "Done",
-            "labels" => ["repo:ui-app", "trigger:auto-scheduler-canary"],
+            "labels" => ["repo:ui-app", "trigger:auto-scheduler-validation"],
             "parent_ref" => nil
           }
         ]
@@ -259,7 +259,7 @@ RSpec.describe A3::CLI do
             "--kanban-command-arg", fake_cli.fetch(:script_path),
             "--kanban-project", "Sample",
             "--kanban-status", "To do",
-            "--kanban-trigger-label", "trigger:auto-scheduler-canary",
+            "--kanban-trigger-label", "trigger:auto-scheduler-validation",
             "--kanban-repo-label", "repo:ui-app=repo_beta",
             "--kanban-repo-label", "repo:both=repo_alpha,repo_beta",
             "--kanban-working-dir", dir,
@@ -294,7 +294,7 @@ RSpec.describe A3::CLI do
     end
   end
 
-  it "continues an imported unfinished child before advancing its parent canary" do
+  it "continues an imported unfinished child before advancing its parent validation" do
     Dir.mktmpdir do |dir|
       create_git_repo_source(dir, name: "repo-alpha-source", file_content: "repo_alpha source\n")
       create_git_repo_source(dir, name: "repo-beta-source", file_content: "repo_beta source\n")
@@ -314,7 +314,7 @@ RSpec.describe A3::CLI do
           {
             "id" => 5100,
             "ref" => "Sample#5100",
-            "title" => "Parent canary",
+            "title" => "Parent validation",
             "description" => "Wait for all child canaries to finish.",
             "status" => "To do",
             "labels" => ["repo:both", "trigger:auto-parent"],
@@ -323,7 +323,7 @@ RSpec.describe A3::CLI do
           {
             "id" => 5101,
             "ref" => "Sample#5101",
-            "title" => "Child canary still running",
+            "title" => "Child validation still running",
             "description" => "This child is already in verification.",
             "status" => "Inspection",
             "labels" => ["repo:ui-app", "trigger:auto-implement"],

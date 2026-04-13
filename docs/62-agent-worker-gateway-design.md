@@ -36,7 +36,7 @@ A3 already has two separate contracts:
 - `A3::Domain::AgentJobRequest` already carries `working_dir`, `command`, `args`, `env`, `timeout_seconds`, and `artifact_rules`.
 - `A3::Infra::AgentHttpPullHandler` currently supports enqueue, claim next, artifact upload, and result submit.
 - `A3::Infra::JsonAgentJobStore` already supports `fetch(job_id)`, but the HTTP handler does not expose `GET /v1/agent/jobs/{job_id}` yet.
-- The compose smoke already proves that an `a3-runtime` control-plane container can send a command job to an `a3-agent` container and receive uploaded result artifacts.
+- The compose validation already proves that an `a3-runtime` control-plane container can send a command job to an `a3-agent` container and receive uploaded result artifacts.
 
 ## Proposed Shape
 
@@ -146,11 +146,11 @@ Rules:
 - `agent-http` treats `--worker-command` as an executable and `--worker-command-arg` as argv entries; shell expressions must be passed explicitly as `--worker-command sh --worker-command-arg -lc --worker-command-arg '...'`
 - invalid combinations fail during CLI option validation
 
-### Same-Path Gateway Smoke
+### Same-Path Gateway Validation
 
 Status: implemented in `spec/a3/infra/agent_worker_gateway_spec.rb`.
 
-Add a focused smoke that proves the full bridge:
+Add a focused validation that proves the full bridge:
 
 1. Start `a3 agent-server` with JSON job store and artifact store.
 2. Prepare a temporary workspace containing a minimal worker script.
@@ -161,11 +161,11 @@ Add a focused smoke that proves the full bridge:
 
 This is intentionally smaller than Portal full verification. Portal full verification should be a later slice after the gateway contract is stable.
 
-### Agent-Materialized Gateway Smoke
+### Agent-Materialized Gateway Validation
 
-Status: implemented as `agent-go/scripts/smoke-materialized-agent-gateway.sh`.
+Status: implemented as `agent-go/scripts/validation-materialized-agent-gateway.sh`.
 
-Add a focused smoke that proves the real A3-side materialized bridge:
+Add a focused validation that proves the real A3-side materialized bridge:
 
 1. Start `a3 agent-server` with JSON job store and artifact store.
 2. Prepare a tiny clean local Git source repository.
@@ -177,15 +177,15 @@ Add a focused smoke that proves the real A3-side materialized bridge:
 8. Assert the reserved `worker-result` artifact exists.
 9. Assert `cleanup_after_job` removed the materialized workspace and did not leave a Git worktree registration.
 
-This smoke uses `sh` as the worker command and does not invoke Portal-specific runtime, Maven, scheduler canaries, or full verification. Its purpose is only to validate the control-plane, Go agent materializer, worker protocol transport, and A3 gateway parsing boundary.
+This validation uses `sh` as the worker command and does not invoke Portal-specific runtime, Maven, scheduler canaries, or full verification. Its purpose is only to validate the control-plane, Go agent materializer, worker protocol transport, and A3 gateway parsing boundary.
 
-### Agent-Materialized Verification Command Smoke
+### Agent-Materialized Verification Command Validation
 
-Status: implemented as `agent-go/scripts/smoke-materialized-command-runner.sh`.
+Status: implemented as `agent-go/scripts/validation-materialized-command-runner.sh`.
 
 `VerificationExecutionStrategy` can now use `AgentCommandRunner` through CLI option `--verification-command-runner agent-http`. This keeps verification as command execution, not worker protocol execution, while moving the actual process execution to the configured `a3-agent` runtime.
 
-The focused smoke proves:
+The focused validation proves:
 
 1. A3 enqueues a verification command job through the HTTP control plane.
 2. Go `a3-agent` materializes the requested repo slot from `source_alias`.
@@ -193,13 +193,13 @@ The focused smoke proves:
 4. The command exits through the agent result contract and uploads the combined log into A3-managed artifact storage.
 5. `cleanup_after_job` removes the agent-owned Git worktree registration.
 
-This smoke still avoids Maven / NullAway. Portal full verification is the next slice that reuses the same command runner with project runtime dependencies installed on the agent side.
+This validation still avoids Maven / NullAway. Portal full verification is the next slice that reuses the same command runner with project runtime dependencies installed on the agent side.
 
-### CLI Bundle Smoke
+### CLI Bundle Validation
 
-Status: historical Docker dev-env smoke was implemented as `task a3:portal:runtime:agent-worker-gateway-smoke`. 2026-04-13 の配布整理で Docker agent image と同 task は削除し、現行確認は host-local `a3-agent` と scheduler run-once に寄せる。
+Status: historical Docker dev-env validation was implemented as `task a3:portal:runtime:agent-worker-gateway-validation`. 2026-04-13 の配布整理で Docker agent image と同 task は削除し、現行確認は host-local `a3-agent` と scheduler run-once に寄せる。
 
-Add a root-level bundle smoke that proves the operator CLI path can use `agent-http`:
+Add a root-level bundle validation that proves the operator CLI path can use `agent-http`:
 
 1. Start `a3-runtime` and `soloboard` through the existing compose bundle.
 2. Bootstrap SoloBoard board/lane/tag surface.
@@ -220,25 +220,25 @@ Add a root-level bundle smoke that proves the operator CLI path can use `agent-h
    - the task reached `Inspection` after the single implementation step
    - combined log artifact exists
 
-This smoke must remain separate from Portal full verification. It validates the control-plane/agent/worker-gateway CLI wiring only; Maven, Java, Ruby worker scripts, NullAway, and full Portal verification stay in later slices. Docker-distributed agent images are no longer part of the release surface; the Go `a3-agent` is installed as a release binary on the host or inside a project-owned dev-env.
+This validation must remain separate from Portal full verification. It validates the control-plane/agent/worker-gateway CLI wiring only; Maven, Java, Ruby worker scripts, NullAway, and full Portal verification stay in later slices. Docker-distributed agent images are no longer part of the release surface; the Go `a3-agent` is installed as a release binary on the host or inside a project-owned dev-env.
 
-Operational constraint: the gateway command blocks while waiting for the agent job, so the smoke must run the gateway in the background, then run one or more `a3-agent` single-job executions, then wait for the gateway process and fail with captured `server_log`, `gateway_log`, and `agent_log` if it does not exit. Use a dedicated smoke storage directory under `/workspace/.work/...`, not the regular bundle canary storage, because the first slice requires the A3-prepared workspace path to be visible at the same path from both `a3-runtime` and `a3-agent`.
+Operational constraint: the gateway command blocks while waiting for the agent job, so the validation must run the gateway in the background, then run one or more `a3-agent` single-job executions, then wait for the gateway process and fail with captured `server_log`, `gateway_log`, and `agent_log` if it does not exit. Use a dedicated validation storage directory under `/workspace/.work/...`, not the regular bundle validation storage, because the first slice requires the A3-prepared workspace path to be visible at the same path from both `a3-runtime` and `a3-agent`.
 
-### CLI Bundle Verification Smoke
+### CLI Bundle Verification Validation
 
-Status: historical Docker dev-env verification smoke was implemented as `task a3:portal:runtime:agent-verification-smoke`. 2026-04-13 の配布整理で同 task は削除し、host-local `a3-agent` 経路を正規確認にする。
+Status: historical Docker dev-env verification validation was implemented as `task a3:portal:runtime:agent-verification-validation`. 2026-04-13 の配布整理で同 task は削除し、host-local `a3-agent` 経路を正規確認にする。
 
-This smoke proves the operator CLI path can run `run-verification --verification-command-runner agent-http` through the compose `a3-agent` service. The compose service intentionally uses the Portal dev-env agent image, not the generic Go-only image, because this path executes project commands (`ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/inject/portal_remediation.rb"` and `ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/inject/portal_verification.rb"`). The smoke uses a small generated repo with a Taskfile to avoid Maven/NullAway cost while still exercising the real Portal remediation/verification script shape.
+This validation proves the operator CLI path can run `run-verification --verification-command-runner agent-http` through the compose `a3-agent` service. The compose service intentionally uses the Portal dev-env agent image, not the generic Go-only image, because this path executes project commands (`ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/inject/portal_remediation.rb"` and `ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/inject/portal_verification.rb"`). The validation uses a small generated repo with a Taskfile to avoid Maven/NullAway cost while still exercising the real Portal remediation/verification script shape.
 
-The smoke asserts:
+The validation asserts:
 
 1. A SoloBoard task reaches `Inspection` after a local implementation worker phase.
 2. A verification run is started with the canonical `refs/heads/a3/work/<task>` source ref.
 3. Remediation and verification are both enqueued as agent command jobs.
 4. The Go agent materializes the repo slot, writes `.a3/workspace.json` and `.a3/slot.json`, executes both commands, uploads combined logs, and cleans up the worktree registration.
-5. A3 completes the verification run and transitions the task to `Merging`; the smoke then moves the synthetic task to `Done` as cleanup.
+5. A3 completes the verification run and transitions the task to `Merging`; the validation then moves the synthetic task to `Done` as cleanup.
 
-Portal single-repo / parent full verification is now covered by host-local `a3-agent` scheduler and parent-topology smoke. Historical Docker dev-env tasks (`agent-full-verification-smoke`, `agent-ui-verification-smoke`, `agent-parent-topology-smoke`) were removed from the release surface after proving the protocol path.
+Portal single-repo / parent full verification is now covered by host-local `a3-agent` scheduler and parent-topology validation. Historical Docker dev-env tasks (`agent-full-verification-validation`, `agent-ui-verification-validation`, `agent-parent-topology-validation`) were removed from the release surface after proving the protocol path.
 
 Uploaded agent artifacts are retained in the A3-managed artifact store and can be cleaned independently from workspace cleanup. `a3 agent-artifact-cleanup` applies retention by artifact class using metadata/blob mtimes, with separate TTLs for `diagnostic` and `evidence` artifacts, optional count caps (`--diagnostic-max-count` / `--evidence-max-count`), optional size caps (`--diagnostic-max-mb` / `--evidence-max-mb`), and a `--dry-run` mode for operator inspection. The Portal runtime exposes the same command as `task a3:portal:runtime:agent-artifact-cleanup`.
 
@@ -375,13 +375,13 @@ Do not move full Portal execution yet. Split implementation into three commits:
    - Add roundtrip tests.
 2. Materializer unit: implemented.
    - Add agent-side materializer for `local_git` alias + `worktree_branch`.
-   - Materializer API has `prepare` and `cleanup` so tests and smoke can remove worktrees deterministically.
+   - Materializer API has `prepare` and `cleanup` so tests and validation can remove worktrees deterministically.
    - Use agent config to resolve source aliases and workspace root.
 3. Worker protocol transport contract: implemented.
    - Add an agent-owned way to carry the worker request into the materialized workspace.
    - Add an agent-owned way to carry the worker result back to A3 without relying on same-path filesystem reads.
-4. HTTP smoke: implemented.
-   - Add an HTTP smoke where `AgentJobRequest` has `workspace_request`, the agent creates the worktree, writes worker protocol files under the materialized workspace root, runs `sh`, uploads the worker result evidence, and returns `AgentWorkspaceDescriptor`.
+4. HTTP validation: implemented.
+   - Add an HTTP validation where `AgentJobRequest` has `workspace_request`, the agent creates the worktree, writes worker protocol files under the materialized workspace root, runs `sh`, uploads the worker result evidence, and returns `AgentWorkspaceDescriptor`.
 5. Gateway materialized-mode internal branch: implemented.
    - `WorkerProtocol#request_form` exposes the same payload that same-path mode writes to `.a3/worker-request.json`.
    - `AgentWorkerGateway` can accept an injected `workspace_request_builder` and enqueue `workspace_request` + `worker_protocol_request`.
@@ -391,9 +391,9 @@ Do not move full Portal execution yet. Split implementation into three commits:
    - A3 CLI accepts `--agent-shared-workspace-mode agent-materialized`.
    - A3 CLI accepts `--agent-source-alias SLOT=ALIAS`.
    - Runtime job payload carries aliases only; agent filesystem paths stay in agent runtime configuration.
-7. End-to-end gateway materialized smoke: implemented.
-   - `agent-go/scripts/smoke-materialized-agent-gateway.sh` proves the real `AgentWorkerGateway` path against the Ruby control plane and Go agent.
-   - The smoke intentionally mismatches worker-reported `changed_files` and verifies A3 canonicalizes from `AgentWorkspaceDescriptor`.
+7. End-to-end gateway materialized validation: implemented.
+   - `agent-go/scripts/validation-materialized-agent-gateway.sh` proves the real `AgentWorkerGateway` path against the Ruby control plane and Go agent.
+   - The validation intentionally mismatches worker-reported `changed_files` and verifies A3 canonicalizes from `AgentWorkspaceDescriptor`.
 
 The next implementation step is runtime package wiring beyond the explicit CLI bridge. Directly deriving `workspace_request` from A3-local `PreparedWorkspace#slot_paths` would weaken the host/dev-env boundary; source aliases and agent workspace roots must come from runtime configuration.
 
@@ -414,7 +414,7 @@ The worker protocol needs one additional transport slice before the materialized
 - The agent must return `.a3/worker-result.json` to A3 as first-class evidence after command execution. A3 must build the final phase `ExecutionResult` from that worker result, not from generic command success.
 - The first implementation returns the worker result in two forms: a bounded inline `worker_protocol_result` field in `AgentJobResult` for synchronous phase parsing, and an uploaded artifact with reserved role `worker-result` for durable evidence. The initial inline payload limit is 1 MiB; invalid or oversized worker result JSON is still uploaded as evidence, but omitted from the inline field.
 
-Configured `artifact_rules` in materialized mode are evaluated relative to the prepared workspace root after worker-result capture. Cleanup must occur only after worker-result capture, configured artifact uploads, and result submission attempts complete. For the first smoke, use a cleanup policy that allows deterministic test cleanup while still preserving enough uploaded evidence for A3 to parse the worker result.
+Configured `artifact_rules` in materialized mode are evaluated relative to the prepared workspace root after worker-result capture. Cleanup must occur only after worker-result capture, configured artifact uploads, and result submission attempts complete. For the first validation, use a cleanup policy that allows deterministic test cleanup while still preserving enough uploaded evidence for A3 to parse the worker result.
 
 `AgentWorkerGateway` materialized mode parses completed worker results through `AgentJobResult.worker_protocol_result`. For successful implementation, A3 derives canonical `changed_files` from `AgentWorkspaceDescriptor.slot_descriptors[*].changed_files`, validates the descriptor against `workspace_request`, records worker-payload mismatches in diagnostics, and writes the descriptor-derived value to the final response bundle. A3 treats agent `runtime_path` values as diagnostics only and does not read them.
 
@@ -427,7 +427,7 @@ The first operator-facing bridge is explicit CLI configuration, not implicit inf
 - Review uses `edit_scope ∪ verification_scope`; edit slots are `read_write`, verification-only slots are `read_only`.
 - Verification requires `verification_scope` slots as `read_only`.
 - Freshness defaults to `reuse_if_clean_and_ref_matches`.
-- Cleanup defaults to `retain_until_a3_cleanup`; `cleanup_after_job` is available for smoke/dev.
+- Cleanup defaults to `retain_until_a3_cleanup`; `cleanup_after_job` is available for validation/dev.
 
 The runtime package surface exposes two separate command shapes:
 
@@ -441,8 +441,8 @@ The first is `slot -> alias` and is safe for A3 job construction. The second is 
 - Do not run Maven/Portal verification.
 - Do not support remote Git auth.
 - Do not support clone/fetch from arbitrary network remotes.
-- Do not support production cleanup/quarantine execution yet; only add enough materializer cleanup API for tests and smoke to remove created worktrees.
-- Do not remove same-path gateway until agent materialization is proven through canary.
+- Do not support production cleanup/quarantine execution yet; only add enough materializer cleanup API for tests and validation to remove created worktrees.
+- Do not remove same-path gateway until agent materialization is proven through validation.
 
 ### Open Review Questions
 

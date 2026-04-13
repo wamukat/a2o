@@ -29,7 +29,7 @@ module A3
             runtime_package_doctor_command: doctor_result.doctor_command_summary,
             runtime_package_migration_command: doctor_result.migration_command_summary,
             runtime_package_runtime_command: doctor_result.runtime_command_summary,
-            runtime_package_runtime_canary_command: doctor_result.runtime_canary_command_summary,
+            runtime_package_runtime_validation_command: doctor_result.runtime_validation_command_summary,
             runtime_package_startup_sequence: doctor_result.startup_sequence,
             runtime_package_startup_blockers: doctor_result.startup_blockers,
             runtime_package_persistent_state_model: doctor_result.distribution_summary.fetch("persistent_state_model"),

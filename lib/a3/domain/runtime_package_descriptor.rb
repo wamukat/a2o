@@ -207,7 +207,7 @@ module A3
           "doctor_command" => doctor_command_summary,
           "migration_command" => migration_command_summary,
           "runtime_command" => runtime_command_summary,
-          "runtime_canary_command" => runtime_canary_command_summary,
+          "runtime_validation_command" => runtime_validation_command_summary,
           "runtime_contract" => [schema_contract_summary, preset_schema_contract_summary, repo_source_contract_summary, secret_contract_summary, migration_contract_summary].join(" "),
           "schema_action" => schema_action_summary,
           "preset_schema_action" => preset_schema_action_summary,
@@ -391,7 +391,7 @@ module A3
           "operator_logs_root=#{state_root.join('logs')}",
           "blocked_diagnosis_root=#{state_root.join('blocked_diagnoses')}",
           "evidence_root=#{state_root.join('evidence')}",
-          "canary_output=stdout_only",
+          "validation_output=stdout_only",
           "workspace_debug_reference=path_only"
         ].join(" ")
       end
@@ -475,7 +475,7 @@ module A3
         "#{runtime_entrypoint} execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend #{storage_backend} --storage-dir #{state_root}"
       end
 
-      def runtime_canary_command_summary
+      def runtime_validation_command_summary
         commands = [doctor_command_summary]
         commands << migration_command_summary if scheduler_store_migration_state == :pending
         commands << runtime_command_summary

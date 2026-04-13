@@ -8,7 +8,7 @@ The goal is to distinguish:
 
 - confirmed API defects
 - CLI-side false negatives
-- operator risks that still need canary coverage
+- operator risks that still need validation coverage
 
 ## Scope
 
@@ -16,7 +16,7 @@ This note covers the current local SoloBoard spike at `http://127.0.0.1:3460` an
 
 - `Taskfile.yml`
 - `a3-engine/tools/kanban/kanban_cli.py`
-- `a3-engine/tools/kanban/soloboard_smoke.py`
+- `a3-engine/tools/kanban/soloboard_validation.py`
 - `a3-engine/tools/kanban/bootstrap_soloboard.py`
 
 ## Confirmed Observations
@@ -70,7 +70,7 @@ If the backend is eventually consistent at short timescales, these flows become 
 - label add/remove confirmation
 - transition confirmation
 - relation confirmation
-- any canary that interprets one immediate read as final truth
+- any validation that interprets one immediate read as final truth
 
 Without mitigation, A3 can incorrectly classify a successful backend mutation as:
 
@@ -115,11 +115,11 @@ The following are stable enough for continued migration work:
 
 - generic `KANBAN_BACKEND=soloboard task kanban:*` operator surface
 - SoloBoard bootstrap for `Portal`, `OIDC`, `A3Engine`
-- SoloBoard parity smoke
-- isolated A3 no-op canary on `.work/a3/portal-soloboard-canary`
-- `plan-next-runnable-task` selection smoke against labeled SoloBoard tasks
-- isolated single full-phase canary on `Portal#17`
-- isolated parent-child canary on `Portal#18/#19/#20`
+- SoloBoard parity validation
+- isolated A3 no-op validation on `.work/a3/portal-soloboard-validation`
+- `plan-next-runnable-task` selection validation against labeled SoloBoard tasks
+- isolated single full-phase validation on `Portal#17`
+- isolated parent-child validation on `Portal#18/#19/#20`
 - bundle agent worker / verification / parent topology loops through `Portal#44` to `Portal#58`
 
 ## What Still Needs More Evidence

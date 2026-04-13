@@ -75,7 +75,7 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
         "repository_metadata_model" => "repository_metadata=runtime_package_scoped source_descriptor_ref_resolution=required review_target_resolution=evidence_driven",
         "branch_resolution_model" => "authoritative_branch_resolution=runtime_package_scoped integration_target_resolution=runtime_package_scoped branch_integration_inputs=required",
         "credential_boundary_model" => "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
-        "observability_boundary_model" => "operator_logs_root=#{Pathname(dir).join('logs')} blocked_diagnosis_root=#{Pathname(dir).join('blocked_diagnoses')} evidence_root=#{Pathname(dir).join('evidence')} canary_output=stdout_only workspace_debug_reference=path_only",
+        "observability_boundary_model" => "operator_logs_root=#{Pathname(dir).join('logs')} blocked_diagnosis_root=#{Pathname(dir).join('blocked_diagnoses')} evidence_root=#{Pathname(dir).join('evidence')} validation_output=stdout_only workspace_debug_reference=path_only",
         "deployment_shape" => "runtime_package=single_project writable_state=isolated scheduler_instance=single_project state_boundary=project secret_boundary=project",
         "networking_boundary" => "outbound=git,issue_api,package_registry,llm_gateway,verification_service secret_source=secret_store token_scope=project",
         "upgrade_contract" => "image_upgrade=independent manifest_schema_version=1 preset_schema_version=1 state_migration=explicit",
@@ -96,7 +96,7 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
       expect(result.doctor_command_summary).to eq("bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
       expect(result.migration_command_summary).to eq("bin/a3 migrate-scheduler-store #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
       expect(result.runtime_command_summary).to eq("bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
-      expect(result.runtime_canary_command_summary).to eq("bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} && bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
+      expect(result.runtime_validation_command_summary).to eq("bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} && bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
       expect(result.next_command).to eq("bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
       expect(result.startup_sequence).to eq("doctor=bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} migrate=skip runtime=bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
       expect(result.operator_guidance).to eq("startup ready; runtime package contract satisfied; run bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
@@ -403,7 +403,7 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
       expect(result.recommended_execution_mode_reason).to eq("scheduler store migration is the only startup blocker; use one_shot_cli to apply migration and continue startup")
       expect(result.recommended_execution_mode_command).to eq("bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} && bin/a3 migrate-scheduler-store #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} && bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
       expect(result.next_command).to eq("bin/a3 migrate-scheduler-store #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
-      expect(result.runtime_canary_command_summary).to eq("bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} && bin/a3 migrate-scheduler-store #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} && bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
+      expect(result.runtime_validation_command_summary).to eq("bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} && bin/a3 migrate-scheduler-store #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} && bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
       expect(result.startup_sequence).to eq("doctor=bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} migrate=bin/a3 migrate-scheduler-store #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} runtime=bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
       expect(result.operator_guidance).to eq("startup blocked by scheduler_store_migration; apply scheduler store migration before startup; run bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
       end
@@ -443,7 +443,7 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
         expect(result.startup_blockers).to eq("none")
         expect(result.recommended_execution_mode).to eq(:one_shot_cli)
         expect(result.next_command).to eq("bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
-        expect(result.runtime_canary_command_summary).to eq("bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} && bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
+        expect(result.runtime_validation_command_summary).to eq("bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} && bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
         expect(result.startup_sequence).to eq("doctor=bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} migrate=skip runtime=bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
       end
     end

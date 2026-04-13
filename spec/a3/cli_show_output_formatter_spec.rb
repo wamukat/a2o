@@ -30,7 +30,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
         runtime_package_next_execution_mode_command: "bin/a3 doctor-runtime /tmp/runtime/manifest.yml",
         runtime_package_next_command: "bin/a3 doctor-runtime /tmp/runtime/manifest.yml",
         runtime_package_doctor_command: "bin/a3 doctor-runtime /tmp/runtime/manifest.yml",
-        runtime_package_runtime_canary_command: "bin/a3 doctor-runtime /tmp/runtime/manifest.yml && bin/a3 execute-until-idle /tmp/runtime/manifest.yml",
+        runtime_package_runtime_validation_command: "bin/a3 doctor-runtime /tmp/runtime/manifest.yml && bin/a3 execute-until-idle /tmp/runtime/manifest.yml",
         runtime_package_startup_blockers: "repo_sources",
         runtime_package_migration_command: "bin/a3 migrate-scheduler-store /tmp/runtime/manifest.yml",
         runtime_package_runtime_command: "bin/a3 execute-until-idle /tmp/runtime/manifest.yml",
@@ -42,7 +42,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
         runtime_package_repository_metadata_model: "repository_metadata=runtime_package_scoped",
         runtime_package_branch_resolution_model: "authoritative_branch_resolution=runtime_package_scoped",
         runtime_package_credential_boundary_model: "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
-        runtime_package_observability_boundary_model: "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence canary_output=stdout_only workspace_debug_reference=path_only",
+        runtime_package_observability_boundary_model: "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence validation_output=stdout_only workspace_debug_reference=path_only",
         runtime_package_deployment_shape: "runtime_package=single_project",
         runtime_package_networking_boundary: "outbound=git",
         runtime_package_upgrade_contract: "state_migration=explicit",
@@ -199,7 +199,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
       runtime_package_doctor_command: "bin/a3 doctor-runtime /tmp/runtime/manifest.yml",
       runtime_package_migration_command: "bin/a3 migrate-scheduler-store /tmp/runtime/manifest.yml",
       runtime_package_runtime_command: "bin/a3 execute-until-idle /tmp/runtime/manifest.yml",
-      runtime_package_runtime_canary_command: "bin/a3 doctor-runtime /tmp/runtime/manifest.yml && bin/a3 execute-until-idle /tmp/runtime/manifest.yml",
+      runtime_package_runtime_validation_command: "bin/a3 doctor-runtime /tmp/runtime/manifest.yml && bin/a3 execute-until-idle /tmp/runtime/manifest.yml",
       runtime_package_startup_sequence: "doctor=bin/a3 doctor-runtime /tmp/runtime/manifest.yml migrate=skip runtime=bin/a3 execute-until-idle /tmp/runtime/manifest.yml",
       runtime_package_startup_blockers: "repo_sources",
       runtime_package_persistent_state_model: "scheduler_state_root=/tmp/runtime/state/scheduler task_repository_root=/tmp/runtime/state/tasks run_repository_root=/tmp/runtime/state/runs evidence_root=/tmp/runtime/state/evidence blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses artifact_owner_cache_root=/tmp/runtime/state/artifact_owner_cache logs_root=/tmp/runtime/state/logs workspace_root=/tmp/runtime/state/workspaces artifact_root=/tmp/runtime/state/artifacts",
@@ -209,7 +209,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
       runtime_package_repository_metadata_model: "repository_metadata=runtime_package_scoped source_descriptor_ref_resolution=required review_target_resolution=evidence_driven",
       runtime_package_branch_resolution_model: "authoritative_branch_resolution=runtime_package_scoped integration_target_resolution=runtime_package_scoped branch_integration_inputs=required",
       runtime_package_credential_boundary_model: "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
-      runtime_package_observability_boundary_model: "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence canary_output=stdout_only workspace_debug_reference=path_only",
+      runtime_package_observability_boundary_model: "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence validation_output=stdout_only workspace_debug_reference=path_only",
       runtime_package_deployment_shape: "runtime_package=single_project writable_state=isolated scheduler_instance=single_project state_boundary=project secret_boundary=project",
       runtime_package_networking_boundary: "outbound=git,issue_api,package_registry,llm_gateway,verification_service secret_source=secret_store token_scope=project",
       runtime_package_upgrade_contract: "image_upgrade=independent manifest_schema_version=1 preset_schema_version=1 state_migration=explicit",
@@ -280,7 +280,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     expect(result).to include("runtime_package_next_execution_mode_command=bin/a3 doctor-runtime /tmp/runtime/manifest.yml")
     expect(result).to include("runtime_package_next_command=bin/a3 doctor-runtime /tmp/runtime/manifest.yml")
     expect(result).to include("runtime_package_migration_command=bin/a3 migrate-scheduler-store /tmp/runtime/manifest.yml")
-    expect(result).to include("runtime_package_runtime_canary_command=bin/a3 doctor-runtime /tmp/runtime/manifest.yml && bin/a3 execute-until-idle /tmp/runtime/manifest.yml")
+    expect(result).to include("runtime_package_runtime_validation_command=bin/a3 doctor-runtime /tmp/runtime/manifest.yml && bin/a3 execute-until-idle /tmp/runtime/manifest.yml")
     expect(result).to include("runtime_package_startup_sequence=doctor=bin/a3 doctor-runtime /tmp/runtime/manifest.yml migrate=skip runtime=bin/a3 execute-until-idle /tmp/runtime/manifest.yml")
     expect(result).to include("runtime_package_startup_blockers=repo_sources")
     expect(result).to include("runtime_package_persistent_state_model=scheduler_state_root=/tmp/runtime/state/scheduler task_repository_root=/tmp/runtime/state/tasks run_repository_root=/tmp/runtime/state/runs evidence_root=/tmp/runtime/state/evidence blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses artifact_owner_cache_root=/tmp/runtime/state/artifact_owner_cache logs_root=/tmp/runtime/state/logs workspace_root=/tmp/runtime/state/workspaces artifact_root=/tmp/runtime/state/artifacts")
@@ -541,7 +541,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
       runtime_package_doctor_command: "bin/a3 doctor-runtime /tmp/runtime/manifest.yml",
       runtime_package_migration_command: "bin/a3 migrate-scheduler-store /tmp/runtime/manifest.yml",
       runtime_package_runtime_command: "bin/a3 execute-until-idle /tmp/runtime/manifest.yml",
-      runtime_package_runtime_canary_command: "bin/a3 doctor-runtime /tmp/runtime/manifest.yml && bin/a3 execute-until-idle /tmp/runtime/manifest.yml",
+      runtime_package_runtime_validation_command: "bin/a3 doctor-runtime /tmp/runtime/manifest.yml && bin/a3 execute-until-idle /tmp/runtime/manifest.yml",
       runtime_package_startup_sequence: "doctor=bin/a3 doctor-runtime /tmp/runtime/manifest.yml migrate=skip runtime=bin/a3 execute-until-idle /tmp/runtime/manifest.yml",
       runtime_package_startup_blockers: "repo_sources",
       runtime_package_persistent_state_model: "scheduler_state_root=/tmp/runtime/state/scheduler",
@@ -551,7 +551,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
         runtime_package_repository_metadata_model: "repository_metadata=runtime_package_scoped",
         runtime_package_branch_resolution_model: "authoritative_branch_resolution=runtime_package_scoped",
         runtime_package_credential_boundary_model: "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
-        runtime_package_observability_boundary_model: "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence canary_output=stdout_only workspace_debug_reference=path_only",
+        runtime_package_observability_boundary_model: "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence validation_output=stdout_only workspace_debug_reference=path_only",
         runtime_package_deployment_shape: "runtime_package=single_project",
       runtime_package_networking_boundary: "outbound=git",
       runtime_package_upgrade_contract: "state_migration=explicit",

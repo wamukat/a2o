@@ -51,7 +51,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 - No tracked root files should remain under `scripts/a3`.
 - Generic root-local maintenance surfaces dispatch through `a3-engine/bin/a3 root-utility`; release-facing runtime surfaces dispatch through Docker A3 runtime `a3`.
 - Individual operator wrappers such as `cleanup.rb`, `diagnostics.rb`, `reconcile.rb`, and `rerun_*` have been retired from root.
-- Worker and generic smoke entrypoints should use `a3-engine/bin/a3 worker:*` commands instead of root wrappers.
+- Worker and generic validation entrypoints should use `a3-engine/bin/a3 worker:*` commands instead of root wrappers.
 
 | Root file | Classification | Action | Reason / dependency |
 | --- | --- | --- | --- |
@@ -70,7 +70,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 | `scripts/a3/launchd.rb` | Optional host service helper | Deleted with macOS LaunchAgent service entrypoints | This was not an `a3-agent` scheduler registration feature. It only supported root `a3:portal:scheduler:install/uninstall/reload/status` and was not required by the Docker A3 + host-local agent flow. |
 | `scripts/a3/assert_a3_live_write_enabled.rb` | A3-owned safety guard, unreferenced | Deleted from root | It contained no Portal knowledge, but no current command used it. Reintroduce only as an A3-owned guard if a current A3 command needs it. |
 | `scripts/a3/a3_stdin_bundle_worker.rb` | Retired worker wrapper | Deleted after `a3-engine/bin/a3 worker:stdin-bundle` became the worker entrypoint | The engine worker reads executor command templates and repo-scope aliases from project config. Portal labels such as `repo:starters` / `repo:ui-app` must not be hardcoded in A3 core. |
-| `scripts/a3/a3_direct_canary_worker.rb` | Retired smoke wrapper | Deleted after `a3-engine/bin/a3 worker:direct-canary` became the smoke worker entrypoint | Legacy direct run-once entrypoints were retired. Direct canary behavior now lives behind the engine CLI. |
+| `scripts/a3/a3_direct_validation_worker.rb` | Retired validation wrapper | Deleted after `a3-engine/bin/a3 worker:direct-validation` became the validation worker entrypoint | Legacy direct run-once entrypoints were retired. Direct validation behavior now lives behind the engine CLI. |
 ### Keep as project-injected Portal package
 
 - `scripts/a3-projects/portal/inject/config/portal/**`
@@ -96,25 +96,25 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 
 ### Keep as Portal support and verification harness
 
-These files are not injected runtime hooks. `operator-tests/` contains explicit canary/smoke entrypoints, and `maintenance/` contains operator maintenance helpers.
+These files are not injected runtime hooks. `operator-tests/` contains explicit validation/validation entrypoints, and `maintenance/` contains operator maintenance helpers.
 
 | Root file | Classification | Action | Reason / dependency |
 | --- | --- | --- | --- |
-| `scripts/a3-projects/portal/operator-tests/agent_host_bundle_smoke.sh` | Portal runtime smoke harness | Keep as operator test, not runtime injection | It validates host-local agent coupling and references the Portal compose bundle. Delete or move to A3 Engine tests once final runtime canary coverage is replaced. |
-| `scripts/a3-projects/portal/operator-tests/agent_parent_topology_bundle_smoke.sh` | Portal runtime smoke harness with Portal mode | Keep as operator test, not runtime injection | It mixes generic parent/child topology with real Portal repo verification. Delete or split when a generic topology smoke is promoted into A3 Engine tests. |
+| `scripts/a3-projects/portal/operator-tests/agent_host_bundle_validation.sh` | Portal runtime validation harness | Keep as operator test, not runtime injection | It validates host-local agent coupling and references the Portal compose bundle. Delete or move to A3 Engine tests once final runtime validation coverage is replaced. |
+| `scripts/a3-projects/portal/operator-tests/agent_parent_topology_bundle_validation.sh` | Portal runtime validation harness with Portal mode | Keep as operator test, not runtime injection | It mixes generic parent/child topology with real Portal repo verification. Delete or split when a generic topology validation is promoted into A3 Engine tests. |
 | `scripts/a3-projects/portal/maintenance/prepare_portal_runtime_config.rb` | Portal root glue | Keep as support helper until Portal config is loaded as an external project package | It materializes project-injected shell env and working directory overrides for `doctor-env`, cleanup, and reconcile without tying the path to macOS LaunchAgent service support. |
 | `scripts/a3-projects/portal/maintenance/rebuild-maven-seed-cache.sh` | Project/operator cache helper | Keep as maintenance, not runtime injection | It prepares a Portal Maven seed cache from the operator environment. A3 may define cache injection contracts, but not own Portal dependency contents. |
-| `scripts/a3-projects/portal/operator-tests/runtime_agent_run_once.sh` | Portal runtime canary launcher | Keep as operator/test harness, not generic injection | It binds Docker A3 runtime, SoloBoard port, Portal manifest, host agent profile, and Portal worker script. This should shrink after final runtime canary automation stabilizes. |
+| `scripts/a3-projects/portal/operator-tests/runtime_agent_run_once.sh` | Portal runtime validation launcher | Keep as operator/test harness, not generic injection | It binds Docker A3 runtime, SoloBoard port, Portal manifest, host agent profile, and Portal worker script. This should shrink after final runtime validation automation stabilizes. |
 | `scripts/a3-projects/portal/runtime_agent_scheduler_ref_candidates.py` | Portal runtime diagnostic helper | Deleted | Dynamic candidate lookup was removed from `operator-tests/runtime_agent_run_once.sh`; agent materialization now owns per-phase ref preparation. |
 | `scripts/a3-projects/portal/maintenance/bootstrap_portal_dev_repos.rb` | Portal-dev maintenance bootstrap | Deleted | `portal-dev` was retired from the current runtime surface. |
-| `scripts/a3/bootstrap_a3_direct_repo_sources.rb` | Direct canary source bootstrap | Deleted with legacy direct canary source preparation | It referenced `member-portal-starters` and `member-portal-ui-app` and was only needed by retired direct canary preparation. |
-| `scripts/a3/ensure_a3_direct_repo_sources.rb` | Direct canary source bootstrap wrapper | Deleted with `bootstrap_a3_direct_repo_sources.rb` | Same dependency and lifecycle as the direct canary source bootstrap. |
+| `scripts/a3/bootstrap_a3_direct_repo_sources.rb` | Direct validation source bootstrap | Deleted with legacy direct validation source preparation | It referenced `member-portal-starters` and `member-portal-ui-app` and was only needed by retired direct validation preparation. |
+| `scripts/a3/ensure_a3_direct_repo_sources.rb` | Direct validation source bootstrap wrapper | Deleted with `bootstrap_a3_direct_repo_sources.rb` | Same dependency and lifecycle as the direct validation source bootstrap. |
 
 ### Migration order
 
 1. Native A3 CLI parity: add `a3-engine/bin/a3` commands for `cleanup`, `diagnostics`, `reconcile`, and `rerun_*`; root Taskfile behavior is preserved through `a3-engine/bin/a3 root-utility`, not a root Ruby wrapper.
-2. Worker bridge extraction: replace root worker wrappers with `a3-engine/bin/a3 worker:stdin-bundle` and `worker:direct-canary`; keep Portal launcher config in the project package.
-3. Smoke split: move synthetic host-agent and parent-topology smoke into A3 tests; keep real Portal full verification as project canary.
+2. Worker bridge extraction: replace root worker wrappers with `a3-engine/bin/a3 worker:stdin-bundle` and `worker:direct-validation`; keep Portal launcher config in the project package.
+3. Validation split: move synthetic host-agent and parent-topology validation into A3 tests; keep real Portal full verification as project validation.
 4. Portal package extraction: move `scripts/a3-projects/portal/**` into an external project package format once A3 can load project packages explicitly.
 
 ### Review checklist
@@ -130,7 +130,7 @@ These files are not injected runtime hooks. `operator-tests/` contains explicit 
 The generic kanban command contract belongs under `a3-engine/tools/kanban`. A top-level root `scripts/kanban` namespace is not allowed because it obscures whether a helper is A3-owned or project-injected. The abstraction boundary is:
 
 - `a3-engine/tools/kanban/cli.py` and `a3-engine/tools/kanban/kanban_cli.py`: generic kanban CLI / adapter entrypoint used by A3 Engine.
-- `a3-engine/tools/kanban/soloboard_smoke.py`: generic SoloBoard compatibility smoke for the current kanban command contract.
+- `a3-engine/tools/kanban/soloboard_validation.py`: generic SoloBoard compatibility validation for the current kanban command contract.
 - `a3-engine/tools/kanban/soloboard_doctor.sh` and `a3-engine/tools/kanban/soloboard_wait_ready.sh`: generic local SoloBoard runtime helpers.
 - `a3-engine/tools/kanban/bootstrap_soloboard.py`: generic SoloBoard bootstrap runner. It reads project-injected board/lane/tag config and must not hardcode Portal / OIDC / A3Engine knowledge.
 - `scripts/a3-projects/portal/inject/config/kanban/soloboard-bootstrap.json`: Portal workspace board/lane/tag config supplied to the generic bootstrap runner.

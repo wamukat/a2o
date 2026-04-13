@@ -20,7 +20,7 @@ module A3
                        recommended_execution_mode_reason: result.recommended_execution_mode_reason,
                        recommended_execution_mode_command: result.recommended_execution_mode_command,
                        startup_blockers: result.startup_blockers,
-                       runtime_canary_command: result.runtime_canary_command_summary,
+                       runtime_validation_command: result.runtime_validation_command_summary,
                        next_command: result.next_command,
                        startup_sequence: result.startup_sequence,
                        contract_health: result.contract_health,
@@ -63,9 +63,9 @@ module A3
         lines
       end
 
-      def canary_lines(result:, runtime_package:)
+      def validation_lines(result:, runtime_package:)
         lines = []
-        lines << "runtime_canary=#{result.status}"
+        lines << "runtime_validation=#{result.status}"
         lines << "image_version=#{runtime_package.image_version}"
         lines << "project_runtime_root=#{runtime_package.project_runtime_root}"
         lines << "storage_backend=#{runtime_package.storage_backend}"
@@ -80,7 +80,7 @@ module A3
                        recommended_execution_mode_reason: result.doctor_result.recommended_execution_mode_reason,
                        recommended_execution_mode_command: result.doctor_result.recommended_execution_mode_command,
                        startup_blockers: result.doctor_result.startup_blockers,
-                       runtime_canary_command: result.doctor_result.runtime_canary_command_summary,
+                       runtime_validation_command: result.doctor_result.runtime_validation_command_summary,
                        next_command: result.doctor_result.next_command,
                        startup_sequence: result.doctor_result.startup_sequence,
                        contract_health: result.doctor_result.contract_health,
@@ -151,13 +151,13 @@ module A3
         lines << "runtime_summary.doctor_command=#{descriptor.operator_summary.fetch('doctor_command')}"
         lines << "runtime_summary.migration_command=#{descriptor.operator_summary.fetch('migration_command')}"
         lines << "runtime_summary.runtime_command=#{descriptor.operator_summary.fetch('runtime_command')}"
-        lines << "runtime_summary.runtime_canary_command=#{descriptor.operator_summary.fetch('runtime_canary_command')}"
+        lines << "runtime_summary.runtime_validation_command=#{descriptor.operator_summary.fetch('runtime_validation_command')}"
         lines << "runtime_summary.startup_sequence=#{descriptor.operator_summary.fetch('startup_sequence')}"
         lines << "runtime_summary.operator_action=#{descriptor.operator_summary.fetch('operator_action')}"
         lines
       end
 
-      def runtime_summary_lines(operator_summary:, mount_summary:, repo_source_summary:, distribution_summary:, startup_readiness:, recommended_execution_mode:, recommended_execution_mode_reason:, recommended_execution_mode_command:, startup_blockers:, runtime_canary_command:, next_command:, startup_sequence:, contract_health:, operator_guidance:)
+      def runtime_summary_lines(operator_summary:, mount_summary:, repo_source_summary:, distribution_summary:, startup_readiness:, recommended_execution_mode:, recommended_execution_mode_reason:, recommended_execution_mode_command:, startup_blockers:, runtime_validation_command:, next_command:, startup_sequence:, contract_health:, operator_guidance:)
         lines = []
         lines << "runtime_summary.contract_health=#{contract_health}"
         lines << "runtime_summary.mount=#{mount_summary_line(mount_summary)}"
@@ -201,7 +201,7 @@ module A3
         lines << "runtime_summary.doctor_command=#{operator_summary.fetch('doctor_command')}"
         lines << "runtime_summary.migration_command=#{operator_summary.fetch('migration_command')}"
         lines << "runtime_summary.runtime_command=#{operator_summary.fetch('runtime_command')}"
-        lines << "runtime_summary.runtime_canary_command=#{runtime_canary_command}"
+        lines << "runtime_summary.runtime_validation_command=#{runtime_validation_command}"
         lines << "runtime_summary.startup_sequence=#{startup_sequence}"
         lines << "runtime_summary.operator_action=#{operator_summary.fetch('operator_action')}"
         lines

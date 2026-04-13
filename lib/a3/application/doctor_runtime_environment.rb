@@ -4,7 +4,7 @@ module A3
   module Application
     class DoctorRuntimeEnvironment
       PathCheck = Struct.new(:name, :path, :status, :detail, keyword_init: true)
-      Result = Struct.new(:status, :image_version, :storage_backend, :project_runtime_root, :repo_source_strategy, :repo_source_slots, :repo_source_paths, :writable_roots, :mount_summary, :repo_source_summary, :distribution_summary, :schema_contract_summary, :preset_schema_contract_summary, :repo_source_contract_summary, :secret_contract_summary, :migration_contract_summary, :schema_action_summary, :preset_schema_action_summary, :repo_source_action_summary, :secret_delivery_action_summary, :scheduler_store_migration_action_summary, :contract_health, :startup_readiness, :startup_blockers, :execution_modes_summary, :execution_mode_contract_summary, :recommended_execution_mode, :recommended_execution_mode_reason, :recommended_execution_mode_command, :doctor_command_summary, :migration_command_summary, :runtime_command_summary, :runtime_canary_command_summary, :next_command, :startup_sequence, :operator_guidance, :checks, keyword_init: true)
+      Result = Struct.new(:status, :image_version, :storage_backend, :project_runtime_root, :repo_source_strategy, :repo_source_slots, :repo_source_paths, :writable_roots, :mount_summary, :repo_source_summary, :distribution_summary, :schema_contract_summary, :preset_schema_contract_summary, :repo_source_contract_summary, :secret_contract_summary, :migration_contract_summary, :schema_action_summary, :preset_schema_action_summary, :repo_source_action_summary, :secret_delivery_action_summary, :scheduler_store_migration_action_summary, :contract_health, :startup_readiness, :startup_blockers, :execution_modes_summary, :execution_mode_contract_summary, :recommended_execution_mode, :recommended_execution_mode_reason, :recommended_execution_mode_command, :doctor_command_summary, :migration_command_summary, :runtime_command_summary, :runtime_validation_command_summary, :next_command, :startup_sequence, :operator_guidance, :checks, keyword_init: true)
 
       def initialize(runtime_package:, migration_marker_store: A3::Infra::LocalMigrationMarkerStore.new)
         @runtime_package = runtime_package
@@ -62,7 +62,7 @@ module A3
           doctor_command_summary: descriptor.doctor_command_summary,
           migration_command_summary: descriptor.migration_command_summary,
           runtime_command_summary: descriptor.runtime_command_summary,
-          runtime_canary_command_summary: runtime_canary_command_summary(descriptor, checks),
+          runtime_validation_command_summary: runtime_validation_command_summary(descriptor, checks),
           next_command: next_command_summary(descriptor, checks),
           startup_sequence: startup_sequence_summary(descriptor, checks),
           operator_guidance: operator_guidance(descriptor, checks),
@@ -228,7 +228,7 @@ module A3
         descriptor.doctor_command_summary
       end
 
-      def runtime_canary_command_summary(descriptor, checks)
+      def runtime_validation_command_summary(descriptor, checks)
         commands = [descriptor.doctor_command_summary]
         if startup_readiness_summary(checks) == :ready
           commands << descriptor.runtime_command_summary
@@ -277,7 +277,7 @@ module A3
       def recommended_execution_mode_command(descriptor, checks)
         case recommended_execution_mode(checks)
         when :one_shot_cli
-          runtime_canary_command_summary(descriptor, checks)
+          runtime_validation_command_summary(descriptor, checks)
         when :doctor_inspect
           descriptor.doctor_command_summary
         else

@@ -115,7 +115,7 @@ Cutover target:
 - `a3-v2/docs/60-container-distribution-and-project-runtime.md`
 - `a3-v2/docs/70-implementation-status.md`
 - `a3-v2/docs/75-engine-redesign.md`
-- cutover / canary / phase 説明に残る `v2` 呼称
+- cutover / validation / phase 説明に残る `v2` 呼称
 
 ## Concrete Inventory
 
@@ -133,7 +133,7 @@ Cutover target:
   - `prepare_portal_v2_launchd_config.rb`
   - retired direct repo source bootstrap scripts
   - retired live-write guard script
-  - retired root worker wrappers (`a3_direct_canary_worker.rb`, `a3_stdin_bundle_worker.rb`)
+  - retired root worker wrappers (`a3_direct_validation_worker.rb`, `a3_stdin_bundle_worker.rb`)
 - root `scripts/a3-projects/portal/inject/config/portal/*`
   - `a3-v2-runtime-manifest.yml`
   - `launcher.json` の operator guidance
@@ -216,7 +216,7 @@ Cutover target:
 
 理由:
 
-- 旧 canary / 旧完了追跡の履歴であり、cutover 後の current A3 正規文書ではない
+- 旧 validation / 旧完了追跡の履歴であり、cutover 後の current A3 正規文書ではない
 - 必要なら `a3-engine-legacy` にだけ残し、current `/a3-engine/docs` には持ち込まない
 
 ## Rollback
@@ -652,11 +652,11 @@ Stop:
 - project-local build outputs under current workspaces
   - `target/`, local `.work/m2/repository`, generated reports を task terminal cleanup の対象に含めるか、rerun/recovery 用 evidence として一定期間保持するかを決める
 - non-current side systems
-  - current Portal canary と無関係な side-system runtime を、保守対象か disposable cache かで分類する
+  - current Portal validation と無関係な side-system runtime を、保守対象か disposable cache かで分類する
 
 ### Planning Questions
 
-- current Portal canary / scheduler を壊さずに削除できる path はどこまでか
+- current Portal validation / scheduler を壊さずに削除できる path はどこまでか
 - blocked diagnosis / rerun investigation に必要な最小証跡は何か
 - `results`, `logs`, `quarantine`, `workspaces`, `m2 cache` に age / size / count のどの retention rule を掛けるべきか
 - terminal task 完了時に即削除するものと、operator 明示 command でだけ削除するものをどう分けるか
