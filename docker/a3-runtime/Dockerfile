@@ -19,7 +19,7 @@ RUN apt-get update \
       ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
-ENV PATH=/usr/local/bundle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV PATH=/usr/local/bin:/usr/local/bundle/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN arch="$(dpkg --print-architecture)" \
     && case "$arch" in \
@@ -45,6 +45,9 @@ RUN cd /tmp/a3-engine \
     && bundle _${BUNDLER_VERSION}_ install \
     && rm -rf /usr/local/bundle/cache/*.gem
 
+RUN ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a3
+
 ENV A3_ROOT_DIR=/workspace
+ENV RUBYLIB=/tmp/a3-engine/lib
 
 CMD ["sleep", "infinity"]

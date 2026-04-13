@@ -8,6 +8,6 @@ Gem::Specification.new do |spec|
     "lib/**/*.rb"
   ]
   spec.bindir = "bin"
-  spec.executables = ["a3", "a3-agent"]
+  spec.executables = ["a3"]
   spec.require_paths = ["lib"]
 end

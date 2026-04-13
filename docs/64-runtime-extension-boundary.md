@@ -55,7 +55,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 
 | Root file | Classification | Action | Reason / dependency |
 | --- | --- | --- | --- |
-| `scripts/a3/run.rb` | Retired wrapper | Deleted after `a3-engine/bin/a3 root-utility` became the operator facade | Users must not invoke Ruby directly. Root Taskfile may set project-injected env, but the release boundary is packaged `a3` / `a3-agent`. |
+| `scripts/a3/run.rb` | Retired wrapper | Deleted after `a3-engine/bin/a3 root-utility` became the operator facade | Users must not invoke Ruby directly. Root Taskfile may set project-injected env, but the release boundary is Docker A3 runtime command + Go `a3-agent` release binary. |
 
 ### Retired from `scripts/a3`
 

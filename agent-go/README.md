@@ -2,7 +2,7 @@
 
 This module contains the `a3-agent` scaffold for macOS, Linux, and WSL2 Ubuntu.
 
-It intentionally depends only on the Go standard library. The Ruby reference agent remains useful for protocol fixtures, but this module is the target for host / dev-env installation.
+It intentionally depends only on the Go standard library. The Ruby reference agent class remains useful for protocol fixtures, but it is not a release executable. This module is the only `a3-agent` target for host / dev-env installation.
 
 ## Build
 
