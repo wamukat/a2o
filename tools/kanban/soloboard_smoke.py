@@ -12,7 +12,8 @@ from pathlib import Path
 A3_ENGINE_DIR = Path(__file__).resolve().parents[2]
 ROOT_DIR = A3_ENGINE_DIR.parent
 CLI = [sys.executable, str(A3_ENGINE_DIR / "tools" / "kanban" / "cli.py"), "--backend", "soloboard"]
-BOOTSTRAP = ROOT_DIR / "scripts" / "a3-projects" / "portal" / "bootstrap_soloboard.py"
+BOOTSTRAP = A3_ENGINE_DIR / "tools" / "kanban" / "bootstrap_soloboard.py"
+BOOTSTRAP_CONFIG = ROOT_DIR / "scripts" / "a3-projects" / "portal" / "inject" / "soloboard-bootstrap.json"
 
 
 def run_cli(*args: str) -> object:
@@ -32,7 +33,7 @@ def main() -> int:
     common = ("--base-url", base_url)
 
     subprocess.run(
-        [sys.executable, str(BOOTSTRAP), "--base-url", base_url],
+        [sys.executable, str(BOOTSTRAP), "--config", str(BOOTSTRAP_CONFIG), "--base-url", base_url],
         cwd=ROOT_DIR,
         check=True,
     )

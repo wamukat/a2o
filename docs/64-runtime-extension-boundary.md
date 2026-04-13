@@ -78,7 +78,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 - `scripts/a3-projects/portal/inject/portal_verification.rb`
 - `scripts/a3-projects/portal/inject/bootstrap-task-maven-local-repo.sh`
 - `scripts/a3-projects/portal/inject/bootstrap-phase-support-maven.sh`
-- `scripts/a3-projects/portal/inject/bootstrap_soloboard.py`
+- `scripts/a3-projects/portal/inject/soloboard-bootstrap.json`
 
 | Root file | Classification | Action | Reason / dependency |
 | --- | --- | --- | --- |
@@ -92,7 +92,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 | `scripts/a3-projects/portal/inject/portal_remediation.rb` | Project remediation hook | Keep project-injected | Encodes Portal remediation command (`task fmt:apply`) and slot expectations. |
 | `scripts/a3-projects/portal/inject/bootstrap-task-maven-local-repo.sh` | Project toolchain bootstrap | Keep project-injected | Maven local repository materialization is required for Portal's starter artifact flow. It is not a simple cache; it can contain starter build artifacts consumed by `ui-app`. |
 | `scripts/a3-projects/portal/inject/bootstrap-phase-support-maven.sh` | Project support-repo bootstrap | Keep project-injected | Installs the support `member-portal-starters` artifact into the issue-local Maven repo before `ui-app` verification. |
-| `scripts/a3-projects/portal/inject/bootstrap_soloboard.py` | Project kanban bootstrap | Keep project-injected | Board names, lanes, tags, and trigger labels are project/operator profile data, not A3 core knowledge. |
+| `scripts/a3-projects/portal/inject/soloboard-bootstrap.json` | Project kanban bootstrap config | Keep project-injected | Board names, lanes, tags, and trigger labels are project/operator profile data, not A3 core knowledge. Generic bootstrap execution belongs to A3 Engine. |
 
 ### Keep as Portal support and verification harness
 
@@ -132,7 +132,8 @@ The generic kanban command contract belongs under `a3-engine/tools/kanban`. A to
 - `a3-engine/tools/kanban/cli.py` and `a3-engine/tools/kanban/kanban_cli.py`: generic kanban CLI / adapter entrypoint used by A3 Engine.
 - `a3-engine/tools/kanban/soloboard_smoke.py`: generic SoloBoard compatibility smoke for the current kanban command contract.
 - `a3-engine/tools/kanban/soloboard_doctor.sh` and `a3-engine/tools/kanban/soloboard_wait_ready.sh`: generic local SoloBoard runtime helpers.
-- `scripts/a3-projects/portal/inject/bootstrap_soloboard.py`: project/workspace bootstrap for Portal / OIDC / A3Engine boards and tags. This stays project-injected because board names, lanes, tags, and trigger labels are not A3 core knowledge.
+- `a3-engine/tools/kanban/bootstrap_soloboard.py`: generic SoloBoard bootstrap runner. It reads project-injected board/lane/tag config and must not hardcode Portal / OIDC / A3Engine knowledge.
+- `scripts/a3-projects/portal/inject/soloboard-bootstrap.json`: Portal workspace board/lane/tag config supplied to the generic bootstrap runner.
 
 Do not add a new top-level script namespace for a kanban backend unless it owns an independently shipped tool. Generic backend helpers stay below `a3-engine/tools/kanban`; project bootstrap stays below the project package.
 
