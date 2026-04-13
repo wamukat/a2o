@@ -4,7 +4,7 @@ require "fileutils"
 require "json"
 require "open3"
 require "tmpdir"
-require_relative "../../../scripts/a3/rerun_quarantine"
+require "a3/operator/rerun_quarantine"
 
 RSpec.describe A3RerunQuarantine do
   def must_run(*args, cwd:)
