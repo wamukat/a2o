@@ -1329,6 +1329,12 @@ module A3
       parser.on("--agent-shared-workspace-mode VALUE") { |value| options[:agent_shared_workspace_mode] = value }
       parser.on("--agent-env KEY=VALUE") { |value| add_named_option(options[:agent_env] ||= {}, value, option_name: "agent env") }
       parser.on("--agent-source-alias SLOT=ALIAS") { |value| add_named_option(options[:agent_source_aliases] ||= {}, value, option_name: "agent source alias") }
+      parser.on("--agent-workspace-root PATH") { |value| options[:agent_workspace_root] = value }
+      parser.on("--agent-source-path ALIAS=PATH") { |value| add_named_option(options[:agent_source_paths] ||= {}, value, option_name: "agent source path") }
+      parser.on("--agent-required-bin VALUE") do |value|
+        options[:agent_required_bins] ||= []
+        options[:agent_required_bins] << value
+      end
       parser.on("--agent-support-ref SLOT=REF") { |value| add_agent_support_ref_option(options, value) }
       parser.on("--agent-workspace-freshness-policy VALUE") { |value| options[:agent_workspace_freshness_policy] = value.to_sym }
       parser.on("--agent-workspace-cleanup-policy VALUE") { |value| options[:agent_workspace_cleanup_policy] = value.to_sym }
@@ -1498,7 +1504,8 @@ module A3
             review_disposition_repo_scopes: review_disposition_repo_scopes_from_kanban_label_map(options.fetch(:kanban_repo_label_map, {}))
           ),
           workspace_request_builder: agent_workspace_request_builder(options),
-          env: options.fetch(:agent_env, {})
+          env: options.fetch(:agent_env, {}),
+          agent_environment: agent_environment_from_options(options)
         )
       end
 
@@ -1528,7 +1535,8 @@ module A3
           timeout_seconds: options.fetch(:agent_job_timeout_seconds, 1800),
           poll_interval_seconds: options.fetch(:agent_job_poll_interval_seconds, 1.0),
           workspace_request_builder: agent_workspace_request_builder(options),
-          env: options.fetch(:agent_env, {})
+          env: options.fetch(:agent_env, {}),
+          agent_environment: agent_environment_from_options(options)
         )
       end
 
@@ -1554,7 +1562,8 @@ module A3
           runtime_profile: options.fetch(:agent_runtime_profile, "default"),
           source_aliases: source_aliases,
           timeout_seconds: options.fetch(:agent_job_timeout_seconds, 1800),
-          poll_interval_seconds: options.fetch(:agent_job_poll_interval_seconds, 1.0)
+          poll_interval_seconds: options.fetch(:agent_job_poll_interval_seconds, 1.0),
+          agent_environment: agent_environment_from_options(options)
         )
       end
 
@@ -1601,6 +1610,23 @@ module A3
         support_ref: options[:agent_support_ref],
         support_refs: options.fetch(:agent_support_refs, {})
       )
+    end
+
+    def agent_environment_from_options(options)
+      environment = {}
+      workspace_root = options[:agent_workspace_root].to_s
+      environment["workspace_root"] = workspace_root unless workspace_root.empty?
+
+      source_paths = options.fetch(:agent_source_paths, {})
+      environment["source_paths"] = source_paths.transform_keys(&:to_s).transform_values(&:to_s) unless source_paths.empty?
+
+      env = options.fetch(:agent_env, {})
+      environment["env"] = env.transform_keys(&:to_s).transform_values(&:to_s) unless env.empty?
+
+      required_bins = Array(options[:agent_required_bins]).map(&:to_s).reject(&:empty?)
+      environment["required_bins"] = required_bins unless required_bins.empty?
+
+      environment.empty? ? nil : environment
     end
 
     def add_agent_support_ref_option(options, value)

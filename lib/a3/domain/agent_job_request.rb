@@ -8,10 +8,10 @@ module A3
       PHASES = %i[implementation review verification merge].freeze
       MAX_WORKER_PROTOCOL_PAYLOAD_BYTES = 1024 * 1024
 
-      attr_reader :job_id, :task_ref, :phase, :runtime_profile, :source_descriptor, :workspace_request, :merge_request, :worker_protocol_request,
+      attr_reader :job_id, :task_ref, :phase, :runtime_profile, :source_descriptor, :workspace_request, :merge_request, :worker_protocol_request, :agent_environment,
                   :working_dir, :command, :args, :env, :timeout_seconds, :artifact_rules
 
-      def initialize(job_id:, task_ref:, phase:, runtime_profile:, source_descriptor:, working_dir:, command:, args:, env:, timeout_seconds:, artifact_rules:, workspace_request: nil, merge_request: nil, worker_protocol_request: nil)
+      def initialize(job_id:, task_ref:, phase:, runtime_profile:, source_descriptor:, working_dir:, command:, args:, env:, timeout_seconds:, artifact_rules:, workspace_request: nil, merge_request: nil, worker_protocol_request: nil, agent_environment: nil)
         @job_id = required_string(job_id, "job_id")
         @task_ref = required_string(task_ref, "task_ref")
         @phase = normalize_phase(phase)
@@ -20,6 +20,7 @@ module A3
         @workspace_request = normalize_workspace_request(workspace_request)
         @merge_request = normalize_optional_json_object(merge_request, "merge_request")
         @worker_protocol_request = normalize_optional_json_object(worker_protocol_request, "worker_protocol_request")
+        @agent_environment = normalize_optional_json_object(agent_environment, "agent_environment")
         @working_dir = required_string(working_dir, "working_dir")
         @command = required_string(command, "command")
         @args = Array(args).map(&:to_s).freeze
@@ -45,7 +46,8 @@ module A3
           artifact_rules: record.fetch("artifact_rules"),
           workspace_request: record["workspace_request"] && AgentWorkspaceRequest.from_request_form(record["workspace_request"]),
           merge_request: record["merge_request"],
-          worker_protocol_request: record["worker_protocol_request"]
+          worker_protocol_request: record["worker_protocol_request"],
+          agent_environment: record["agent_environment"]
         )
       end
 
@@ -59,6 +61,7 @@ module A3
           "workspace_request" => workspace_request&.request_form,
           "merge_request" => merge_request,
           "worker_protocol_request" => worker_protocol_request,
+          "agent_environment" => agent_environment,
           "working_dir" => working_dir,
           "command" => command,
           "args" => args,

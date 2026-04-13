@@ -16,12 +16,20 @@ type JobRequest struct {
 	WorkspaceRequest      *WorkspaceRequest   `json:"workspace_request,omitempty"`
 	MergeRequest          *MergeRequest       `json:"merge_request,omitempty"`
 	WorkerProtocolRequest map[string]any      `json:"worker_protocol_request,omitempty"`
+	AgentEnvironment      *AgentEnvironment   `json:"agent_environment,omitempty"`
 	WorkingDir            string              `json:"working_dir"`
 	Command               string              `json:"command"`
 	Args                  []string            `json:"args"`
 	Env                   map[string]string   `json:"env"`
 	TimeoutSeconds        int                 `json:"timeout_seconds"`
 	ArtifactRules         []map[string]string `json:"artifact_rules"`
+}
+
+type AgentEnvironment struct {
+	WorkspaceRoot string            `json:"workspace_root,omitempty"`
+	SourcePaths   map[string]string `json:"source_paths,omitempty"`
+	Env           map[string]string `json:"env,omitempty"`
+	RequiredBins  []string          `json:"required_bins,omitempty"`
 }
 
 type MergeRequest struct {

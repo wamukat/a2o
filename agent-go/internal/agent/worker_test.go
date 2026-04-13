@@ -110,6 +110,52 @@ func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T)
 	}
 }
 
+func TestWorkerUsesEngineProvidedAgentEnvironmentForMaterialization(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	request := testRequest(".")
+	request.Phase = "implementation"
+	request.SourceDescriptor.WorkspaceKind = "ticket_workspace"
+	request.WorkspaceRequest = ptr(testWorkspaceRequest("member-portal-starters"))
+	request.WorkspaceRequest.CleanupPolicy = "cleanup_after_job"
+	request.WorkerProtocolRequest = map[string]any{
+		"task_ref": "Portal#42",
+		"phase":    "implementation",
+	}
+	request.AgentEnvironment = &AgentEnvironment{
+		WorkspaceRoot: filepath.Join(tmp, "engine-managed-workspaces"),
+		SourcePaths: map[string]string{
+			"member-portal-starters": sourceRoot,
+		},
+		Env: map[string]string{
+			"A3_ENGINE_MANAGED_ENV": "true",
+		},
+	}
+	client := &fakeClient{request: &request}
+
+	result, idle, err := Worker{
+		AgentName: "host-local",
+		Client:    client,
+		Executor:  envAwareWorkerProtocolExecutor{key: "A3_ENGINE_MANAGED_ENV", value: "true"},
+		Now:       func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+	}.RunOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idle {
+		t.Fatal("expected job result, got idle")
+	}
+	if result.Status != "succeeded" {
+		t.Fatalf("expected success from engine-managed environment, got %#v", result)
+	}
+	if result.WorkspaceDescriptor.WorkspaceID != "Portal-42-ticket" {
+		t.Fatalf("unexpected workspace descriptor: %#v", result.WorkspaceDescriptor)
+	}
+	if _, err := os.Stat(filepath.Join(tmp, "engine-managed-workspaces", "Portal-42-ticket")); !os.IsNotExist(err) {
+		t.Fatalf("workspace was not cleaned up: %v", err)
+	}
+}
+
 func TestWorkerRejectsPublishWhenWorkerResultOmitsChangedFiles(t *testing.T) {
 	tmp := t.TempDir()
 	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
@@ -295,6 +341,19 @@ func (fakeExecutor) Execute(JobRequest) ExecutionResult {
 type workerProtocolExecutor struct {
 	omitChangedFiles bool
 	requireSlotPaths bool
+}
+
+type envAwareWorkerProtocolExecutor struct {
+	key   string
+	value string
+}
+
+func (executor envAwareWorkerProtocolExecutor) Execute(request JobRequest) ExecutionResult {
+	if request.Env[executor.key] != executor.value {
+		code := 1
+		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte("missing engine-managed agent environment")}
+	}
+	return workerProtocolExecutor{requireSlotPaths: true}.Execute(request)
 }
 
 func (executor workerProtocolExecutor) Execute(request JobRequest) ExecutionResult {

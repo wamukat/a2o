@@ -5,7 +5,7 @@ require "securerandom"
 module A3
   module Infra
     class AgentCommandRunner
-      def initialize(control_plane_client:, runtime_profile:, shared_workspace_mode:, timeout_seconds: 1800, poll_interval_seconds: 1.0, job_id_generator: -> { SecureRandom.uuid }, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, workspace_request_builder: nil, env: {})
+      def initialize(control_plane_client:, runtime_profile:, shared_workspace_mode:, timeout_seconds: 1800, poll_interval_seconds: 1.0, job_id_generator: -> { SecureRandom.uuid }, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, workspace_request_builder: nil, env: {}, agent_environment: nil)
         @control_plane_client = control_plane_client
         @runtime_profile = runtime_profile.to_s
         @shared_workspace_mode = shared_workspace_mode.to_s
@@ -16,6 +16,7 @@ module A3
         @monotonic_clock = monotonic_clock
         @workspace_request_builder = workspace_request_builder
         @env = env.transform_keys(&:to_s).transform_values(&:to_s).freeze
+        @agent_environment = agent_environment
       end
 
       def agent_owned_workspace?
@@ -55,6 +56,7 @@ module A3
           runtime_profile: @runtime_profile,
           source_descriptor: run.source_descriptor,
           workspace_request: workspace_request_for(workspace: workspace, task: task, run: run),
+          agent_environment: @agent_environment,
           working_dir: workspace.root_path.to_s,
           command: "sh",
           args: ["-lc", command.to_s],

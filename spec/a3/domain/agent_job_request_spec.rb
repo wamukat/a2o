@@ -83,6 +83,16 @@ RSpec.describe A3::Domain::AgentJobRequest do
         run_ref: "run-42",
         phase: "implementation"
       },
+      agent_environment: {
+        workspace_root: "/agent/workspaces",
+        source_paths: {
+          "member-portal-starters" => "/agent/repos/starters"
+        },
+        env: {
+          A3_ROOT_DIR: "/agent/a3"
+        },
+        required_bins: ["git", "task"]
+      },
       working_dir: ".",
       command: "ruby",
       args: ["scripts/a3/worker.rb"],
@@ -96,6 +106,16 @@ RSpec.describe A3::Domain::AgentJobRequest do
       "task_ref" => "Portal#42",
       "run_ref" => "run-42",
       "phase" => "implementation"
+    )
+    expect(request.request_form.fetch("agent_environment")).to eq(
+      "workspace_root" => "/agent/workspaces",
+      "source_paths" => {
+        "member-portal-starters" => "/agent/repos/starters"
+      },
+      "env" => {
+        "A3_ROOT_DIR" => "/agent/a3"
+      },
+      "required_bins" => ["git", "task"]
     )
     expect(described_class.from_request_form(request.request_form)).to eq(request)
   end

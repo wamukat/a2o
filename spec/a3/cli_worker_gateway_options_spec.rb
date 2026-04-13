@@ -50,6 +50,40 @@ RSpec.describe "A3 CLI worker gateway options" do
     expect(gateway.instance_variable_get(:@env)).to eq("A3_ROOT_DIR" => "/host/a3")
   end
 
+  it "passes engine-managed agent environment options to an agent HTTP worker gateway" do
+    gateway = A3::CLI.send(
+      :build_worker_gateway,
+      options: {
+        worker_gateway: "agent-http",
+        worker_command: "ruby",
+        worker_command_args: ["worker.rb"],
+        agent_control_plane_url: "http://127.0.0.1:4567",
+        agent_runtime_profile: "host-local",
+        agent_shared_workspace_mode: "same-path",
+        agent_workspace_root: "/agent/workspaces",
+        agent_source_paths: {
+          "member-portal-starters" => "/agent/repos/starters"
+        },
+        agent_env: {
+          "A3_ROOT_DIR" => "/agent/a3"
+        },
+        agent_required_bins: ["git", "task"]
+      },
+      command_runner: instance_double(A3::Infra::LocalCommandRunner)
+    )
+
+    expect(gateway.instance_variable_get(:@agent_environment)).to eq(
+      "workspace_root" => "/agent/workspaces",
+      "source_paths" => {
+        "member-portal-starters" => "/agent/repos/starters"
+      },
+      "env" => {
+        "A3_ROOT_DIR" => "/agent/a3"
+      },
+      "required_bins" => ["git", "task"]
+    )
+  end
+
   it "builds an agent materialized HTTP worker gateway with explicit source aliases" do
     gateway = A3::CLI.send(
       :build_worker_gateway,
@@ -256,6 +290,40 @@ RSpec.describe "A3 CLI worker gateway options" do
     )
 
     expect(runner.instance_variable_get(:@env)).to eq("A3_ROOT_DIR" => "/host/a3")
+  end
+
+  it "passes engine-managed agent environment options to verification and merge runners" do
+    options = {
+      agent_control_plane_url: "http://127.0.0.1:4567",
+      agent_runtime_profile: "host-local",
+      agent_shared_workspace_mode: "agent-materialized",
+      agent_source_aliases: {
+        "repo_alpha" => "member-portal-starters"
+      },
+      agent_workspace_root: "/agent/workspaces",
+      agent_source_paths: {
+        "member-portal-starters" => "/agent/repos/starters"
+      }
+    }
+
+    command_runner = A3::CLI.send(
+      :build_command_runner,
+      options: options.merge(verification_command_runner: "agent-http"),
+      fallback: instance_double(A3::Infra::LocalCommandRunner)
+    )
+    merge_runner = A3::CLI.send(
+      :build_merge_runner,
+      options: options.merge(merge_runner: "agent-http"),
+      fallback: instance_double(A3::Infra::DisabledMergeRunner)
+    )
+
+    expect(command_runner.instance_variable_get(:@agent_environment)).to eq(
+      "workspace_root" => "/agent/workspaces",
+      "source_paths" => {
+        "member-portal-starters" => "/agent/repos/starters"
+      }
+    )
+    expect(merge_runner.instance_variable_get(:@agent_environment)).to eq(command_runner.instance_variable_get(:@agent_environment))
   end
 
   it "resolves the agent auth token from a token file when no direct token is configured" do

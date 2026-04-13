@@ -5,7 +5,7 @@ require "securerandom"
 module A3
   module Infra
     class AgentMergeRunner
-      def initialize(control_plane_client:, runtime_profile:, source_aliases:, timeout_seconds: 1800, poll_interval_seconds: 1.0, job_id_generator: -> { SecureRandom.uuid }, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) })
+      def initialize(control_plane_client:, runtime_profile:, source_aliases:, timeout_seconds: 1800, poll_interval_seconds: 1.0, job_id_generator: -> { SecureRandom.uuid }, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, agent_environment: nil)
         @control_plane_client = control_plane_client
         @runtime_profile = runtime_profile.to_s
         @source_aliases = source_aliases.transform_keys(&:to_sym).transform_values(&:to_s).freeze
@@ -14,6 +14,7 @@ module A3
         @job_id_generator = job_id_generator
         @sleeper = sleeper
         @monotonic_clock = monotonic_clock
+        @agent_environment = agent_environment
       end
 
       def run(merge_plan, workspace:)
@@ -58,6 +59,7 @@ module A3
             ref: merge_plan.integration_target.target_ref
           ),
           merge_request: merge_request_form(merge_plan),
+          agent_environment: @agent_environment,
           working_dir: ".",
           command: "a3-agent-merge",
           args: [],

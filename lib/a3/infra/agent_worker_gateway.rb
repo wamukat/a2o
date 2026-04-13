@@ -7,7 +7,7 @@ require "a3/infra/workspace_trace_logger"
 module A3
   module Infra
     class AgentWorkerGateway
-      def initialize(control_plane_client:, worker_command:, worker_command_args: [], runtime_profile:, shared_workspace_mode:, timeout_seconds: 1800, poll_interval_seconds: 1.0, job_id_generator: -> { SecureRandom.uuid }, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, worker_protocol: A3::Infra::WorkerProtocol.new, workspace_request_builder: nil, env: {})
+      def initialize(control_plane_client:, worker_command:, worker_command_args: [], runtime_profile:, shared_workspace_mode:, timeout_seconds: 1800, poll_interval_seconds: 1.0, job_id_generator: -> { SecureRandom.uuid }, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, worker_protocol: A3::Infra::WorkerProtocol.new, workspace_request_builder: nil, env: {}, agent_environment: nil)
         @control_plane_client = control_plane_client
         @worker_command = worker_command.to_s
         @worker_command_args = Array(worker_command_args).map(&:to_s).freeze
@@ -21,6 +21,7 @@ module A3
         @worker_protocol = worker_protocol
         @workspace_request_builder = workspace_request_builder
         @env = env.transform_keys(&:to_s).transform_values(&:to_s).freeze
+        @agent_environment = agent_environment
       end
 
       def run(skill:, workspace:, task:, run:, phase_runtime:, task_packet:)
@@ -148,6 +149,7 @@ module A3
           source_descriptor: run.source_descriptor,
           workspace_request: workspace_request,
           worker_protocol_request: worker_protocol_request,
+          agent_environment: @agent_environment,
           working_dir: workspace.root_path.to_s,
           command: @worker_command,
           args: @worker_command_args,

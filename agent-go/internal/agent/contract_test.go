@@ -47,6 +47,16 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 			"task_ref": "Portal#42",
 			"phase": "implementation"
 		},
+		"agent_environment": {
+			"workspace_root": "/agent/workspaces",
+			"source_paths": {
+				"member-portal-starters": "/agent/repos/starters"
+			},
+			"env": {
+				"A3_ROOT_DIR": "/agent/a3"
+			},
+			"required_bins": ["git", "task"]
+		},
 		"working_dir": ".",
 		"command": "sh",
 		"args": ["worker.sh"],
@@ -67,6 +77,18 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 	}
 	if request.WorkerProtocolRequest["task_ref"] != "Portal#42" {
 		t.Fatalf("worker protocol request was not decoded: %#v", request.WorkerProtocolRequest)
+	}
+	if request.AgentEnvironment == nil || request.AgentEnvironment.WorkspaceRoot != "/agent/workspaces" {
+		t.Fatalf("agent environment was not decoded: %#v", request.AgentEnvironment)
+	}
+	if request.AgentEnvironment.SourcePaths["member-portal-starters"] != "/agent/repos/starters" {
+		t.Fatalf("agent source paths were not decoded: %#v", request.AgentEnvironment.SourcePaths)
+	}
+	if request.AgentEnvironment.Env["A3_ROOT_DIR"] != "/agent/a3" {
+		t.Fatalf("agent env was not decoded: %#v", request.AgentEnvironment.Env)
+	}
+	if len(request.AgentEnvironment.RequiredBins) != 2 || request.AgentEnvironment.RequiredBins[0] != "git" {
+		t.Fatalf("agent required bins were not decoded: %#v", request.AgentEnvironment.RequiredBins)
 	}
 	slot := request.WorkspaceRequest.Slots["repo_alpha"]
 	if slot.Source.Alias != "member-portal-starters" || slot.Checkout != "worktree_branch" || slot.SyncClass != "eager" || slot.Ownership != "edit_target" {
@@ -89,6 +111,9 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 	}
 	if roundTrip.WorkerProtocolRequest["phase"] != "implementation" {
 		t.Fatalf("unexpected roundtrip worker protocol request: %#v", roundTrip.WorkerProtocolRequest)
+	}
+	if roundTrip.AgentEnvironment == nil || roundTrip.AgentEnvironment.SourcePaths["member-portal-starters"] != "/agent/repos/starters" {
+		t.Fatalf("unexpected roundtrip agent environment: %#v", roundTrip.AgentEnvironment)
 	}
 }
 

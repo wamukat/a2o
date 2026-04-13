@@ -114,7 +114,7 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 		return nil, false, err
 	}
 	if prepared != nil && request.WorkspaceRequest != nil {
-		if err := w.publishPrepared(*prepared, *request.WorkspaceRequest, workerProtocolResult); err != nil {
+		if err := w.publishPrepared(*prepared, *request, workerProtocolResult); err != nil {
 			if refreshErr := RefreshWorkspaceEvidence(*prepared); refreshErr == nil {
 				workspaceDescriptor = requestedWorkspaceDescriptor(runRequest, prepared.SlotDescriptors)
 			}
@@ -156,7 +156,7 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 }
 
 func (w Worker) runMergeJob(request JobRequest, startedAt string) (*JobResult, bool, error) {
-	descriptor, execution := w.mergeRequest(*request.MergeRequest)
+	descriptor, execution := w.mergeRequest(request)
 	finishedAt := w.now().Format(time.RFC3339)
 	descriptor.RuntimeProfile = request.RuntimeProfile
 	descriptor.SourceDescriptor = request.SourceDescriptor
@@ -186,18 +186,21 @@ func (w Worker) runMergeJob(request JobRequest, startedAt string) (*JobResult, b
 	return &result, false, nil
 }
 
-func (w Worker) mergeRequest(request MergeRequest) (WorkspaceDescriptor, ExecutionResult) {
-	if merger, ok := w.Materializer.(WorkspaceMerger); ok {
-		return merger.Merge(request)
+func (w Worker) mergeRequest(request JobRequest) (WorkspaceDescriptor, ExecutionResult) {
+	if merger, ok := w.workspacePreparerForRequest(request).(WorkspaceMerger); ok {
+		return merger.Merge(*request.MergeRequest)
 	}
-	return WorkspaceDescriptor{WorkspaceID: request.WorkspaceID, SlotDescriptors: map[string]map[string]any{}}, failedMergeExecution(fmt.Errorf("workspace merger is not configured"))
+	return WorkspaceDescriptor{WorkspaceID: request.MergeRequest.WorkspaceID, SlotDescriptors: map[string]map[string]any{}}, failedMergeExecution(fmt.Errorf("workspace merger is not configured"))
 }
 
-func (w Worker) publishPrepared(prepared PreparedWorkspace, request WorkspaceRequest, workerProtocolResult map[string]any) error {
-	if publisher, ok := w.Materializer.(WorkspacePublisher); ok {
-		return publisher.Publish(prepared, request, workerProtocolResult)
+func (w Worker) publishPrepared(prepared PreparedWorkspace, request JobRequest, workerProtocolResult map[string]any) error {
+	if request.WorkspaceRequest == nil {
+		return fmt.Errorf("workspace request is not configured")
 	}
-	return PublishWorkspaceChanges(prepared, request, workerProtocolResult)
+	if publisher, ok := w.workspacePreparerForRequest(request).(WorkspacePublisher); ok {
+		return publisher.Publish(prepared, *request.WorkspaceRequest, workerProtocolResult)
+	}
+	return PublishWorkspaceChanges(prepared, *request.WorkspaceRequest, workerProtocolResult)
 }
 
 func postExecutionFailureResult(request JobRequest, descriptor WorkspaceDescriptor, startedAt, finishedAt string, logUpload ArtifactUpload, artifactUploads []ArtifactUpload, summary, failingCommand string, cause error) JobResult {
@@ -226,16 +229,17 @@ func (w Worker) prepareRequest(request JobRequest) (JobRequest, *PreparedWorkspa
 	if request.WorkspaceRequest == nil {
 		return request, nil, legacyWorkspaceDescriptor(request), nil
 	}
-	if w.Materializer == nil {
+	materializer := w.workspacePreparerForRequest(request)
+	if materializer == nil {
 		return request, nil, requestedWorkspaceDescriptor(request, nil), fmt.Errorf("workspace materializer is not configured")
 	}
-	prepared, err := w.Materializer.Prepare(*request.WorkspaceRequest)
+	prepared, err := materializer.Prepare(*request.WorkspaceRequest)
 	if err != nil {
 		return request, nil, requestedWorkspaceDescriptor(request, nil), err
 	}
 	runRequest := request
 	runRequest.WorkingDir = prepared.Root
-	runRequest.Env = workerProtocolEnv(request.Env, prepared.Root, request.WorkerProtocolRequest != nil)
+	runRequest.Env = workerProtocolEnv(requestEnvForAgent(request), prepared.Root, request.WorkerProtocolRequest != nil)
 	if err := writeWorkerProtocolRequest(prepared.Root, workerProtocolRequestWithMaterializedSlots(request.WorkerProtocolRequest, prepared.SlotDescriptors)); err != nil {
 		return request, &prepared, requestedWorkspaceDescriptor(request, prepared.SlotDescriptors), err
 	}
@@ -272,7 +276,11 @@ func (w Worker) cleanupPrepared(request JobRequest, prepared *PreparedWorkspace)
 	if request.WorkspaceRequest.CleanupPolicy != "cleanup_after_job" {
 		return nil
 	}
-	return w.Materializer.Cleanup(*prepared)
+	materializer := w.workspacePreparerForRequest(request)
+	if materializer == nil {
+		return fmt.Errorf("workspace materializer is not configured")
+	}
+	return materializer.Cleanup(*prepared)
 }
 
 func (w Worker) uploadArtifactsAndWorkerResult(request JobRequest) ([]ArtifactUpload, map[string]any, error) {
@@ -355,6 +363,31 @@ func (w Worker) executor() CommandExecutor {
 		return w.Executor
 	}
 	return Executor{}
+}
+
+func (w Worker) workspacePreparerForRequest(request JobRequest) WorkspacePreparer {
+	if request.AgentEnvironment != nil &&
+		request.AgentEnvironment.WorkspaceRoot != "" &&
+		len(request.AgentEnvironment.SourcePaths) > 0 {
+		return WorkspaceMaterializer{
+			WorkspaceRoot: request.AgentEnvironment.WorkspaceRoot,
+			SourceAliases: request.AgentEnvironment.SourcePaths,
+		}
+	}
+	return w.Materializer
+}
+
+func requestEnvForAgent(request JobRequest) map[string]string {
+	env := map[string]string{}
+	if request.AgentEnvironment != nil {
+		for key, value := range request.AgentEnvironment.Env {
+			env[key] = value
+		}
+	}
+	for key, value := range request.Env {
+		env[key] = value
+	}
+	return env
 }
 
 func (w Worker) now() time.Time {
