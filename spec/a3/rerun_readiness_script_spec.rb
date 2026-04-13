@@ -3,7 +3,7 @@
 require "json"
 require "tmpdir"
 require "fileutils"
-require_relative "../../../scripts/a3/rerun_readiness"
+require "a3/operator/rerun_readiness"
 
 RSpec.describe A3RerunReadiness do
   def write_json(path, payload)
