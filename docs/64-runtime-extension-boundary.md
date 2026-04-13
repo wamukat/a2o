@@ -49,7 +49,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 ### Move toward `a3-engine`
 
 - No tracked root files should remain under `scripts/a3`.
-- Generic launcher surfaces now dispatch through `a3-engine/bin/a3 root-utility`; root Taskfile injects project paths and environment only.
+- Generic root-local maintenance surfaces dispatch through `a3-engine/bin/a3 root-utility`; release-facing runtime surfaces dispatch through Docker A3 runtime `a3`.
 - Individual operator wrappers such as `cleanup.rb`, `diagnostics.rb`, `reconcile.rb`, and `rerun_*` have been retired from root.
 - Worker and generic smoke entrypoints should use `a3-engine/bin/a3 worker:*` commands instead of root wrappers.
 
