@@ -140,33 +140,7 @@
   - Portal starters / UI app の単独 full verification は、それぞれ実 source repo で `a3-agent` 経由確認済み。`repo:both` parent topology canary は synthetic source repo で確認済み。実 Portal source の `repo:both` full verification は重い PR前/統合前 canary として扱う
   根拠: `docs/60-container-distribution-and-project-runtime.md` の `0.4.5.1` と `0.4.5.1b`
 
-## Portal Dev 実運用トラック
-
-- [x] isolated repo bootstrap
-  現状: source repo の current `HEAD` を isolated local `main` に materialize できる。
-  根拠: `scripts/a3-projects/portal/support/bootstrap_portal_dev_repos.rb`, related Portal project package tests
-
-- [x] source `HEAD` materialization
-  現状: source repo の current `HEAD` を isolated local `main` に配置できる。
-
-- [x] detached `HEAD` refresh
-  現状: detached source `HEAD` を explicit fetch して materialize 可能。
-
-- [x] prerequisite command-surface guard
-  現状: `Taskfile.yml` / `mvnw` / `pom.xml` 欠落を preflight で止められる。
-  根拠: `scripts/a3-projects/portal/inject/config/portal-dev/project.json`, `a3_engine/preflight.py`
-
-- [x] implementation execution
-  現状: `repo:ui-app` implementation を isolated repo 上で end-to-end 実行確認済み。
-  根拠: `python3 scripts/a3/run.py execute-phase --project portal-dev --phase implementation --labels trigger:auto-implement,repo:ui-app`
-
-- [x] child inspection execution
-  現状: `repo:ui-app` child inspection を isolated repo 上で end-to-end 実行確認済み。
-  根拠: `python3 scripts/a3/run.py execute-phase --project portal-dev --phase inspection --labels trigger:auto-implement,repo:ui-app`
-
-- [x] parent inspection execution
-  現状: `repo:ui-app` parent inspection を isolated repo 上で end-to-end 実行確認済み。
-  根拠: `python3 scripts/a3/run.py execute-phase --project portal-dev --phase inspection --labels trigger:auto-parent,repo:ui-app`
+## Portal Runtime 実運用トラック
 
 - [ ] parent/child branch topology
   現状: agent-materialized workspace は `worktree_branch` を使うが、2026-04-13 の final canary で scheduler 起動時に batch 内の全 `a3/work/*` / `a3/parent/*` ref を一括 `update-ref` していたため、`Portal#203` / `Portal#205` の parent branch が先行 single merge (`Portal#201` / `Portal#202`) 後の live head ではなく、batch 開始時点の live head から始まる defect を確認した。
@@ -176,15 +150,10 @@
   - `workspace_request.slots[*].bootstrap_ref` / `bootstrap_base_ref` を使い、single は live target、parent は live target、child は parent integration branch から materialize 時に missing branch を作る。最初の child で parent integration branch も未作成の場合は live target から parent integration branch を作ってから child work branch を切る
   - scheduler の batch 事前 ref 作成を default off にし、phase-local bootstrap を正規経路にする
   - live Portal parent-child canary で separated branch model を完走させる
-  根拠: `scripts/a3-projects/portal/support/bootstrap_portal_dev_repos.rb`, `scripts/a3-projects/portal/inject/config/portal-dev/project.json`
+  根拠: live Portal final canary observation
 
-- [x] merge execution
-  現状: `repo:ui-app` の child merge / parent merge を isolated repo 上で end-to-end 実行確認済み。
-  根拠: `python3 scripts/a3/run.py execute-phase --project portal-dev --phase merge --labels trigger:auto-implement,repo:ui-app`, `python3 scripts/a3/run.py execute-phase --project portal-dev --phase merge --labels trigger:auto-parent,repo:ui-app`
-
-- [x] live repo handoff / promotion
-  現状: merge 結果を launcher-config 管理の disposable live target へ dry-run / apply でき、canonical branch / clean-worktree guard を通す。
-  根拠: `a3_engine/promotion_executor.py`, `tests/test_promotion_executor.py`, `scripts/a3-projects/portal/inject/config/portal-dev/launcher.json`
+- [x] portal-dev isolated track retirement
+  現状: `portal-dev` は過去の隔離 clone 検証 profile であり、current Docker runtime + host-local `a3-agent` surface には不要。root Taskfile entry、project config、bootstrap helper、関連 spec は削除済み。
 
 ## Root Integration
 
@@ -193,7 +162,7 @@
   根拠: `scripts/a3/run.py`
 
 - [x] root task entrypoints
-  現状: `task a3:portal-dev:*` 入口を持つ。
+  現状: `task a3:portal:*` と runtime / maintenance 入口を持つ。
   根拠: root `Taskfile.yml`
 
 - [x] root docs/skills migration

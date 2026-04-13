@@ -137,8 +137,8 @@ Cutover target:
 - root `scripts/a3-projects/portal/inject/config/portal/*`
   - `a3-v2-runtime-manifest.yml`
   - `launcher.json` の operator guidance
-- root `scripts/a3-projects/portal/inject/config/portal-dev/launcher.json`
-  - `task a3:portal-v2:scheduler:*` 参照
+- retired root `scripts/a3-projects/portal/inject/config/portal-dev/*`
+  - `portal-dev` isolated clone compatibility profile は current runtime surface から削除済み
 - retired root `scripts/a3/run.rb`; current user-facing root entrypoint is `task a3:*`, and the release-bound engine entrypoint is Docker A3 runtime command, not a host Ruby `a3`
   - legacy disabled message の `task a3:portal-v2:*`, `a3-v2/bin/a3`
 - internal defaults
@@ -690,17 +690,17 @@ Stop:
     - current launchd plist / stdout / stderr
   - `.work/a3/env`
     - current launchd env file
-- keep as reusable bootstrap source
+- delete candidate
   - `.work/a3/repos/portal-dev/*`
-    - portal-dev repo mirror。current Portal scheduler の state rootではないが、bootstrap source として維持
+    - retired `portal-dev` repo mirror。current Portal runtime では使わない
 - retention managed / disposable
   - `.work/a3/portal-kanban-scheduler-auto/quarantine/*`
   - `.work/a3/results/*`
   - `.work/cache/*`
   - `.work/kanban/trace.log`
-- keep as reusable live target source
+- delete candidate
   - `.work/a3/live-targets/portal-dev/*`
-    - `portal-dev` bootstrap が参照する live target mirror。current Portal scheduler の state root ではないが、delete 候補にはしない
+    - retired `portal-dev` live target mirror。current Portal runtime では使わない
 - effectively empty or low-value in current root
   - `.work/a3/issues`
     - current root では実質空で、legacy-compatible path の残骸に近い
@@ -712,7 +712,7 @@ Stop:
 - `portal-kanban-scheduler-auto` は current runtime のため delete 対象にしない
 - `portal-kanban-scheduler-auto/quarantine/*` は retention policy の対象で、evidence 保持期間を超えたら delete 候補
 - `results/logs/cache` は disposable として扱い、operator cleanup または scheduler idle cleanup の管理下に置く
-- `.work/a3/live-targets/portal-dev/*` は `portal-dev` bootstrap の参照先のため delete 候補にしない
+- `.work/a3/repos/portal-dev/*` と `.work/a3/live-targets/portal-dev/*` は retired compatibility mirror のため delete 候補
 - `.work/a3/issues` は current runtime では使わない。rerun readiness / quarantine utility が legacy-compatible path として参照するため、top-level path だけ残して中身は空運用でよい
 - `.work/a3/issues/*` に payload が残っている場合は delete 候補とし、retention 対象にしない
 - `.work/a3/notifications/automation-events.jsonl` は low-value log として retention/delete 対象にする

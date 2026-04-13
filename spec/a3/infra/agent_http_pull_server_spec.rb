@@ -29,7 +29,7 @@ RSpec.describe A3::Infra::AgentHttpPullServer do
     )
     expect(enqueue_response.code).to eq("201")
 
-    claim_response = Net::HTTP.get_response(base_uri + "/v1/agent/jobs/next?agent=portal-dev-env")
+    claim_response = Net::HTTP.get_response(base_uri + "/v1/agent/jobs/next?agent=host-local-agent")
     expect(claim_response.code).to eq("200")
     expect(JSON.parse(claim_response.body).fetch("job").fetch("job_id")).to eq("job-1")
 
@@ -76,7 +76,7 @@ RSpec.describe A3::Infra::AgentHttpPullServer do
       job_id: job_id,
       task_ref: "Portal#42",
       phase: :verification,
-      runtime_profile: "portal-dev-env",
+      runtime_profile: "host-local-agent",
       source_descriptor: source_descriptor,
       working_dir: "/workspace/member-portal-starters",
       command: "task",
@@ -117,7 +117,7 @@ RSpec.describe A3::Infra::AgentHttpPullServer do
   def workspace_descriptor
     A3::Domain::AgentWorkspaceDescriptor.new(
       workspace_kind: :runtime_workspace,
-      runtime_profile: "portal-dev-env",
+      runtime_profile: "host-local-agent",
       workspace_id: "workspace-portal-42",
       source_descriptor: source_descriptor,
       slot_descriptors: {}

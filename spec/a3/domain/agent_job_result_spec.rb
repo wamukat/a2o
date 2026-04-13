@@ -13,7 +13,7 @@ RSpec.describe A3::Domain::AgentJobResult do
   let(:workspace_descriptor) do
     A3::Domain::AgentWorkspaceDescriptor.new(
       workspace_kind: :runtime_workspace,
-      runtime_profile: "portal-dev-env",
+      runtime_profile: "host-local-agent",
       workspace_id: "workspace-portal-42",
       source_descriptor: source_descriptor,
       slot_descriptors: {
@@ -140,7 +140,7 @@ RSpec.describe A3::Domain::AgentJobResult do
     expect do
       A3::Domain::AgentWorkspaceDescriptor.new(
         workspace_kind: :ticket_workspace,
-        runtime_profile: "portal-dev-env",
+        runtime_profile: "host-local-agent",
         workspace_id: "workspace-portal-42",
         source_descriptor: source_descriptor,
         slot_descriptors: {}

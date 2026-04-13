@@ -10,16 +10,16 @@ ENV["A3_ROOT_DIR"] ||= RUN_SCRIPT_SPEC_ROOT_DIR.to_s
 ENV["A3_ROOT_DEFAULT_PROJECT"] ||= "portal"
 ENV["A3_ROOT_RUNTIME_CONFIG_PATH"] ||= ".work/a3/config/portal-runtime.json"
 ENV["A3_ROOT_CONFIG_DIR"] ||= "scripts/a3-projects/portal/inject/config"
-ENV["A3_ROOT_PREPARE_RUNTIME_CONFIG_SCRIPT"] ||= "scripts/a3-projects/portal/support/prepare_portal_runtime_config.rb"
+ENV["A3_ROOT_PREPARE_RUNTIME_CONFIG_SCRIPT"] ||= "scripts/a3-projects/portal/maintenance/prepare_portal_runtime_config.rb"
 ENV["A3_ROOT_RUNTIME_CONFIG_PROJECTS"] ||= "portal"
-ENV["A3_ROOT_RECONCILE_LIVE_PROCESS_PATTERN"] ||= "scripts/a3-projects/portal/support/runtime_agent_run_once.sh"
+ENV["A3_ROOT_RECONCILE_LIVE_PROCESS_PATTERN"] ||= "scripts/a3-projects/portal/operator-tests/runtime_agent_run_once.sh"
 ENV["A3_ROOT_LEGACY_DISABLED_MESSAGE"] ||= "Legacy A3Engine-v1 commands are disabled."
 
 require "a3/operator/root_utility_launcher"
 
 RSpec.describe A3RootUtilityLauncher do
-  it "disables legacy A3Engine commands for portal-dev" do
-    expect { described_class.main(["describe-project", "--project", "portal-dev"]) }
+  it "disables legacy A3Engine commands for portal" do
+    expect { described_class.main(["describe-project", "--project", "portal"]) }
       .not_to raise_error
   end
 
@@ -34,7 +34,7 @@ RSpec.describe A3RootUtilityLauncher do
   it "fails fast for a legacy command through the A3 CLI root-utility entrypoint" do
     _stdout, stderr, status = Open3.capture3(
       root_utility_env,
-      *root_utility_command("describe-project", "--project", "portal-dev"),
+      *root_utility_command("describe-project", "--project", "portal"),
       chdir: described_class::ROOT_DIR.to_s
     )
 
@@ -54,7 +54,7 @@ RSpec.describe A3RootUtilityLauncher do
         root_utility_env,
         *root_utility_command(
           "describe-state",
-          "--project", "portal-dev",
+          "--project", "portal",
           "--active-runs-file", active_runs.to_s,
           "--worker-runs-file", worker_runs.to_s
         ),
@@ -85,7 +85,7 @@ RSpec.describe A3RootUtilityLauncher do
         root_utility_env("PATH" => "#{fake_bin}:#{ENV.fetch('PATH', '')}"),
         *root_utility_command(
           "cleanup",
-          "--project", "portal-dev",
+          "--project", "portal",
           "--active-runs-file", active_runs.to_s,
           "--worker-runs-file", worker_runs.to_s,
           "--launcher-config", launcher.to_s
@@ -110,7 +110,7 @@ RSpec.describe A3RootUtilityLauncher do
         root_utility_env,
         *root_utility_command(
           "reconcile-active-runs",
-          "--project", "portal-dev",
+          "--project", "portal",
           "--active-runs-file", active_runs.to_s,
           "--worker-runs-file", worker_runs.to_s
         ),
@@ -138,7 +138,7 @@ RSpec.describe A3RootUtilityLauncher do
         root_utility_env,
         *root_utility_command(
           "doctor-env",
-          "--project", "portal-dev",
+          "--project", "portal",
           "--launcher-config", launcher.to_s
         ),
         chdir: described_class::ROOT_DIR.to_s
@@ -154,13 +154,13 @@ RSpec.describe A3RootUtilityLauncher do
       root = Pathname(temp_dir)
       stub_const("A3RootUtilityLauncher::ROOT_DIR", root)
 
-      pause_rc = described_class.main(["pause-scheduler", "--project", "portal-dev", "--reason", "operator"])
-      pause_file = root.join(".work", "a3", "state", "portal-dev", "scheduler-paused.json")
+      pause_rc = described_class.main(["pause-scheduler", "--project", "portal", "--reason", "operator"])
+      pause_file = root.join(".work", "a3", "state", "portal", "scheduler-paused.json")
       expect(pause_rc).to eq(0)
       expect(pause_file).to exist
       expect(JSON.parse(pause_file.read).fetch("reason")).to eq("operator")
 
-      resume_rc = described_class.main(["resume-scheduler", "--project", "portal-dev"])
+      resume_rc = described_class.main(["resume-scheduler", "--project", "portal"])
       expect(resume_rc).to eq(0)
       expect(pause_file).not_to exist
     end
@@ -171,10 +171,10 @@ RSpec.describe A3RootUtilityLauncher do
       root = Pathname(temp_dir)
       stub_const("A3RootUtilityLauncher::ROOT_DIR", root)
 
-      pause_stdout = capture_stdout { expect(described_class.main(["pause-scheduler", "--project", "portal-dev", "--reason", "operator"])).to eq(0) }
-      describe_pause = capture_stdout { expect(described_class.main(["describe-scheduler-control", "--project", "portal-dev"])).to eq(0) }
-      resume_stdout = capture_stdout { expect(described_class.main(["resume-scheduler", "--project", "portal-dev"])).to eq(0) }
-      describe_resume = capture_stdout { expect(described_class.main(["describe-scheduler-control", "--project", "portal-dev"])).to eq(0) }
+      pause_stdout = capture_stdout { expect(described_class.main(["pause-scheduler", "--project", "portal", "--reason", "operator"])).to eq(0) }
+      describe_pause = capture_stdout { expect(described_class.main(["describe-scheduler-control", "--project", "portal"])).to eq(0) }
+      resume_stdout = capture_stdout { expect(described_class.main(["resume-scheduler", "--project", "portal"])).to eq(0) }
+      describe_resume = capture_stdout { expect(described_class.main(["describe-scheduler-control", "--project", "portal"])).to eq(0) }
 
       expect(JSON.parse(pause_stdout)).to eq(JSON.parse(describe_pause))
       expect(JSON.parse(resume_stdout)).to eq(JSON.parse(describe_resume))
@@ -184,17 +184,17 @@ RSpec.describe A3RootUtilityLauncher do
   it "uses project defaults for cleanup" do
     allow(A3Cleanup).to receive(:main).and_return(0)
 
-    rc = described_class.main(["cleanup", "--project", "portal-dev"])
+    rc = described_class.main(["cleanup", "--project", "portal"])
 
     expect(rc).to eq(0)
     expect(A3Cleanup).to have_received(:main).with(
       [
-        "--project", "portal-dev",
+        "--project", "portal",
         "--kanban-project", "Portal",
         "--root-dir", described_class::ROOT_DIR.to_s,
-        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "worker-runs.json").to_s,
-        "--launcher-config", described_class::CONFIG_DIR.join("portal-dev", "launcher.json").to_s,
+        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "active-runs.json").to_s,
+        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "worker-runs.json").to_s,
+        "--launcher-config", described_class::CONFIG_DIR.join("portal", "launcher.json").to_s,
         "--done-ttl-hours", "24",
         "--blocked-ttl-hours", "24",
         "--result-ttl-hours", "168",
@@ -212,7 +212,7 @@ RSpec.describe A3RootUtilityLauncher do
     rc = described_class.main(
       [
         "cleanup",
-        "--project", "portal-dev",
+        "--project", "portal",
         "--max-quarantine-count", "5",
         "--max-result-count", "10",
         "--max-log-count", "8"
@@ -222,12 +222,12 @@ RSpec.describe A3RootUtilityLauncher do
     expect(rc).to eq(0)
     expect(A3Cleanup).to have_received(:main).with(
       [
-        "--project", "portal-dev",
+        "--project", "portal",
         "--kanban-project", "Portal",
         "--root-dir", described_class::ROOT_DIR.to_s,
-        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "worker-runs.json").to_s,
-        "--launcher-config", described_class::CONFIG_DIR.join("portal-dev", "launcher.json").to_s,
+        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "active-runs.json").to_s,
+        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "worker-runs.json").to_s,
+        "--launcher-config", described_class::CONFIG_DIR.join("portal", "launcher.json").to_s,
         "--done-ttl-hours", "24",
         "--blocked-ttl-hours", "24",
         "--result-ttl-hours", "168",
@@ -248,7 +248,7 @@ RSpec.describe A3RootUtilityLauncher do
     rc = described_class.main(
       [
         "cleanup",
-        "--project", "portal-dev",
+        "--project", "portal",
         "--max-quarantine-bytes", "1024",
         "--max-result-bytes", "2048",
         "--max-log-bytes", "4096",
@@ -259,12 +259,12 @@ RSpec.describe A3RootUtilityLauncher do
     expect(rc).to eq(0)
     expect(A3Cleanup).to have_received(:main).with(
       [
-        "--project", "portal-dev",
+        "--project", "portal",
         "--kanban-project", "Portal",
         "--root-dir", described_class::ROOT_DIR.to_s,
-        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "worker-runs.json").to_s,
-        "--launcher-config", described_class::CONFIG_DIR.join("portal-dev", "launcher.json").to_s,
+        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "active-runs.json").to_s,
+        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "worker-runs.json").to_s,
+        "--launcher-config", described_class::CONFIG_DIR.join("portal", "launcher.json").to_s,
         "--done-ttl-hours", "24",
         "--blocked-ttl-hours", "24",
         "--result-ttl-hours", "168",
@@ -286,7 +286,7 @@ RSpec.describe A3RootUtilityLauncher do
     rc = described_class.main(
       [
         "cleanup",
-        "--project", "portal-dev",
+        "--project", "portal",
         "--build-output-ttl-hours", "72",
         "--max-build-output-bytes", "16384"
       ]
@@ -295,12 +295,12 @@ RSpec.describe A3RootUtilityLauncher do
     expect(rc).to eq(0)
     expect(A3Cleanup).to have_received(:main).with(
       [
-        "--project", "portal-dev",
+        "--project", "portal",
         "--kanban-project", "Portal",
         "--root-dir", described_class::ROOT_DIR.to_s,
-        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "worker-runs.json").to_s,
-        "--launcher-config", described_class::CONFIG_DIR.join("portal-dev", "launcher.json").to_s,
+        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "active-runs.json").to_s,
+        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "worker-runs.json").to_s,
+        "--launcher-config", described_class::CONFIG_DIR.join("portal", "launcher.json").to_s,
         "--done-ttl-hours", "24",
         "--blocked-ttl-hours", "24",
         "--result-ttl-hours", "168",
@@ -316,17 +316,17 @@ RSpec.describe A3RootUtilityLauncher do
   it "uses project defaults for reconcile-active-runs" do
     allow(described_class).to receive(:run_reconcile_command).and_return(0)
 
-    rc = described_class.main(["reconcile-active-runs", "--project", "portal-dev", "--status", "To do", "--apply"])
+    rc = described_class.main(["reconcile-active-runs", "--project", "portal", "--status", "To do", "--apply"])
 
     expect(rc).to eq(0)
     expect(described_class).to have_received(:run_reconcile_command).with(
       [
-        "--project", "portal-dev",
-        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "worker-runs.json").to_s,
-        "--live-process-pattern", "scripts/a3-projects/portal/support/runtime_agent_run_once.sh",
-        "--live-process-pattern", "portal-dev-kanban-scheduler-auto",
-        "--launcher-config", described_class::CONFIG_DIR.join("portal-dev", "launcher.json").to_s,
+        "--project", "portal",
+        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "active-runs.json").to_s,
+        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "worker-runs.json").to_s,
+        "--live-process-pattern", "scripts/a3-projects/portal/operator-tests/runtime_agent_run_once.sh",
+        "--live-process-pattern", "portal-kanban-scheduler-auto",
+        "--launcher-config", described_class::CONFIG_DIR.join("portal", "launcher.json").to_s,
         "--status", "To do",
         "--apply"
       ]
@@ -336,12 +336,12 @@ RSpec.describe A3RootUtilityLauncher do
   it "uses project defaults for quarantine-rerun-artifacts" do
     allow(A3RerunQuarantine).to receive(:main).and_return(0)
 
-    rc = described_class.main(["quarantine-rerun-artifacts", "--project", "portal-dev", "--task-ref", "Portal#2700"])
+    rc = described_class.main(["quarantine-rerun-artifacts", "--project", "portal", "--task-ref", "Portal#2700"])
 
     expect(rc).to eq(0)
     expect(A3RerunQuarantine).to have_received(:main).with(
       [
-        "--project", "portal-dev",
+        "--project", "portal",
         "--root-dir", described_class::ROOT_DIR.to_s,
         "--task-ref", "Portal#2700"
       ]
@@ -351,16 +351,16 @@ RSpec.describe A3RootUtilityLauncher do
   it "uses project defaults for check-rerun-readiness" do
     allow(A3RerunReadiness).to receive(:main).and_return(0)
 
-    rc = described_class.main(["check-rerun-readiness", "--project", "portal-dev", "--task-ref", "Portal#2700"])
+    rc = described_class.main(["check-rerun-readiness", "--project", "portal", "--task-ref", "Portal#2700"])
 
     expect(rc).to eq(0)
     expect(A3RerunReadiness).to have_received(:main).with(
       [
-        "--project", "portal-dev",
+        "--project", "portal",
         "--root-dir", described_class::ROOT_DIR.to_s,
         "--task-ref", "Portal#2700",
-        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "worker-runs.json").to_s,
+        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "active-runs.json").to_s,
+        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "worker-runs.json").to_s,
         "--kanban-project", "Portal"
       ],
       default_kanban_working_dir: described_class::ROOT_DIR
@@ -370,16 +370,16 @@ RSpec.describe A3RootUtilityLauncher do
   it "uses project defaults for describe-state" do
     allow(described_class).to receive(:run_diagnostics_command).and_return(0)
 
-    rc = described_class.main(["describe-state", "--project", "portal-dev"])
+    rc = described_class.main(["describe-state", "--project", "portal"])
 
     expect(rc).to eq(0)
     expect(described_class).to have_received(:run_diagnostics_command).with(
       [
         "describe-state",
-        "--project", "portal-dev",
+        "--project", "portal",
         "--root-dir", described_class::ROOT_DIR.to_s,
-        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "worker-runs.json").to_s
+        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "active-runs.json").to_s,
+        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "worker-runs.json").to_s
       ]
     )
   end
@@ -387,8 +387,8 @@ RSpec.describe A3RootUtilityLauncher do
   it "emits selected and projected states through diagnostics" do
     Dir.mktmpdir("a3-run-describe-state-") do |temp_dir|
       root = Pathname(temp_dir)
-      active_runs = root.join(".work", "a3", "state", "portal-dev", "active-runs.json")
-      worker_runs = root.join(".work", "a3", "state", "portal-dev", "worker-runs.json")
+      active_runs = root.join(".work", "a3", "state", "portal", "active-runs.json")
+      worker_runs = root.join(".work", "a3", "state", "portal", "worker-runs.json")
       active_runs.dirname.mkpath
       active_runs.write(JSON.generate({ "active_task_refs" => ["Portal#1"] }))
       worker_runs.write(
@@ -421,7 +421,7 @@ RSpec.describe A3RootUtilityLauncher do
       )
       stub_const("A3RootUtilityLauncher::ROOT_DIR", root)
 
-      stdout = capture_stdout { expect(described_class.main(["describe-state", "--project", "portal-dev"])).to eq(0) }
+      stdout = capture_stdout { expect(described_class.main(["describe-state", "--project", "portal"])).to eq(0) }
       payload = JSON.parse(stdout)
       expect(payload.fetch("selected_pending_refs")).to eq(["Portal#1"])
       recent_by_ref = payload.fetch("recent_runs").to_h { |item| [item.fetch("task_ref"), item] }
@@ -432,16 +432,16 @@ RSpec.describe A3RootUtilityLauncher do
   it "uses project defaults for watch" do
     allow(described_class).to receive(:run_diagnostics_command).and_return(0)
 
-    rc = described_class.main(["watch", "--project", "portal-dev", "--interval", "3", "--iterations", "4"])
+    rc = described_class.main(["watch", "--project", "portal", "--interval", "3", "--iterations", "4"])
 
     expect(rc).to eq(0)
     expect(described_class).to have_received(:run_diagnostics_command).with(
       [
         "watch",
-        "--project", "portal-dev",
+        "--project", "portal",
         "--root-dir", described_class::ROOT_DIR.to_s,
-        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "worker-runs.json").to_s,
+        "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "active-runs.json").to_s,
+        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "worker-runs.json").to_s,
         "--interval", "3.0",
         "--iterations", "4"
       ]
@@ -451,13 +451,13 @@ RSpec.describe A3RootUtilityLauncher do
   it "uses project launcher for doctor-env" do
     allow(described_class).to receive(:run_diagnostics_command).and_return(0)
 
-    rc = described_class.main(["doctor-env", "--project", "portal-dev"])
+    rc = described_class.main(["doctor-env", "--project", "portal"])
 
     expect(rc).to eq(0)
     expect(described_class).to have_received(:run_diagnostics_command).with(
       [
         "doctor-env",
-        "--launcher-config", described_class::CONFIG_DIR.join("portal-dev", "launcher.json").to_s
+        "--launcher-config", described_class::CONFIG_DIR.join("portal", "launcher.json").to_s
       ]
     )
   end

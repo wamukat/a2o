@@ -272,13 +272,13 @@ RSpec.describe A3Cleanup do
     end
   end
 
-  it "uses kanban project ref for portal-dev orphans and active refs" do
+  it "uses kanban project ref for portal-test orphans and active refs" do
     Dir.mktmpdir("a3-cleanup-") do |dir|
       root = Pathname(dir)
-      issue_dir = root.join(".work", "a3", "issues", "portal-dev", "portal-555")
-      runtime_dir = root.join(".work", "a3", "runtime", "inspection", "portal-dev", "portal-555")
-      result_file = root.join(".work", "a3", "results", "portal-dev", "20260322T000000Z-Portal-555.json")
-      log_dir = root.join(".work", "a3", "results", "logs", "portal-dev", "Portal-555")
+      issue_dir = root.join(".work", "a3", "issues", "portal-test", "portal-555")
+      runtime_dir = root.join(".work", "a3", "runtime", "inspection", "portal-test", "portal-555")
+      result_file = root.join(".work", "a3", "results", "portal-test", "20260322T000000Z-Portal-555.json")
+      log_dir = root.join(".work", "a3", "results", "logs", "portal-test", "Portal-555")
       [issue_dir, runtime_dir, log_dir].each { |path| FileUtils.mkdir_p(path) }
       FileUtils.mkdir_p(result_file.dirname)
       File.write(result_file, "{}")
@@ -287,7 +287,7 @@ RSpec.describe A3Cleanup do
 
       candidates = described_class.build_cleanup_candidates(
         root_dir: root,
-        project: "portal-dev",
+        project: "portal-test",
         task_project_ref: "Portal",
         task_snapshots: [],
         active_refs: Set.new,
@@ -304,7 +304,7 @@ RSpec.describe A3Cleanup do
 
       kept = described_class.build_cleanup_candidates(
         root_dir: root,
-        project: "portal-dev",
+        project: "portal-test",
         task_project_ref: "Portal",
         task_snapshots: [],
         active_refs: Set["Portal#555"],

@@ -25,7 +25,7 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
     claim_response = handler.handle(
       method: "GET",
       path: "/v1/agent/jobs/next",
-      query: {"agent" => "portal-dev-env"}
+      query: {"agent" => "host-local-agent"}
     )
     claimed_payload = JSON.parse(claim_response.body)
 
@@ -35,7 +35,7 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
     idle_response = handler.handle(
       method: "GET",
       path: "/v1/agent/jobs/next",
-      query: {"agent" => "portal-dev-env"}
+      query: {"agent" => "host-local-agent"}
     )
     expect(idle_response.status).to eq(204)
 
@@ -69,7 +69,7 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
 
   it "rejects local path based result payloads" do
     store.enqueue(agent_job_request("job-1"))
-    store.claim_next(agent_name: "portal-dev-env", claimed_at: "2026-04-11T08:00:00Z")
+    store.claim_next(agent_name: "host-local-agent", claimed_at: "2026-04-11T08:00:00Z")
     payload = agent_job_result("job-1").result_form.merge(
       "combined_log" => "/tmp/combined.log",
       "artifacts" => ["/tmp/report.xml"]
@@ -106,12 +106,12 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
     unauthorized_response = secured_handler.handle(
       method: "GET",
       path: "/v1/agent/jobs/next",
-      query: {"agent" => "portal-dev-env"}
+      query: {"agent" => "host-local-agent"}
     )
     authorized_response = secured_handler.handle(
       method: "GET",
       path: "/v1/agent/jobs/next",
-      query: {"agent" => "portal-dev-env"},
+      query: {"agent" => "host-local-agent"},
       headers: {"authorization" => "Bearer secret-token"}
     )
 
@@ -142,13 +142,13 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
     control_claim_response = secured_handler.handle(
       method: "GET",
       path: "/v1/agent/jobs/next",
-      query: {"agent" => "portal-dev-env"},
+      query: {"agent" => "host-local-agent"},
       headers: {"authorization" => "Bearer control-token"}
     )
     agent_claim_response = secured_handler.handle(
       method: "GET",
       path: "/v1/agent/jobs/next",
-      query: {"agent" => "portal-dev-env"},
+      query: {"agent" => "host-local-agent"},
       headers: {"authorization" => "Bearer agent-token"}
     )
 
@@ -170,20 +170,20 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
     first_response = secured_handler.handle(
       method: "GET",
       path: "/v1/agent/jobs/next",
-      query: {"agent" => "portal-dev-env"},
+      query: {"agent" => "host-local-agent"},
       headers: {"authorization" => "Bearer first-token"}
     )
     File.write(token_path, "second-token\n")
     old_token_response = secured_handler.handle(
       method: "GET",
       path: "/v1/agent/jobs/next",
-      query: {"agent" => "portal-dev-env"},
+      query: {"agent" => "host-local-agent"},
       headers: {"authorization" => "Bearer first-token"}
     )
     rotated_token_response = secured_handler.handle(
       method: "GET",
       path: "/v1/agent/jobs/next",
-      query: {"agent" => "portal-dev-env"},
+      query: {"agent" => "host-local-agent"},
       headers: {"authorization" => "Bearer second-token"}
     )
 
@@ -222,7 +222,7 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
       job_id: job_id,
       task_ref: "Portal#42",
       phase: :verification,
-      runtime_profile: "portal-dev-env",
+      runtime_profile: "host-local-agent",
       source_descriptor: source_descriptor,
       working_dir: "/workspace/member-portal-starters",
       command: "task",
@@ -263,7 +263,7 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
   def workspace_descriptor
     A3::Domain::AgentWorkspaceDescriptor.new(
       workspace_kind: :runtime_workspace,
-      runtime_profile: "portal-dev-env",
+      runtime_profile: "host-local-agent",
       workspace_id: "workspace-portal-42",
       source_descriptor: source_descriptor,
       slot_descriptors: {}

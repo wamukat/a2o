@@ -199,17 +199,17 @@ RSpec.describe A3Reconcile do
 
   it "recognizes current portal scheduler shot processes" do
     allow(IO).to receive(:popen).and_return(<<~PS)
-      bash scripts/a3-projects/portal/support/runtime_agent_run_once.sh
+      bash scripts/a3-projects/portal/operator-tests/runtime_agent_run_once.sh
       ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/portal-kanban-scheduler-auto scripts/a3-projects/portal/inject/config/portal/a3-runtime-manifest.yml
     PS
 
     matches = described_class.live_scheduler_processes(
       "portal",
-      patterns: ["scripts/a3-projects/portal/support/runtime_agent_run_once.sh", "portal-kanban-scheduler-auto"]
+      patterns: ["scripts/a3-projects/portal/operator-tests/runtime_agent_run_once.sh", "portal-kanban-scheduler-auto"]
     )
     expect(matches).to eq(
       [
-        "bash scripts/a3-projects/portal/support/runtime_agent_run_once.sh",
+        "bash scripts/a3-projects/portal/operator-tests/runtime_agent_run_once.sh",
         "ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/portal-kanban-scheduler-auto scripts/a3-projects/portal/inject/config/portal/a3-runtime-manifest.yml"
       ]
     )

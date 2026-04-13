@@ -14,12 +14,12 @@ RSpec.describe A3::Infra::JsonAgentJobStore do
     request = agent_job_request("job-1")
 
     store.enqueue(request)
-    claimed = store.claim_next(agent_name: "portal-dev-env", claimed_at: "2026-04-11T08:00:00Z")
+    claimed = store.claim_next(agent_name: "host-local-agent", claimed_at: "2026-04-11T08:00:00Z")
 
     expect(claimed.request).to eq(request)
     expect(claimed.state).to eq(:claimed)
-    expect(claimed.claimed_by).to eq("portal-dev-env")
-    expect(store.claim_next(agent_name: "portal-dev-env", claimed_at: "2026-04-11T08:00:01Z")).to be_nil
+    expect(claimed.claimed_by).to eq("host-local-agent")
+    expect(store.claim_next(agent_name: "host-local-agent", claimed_at: "2026-04-11T08:00:01Z")).to be_nil
 
     result = agent_job_result("job-1")
     completed = store.complete(result)
@@ -43,7 +43,7 @@ RSpec.describe A3::Infra::JsonAgentJobStore do
       job_id: job_id,
       task_ref: "Portal#42",
       phase: :verification,
-      runtime_profile: "portal-dev-env",
+      runtime_profile: "host-local-agent",
       source_descriptor: source_descriptor,
       working_dir: "/workspace/member-portal-starters",
       command: "task",
@@ -76,7 +76,7 @@ RSpec.describe A3::Infra::JsonAgentJobStore do
   def workspace_descriptor
     A3::Domain::AgentWorkspaceDescriptor.new(
       workspace_kind: :runtime_workspace,
-      runtime_profile: "portal-dev-env",
+      runtime_profile: "host-local-agent",
       workspace_id: "workspace-portal-42",
       source_descriptor: source_descriptor,
       slot_descriptors: {}

@@ -341,7 +341,7 @@ live canary と scheduler surface の検証結果に加え、workspace root の 
 `A3-v2#3160` では、workspace root に残っていた compatibility 資産を `retire / delete / keep` に分けて扱い、2026-04-11 時点で次のように整理した。
 
 - `retire`
-  - `Taskfile.yml` 上の disabled な `a3:portal:*` / `a3:portal-dev:*` sentinel task 群
+  - `Taskfile.yml` 上の disabled な legacy `a3:portal:*` sentinel task 群
   - help / runbook / README / AGENTS 上で日常入口のように見える obsolete alias の案内
 - `delete`
   - `a3-v2/` source tree
@@ -350,10 +350,7 @@ live canary と scheduler surface の検証結果に加え、workspace root の 
   - legacy automation 向け skill / runbook / redesign メモ
   - root surface では `task automation*` を fail-fast sentinel とし、実行系 / mutation 系 entrypoint は残さない
 - `keep`
-  - `scripts/a3-projects/portal/inject/config/portal-dev/*`
-  - `portal-dev` root local utility
-  - `scripts/a3-projects/portal/support/bootstrap_portal_dev_repos.rb`
-  - `scripts/a3-projects/portal/support/prepare_portal_runtime_config.rb`
+  - `scripts/a3-projects/portal/maintenance/prepare_portal_runtime_config.rb`
 
 判断理由は次のとおりである。
 
@@ -362,8 +359,8 @@ live canary と scheduler surface の検証結果に加え、workspace root の 
 - `delete`
   - `a3-v2/` と `scripts/automation/*` は current operator surface では実行しないため、git history へ委ねて物理削除した
 - `keep`
-  - `portal-dev` root local utility / config と `bootstrap_portal_dev_repos.rb` は synthetic stale cleanup / maintenance utility / related spec からまだ参照される
-  - `scripts/a3-projects/portal/support/prepare_portal_runtime_config.rb` は `portal` doctor-env / cleanup / reconcile の internal helper と related spec からまだ参照される
+  - `portal-dev` root local utility / config と `bootstrap_portal_dev_repos.rb` は current runtime surface から削除済み
+  - `scripts/a3-projects/portal/maintenance/prepare_portal_runtime_config.rb` は `portal` doctor-env / cleanup / reconcile の internal helper と related spec からまだ参照される
 
 この時点で `A3-v2#3160` の acceptance は満たしており、compatibility 資産の扱いは「retire したもの」「delete 済みのもの」「current root utility を支えるため keep するもの」に分かれた。2026-04-12 の判断で旧 backend compatibility path も current runtime から物理削除する。以後の残件は、A3 / SoloBoard / a3-agent 配布導線を固定し、実 Portal source の `repo:both` parent/full verification canary を完了条件として通すことである。
 
@@ -594,7 +591,7 @@ Portal fresh canary の intake と stabilisation は `A3-v2#3031` / `#3119` / `#
 1. 完了済みの前提
 - operator surface の入口整理
   - root-managed kanban bridge の `a3-engine` 依存を外した
-  - legacy `task a3:portal:*` / `task a3:portal-dev:*` と root local utility の役割を整理した
+  - legacy `task a3:portal:*` と root local utility の役割を整理した
   - docs / runbook / launcher config の案内を、`legacy scheduler` ではなく A3 正規入口へ寄せた
 - root local utility の Python 依存棚卸し
   - `scripts/a3/*.py` を移植対象 / retain / retire に分類し、operator surface を先に固定した
@@ -602,7 +599,7 @@ Portal fresh canary の intake と stabilisation は `A3-v2#3031` / `#3119` / `#
 - Python/root-wrapper -> engine CLI migration
   - `portal_v2_watch_summary`, `portal_v2_scheduler_launcher`, `assert-live-write`, `portal_v2_verification`
   - `diagnostics`, `reconcile`, `rerun_readiness`, `rerun_quarantine`, `cleanup`
-  - retired direct repo source bootstrap, `bootstrap_portal_dev_repos`
+  - retired direct repo source bootstrap and `portal-dev` isolated clone bootstrap
   - `stdin bundle worker`, `direct canary worker`, root utility surface
   - この結果、generic operator 用の `scripts/a3` 直下 Python script は retire 済み。Portal runtime 診断 helper は project-injected glue として残す
 
@@ -1656,7 +1653,7 @@ runtime 開始時に次を validate する。
 
 #### 0.4.6.7 implementation plan
 
-1. `scripts/a3-projects/portal/inject/config/portal/launcher.json` と `portal-dev/launcher.json` を `kind: command` へ移行する
+1. `scripts/a3-projects/portal/inject/config/portal/launcher.json` を `kind: command` へ移行する
 2. `a3-engine/bin/a3 worker:stdin-bundle` の `codex_command` / `model` / `reasoning_effort` resolver を `executor_command` / command template resolver へ置き換える
 3. invalid config fallback の `["codex", "exec", "--json"]` を廃止し、設定不備は worker failure として明示する
 4. current `a3-engine` / root tests に次を追加・更新する
@@ -1684,7 +1681,7 @@ adapter は、command template contract だけでは provider ごとの auth / s
 - 回収済み:
   - `a3-engine/bin/a3 worker:stdin-bundle` の `codex_command` は `executor_command` へ置き換え、A3 worker は command template と placeholder 展開だけを扱う
   - invalid config fallback の `["codex", "exec", "--json"]` は廃止し、`["executor", "command"]` として設定不備を明示する
-  - `scripts/a3-projects/portal/inject/config/portal/launcher.json` と `scripts/a3-projects/portal/inject/config/portal-dev/launcher.json` は `kind: command` と command argv template へ移行済み
+  - `scripts/a3-projects/portal/inject/config/portal/launcher.json` は `kind: command` と command argv template へ移行済み
   - diagnostics operator の `.codex/vendor/ripgrep/rg` と Volta 配下 Codex vendor `rg` fallback は削除済み。残す vendor fallback は `AI_CLI_HOME` / `.ai-cli` の generic path のみとする
   - `scripts/a3-projects/portal/inject/config/portal/launcher.json` の `$CODEX_HOME/notify.sh` 通知 hook は削除済み
 - 残存する project profile 依存:
