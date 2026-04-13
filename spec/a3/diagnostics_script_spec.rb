@@ -3,9 +3,39 @@
 require "json"
 require "tmpdir"
 require "time"
-require_relative "../../../scripts/a3/diagnostics"
+require "open3"
+require "a3/operator/diagnostics"
 
 RSpec.describe A3Diagnostics do
+  it "keeps the root diagnostics wrapper executable" do
+    stdout, _stderr, status = Open3.capture3("ruby", "scripts/a3/diagnostics.rb", "--help", chdir: Pathname(__dir__).join("..", "..", "..").expand_path.to_s)
+
+    expect(status).to be_success
+    expect(stdout).to include("usage: diagnostics.rb")
+  end
+
+  it "delegates describe-state through the root diagnostics wrapper" do
+    Dir.mktmpdir("a3-diagnostics-wrapper-") do |dir|
+      root = Pathname(dir)
+      active_runs = root.join("active-runs.json")
+      worker_runs = root.join("worker-runs.json")
+      active_runs.write(JSON.generate({ "active_task_refs" => [] }))
+      worker_runs.write(JSON.generate({ "runs" => {} }))
+
+      stdout, _stderr, status = Open3.capture3(
+        "ruby", "scripts/a3/diagnostics.rb", "describe-state",
+        "--project", "portal",
+        "--root-dir", root.to_s,
+        "--active-runs-file", active_runs.to_s,
+        "--worker-runs-file", worker_runs.to_s,
+        chdir: Pathname(__dir__).join("..", "..", "..").expand_path.to_s
+      )
+
+      expect(status).to be_success
+      expect(JSON.parse(stdout).fetch("active_refs")).to eq([])
+    end
+  end
+
   it "includes active and recent runs in describe-state" do
     Dir.mktmpdir("a3-diagnostics-") do |dir|
       root = Pathname(dir)

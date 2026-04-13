@@ -2,9 +2,39 @@
 
 require "json"
 require "tmpdir"
-require_relative "../../../scripts/a3/reconcile"
+require "open3"
+require "a3/operator/reconcile"
 
 RSpec.describe A3Reconcile do
+  it "keeps the root reconcile wrapper executable" do
+    stdout, _stderr, status = Open3.capture3("ruby", "scripts/a3/reconcile.rb", "--help", chdir: Pathname(__dir__).join("..", "..", "..").expand_path.to_s)
+
+    expect(status).to be_success
+    expect(stdout).to include("usage: reconcile.rb")
+  end
+
+  it "delegates inspect through the root reconcile wrapper" do
+    Dir.mktmpdir("a3-reconcile-wrapper-") do |dir|
+      root = Pathname(dir)
+      active_runs = root.join("active-runs.json")
+      worker_runs = root.join("worker-runs.json")
+      active_runs.write(JSON.generate({ "active_task_refs" => [] }))
+      worker_runs.write(JSON.generate({ "runs" => {} }))
+
+      stdout, _stderr, status = Open3.capture3(
+        "ruby", "scripts/a3/reconcile.rb",
+        "--project", "portal",
+        "--active-runs-file", active_runs.to_s,
+        "--worker-runs-file", worker_runs.to_s,
+        "--live-process-pattern", "unlikely-a3-test-process-pattern",
+        chdir: Pathname(__dir__).join("..", "..", "..").expand_path.to_s
+      )
+
+      expect(status).to be_success
+      expect(JSON.parse(stdout).fetch("active_refs_before")).to eq([])
+    end
+  end
+
   it "flags terminal and missing runs as stale" do
     Dir.mktmpdir("a3-reconcile-") do |dir|
       root = Pathname(dir)
@@ -22,7 +52,7 @@ RSpec.describe A3Reconcile do
           }
         )
       )
-      allow(described_class).to receive(:live_portal_processes).and_return([])
+      allow(described_class).to receive(:live_scheduler_processes).and_return([])
 
       payload = described_class.inspect_stale_active_runs(project: "portal", active_runs_file: active_runs, worker_runs_file: worker_runs)
       reasons = payload.fetch("stale_active_runs").each_with_object({}) { |item, acc| acc[item.fetch("task_ref")] = item.fetch("reason") }
@@ -53,7 +83,7 @@ RSpec.describe A3Reconcile do
           }
         )
       )
-      allow(described_class).to receive(:live_portal_processes).and_return([])
+      allow(described_class).to receive(:live_scheduler_processes).and_return([])
 
       payload = described_class.apply_stale_active_run_reconciliation(project: "portal", active_runs_file: active_runs, worker_runs_file: worker_runs)
 
@@ -83,7 +113,7 @@ RSpec.describe A3Reconcile do
           }
         )
       )
-      allow(described_class).to receive(:live_portal_processes).and_return([])
+      allow(described_class).to receive(:live_scheduler_processes).and_return([])
 
       payload = described_class.inspect_stale_active_runs(project: "portal", active_runs_file: active_runs, worker_runs_file: worker_runs)
       expect(payload.fetch("stale_active_runs")).to eq([
@@ -158,7 +188,7 @@ RSpec.describe A3Reconcile do
   it "ignores unrelated AI executor processes when checking portal liveness" do
     allow(IO).to receive(:popen).and_return("ai-runner --json -\n")
 
-    expect(described_class.live_portal_processes("portal")).to eq([])
+    expect(described_class.live_scheduler_processes("portal")).to eq([])
   end
 
   it "recognizes current portal scheduler shot processes" do
@@ -167,7 +197,7 @@ RSpec.describe A3Reconcile do
       ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/portal-kanban-scheduler-auto scripts/a3/config/portal/a3-runtime-manifest.yml
     PS
 
-    matches = described_class.live_portal_processes("portal")
+    matches = described_class.live_scheduler_processes("portal")
     expect(matches).to eq(
       [
         "ruby scripts/a3/portal_scheduler_launcher.rb --run-shot",

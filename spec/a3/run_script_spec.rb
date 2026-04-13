@@ -207,6 +207,8 @@ RSpec.describe A3RootUtilityLauncher do
         "--project", "portal-dev",
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "active-runs.json").to_s,
         "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal-dev", "worker-runs.json").to_s,
+        "--live-process-pattern", "scripts/a3/portal_scheduler_launcher.rb --run-shot",
+        "--live-process-pattern", "portal-dev-kanban-scheduler-auto",
         "--launcher-config", described_class::CONFIG_DIR.join("portal-dev", "launcher.json").to_s,
         "--status", "To do",
         "--apply"
