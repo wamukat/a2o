@@ -2,8 +2,20 @@
 
 require "json"
 require "open3"
+require "pathname"
 require "tmpdir"
-require_relative "../../../scripts/a3/run"
+
+RUN_SCRIPT_SPEC_ROOT_DIR = Pathname(__dir__).join("..", "..", "..").expand_path
+ENV["A3_ROOT_DIR"] ||= RUN_SCRIPT_SPEC_ROOT_DIR.to_s
+ENV["A3_ROOT_DEFAULT_PROJECT"] ||= "portal"
+ENV["A3_ROOT_RUNTIME_CONFIG_PATH"] ||= ".work/a3/config/portal-runtime.json"
+ENV["A3_ROOT_CONFIG_DIR"] ||= "scripts/a3-projects/portal/config"
+ENV["A3_ROOT_PREPARE_RUNTIME_CONFIG_SCRIPT"] ||= "scripts/a3-projects/portal/prepare_portal_runtime_config.rb"
+ENV["A3_ROOT_RUNTIME_CONFIG_PROJECTS"] ||= "portal"
+ENV["A3_ROOT_RECONCILE_LIVE_PROCESS_PATTERN"] ||= "scripts/a3-projects/portal/portal_scheduler_launcher.rb --run-shot"
+ENV["A3_ROOT_LEGACY_DISABLED_MESSAGE"] ||= "Legacy A3Engine-v1 commands are disabled."
+
+require "a3/operator/root_utility_launcher"
 
 RSpec.describe A3RootUtilityLauncher do
   it "disables legacy A3Engine commands for portal-dev" do
@@ -11,24 +23,26 @@ RSpec.describe A3RootUtilityLauncher do
       .not_to raise_error
   end
 
-  it "prints help as a direct CLI entrypoint" do
-    stdout, stderr, status = Open3.capture3("ruby", "scripts/a3/run.rb", "--help", chdir: described_class::ROOT_DIR.to_s)
+  it "prints help through the A3 CLI root-utility entrypoint" do
+    stdout, stderr, status = Open3.capture3(root_utility_env, *root_utility_command("--help"), chdir: described_class::ROOT_DIR.to_s)
 
     expect(status.success?).to eq(true), stderr
     expect(stdout).to include("Root utility launcher for A3 migration support.")
     expect(stdout).not_to include("describe-project")
   end
 
-  it "fails fast for a legacy command as a direct CLI entrypoint" do
+  it "fails fast for a legacy command through the A3 CLI root-utility entrypoint" do
     _stdout, stderr, status = Open3.capture3(
-      "ruby", "scripts/a3/run.rb", "describe-project", "--project", "portal-dev", chdir: described_class::ROOT_DIR.to_s
+      root_utility_env,
+      *root_utility_command("describe-project", "--project", "portal-dev"),
+      chdir: described_class::ROOT_DIR.to_s
     )
 
     expect(status.success?).to eq(false)
     expect(stderr).to include(described_class::LEGACY_A3ENGINE_DISABLED_MESSAGE)
   end
 
-  it "delegates operational commands through the root run wrapper" do
+  it "delegates operational commands through the A3 CLI root-utility entrypoint" do
     Dir.mktmpdir("a3-run-wrapper-") do |temp_dir|
       root = Pathname(temp_dir)
       active_runs = root.join("active-runs.json")
@@ -37,10 +51,13 @@ RSpec.describe A3RootUtilityLauncher do
       worker_runs.write(JSON.generate({ "runs" => {} }))
 
       stdout, _stderr, status = Open3.capture3(
-        "ruby", "scripts/a3/run.rb", "describe-state",
-        "--project", "portal-dev",
-        "--active-runs-file", active_runs.to_s,
-        "--worker-runs-file", worker_runs.to_s,
+        root_utility_env,
+        *root_utility_command(
+          "describe-state",
+          "--project", "portal-dev",
+          "--active-runs-file", active_runs.to_s,
+          "--worker-runs-file", worker_runs.to_s
+        ),
         chdir: described_class::ROOT_DIR.to_s
       )
 
@@ -49,7 +66,7 @@ RSpec.describe A3RootUtilityLauncher do
     end
   end
 
-  it "delegates cleanup through the root run wrapper" do
+  it "delegates cleanup through the A3 CLI root-utility entrypoint" do
     Dir.mktmpdir("a3-run-cleanup-wrapper-") do |temp_dir|
       root = Pathname(temp_dir)
       fake_bin = root.join("bin")
@@ -65,12 +82,14 @@ RSpec.describe A3RootUtilityLauncher do
       launcher.write(JSON.generate({ "shell" => { "inherit_env" => true, "env_files" => [], "env_overrides" => {} } }))
 
       stdout, _stderr, status = Open3.capture3(
-        { "PATH" => "#{fake_bin}:#{ENV.fetch('PATH', '')}" },
-        "ruby", "scripts/a3/run.rb", "cleanup",
-        "--project", "portal-dev",
-        "--active-runs-file", active_runs.to_s,
-        "--worker-runs-file", worker_runs.to_s,
-        "--launcher-config", launcher.to_s,
+        root_utility_env("PATH" => "#{fake_bin}:#{ENV.fetch('PATH', '')}"),
+        *root_utility_command(
+          "cleanup",
+          "--project", "portal-dev",
+          "--active-runs-file", active_runs.to_s,
+          "--worker-runs-file", worker_runs.to_s,
+          "--launcher-config", launcher.to_s
+        ),
         chdir: described_class::ROOT_DIR.to_s
       )
 
@@ -79,7 +98,7 @@ RSpec.describe A3RootUtilityLauncher do
     end
   end
 
-  it "delegates reconcile through the root run wrapper" do
+  it "delegates reconcile through the A3 CLI root-utility entrypoint" do
     Dir.mktmpdir("a3-run-reconcile-wrapper-") do |temp_dir|
       root = Pathname(temp_dir)
       active_runs = root.join("active-runs.json")
@@ -88,10 +107,13 @@ RSpec.describe A3RootUtilityLauncher do
       worker_runs.write(JSON.generate({ "runs" => {} }))
 
       stdout, _stderr, status = Open3.capture3(
-        "ruby", "scripts/a3/run.rb", "reconcile-active-runs",
-        "--project", "portal-dev",
-        "--active-runs-file", active_runs.to_s,
-        "--worker-runs-file", worker_runs.to_s,
+        root_utility_env,
+        *root_utility_command(
+          "reconcile-active-runs",
+          "--project", "portal-dev",
+          "--active-runs-file", active_runs.to_s,
+          "--worker-runs-file", worker_runs.to_s
+        ),
         chdir: described_class::ROOT_DIR.to_s
       )
 
@@ -100,7 +122,7 @@ RSpec.describe A3RootUtilityLauncher do
     end
   end
 
-  it "delegates doctor-env through the root run wrapper with explicit launcher config" do
+  it "delegates doctor-env through the A3 CLI root-utility entrypoint with explicit launcher config" do
     Dir.mktmpdir("a3-run-doctor-wrapper-") do |temp_dir|
       launcher = Pathname(temp_dir).join("launcher.json")
       launcher.write(
@@ -113,9 +135,12 @@ RSpec.describe A3RootUtilityLauncher do
       )
 
       stdout, _stderr, status = Open3.capture3(
-        "ruby", "scripts/a3/run.rb", "doctor-env",
-        "--project", "portal-dev",
-        "--launcher-config", launcher.to_s,
+        root_utility_env,
+        *root_utility_command(
+          "doctor-env",
+          "--project", "portal-dev",
+          "--launcher-config", launcher.to_s
+        ),
         chdir: described_class::ROOT_DIR.to_s
       )
 
@@ -468,5 +493,13 @@ RSpec.describe A3RootUtilityLauncher do
     output.string
   ensure
     $stdout = original_stdout
+  end
+
+  def root_utility_command(*args)
+    ["a3-engine/bin/a3", "root-utility", *args]
+  end
+
+  def root_utility_env(extra = {})
+    ENV.to_h.merge("RUBYLIB" => "a3-engine/lib").merge(extra)
   end
 end

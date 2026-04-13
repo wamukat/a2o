@@ -313,12 +313,12 @@ disk pressure 時の cleanup 判断:
 
 ### 0.1.2 2026-04-08 v1 / legacy 破棄可否の現状判定
 
-live canary と scheduler surface の検証結果に加え、workspace root の operator surface / Python utility の棚卸しと Ruby migration を進めた結果、A3 は `legacy scheduler や root Python thin tooling がないと Portal canary を進められない` 段階を抜けた。2026-04-11 時点では `a3-v2/` source tree と legacy automation scripts も削除済みであり、現時点の未完は runtime の正当性よりも、配布・agent 運用・retention hardening の整理である。
+live canary と scheduler surface の検証結果に加え、workspace root の operator surface / Python utility の棚卸しと engine CLI 集約を進めた結果、A3 は `legacy scheduler や root Python thin tooling がないと Portal canary を進められない` 段階を抜けた。2026-04-11 時点では `a3-v2/` source tree と legacy automation scripts も削除済みであり、現時点の未完は runtime の正当性よりも、配布・agent 運用・retention hardening の整理である。
 
 - A3 product/runtime 側で達した状態
   - direct verification と fresh canary を A3 側の経路で完走できる
   - Portal 向け legacy scheduler 入口は fail-fast 化済み
-  - root local utility は `run.rb` を含め Ruby へ移行済みで、`scripts/a3` 直下の Python script は retire 済み
+  - root local utility は `a3-engine/bin/a3 root-utility` へ集約済みで、`scripts/a3/run.rb` を含む root wrapper は retire 済み
 - まだ残っている依存の種類
   - root-managed kanban adapter と compatibility launcher config
   - historical backlog 上の `A3Engine` 前提 relation / close 条件
@@ -460,11 +460,11 @@ A3-v2 direct verification で確認済みの類型:
 
 ### 0.3.3 A3-v2 Scheduler Surface Clarification
 
-A3-v2 には scheduler がある。今回の混同は `legacy A3` (`task a3:portal:scheduler:*`, `scripts/a3/run.rb ...`) と `A3-v2` (`task a3:portal-v2:scheduler:*`, `a3-v2/bin/a3 ...`) の入口が workspace root に並存していることが原因だった。
+A3-v2 には scheduler がある。今回の混同は `legacy A3` (`task a3:portal:scheduler:*`, historical `scripts/a3/run.rb ...`) と `A3-v2` (`task a3:portal-v2:scheduler:*`, `a3-v2/bin/a3 ...`) の入口が workspace root に並存していることが原因だった。
 
 - legacy A3 scheduler
   - `task a3:portal:scheduler:*`
-  - `ruby scripts/a3/run.rb ...`
+  - historical `scripts/a3/run.rb ...` root wrapper
   - `a3-engine` / legacy automation 実行系の scheduler
 - A3-v2 scheduler
   - `task a3:portal-v2:scheduler:run-once`
@@ -583,9 +583,9 @@ A3-v2 には scheduler がある。今回の混同は `legacy A3` (`task a3:port
 
 Portal fresh canary の intake と stabilisation は `A3-v2#3031` / `#3119` / `#3150` / `#3151` / `#3159` を `Done` にしたことで一段落した。以後の主題は `Portal canary を通すこと` ではなく、`A3-v2 が v1/legacy に依存せず自立すること` へ移る。
 
-2026-04-08 時点で、A3-v2 Project で issue 管理されている主残件は `A3-v2#3103` と `A3-v2#3160` である。`A3-v2#2949` / `#2954` / `#2960` / `#2961` は fresh-5 canary と Ruby migration 後の current evidence をもって `Done` 化済みである。`#3103` は backend bootstrap の別レーン、`#3160` は compatibility 資産の retire / archive / keep 判断を担う。
+2026-04-08 時点で、A3-v2 Project で issue 管理されている主残件は `A3-v2#3103` と `A3-v2#3160` である。`A3-v2#2949` / `#2954` / `#2960` / `#2961` は fresh-5 canary と root utility migration 後の current evidence をもって `Done` 化済みである。`#3103` は backend bootstrap の別レーン、`#3160` は compatibility 資産の retire / archive / keep 判断を担う。
 
-次の計画は、`Portal scheduler の安定化` ではなく `A3-v2 が v1/legacy に依存せず自立すること` を先頭に置いて組み直す。2026-04-08 時点では、operator surface の入口整理と root local utility の Ruby migration は完了したため、次段は backlog / compatibility / 削除判断に移る。
+次の計画は、`Portal scheduler の安定化` ではなく `A3-v2 が v1/legacy に依存せず自立すること` を先頭に置いて組み直す。2026-04-08 時点では、operator surface の入口整理と root local utility の engine CLI 集約は完了したため、次段は backlog / compatibility / 削除判断に移る。
 
 1. 完了済みの前提
 - operator surface の入口整理
@@ -595,18 +595,18 @@ Portal fresh canary の intake と stabilisation は `A3-v2#3031` / `#3119` / `#
 - root local utility の Python 依存棚卸し
   - `scripts/a3/*.py` を移植対象 / retain / retire に分類し、operator surface を先に固定した
   - `run.py` を含む legacy-v1 backend 中継面は `run.rb` または fail-fast に置き換えた
-- Python -> Ruby migration
+- Python/root-wrapper -> engine CLI migration
   - `portal_v2_watch_summary`, `portal_v2_scheduler_launcher`, `assert-live-write`, `portal_v2_verification`
   - `diagnostics`, `reconcile`, `rerun_readiness`, `rerun_quarantine`, `cleanup`
   - retired direct repo source bootstrap, `bootstrap_portal_dev_repos`
-  - `stdin bundle worker`, `direct canary worker`, `run.rb` 相当の local utility surface
+  - `stdin bundle worker`, `direct canary worker`, root utility surface
   - この結果、generic operator 用の `scripts/a3` 直下 Python script は retire 済み。Portal runtime 診断 helper は project-injected glue として残す
 
 2. A3-v2 task relation と backlog の脱A3Engine
 - `A3-v2#2949` / `#2954` / `#2960` / `#2961` の description と relation から、`A3Engine` blocker を完了条件として参照する構造を外す
 - close 条件を A3-v2 だけで観測できる evidence に言い換える
 - `A3Engine` は設計参照にだけ残し、進捗管理の依存先にはしない
-- `#2954` / `#2960` / `#2961` を fresh-5 canary と Ruby migration 後の current evidence で close judgment 済み
+- `#2954` / `#2960` / `#2961` を fresh-5 canary と root utility migration 後の current evidence で close judgment 済み
 - 親 `#2949` も同じ evidence で close 済み
 - `#3103` は採用 backend が必要なら進め、不要なら close / archive 判断する
 - `#3160` で compatibility 資産の inventory と削除可否を確定する
@@ -685,7 +685,7 @@ Portal fresh canary の intake と stabilisation は `A3-v2#3031` / `#3119` / `#
 
 要するに、`legacy/v1 を削除するか` の判断と `A3Engine を新 repo として作り直すか` の判断は切り離さず、Kanboard baseline 完了後に `A3-v2 -> A3Engine` への naming cutover まで含めて一体で進める。
 
-要するに、次の実装優先順位は `Python utility の Ruby migration` ではなく、Kanboard baseline を閉じてから `A3-v2#3103` を再開できるかを判断し、そのうえで `legacy/compatibility 資産の削減判断` を進めることである。
+要するに、次の実装優先順位は `root utility の言語移植` ではなく、Kanboard baseline を閉じてから `A3-v2#3103` を再開できるかを判断し、そのうえで `legacy/compatibility 資産の削減判断` を進めることである。
 
 ### 0.4.2 2026-04-06 Topology / Rerun 設計見直し
 
@@ -750,7 +750,7 @@ Portal fresh rerun (`Portal#3140` / `Portal#3141`) で、A3-v2 internal storage 
 
 5. operator / deployment 仕上げ
 - `A3-v2#3103` を起点に、Kanban backend bootstrap を整理する
-- Portal 向け Python thin tooling の Ruby migration は、scheduler launcher / watch-summary を優先対象として別 residual として進める
+- Portal 向け thin tooling の engine CLI 集約は、scheduler launcher / watch-summary を優先対象として別 residual として進める
 - `A3-v2#3142` で整えた run evidence 正本の watch/log surface を維持し、以後の residual はそこへ寄せる
 - cleanup / retention policy は operator command として残し、Portal 実運用で disk pressure を避ける
 
@@ -767,13 +767,13 @@ Portal scheduler の live 運用で露出した問題は、A3-v2 固有の新規
   - current Portal scheduler launcher は detached shot を起動し、shot 本体は `execute-until-idle` を別 process で実行している
   - 2026-04-08 時点で shot 分離自体は parity 回復済み。compatibility launcher config は legacy scheduler を再起動させない fail-fast sentinel とし、残差は他の root local utility の脱v1へ移っている
 - stale run reconcile と active run repair
-  - root utility は `scripts/a3/run.rb reconcile-active-runs` で live process / worker run / active run の不整合を検出し、`--apply` で修復できる
+  - root utility は `task a3:portal:reconcile-active-runs` で live process / worker run / active run の不整合を検出し、`--apply` で修復できる
   - v2 には同等の operator surface が未整備で、stale blocked / stale active の復旧が場当たりになりやすい
 - run-once 前後の safety rail
   - v1 の `execute-run-once` は stale run reconcile、explicit rerun 準備、touched runtime workspace cleanup を前後に挟んでいた
   - v2 の `execute-until-idle` は core loop を直に呼んでおり、この保全レイヤをまだ持っていない
 - describe-state 相当の統合観測
-  - root utility は `scripts/a3/run.rb describe-state` / `watch` で live process / running_runs / recent_runs / scheduler files / latest results を一度に見られる
+  - root utility は `task a3:portal:describe-state` / `task a3:portal:watch` で live process / running_runs / recent_runs / scheduler files / latest results を一度に見られる
   - v2 の `show-scheduler-state` は pause 状態中心で、live shot failure や stale process の把握に必要な粒度が不足している
 - watch-summary の live observability
   - v1 は worker run/log ベースで live 実行状況を追えた
@@ -787,7 +787,7 @@ Portal scheduler の live 運用で露出した問題は、A3-v2 固有の新規
   - v2 は [execute_next_runnable_task.rb](/Users/takuma/workspace/mypage-prototype/a3-v2/lib/a3/application/execute_next_runnable_task.rb) が `next runnable` を 1 件選び、その phase 実行を同期で待つため、実質 single-lane になっている
   - その結果、`Portal#2982` が `verification` 実行中の間、`Portal#2987` は runnable 候補でも着手されず待機した
 - cleanup / quarantine の deterministic 契約
-  - root utility は `scripts/a3/run.rb cleanup` で issue/runtime/results/logs の cleanup 分類を持つ
+  - root utility は `task a3:portal:cleanup` で issue/runtime/results/logs の cleanup 分類を持つ
   - v2 は terminal cleanup command を持つが、registered worktree removal と plain-copy quarantine の責務分離が未完成で、`repo-beta` の registered worktree 残存や `repo-alpha` plain directory 残骸が出た
 
 判断:
@@ -819,12 +819,12 @@ Portal scheduler の v2 は、単一の bug を潰せば済む段階ではない
 | scheduler shot 分離 | legacy scheduler は detached shot を起動し、自身は待たない | current Portal scheduler launcher が detached shot を起動し、shot 本体で `execute-until-idle` を実行する | current behavior は改善済み。compatibility launcher config は fail-fast sentinel にし、active shot は current launcher/process だけを参照先として扱う | launchd scheduler は detached shot だけ起動し、shot 完了待ちをしない |
 | lane model | `build` / `gate` で少なくとも 1 本ずつ進行できる | lane 概念が無く、[execute_next_runnable_task.rb](/Users/takuma/workspace/mypage-prototype/a3-v2/lib/a3/application/execute_next_runnable_task.rb) が runnable 1 件を同期実行 | `Portal#2982` verification 中に `Portal#2987` が着手されない | lane-aware selection と lane ごとの shot 分離を入れる |
 | pause semantics | 新規 shot 停止に加え、current cycle が次 task に入る前にも効く | pause は state flag を立てるだけで、起動済み `execute-until-idle` は次 task に進みうる | pause 後も `2986/2987` が進んだ | cycle ごとに `paused?` を再確認し、current execution 後は `stop_reason=paused` で抜ける |
-| stale run repair | `scripts/a3/run.rb reconcile-active-runs` が active run / worker run / live process を突き合わせ、`--apply` で修復 | 同等 surface が未整備 | stale blocked / stale active を手動 cleanup で都度対処 | `show-state` + `repair-runs` 相当の operator command を戻す |
-| describe-state / observability | `scripts/a3/run.rb describe-state` / `watch` が running/recent/scheduler/result を一括表示 | `show-scheduler-state` は pause 中心、watch-summary は storage-first | launchd failure が `idle` に見える、live process と storage state がずれる | `show-state` を v1 相当へ拡張し、watch-summary は state inspection の表層にする |
+| stale run repair | `task a3:portal:reconcile-active-runs` が active run / worker run / live process を突き合わせ、`--apply` で修復 | 同等 surface が未整備 | stale blocked / stale active を手動 cleanup で都度対処 | `show-state` + `repair-runs` 相当の operator command を戻す |
+| describe-state / observability | `task a3:portal:describe-state` / `task a3:portal:watch` が running/recent/scheduler/result を一括表示 | `show-scheduler-state` は pause 中心、watch-summary は storage-first | launchd failure が `idle` に見える、live process と storage state がずれる | `show-state` を v1 相当へ拡張し、watch-summary は state inspection の表層にする |
 | watch-summary の live 性 | worker run / current command / live process を見せる | storage の `tasks/runs` 中心。overlay を後付けで追加中 | stale status に引きずられやすい | watch-summary の正本を `state inspection + storage` の合成に寄せる |
 | launchd env completeness | launcher config から Kanban 接続情報を env file へ出す | 初期実装で `KANBOARD_*` を出していなかった | scheduler が `KANBOARD_API_TOKEN is required` で即死 | env completeness を runtime contract として spec 化し、prepare script を正本化する |
 | merge publish モデル | operator が見る root repo と live branch の整合を崩しにくい運用 surface | merge は temporary branch 化したが、publish はまだ `update-ref` ベース | `member-portal-starters` で `feature/prototype` が進んだのに staged diff が残る | live branch 反映も checkout-based publish へ寄せ、root repo dirty を構造的に防ぐ |
-| terminal cleanup | `scripts/a3/run.rb cleanup` が issue/runtime/results/logs を分類 | registered worktree removal と quarantine plain copy の責務が未分離 | `repo-beta` registered worktree 残存、`repo-alpha` plain dir 残骸 | cleanup contract を 6.2.1 の計画どおり本実装する |
+| terminal cleanup | `task a3:portal:cleanup` が issue/runtime/results/logs を分類 | registered worktree removal と quarantine plain copy の責務が未分離 | `repo-beta` registered worktree 残存、`repo-alpha` plain dir 残骸 | cleanup contract を 6.2.1 の計画どおり本実装する |
 
 #### 0.4.4.2 現時点の blocker 分類
 

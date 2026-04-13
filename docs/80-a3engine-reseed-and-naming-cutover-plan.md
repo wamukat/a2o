@@ -139,7 +139,7 @@ Cutover target:
   - `launcher.json` の operator guidance
 - root `scripts/a3-projects/portal/config/portal-dev/launcher.json`
   - `task a3:portal-v2:scheduler:*` 参照
-- root `scripts/a3/run.rb`
+- retired root `scripts/a3/run.rb`; current user-facing root entrypoint is `task a3:*`, and the release-bound direct entrypoint is packaged `a3`
   - legacy disabled message の `task a3:portal-v2:*`, `a3-v2/bin/a3`
 - internal defaults
   - `a3-v2/lib/a3/cli.rb` の `tmp/a3-v2`

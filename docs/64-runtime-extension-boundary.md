@@ -48,24 +48,25 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 
 ### Move toward `a3-engine`
 
-- Generic launcher surfaces that remain in root should be limited to `scripts/a3/run.rb` and should dispatch into A3 Engine operators.
+- No tracked root files should remain under `scripts/a3`.
+- Generic launcher surfaces now dispatch through `a3-engine/bin/a3 root-utility`; root Taskfile injects project paths and environment only.
 - Individual operator wrappers such as `cleanup.rb`, `diagnostics.rb`, `reconcile.rb`, and `rerun_*` have been retired from root.
 - Worker and generic smoke entrypoints should use `a3-engine/bin/a3 worker:*` commands instead of root wrappers.
 
 | Root file | Classification | Action | Reason / dependency |
 | --- | --- | --- | --- |
-| `scripts/a3/run.rb` | A3-owned operator facade | Engine logic migrated to `a3-engine/lib/a3/operator/root_utility_launcher.rb`; root file is a thin wrapper | It dispatches generic state / cleanup / reconcile / rerun operations. Root injects `A3_ROOT_DIR` and project config paths remain outside the A3 release boundary. |
+| `scripts/a3/run.rb` | Retired wrapper | Deleted after `a3-engine/bin/a3 root-utility` became the operator facade | Users must not invoke Ruby directly. Root Taskfile may set project-injected env, but the release boundary is packaged `a3` / `a3-agent`. |
 
 ### Retired from `scripts/a3`
 
 | Retired root file | Classification | Action | Reason / dependency |
 | --- | --- | --- | --- |
-| `scripts/a3/cleanup.rb` | Retired wrapper | Deleted after `scripts/a3/run.rb` began dispatching directly to `a3-engine/lib/a3/operator/cleanup.rb` | Cleanup policy for issue workspace, runtime results, logs, quarantine, and disposable caches is generic A3 behavior. Project-specific storage roots remain arguments/config. |
-| `scripts/a3/diagnostics.rb` | Retired wrapper | Deleted after `scripts/a3/run.rb` began dispatching directly to `a3-engine/lib/a3/operator/diagnostics.rb` | Live process / worker run / result / scheduler diagnostics are generic. Project names, storage dirs, and launcher paths remain injected. |
-| `scripts/a3/reconcile.rb` | Retired wrapper | Deleted after `scripts/a3/run.rb` began dispatching directly to `a3-engine/lib/a3/operator/reconcile.rb` | Active-run reconciliation is core scheduler behavior. Project storage and command patterns remain injected. |
+| `scripts/a3/cleanup.rb` | Retired wrapper | Deleted after operator logic moved to `a3-engine/lib/a3/operator/cleanup.rb` | Cleanup policy for issue workspace, runtime results, logs, quarantine, and disposable caches is generic A3 behavior. Project-specific storage roots remain arguments/config. |
+| `scripts/a3/diagnostics.rb` | Retired wrapper | Deleted after operator logic moved to `a3-engine/lib/a3/operator/diagnostics.rb` | Live process / worker run / result / scheduler diagnostics are generic. Project names, storage dirs, and launcher paths remain injected. |
+| `scripts/a3/reconcile.rb` | Retired wrapper | Deleted after operator logic moved to `a3-engine/lib/a3/operator/reconcile.rb` | Active-run reconciliation is core scheduler behavior. Project storage and command patterns remain injected. |
 | `scripts/a3/rerun_workspace_support.rb` | Retired support library | Migrated to `a3-engine/lib/a3/operator/rerun_workspace_support.rb` | It defines generic issue workspace and quarantine path policy. Root scripts should require the engine library instead of keeping a root copy. |
-| `scripts/a3/rerun_quarantine.rb` | Retired wrapper | Deleted after `scripts/a3/run.rb` began dispatching directly to `a3-engine/lib/a3/operator/rerun_quarantine.rb` | Quarantine mechanics are generic; allowed project build outputs must remain configurable. |
-| `scripts/a3/rerun_readiness.rb` | Retired wrapper | Deleted after `scripts/a3/run.rb` began dispatching directly to `a3-engine/lib/a3/operator/rerun_readiness.rb` | Rerun readiness checks are generic runtime state inspection. Project kanban command working directory remains injected by the root wrapper. |
+| `scripts/a3/rerun_quarantine.rb` | Retired wrapper | Deleted after operator logic moved to `a3-engine/lib/a3/operator/rerun_quarantine.rb` | Quarantine mechanics are generic; allowed project build outputs must remain configurable. |
+| `scripts/a3/rerun_readiness.rb` | Retired wrapper | Deleted after operator logic moved to `a3-engine/lib/a3/operator/rerun_readiness.rb` | Rerun readiness checks are generic runtime state inspection. Project kanban command working directory remains injected by project config. |
 | `scripts/a3/launchd.rb` | Optional host service helper | Deleted with macOS LaunchAgent service entrypoints | This was not an `a3-agent` scheduler registration feature. It only supported root `a3:portal:scheduler:install/uninstall/reload/status` and was not required by the Docker A3 + host-local agent flow. |
 | `scripts/a3/assert_a3_live_write_enabled.rb` | A3-owned safety guard, unreferenced | Deleted from root | It contained no Portal knowledge, but no current command used it. Reintroduce only as an A3-owned guard if a current A3 command needs it. |
 | `scripts/a3/a3_stdin_bundle_worker.rb` | Retired worker wrapper | Deleted after `a3-engine/bin/a3 worker:stdin-bundle` became the worker entrypoint | The engine worker reads executor command templates and repo-scope aliases from project config. Portal labels such as `repo:starters` / `repo:ui-app` must not be hardcoded in A3 core. |
@@ -106,7 +107,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 
 ### Migration order
 
-1. Native A3 CLI parity: add `a3-engine/bin/a3` commands for `cleanup`, `diagnostics`, `reconcile`, and `rerun_*`, preserving root Taskfile behavior through `scripts/a3/run.rb` until the root facade is retired.
+1. Native A3 CLI parity: add `a3-engine/bin/a3` commands for `cleanup`, `diagnostics`, `reconcile`, and `rerun_*`; root Taskfile behavior is preserved through `a3-engine/bin/a3 root-utility`, not a root Ruby wrapper.
 2. Worker bridge extraction: replace root worker wrappers with `a3-engine/bin/a3 worker:stdin-bundle` and `worker:direct-canary`; keep Portal launcher config in the project package.
 3. Smoke split: move synthetic host-agent and parent-topology smoke into A3 tests; keep real Portal full verification as project canary.
 4. Portal package extraction: move `scripts/a3-projects/portal/**` into an external project package format once A3 can load project packages explicitly.

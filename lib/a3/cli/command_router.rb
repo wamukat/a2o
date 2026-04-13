@@ -60,6 +60,7 @@ module A3
         "run-verification" => Definition.new(handler: :handle_run_verification, needs_worker_gateway: true, session_kind: :runtime),
         "run-worker-phase" => Definition.new(handler: :handle_run_worker_phase, needs_worker_gateway: true, session_kind: :runtime),
         "run-merge" => Definition.new(handler: :handle_run_merge, needs_worker_gateway: true, session_kind: :runtime),
+        "root-utility" => Definition.new(handler: :handle_root_utility),
         "worker:stdin-bundle" => Definition.new(handler: :handle_worker_stdin_bundle),
         "worker:direct-canary" => Definition.new(handler: :handle_worker_direct_canary)
       }.freeze

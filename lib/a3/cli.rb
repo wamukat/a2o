@@ -671,6 +671,14 @@ module A3
       exit(exit_code)
     end
 
+    def handle_root_utility(argv, out:)
+      require "a3/operator/root_utility_launcher"
+
+      exit_code = A3RootUtilityLauncher.main(argv)
+      out.flush
+      exit(exit_code)
+    end
+
     def handle_worker_direct_canary(_argv, out:)
       require "a3/operator/direct_canary_worker"
 
