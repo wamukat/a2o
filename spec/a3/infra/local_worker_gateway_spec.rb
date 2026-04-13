@@ -165,11 +165,11 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     gateway = described_class.new(
       command_runner: command_runner,
       worker_command: "ruby",
-      worker_command_args: ["scripts/a3/a3_v2_direct_canary_worker.rb"]
+      worker_command_args: ["scripts/a3/a3_direct_canary_worker.rb"]
     )
 
     expect(command_runner).to receive(:run).with(
-      ["ruby scripts/a3/a3_v2_direct_canary_worker.rb"],
+      ["ruby scripts/a3/a3_direct_canary_worker.rb"],
       workspace: workspace,
       env: {
         "A3_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
@@ -448,6 +448,16 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
 
   it "accepts a parent review result without changed_files when review_disposition is present" do
     result_path = workspace.root_path.join(".a3", "worker-result.json")
+    parent_workspace = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: workspace.workspace_kind,
+      root_path: workspace.root_path,
+      source_descriptor: workspace.source_descriptor,
+      slot_paths: {
+        repo_alpha: Pathname(tmpdir).join("workspace", "repo-alpha"),
+        repo_beta: Pathname(tmpdir).join("workspace", "repo-beta")
+      }
+    )
+    FileUtils.mkdir_p(parent_workspace.slot_paths.fetch(:repo_alpha))
     parent_task = A3::Domain::Task.new(
       ref: "Portal#3140",
       kind: :parent,
@@ -506,7 +516,10 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
         "finding_key" => "completed-no-findings"
       }
     }
-    gateway = described_class.new(command_runner: command_runner)
+    gateway = described_class.new(
+      command_runner: command_runner,
+      worker_protocol: A3::Infra::WorkerProtocol.new(review_disposition_repo_scopes: %w[repo_alpha repo_beta both])
+    )
 
     allow(command_runner).to receive(:run) do
       result_path.write(JSON.pretty_generate(bundle))
@@ -515,7 +528,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
 
     execution = gateway.run(
       skill: parent_phase_runtime.review_skill,
-      workspace: workspace,
+      workspace: parent_workspace,
       task: parent_task,
       run: parent_run,
       phase_runtime: parent_phase_runtime,
@@ -528,6 +541,16 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
 
   it "accepts a parent review result with changed_files null when review_disposition is present" do
     result_path = workspace.root_path.join(".a3", "worker-result.json")
+    parent_workspace = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: workspace.workspace_kind,
+      root_path: workspace.root_path,
+      source_descriptor: workspace.source_descriptor,
+      slot_paths: {
+        repo_alpha: Pathname(tmpdir).join("workspace", "repo-alpha"),
+        repo_beta: Pathname(tmpdir).join("workspace", "repo-beta")
+      }
+    )
+    FileUtils.mkdir_p(parent_workspace.slot_paths.fetch(:repo_alpha))
     parent_task = A3::Domain::Task.new(
       ref: "Portal#3140",
       kind: :parent,
@@ -587,7 +610,10 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
         "finding_key" => "completed-no-findings"
       }
     }
-    gateway = described_class.new(command_runner: command_runner)
+    gateway = described_class.new(
+      command_runner: command_runner,
+      worker_protocol: A3::Infra::WorkerProtocol.new(review_disposition_repo_scopes: %w[repo_alpha repo_beta both])
+    )
 
     allow(command_runner).to receive(:run) do
       result_path.write(JSON.pretty_generate(bundle))
@@ -596,7 +622,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
 
     execution = gateway.run(
       skill: parent_phase_runtime.review_skill,
-      workspace: workspace,
+      workspace: parent_workspace,
       task: parent_task,
       run: parent_run,
       phase_runtime: parent_phase_runtime,

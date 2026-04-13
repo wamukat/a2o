@@ -190,7 +190,7 @@ RSpec.describe A3::CLI do
       )
 
       expect(command_runner).to receive(:run).with(
-        ["ruby scripts/a3/a3_v2_direct_canary_worker.rb"],
+        ["ruby scripts/a3/a3_direct_canary_worker.rb"],
         workspace: an_instance_of(A3::Domain::PreparedWorkspace),
         env: hash_including("A3_WORKER_REQUEST_PATH", "A3_WORKER_RESULT_PATH", "A3_WORKSPACE_ROOT")
       ).and_return(
@@ -211,7 +211,7 @@ RSpec.describe A3::CLI do
             *repo_source_args(repo_sources),
             "--preset-dir", File.join(dir, "presets"),
             "--worker-command", "ruby",
-            "--worker-command-arg", "scripts/a3/a3_v2_direct_canary_worker.rb",
+            "--worker-command-arg", "scripts/a3/a3_direct_canary_worker.rb",
             "--kanban-command", "ruby",
             "--kanban-command-arg", fake_cli.fetch(:script_path),
             "--kanban-project", "A3-v2",

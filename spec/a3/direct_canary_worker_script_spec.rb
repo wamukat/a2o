@@ -1,11 +1,10 @@
 # frozen_string_literal: true
 
 require "json"
-require "set"
 require "tmpdir"
-require_relative "../../../scripts/a3/a3_v2_direct_canary_worker"
+require_relative "../../lib/a3/operator/direct_canary_worker"
 
-RSpec.describe A3V2DirectCanaryWorker do
+RSpec.describe A3DirectCanaryWorker do
   def base_request(phase: "implementation")
     {
       "task_ref" => "Portal#3157",
@@ -28,27 +27,27 @@ RSpec.describe A3V2DirectCanaryWorker do
   end
 
   it "reports changed marker file when diff is enabled" do
-    Dir.mktmpdir("a3-v2-direct-canary-worker-") do |temp_dir|
+    Dir.mktmpdir("a3-direct-canary-worker-") do |temp_dir|
       repo_root = Pathname(temp_dir).join("repo-beta")
       repo_root.mkpath
       request = base_request.merge("slot_paths" => { "repo_beta" => repo_root.to_s })
 
       payload = described_class.maybe_apply_local_live_diff(
         request,
-        env: { "A3_V2_DIRECT_CANARY_DIFF_TASK_REFS" => "Portal#3157" }
+        env: { "A3_DIRECT_CANARY_DIFF_TASK_REFS" => "Portal#3157" }
       )
 
       expect(payload.fetch("changed_files")).to eq(
-        "repo_beta" => [".a3-canary/local-live-merge-verification.md"]
+        "repo_beta" => [".a3-canary/tasks/Portal-3157/repo_beta.md"]
       )
       expect(payload.fetch("diff_applied")).to eq(true)
-      expect(repo_root.join(".a3-canary", "local-live-merge-verification.md").read)
+      expect(repo_root.join(".a3-canary", "tasks", "Portal-3157", "repo_beta.md").read)
         .to include("Portal#3157 (repo_beta): implementation diff generated")
     end
   end
 
   it "writes worker result payload from request and env" do
-    Dir.mktmpdir("a3-v2-direct-canary-worker-main-") do |temp_dir|
+    Dir.mktmpdir("a3-direct-canary-worker-main-") do |temp_dir|
       root = Pathname(temp_dir)
       request_path = root.join("request.json")
       result_path = root.join("result.json")
@@ -61,7 +60,7 @@ RSpec.describe A3V2DirectCanaryWorker do
         env: {
           "A3_WORKER_REQUEST_PATH" => request_path.to_s,
           "A3_WORKER_RESULT_PATH" => result_path.to_s,
-          "A3_V2_DIRECT_CANARY_DIFF_TASK_REFS" => "Portal#3157"
+          "A3_DIRECT_CANARY_DIFF_TASK_REFS" => "Portal#3157"
         }
       )
 
@@ -69,14 +68,14 @@ RSpec.describe A3V2DirectCanaryWorker do
       payload = JSON.parse(result_path.read)
       expect(payload.fetch("success")).to eq(true)
       expect(payload.fetch("changed_files")).to eq(
-        "repo_beta" => [".a3-canary/local-live-merge-verification.md"]
+        "repo_beta" => [".a3-canary/tasks/Portal-3157/repo_beta.md"]
       )
       expect(payload.fetch("diagnostics").fetch("worker_mode")).to eq("direct_canary_diff_write")
     end
   end
 
   it "runs as a standalone script process" do
-    Dir.mktmpdir("a3-v2-direct-canary-worker-cli-") do |temp_dir|
+    Dir.mktmpdir("a3-direct-canary-worker-cli-") do |temp_dir|
       root = Pathname(temp_dir)
       request_path = root.join("request.json")
       result_path = root.join("result.json")
@@ -89,7 +88,7 @@ RSpec.describe A3V2DirectCanaryWorker do
         {
           "A3_WORKER_REQUEST_PATH" => request_path.to_s,
           "A3_WORKER_RESULT_PATH" => result_path.to_s,
-          "A3_V2_DIRECT_CANARY_DIFF_TASK_REFS" => "Portal#3157"
+          "A3_DIRECT_CANARY_DIFF_TASK_REFS" => "Portal#3157"
         },
         "ruby",
         described_class.method(:main).source_location.first

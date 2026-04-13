@@ -131,11 +131,10 @@ Cutover target:
   - `portal_v2_watch_summary.rb`
   - `portal_v2_verification.rb`
   - `prepare_portal_v2_launchd_config.rb`
-  - `bootstrap_a3_v2_direct_repo_sources.rb`
-  - `ensure_a3_v2_direct_repo_sources.rb`
-  - `assert_a3_v2_live_write_enabled.rb`
-  - `a3_v2_direct_canary_worker.rb`
-  - `a3_v2_stdin_bundle_worker.rb`
+  - retired direct repo source bootstrap scripts
+  - retired live-write guard script
+  - `a3_direct_canary_worker.rb`
+  - `a3_stdin_bundle_worker.rb`
 - root `scripts/a3/config/portal/*`
   - `a3-v2-runtime-manifest.yml`
   - `launcher.json` の operator guidance

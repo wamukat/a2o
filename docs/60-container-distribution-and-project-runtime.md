@@ -591,16 +591,16 @@ Portal fresh canary の intake と stabilisation は `A3-v2#3031` / `#3119` / `#
 - operator surface の入口整理
   - root-managed kanban bridge の `a3-engine` 依存を外した
   - legacy `task a3:portal:*` / `task a3:portal-dev:*` と root local utility の役割を整理した
-  - docs / runbook / launcher config の案内を、`legacy scheduler` ではなく `A3-v2` 正規入口へ寄せた
+  - docs / runbook / launcher config の案内を、`legacy scheduler` ではなく A3 正規入口へ寄せた
 - root local utility の Python 依存棚卸し
   - `scripts/a3/*.py` を移植対象 / retain / retire に分類し、operator surface を先に固定した
   - `run.py` を含む legacy-v1 backend 中継面は `run.rb` または fail-fast に置き換えた
 - Python -> Ruby migration
   - `portal_v2_watch_summary`, `portal_v2_scheduler_launcher`, `assert-live-write`, `portal_v2_verification`
   - `diagnostics`, `reconcile`, `rerun_readiness`, `rerun_quarantine`, `cleanup`
-  - `bootstrap_a3_v2_direct_repo_sources`, `bootstrap_portal_dev_repos`
+  - retired direct repo source bootstrap, `bootstrap_portal_dev_repos`
   - `stdin bundle worker`, `direct canary worker`, `run.rb` 相当の local utility surface
-  - この結果、`scripts/a3` 直下の Python script は retire 済み
+  - この結果、generic operator 用の `scripts/a3` 直下 Python script は retire 済み。Portal runtime 診断 helper は project-injected glue として残す
 
 2. A3-v2 task relation と backlog の脱A3Engine
 - `A3-v2#2949` / `#2954` / `#2960` / `#2961` の description と relation から、`A3Engine` blocker を完了条件として参照する構造を外す
@@ -1689,7 +1689,7 @@ adapter は、command template contract だけでは provider ごとの auth / s
   - これは A3 Engine core の依存ではなく、Portal project が選んだ executor command profile の依存である。別 A-AI CLI へ切り替える場合は command profile と required bin を差し替える
 - test fixture dependency:
   - `scripts/a3/diagnostics.rb` の generic vendor `rg` fallback は `AI_CLI_HOME` / `.ai-cli` を参照する。関連 spec も `.codex` 前提から generic path へ更新済み
-  - stale な `a3-engine/spec/a3/a3_v2_stdin_bundle_worker_script_spec.rb` は deleted legacy root script を要求しており、current runtime の検証対象から外す。残す場合も fake `codex` と Codex CLI option 前提の fixture は generic command runner fixture へ置き換える
+  - stale な deleted legacy root script 参照 spec は削除済み。stdin bundle worker / direct canary worker の current spec は engine library を直接対象にする
   - `a3-engine/spec/a3/**/*_spec.rb` の blocked / inspection / show output fixture に `failing_command: "codex exec --json -"` が残っている。これは観測例の fixture であり runtime dependency ではないが、command template 移行時に汎用 command 表記へ更新する
 - document / operation wording:
   - `docs/10-ops/10-02-codex-reporting-style.md` などの「Codex 実行者」は human/operator role 名として残っている。AI executor の hard dependency ではないため、今回の runtime 汎用化 blocker にはしない
