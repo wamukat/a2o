@@ -5,3 +5,4 @@
 /tmp/
 /.rspec_status
 /agent-go/dist/
+__pycache__/
