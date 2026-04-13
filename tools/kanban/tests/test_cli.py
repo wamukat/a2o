@@ -117,6 +117,13 @@ class SoloBoardCliTest(unittest.TestCase):
         self.assertEqual({"value": 1}, payload["payload"])
         path.unlink()
 
+    def test_safe_text_arg_allows_multiline_adapter_input(self) -> None:
+        kanban_cli.ensure_safe_text_arg(
+            option_name="--description",
+            value="line 1\nline 2",
+            file_path=None,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

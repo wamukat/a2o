@@ -208,8 +208,9 @@ def load_text_arg(value: str | None, file_path: str | None) -> str | None:
 
 
 def ensure_safe_text_arg(*, option_name: str, value: str | None, file_path: str | None) -> None:
-    if value is not None and "\n" in value and file_path is None:
-        raise RuntimeError(f"{option_name} contains newlines; use {option_name}-file or '-' stdin instead.")
+    # This CLI is A3's adapter layer, not SoloBoard's public CLI. Accept
+    # multiline text here so callers are not forced to encode transport details.
+    return None
 
 
 def parse_task_reference(reference: str | None) -> tuple[str | None, int | None]:

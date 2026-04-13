@@ -2,6 +2,7 @@
 
 require "json"
 require "open3"
+require "tempfile"
 
 module A3
   module Infra
@@ -26,6 +27,18 @@ module A3
         raise A3::Domain::ConfigurationError, build_command_error(stderr, status.exitstatus) unless status.success?
 
         nil
+      end
+
+      def run_json_command_with_text_file_option(*args, option_name:, text:, file_option_name: "#{option_name}-file", tempfile_prefix: "a3-kanban-text")
+        with_text_file(text, tempfile_prefix: tempfile_prefix) do |path|
+          run_json_command(*args, file_option_name, path)
+        end
+      end
+
+      def run_command_with_text_file_option(*args, option_name:, text:, file_option_name: "#{option_name}-file", tempfile_prefix: "a3-kanban-text")
+        with_text_file(text, tempfile_prefix: tempfile_prefix) do |path|
+          run_command(*args, file_option_name, path)
+        end
       end
 
       def fetch_task_by_id(task_id)
@@ -66,6 +79,14 @@ module A3
       end
 
       private
+
+      def with_text_file(text, tempfile_prefix:)
+        Tempfile.create([tempfile_prefix, ".md"], @working_dir || Dir.tmpdir) do |file|
+          file.write(String(text))
+          file.flush
+          yield file.path
+        end
+      end
 
       def build_command_error(stderr, exitstatus)
         detail = stderr.to_s.strip

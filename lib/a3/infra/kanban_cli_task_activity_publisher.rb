@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "tempfile"
-
 module A3
   module Infra
     class KanbanCliTaskActivityPublisher
@@ -27,21 +25,15 @@ module A3
         @client.resolve_task_id(task_ref, external_task_id: external_task_id, canonical_required: false)
       end
 
-      def run_command(*args)
-        @client.run_command(*args)
-      end
-
       def run_comment_command(task_id:, body:)
-        Tempfile.create(["a3-comment", ".md"], @working_dir || Dir.tmpdir) do |file|
-          file.write(String(body))
-          file.flush
-          run_command(
-            "task-comment-create",
-            "--project", @project,
-            "--task-id", task_id.to_s,
-            "--comment-file", file.path
-          )
-        end
+        @client.run_command_with_text_file_option(
+          "task-comment-create",
+          "--project", @project,
+          "--task-id", task_id.to_s,
+          option_name: "--comment",
+          text: body,
+          tempfile_prefix: "a3-comment"
+        )
       end
 
     end

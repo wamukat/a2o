@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "tempfile"
-
 module A3
   module Infra
     class KanbanCliFollowUpChildWriter
@@ -140,18 +138,15 @@ module A3
       end
 
       def create_child(task_payload)
-        Tempfile.create(["a3-follow-up-child-description", ".md"]) do |file|
-          file.write(task_payload.fetch("description"))
-          file.flush
-
-          @client.run_json_command(
-            "task-create",
-            "--project", @project,
-            "--title", task_payload.fetch("title"),
-            "--description-file", file.path,
-            "--status", "To do"
-          )
-        end
+        @client.run_json_command_with_text_file_option(
+          "task-create",
+          "--project", @project,
+          "--title", task_payload.fetch("title"),
+          "--status", "To do",
+          option_name: "--description",
+          text: task_payload.fetch("description"),
+          tempfile_prefix: "a3-follow-up-child-description"
+        )
       end
 
       def ensure_canonical_payload!(task, canonical:, parent_external_task_id:)

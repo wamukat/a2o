@@ -31,11 +31,11 @@ RSpec.describe A3::Infra::KanbanCliTaskActivityPublisher do
     )
 
     with_env(fake_cli.fetch(:env)) do
-      publisher.publish(task_ref: "Sample#5001", body: "A3-v2 started implementation")
+      publisher.publish(task_ref: "Sample#5001", body: "A3 started implementation\nwith details")
     end
 
     comments = read_fake_kanban_comments(fake_cli.fetch(:comments_path))
-    expect(comments.fetch("5001").fetch(0).fetch("comment")).to eq("A3-v2 started implementation")
+    expect(comments.fetch("5001").fetch(0).fetch("comment")).to eq("A3 started implementation\nwith details")
   end
 
   it "rejects non-canonical task refs" do
