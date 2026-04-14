@@ -119,10 +119,7 @@ cd a3-engine/agent-go
 go run ./cmd/a3 agent install \
   --target auto \
   --output /tmp/a3-agent-user-check \
-  --build \
-  --compose-project a3-portal-bundle \
-  --compose-file ../docker/compose/a3-portal-soloboard.yml \
-  --runtime-service a3-runtime
+  --build
 ```
 
 runtime orchestration の暫定入口は root Taskfile の次である。
@@ -143,3 +140,4 @@ task a3:portal:runtime:watch-summary
 - `a3 agent install` を release artifact に含め、runtime image から host/dev-env への binary export を利用者向け配布物として固定する。
 - `scripts/a3-projects/portal/runtime/run_once.sh` の責務を A3 Engine command へ移し、Portal 側を thin config package にする。
 - `A3_RUNTIME_RUN_ONCE_*` のような内部 env は project package / CLI option に寄せ、利用者の主要入口から隠す。
+- A3/SoloBoard compose file は A3 配布物として同梱し、project package 側に compose file 作成を要求しない。compose override は開発・診断用に限定する。

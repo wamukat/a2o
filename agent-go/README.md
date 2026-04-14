@@ -75,13 +75,12 @@ Export `a3-agent` from the A3 Engine runtime image:
 a3 agent install \
   --target auto \
   --output ./.work/a3-agent/bin/a3-agent \
-  --build \
-  --compose-project a3-portal-bundle \
-  --compose-file a3-engine/docker/compose/a3-portal-soloboard.yml \
-  --runtime-service a3-runtime
+  --build
 ```
 
 This command starts the runtime service if needed, verifies the matching agent package inside the runtime container, exports it to the requested host path, and marks it executable. Use `--build` when validating local source changes against a freshly built runtime image. Omit `--build` when using a prebuilt release image.
+
+The standard compose file is an A3 distribution asset. Project packages provide bootstrap/config values; they do not provide the A3/SoloBoard compose file. `--compose-file`, `--compose-project`, and `--runtime-service` remain available as development/diagnostic overrides, but they are not part of the normal user path.
 
 ## Deployment Shapes
 

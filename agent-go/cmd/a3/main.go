@@ -55,7 +55,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage:")
 	fmt.Fprintln(w, "  a3 version")
 	fmt.Fprintln(w, "  a3 agent target")
-	fmt.Fprintln(w, "  a3 agent install --target auto --output PATH [--build] [--compose-project NAME] [--compose-file PATH] [--runtime-service NAME]")
+	fmt.Fprintln(w, "  a3 agent install --target auto --output PATH [--build]")
 }
 
 func runAgent(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) int {
@@ -205,7 +205,9 @@ func envDefault(name string, fallback string) string {
 func defaultComposeFile() string {
 	candidates := []string{
 		"a3-engine/docker/compose/a3-portal-soloboard.yml",
+		"docker/compose/a3-portal-soloboard.yml",
 		"../docker/compose/a3-portal-soloboard.yml",
+		"../share/a3/docker/compose/a3-portal-soloboard.yml",
 	}
 	for _, candidate := range candidates {
 		if _, err := os.Stat(candidate); err == nil {
