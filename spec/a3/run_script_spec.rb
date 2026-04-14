@@ -12,7 +12,7 @@ ENV["A3_ROOT_RUNTIME_CONFIG_PATH"] ||= ".work/a3/config/portal-runtime.json"
 ENV["A3_ROOT_CONFIG_DIR"] ||= "scripts/a3-projects/portal/inject/config"
 ENV["A3_ROOT_PREPARE_RUNTIME_CONFIG_SCRIPT"] ||= "scripts/a3-projects/portal/maintenance/prepare_portal_runtime_config.rb"
 ENV["A3_ROOT_RUNTIME_CONFIG_PROJECTS"] ||= "portal"
-ENV["A3_ROOT_RECONCILE_LIVE_PROCESS_PATTERN"] ||= "scripts/a3-projects/portal/operator-tests/runtime_agent_run_once.sh"
+ENV["A3_ROOT_RECONCILE_LIVE_PROCESS_PATTERN"] ||= "scripts/a3-projects/portal/runtime/run_once.sh"
 ENV["A3_ROOT_LEGACY_DISABLED_MESSAGE"] ||= "Legacy A3Engine-v1 commands are disabled."
 
 require "a3/operator/root_utility_launcher"
@@ -181,7 +181,7 @@ RSpec.describe A3RootUtilityLauncher do
     end
   end
 
-  it "uses project defaults for cleanup" do
+  it "uses runtime config defaults for cleanup" do
     allow(A3Cleanup).to receive(:main).and_return(0)
 
     rc = described_class.main(["cleanup", "--project", "portal"])
@@ -194,7 +194,7 @@ RSpec.describe A3RootUtilityLauncher do
         "--root-dir", described_class::ROOT_DIR.to_s,
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "active-runs.json").to_s,
         "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "worker-runs.json").to_s,
-        "--launcher-config", described_class::CONFIG_DIR.join("portal", "launcher.json").to_s,
+        "--launcher-config", described_class::RUNTIME_CONFIG.to_s,
         "--done-ttl-hours", "24",
         "--blocked-ttl-hours", "24",
         "--result-ttl-hours", "168",
@@ -227,7 +227,7 @@ RSpec.describe A3RootUtilityLauncher do
         "--root-dir", described_class::ROOT_DIR.to_s,
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "active-runs.json").to_s,
         "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "worker-runs.json").to_s,
-        "--launcher-config", described_class::CONFIG_DIR.join("portal", "launcher.json").to_s,
+        "--launcher-config", described_class::RUNTIME_CONFIG.to_s,
         "--done-ttl-hours", "24",
         "--blocked-ttl-hours", "24",
         "--result-ttl-hours", "168",
@@ -264,7 +264,7 @@ RSpec.describe A3RootUtilityLauncher do
         "--root-dir", described_class::ROOT_DIR.to_s,
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "active-runs.json").to_s,
         "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "worker-runs.json").to_s,
-        "--launcher-config", described_class::CONFIG_DIR.join("portal", "launcher.json").to_s,
+        "--launcher-config", described_class::RUNTIME_CONFIG.to_s,
         "--done-ttl-hours", "24",
         "--blocked-ttl-hours", "24",
         "--result-ttl-hours", "168",
@@ -300,7 +300,7 @@ RSpec.describe A3RootUtilityLauncher do
         "--root-dir", described_class::ROOT_DIR.to_s,
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "active-runs.json").to_s,
         "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "worker-runs.json").to_s,
-        "--launcher-config", described_class::CONFIG_DIR.join("portal", "launcher.json").to_s,
+        "--launcher-config", described_class::RUNTIME_CONFIG.to_s,
         "--done-ttl-hours", "24",
         "--blocked-ttl-hours", "24",
         "--result-ttl-hours", "168",
@@ -313,7 +313,7 @@ RSpec.describe A3RootUtilityLauncher do
     )
   end
 
-  it "uses project defaults for reconcile-active-runs" do
+  it "uses runtime config defaults for reconcile-active-runs" do
     allow(described_class).to receive(:run_reconcile_command).and_return(0)
 
     rc = described_class.main(["reconcile-active-runs", "--project", "portal", "--status", "To do", "--apply"])
@@ -324,9 +324,9 @@ RSpec.describe A3RootUtilityLauncher do
         "--project", "portal",
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "active-runs.json").to_s,
         "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "portal", "worker-runs.json").to_s,
-        "--live-process-pattern", "scripts/a3-projects/portal/operator-tests/runtime_agent_run_once.sh",
+        "--live-process-pattern", "scripts/a3-projects/portal/runtime/run_once.sh",
         "--live-process-pattern", "portal-kanban-scheduler-auto",
-        "--launcher-config", described_class::CONFIG_DIR.join("portal", "launcher.json").to_s,
+        "--launcher-config", described_class::RUNTIME_CONFIG.to_s,
         "--status", "To do",
         "--apply"
       ]
@@ -448,7 +448,7 @@ RSpec.describe A3RootUtilityLauncher do
     )
   end
 
-  it "uses project launcher for doctor-env" do
+  it "uses runtime config for doctor-env" do
     allow(described_class).to receive(:run_diagnostics_command).and_return(0)
 
     rc = described_class.main(["doctor-env", "--project", "portal"])
@@ -457,7 +457,7 @@ RSpec.describe A3RootUtilityLauncher do
     expect(described_class).to have_received(:run_diagnostics_command).with(
       [
         "doctor-env",
-        "--launcher-config", described_class::CONFIG_DIR.join("portal", "launcher.json").to_s
+        "--launcher-config", described_class::RUNTIME_CONFIG.to_s
       ]
     )
   end
