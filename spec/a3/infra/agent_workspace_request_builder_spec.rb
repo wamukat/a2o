@@ -238,6 +238,23 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     expect(request.slots.fetch("repo_gamma")).to include("ref" => "refs/heads/support/gamma")
   end
 
+  it "makes only edit target slots writable and publishable for remediation commands" do
+    request = described_class.new(
+      source_aliases: {
+        repo_alpha: "portal-alpha",
+        repo_beta: "portal-beta"
+      },
+      support_ref: "refs/heads/feature/prototype"
+    ).call(workspace: workspace, task: task, run: run(:verification), command_intent: :remediation)
+
+    expect(request.publish_policy).to eq(
+      "mode" => "commit_all_edit_target_changes_on_success",
+      "commit_message" => "A3 remediation update for Portal#42"
+    )
+    expect(request.slots.fetch("repo_alpha")).to include("access" => "read_write", "ownership" => "edit_target")
+    expect(request.slots.fetch("repo_beta")).to include("access" => "read_only", "ownership" => "support")
+  end
+
   it "keeps support slots present for verification even when the scope is narrow" do
     request = described_class.new(
       source_aliases: {

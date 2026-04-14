@@ -260,13 +260,97 @@ func TestPublishWorkspaceChangesValidatesAllSlotsBeforeCommitting(t *testing.T) 
 			"repo_alpha": []any{"alpha.txt"},
 			"repo_beta":  []any{},
 		},
-	})
+	}, true)
 
 	if err == nil || !strings.Contains(err.Error(), "repo_beta changed files do not match worker result") {
 		t.Fatalf("expected repo_beta changed files mismatch, got %v", err)
 	}
 	if head := git(t, alphaRoot, "rev-parse", "a3/work/Portal-42"); head != alphaHead {
 		t.Fatalf("repo_alpha branch advanced before all slots validated: before=%s after=%s", alphaHead, head)
+	}
+}
+
+func TestPublishWorkspaceChangesCommitsAllEditTargetChangesOnCommandSuccess(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	betaRoot := createGitSource(t, tmp, "repo-beta")
+	request := testWorkspaceRequest("repo-alpha")
+	request.PublishPolicy = &WorkspacePublishPolicy{
+		Mode:          "commit_all_edit_target_changes_on_success",
+		CommitMessage: "A3 remediation update for Portal#42",
+	}
+	request.Slots["repo_beta"] = WorkspaceSlotRequest{
+		Source:    WorkspaceSourceRequest{Kind: "local_git", Alias: "repo-beta"},
+		Ref:       "refs/heads/a3/work/Portal-42",
+		Checkout:  "worktree_branch",
+		Access:    "read_only",
+		SyncClass: "lazy_but_guaranteed",
+		Ownership: "support",
+		Required:  true,
+	}
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": alphaRoot,
+			"repo-beta":  betaRoot,
+		},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-alpha", "formatted.txt"), []byte("formatted\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err = PublishWorkspaceChanges(prepared, request, nil, true)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	alphaSlot := prepared.SlotDescriptors["repo_alpha"]
+	if alphaSlot["publish_status"] != "committed" || alphaSlot["published"] != true {
+		t.Fatalf("expected remediation commit evidence: %#v", alphaSlot)
+	}
+	if head := trimTrailingNewline(git(t, alphaRoot, "rev-parse", "a3/work/Portal-42")); head != alphaSlot["publish_after_head"] {
+		t.Fatalf("source branch was not advanced by remediation: head=%s slot=%#v", head, alphaSlot)
+	}
+	if betaSlot := prepared.SlotDescriptors["repo_beta"]; betaSlot["publish_status"] != "skipped" || betaSlot["published"] != false {
+		t.Fatalf("support slot should be skipped: %#v", betaSlot)
+	}
+}
+
+func TestPublishWorkspaceChangesRejectsSupportSlotChangesDuringCommandPublish(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	betaRoot := createGitSource(t, tmp, "repo-beta")
+	request := testWorkspaceRequest("repo-alpha")
+	request.PublishPolicy = &WorkspacePublishPolicy{Mode: "commit_all_edit_target_changes_on_success", CommitMessage: "remediate"}
+	request.Slots["repo_beta"] = WorkspaceSlotRequest{
+		Source:    WorkspaceSourceRequest{Kind: "local_git", Alias: "repo-beta"},
+		Ref:       "refs/heads/a3/work/Portal-42",
+		Checkout:  "worktree_branch",
+		Access:    "read_only",
+		SyncClass: "lazy_but_guaranteed",
+		Ownership: "support",
+		Required:  true,
+	}
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{"repo-alpha": alphaRoot, "repo-beta": betaRoot},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-beta", "unexpected.txt"), []byte("unexpected\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err = PublishWorkspaceChanges(prepared, request, nil, true)
+
+	if err == nil || !strings.Contains(err.Error(), "repo_beta has changes but is not an edit target") {
+		t.Fatalf("expected support slot mutation failure, got %v", err)
 	}
 }
 

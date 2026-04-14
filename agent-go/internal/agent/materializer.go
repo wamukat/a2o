@@ -389,21 +389,56 @@ func RefreshWorkspaceEvidence(prepared PreparedWorkspace) error {
 	return nil
 }
 
-func PublishWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceRequest, workerProtocolResult map[string]any) error {
+func PublishWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceRequest, workerProtocolResult map[string]any, commandSucceeded bool) error {
 	policy := request.PublishPolicy
 	if policy == nil {
 		return nil
 	}
-	if policy.Mode != "commit_declared_changes_on_success" {
+	switch policy.Mode {
+	case "commit_declared_changes_on_success":
+		if workerProtocolResult == nil || workerProtocolResult["success"] != true {
+			return nil
+		}
+		declaredChangedFiles, err := declaredChangedFilesBySlot(workerProtocolResult)
+		if err != nil {
+			return err
+		}
+		return publishDeclaredWorkspaceChanges(prepared, request, declaredChangedFiles, strings.TrimSpace(policy.CommitMessage))
+	case "commit_all_edit_target_changes_on_success":
+		if !commandSucceeded {
+			return nil
+		}
+		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage))
+	default:
 		return fmt.Errorf("unsupported publish policy mode: %s", policy.Mode)
 	}
-	if workerProtocolResult == nil || workerProtocolResult["success"] != true {
-		return nil
-	}
-	declaredChangedFiles, err := declaredChangedFilesBySlot(workerProtocolResult)
+}
+
+func publishDeclaredWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceRequest, declaredChangedFiles map[string][]string, commitMessage string) error {
+	plans, err := buildPublishPlans(prepared, request, func(slotName string, actual []string) ([]string, error) {
+		declared := normalizePathList(declaredChangedFiles[slotName])
+		if !sameStrings(actual, declared) {
+			return nil, fmt.Errorf("slot %s changed files do not match worker result: actual=%v declared=%v", slotName, actual, declared)
+		}
+		return declared, nil
+	})
 	if err != nil {
 		return err
 	}
+	return executePublishPlans(prepared, plans, commitMessage)
+}
+
+func publishAllEditTargetWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceRequest, commitMessage string) error {
+	plans, err := buildPublishPlans(prepared, request, func(_ string, actual []string) ([]string, error) {
+		return normalizePathList(actual), nil
+	})
+	if err != nil {
+		return err
+	}
+	return executePublishPlans(prepared, plans, commitMessage)
+}
+
+func buildPublishPlans(prepared PreparedWorkspace, request WorkspaceRequest, changedFilesFor func(string, []string) ([]string, error)) ([]publishPlan, error) {
 	slotNames := make([]string, 0, len(request.Slots))
 	for slotName := range request.Slots {
 		slotNames = append(slotNames, slotName)
@@ -414,34 +449,34 @@ func PublishWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceReques
 		slot := request.Slots[slotName]
 		descriptor := prepared.SlotDescriptors[slotName]
 		if descriptor == nil {
-			return fmt.Errorf("workspace descriptor missing slot %s", slotName)
+			return nil, fmt.Errorf("workspace descriptor missing slot %s", slotName)
 		}
 		runtimePath, ok := descriptor["runtime_path"].(string)
 		if !ok || runtimePath == "" {
-			return fmt.Errorf("slot descriptor runtime_path is required for %s", slotName)
+			return nil, fmt.Errorf("slot descriptor runtime_path is required for %s", slotName)
 		}
 		actual, err := gitChangedPaths(runtimePath)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		declared := normalizePathList(declaredChangedFiles[slotName])
 		if slot.Access != "read_write" || slot.Ownership != "edit_target" {
 			if len(actual) > 0 {
-				return fmt.Errorf("slot %s has changes but is not an edit target: %v", slotName, actual)
+				return nil, fmt.Errorf("slot %s has changes but is not an edit target: %v", slotName, actual)
 			}
 			plans = append(plans, publishPlan{slotName: slotName, runtimePath: runtimePath, skipped: true})
 			continue
 		}
-		if !sameStrings(actual, declared) {
-			return fmt.Errorf("slot %s changed files do not match worker result: actual=%v declared=%v", slotName, actual, declared)
+		changedFiles, err := changedFilesFor(slotName, actual)
+		if err != nil {
+			return nil, err
 		}
-		if len(declared) == 0 {
-			plans = append(plans, publishPlan{slotName: slotName, runtimePath: runtimePath, declared: declared, noChanges: true})
+		if len(changedFiles) == 0 {
+			plans = append(plans, publishPlan{slotName: slotName, runtimePath: runtimePath, declared: changedFiles, noChanges: true})
 			continue
 		}
-		plans = append(plans, publishPlan{slotName: slotName, runtimePath: runtimePath, declared: declared})
+		plans = append(plans, publishPlan{slotName: slotName, runtimePath: runtimePath, declared: changedFiles})
 	}
-	return executePublishPlans(prepared, plans, strings.TrimSpace(policy.CommitMessage))
+	return plans, nil
 }
 
 func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commitMessage string) error {
@@ -860,6 +895,8 @@ func writeSlotMetadata(slotPath string, sourceRoot string, request WorkspaceRequ
 		"sync_class":       "copy",
 		"source_type":      "branch_head",
 		"source_ref":       slot.Ref,
+		"access":           slot.Access,
+		"ownership":        slot.Ownership,
 	}
 	if err := writeMetadataJSON(filepath.Join(metadataDir, "slot.json"), payload); err != nil {
 		return err

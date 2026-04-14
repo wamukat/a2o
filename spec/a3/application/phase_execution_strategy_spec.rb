@@ -218,13 +218,15 @@ RSpec.describe "phase execution strategies" do
       runtime.remediation_commands,
       workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-alpha")),
       task: task,
-      run: implementation_run
+      run: implementation_run,
+      command_intent: :remediation
     ).ordered.and_return(remediation_execution)
     expect(command_runner).to receive(:run).with(
       runtime.remediation_commands,
       workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-beta")),
       task: task,
-      run: implementation_run
+      run: implementation_run,
+      command_intent: :remediation
     ).ordered.and_return(remediation_execution)
     expect(command_runner).to receive(:run).with(
       runtime.verification_commands,
@@ -236,6 +238,41 @@ RSpec.describe "phase execution strategies" do
     result = strategy.execute(task: task, run: implementation_run, runtime: runtime, workspace: slot_workspace)
 
     expect(result.summary).to eq("commands/apply-remediation ok; commands/apply-remediation ok; commands/verify-all ok")
+  end
+
+  it "runs remediation once at the workspace root when the agent owns materialization" do
+    slot_workspace = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: :ticket_workspace,
+      root_path: "/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace",
+      source_descriptor: implementation_run.source_descriptor,
+      slot_paths: {
+        repo_alpha: "/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-alpha",
+        repo_beta: "/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-beta"
+      }
+    )
+    command_runner = instance_double("CommandRunner")
+    allow(command_runner).to receive(:agent_owned_workspace?).and_return(true)
+    strategy = A3::Application::VerificationExecutionStrategy.new(command_runner: command_runner)
+    remediation_execution = A3::Application::ExecutionResult.new(success: true, summary: "commands/apply-remediation ok")
+    verification_execution = A3::Application::ExecutionResult.new(success: true, summary: "commands/verify-all ok")
+
+    expect(command_runner).to receive(:run).with(
+      runtime.remediation_commands,
+      workspace: slot_workspace,
+      task: task,
+      run: implementation_run,
+      command_intent: :remediation
+    ).ordered.and_return(remediation_execution)
+    expect(command_runner).to receive(:run).with(
+      runtime.verification_commands,
+      workspace: slot_workspace,
+      task: task,
+      run: implementation_run
+    ).ordered.and_return(verification_execution)
+
+    result = strategy.execute(task: task, run: implementation_run, runtime: runtime, workspace: slot_workspace)
+
+    expect(result.summary).to eq("commands/apply-remediation ok; commands/verify-all ok")
   end
 
   it "stops verification when slot-local remediation fails" do
@@ -262,13 +299,15 @@ RSpec.describe "phase execution strategies" do
       runtime.remediation_commands,
       workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-alpha")),
       task: task,
-      run: implementation_run
+      run: implementation_run,
+      command_intent: :remediation
     ).ordered.and_return(remediation_failure)
     expect(command_runner).not_to receive(:run).with(
       runtime.remediation_commands,
       workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-beta")),
       task: task,
-      run: implementation_run
+      run: implementation_run,
+      command_intent: :remediation
     )
     expect(command_runner).not_to receive(:run).with(runtime.verification_commands, workspace: slot_workspace, task: task, run: implementation_run)
 

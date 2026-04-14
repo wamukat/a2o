@@ -23,14 +23,14 @@ module A3
         @shared_workspace_mode == "agent-materialized"
       end
 
-      def run(commands, workspace:, env: {}, task: nil, run: nil, **)
+      def run(commands, workspace:, env: {}, task: nil, run: nil, command_intent: nil, **)
         return invalid_configuration_result("agent command runner requires task and run context") unless task && run
         return invalid_configuration_result("agent-materialized command runner requires workspace_request_builder") if @shared_workspace_mode == "agent-materialized" && !@workspace_request_builder
         return unsupported_workspace_result unless %w[same-path agent-materialized].include?(@shared_workspace_mode)
 
         summaries = []
         Array(commands).each do |command|
-          request = build_job_request(command: command, workspace: workspace, env: env, task: task, run: run)
+          request = build_job_request(command: command, workspace: workspace, env: env, task: task, run: run, command_intent: command_intent)
           record = enqueue(request)
           return record if record.is_a?(A3::Application::ExecutionResult)
 
@@ -48,14 +48,14 @@ module A3
 
       private
 
-      def build_job_request(command:, workspace:, env:, task:, run:)
+      def build_job_request(command:, workspace:, env:, task:, run:, command_intent:)
         A3::Domain::AgentJobRequest.new(
           job_id: job_id_for(run),
           task_ref: task.ref,
           phase: run.phase,
           runtime_profile: @runtime_profile,
           source_descriptor: run.source_descriptor,
-          workspace_request: workspace_request_for(workspace: workspace, task: task, run: run),
+          workspace_request: workspace_request_for(workspace: workspace, task: task, run: run, command_intent: command_intent),
           agent_environment: @agent_environment,
           working_dir: workspace.root_path.to_s,
           command: "sh",
@@ -66,10 +66,10 @@ module A3
         )
       end
 
-      def workspace_request_for(workspace:, task:, run:)
+      def workspace_request_for(workspace:, task:, run:, command_intent:)
         return nil if @shared_workspace_mode == "same-path"
 
-        @workspace_request_builder.call(workspace: workspace, task: task, run: run)
+        @workspace_request_builder.call(workspace: workspace, task: task, run: run, command_intent: command_intent)
       end
 
       def enqueue(request)

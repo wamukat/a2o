@@ -7,7 +7,10 @@ module A3
       WORKSPACE_KINDS = %i[ticket_workspace runtime_workspace].freeze
       FRESHNESS_POLICIES = %i[reuse_if_clean_and_ref_matches force_fresh].freeze
       CLEANUP_POLICIES = %i[retain_until_a3_cleanup cleanup_after_job].freeze
-      PUBLISH_POLICY_MODES = %w[commit_declared_changes_on_success].freeze
+      PUBLISH_POLICY_MODES = %w[
+        commit_declared_changes_on_success
+        commit_all_edit_target_changes_on_success
+      ].freeze
 
       attr_reader :mode, :workspace_kind, :workspace_id, :freshness_policy, :cleanup_policy, :publish_policy, :slots
 

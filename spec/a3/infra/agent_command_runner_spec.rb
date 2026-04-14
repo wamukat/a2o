@@ -111,6 +111,29 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(runner.agent_owned_workspace?).to eq(true)
   end
 
+  it "marks remediation command jobs as publishable edit-target mutations" do
+    client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :succeeded, 0)) }
+    builder = A3::Infra::AgentWorkspaceRequestBuilder.new(source_aliases: {repo_alpha: "member-portal-starters"})
+    runner = described_class.new(
+      control_plane_client: client,
+      runtime_profile: "docker-dev-env",
+      shared_workspace_mode: "agent-materialized",
+      workspace_request_builder: builder,
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_) {}
+    )
+
+    result = runner.run(["ruby portal_remediation.rb"], workspace: workspace, task: task, run: run, command_intent: :remediation)
+
+    request = client.records.values.first.request
+    expect(result.success?).to eq(true)
+    expect(request.workspace_request.publish_policy).to eq(
+      "mode" => "commit_all_edit_target_changes_on_success",
+      "commit_message" => "A3 remediation update for Portal#42"
+    )
+    expect(request.workspace_request.slots.fetch("repo_alpha")).to include("access" => "read_write")
+  end
+
   it "passes explicit agent env overrides to command jobs" do
     client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :succeeded, 0)) }
     runner = described_class.new(

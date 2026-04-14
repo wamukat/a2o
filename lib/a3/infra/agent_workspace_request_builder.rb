@@ -14,8 +14,9 @@ module A3
         validate_policy!(:cleanup_policy, @cleanup_policy, A3::Domain::AgentWorkspaceRequest::CLEANUP_POLICIES)
       end
 
-      def call(workspace:, task:, run:)
+      def call(workspace:, task:, run:, command_intent: nil)
         validate_phase!(run.phase)
+        command_intent = normalize_command_intent(command_intent)
         slots = @repo_slots.each_with_object({}) do |slot_name, request_slots|
           alias_name = @source_aliases[slot_name]
           raise A3::Domain::ConfigurationError, "missing agent source alias for #{slot_name}" if alias_name.to_s.empty?
@@ -29,7 +30,7 @@ module A3
             bootstrap_ref: bootstrap_ref_for(slot_name, task, run),
             bootstrap_base_ref: bootstrap_base_ref_for(slot_name, task, run),
             checkout: "worktree_branch",
-            access: access_for(slot_name, run),
+            access: access_for(slot_name, run, command_intent),
             sync_class: sync_class_for(slot_name, run),
             ownership: ownership_for(slot_name, run),
             required: true
@@ -42,7 +43,7 @@ module A3
           workspace_id: workspace_id_for(task: task, run: run),
           freshness_policy: @freshness_policy,
           cleanup_policy: @cleanup_policy,
-          publish_policy: publish_policy_for(task: task, run: run),
+          publish_policy: publish_policy_for(task: task, run: run, command_intent: command_intent),
           slots: slots
         )
       end
@@ -55,8 +56,9 @@ module A3
         raise A3::Domain::ConfigurationError, "agent materialized workspace is not supported for phase #{phase}"
       end
 
-      def access_for(slot_name, run)
+      def access_for(slot_name, run, command_intent)
         return "read_write" if %i[implementation review].include?(run.phase.to_sym) && run.scope_snapshot.edit_scope.include?(slot_name)
+        return "read_write" if command_intent == :remediation && run.phase.to_sym == :verification && run.scope_snapshot.edit_scope.include?(slot_name)
 
         "read_only"
       end
@@ -132,13 +134,28 @@ module A3
         normalized.freeze
       end
 
-      def publish_policy_for(task:, run:)
+      def publish_policy_for(task:, run:, command_intent:)
+        if command_intent == :remediation && run.phase.to_sym == :verification
+          return {
+            mode: "commit_all_edit_target_changes_on_success",
+            commit_message: "A3 remediation update for #{task.ref}"
+          }
+        end
         return nil unless run.phase.to_sym == :implementation
 
         {
           mode: "commit_declared_changes_on_success",
           commit_message: "A3 implementation update for #{task.ref}"
         }
+      end
+
+      def normalize_command_intent(value)
+        return nil if value.nil?
+
+        normalized = value.to_sym
+        return normalized if normalized == :remediation
+
+        raise A3::Domain::ConfigurationError, "unsupported agent command intent: #{value.inspect}"
       end
 
       def workspace_id_for(task:, run:)

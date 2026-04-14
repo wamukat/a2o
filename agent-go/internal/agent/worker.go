@@ -22,7 +22,7 @@ type WorkspacePreparer interface {
 }
 
 type WorkspacePublisher interface {
-	Publish(prepared PreparedWorkspace, request WorkspaceRequest, workerProtocolResult map[string]any) error
+	Publish(prepared PreparedWorkspace, request WorkspaceRequest, workerProtocolResult map[string]any, commandSucceeded bool) error
 }
 
 type WorkspaceMerger interface {
@@ -114,7 +114,7 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 		return nil, false, err
 	}
 	if prepared != nil && request.WorkspaceRequest != nil {
-		if err := w.publishPrepared(*prepared, *request, workerProtocolResult); err != nil {
+		if err := w.publishPrepared(*prepared, *request, workerProtocolResult, execution.Status == "succeeded"); err != nil {
 			if refreshErr := RefreshWorkspaceEvidence(*prepared); refreshErr == nil {
 				workspaceDescriptor = requestedWorkspaceDescriptor(runRequest, prepared.SlotDescriptors)
 			}
@@ -193,14 +193,14 @@ func (w Worker) mergeRequest(request JobRequest) (WorkspaceDescriptor, Execution
 	return WorkspaceDescriptor{WorkspaceID: request.MergeRequest.WorkspaceID, SlotDescriptors: map[string]map[string]any{}}, failedMergeExecution(fmt.Errorf("workspace merger is not configured"))
 }
 
-func (w Worker) publishPrepared(prepared PreparedWorkspace, request JobRequest, workerProtocolResult map[string]any) error {
+func (w Worker) publishPrepared(prepared PreparedWorkspace, request JobRequest, workerProtocolResult map[string]any, commandSucceeded bool) error {
 	if request.WorkspaceRequest == nil {
 		return fmt.Errorf("workspace request is not configured")
 	}
 	if publisher, ok := w.workspacePreparerForRequest(request).(WorkspacePublisher); ok {
-		return publisher.Publish(prepared, *request.WorkspaceRequest, workerProtocolResult)
+		return publisher.Publish(prepared, *request.WorkspaceRequest, workerProtocolResult, commandSucceeded)
 	}
-	return PublishWorkspaceChanges(prepared, *request.WorkspaceRequest, workerProtocolResult)
+	return PublishWorkspaceChanges(prepared, *request.WorkspaceRequest, workerProtocolResult, commandSucceeded)
 }
 
 func postExecutionFailureResult(request JobRequest, descriptor WorkspaceDescriptor, startedAt, finishedAt string, logUpload ArtifactUpload, artifactUploads []ArtifactUpload, summary, failingCommand string, cause error) JobResult {

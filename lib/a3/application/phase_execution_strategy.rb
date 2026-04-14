@@ -128,7 +128,7 @@ module A3
 
         summaries = []
         resolve_remediation_workspaces(run: run, workspace: workspace).each do |target_workspace|
-          result = @command_runner.run(runtime.remediation_commands, workspace: target_workspace, task: task, run: run)
+          result = @command_runner.run(runtime.remediation_commands, workspace: target_workspace, task: task, run: run, command_intent: :remediation)
           return result unless result.success?
 
           summaries << result.summary
@@ -141,6 +141,7 @@ module A3
       end
 
       def resolve_remediation_workspaces(run:, workspace:)
+        return [workspace] if @command_runner.respond_to?(:agent_owned_workspace?) && @command_runner.agent_owned_workspace?
         return [workspace] if workspace.slot_paths.empty?
 
         target_slots = run.scope_snapshot.verification_scope.map do |slot_name|

@@ -112,7 +112,10 @@ RSpec.describe A3::Application::RunVerification do
     )
     allow(command_runner).to receive(:run).with(
       project_context.resolve_phase_runtime(task: task, phase: run.phase).remediation_commands,
-      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/runtime_workspace/repo-alpha"))
+      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/runtime_workspace/repo-alpha")),
+      task: anything,
+      run: anything,
+      command_intent: :remediation
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: true,
@@ -121,7 +124,10 @@ RSpec.describe A3::Application::RunVerification do
     )
     allow(command_runner).to receive(:run).with(
       project_context.resolve_phase_runtime(task: task, phase: run.phase).remediation_commands,
-      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/runtime_workspace/repo-beta"))
+      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/runtime_workspace/repo-beta")),
+      task: anything,
+      run: anything,
+      command_intent: :remediation
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: true,
@@ -130,7 +136,9 @@ RSpec.describe A3::Application::RunVerification do
     )
     allow(command_runner).to receive(:run).with(
       project_context.resolve_phase_runtime(task: task, phase: run.phase).verification_commands,
-      workspace: prepared_workspace
+      workspace: prepared_workspace,
+      task: anything,
+      run: anything
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: true,
@@ -163,7 +171,10 @@ RSpec.describe A3::Application::RunVerification do
     )
     allow(command_runner).to receive(:run).with(
       project_context.resolve_phase_runtime(task: task, phase: run.phase).remediation_commands,
-      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/runtime_workspace/repo-alpha"))
+      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/runtime_workspace/repo-alpha")),
+      task: anything,
+      run: anything,
+      command_intent: :remediation
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: true,
@@ -172,7 +183,10 @@ RSpec.describe A3::Application::RunVerification do
     )
     allow(command_runner).to receive(:run).with(
       project_context.resolve_phase_runtime(task: task, phase: run.phase).remediation_commands,
-      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/runtime_workspace/repo-beta"))
+      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/runtime_workspace/repo-beta")),
+      task: anything,
+      run: anything,
+      command_intent: :remediation
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: true,
@@ -181,7 +195,9 @@ RSpec.describe A3::Application::RunVerification do
     )
     allow(command_runner).to receive(:run).with(
       project_context.resolve_phase_runtime(task: task, phase: run.phase).verification_commands,
-      workspace: prepared_workspace
+      workspace: prepared_workspace,
+      task: anything,
+      run: anything
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: false,
@@ -215,7 +231,10 @@ RSpec.describe A3::Application::RunVerification do
     )
     allow(command_runner).to receive(:run).with(
       project_context.resolve_phase_runtime(task: task, phase: run.phase).remediation_commands,
-      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/runtime_workspace/repo-alpha"))
+      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/runtime_workspace/repo-alpha")),
+      task: anything,
+      run: anything,
+      command_intent: :remediation
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: false,
@@ -227,11 +246,16 @@ RSpec.describe A3::Application::RunVerification do
     )
     expect(command_runner).not_to receive(:run).with(
       project_context.resolve_phase_runtime(task: task, phase: run.phase).remediation_commands,
-      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/runtime_workspace/repo-beta"))
+      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/runtime_workspace/repo-beta")),
+      task: anything,
+      run: anything,
+      command_intent: :remediation
     )
     expect(command_runner).not_to receive(:run).with(
       project_context.resolve_phase_runtime(task: task, phase: run.phase).verification_commands,
-      workspace: prepared_workspace
+      workspace: prepared_workspace,
+      task: anything,
+      run: anything
     )
 
     result = use_case.call(task_ref: task.ref, run_ref: run.ref, project_context: project_context)
@@ -310,7 +334,10 @@ RSpec.describe A3::Application::RunVerification do
     )
     allow(command_runner).to receive(:run).with(
       project_context.resolve_phase_runtime(task: parent_task, phase: parent_run.phase).remediation_commands,
-      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3022/runtime_workspace/repo-alpha"))
+      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3022/runtime_workspace/repo-alpha")),
+      task: anything,
+      run: anything,
+      command_intent: :remediation
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: true,
@@ -319,7 +346,10 @@ RSpec.describe A3::Application::RunVerification do
     )
     allow(command_runner).to receive(:run).with(
       project_context.resolve_phase_runtime(task: parent_task, phase: parent_run.phase).remediation_commands,
-      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3022/runtime_workspace/repo-beta"))
+      workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3022/runtime_workspace/repo-beta")),
+      task: anything,
+      run: anything,
+      command_intent: :remediation
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: true,
@@ -328,7 +358,9 @@ RSpec.describe A3::Application::RunVerification do
     )
     allow(command_runner).to receive(:run).with(
       project_context.resolve_phase_runtime(task: parent_task, phase: parent_run.phase).verification_commands,
-      workspace: prepared_parent_workspace
+      workspace: prepared_parent_workspace,
+      task: anything,
+      run: anything
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: true,
