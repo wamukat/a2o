@@ -38,7 +38,16 @@ module A3
       private
 
       def ref_exists?(source_root, ref)
-        _stdout, _stderr, status = Open3.capture3("git", "-C", source_root.to_s, "rev-parse", "--verify", ref.to_s)
+        _stdout, _stderr, status = Open3.capture3(
+          "git",
+          "-c",
+          "safe.directory=#{source_root}",
+          "-C",
+          source_root.to_s,
+          "rev-parse",
+          "--verify",
+          ref.to_s
+        )
         status.success?
       end
     end
