@@ -63,6 +63,18 @@ The installer only installs the binary. It does not install or enable OS service
 
 `a3` is the host-side launcher. It is the user-facing command for Docker A3 Engine operations and host/dev-env agent installation. It is a Go binary and does not require Ruby on the host.
 
+Install the host launcher from a published A3 Engine image:
+
+```sh
+mkdir -p "$HOME/.local/bin"
+docker run --rm \
+  -v "$HOME/.local/bin:/out" \
+  docker.io/<org>/a3-engine:latest \
+  a3 host install --output-dir /out
+```
+
+The container command copies platform binaries such as `a3-darwin-amd64` and `a3-linux-amd64`, then writes a host-side `a3` shell wrapper that selects the right binary with `uname`. The host does not need Ruby.
+
 Detect the package target for the current host:
 
 ```sh

@@ -689,6 +689,25 @@ module A3
       end
     end
 
+    def handle_host(argv, out:)
+      action = argv.shift
+      unless action == "install"
+        raise ArgumentError, "usage: a3 host install --output-dir DIR"
+      end
+
+      options = parse_host_install_options(argv)
+      package_dir = options.fetch(:package_dir)
+      output_dir = options.fetch(:output_dir)
+      FileUtils.mkdir_p(output_dir)
+
+      installed_targets = install_host_launchers(package_dir: package_dir, output_dir: output_dir)
+      wrapper_path = File.join(output_dir, "a3")
+      File.write(wrapper_path, host_launcher_wrapper)
+      FileUtils.chmod(0o755, wrapper_path)
+
+      out.puts("host_launcher_installed output=#{wrapper_path} targets=#{installed_targets.join(',')}")
+    end
+
     def handle_agent_server(argv, out:)
       options = parse_agent_server_options(argv)
       store = A3::Infra::JsonAgentJobStore.new(options.fetch(:job_store_path))
@@ -739,6 +758,59 @@ module A3
       parser.on("--output PATH") { |value| options[:output] = File.expand_path(value) }
       parser.parse!(argv)
       options
+    end
+
+    def parse_host_install_options(argv)
+      options = {
+        package_dir: ENV.fetch("A3_AGENT_PACKAGE_DIR", A3::Infra::AgentPackageStore::DEFAULT_PACKAGE_DIR)
+      }
+      parser = OptionParser.new
+      parser.on("--package-dir DIR") { |value| options[:package_dir] = File.expand_path(value) }
+      parser.on("--output-dir DIR") { |value| options[:output_dir] = File.expand_path(value) }
+      parser.parse!(argv)
+      options.fetch(:output_dir) { raise ArgumentError, "--output-dir is required for host install" }
+      options
+    end
+
+    def install_host_launchers(package_dir:, output_dir:)
+      targets = Dir.glob(File.join(package_dir, "*", "a3")).sort.map do |source|
+        target = File.basename(File.dirname(source))
+        destination = File.join(output_dir, "a3-#{target}")
+        FileUtils.cp(source, destination)
+        FileUtils.chmod(0o755, destination)
+        target
+      end
+      raise A3::Domain::ConfigurationError, "host launcher binaries not found under #{package_dir}" if targets.empty?
+
+      targets
+    end
+
+    def host_launcher_wrapper
+      <<~'SH'
+        #!/usr/bin/env sh
+        set -eu
+
+        os="$(uname -s)"
+        arch="$(uname -m)"
+        case "$os" in
+          Darwin) os_part="darwin" ;;
+          Linux) os_part="linux" ;;
+          *) echo "unsupported host OS: $os" >&2; exit 2 ;;
+        esac
+        case "$arch" in
+          x86_64|amd64) arch_part="amd64" ;;
+          arm64|aarch64) arch_part="arm64" ;;
+          *) echo "unsupported host architecture: $arch" >&2; exit 2 ;;
+        esac
+
+        dir="$(CDPATH= cd "$(dirname "$0")" && pwd)"
+        binary="$dir/a3-$os_part-$arch_part"
+        if [ ! -x "$binary" ]; then
+          echo "A3 host launcher not found for ${os_part}-${arch_part}: $binary" >&2
+          exit 1
+        fi
+        exec "$binary" "$@"
+      SH
     end
 
     def parse_start_run_options(argv)

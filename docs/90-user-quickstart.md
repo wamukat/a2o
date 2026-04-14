@@ -76,11 +76,20 @@ runtime:
 A3 release 後の利用者コマンドは次の形にする。
 
 ```bash
+mkdir -p "$HOME/.local/bin"
+docker run --rm \
+  -v "$HOME/.local/bin:/out" \
+  docker.io/<org>/a3-engine:latest \
+  a3 host install --output-dir /out
+export PATH="$HOME/.local/bin:$PATH"
+
 a3 project bootstrap --package ./a3-project
 a3 runtime up --project portal
 a3 agent install --target auto --output ./.work/a3-agent/bin/a3-agent
 a3 runtime doctor --project portal
 ```
+
+`a3 host install` は Docker image に同梱された Go host launcher を host へコピーする。container 内の Ruby Engine CLI は host に出ない。host 側の `$HOME/.local/bin/a3` は POSIX shell wrapper で、`uname` により `a3-darwin-amd64` / `a3-linux-amd64` などの platform binary を選んで実行する。
 
 `a3 agent install` は Engine image に同梱された `a3-agent` release binary を host または project dev-env へ export する。利用者に Go toolchain や Ruby interpreter を要求しない。
 

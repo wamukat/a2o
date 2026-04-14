@@ -10,9 +10,10 @@
 利用者の通常操作を次に収束させる。
 
 ```bash
+docker run --rm -v "$HOME/.local/bin:/out" docker.io/<org>/a3-engine:latest a3 host install --output-dir /out
 a3 project bootstrap --package ./a3-project
 a3 runtime up --project portal
-a3 agent install --project portal --target auto --output ./.work/a3-agent/bin/a3-agent
+a3 agent install --target auto --output ./.work/a3-agent/bin/a3-agent
 a3 runtime doctor --project portal
 a3 runtime run-once --project portal
 ```
@@ -46,6 +47,17 @@ a3 runtime loop --project portal
   - A3/SoloBoard compose file を持たない。compose は A3 配布物の一部であり、project package が持つのは bootstrap/config だけである。
 
 ## 実装スライス
+
+### Slice 0: host launcher extraction
+
+Docker image から host launcher `a3` を取り出せる入口を提供する。
+
+- `[done]` container 内 Engine CLI に `a3 host install --output-dir DIR` を追加する。
+- `[done]` Docker image に同梱される platform 別 Go launcher `a3` を output dir へ `a3-<os>-<arch>` としてコピーする。
+- `[done]` output dir の `a3` は shell wrapper とし、host の `uname` で platform binary を選ぶ。
+- `[todo]` Docker Hub / GHCR の正式 image ref が決まったら quickstart の `<org>` placeholder を置換する。
+
+container 内から host OS は判定できないため、単一 target を推測してコピーしない。全 platform launcher と host-side wrapper を配置することで、macOS / Linux / WSL2 Ubuntu を同一コマンドで扱う。
 
 ### Slice 1: command naming parity
 
