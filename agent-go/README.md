@@ -66,14 +66,14 @@ The installer only installs the binary. It does not install or enable OS service
 Install the host launcher from a published A3 Engine image:
 
 ```sh
-mkdir -p "$HOME/.local/bin"
+mkdir -p "$HOME/.local/bin" "$HOME/.local/share"
 docker run --rm \
-  -v "$HOME/.local/bin:/out" \
+  -v "$HOME/.local:/install" \
   docker.io/<org>/a3-engine:latest \
-  a3 host install --output-dir /out
+  a3 host install --output-dir /install/bin --share-dir /install/share/a3
 ```
 
-The container command copies platform binaries such as `a3-darwin-amd64` and `a3-linux-amd64`, then writes a host-side `a3` shell wrapper that selects the right binary with `uname`. The host does not need Ruby.
+The container command copies platform binaries such as `a3-darwin-amd64` and `a3-linux-amd64`, copies A3 distribution assets such as the standard compose file under `$HOME/.local/share/a3`, then writes a host-side `a3` shell wrapper that selects the right binary with `uname`. Mount the install prefix, not only the `bin` directory, so the share assets are exported to the host. The host does not need Ruby.
 
 Detect the package target for the current host:
 

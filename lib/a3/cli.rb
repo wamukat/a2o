@@ -698,14 +698,17 @@ module A3
       options = parse_host_install_options(argv)
       package_dir = options.fetch(:package_dir)
       output_dir = options.fetch(:output_dir)
+      share_dir = options.fetch(:share_dir)
       FileUtils.mkdir_p(output_dir)
 
       installed_targets = install_host_launchers(package_dir: package_dir, output_dir: output_dir)
+      installed_share_dir = install_host_share_assets(share_dir: share_dir)
       wrapper_path = File.join(output_dir, "a3")
       File.write(wrapper_path, host_launcher_wrapper)
       FileUtils.chmod(0o755, wrapper_path)
 
       out.puts("host_launcher_installed output=#{wrapper_path} targets=#{installed_targets.join(',')}")
+      out.puts("host_share_installed output=#{installed_share_dir}") if installed_share_dir
     end
 
     def handle_agent_server(argv, out:)
@@ -767,8 +770,10 @@ module A3
       parser = OptionParser.new
       parser.on("--package-dir DIR") { |value| options[:package_dir] = File.expand_path(value) }
       parser.on("--output-dir DIR") { |value| options[:output_dir] = File.expand_path(value) }
+      parser.on("--share-dir DIR") { |value| options[:share_dir] = File.expand_path(value) }
       parser.parse!(argv)
       options.fetch(:output_dir) { raise ArgumentError, "--output-dir is required for host install" }
+      options[:share_dir] ||= File.expand_path(File.join(options.fetch(:output_dir), "..", "share", "a3"))
       options
     end
 
@@ -783,6 +788,16 @@ module A3
       raise A3::Domain::ConfigurationError, "host launcher binaries not found under #{package_dir}" if targets.empty?
 
       targets
+    end
+
+    def install_host_share_assets(share_dir:)
+      source_dir = ENV.fetch("A3_SHARE_DIR", "/opt/a3/share")
+      return nil unless Dir.exist?(source_dir)
+
+      FileUtils.mkdir_p(File.dirname(share_dir))
+      FileUtils.rm_rf(share_dir)
+      FileUtils.cp_r(source_dir, share_dir)
+      share_dir
     end
 
     def host_launcher_wrapper

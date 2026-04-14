@@ -55,6 +55,7 @@ COPY Gemfile.lock /tmp/a3-engine/Gemfile.lock
 COPY a3.gemspec /tmp/a3-engine/a3.gemspec
 COPY lib /tmp/a3-engine/lib
 COPY bin /tmp/a3-engine/bin
+COPY docker/compose /opt/a3/share/docker/compose
 
 RUN cd /tmp/a3-engine \
     && bundle _${BUNDLER_VERSION}_ install \

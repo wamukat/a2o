@@ -3,7 +3,6 @@ services:
     build:
       context: ../..
       dockerfile: docker/a3-runtime/Dockerfile
-    container_name: a3-portal-bundle-runtime
     working_dir: /workspace
     environment:
       A3_ROOT_DIR: /workspace
@@ -18,7 +17,6 @@ services:
 
   soloboard:
     image: ${SOLOBOARD_IMAGE:-ghcr.io/wamukat/soloboard:latest}
-    container_name: a3-portal-bundle-soloboard
     environment:
       HOST: 0.0.0.0
       PORT: 3000

@@ -220,9 +220,9 @@ docker run --rm a3-engine:latest a3 agent package list
 
 # host へ export
 docker run --rm \
-  -v "$HOME/.local/bin:/out" \
+  -v "$HOME/.local:/install" \
   a3-engine:latest \
-  a3 agent package export --target darwin-arm64 --output /out/a3-agent
+  a3 host install --output-dir /install/bin --share-dir /install/share/a3
 
 # WSL2 Ubuntu / Linux dev-env へ export
 docker run --rm \

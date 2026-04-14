@@ -8,7 +8,6 @@ WORKSPACE_ROOT="$(cd "${ENGINE_ROOT}/.." && pwd)"
 COMPOSE_PROJECT="${COMPOSE_PROJECT:-a3-portal-bundle}"
 COMPOSE_FILE="${COMPOSE_FILE:-${ENGINE_ROOT}/docker/compose/a3-portal-soloboard.yml}"
 RUNTIME_SERVICE="${RUNTIME_SERVICE:-a3-runtime}"
-RUNTIME_CONTAINER="${RUNTIME_CONTAINER:-a3-portal-bundle-runtime}"
 
 detect_host_target() {
   local os
@@ -47,9 +46,10 @@ SOLOBOARD_IMAGE="${SOLOBOARD_IMAGE:-ghcr.io/wamukat/soloboard:latest}" \
 A3_BUNDLE_SOLOBOARD_PORT="${A3_BUNDLE_SOLOBOARD_PORT:-3470}" \
 docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" up -d --no-deps --force-recreate "${RUNTIME_SERVICE}"
 
-docker exec "${RUNTIME_CONTAINER}" a3 agent package verify --target "${target}"
-docker exec "${RUNTIME_CONTAINER}" a3 agent package export --target "${target}" --output /tmp/a3-agent-validation
-docker cp "${RUNTIME_CONTAINER}:/tmp/a3-agent-validation" "${exported_agent}"
+runtime_container="$(docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" ps -q "${RUNTIME_SERVICE}")"
+docker exec "${runtime_container}" a3 agent package verify --target "${target}"
+docker exec "${runtime_container}" a3 agent package export --target "${target}" --output /tmp/a3-agent-validation
+docker cp "${runtime_container}:/tmp/a3-agent-validation" "${exported_agent}"
 chmod +x "${exported_agent}"
 
 mkdir -p "${source_root}"
