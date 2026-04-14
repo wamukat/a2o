@@ -320,6 +320,53 @@ func TestPublishWorkspaceChangesCommitsAllEditTargetChangesOnCommandSuccess(t *t
 	}
 }
 
+func TestPublishWorkspaceChangesCommitsAllEditTargetChangesOnWorkerSuccess(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	request := testWorkspaceRequest("repo-alpha")
+	request.PublishPolicy = &WorkspacePublishPolicy{
+		Mode:          "commit_all_edit_target_changes_on_worker_success",
+		CommitMessage: "A3 implementation update for Portal#42",
+	}
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{"repo-alpha": alphaRoot},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-alpha", "declared.txt"), []byte("declared\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-alpha", "generated.txt"), []byte("generated\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err = PublishWorkspaceChanges(prepared, request, map[string]any{
+		"success": true,
+		"changed_files": map[string]any{
+			"repo_alpha": []any{"declared.txt"},
+		},
+	}, true)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	alphaSlot := prepared.SlotDescriptors["repo_alpha"]
+	if alphaSlot["publish_status"] != "committed" || alphaSlot["published"] != true {
+		t.Fatalf("expected implementation commit evidence: %#v", alphaSlot)
+	}
+	published := stringSlice(alphaSlot["published_changed_files"])
+	if join(published) != "declared.txt,generated.txt" {
+		t.Fatalf("expected actual edit-target changes to be published, got %#v", published)
+	}
+	commitFiles := git(t, alphaRoot, "show", "--name-only", "--format=", "a3/work/Portal-42")
+	if !strings.Contains(commitFiles, "declared.txt") || !strings.Contains(commitFiles, "generated.txt") {
+		t.Fatalf("implementation commit did not include actual changes: %s", commitFiles)
+	}
+}
+
 func TestPublishWorkspaceChangesRejectsSupportSlotChangesDuringCommandPublish(t *testing.T) {
 	tmp := t.TempDir()
 	alphaRoot := createGitSource(t, tmp, "repo-alpha")

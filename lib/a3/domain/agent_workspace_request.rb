@@ -9,6 +9,7 @@ module A3
       CLEANUP_POLICIES = %i[retain_until_a3_cleanup cleanup_after_job].freeze
       PUBLISH_POLICY_MODES = %w[
         commit_declared_changes_on_success
+        commit_all_edit_target_changes_on_worker_success
         commit_all_edit_target_changes_on_success
       ].freeze
 

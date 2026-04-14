@@ -144,7 +144,7 @@ module A3
         return nil unless run.phase.to_sym == :implementation
 
         {
-          mode: "commit_declared_changes_on_success",
+          mode: "commit_all_edit_target_changes_on_worker_success",
           commit_message: "A3 implementation update for #{task.ref}"
         }
       end

@@ -735,7 +735,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       freshness_policy: :reuse_if_clean_and_ref_matches,
       cleanup_policy: :retain_until_a3_cleanup,
       publish_policy: publish ? {
-        mode: "commit_declared_changes_on_success",
+        mode: "commit_all_edit_target_changes_on_worker_success",
         commit_message: "A3 implementation update for #{task.ref}"
       } : nil,
       slots: {
@@ -763,7 +763,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       freshness_policy: :reuse_if_clean_and_ref_matches,
       cleanup_policy: :retain_until_a3_cleanup,
       publish_policy: {
-        mode: "commit_declared_changes_on_success",
+        mode: "commit_all_edit_target_changes_on_worker_success",
         commit_message: "A3 implementation update for #{task.ref}"
       },
       slots: {

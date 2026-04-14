@@ -404,6 +404,11 @@ func PublishWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceReques
 			return err
 		}
 		return publishDeclaredWorkspaceChanges(prepared, request, declaredChangedFiles, strings.TrimSpace(policy.CommitMessage))
+	case "commit_all_edit_target_changes_on_worker_success":
+		if workerProtocolResult == nil || workerProtocolResult["success"] != true {
+			return nil
+		}
+		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage))
 	case "commit_all_edit_target_changes_on_success":
 		if !commandSucceeded {
 			return nil

@@ -27,7 +27,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     expect(request.workspace_kind).to eq(:ticket_workspace)
     expect(request.workspace_id).to eq("Portal-42-implementation-run-implementation")
     expect(request.publish_policy).to eq(
-      "mode" => "commit_declared_changes_on_success",
+      "mode" => "commit_all_edit_target_changes_on_worker_success",
       "commit_message" => "A3 implementation update for Portal#42"
     )
     expect(request.slots.keys).to eq(%w[repo_alpha repo_beta])
