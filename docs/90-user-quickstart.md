@@ -18,6 +18,8 @@ A3 利用者に長い shell script を書かせない。
 
 A3 runtime は、現行設計では「1 project package = 1 runtime instance」として扱う。1つの Engine instance に複数 project を登録して `--project NAME` で切り替える registry 型ではない。複数 project を同時に動かす場合は、project package ごとに compose project name / storage dir / port / workspace root を分けた別 runtime instance として起動する。
 
+`a3 project bootstrap --package ./a3-project` は、カレント workspace に A3 runtime instance config を作成する。bootstrap 後の通常操作では package path を毎回指定しない。`a3 runtime ...` と `a3 agent install` は、カレントディレクトリから上方向に instance config を探索して、対象 package と runtime instance を解決する。
+
 ## 利用者が用意するもの
 
 利用者が用意するのは project package である。Portal でいえば root repo の `scripts/a3-projects/portal/` に相当する。
@@ -86,9 +88,9 @@ docker run --rm \
 export PATH="$HOME/.local/bin:$PATH"
 
 a3 project bootstrap --package ./a3-project
-a3 runtime up --package ./a3-project
+a3 runtime up
 a3 agent install --target auto --output ./.work/a3-agent/bin/a3-agent
-a3 runtime doctor --package ./a3-project
+a3 runtime doctor
 ```
 
 `a3 host install` は Docker image に同梱された Go host launcher を host へコピーする。container 内の Ruby Engine CLI は host に出ない。host 側の `$HOME/.local/bin/a3` は POSIX shell wrapper で、`uname` により `a3-darwin-amd64` / `a3-linux-amd64` などの platform binary を選んで実行する。
@@ -100,13 +102,13 @@ a3 runtime doctor --package ./a3-project
 手動で 1 cycle だけ流す場合は次だけにする。
 
 ```bash
-a3 runtime run-once --package ./a3-project
+a3 runtime run-once
 ```
 
 繰り返し動かす場合は次にする。
 
 ```bash
-a3 runtime loop --package ./a3-project
+a3 runtime loop
 ```
 
 `run-once` は、kanban から対象 task を選び、必要な agent job を queue し、`a3-agent` に実行させ、結果を A3 state / artifact store / kanban に反映する。利用者は `execute-until-idle` の詳細引数を直接組み立てない。
@@ -147,7 +149,7 @@ task a3:portal:runtime:watch-summary
 ## 残タスク
 
 - `a3 runtime up/down/doctor/run-once/loop` を A3 Engine の release command として実装する。
-- project package loader を実装し、root Taskfile 依存を release surface から外す。runtime command は `--package ./a3-project` を正規入口とし、multi-project registry に見える `--project NAME` は標準入口にしない。
+- project package loader と runtime instance config を実装し、root Taskfile 依存を release surface から外す。`a3 project bootstrap --package ./a3-project` 後は package 指定不要とし、multi-project registry に見える `--project NAME` は標準入口にしない。
 - `a3 agent install` を release artifact に含め、runtime image から host/dev-env への binary export を利用者向け配布物として固定する。
 - `scripts/a3-projects/portal/runtime/run_once.sh` の責務を A3 Engine command へ移し、Portal 側を thin config package にする。
 - `A3_RUNTIME_RUN_ONCE_*` のような内部 env は project package / CLI option に寄せ、利用者の主要入口から隠す。
