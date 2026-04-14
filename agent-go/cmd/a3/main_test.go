@@ -229,6 +229,59 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	}
 }
 
+func TestRuntimeLoopRunsConfiguredCycles(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	writeRuntimeScript(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "loop", "--max-cycles", "2", "--interval", "0s", "--max-steps", "3", "--agent-attempts", "4"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if count := runner.callCount("bash " + filepath.Join(packageDir, "runtime", "run_once.sh")); count != 2 {
+		t.Fatalf("run-once script call count=%d, want 2\ncalls:\n%s", count, runner.joinedCalls())
+	}
+	if !strings.Contains(stdout.String(), "runtime_loop_finished cycles=2") {
+		t.Fatalf("stdout should report loop completion, got %q", stdout.String())
+	}
+	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"] != "3" {
+		t.Fatalf("max steps env=%q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"])
+	}
+	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] != "4" {
+		t.Fatalf("agent attempts env=%q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"])
+	}
+}
+
+func TestRuntimeLoopRejectsNegativeMaxCycles(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"runtime", "loop", "--max-cycles", "-1"}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatal("run should fail with negative max cycles")
+	}
+	if !strings.Contains(stderr.String(), "--max-cycles must be >= 0") {
+		t.Fatalf("stderr should mention invalid max cycles, got %q", stderr.String())
+	}
+}
+
 func TestAgentInstallRequiresOutput(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -332,6 +385,16 @@ func (r fakeRunner) joinedCalls() []string {
 	return out
 }
 
+func (r fakeRunner) callCount(want string) int {
+	count := 0
+	for _, call := range r.joinedCalls() {
+		if call == want {
+			count++
+		}
+	}
+	return count
+}
+
 func assertCallContains(t *testing.T, calls []string, want string) {
 	t.Helper()
 	for _, call := range calls {
@@ -363,6 +426,18 @@ func writeTestInstanceConfig(t *testing.T, dir string, config runtimeInstanceCon
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeRuntimeScript(t *testing.T, packageDir string) {
+	t.Helper()
+	runtimeDir := filepath.Join(packageDir, "runtime")
+	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	scriptPath := filepath.Join(runtimeDir, "run_once.sh")
+	if err := os.WriteFile(scriptPath, []byte("#!/usr/bin/env bash\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 }

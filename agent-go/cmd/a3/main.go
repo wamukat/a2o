@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 const version = "dev"
@@ -76,6 +77,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a3 runtime up [--build]")
 	fmt.Fprintln(w, "  a3 runtime doctor")
 	fmt.Fprintln(w, "  a3 runtime run-once [--max-steps N] [--agent-attempts N]")
+	fmt.Fprintln(w, "  a3 runtime loop [--interval DURATION] [--max-cycles N] [--max-steps N] [--agent-attempts N]")
 	fmt.Fprintln(w, "  a3 agent target")
 	fmt.Fprintln(w, "  a3 agent install --target auto --output PATH [--build]")
 }
@@ -204,6 +206,12 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 		return 0
 	case "run-once":
 		if err := runRuntimeRunOnce(args[1:], runner, stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	case "loop":
+		if err := runRuntimeLoop(args[1:], runner, stdout, stderr); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -344,6 +352,59 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 		return err
 	}
 	return nil
+}
+
+func runRuntimeLoop(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a3 runtime loop", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	interval := flags.String("interval", "60s", "duration between run-once cycles")
+	maxCycles := flags.Int("max-cycles", 0, "maximum cycles to run; 0 means forever")
+	maxSteps := flags.String("max-steps", "", "maximum runtime steps for each cycle")
+	agentAttempts := flags.String("agent-attempts", "", "maximum host agent attempts for each cycle")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+	if *maxCycles < 0 {
+		return errors.New("--max-cycles must be >= 0")
+	}
+	sleepDuration, err := time.ParseDuration(*interval)
+	if err != nil {
+		return fmt.Errorf("parse --interval: %w", err)
+	}
+	if sleepDuration < 0 {
+		return errors.New("--interval must be >= 0")
+	}
+
+	cycle := 0
+	for {
+		cycle++
+		fmt.Fprintf(stdout, "runtime_loop_cycle_start cycle=%d\n", cycle)
+		if err := runRuntimeRunOnce(buildRunOnceArgs(*maxSteps, *agentAttempts), runner, stdout, stderr); err != nil {
+			return fmt.Errorf("runtime loop cycle %d failed: %w", cycle, err)
+		}
+		fmt.Fprintf(stdout, "runtime_loop_cycle_done cycle=%d\n", cycle)
+		if *maxCycles > 0 && cycle >= *maxCycles {
+			fmt.Fprintf(stdout, "runtime_loop_finished cycles=%d\n", cycle)
+			return nil
+		}
+		if sleepDuration > 0 {
+			time.Sleep(sleepDuration)
+		}
+	}
+}
+
+func buildRunOnceArgs(maxSteps string, agentAttempts string) []string {
+	args := []string{}
+	if strings.TrimSpace(maxSteps) != "" {
+		args = append(args, "--max-steps", strings.TrimSpace(maxSteps))
+	}
+	if strings.TrimSpace(agentAttempts) != "" {
+		args = append(args, "--agent-attempts", strings.TrimSpace(agentAttempts))
+	}
+	return args
 }
 
 func runAgent(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) int {

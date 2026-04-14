@@ -150,9 +150,10 @@ task a3:portal:runtime:watch-summary
 
 ## 残タスク
 
-- `a3 runtime loop` を A3 Engine の release command として実装する。
+- `a3 runtime loop` は A3 Engine の release command として実装済み。現時点では `run-once` を interval 実行する最小 loop であり、stale recovery / retention cleanup の cycle hook は後続 hardening として扱う。
 - project package loader と runtime instance config を実装し、root Taskfile 依存を release surface から外す。`a3 project bootstrap --package ./a3-project` 後は package 指定不要とし、multi-project registry に見える `--project NAME` は標準入口にしない。
-- `a3 agent install` を release artifact に含め、runtime image から host/dev-env への binary export を利用者向け配布物として固定する。
+- `a3 agent install` は release artifact に含め、runtime image から host/dev-env への binary export を利用者向け配布物として固定済み。release 前には正式 image ref で同手順を再 smoke する。
 - `scripts/a3-projects/portal/runtime/run_once.sh` の責務を A3 Engine command へ移し、Portal 側を thin config package にする。現時点の `a3 runtime run-once` はこの script を隠蔽する互換入口である。
 - `A3_RUNTIME_RUN_ONCE_*` のような内部 env は project package / CLI option に寄せ、利用者の主要入口から隠す。
 - A3/SoloBoard compose file は A3 配布物として同梱し、project package 側に compose file 作成を要求しない。compose override は開発・診断用に限定する。
+- Docker Hub / GHCR の正式 image ref が決まったら、この README の `docker.io/<org>/a3-engine:latest` placeholder を置換する。

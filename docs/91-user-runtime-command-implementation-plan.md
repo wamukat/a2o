@@ -129,9 +129,11 @@ host launcher `a3 runtime run-once` が次を実行する。
 
 `a3 runtime loop` を追加する。
 
-- run-once を interval 実行する。
-- active run / stale process / repairable state を cycle 前に検査する。
-- disk/artifact retention を cycle 後に実行できるようにする。
+- `[done]` run-once を interval 実行する host launcher command を追加する。
+- `[done]` `--max-cycles` で release validation / operator test 用に有限 cycle 実行できるようにする。
+- `[done]` `--max-steps` / `--agent-attempts` を各 run-once cycle へ渡す。
+- `[todo]` active run / stale process / repairable state を cycle 前に検査する。
+- `[todo]` disk/artifact retention を cycle 後に実行できるようにする。
 - OS service 登録は標準 scope に入れない。必要なら利用者が外側で wrapper 化する。
 
 ### Slice 6: Portal wrapper retirement
@@ -143,6 +145,22 @@ a3 runtime run-once
 ```
 
 `scripts/a3-projects/portal/runtime/run_once.sh` は、互換期間後に削除する。Portal package に残すのは `inject/config`, `inject/hooks`, `maintenance` のみとする。
+
+### Slice 7: release readiness closeout
+
+機能完成後の release candidate 化に向けて、次を完了条件として扱う。
+
+- `[done]` A3 Engine runtime image を再ビルドし、Engine image 同梱の host launcher / agent package を使って Portal isolated runtime を起動する。
+- `[done]` Portal 実チケットの parent-child flow で、child implementation -> child verification -> child-to-parent merge -> parent review -> parent verification -> live repo merge まで完走する。
+- `[done]` `repo:starters` parent-child validation で live repo `member-portal-starters feature/prototype` が child commit `c8a90bd0` へ進むことを確認する。
+- `[done]` implementation worker が宣言した `changed_files` と実 worktree 差分がずれた場合でも、edit-target の実差分を publish できるようにする。
+- `[done]` Portal launcher の Codex model 設定を current ChatGPT account で利用可能な model に更新する。
+- `[done]` `a3 runtime loop` の host launcher command を実装し、有限 cycle validation を可能にする。
+- `[todo]` Docker Hub / GHCR の正式 image ref を決め、`90-user-quickstart.md` と本計画の `<org>` placeholder を置換する。
+- `[done]` local release image equivalent (`a3-portal-bundle-a3-runtime`) で `a3 host install` -> `a3 project bootstrap` -> `a3 runtime up` -> `a3 agent install` -> `a3 runtime doctor` -> `a3 runtime command-plan` の smoke を実行する。
+- `[todo]` 正式 registry image ref 公開後に、同じ smoke を registry image で再実行する。
+- `[todo]` Portal live repo を remote 最新へ整理し直す場合の再適用手順を確認する。A3 実行に必要な Taskfile / injected project package / repo-local bootstrap 変更は、remote 最新化後に意図的に再投入する。
+- `[todo]` validation 用 ticket / branch / workspace / Docker runtime を release 前 cleanup 手順として再点検する。
 
 ## 完了条件
 
