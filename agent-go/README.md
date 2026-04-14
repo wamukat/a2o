@@ -8,6 +8,7 @@ It intentionally depends only on the Go standard library. The Ruby reference age
 
 ```sh
 go build -o /tmp/a3-agent ./cmd/a3-agent
+go build -o /tmp/a3 ./cmd/a3
 ```
 
 For release-style builds:
@@ -25,7 +26,7 @@ This writes binaries and release archives under `dist/` for:
 
 Release output includes:
 
-- platform binary directories, for example `dist/linux-amd64/a3-agent`
+- platform binary directories, for example `dist/linux-amd64/a3-agent` and `dist/linux-amd64/a3`
 - archives, for example `dist/a3-agent-0.1.0-linux-amd64.tar.gz`
 - `dist/checksums.txt`
 - `dist/release-manifest.jsonl`
@@ -41,7 +42,7 @@ Install from source when Go is available:
 ./scripts/install-local.sh
 ```
 
-By default this installs to `$HOME/.local/bin/a3-agent`. Override with `PREFIX=/path` or `BIN_DIR=/path`.
+By default this installs to `$HOME/.local/bin/a3-agent` and `$HOME/.local/bin/a3`. Override with `PREFIX=/path` or `BIN_DIR=/path`.
 
 Install from a release archive when Go is not required on the target host:
 
@@ -57,6 +58,30 @@ CHECKSUM_FILE=dist/checksums.txt \
 ```
 
 The installer only installs the binary. It does not install or enable OS service definitions. Standard A3 operation starts the agent manually in loop mode from an operator terminal or from the project dev-env container.
+
+## Host Launcher
+
+`a3` is the host-side launcher. It is the user-facing command for Docker A3 Engine operations and host/dev-env agent installation. It is a Go binary and does not require Ruby on the host.
+
+Detect the package target for the current host:
+
+```sh
+a3 agent target
+```
+
+Export `a3-agent` from the A3 Engine runtime image:
+
+```sh
+a3 agent install \
+  --target auto \
+  --output ./.work/a3-agent/bin/a3-agent \
+  --build \
+  --compose-project a3-portal-bundle \
+  --compose-file a3-engine/docker/compose/a3-portal-soloboard.yml \
+  --runtime-service a3-runtime
+```
+
+This command starts the runtime service if needed, verifies the matching agent package inside the runtime container, exports it to the requested host path, and marks it executable. Use `--build` when validating local source changes against a freshly built runtime image. Omit `--build` when using a prebuilt release image.
 
 ## Deployment Shapes
 

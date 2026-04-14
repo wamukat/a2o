@@ -34,20 +34,21 @@ for target in "${targets[@]}"; do
   goos="${target%%/*}"
   goarch="${target##*/}"
   out_dir="${DIST_DIR}/${goos}-${goarch}"
-  binary_name="a3-agent"
 
   mkdir -p "${out_dir}"
   echo "building ${goos}/${goarch}"
   (
     cd "${ROOT_DIR}"
     GOOS="${goos}" GOARCH="${goarch}" CGO_ENABLED=0 \
-      go build -trimpath -o "${out_dir}/${binary_name}" ./cmd/a3-agent
+      go build -trimpath -o "${out_dir}/a3-agent" ./cmd/a3-agent
+    GOOS="${goos}" GOARCH="${goarch}" CGO_ENABLED=0 \
+      go build -trimpath -o "${out_dir}/a3" ./cmd/a3
   )
 
   archive_name="a3-agent-${VERSION}-${goos}-${goarch}"
   if [[ "${PACKAGE_ARCHIVES}" == "1" ]]; then
     archive_path="${DIST_DIR}/${archive_name}.tar.gz"
-    tar -C "${out_dir}" -czf "${archive_path}" "${binary_name}"
+    tar -C "${out_dir}" -czf "${archive_path}" "a3-agent"
     checksum="$(sha256sum_or_shasum "${archive_path}")"
     printf '%s  %s\n' "${checksum}" "$(basename "${archive_path}")" >> "${DIST_DIR}/checksums.txt"
     printf '{"version":"%s","goos":"%s","goarch":"%s","archive":"%s","sha256":"%s"}\n' \

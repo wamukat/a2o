@@ -78,7 +78,7 @@ A3 release 後の利用者コマンドは次の形にする。
 ```bash
 a3 project bootstrap --package ./a3-project
 a3 runtime up --project portal
-a3 agent install --project portal --target auto --output ./.work/a3-agent/bin/a3-agent
+a3 agent install --target auto --output ./.work/a3-agent/bin/a3-agent
 a3 runtime doctor --project portal
 ```
 
@@ -112,7 +112,20 @@ a3-agent --engine http://localhost:7393 --loop --poll-interval 2s
 
 ## Portal での現状
 
-現時点の Portal workspace では、利用者向けの理想 command はまだ完全には実装されていない。暫定入口は root Taskfile の次である。
+現時点の Portal workspace では、`a3 agent install` は実装済みで、A3 Engine runtime image から host/dev-env 用 `a3-agent` を export できる。runtime orchestration の暫定入口は root Taskfile の次である。
+
+```bash
+cd a3-engine/agent-go
+go run ./cmd/a3 agent install \
+  --target auto \
+  --output /tmp/a3-agent-user-check \
+  --build \
+  --compose-project a3-portal-bundle \
+  --compose-file ../docker/compose/a3-portal-soloboard.yml \
+  --runtime-service a3-runtime
+```
+
+runtime orchestration の暫定入口は root Taskfile の次である。
 
 ```bash
 task a3:portal:runtime:up
@@ -127,6 +140,6 @@ task a3:portal:runtime:watch-summary
 
 - `a3 runtime up/down/doctor/run-once/loop` を A3 Engine の release command として実装する。
 - project package loader を実装し、root Taskfile 依存を release surface から外す。
-- `a3 agent install --target auto` を実装し、runtime image から host/dev-env への binary export を 1 command にする。
+- `a3 agent install` を release artifact に含め、runtime image から host/dev-env への binary export を利用者向け配布物として固定する。
 - `scripts/a3-projects/portal/runtime/run_once.sh` の責務を A3 Engine command へ移し、Portal 側を thin config package にする。
 - `A3_RUNTIME_RUN_ONCE_*` のような内部 env は project package / CLI option に寄せ、利用者の主要入口から隠す。

@@ -58,12 +58,12 @@ a3 runtime loop --project portal
 
 Go binary として host launcher `a3` を追加する。
 
-- `a3 version`
-- `a3 agent target`
-- `a3 agent install --target auto --output PATH`
-- `a3 runtime command-plan --project PACKAGE_OR_NAME`
+- `[done]` `a3 version`
+- `[done]` `a3 agent target`
+- `[done]` `a3 agent install --target auto --output PATH`
+- `[todo]` `a3 runtime command-plan --project PACKAGE_OR_NAME`
 
-この時点では `run-once` をまだ実行しなくてよい。まず利用者に見せる command surface と引数 parse を固定する。
+この時点では `run-once` をまだ実行しなくてよい。まず利用者に見せる command surface と引数 parse を固定する。`a3 agent install` は Docker A3 Engine runtime image を起動し、runtime container 内の agent package を verify/export して host path へ配置する。local source から確認する場合は `--build` で runtime image を明示再ビルドし、古い image から古い agent を取り出す事故を避ける。
 
 ### Slice 3: project package loader
 
