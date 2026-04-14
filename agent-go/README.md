@@ -118,11 +118,13 @@ The individual flags remain available as overrides:
 ```sh
 /tmp/a3-agent \
   -agent host-local \
-  -control-plane-url http://127.0.0.1:7393 \
+  --engine http://127.0.0.1:7393 \
   -agent-token-file /run/secrets/a3-agent-token \
   -workspace-root /tmp/a3-agent-workspaces \
   -source-alias member-portal-starters=/path/to/scratch-parent-repo
 ```
+
+`--engine` is the user-facing alias for `--control-plane-url`. Both flags are accepted for normal execution and `doctor`.
 
 The current command runs a single poll cycle:
 
@@ -142,7 +144,7 @@ The runtime profile rejects remote `http://` control-plane URLs by default. Loop
 Run the same profile in loop mode from a terminal while A3 is operating:
 
 ```sh
-a3-agent -config /path/to/agent-profile.json --loop --poll-interval 2s
+a3-agent --engine http://127.0.0.1:7393 --loop --poll-interval 2s
 ```
 
 Useful flags and environment overrides:

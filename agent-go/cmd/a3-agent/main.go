@@ -32,7 +32,9 @@ func run(args []string) int {
 	flags := flag.NewFlagSet("a3-agent", flag.ContinueOnError)
 	configFlag := flags.String("config", configPath, "runtime profile JSON file")
 	agentName := flags.String("agent", defaultString("A3_AGENT_NAME", config.AgentName, "local-agent"), "agent name used when polling the A3 control plane")
-	controlPlaneURL := flags.String("control-plane-url", defaultString("A3_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393"), "A3 control plane base URL")
+	controlPlaneURL := defaultString("A3_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393")
+	flags.StringVar(&controlPlaneURL, "control-plane-url", controlPlaneURL, "A3 control plane base URL")
+	flags.StringVar(&controlPlaneURL, "engine", controlPlaneURL, "alias for --control-plane-url")
 	agentToken := flags.String("agent-token", os.Getenv("A3_AGENT_TOKEN"), "bearer token for the A3 control plane")
 	agentTokenFile := flags.String("agent-token-file", defaultString("A3_AGENT_TOKEN_FILE", config.AgentTokenFile, ""), "file containing bearer token for the A3 control plane")
 	workspaceRoot := flags.String("workspace-root", defaultString("A3_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root for materialized jobs")
@@ -47,7 +49,7 @@ func run(args []string) int {
 	_ = configFlag
 
 	client := agent.HTTPClient{
-		BaseURL:       *controlPlaneURL,
+		BaseURL:       controlPlaneURL,
 		Token:         *agentToken,
 		TokenFile:     *agentTokenFile,
 		FallbackToken: config.AgentToken,
@@ -97,7 +99,9 @@ func runDoctor(args []string) int {
 	flags := flag.NewFlagSet("a3-agent doctor", flag.ContinueOnError)
 	configFlag := flags.String("config", configPath, "runtime profile JSON file")
 	agentName := flags.String("agent", defaultString("A3_AGENT_NAME", config.AgentName, "local-agent"), "agent name")
-	controlPlaneURL := flags.String("control-plane-url", defaultString("A3_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393"), "A3 control plane base URL")
+	controlPlaneURL := defaultString("A3_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393")
+	flags.StringVar(&controlPlaneURL, "control-plane-url", controlPlaneURL, "A3 control plane base URL")
+	flags.StringVar(&controlPlaneURL, "engine", controlPlaneURL, "alias for --control-plane-url")
 	workspaceRoot := flags.String("workspace-root", defaultString("A3_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root for materialized jobs")
 	sourceAliases := sourceAliasFlag(mergeSourceAliases(config.SourceAliases, parseSourceAliases(os.Getenv("A3_AGENT_SOURCE_ALIASES"))))
 	flags.Var(&sourceAliases, "source-path", "source alias mapping for materialized jobs, in name=path form; repeatable")
@@ -109,7 +113,7 @@ func runDoctor(args []string) int {
 	}
 	_ = configFlag
 	config.AgentName = *agentName
-	config.ControlPlaneURL = *controlPlaneURL
+	config.ControlPlaneURL = controlPlaneURL
 	config.WorkspaceRoot = *workspaceRoot
 	config.SourceAliases = map[string]string(sourceAliases)
 	config.RequiredBins = []string(requiredBins)

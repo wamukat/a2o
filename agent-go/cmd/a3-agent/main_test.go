@@ -75,6 +75,23 @@ func TestRunDoctorAcceptsEngineManagedEnvironmentFlags(t *testing.T) {
 	}
 }
 
+func TestRunDoctorAcceptsEngineAlias(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createDoctorGitSource(t, tmp)
+
+	code := run([]string{
+		"doctor",
+		"--agent", "dev-env",
+		"--engine", "http://a3-runtime:7393",
+		"--workspace-root", filepath.Join(tmp, "workspaces"),
+		"--source-path", "member-portal-starters=" + sourceRoot,
+		"--required-bin", "git",
+	})
+	if code != 0 {
+		t.Fatalf("doctor exit code = %d", code)
+	}
+}
+
 func TestRunDoctorRejectsMissingRequiredBin(t *testing.T) {
 	tmp := t.TempDir()
 	sourceRoot := createDoctorGitSource(t, tmp)
