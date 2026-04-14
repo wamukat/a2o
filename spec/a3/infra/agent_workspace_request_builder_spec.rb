@@ -167,6 +167,57 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     )
   end
 
+
+  it "uses the runtime branch namespace for generated parent support refs" do
+    parent_workspace = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: :runtime_workspace,
+      root_path: "/tmp/a3-parent-runtime-workspace",
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(
+        task_ref: "Portal#173",
+        ref: "refs/heads/a3/runtime/a3-user-runtime-check/parent/Portal-173"
+      ),
+      slot_paths: {}
+    )
+    parent_task = A3::Domain::Task.new(
+      ref: "Portal#173",
+      kind: :parent,
+      edit_scope: [:repo_alpha],
+      verification_scope: %i[repo_alpha repo_beta]
+    )
+    parent_run = A3::Domain::Run.new(
+      ref: "run-verification",
+      task_ref: parent_task.ref,
+      phase: :verification,
+      workspace_kind: parent_workspace.workspace_kind,
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(
+        task_ref: parent_task.ref,
+        ref: "refs/heads/a3/runtime/a3-user-runtime-check/parent/Portal-173"
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: parent_task.edit_scope,
+        verification_scope: parent_task.verification_scope,
+        ownership_scope: :parent
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: parent_task.ref,
+        owner_scope: :task,
+        snapshot_version: "refs/heads/a3/runtime/a3-user-runtime-check/parent/Portal-173"
+      )
+    )
+
+    request = described_class.new(
+      source_aliases: {
+        repo_alpha: "portal-alpha",
+        repo_beta: "portal-beta"
+      },
+      support_ref: "refs/heads/feature/prototype",
+      branch_namespace: "runtime/a3-user-runtime-check"
+    ).call(workspace: parent_workspace, task: parent_task, run: parent_run)
+
+    expect(request.slots.fetch("repo_alpha")).to include("ref" => "refs/heads/a3/runtime/a3-user-runtime-check/parent/Portal-173")
+    expect(request.slots.fetch("repo_beta")).to include("ref" => "refs/heads/a3/runtime/a3-user-runtime-check/parent/Portal-173")
+  end
+
   it "uses slot-specific support refs when multiple support repositories are configured" do
     multi_support_builder = described_class.new(
       source_aliases: {

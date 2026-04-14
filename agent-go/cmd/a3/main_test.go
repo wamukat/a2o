@@ -221,6 +221,9 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"] != "1" {
 		t.Fatalf("max steps env=%q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"])
 	}
+	if runner.lastEnv["A3_BRANCH_NAMESPACE"] != "a3-test" {
+		t.Fatalf("branch namespace env=%q", runner.lastEnv["A3_BRANCH_NAMESPACE"])
+	}
 	if runner.lastEnv["A3_HOST_AGENT_BIN"] != filepath.Join(tempDir, ".work", "a3-agent", "bin", "a3-agent") {
 		t.Fatalf("agent bin env=%q", runner.lastEnv["A3_HOST_AGENT_BIN"])
 	}
@@ -294,6 +297,7 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		"A3_PORTAL_BUNDLE_PROJECT":           os.Getenv("A3_PORTAL_BUNDLE_PROJECT"),
 		"A3_RUNTIME_RUN_ONCE_MAX_STEPS":      os.Getenv("A3_RUNTIME_RUN_ONCE_MAX_STEPS"),
 		"A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS": os.Getenv("A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"),
+		"A3_BRANCH_NAMESPACE":                os.Getenv("A3_BRANCH_NAMESPACE"),
 		"A3_HOST_AGENT_BIN":                  os.Getenv("A3_HOST_AGENT_BIN"),
 	}
 	if r.err != nil {

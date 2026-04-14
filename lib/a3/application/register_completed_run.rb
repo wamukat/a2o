@@ -5,12 +5,13 @@ module A3
     class RegisterCompletedRun
       Result = Struct.new(:task, :run, keyword_init: true)
 
-      def initialize(task_repository:, run_repository:, plan_next_phase:, publish_external_task_status: nil, publish_external_task_activity: nil, integration_ref_readiness_checker:, handle_parent_review_disposition: nil)
+      def initialize(task_repository:, run_repository:, plan_next_phase:, publish_external_task_status: nil, publish_external_task_activity: nil, integration_ref_readiness_checker:, handle_parent_review_disposition: nil, branch_namespace: ENV.fetch("A3_BRANCH_NAMESPACE", nil))
         @task_repository = task_repository
         @run_repository = run_repository
         @plan_next_phase = plan_next_phase
         @publish_external_task_status = publish_external_task_status
         @publish_external_task_activity = publish_external_task_activity
+        @branch_namespace = normalize_branch_namespace(branch_namespace)
         raise ArgumentError, "integration_ref_readiness_checker is required" unless integration_ref_readiness_checker
 
         @integration_ref_readiness_checker = integration_ref_readiness_checker
@@ -171,7 +172,11 @@ module A3
       end
 
       def parent_integration_ref_for(task)
-        "refs/heads/a3/parent/#{task.parent_ref.tr('#', '-')}"
+        parts = ["refs/heads/a3"]
+        parts << @branch_namespace if @branch_namespace
+        parts << "parent"
+        parts << task.parent_ref.tr("#", "-")
+        parts.join("/")
       end
 
       def completed_run_comment(run:, task:, extra_lines: nil)
@@ -213,6 +218,11 @@ module A3
 
       def single_line(text)
         text.to_s.split("\n").map(&:strip).reject(&:empty?).join(" ")
+      end
+
+      def normalize_branch_namespace(value)
+        normalized = value.to_s.strip.gsub(%r{[^A-Za-z0-9._/-]}, "-").gsub(%r{/+}, "/").gsub(%r{\A/+|/+\z}, "")
+        normalized.empty? ? nil : normalized
       end
     end
   end

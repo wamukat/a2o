@@ -18,7 +18,7 @@ A3 利用者に長い shell script を書かせない。
 
 A3 runtime は、現行設計では「1 project package = 1 runtime instance」として扱う。1つの Engine instance に複数 project を登録して `--project NAME` で切り替える registry 型ではない。複数 project を同時に動かす場合は、project package ごとに compose project name / storage dir / port / workspace root を分けた別 runtime instance として起動する。
 
-`a3 project bootstrap --package ./a3-project` は、カレント workspace に A3 runtime instance config を作成する。bootstrap 後の通常操作では package path を毎回指定しない。`a3 runtime ...` と `a3 agent install` は、カレントディレクトリから上方向に instance config を探索して、対象 package と runtime instance を解決する。
+`a3 project bootstrap --package ./a3-project` は、カレント workspace に A3 runtime instance config を作成する。bootstrap 後の通常操作では package path を毎回指定しない。`a3 runtime ...` と `a3 agent install` は、カレントディレクトリから上方向に instance config を探索して、対象 package と runtime instance を解決する。runtime instance の compose project name を branch namespace として注入するため、isolated board で同じ `Portal#1` が作られても既存 live repo の historical `a3/work/Portal-1` branch を再利用しない。
 
 ## 利用者が用意するもの
 

@@ -10,10 +10,11 @@ module A3
     class LocalWorkspaceProvisioner
       IGNORED_REPO_SOURCE_ENTRIES = %w[.git .a3 .work target node_modules].freeze
 
-      def initialize(base_dir:, repo_sources: {}, git_workspace_backend: A3::Infra::LocalGitWorkspaceBackend.new)
+      def initialize(base_dir:, repo_sources: {}, git_workspace_backend: A3::Infra::LocalGitWorkspaceBackend.new, branch_namespace: ENV.fetch("A3_BRANCH_NAMESPACE", nil))
         @base_dir = Pathname(base_dir)
         @repo_sources = repo_sources.transform_keys(&:to_sym).transform_values { |value| Pathname(value) }.freeze
         @git_workspace_backend = git_workspace_backend
+        @branch_namespace = normalize_branch_namespace(branch_namespace)
       end
 
       def call(task:, workspace_plan:, artifact_owner:, bootstrap_marker:)
@@ -346,7 +347,16 @@ module A3
       end
 
       def parent_integration_ref(parent_ref)
-        "refs/heads/a3/parent/#{slugify(parent_ref)}"
+        parts = ["refs/heads/a3"]
+        parts << @branch_namespace if @branch_namespace
+        parts << "parent"
+        parts << slugify(parent_ref)
+        parts.join("/")
+      end
+
+      def normalize_branch_namespace(value)
+        normalized = value.to_s.strip.gsub(%r{[^A-Za-z0-9._/-]}, "-").gsub(%r{/+}, "/").gsub(%r{\A/+|/+\z}, "")
+        normalized.empty? ? nil : normalized
       end
 
       def git_worktree_slots(source_root)

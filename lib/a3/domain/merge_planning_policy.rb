@@ -3,6 +3,10 @@
 module A3
   module Domain
     class MergePlanningPolicy
+      def initialize(branch_namespace: ENV.fetch("A3_BRANCH_NAMESPACE", nil))
+        @branch_namespace = normalize_branch_namespace(branch_namespace)
+      end
+
       def build(task:, run:, merge_config:)
         MergePlan.new(
           task_ref: task.ref,
@@ -24,7 +28,7 @@ module A3
         when :merge_to_parent
           raise ConfigurationError, "merge_to_parent requires parent_ref" unless task.parent_ref
 
-          "refs/heads/a3/parent/#{task.parent_ref.tr('#', '-')}"
+          parent_integration_ref(task.parent_ref)
         when :merge_to_live
           raise ConfigurationError, "merge_to_live requires parent task" unless task.kind == :parent || task.kind == :single
 
@@ -53,6 +57,19 @@ module A3
 
       def present?(value)
         !value.nil? && !value.to_s.strip.empty?
+      end
+
+      def parent_integration_ref(parent_ref)
+        parts = ["refs/heads/a3"]
+        parts << @branch_namespace if @branch_namespace
+        parts << "parent"
+        parts << parent_ref.tr("#", "-")
+        parts.join("/")
+      end
+
+      def normalize_branch_namespace(value)
+        normalized = value.to_s.strip.gsub(%r{[^A-Za-z0-9._/-]}, "-").gsub(%r{/+}, "/").gsub(%r{\A/+|/+\z}, "")
+        normalized.empty? ? nil : normalized
       end
     end
   end

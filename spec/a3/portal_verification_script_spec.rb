@@ -120,7 +120,7 @@ RSpec.describe PortalVerification do
       write_taskfile(repo_beta)
       write_slot_metadata(repo_alpha, "member-portal-ui-app")
       write_slot_metadata(repo_beta, "member-portal-starters")
-      write_workspace_metadata(workspace_root, "refs/heads/a3/parent/Portal-3153")
+      write_workspace_metadata(workspace_root, "refs/heads/a3/a3-user-runtime-check/parent/Portal-3153")
 
       allow(described_class).to receive(:run_command)
 

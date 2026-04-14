@@ -3,6 +3,10 @@
 module A3
   module Domain
     class PhaseSourcePolicy
+      def initialize(branch_namespace: ENV.fetch("A3_BRANCH_NAMESPACE", nil))
+        @branch_namespace = normalize_branch_namespace(branch_namespace)
+      end
+
       def source_descriptor_for(task:, phase:)
         ref = source_ref_for(task: task, phase: phase)
 
@@ -32,11 +36,24 @@ module A3
       end
 
       def work_branch_ref_for(task)
-        "refs/heads/a3/work/#{task.ref.tr('#', '-')}"
+        branch_ref("work", task.ref)
       end
 
       def parent_integration_ref_for(task)
-        "refs/heads/a3/parent/#{task.parent_ref&.tr('#', '-') || task.ref.tr('#', '-')}"
+        branch_ref("parent", task.parent_ref || task.ref)
+      end
+
+      def branch_ref(kind, task_ref)
+        parts = ["refs/heads/a3"]
+        parts << @branch_namespace if @branch_namespace
+        parts << kind
+        parts << task_ref.tr("#", "-")
+        parts.join("/")
+      end
+
+      def normalize_branch_namespace(value)
+        normalized = value.to_s.strip.gsub(%r{[^A-Za-z0-9._/-]}, "-").gsub(%r{/+}, "/").gsub(%r{\A/+|/+\z}, "")
+        normalized.empty? ? nil : normalized
       end
     end
   end

@@ -114,6 +114,7 @@ host launcher `a3 runtime run-once` が次を実行する。
 - `[done]` 利用者入口として `a3 runtime run-once` を追加する。
 - `[done]` bootstrap 済み runtime instance config から package / compose file / compose project / ports / workspace root を注入する。
 - `[done]` 現時点では project package の `runtime/run_once.sh` を呼び出し、利用者から script 直接実行を隠す。
+- `[done]` runtime instance の compose project name を `A3_BRANCH_NAMESPACE` として注入し、`refs/heads/a3/<namespace>/work/...` / `parent/...` を使う。
 - `[todo]` compose up
 - `[todo]` stale runtime process cleanup
 - `[todo]` Engine image から `a3-agent` export/install

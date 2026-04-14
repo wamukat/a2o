@@ -688,6 +688,9 @@ func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttem
 		overrides["A3_RUNTIME_RUN_ONCE_AGENT_WORKSPACE_ROOT"] = filepath.Join(config.WorkspaceRoot, ".work", "a3", "runtime-host-agent", "workspaces")
 		overrides["A3_HOST_AGENT_BIN"] = filepath.Join(config.WorkspaceRoot, ".work", "a3-agent", "bin", "a3-agent")
 	}
+	if strings.TrimSpace(config.ComposeProject) != "" {
+		overrides["A3_BRANCH_NAMESPACE"] = config.ComposeProject
+	}
 	if strings.TrimSpace(maxSteps) != "" {
 		overrides["A3_RUNTIME_RUN_ONCE_MAX_STEPS"] = strings.TrimSpace(maxSteps)
 	}

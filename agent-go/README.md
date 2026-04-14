@@ -105,7 +105,7 @@ a3 runtime doctor
 a3 runtime run-once
 ```
 
-`a3 runtime run-once` currently delegates to the project package `runtime/run_once.sh` while keeping that script out of the user-facing command path. The generic Go implementation will absorb that script in later slices.
+`a3 runtime run-once` currently delegates to the project package `runtime/run_once.sh` while keeping that script out of the user-facing command path. Branch refs created by runtime jobs are namespaced by the compose project, for example `refs/heads/a3/a3-portal/work/Portal-1`, so isolated boards do not reuse historical live-repo branches with the same task number. The generic Go implementation will absorb that script in later slices.
 
 ## Deployment Shapes
 

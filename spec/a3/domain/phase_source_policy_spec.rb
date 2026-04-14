@@ -70,6 +70,17 @@ RSpec.describe A3::Domain::PhaseSourcePolicy do
     )
   end
 
+
+  it "adds a runtime namespace to generated branch refs when configured" do
+    namespaced = described_class.new(branch_namespace: "runtime/a3-user-runtime-check")
+
+    implementation_descriptor = namespaced.source_descriptor_for(task: child_task, phase: :implementation)
+    parent_descriptor = namespaced.source_descriptor_for(task: parent_task, phase: :verification)
+
+    expect(implementation_descriptor.ref).to eq("refs/heads/a3/runtime/a3-user-runtime-check/work/A3-v2-3030")
+    expect(parent_descriptor.ref).to eq("refs/heads/a3/runtime/a3-user-runtime-check/parent/A3-v2-3022")
+  end
+
   it "builds canonical review targets from the source ref" do
     review_target = policy.review_target_for(
       task: child_task,

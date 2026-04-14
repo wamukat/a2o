@@ -3,8 +3,9 @@
 module A3
   module Infra
     class AgentWorkspaceRequestBuilder
-      def initialize(source_aliases:, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, support_ref: nil, support_refs: {})
+      def initialize(source_aliases:, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, support_ref: nil, support_refs: {}, branch_namespace: ENV.fetch("A3_BRANCH_NAMESPACE", nil))
         @source_aliases = source_aliases.transform_keys(&:to_sym).transform_values(&:to_s).freeze
+        @branch_namespace = normalize_branch_namespace(branch_namespace)
         @repo_slots = @source_aliases.keys.sort.freeze
         @freshness_policy = freshness_policy.to_sym
         @cleanup_policy = cleanup_policy.to_sym
@@ -101,7 +102,11 @@ module A3
 
       def parent_integration_ref_for(task)
         owner_ref = task.parent_ref || task.ref
-        "refs/heads/a3/parent/#{owner_ref.tr('#', '-')}"
+        parts = ["refs/heads/a3"]
+        parts << @branch_namespace if @branch_namespace
+        parts << "parent"
+        parts << owner_ref.tr("#", "-")
+        parts.join("/")
       end
 
       def support_ref_for(slot_name)
@@ -109,6 +114,11 @@ module A3
         return @support_refs.fetch(:default) if @support_refs.key?(:default)
 
         nil
+      end
+
+      def normalize_branch_namespace(value)
+        normalized = value.to_s.strip.gsub(%r{[^A-Za-z0-9._/-]}, "-").gsub(%r{/+}, "/").gsub(%r{\A/+|/+\z}, "")
+        normalized.empty? ? nil : normalized
       end
 
       def normalize_support_refs(support_ref:, support_refs:)
