@@ -1,0 +1,30 @@
+services:
+  a3-runtime:
+    image: ${A3_RUNTIME_IMAGE:-a3-portal-bundle-a3-runtime}
+    working_dir: /workspace
+    environment:
+      A3_ROOT_DIR: /workspace
+    volumes:
+      - ${A3_WORKSPACE_ROOT:-../../..}:/workspace
+      - ${A3_HOST_WORKSPACE_ROOT:-../../..}:${A3_HOST_WORKSPACE_ROOT:-/workspace-host}
+      - a3-runtime-state:/var/lib/a3
+    ports:
+      - "${A3_BUNDLE_AGENT_PORT:-7393}:7393"
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+
+  soloboard:
+    image: ${SOLOBOARD_IMAGE:-ghcr.io/wamukat/soloboard:latest}
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      SOLOBOARD_DB_FILE: /app/data/soloboard.sqlite
+    ports:
+      - "${A3_BUNDLE_SOLOBOARD_PORT:-3470}:3000"
+    volumes:
+      - soloboard-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  a3-runtime-state:
+  soloboard-data:

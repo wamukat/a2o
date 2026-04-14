@@ -75,6 +75,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a3 project bootstrap --package DIR")
 	fmt.Fprintln(w, "  a3 runtime up [--build]")
 	fmt.Fprintln(w, "  a3 runtime doctor")
+	fmt.Fprintln(w, "  a3 runtime run-once [--max-steps N] [--agent-attempts N]")
 	fmt.Fprintln(w, "  a3 agent target")
 	fmt.Fprintln(w, "  a3 agent install --target auto --output PATH [--build]")
 }
@@ -201,6 +202,12 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
+	case "run-once":
+		if err := runRuntimeRunOnce(args[1:], runner, stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
 	default:
 		fmt.Fprintf(stderr, "unknown runtime subcommand: %s\n", args[0])
 		printUsage(stderr)
@@ -301,7 +308,41 @@ func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) er
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
 	fmt.Fprintf(stdout, "runtime_up=docker compose -p %s -f %s up -d %s soloboard\n", config.ComposeProject, config.ComposeFile, config.RuntimeService)
 	fmt.Fprintf(stdout, "agent_install=a3 agent install --target auto --output ./.work/a3-agent/bin/a3-agent\n")
-	fmt.Fprintf(stdout, "runtime_run_once=not implemented in host launcher yet\n")
+	fmt.Fprintf(stdout, "runtime_run_once=a3 runtime run-once\n")
+	return nil
+}
+
+func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a3 runtime run-once", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	maxSteps := flags.String("max-steps", "", "maximum runtime steps for this cycle")
+	agentAttempts := flags.String("agent-attempts", "", "maximum host agent attempts for this cycle")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+
+	config, configPath, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	scriptPath := filepath.Join(effectiveConfig.PackagePath, "runtime", "run_once.sh")
+	if _, err := os.Stat(scriptPath); err != nil {
+		return fmt.Errorf("project runtime run_once.sh not found: %w", err)
+	}
+
+	output, err := runWithEnv(runtimeRunOnceEnv(effectiveConfig, *maxSteps, *agentAttempts), func() ([]byte, error) {
+		return runExternal(runner, "bash", scriptPath)
+	})
+	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
+	fmt.Fprintf(stdout, "runtime_run_once_script=%s\n", scriptPath)
+	fmt.Fprint(stdout, string(output))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -485,6 +526,19 @@ func defaultComposeFile() string {
 	return candidates[0]
 }
 
+func defaultRuntimeImage() string {
+	if value := strings.TrimSpace(os.Getenv("A3_RUNTIME_IMAGE")); value != "" {
+		return value
+	}
+	if executablePath, err := os.Executable(); err == nil {
+		path := filepath.Join(filepath.Dir(executablePath), "..", "share", "a3", "runtime-image")
+		if body, err := os.ReadFile(path); err == nil {
+			return strings.TrimSpace(string(body))
+		}
+	}
+	return ""
+}
+
 func writeInstanceConfig(workspaceRoot string, config runtimeInstanceConfig) error {
 	path := filepath.Join(workspaceRoot, instanceConfigRelativePath)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -600,6 +654,10 @@ func composeArgs(config runtimeInstanceConfig) []string {
 }
 
 func withComposeEnv(config runtimeInstanceConfig, fn func() error) error {
+	return withEnv(composeEnv(config), fn)
+}
+
+func composeEnv(config runtimeInstanceConfig) map[string]string {
 	overrides := map[string]string{}
 	if strings.TrimSpace(config.SoloBoardPort) != "" {
 		overrides["A3_BUNDLE_SOLOBOARD_PORT"] = config.SoloBoardPort
@@ -611,7 +669,42 @@ func withComposeEnv(config runtimeInstanceConfig, fn func() error) error {
 		overrides["A3_WORKSPACE_ROOT"] = config.WorkspaceRoot
 		overrides["A3_HOST_WORKSPACE_ROOT"] = config.WorkspaceRoot
 	}
-	return withEnv(overrides, fn)
+	if runtimeImage := defaultRuntimeImage(); runtimeImage != "" {
+		overrides["A3_RUNTIME_IMAGE"] = runtimeImage
+	}
+	return overrides
+}
+
+func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttempts string) map[string]string {
+	overrides := composeEnv(config)
+	overrides["A3_PORTAL_BUNDLE_COMPOSE_FILE"] = config.ComposeFile
+	overrides["A3_PORTAL_BUNDLE_PROJECT"] = config.ComposeProject
+	if strings.TrimSpace(config.StorageDir) != "" {
+		overrides["PORTAL_A3_BUNDLE_STORAGE_DIR"] = config.StorageDir
+	}
+	if strings.TrimSpace(config.WorkspaceRoot) != "" {
+		overrides["A3_RUNTIME_RUN_ONCE_HOST_ROOT_DIR"] = config.WorkspaceRoot
+		overrides["A3_RUNTIME_RUN_ONCE_HOST_ROOT"] = filepath.Join(config.WorkspaceRoot, ".work", "a3", "runtime-host-agent")
+		overrides["A3_RUNTIME_RUN_ONCE_AGENT_WORKSPACE_ROOT"] = filepath.Join(config.WorkspaceRoot, ".work", "a3", "runtime-host-agent", "workspaces")
+		overrides["A3_HOST_AGENT_BIN"] = filepath.Join(config.WorkspaceRoot, ".work", "a3-agent", "bin", "a3-agent")
+	}
+	if strings.TrimSpace(maxSteps) != "" {
+		overrides["A3_RUNTIME_RUN_ONCE_MAX_STEPS"] = strings.TrimSpace(maxSteps)
+	}
+	if strings.TrimSpace(agentAttempts) != "" {
+		overrides["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] = strings.TrimSpace(agentAttempts)
+	}
+	return overrides
+}
+
+func runWithEnv(overrides map[string]string, fn func() ([]byte, error)) ([]byte, error) {
+	var output []byte
+	err := withEnv(overrides, func() error {
+		var runErr error
+		output, runErr = fn()
+		return runErr
+	})
+	return output, err
 }
 
 func withEnv(overrides map[string]string, fn func() error) error {

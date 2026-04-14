@@ -175,6 +175,57 @@ func TestAgentInstallUsesBootstrappedInstanceConfig(t *testing.T) {
 	assertCallContains(t, joined, "docker exec container-123 a3 agent package verify --target linux-amd64")
 }
 
+func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	runtimeDir := filepath.Join(packageDir, "runtime")
+	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	scriptPath := filepath.Join(runtimeDir, "run_once.sh")
+	if err := os.WriteFile(scriptPath, []byte("#!/usr/bin/env bash\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once", "--max-steps", "1", "--agent-attempts", "2"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	assertCallContains(t, runner.joinedCalls(), "bash "+scriptPath)
+	if !strings.Contains(stdout.String(), "runtime_run_once_script="+scriptPath) {
+		t.Fatalf("stdout should describe run-once script, got %q", stdout.String())
+	}
+	if runner.lastEnv["A3_PORTAL_BUNDLE_COMPOSE_FILE"] != "compose.yml" {
+		t.Fatalf("compose env=%q", runner.lastEnv["A3_PORTAL_BUNDLE_COMPOSE_FILE"])
+	}
+	if runner.lastEnv["A3_PORTAL_BUNDLE_PROJECT"] != "a3-test" {
+		t.Fatalf("project env=%q", runner.lastEnv["A3_PORTAL_BUNDLE_PROJECT"])
+	}
+	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"] != "1" {
+		t.Fatalf("max steps env=%q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"])
+	}
+	if runner.lastEnv["A3_HOST_AGENT_BIN"] != filepath.Join(tempDir, ".work", "a3-agent", "bin", "a3-agent") {
+		t.Fatalf("agent bin env=%q", runner.lastEnv["A3_HOST_AGENT_BIN"])
+	}
+}
+
 func TestAgentInstallRequiresOutput(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -232,11 +283,19 @@ type fakeRunner struct {
 	calls          [][]string
 	emptyContainer bool
 	err            error
+	lastEnv        map[string]string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	call := append([]string{name}, args...)
 	r.calls = append(r.calls, call)
+	r.lastEnv = map[string]string{
+		"A3_PORTAL_BUNDLE_COMPOSE_FILE":      os.Getenv("A3_PORTAL_BUNDLE_COMPOSE_FILE"),
+		"A3_PORTAL_BUNDLE_PROJECT":           os.Getenv("A3_PORTAL_BUNDLE_PROJECT"),
+		"A3_RUNTIME_RUN_ONCE_MAX_STEPS":      os.Getenv("A3_RUNTIME_RUN_ONCE_MAX_STEPS"),
+		"A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS": os.Getenv("A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"),
+		"A3_HOST_AGENT_BIN":                  os.Getenv("A3_HOST_AGENT_BIN"),
+	}
 	if r.err != nil {
 		return []byte("forced error"), r.err
 	}

@@ -703,12 +703,14 @@ module A3
 
       installed_targets = install_host_launchers(package_dir: package_dir, output_dir: output_dir)
       installed_share_dir = install_host_share_assets(share_dir: share_dir)
+      install_runtime_image_reference(share_dir: share_dir, runtime_image: options[:runtime_image])
       wrapper_path = File.join(output_dir, "a3")
       File.write(wrapper_path, host_launcher_wrapper)
       FileUtils.chmod(0o755, wrapper_path)
 
       out.puts("host_launcher_installed output=#{wrapper_path} targets=#{installed_targets.join(',')}")
       out.puts("host_share_installed output=#{installed_share_dir}") if installed_share_dir
+      out.puts("host_runtime_image=#{options[:runtime_image]}") if options[:runtime_image]
     end
 
     def handle_agent_server(argv, out:)
@@ -771,6 +773,7 @@ module A3
       parser.on("--package-dir DIR") { |value| options[:package_dir] = File.expand_path(value) }
       parser.on("--output-dir DIR") { |value| options[:output_dir] = File.expand_path(value) }
       parser.on("--share-dir DIR") { |value| options[:share_dir] = File.expand_path(value) }
+      parser.on("--runtime-image IMAGE") { |value| options[:runtime_image] = value.to_s.strip }
       parser.parse!(argv)
       options.fetch(:output_dir) { raise ArgumentError, "--output-dir is required for host install" }
       options[:share_dir] ||= File.expand_path(File.join(options.fetch(:output_dir), "..", "share", "a3"))
@@ -798,6 +801,13 @@ module A3
       FileUtils.rm_rf(share_dir)
       FileUtils.cp_r(source_dir, share_dir)
       share_dir
+    end
+
+    def install_runtime_image_reference(share_dir:, runtime_image:)
+      return if runtime_image.nil? || runtime_image.empty?
+
+      FileUtils.mkdir_p(share_dir)
+      File.write(File.join(share_dir, "runtime-image"), "#{runtime_image}\n")
     end
 
     def host_launcher_wrapper

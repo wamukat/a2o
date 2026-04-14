@@ -70,10 +70,13 @@ mkdir -p "$HOME/.local/bin" "$HOME/.local/share"
 docker run --rm \
   -v "$HOME/.local:/install" \
   docker.io/<org>/a3-engine:latest \
-  a3 host install --output-dir /install/bin --share-dir /install/share/a3
+  a3 host install \
+    --output-dir /install/bin \
+    --share-dir /install/share/a3 \
+    --runtime-image docker.io/<org>/a3-engine:latest
 ```
 
-The container command copies platform binaries such as `a3-darwin-amd64` and `a3-linux-amd64`, copies A3 distribution assets such as the standard compose file under `$HOME/.local/share/a3`, then writes a host-side `a3` shell wrapper that selects the right binary with `uname`. Mount the install prefix, not only the `bin` directory, so the share assets are exported to the host. The host does not need Ruby.
+The container command copies platform binaries such as `a3-darwin-amd64` and `a3-linux-amd64`, copies A3 distribution assets such as the standard compose file under `$HOME/.local/share/a3`, records the runtime image used by later `a3 runtime ...` commands, then writes a host-side `a3` shell wrapper that selects the right binary with `uname`. Mount the install prefix, not only the `bin` directory, so the share assets are exported to the host. The host does not need Ruby.
 
 Detect the package target for the current host:
 
@@ -93,6 +96,16 @@ a3 agent install \
 This command starts the runtime service if needed, verifies the matching agent package inside the runtime container, exports it to the requested host path, and marks it executable. Use `--build` when validating local source changes against a freshly built runtime image. Omit `--build` when using a prebuilt release image.
 
 The standard compose file is an A3 distribution asset. Project packages provide bootstrap/config values; they do not provide the A3/SoloBoard compose file. `--compose-file`, `--compose-project`, and `--runtime-service` remain available as development/diagnostic overrides, but they are not part of the normal user path.
+
+After `a3 project bootstrap --package ./a3-project`, runtime commands discover `.a3/runtime-instance.json` from the current directory upward:
+
+```sh
+a3 runtime up
+a3 runtime doctor
+a3 runtime run-once
+```
+
+`a3 runtime run-once` currently delegates to the project package `runtime/run_once.sh` while keeping that script out of the user-facing command path. The generic Go implementation will absorb that script in later slices.
 
 ## Deployment Shapes
 

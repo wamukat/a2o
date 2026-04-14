@@ -222,7 +222,7 @@ docker run --rm a3-engine:latest a3 agent package list
 docker run --rm \
   -v "$HOME/.local:/install" \
   a3-engine:latest \
-  a3 host install --output-dir /install/bin --share-dir /install/share/a3
+  a3 host install --output-dir /install/bin --share-dir /install/share/a3 --runtime-image a3-engine:latest
 
 # WSL2 Ubuntu / Linux dev-env へ export
 docker run --rm \

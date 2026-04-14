@@ -84,7 +84,10 @@ mkdir -p "$HOME/.local/bin" "$HOME/.local/share"
 docker run --rm \
   -v "$HOME/.local:/install" \
   docker.io/<org>/a3-engine:latest \
-  a3 host install --output-dir /install/bin --share-dir /install/share/a3
+  a3 host install \
+    --output-dir /install/bin \
+    --share-dir /install/share/a3 \
+    --runtime-image docker.io/<org>/a3-engine:latest
 export PATH="$HOME/.local/bin:$PATH"
 
 a3 project bootstrap --package ./a3-project
@@ -93,7 +96,7 @@ a3 agent install --target auto --output ./.work/a3-agent/bin/a3-agent
 a3 runtime doctor
 ```
 
-`a3 host install` は Docker image に同梱された Go host launcher と A3 配布 asset を host へコピーする。container 内の Ruby Engine CLI は host に出ない。host 側の `$HOME/.local/bin/a3` は POSIX shell wrapper で、`uname` により `a3-darwin-amd64` / `a3-linux-amd64` などの platform binary を選んで実行する。標準 compose file は `$HOME/.local/share/a3` 配下へ配置される。Docker から export するため、`bin` だけではなく `$HOME/.local` のような install prefix を mount する。
+`a3 host install` は Docker image に同梱された Go host launcher と A3 配布 asset を host へコピーする。container 内の Ruby Engine CLI は host に出ない。host 側の `$HOME/.local/bin/a3` は POSIX shell wrapper で、`uname` により `a3-darwin-amd64` / `a3-linux-amd64` などの platform binary を選んで実行する。標準 compose file は `$HOME/.local/share/a3` 配下へ配置される。Docker から export するため、`bin` だけではなく `$HOME/.local` のような install prefix を mount する。`--runtime-image` は後続の `a3 runtime ...` が起動する Engine image を記録する。
 
 `a3 agent install` は Engine image に同梱された `a3-agent` release binary を host または project dev-env へ export する。利用者に Go toolchain や Ruby interpreter を要求しない。
 
@@ -125,17 +128,16 @@ a3-agent --engine http://localhost:7393 --loop --poll-interval 2s
 
 ## Portal での現状
 
-現時点の Portal workspace では、`a3 agent install` は実装済みで、A3 Engine runtime image から host/dev-env 用 `a3-agent` を export できる。runtime orchestration の暫定入口は root Taskfile の次である。
+現時点の Portal workspace では、`a3 project bootstrap` / `a3 runtime up` / `a3 agent install` / `a3 runtime run-once` は実装済みで、A3 Engine runtime image から host/dev-env 用 `a3-agent` を export できる。
 
 ```bash
-cd a3-engine/agent-go
-go run ./cmd/a3 agent install \
-  --target auto \
-  --output /tmp/a3-agent-user-check \
-  --build
+a3 project bootstrap --package ./scripts/a3-projects/portal
+a3 runtime up
+a3 agent install --target auto --output ./.work/a3-agent/bin/a3-agent
+a3 runtime run-once
 ```
 
-runtime orchestration の暫定入口は root Taskfile の次である。
+root Taskfile の互換入口も残っている。
 
 ```bash
 task a3:portal:runtime:up
@@ -144,13 +146,13 @@ task a3:portal:runtime:run-once
 task a3:portal:runtime:watch-summary
 ```
 
-ただし、`task a3:portal:runtime:run-once` の裏側にはまだ Portal 固有 launcher が残っている。現在の配置は `scripts/a3-projects/portal/runtime/run_once.sh` であり、これは利用者に複製させる script ではない。後続実装で A3 Engine の generic `a3 runtime run-once` command に吸収する。
+ただし、現時点の `a3 runtime run-once` は project package の `runtime/run_once.sh` を A3 launcher から呼ぶ互換実装である。利用者は script を直接叩かないが、後続実装で A3 Engine の generic `a3 runtime run-once` command に吸収する。
 
 ## 残タスク
 
-- `a3 runtime up/down/doctor/run-once/loop` を A3 Engine の release command として実装する。
+- `a3 runtime loop` を A3 Engine の release command として実装する。
 - project package loader と runtime instance config を実装し、root Taskfile 依存を release surface から外す。`a3 project bootstrap --package ./a3-project` 後は package 指定不要とし、multi-project registry に見える `--project NAME` は標準入口にしない。
 - `a3 agent install` を release artifact に含め、runtime image から host/dev-env への binary export を利用者向け配布物として固定する。
-- `scripts/a3-projects/portal/runtime/run_once.sh` の責務を A3 Engine command へ移し、Portal 側を thin config package にする。
+- `scripts/a3-projects/portal/runtime/run_once.sh` の責務を A3 Engine command へ移し、Portal 側を thin config package にする。現時点の `a3 runtime run-once` はこの script を隠蔽する互換入口である。
 - `A3_RUNTIME_RUN_ONCE_*` のような内部 env は project package / CLI option に寄せ、利用者の主要入口から隠す。
 - A3/SoloBoard compose file は A3 配布物として同梱し、project package 側に compose file 作成を要求しない。compose override は開発・診断用に限定する。
