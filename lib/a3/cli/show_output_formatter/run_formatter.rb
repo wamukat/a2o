@@ -82,10 +82,23 @@ module A3
           result << "failing_command=#{execution.failing_command}" if execution.failing_command
           result << "observed_state=#{execution.observed_state}" if execution.observed_state
           result << "worker_response_bundle=#{FormattingHelpers.diagnostic_value(execution.worker_response_bundle)}" if execution.worker_response_bundle
-          execution.diagnostics.sort.each do |key, value|
+          append_merge_recovery_lines(result, execution.merge_recovery)
+          execution.diagnostics.reject { |key, _| key == "merge_recovery" }.sort.each do |key, value|
             result << "execution_diagnostic.#{key}=#{FormattingHelpers.diagnostic_value(value)}"
           end
           append_runtime_lines(result, execution.runtime_snapshot)
+        end
+
+        def append_merge_recovery_lines(result, merge_recovery)
+          return unless merge_recovery.is_a?(Hash)
+
+          result << "merge_recovery status=#{merge_recovery['status']} target_ref=#{merge_recovery['target_ref']} source_ref=#{merge_recovery['source_ref']}"
+          result << "merge_recovery_worker_result_ref=#{merge_recovery['worker_result_ref']}" if merge_recovery['worker_result_ref']
+          result << "merge_recovery_publish=#{merge_recovery['publish_before_head']}..#{merge_recovery['publish_after_head']}" if merge_recovery['publish_before_head'] || merge_recovery['publish_after_head']
+          conflict_files = Array(merge_recovery['conflict_files'])
+          result << "merge_recovery_conflict_files=#{conflict_files.join(',')}" unless conflict_files.empty?
+          changed_files = Array(merge_recovery['changed_files'])
+          result << "merge_recovery_changed_files=#{changed_files.join(',')}" unless changed_files.empty?
         end
 
         def append_runtime_lines(result, runtime)

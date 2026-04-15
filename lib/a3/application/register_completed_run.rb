@@ -45,7 +45,7 @@ module A3
         @publish_external_task_activity&.publish(
           task_ref: completed_task.ref,
           external_task_id: completed_task.external_task_id,
-          body: completed_run_comment(run: completed_run, task: completed_task)
+          body: completed_run_comment(run: completed_run, task: completed_task, execution: execution)
         )
 
         Result.new(task: completed_task, run: completed_run)
@@ -188,7 +188,7 @@ module A3
         parts.join("/")
       end
 
-      def completed_run_comment(run:, task:, extra_lines: nil)
+      def completed_run_comment(run:, task:, execution: nil, extra_lines: nil)
         lines = [
           "A3 実行完了: #{run.phase}",
           "run_ref: #{run.ref}",
@@ -204,6 +204,8 @@ module A3
           lines << "要約: #{single_line(execution_record.summary)}"
         end
 
+        append_merge_recovery_comment_lines(lines, execution_record&.diagnostics || execution&.diagnostics)
+
         if blocked_diagnosis
           lines << "ブロック要約: #{single_line(blocked_diagnosis.diagnostic_summary)}"
           lines << "失敗コマンド: #{single_line(blocked_diagnosis.failing_command)}" if present?(blocked_diagnosis.failing_command)
@@ -215,6 +217,21 @@ module A3
         Array(extra_lines).each { |line| lines << line }
 
         lines.join("\n")
+      end
+
+      def append_merge_recovery_comment_lines(lines, diagnostics)
+        return unless diagnostics.is_a?(Hash)
+
+        recovery = diagnostics["merge_recovery"]
+        return unless recovery.is_a?(Hash)
+
+        lines << "merge_recovery: #{single_line(recovery['status'])}" if present?(recovery["status"])
+        if present?(recovery["target_ref"])
+          lines << "merge_recovery_target: #{single_line(recovery['target_ref'])}"
+        end
+        if present?(recovery["publish_before_head"]) || present?(recovery["publish_after_head"])
+          lines << "merge_recovery_publish: #{single_line(recovery['publish_before_head'])}..#{single_line(recovery['publish_after_head'])}"
+        end
       end
 
       def latest_phase_record(run)

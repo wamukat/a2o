@@ -259,6 +259,42 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(task_entry.phase_counts).to eq("implementation" => 1, "inspection" => 1)
   end
 
+  it "does not infer latest phase for run-less terminal tasks" do
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "Portal#done",
+        kind: :single,
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        status: :done
+      )
+    )
+
+    result = use_case.call
+
+    task_entry = result.tasks.find { |item| item.ref == "Portal#done" }
+    expect(task_entry.latest_phase).to be_nil
+  end
+
+  it "shows merge recovery verification source details" do
+    task = A3::Domain::Task.new(
+      ref: "Portal#245",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :verifying,
+      parent_ref: "Portal#201",
+      verification_source_ref: "refs/heads/a3/parent/Portal-201"
+    )
+    task_repository.save(task)
+
+    result = use_case.call
+
+    task_entry = result.tasks.find { |item| item.ref == "Portal#245" }
+    expect(task_entry.latest_phase).to eq("inspection")
+    expect(task_entry.blocked_lines).to include("merge_recovery verification_source_ref=refs/heads/a3/parent/Portal-201")
+  end
+
   it "treats in-review tasks with a current run as running review work" do
     task = A3::Domain::Task.new(
       ref: "Portal#3141",

@@ -7,9 +7,9 @@ module A3
     class OperatorInspectionReadModel
       class RunView
         class ExecutionSnapshot
-          attr_reader :phase, :summary, :verification_summary, :failing_command, :observed_state, :diagnostics, :worker_response_bundle, :runtime_snapshot, :review_disposition
+          attr_reader :phase, :summary, :verification_summary, :failing_command, :observed_state, :diagnostics, :worker_response_bundle, :merge_recovery, :runtime_snapshot, :review_disposition
 
-          def initialize(phase:, summary:, verification_summary:, failing_command:, observed_state:, diagnostics:, worker_response_bundle:, runtime_snapshot:, review_disposition:)
+          def initialize(phase:, summary:, verification_summary:, failing_command:, observed_state:, diagnostics:, worker_response_bundle:, runtime_snapshot:, review_disposition:, merge_recovery: nil)
             @phase = phase.to_sym
             @summary = summary
             @verification_summary = verification_summary
@@ -17,6 +17,7 @@ module A3
             @observed_state = observed_state
             @diagnostics = diagnostics
             @worker_response_bundle = worker_response_bundle
+            @merge_recovery = merge_recovery
             @runtime_snapshot = runtime_snapshot
             @review_disposition = review_disposition
             freeze
@@ -26,6 +27,7 @@ module A3
             return nil unless phase_record&.execution_record
             diagnostics = phase_record.execution_record.diagnostics
             worker_response_bundle = diagnostics["worker_response_bundle"]
+            merge_recovery = diagnostics["merge_recovery"]
             runtime_snapshot = RuntimeSnapshot.from_phase_runtime_snapshot(
               phase_record.execution_record.runtime_snapshot
             )
@@ -39,6 +41,7 @@ module A3
               observed_state: phase_record.execution_record.observed_state,
               diagnostics: diagnostics,
               worker_response_bundle: worker_response_bundle,
+              merge_recovery: merge_recovery,
               review_disposition: phase_record.execution_record.review_disposition,
               runtime_snapshot: runtime_snapshot
             )

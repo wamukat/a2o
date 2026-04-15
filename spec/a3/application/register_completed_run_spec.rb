@@ -247,6 +247,14 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     execution = A3::Application::ExecutionResult.new(
       success: true,
       summary: "merge recovery published",
+      diagnostics: {
+        "merge_recovery" => {
+          "status" => "recovered",
+          "target_ref" => "refs/heads/a3/parent/3022",
+          "publish_before_head" => "abc123",
+          "publish_after_head" => "def456"
+        }
+      },
       response_bundle: {
         "merge_recovery_verification_required" => true,
         "merge_recovery_verification_source_ref" => "refs/heads/a3/parent/3022"
@@ -254,7 +262,11 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     )
 
     expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :verifying, task_kind: :child)
-    expect(activity_publisher).to receive(:publish)
+    expect(activity_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      body: a_string_matching(/merge_recovery: recovered.*merge_recovery_target: refs\/heads\/a3\/parent\/3022.*merge_recovery_publish: abc123\.\.def456/m)
+    )
     result = use_case.call(task_ref: task.ref, run_ref: merge_run.ref, outcome: :verification_required, execution: execution)
 
     expect(result.task.status).to eq(:verifying)

@@ -77,7 +77,7 @@ module A3
         canonical_status = canonical_status_for(task)
         latest_phase = resolve_latest_phase(task: task, current_run: current_run, latest_run: latest_run)
         running_entry = build_running_entry(task, run: current_run)
-        blocked_lines = build_blocked_lines(latest_run)
+        blocked_lines = build_detail_lines(task, latest_run)
         kanban_snapshot = resolve_kanban_snapshot(task)
 
         TaskEntry.new(
@@ -144,14 +144,17 @@ module A3
         %i[in_progress in_review verifying merging].include?(status)
       end
 
-      def build_blocked_lines(run)
-        return [].freeze unless run
-
-        phase_record = run.phase_records.reverse_each.find { |item| !item.blocked_diagnosis.nil? }
-        diagnosis = phase_record&.blocked_diagnosis
-        return [].freeze unless diagnosis
-
-        [diagnosis.diagnostic_summary || diagnosis.observed_state].compact.map(&:to_s).reject(&:empty?).freeze
+      def build_detail_lines(task, run)
+        lines = []
+        if task.verification_source_ref
+          lines << "merge_recovery verification_source_ref=#{task.verification_source_ref}"
+        end
+        if run
+          phase_record = run.phase_records.reverse_each.find { |item| !item.blocked_diagnosis.nil? }
+          diagnosis = phase_record&.blocked_diagnosis
+          lines.concat([diagnosis&.diagnostic_summary || diagnosis&.observed_state].compact.map(&:to_s).reject(&:empty?)) if diagnosis
+        end
+        lines.freeze
       end
 
       def phase_counts_for(task, task_runs)
@@ -166,7 +169,10 @@ module A3
           normalized = normalize_phase(canonical_phase_for(task, run.phase).to_s)
           return normalized if normalized
         end
-        nil
+        fallback_phase = task.runnable_phase
+        return nil unless fallback_phase
+
+        normalize_phase(canonical_phase_for(task, fallback_phase).to_s)
       end
 
       def canonical_status_for(task)
