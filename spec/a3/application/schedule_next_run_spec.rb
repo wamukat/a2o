@@ -91,6 +91,52 @@ RSpec.describe A3::Application::ScheduleNextRun do
     expect(result.phase).to eq(:implementation)
   end
 
+  it "starts recovery verification against the task-scoped verification source ref" do
+    recovered_task = build_child_task(
+      ref: task.ref,
+      edit_scope: task.edit_scope,
+      status: :verifying,
+      parent_ref: task.parent_ref,
+      verification_source_ref: "refs/heads/a3/parent/A3-v2-3022"
+    )
+    task_repository.save(recovered_task)
+
+    expect(start_run).to receive(:call).with(
+      task_ref: recovered_task.ref,
+      phase: :verification,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :branch_head,
+        ref: "refs/heads/a3/parent/A3-v2-3022",
+        task_ref: recovered_task.ref
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_alpha],
+        verification_scope: %i[repo_alpha repo_beta],
+        ownership_scope: :task
+      ),
+      review_target: A3::Domain::ReviewTarget.new(
+        base_commit: "refs/heads/a3/parent/A3-v2-3022",
+        head_commit: "refs/heads/a3/parent/A3-v2-3022",
+        task_ref: recovered_task.ref,
+        phase_ref: :verification
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: recovered_task.parent_ref,
+        owner_scope: :task,
+        snapshot_version: "refs/heads/a3/parent/A3-v2-3022"
+      ),
+      bootstrap_marker: "hooks/prepare-runtime.sh"
+    ).and_return(
+      A3::Application::StartRun::Result.new(task: recovered_task, run: instance_double(A3::Domain::Run), workspace: instance_double(A3::Domain::PreparedWorkspace))
+    )
+
+    result = use_case.call(project_context: project_context)
+
+    expect(result.task).to eq(recovered_task)
+    expect(result.phase).to eq(:verification)
+  end
+
   it "does not schedule legacy child review tasks" do
     task_repository.save(
       build_child_task(

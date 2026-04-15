@@ -30,7 +30,8 @@ module A3
         completed_run = completed_run_for(task: task, run: run, outcome: terminal_outcome, artifact_violation: artifact_violation)
         completed_task = task.complete_run(
           next_phase: phase_result.next_phase,
-          terminal_status: phase_result.terminal_status
+          terminal_status: phase_result.terminal_status,
+          verification_source_ref: verification_source_ref_for(task: task, outcome: terminal_outcome, execution: execution)
         )
 
         @run_repository.save(completed_run)
@@ -127,6 +128,14 @@ module A3
 
         updated_execution_record = execution_record.with_follow_up_child_fingerprints(Array(child_fingerprints))
         run.replace_latest_phase_record(last_phase_record.with_execution_record(updated_execution_record))
+      end
+
+      def verification_source_ref_for(task:, outcome:, execution:)
+        outcome_name = outcome.to_sym
+        return execution&.merge_recovery_verification_source_ref if outcome_name == :verification_required
+        return task.verification_source_ref if %i[retryable terminal_noop].include?(outcome_name)
+
+        nil
       end
 
       def completed_run_for(task:, run:, outcome:, artifact_violation:)

@@ -28,7 +28,9 @@ module A3
         case phase.to_sym
         when :implementation
           work_branch_ref_for(task)
-        when :review, :verification, :merge
+        when :verification
+          task.verification_source_ref || (task.kind == :parent ? parent_integration_ref_for(task) : work_branch_ref_for(task))
+        when :review, :merge
           task.kind == :parent ? parent_integration_ref_for(task) : work_branch_ref_for(task)
         else
           raise A3::Domain::InvalidPhaseError, "unsupported phase #{phase}"

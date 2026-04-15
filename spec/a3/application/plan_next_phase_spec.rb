@@ -246,6 +246,29 @@ RSpec.describe A3::Application::PlanNextPhase do
     expect(result.terminal_status).to eq(:in_progress)
   end
 
+  it "routes merge recovery completion back to verification" do
+    task = A3::Domain::Task.new(
+      ref: "Portal#1",
+      kind: :single,
+      edit_scope: [:repo_alpha],
+      status: :merging
+    )
+    run = A3::Domain::Run.new(
+      ref: "run-merge",
+      task_ref: task.ref,
+      phase: :merge,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: task.ref, ref: "refs/heads/main"),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], ownership_scope: :task),
+      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: task.ref, owner_scope: :task, snapshot_version: "refs/heads/main")
+    )
+
+    result = use_case.call(task: task, run: run, outcome: :verification_required)
+
+    expect(result.next_phase).to eq(:verification)
+    expect(result.terminal_status).to be_nil
+  end
+
   it "keeps retryable runs on the current status without advancing phase" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",

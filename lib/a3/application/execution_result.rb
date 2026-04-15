@@ -27,6 +27,17 @@ module A3
         response_bundle.is_a?(Hash) && response_bundle["merge_recovery_required"] == true
       end
 
+      def merge_recovery_verification_required?
+        response_bundle.is_a?(Hash) && response_bundle["merge_recovery_verification_required"] == true
+      end
+
+      def merge_recovery_verification_source_ref
+        return nil unless response_bundle.is_a?(Hash)
+
+        value = response_bundle["merge_recovery_verification_source_ref"]
+        value.is_a?(String) && !value.empty? ? value : nil
+      end
+
       def review_disposition
         return nil unless response_bundle.is_a?(Hash)
 

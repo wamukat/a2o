@@ -7,6 +7,7 @@ module A3
 
       def call(task:, run:, outcome:)
         outcome_name = outcome.to_sym
+        return Result.new(next_phase: :verification, terminal_status: nil) if outcome_name == :verification_required
         return Result.new(next_phase: nil, terminal_status: task.terminal_status_for(phase: run.phase, outcome: outcome_name)) if outcome_name == :rework
 
         if %i[blocked retryable terminal_noop].include?(outcome_name)

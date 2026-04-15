@@ -215,6 +215,53 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(result.run.terminal_outcome).to eq(:completed)
   end
 
+  it "requires verification against the published merge target after merge recovery" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :merging,
+      current_run_ref: "run-9",
+      external_task_id: 3025
+    )
+    task_repository.save(task)
+    merge_run = A3::Domain::Run.new(
+      ref: "run-9",
+      task_ref: task.ref,
+      phase: :merge,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :integration_record,
+        ref: "refs/heads/a3/parent/3022",
+        task_ref: task.ref
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        ownership_scope: :task
+      ),
+      artifact_owner: artifact_owner
+    )
+    run_repository.save(merge_run)
+    execution = A3::Application::ExecutionResult.new(
+      success: true,
+      summary: "merge recovery published",
+      response_bundle: {
+        "merge_recovery_verification_required" => true,
+        "merge_recovery_verification_source_ref" => "refs/heads/a3/parent/3022"
+      }
+    )
+
+    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :verifying, task_kind: :child)
+    expect(activity_publisher).to receive(:publish)
+    result = use_case.call(task_ref: task.ref, run_ref: merge_run.ref, outcome: :verification_required, execution: execution)
+
+    expect(result.task.status).to eq(:verifying)
+    expect(result.task.verification_source_ref).to eq("refs/heads/a3/parent/3022")
+    expect(result.run.terminal_outcome).to eq(:verification_required)
+  end
+
   it "blocks a completed child merge when the parent integration ref is missing in its edit scope" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",
@@ -290,6 +337,38 @@ RSpec.describe A3::Application::RegisterCompletedRun do
 
     expect(result.task.status).to eq(:in_progress)
     expect(result.task.current_run_ref).to be_nil
+    expect(result.run.terminal_outcome).to eq(:retryable)
+  end
+
+  it "preserves recovery verification source on retryable verification runs" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :verifying,
+      current_run_ref: "run-verification-1",
+      external_task_id: 3025,
+      verification_source_ref: "refs/heads/a3/parent/3022"
+    )
+    verification_run = A3::Domain::Run.new(
+      ref: "run-verification-1",
+      task_ref: task.ref,
+      phase: :verification,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.runtime(task_ref: task.ref, ref: task.verification_source_ref, source_type: :branch_head),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], ownership_scope: :task),
+      artifact_owner: artifact_owner
+    )
+    task_repository.save(task)
+    run_repository.save(verification_run)
+
+    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :verifying, task_kind: :child)
+    expect(activity_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, body: /A3 実行完了: verification/)
+    result = use_case.call(task_ref: task.ref, run_ref: verification_run.ref, outcome: :retryable)
+
+    expect(result.task.status).to eq(:verifying)
+    expect(result.task.current_run_ref).to be_nil
+    expect(result.task.verification_source_ref).to eq("refs/heads/a3/parent/3022")
     expect(result.run.terminal_outcome).to eq(:retryable)
   end
 

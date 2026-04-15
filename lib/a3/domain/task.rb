@@ -5,9 +5,9 @@ module A3
     class InvalidPhaseError < StandardError; end
 
     class Task
-      attr_reader :ref, :kind, :edit_scope, :verification_scope, :status, :current_run_ref, :parent_ref, :child_refs, :external_task_id
+      attr_reader :ref, :kind, :edit_scope, :verification_scope, :status, :current_run_ref, :parent_ref, :child_refs, :external_task_id, :verification_source_ref
 
-      def initialize(ref:, kind:, edit_scope:, verification_scope: nil, status: :todo, current_run_ref: nil, parent_ref: nil, child_refs: [], external_task_id: nil)
+      def initialize(ref:, kind:, edit_scope:, verification_scope: nil, status: :todo, current_run_ref: nil, parent_ref: nil, child_refs: [], external_task_id: nil, verification_source_ref: nil)
         @ref = ref
         @kind = kind.to_sym
         @edit_scope = Array(edit_scope).map(&:to_sym).freeze
@@ -17,6 +17,7 @@ module A3
         @parent_ref = parent_ref
         @child_refs = Array(child_refs).freeze
         @external_task_id = external_task_id && Integer(external_task_id)
+        @verification_source_ref = normalize_optional_ref(verification_source_ref)
         freeze
       end
 
@@ -42,11 +43,12 @@ module A3
           current_run_ref: run_ref,
           parent_ref: parent_ref,
           child_refs: child_refs,
-          external_task_id: external_task_id
+          external_task_id: external_task_id,
+          verification_source_ref: verification_source_ref
         )
       end
 
-      def complete_run(next_phase:, terminal_status:)
+      def complete_run(next_phase:, terminal_status:, verification_source_ref: nil)
         resolved_status =
           if next_phase
             phase_policy.status_for_phase(next_phase)
@@ -63,7 +65,23 @@ module A3
           current_run_ref: nil,
           parent_ref: parent_ref,
           child_refs: child_refs,
-          external_task_id: external_task_id
+          external_task_id: external_task_id,
+          verification_source_ref: verification_source_ref
+        )
+      end
+
+      def with_verification_source_ref(source_ref)
+        self.class.new(
+          ref: ref,
+          kind: kind,
+          edit_scope: edit_scope,
+          verification_scope: verification_scope,
+          status: status,
+          current_run_ref: current_run_ref,
+          parent_ref: parent_ref,
+          child_refs: child_refs,
+          external_task_id: external_task_id,
+          verification_source_ref: source_ref
         )
       end
 
@@ -102,11 +120,17 @@ module A3
           other.current_run_ref == current_run_ref &&
           other.parent_ref == parent_ref &&
           other.child_refs == child_refs &&
-          other.external_task_id == external_task_id
+          other.external_task_id == external_task_id &&
+          other.verification_source_ref == verification_source_ref
       end
       alias eql? ==
 
       private
+
+      def normalize_optional_ref(value)
+        normalized = value.to_s.strip
+        normalized.empty? ? nil : normalized
+      end
 
       def phase_policy
         PhasePolicy.new(task_kind: kind, current_status: status)

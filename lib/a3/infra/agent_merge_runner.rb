@@ -201,7 +201,9 @@ module A3
           },
           response_bundle: {
             "merge_recovery" => evidence,
-            "merge_recovery_required" => false
+            "merge_recovery_required" => false,
+            "merge_recovery_verification_required" => true,
+            "merge_recovery_verification_source_ref" => evidence.fetch("target_ref")
           }
         )
       end
