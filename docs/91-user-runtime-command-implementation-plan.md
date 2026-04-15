@@ -123,7 +123,7 @@ host launcher `a2o runtime run-once` が次を実行する。
 - `[done]` host `a2o-agent` single-job loop
 - `[done]` runtime log / agent log / exit code の集約
 
-`scripts/a3-projects/portal/runtime/run_once.sh` は削除済み。root Taskfile の互換入口は `go run ./a3-engine/agent-go/cmd/a3 runtime run-once` を呼ぶ。
+`scripts/a3-projects/portal/runtime/run_once.sh` は削除済み。root Taskfile の互換入口は、workspace root を Go module と誤認しないよう `go -C a3-engine/agent-go run ./cmd/a3 runtime run-once` を呼ぶ。
 
 ### Slice 5: runtime loop
 
