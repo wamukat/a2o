@@ -29,6 +29,10 @@ type WorkspaceMerger interface {
 	Merge(request MergeRequest) (WorkspaceDescriptor, ExecutionResult)
 }
 
+type MergeRecoveryFinalizer interface {
+	RecoverMerge(request MergeRecoveryRequest) (WorkspaceDescriptor, ExecutionResult)
+}
+
 const maxWorkerProtocolPayloadBytes = 1024 * 1024
 
 type Worker struct {
@@ -92,6 +96,9 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 	startedAt := now.Format(time.RFC3339)
 	if request.MergeRequest != nil {
 		return w.runMergeJob(*request, startedAt)
+	}
+	if request.MergeRecoveryRequest != nil {
+		return w.runMergeRecoveryJob(*request, startedAt)
 	}
 	runRequest, prepared, workspaceDescriptor, err := w.prepareRequest(*request)
 	if err != nil {
@@ -186,11 +193,49 @@ func (w Worker) runMergeJob(request JobRequest, startedAt string) (*JobResult, b
 	return &result, false, nil
 }
 
+func (w Worker) runMergeRecoveryJob(request JobRequest, startedAt string) (*JobResult, bool, error) {
+	descriptor, execution := w.mergeRecoveryRequest(request)
+	finishedAt := w.now().Format(time.RFC3339)
+	descriptor.RuntimeProfile = request.RuntimeProfile
+	descriptor.SourceDescriptor = request.SourceDescriptor
+	if descriptor.WorkspaceKind == "" {
+		descriptor.WorkspaceKind = request.SourceDescriptor.WorkspaceKind
+	}
+	logUpload, err := w.upload("combined-log", safeID(request.JobID+"-combined-log"), "diagnostic", "text/plain", execution.CombinedLog)
+	if err != nil {
+		return nil, false, err
+	}
+	result := JobResult{
+		JobID:               request.JobID,
+		Status:              execution.Status,
+		ExitCode:            execution.ExitCode,
+		StartedAt:           startedAt,
+		FinishedAt:          finishedAt,
+		Summary:             fmt.Sprintf("merge recovery %s", execution.Status),
+		LogUploads:          []ArtifactUpload{logUpload},
+		ArtifactUploads:     []ArtifactUpload{},
+		WorkspaceDescriptor: descriptor,
+		Heartbeat:           finishedAt,
+	}
+	submitErr := w.Client.SubmitResult(result)
+	if submitErr != nil {
+		return &result, false, submitErr
+	}
+	return &result, false, nil
+}
+
 func (w Worker) mergeRequest(request JobRequest) (WorkspaceDescriptor, ExecutionResult) {
 	if merger, ok := w.workspacePreparerForRequest(request).(WorkspaceMerger); ok {
 		return merger.Merge(*request.MergeRequest)
 	}
 	return WorkspaceDescriptor{WorkspaceID: request.MergeRequest.WorkspaceID, SlotDescriptors: map[string]map[string]any{}}, failedMergeExecution(fmt.Errorf("workspace merger is not configured"))
+}
+
+func (w Worker) mergeRecoveryRequest(request JobRequest) (WorkspaceDescriptor, ExecutionResult) {
+	if finalizer, ok := w.workspacePreparerForRequest(request).(MergeRecoveryFinalizer); ok {
+		return finalizer.RecoverMerge(*request.MergeRecoveryRequest)
+	}
+	return WorkspaceDescriptor{WorkspaceID: request.MergeRecoveryRequest.WorkspaceID, SlotDescriptors: map[string]map[string]any{}}, failedMergeExecution(fmt.Errorf("merge recovery finalizer is not configured"))
 }
 
 func (w Worker) publishPrepared(prepared PreparedWorkspace, request JobRequest, workerProtocolResult map[string]any, commandSucceeded bool) error {

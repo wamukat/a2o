@@ -1,11 +1,12 @@
 # frozen_string_literal: true
 
+require "json"
 require "securerandom"
 
 module A3
   module Infra
     class AgentMergeRunner
-      def initialize(control_plane_client:, runtime_profile:, source_aliases:, timeout_seconds: 1800, poll_interval_seconds: 1.0, job_id_generator: -> { SecureRandom.uuid }, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, agent_environment: nil)
+      def initialize(control_plane_client:, runtime_profile:, source_aliases:, timeout_seconds: 1800, poll_interval_seconds: 1.0, job_id_generator: -> { SecureRandom.uuid }, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, agent_environment: nil, merge_recovery_command: nil, merge_recovery_args: [], merge_recovery_env: {})
         @control_plane_client = control_plane_client
         @runtime_profile = runtime_profile.to_s
         @source_aliases = source_aliases.transform_keys(&:to_sym).transform_values(&:to_s).freeze
@@ -15,6 +16,9 @@ module A3
         @sleeper = sleeper
         @monotonic_clock = monotonic_clock
         @agent_environment = agent_environment
+        @merge_recovery_command = merge_recovery_command&.to_s
+        @merge_recovery_args = Array(merge_recovery_args).map(&:to_s).freeze
+        @merge_recovery_env = merge_recovery_env.transform_keys(&:to_s).transform_values(&:to_s).freeze
       end
 
       def run(merge_plan, workspace:)
@@ -27,7 +31,13 @@ module A3
         return completed if completed.is_a?(A3::Application::ExecutionResult)
 
         result = completed.result
-        return failed_merge_result(merge_plan, result) unless result.succeeded?
+        unless result.succeeded?
+          recovery_candidate = merge_recovery_candidate(merge_plan, result)
+          recovery_result = run_merge_recovery(merge_plan, recovery_candidate, result) if recovery_candidate && merge_recovery_enabled?
+          return recovery_result if recovery_result
+
+          return failed_merge_result(merge_plan, result, recovery_candidate: recovery_candidate)
+        end
 
         evidence = validate_merge_evidence(merge_plan, result)
         return evidence if evidence.is_a?(A3::Application::ExecutionResult)
@@ -130,8 +140,7 @@ module A3
         )
       end
 
-      def failed_merge_result(merge_plan, result)
-        recovery_candidate = merge_recovery_candidate(merge_plan, result)
+      def failed_merge_result(_merge_plan, result, recovery_candidate: nil)
         diagnostics = {
           "agent_job_result" => result.result_form,
           "control_plane_url" => control_plane_url
@@ -154,6 +163,213 @@ module A3
           observed_state: observed_state,
           diagnostics: diagnostics,
           response_bundle: response_bundle
+        )
+      end
+
+      def run_merge_recovery(merge_plan, recovery_candidate, merge_result)
+        worker_request = build_merge_recovery_worker_request(merge_plan, recovery_candidate)
+        worker_record = enqueue(worker_request)
+        return recovery_infra_failure_result(merge_result, worker_record, recovery_candidate, "worker_enqueue") if worker_record.is_a?(A3::Application::ExecutionResult)
+
+        worker_completed = wait_for_completion(worker_request.job_id)
+        return recovery_infra_failure_result(merge_result, worker_completed, recovery_candidate, "worker_wait") if worker_completed.is_a?(A3::Application::ExecutionResult)
+
+        worker_result = worker_completed.result
+        return failed_recovery_result(merge_result, worker_result, recovery_candidate, "worker") unless worker_result.succeeded?
+
+        finalizer_request = build_merge_recovery_finalizer_request(merge_plan, recovery_candidate)
+        finalizer_record = enqueue(finalizer_request)
+        return recovery_infra_failure_result(merge_result, finalizer_record, recovery_candidate, "finalizer_enqueue") if finalizer_record.is_a?(A3::Application::ExecutionResult)
+
+        finalizer_completed = wait_for_completion(finalizer_request.job_id)
+        return recovery_infra_failure_result(merge_result, finalizer_completed, recovery_candidate, "finalizer_wait") if finalizer_completed.is_a?(A3::Application::ExecutionResult)
+
+        finalizer_result = finalizer_completed.result
+        return failed_recovery_result(merge_result, finalizer_result, recovery_candidate, "finalizer") unless finalizer_result.succeeded?
+
+        evidence = validate_merge_recovery_evidence(recovery_candidate, worker_result, finalizer_result)
+        return evidence if evidence.is_a?(A3::Application::ExecutionResult)
+
+        A3::Application::ExecutionResult.new(
+          success: true,
+          summary: "agent recovered merge #{merge_plan.merge_source.source_ref} into #{merge_plan.integration_target.target_ref} for #{merge_plan.merge_slots.join(',')}",
+          diagnostics: {
+            "agent_job_result" => merge_result.result_form,
+            "merge_recovery" => evidence,
+            "merge_recovery_worker_result" => worker_result.result_form,
+            "merge_recovery_finalizer_result" => finalizer_result.result_form
+          },
+          response_bundle: {
+            "merge_recovery" => evidence,
+            "merge_recovery_required" => false
+          }
+        )
+      end
+
+      def build_merge_recovery_worker_request(merge_plan, recovery_candidate)
+        A3::Domain::AgentJobRequest.new(
+          job_id: recovery_worker_job_id_for(merge_plan),
+          task_ref: merge_plan.task_ref,
+          phase: :merge,
+          runtime_profile: @runtime_profile,
+          source_descriptor: A3::Domain::SourceDescriptor.runtime_detached_commit(
+            task_ref: merge_plan.task_ref,
+            ref: merge_plan.integration_target.target_ref
+          ),
+          agent_environment: @agent_environment,
+          working_dir: first_recovery_runtime_path(recovery_candidate) || ".",
+          command: @merge_recovery_command,
+          args: @merge_recovery_args,
+          env: @merge_recovery_env.merge("A3_MERGE_RECOVERY" => JSON.generate(recovery_candidate)),
+          timeout_seconds: @timeout_seconds,
+          artifact_rules: []
+        )
+      end
+
+      def build_merge_recovery_finalizer_request(merge_plan, recovery_candidate)
+        A3::Domain::AgentJobRequest.new(
+          job_id: recovery_finalizer_job_id_for(merge_plan),
+          task_ref: merge_plan.task_ref,
+          phase: :merge,
+          runtime_profile: @runtime_profile,
+          source_descriptor: A3::Domain::SourceDescriptor.runtime_detached_commit(
+            task_ref: merge_plan.task_ref,
+            ref: merge_plan.integration_target.target_ref
+          ),
+          merge_recovery_request: merge_recovery_request_form(merge_plan, recovery_candidate),
+          agent_environment: @agent_environment,
+          working_dir: ".",
+          command: "a3-agent-merge-recovery",
+          args: [],
+          env: {},
+          timeout_seconds: @timeout_seconds,
+          artifact_rules: []
+        )
+      end
+
+      def merge_recovery_request_form(merge_plan, recovery_candidate)
+        {
+          "workspace_id" => recovery_candidate.fetch("recovery_id"),
+          "slots" => recovery_candidate.fetch("slots").each_with_object({}) do |slot, slots|
+            slots[slot.fetch("slot")] = {
+              "runtime_path" => slot.fetch("runtime_path"),
+              "target_ref" => slot.fetch("target_ref"),
+              "source_ref" => slot.fetch("source_ref"),
+              "merge_before_head" => slot.fetch("merge_before_head"),
+              "source_head_commit" => slot.fetch("source_head_commit"),
+              "conflict_files" => Array(slot.fetch("conflict_files")),
+              "commit_message" => "A3 merge recovery #{merge_plan.task_ref} #{merge_plan.run_ref}"
+            }
+          end
+        }
+      end
+
+      def failed_recovery_result(merge_result, recovery_result, recovery_candidate, stage)
+        recovery = recovery_candidate.merge(
+          "worker_result_ref" => stage == "worker" ? recovery_result.job_id : recovery_candidate["worker_result_ref"],
+          "status" => "recovery_#{stage}_failed"
+        )
+        A3::Application::ExecutionResult.new(
+          success: false,
+          summary: recovery_result.summary,
+          failing_command: "agent_merge_recovery_#{stage}",
+          observed_state: "merge_recovery_#{stage}_failed",
+          diagnostics: {
+            "agent_job_result" => merge_result.result_form,
+            "merge_recovery" => recovery,
+            "merge_recovery_#{stage}_result" => recovery_result.result_form,
+            "control_plane_url" => control_plane_url
+          },
+          response_bundle: {
+            "merge_recovery" => recovery,
+            "merge_recovery_required" => true
+          }
+        )
+      end
+
+      def recovery_infra_failure_result(merge_result, infra_result, recovery_candidate, stage)
+        recovery = recovery_candidate.merge("status" => "recovery_#{stage}_failed")
+        A3::Application::ExecutionResult.new(
+          success: false,
+          summary: infra_result.summary,
+          failing_command: "agent_merge_recovery_#{stage}",
+          observed_state: "merge_recovery_candidate",
+          diagnostics: {
+            "agent_job_result" => merge_result.result_form,
+            "merge_recovery" => recovery,
+            "merge_recovery_infra_failure" => infra_result.diagnostics,
+            "control_plane_url" => control_plane_url
+          },
+          response_bundle: {
+            "merge_recovery" => recovery,
+            "merge_recovery_required" => true
+          }
+        )
+      end
+
+      def validate_merge_recovery_evidence(recovery_candidate, worker_result, finalizer_result)
+        errors = []
+        descriptors = finalizer_result.workspace_descriptor&.slot_descriptors || {}
+        expected_slots = recovery_candidate.fetch("slots").map { |slot| slot.fetch("slot") }.sort
+        actual_slots = descriptors.keys.sort
+        errors << "slot descriptors must match merge recovery slots" unless actual_slots == expected_slots
+
+        enriched_slots = recovery_candidate.fetch("slots").map do |slot|
+          slot_name = slot.fetch("slot")
+          descriptor = descriptors[slot_name] || {}
+          conflict_files = Array(slot.fetch("conflict_files")).map(&:to_s).sort
+          changed_files = Array(descriptor["changed_files"]).map(&:to_s).sort
+          resolved_conflict_files = Array(descriptor["resolved_conflict_files"]).map(&:to_s).sort
+          marker_scan_result = descriptor["marker_scan_result"]
+          publish_after_head = descriptor["publish_after_head"]
+          merge_after_head = descriptor["merge_after_head"]
+          resolved_head = descriptor["resolved_head"]
+          errors << "#{slot_name}.merge_status must be recovered" unless descriptor["merge_status"] == "recovered"
+          errors << "#{slot_name}.publish_before_head must match merge_before_head" unless descriptor["publish_before_head"] == slot.fetch("merge_before_head")
+          errors << "#{slot_name}.publish_after_head must be present" unless present_string?(publish_after_head)
+          errors << "#{slot_name}.merge_after_head must match publish_after_head" unless present_string?(publish_after_head) && merge_after_head == publish_after_head
+          errors << "#{slot_name}.resolved_head must match publish_after_head" unless present_string?(publish_after_head) && resolved_head == publish_after_head
+          errors << "#{slot_name}.resolved_conflict_files must be within conflict_files" unless (resolved_conflict_files - conflict_files).empty?
+          errors << "#{slot_name}.changed_files must be within conflict_files" unless (changed_files - conflict_files).empty?
+          errors << "#{slot_name}.changed_files must not be empty" if changed_files.empty?
+          errors << "#{slot_name}.marker_scan_result must report no unresolved files" unless marker_scan_clean?(marker_scan_result)
+          slot.merge(
+            "resolved_conflict_files" => resolved_conflict_files,
+            "changed_files" => changed_files,
+            "publish_before_head" => descriptor["publish_before_head"],
+            "publish_after_head" => descriptor["publish_after_head"],
+            "merge_after_head" => descriptor["merge_after_head"],
+            "resolved_head" => descriptor["resolved_head"],
+            "marker_scan_result" => marker_scan_result
+          )
+        end
+        return invalid_merge_recovery_evidence(errors, recovery_candidate, worker_result, finalizer_result) unless errors.empty?
+
+        recovery_candidate.merge(
+          "worker_result_ref" => worker_result.job_id,
+          "changed_files" => enriched_slots.flat_map { |slot| Array(slot["changed_files"]) }.uniq.sort,
+          "marker_scan_result" => enriched_slots.each_with_object({}) { |slot, scan| scan[slot.fetch("slot")] = slot["marker_scan_result"] },
+          "publish_before_head" => enriched_slots.map { |slot| slot["publish_before_head"] }.compact.first,
+          "publish_after_head" => enriched_slots.map { |slot| slot["publish_after_head"] }.compact.first,
+          "resolved_conflict_files" => enriched_slots.flat_map { |slot| Array(slot["resolved_conflict_files"]) }.uniq.sort,
+          "status" => "recovered",
+          "slots" => enriched_slots
+        )
+      end
+
+      def invalid_merge_recovery_evidence(errors, recovery_candidate, worker_result, finalizer_result)
+        A3::Application::ExecutionResult.new(
+          success: false,
+          summary: "agent merge recovery evidence is invalid",
+          failing_command: "agent_merge_recovery_evidence",
+          observed_state: "merge_recovery_evidence_invalid",
+          diagnostics: {
+            "validation_errors" => errors,
+            "merge_recovery" => recovery_candidate,
+            "merge_recovery_worker_result" => worker_result.result_form,
+            "merge_recovery_finalizer_result" => finalizer_result.result_form,
+            "control_plane_url" => control_plane_url
+          }
         )
       end
 
@@ -250,6 +466,30 @@ module A3
 
       def job_id_for(merge_plan)
         "merge-#{safe_id(merge_plan.run_ref)}-#{safe_id(@job_id_generator.call)}"
+      end
+
+      def recovery_worker_job_id_for(merge_plan)
+        "merge-recovery-worker-#{safe_id(merge_plan.run_ref)}-#{safe_id(@job_id_generator.call)}"
+      end
+
+      def recovery_finalizer_job_id_for(merge_plan)
+        "merge-recovery-finalizer-#{safe_id(merge_plan.run_ref)}-#{safe_id(@job_id_generator.call)}"
+      end
+
+      def marker_scan_clean?(marker_scan_result)
+        return false unless marker_scan_result.is_a?(Hash)
+        return false unless marker_scan_result["scanner"] == "a3-agent-conflict-marker-scan"
+
+        unresolved = marker_scan_result["unresolved_files"]
+        unresolved.is_a?(Array) && unresolved.empty?
+      end
+
+      def first_recovery_runtime_path(recovery_candidate)
+        recovery_candidate.fetch("slots").map { |slot| slot["runtime_path"] }.find { |path| present_string?(path) }
+      end
+
+      def merge_recovery_enabled?
+        present_string?(@merge_recovery_command)
       end
 
       def present_string?(value)

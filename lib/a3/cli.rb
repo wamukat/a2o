@@ -1671,7 +1671,10 @@ module A3
           source_aliases: source_aliases,
           timeout_seconds: options.fetch(:agent_job_timeout_seconds, 1800),
           poll_interval_seconds: options.fetch(:agent_job_poll_interval_seconds, 1.0),
-          agent_environment: agent_environment_from_options(options)
+          agent_environment: agent_environment_from_options(options),
+          merge_recovery_command: options[:worker_command],
+          merge_recovery_args: options.fetch(:worker_command_args, []),
+          merge_recovery_env: options.fetch(:agent_env, {})
         )
       end
 

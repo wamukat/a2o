@@ -58,6 +58,13 @@ type unmergedFile struct {
 	path   string
 }
 
+type mergeRecoveryPlan struct {
+	slotName     string
+	slot         MergeRecoverySlotRequest
+	descriptor   map[string]any
+	changedFiles []string
+}
+
 func (e mergeConflictError) Error() string {
 	return e.err.Error()
 }
@@ -146,6 +153,48 @@ func (m WorkspaceMaterializer) Merge(request MergeRequest) (WorkspaceDescriptor,
 		return descriptor, failedMergeExecution(err)
 	}
 	return descriptor, ExecutionResult{Status: "succeeded", ExitCode: intPtr(0), CombinedLog: []byte("A3 agent merge completed\n")}
+}
+
+func (m WorkspaceMaterializer) RecoverMerge(request MergeRecoveryRequest) (WorkspaceDescriptor, ExecutionResult) {
+	descriptor := WorkspaceDescriptor{
+		WorkspaceKind:    "runtime_workspace",
+		RuntimeProfile:   "",
+		WorkspaceID:      request.WorkspaceID,
+		SourceDescriptor: SourceDescriptor{WorkspaceKind: "runtime_workspace", SourceType: "branch_head"},
+		SlotDescriptors:  map[string]map[string]any{},
+	}
+	if request.WorkspaceID == "" {
+		return descriptor, failedMergeExecution(fmt.Errorf("merge recovery workspace_id is required"))
+	}
+	slotNames := make([]string, 0, len(request.Slots))
+	for slotName := range request.Slots {
+		slotNames = append(slotNames, slotName)
+	}
+	sort.Strings(slotNames)
+	plans := make([]mergeRecoveryPlan, 0, len(slotNames))
+	for _, slotName := range slotNames {
+		slot := request.Slots[slotName]
+		slotDescriptor := map[string]any{
+			"runtime_path":         slot.RuntimePath,
+			"merge_target_ref":     slot.TargetRef,
+			"merge_source_ref":     slot.SourceRef,
+			"merge_before_head":    slot.MergeBeforeHead,
+			"source_head_commit":   slot.SourceHeadCommit,
+			"conflict_files":       normalizePathList(slot.ConflictFiles),
+			"merge_status":         "recovery_prepared",
+			"project_repo_mutator": "a3-agent",
+		}
+		descriptor.SlotDescriptors[slotName] = slotDescriptor
+		plan, err := prepareMergeRecoverySlot(slotName, slot, slotDescriptor)
+		if err != nil {
+			return descriptor, failedMergeExecution(err)
+		}
+		plans = append(plans, plan)
+	}
+	if err := commitRecoveredMergePlans(plans); err != nil {
+		return descriptor, failedMergeExecution(err)
+	}
+	return descriptor, ExecutionResult{Status: "succeeded", ExitCode: intPtr(0), CombinedLog: []byte("A3 agent merge recovery completed\n")}
 }
 
 func (m WorkspaceMaterializer) prepareMergePlans(request MergeRequest, descriptors map[string]map[string]any) ([]mergePlan, error) {
@@ -341,6 +390,162 @@ func cleanupMergeWorktrees(plans []mergePlan) error {
 		}
 	}
 	return cleanupErr
+}
+
+func prepareMergeRecoverySlot(slotName string, slot MergeRecoverySlotRequest, descriptor map[string]any) (mergeRecoveryPlan, error) {
+	plan := mergeRecoveryPlan{slotName: slotName, slot: slot, descriptor: descriptor}
+	if strings.TrimSpace(slot.RuntimePath) == "" {
+		descriptor["merge_status"] = "recovery_failed"
+		return plan, fmt.Errorf("merge recovery runtime_path is required for %s", slotName)
+	}
+	conflictFiles := normalizePathList(slot.ConflictFiles)
+	if len(conflictFiles) == 0 {
+		descriptor["merge_status"] = "recovery_failed"
+		return plan, fmt.Errorf("merge recovery conflict_files are required for %s", slotName)
+	}
+	head, err := gitOutput(slot.RuntimePath, "rev-parse", "HEAD")
+	if err != nil {
+		descriptor["merge_status"] = "recovery_failed"
+		return plan, err
+	}
+	if slot.MergeBeforeHead != "" && head != slot.MergeBeforeHead {
+		descriptor["merge_status"] = "recovery_failed"
+		return plan, fmt.Errorf("merge recovery head mismatch for %s: got=%s want=%s", slotName, head, slot.MergeBeforeHead)
+	}
+	mergeHead, err := gitOutput(slot.RuntimePath, "rev-parse", "MERGE_HEAD")
+	if err != nil {
+		descriptor["merge_status"] = "recovery_failed"
+		return plan, fmt.Errorf("merge recovery workspace is not in a merge state for %s: %w", slotName, err)
+	}
+	if slot.SourceHeadCommit != "" && mergeHead != slot.SourceHeadCommit {
+		descriptor["merge_status"] = "recovery_failed"
+		return plan, fmt.Errorf("merge recovery source head mismatch for %s: got=%s want=%s", slotName, mergeHead, slot.SourceHeadCommit)
+	}
+	markerResult, err := scanConflictMarkers(slot.RuntimePath, conflictFiles)
+	descriptor["marker_scan_result"] = markerResult
+	if err != nil {
+		descriptor["merge_status"] = "recovery_failed"
+		return plan, err
+	}
+	if unresolved := markerResult["unresolved_files"].([]string); len(unresolved) > 0 {
+		descriptor["merge_status"] = "recovery_failed"
+		return plan, fmt.Errorf("merge recovery conflict markers remain for %s: %v", slotName, unresolved)
+	}
+	if err := stageDeclaredPaths(slot.RuntimePath, conflictFiles); err != nil {
+		descriptor["merge_status"] = "recovery_failed"
+		return plan, err
+	}
+	unmergedFiles, err := gitUnmergedFiles(slot.RuntimePath)
+	if err != nil {
+		descriptor["merge_status"] = "recovery_failed"
+		return plan, err
+	}
+	if len(unmergedFiles) > 0 {
+		descriptor["merge_status"] = "recovery_failed"
+		descriptor["conflict_statuses"] = unmergedStatuses(unmergedFiles)
+		return plan, fmt.Errorf("merge recovery has unresolved index conflicts for %s: %v", slotName, unmergedPaths(unmergedFiles))
+	}
+	changedFiles, err := gitChangedPaths(slot.RuntimePath)
+	if err != nil {
+		descriptor["merge_status"] = "recovery_failed"
+		return plan, err
+	}
+	if !pathsWithin(changedFiles, conflictFiles) {
+		descriptor["merge_status"] = "recovery_failed"
+		descriptor["changed_files"] = changedFiles
+		return plan, fmt.Errorf("merge recovery changed files outside conflict set for %s: changed=%v allowed=%v", slotName, changedFiles, conflictFiles)
+	}
+	if len(changedFiles) == 0 {
+		descriptor["merge_status"] = "recovery_failed"
+		return plan, fmt.Errorf("merge recovery produced no changes for %s", slotName)
+	}
+	plan.changedFiles = changedFiles
+	return plan, nil
+}
+
+func commitRecoveredMergePlans(plans []mergeRecoveryPlan) error {
+	committed := []mergeRecoveryPlan{}
+	for _, plan := range plans {
+		message := strings.TrimSpace(plan.slot.CommitMessage)
+		if message == "" {
+			message = "A3 agent merge recovery"
+		}
+		if err := runGit(plan.slot.RuntimePath, "-c", "user.name=A3 Agent", "-c", "user.email=a3-agent@example.invalid", "commit", "--no-gpg-sign", "--no-verify", "-m", message); err != nil {
+			plan.descriptor["merge_status"] = "recovery_failed"
+			return errors.Join(err, rollbackRecoveredMergePlans(committed))
+		}
+		afterHead, err := gitOutput(plan.slot.RuntimePath, "rev-parse", "HEAD")
+		if err != nil {
+			plan.descriptor["merge_status"] = "recovery_failed"
+			return errors.Join(err, rollbackRecoveredMergePlans(append(committed, plan)))
+		}
+		plan.descriptor["merge_status"] = "recovered"
+		plan.descriptor["resolved_conflict_files"] = normalizePathList(plan.slot.ConflictFiles)
+		plan.descriptor["changed_files"] = plan.changedFiles
+		plan.descriptor["publish_before_head"] = plan.slot.MergeBeforeHead
+		plan.descriptor["publish_after_head"] = afterHead
+		plan.descriptor["merge_after_head"] = afterHead
+		plan.descriptor["resolved_head"] = afterHead
+		committed = append(committed, plan)
+	}
+	return nil
+}
+
+func rollbackRecoveredMergePlans(plans []mergeRecoveryPlan) error {
+	var rollbackErr error
+	for index := len(plans) - 1; index >= 0; index-- {
+		plan := plans[index]
+		if plan.slot.MergeBeforeHead != "" {
+			rollbackErr = errors.Join(rollbackErr, runGit(plan.slot.RuntimePath, "reset", "--hard", plan.slot.MergeBeforeHead))
+			plan.descriptor["merge_status"] = "recovery_rolled_back"
+			delete(plan.descriptor, "publish_after_head")
+			delete(plan.descriptor, "merge_after_head")
+			delete(plan.descriptor, "resolved_head")
+		}
+	}
+	return rollbackErr
+}
+
+func scanConflictMarkers(root string, paths []string) (map[string]any, error) {
+	unresolved := []string{}
+	for _, path := range normalizePathList(paths) {
+		if filepath.IsAbs(path) || strings.HasPrefix(path, ".."+string(filepath.Separator)) || path == ".." {
+			return nil, fmt.Errorf("merge recovery conflict file path must be relative: %s", path)
+		}
+		data, err := os.ReadFile(filepath.Join(root, path))
+		if err != nil {
+			return nil, err
+		}
+		if containsConflictMarker(string(data)) {
+			unresolved = append(unresolved, path)
+		}
+	}
+	return map[string]any{
+		"scanner":          "a3-agent-conflict-marker-scan",
+		"unresolved_files": unresolved,
+	}, nil
+}
+
+func containsConflictMarker(content string) bool {
+	for _, line := range strings.FieldsFunc(content, func(char rune) bool { return char == '\n' || char == '\r' }) {
+		if strings.HasPrefix(line, "<<<<<<< ") || strings.HasPrefix(line, "=======") || strings.HasPrefix(line, ">>>>>>> ") {
+			return true
+		}
+	}
+	return false
+}
+
+func pathsWithin(changedFiles, allowedFiles []string) bool {
+	allowed := map[string]bool{}
+	for _, path := range normalizePathList(allowedFiles) {
+		allowed[path] = true
+	}
+	for _, path := range normalizePathList(changedFiles) {
+		if !allowed[path] {
+			return false
+		}
+	}
+	return true
 }
 
 func gitUnmergedFiles(root string) ([]unmergedFile, error) {
@@ -630,7 +835,7 @@ func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commit
 			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
 			return err
 		}
-		if err := runGit(plan.runtimePath, "-c", "user.name=A3 Agent", "-c", "user.email=a3-agent@example.invalid", "commit", "-m", commitMessage); err != nil {
+		if err := runGit(plan.runtimePath, "-c", "user.name=A3 Agent", "-c", "user.email=a3-agent@example.invalid", "commit", "--no-gpg-sign", "--no-verify", "-m", commitMessage); err != nil {
 			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
 			return err
 		}

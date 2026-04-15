@@ -184,6 +184,200 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     expect(execution.response_bundle.fetch("merge_recovery_required")).to be(true)
   end
 
+  it "runs merge recovery worker and finalizer for recoverable conflicts" do
+    sequence = 0
+    recovery_runner = described_class.new(
+      control_plane_client: client,
+      runtime_profile: "host-local",
+      source_aliases: { repo_alpha: "member-portal-starters" },
+      poll_interval_seconds: 0,
+      job_id_generator: -> {
+        sequence += 1
+        "job-#{sequence}"
+      },
+      sleeper: ->(_seconds) {},
+      merge_recovery_command: "a3-merge-recovery-worker",
+      merge_recovery_args: ["--resolve"],
+      merge_recovery_env: { "A3_EXTRA" => "1" }
+    )
+
+    client.on_fetch = lambda do |job_id|
+      request = client.records.fetch(job_id).request
+      case request.command
+      when "a3-agent-merge"
+        client.complete(job_id, agent_result(
+          job_id,
+          workspace_descriptor(
+            "repo_alpha" => {
+              "runtime_path" => "/agent/workspaces/merge-Portal-42-run-merge-1/repo-alpha",
+              "source_alias" => "member-portal-starters",
+              "merge_source_ref" => "refs/heads/a3/work/Portal-42",
+              "merge_target_ref" => "refs/heads/main",
+              "merge_policy" => "ff_or_merge",
+              "merge_before_head" => "abc123",
+              "source_head_commit" => "def456",
+              "merge_status" => "conflicted",
+              "merge_recovery_candidate" => true,
+              "conflict_files" => ["docs/conflict.md"],
+              "resolved_conflict_files" => []
+            }
+          ),
+          status: :failed,
+          exit_code: 1,
+          summary: "merge conflicted"
+        ))
+      when "a3-merge-recovery-worker"
+        payload = JSON.parse(request.env.fetch("A3_MERGE_RECOVERY"))
+        expect(payload).to include(
+          "recovery_id" => "merge-recovery-merge-run-merge-1-job-1",
+          "conflict_files" => ["docs/conflict.md"]
+        )
+        expect(request.working_dir).to eq("/agent/workspaces/merge-Portal-42-run-merge-1/repo-alpha")
+        expect(request.args).to eq(["--resolve"])
+        expect(request.env.fetch("A3_EXTRA")).to eq("1")
+        client.complete(job_id, agent_result(job_id, workspace_descriptor({}), summary: "recovery worker resolved conflict"))
+      when "a3-agent-merge-recovery"
+        expect(request.merge_recovery_request).to eq(
+          "workspace_id" => "merge-recovery-merge-run-merge-1-job-1",
+          "slots" => {
+            "repo_alpha" => {
+              "runtime_path" => "/agent/workspaces/merge-Portal-42-run-merge-1/repo-alpha",
+              "target_ref" => "refs/heads/main",
+              "source_ref" => "refs/heads/a3/work/Portal-42",
+              "merge_before_head" => "abc123",
+              "source_head_commit" => "def456",
+              "conflict_files" => ["docs/conflict.md"],
+              "commit_message" => "A3 merge recovery Portal#42 run-merge-1"
+            }
+          }
+        )
+        client.complete(job_id, agent_result(job_id, workspace_descriptor(
+          "repo_alpha" => {
+            "merge_status" => "recovered",
+            "publish_before_head" => "abc123",
+            "publish_after_head" => "fedcba",
+            "merge_after_head" => "fedcba",
+            "resolved_head" => "fedcba",
+            "resolved_conflict_files" => ["docs/conflict.md"],
+            "changed_files" => ["docs/conflict.md"],
+            "marker_scan_result" => {
+              "scanner" => "a3-agent-conflict-marker-scan",
+              "unresolved_files" => []
+            }
+          }
+        ), summary: "merge recovery finalized"))
+      else
+        raise "unexpected command: #{request.command}"
+      end
+    end
+
+    execution = recovery_runner.run(merge_plan, workspace: workspace)
+
+    expect(execution).to have_attributes(success?: true)
+    expect(client.records.values.map { |record| record.request.command }).to eq(
+      ["a3-agent-merge", "a3-merge-recovery-worker", "a3-agent-merge-recovery"]
+    )
+    recovery = execution.diagnostics.fetch("merge_recovery")
+    expect(recovery).to include(
+      "worker_result_ref" => "merge-recovery-worker-run-merge-1-job-2",
+      "status" => "recovered",
+      "changed_files" => ["docs/conflict.md"],
+      "publish_before_head" => "abc123",
+      "publish_after_head" => "fedcba",
+      "resolved_conflict_files" => ["docs/conflict.md"]
+    )
+    expect(execution.response_bundle.fetch("merge_recovery_required")).to be(false)
+  end
+
+  it "keeps merge recovery retryable when recovery worker enqueue fails" do
+    recovery_runner = described_class.new(
+      control_plane_client: client,
+      runtime_profile: "host-local",
+      source_aliases: { repo_alpha: "member-portal-starters" },
+      poll_interval_seconds: 0,
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_seconds) {},
+      merge_recovery_command: "a3-merge-recovery-worker"
+    )
+    allow(client).to receive(:enqueue).and_wrap_original do |original, request|
+      raise "agent unavailable" if request.command == "a3-merge-recovery-worker"
+
+      original.call(request)
+    end
+    client.on_fetch = lambda do |job_id|
+      client.complete(job_id, agent_result(
+        job_id,
+        workspace_descriptor(
+          "repo_alpha" => {
+            "runtime_path" => "/agent/workspaces/merge-Portal-42-run-merge-1/repo-alpha",
+            "merge_source_ref" => "refs/heads/a3/work/Portal-42",
+            "merge_target_ref" => "refs/heads/main",
+            "merge_before_head" => "abc123",
+            "source_head_commit" => "def456",
+            "merge_status" => "conflicted",
+            "merge_recovery_candidate" => true,
+            "conflict_files" => ["docs/conflict.md"]
+          }
+        ),
+        status: :failed,
+        exit_code: 1,
+        summary: "merge conflicted"
+      ))
+    end
+
+    execution = recovery_runner.run(merge_plan, workspace: workspace)
+
+    expect(execution).to have_attributes(
+      success?: false,
+      failing_command: "agent_merge_recovery_worker_enqueue",
+      observed_state: "merge_recovery_candidate"
+    )
+    expect(execution.response_bundle.fetch("merge_recovery_required")).to be(true)
+  end
+
+  it "rejects recovered merge evidence with unresolved marker scan" do
+    candidate = {
+      "recovery_id" => "merge-recovery-1",
+      "slots" => [
+        {
+          "slot" => "repo_alpha",
+          "runtime_path" => "/agent/workspaces/merge-Portal-42-run-merge-1/repo-alpha",
+          "target_ref" => "refs/heads/main",
+          "source_ref" => "refs/heads/a3/work/Portal-42",
+          "merge_before_head" => "abc123",
+          "source_head_commit" => "def456",
+          "conflict_files" => ["docs/conflict.md"],
+          "resolved_conflict_files" => []
+        }
+      ]
+    }
+    worker_result = agent_result("worker-job", workspace_descriptor({}))
+    finalizer_result = agent_result("finalizer-job", workspace_descriptor(
+      "repo_alpha" => {
+        "merge_status" => "recovered",
+        "publish_before_head" => "abc123",
+        "publish_after_head" => "fedcba",
+        "merge_after_head" => "fedcba",
+        "resolved_head" => "fedcba",
+        "resolved_conflict_files" => ["docs/conflict.md"],
+        "changed_files" => ["docs/conflict.md"],
+        "marker_scan_result" => {
+          "scanner" => "a3-agent-conflict-marker-scan",
+          "unresolved_files" => ["docs/conflict.md"]
+        }
+      }
+    ))
+
+    execution = runner.send(:validate_merge_recovery_evidence, candidate, worker_result, finalizer_result)
+
+    expect(execution).to have_attributes(
+      success?: false,
+      failing_command: "agent_merge_recovery_evidence",
+      observed_state: "merge_recovery_evidence_invalid"
+    )
+    expect(execution.diagnostics.fetch("validation_errors")).to include("repo_alpha.marker_scan_result must report no unresolved files")
+  end
+
   it "rejects extra merge slot descriptors" do
     client.on_fetch = lambda do |job_id|
       client.complete(job_id, agent_result(job_id, workspace_descriptor(

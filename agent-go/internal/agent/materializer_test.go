@@ -705,6 +705,140 @@ func TestWorkspaceMaterializerRollsBackNonRecoverableMergeConflict(t *testing.T)
 	}
 }
 
+func TestWorkspaceMaterializerFinalizesRecoveredMergeWorkspace(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "repo-alpha")
+	targetHead, sourceHead, runtimePath := createRetainedContentConflict(t, tmp, sourceRoot)
+	if err := os.WriteFile(filepath.Join(runtimePath, "conflict.txt"), []byte("target\nsource\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	descriptor, execution := WorkspaceMaterializer{}.RecoverMerge(MergeRecoveryRequest{
+		WorkspaceID: "merge-Portal-42",
+		Slots: map[string]MergeRecoverySlotRequest{
+			"repo_alpha": {
+				RuntimePath:      runtimePath,
+				TargetRef:        "refs/heads/a3/live",
+				SourceRef:        "refs/heads/a3/work/Portal-42",
+				MergeBeforeHead:  targetHead,
+				SourceHeadCommit: sourceHead,
+				ConflictFiles:    []string{"conflict.txt"},
+				CommitMessage:    "Recover Portal#42 merge",
+			},
+		},
+	})
+
+	if execution.Status != "succeeded" {
+		t.Fatalf("expected recovered merge success, got %#v", execution)
+	}
+	slot := descriptor.SlotDescriptors["repo_alpha"]
+	if slot["merge_status"] != "recovered" {
+		t.Fatalf("expected recovered merge evidence: %#v", slot)
+	}
+	if slot["publish_before_head"] != targetHead {
+		t.Fatalf("unexpected publish_before_head: %#v", slot)
+	}
+	afterHead, ok := slot["publish_after_head"].(string)
+	if !ok || afterHead == "" || afterHead == targetHead {
+		t.Fatalf("unexpected publish_after_head: %#v", slot)
+	}
+	if head := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "refs/heads/a3/live")); head != afterHead {
+		t.Fatalf("target branch did not advance to recovered merge commit: got=%s want=%s", head, afterHead)
+	}
+	parents := strings.Fields(git(t, runtimePath, "rev-list", "--parents", "-n", "1", "HEAD"))
+	if len(parents) != 3 || parents[1] != targetHead || parents[2] != sourceHead {
+		t.Fatalf("expected recovered merge commit with target/source parents, got %v", parents)
+	}
+	if status := git(t, runtimePath, "status", "--porcelain"); status != "" {
+		t.Fatalf("recovered workspace should be clean: %s", status)
+	}
+}
+
+func TestWorkspaceMaterializerRejectsRecoveredMergeWithConflictMarkers(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "repo-alpha")
+	targetHead, sourceHead, runtimePath := createRetainedContentConflict(t, tmp, sourceRoot)
+
+	descriptor, execution := WorkspaceMaterializer{}.RecoverMerge(MergeRecoveryRequest{
+		WorkspaceID: "merge-Portal-42",
+		Slots: map[string]MergeRecoverySlotRequest{
+			"repo_alpha": {
+				RuntimePath:      runtimePath,
+				TargetRef:        "refs/heads/a3/live",
+				SourceRef:        "refs/heads/a3/work/Portal-42",
+				MergeBeforeHead:  targetHead,
+				SourceHeadCommit: sourceHead,
+				ConflictFiles:    []string{"conflict.txt"},
+			},
+		},
+	})
+
+	if execution.Status != "failed" {
+		t.Fatalf("expected marker scan failure, got %#v", execution)
+	}
+	slot := descriptor.SlotDescriptors["repo_alpha"]
+	if slot["merge_status"] != "recovery_failed" {
+		t.Fatalf("expected recovery_failed evidence: %#v", slot)
+	}
+	markerResult, ok := slot["marker_scan_result"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing marker scan result: %#v", slot)
+	}
+	unresolved, ok := markerResult["unresolved_files"].([]string)
+	if !ok || len(unresolved) != 1 || unresolved[0] != "conflict.txt" {
+		t.Fatalf("unexpected marker scan result: %#v", markerResult)
+	}
+	if head := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "refs/heads/a3/live")); head != targetHead {
+		t.Fatalf("target branch advanced after rejected recovery: got=%s want=%s", head, targetHead)
+	}
+}
+
+func TestWorkspaceMaterializerDoesNotPartiallyPublishRecoveredMergeSlots(t *testing.T) {
+	tmp := t.TempDir()
+	firstRoot := createGitSource(t, tmp, "repo-alpha")
+	firstTarget, firstSource, firstRuntime := createRetainedContentConflict(t, tmp, firstRoot)
+	if err := os.WriteFile(filepath.Join(firstRuntime, "conflict.txt"), []byte("target\nsource\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	secondRoot := createGitSource(t, tmp, "repo-beta")
+	secondTarget, secondSource, secondRuntime := createRetainedContentConflict(t, filepath.Join(tmp, "second"), secondRoot)
+
+	descriptor, execution := WorkspaceMaterializer{}.RecoverMerge(MergeRecoveryRequest{
+		WorkspaceID: "merge-Portal-42",
+		Slots: map[string]MergeRecoverySlotRequest{
+			"repo_alpha": {
+				RuntimePath:      firstRuntime,
+				TargetRef:        "refs/heads/a3/live",
+				SourceRef:        "refs/heads/a3/work/Portal-42",
+				MergeBeforeHead:  firstTarget,
+				SourceHeadCommit: firstSource,
+				ConflictFiles:    []string{"conflict.txt"},
+			},
+			"repo_beta": {
+				RuntimePath:      secondRuntime,
+				TargetRef:        "refs/heads/a3/live",
+				SourceRef:        "refs/heads/a3/work/Portal-42",
+				MergeBeforeHead:  secondTarget,
+				SourceHeadCommit: secondSource,
+				ConflictFiles:    []string{"conflict.txt"},
+			},
+		},
+	})
+
+	if execution.Status != "failed" {
+		t.Fatalf("expected second slot marker failure, got %#v", execution)
+	}
+	if descriptor.SlotDescriptors["repo_alpha"]["merge_status"] != "recovery_prepared" {
+		t.Fatalf("first slot should not be committed before all preflight passes: %#v", descriptor.SlotDescriptors["repo_alpha"])
+	}
+	if head := trimTrailingNewline(git(t, firstRoot, "rev-parse", "refs/heads/a3/live")); head != firstTarget {
+		t.Fatalf("first target branch was partially published: got=%s want=%s", head, firstTarget)
+	}
+	if head := trimTrailingNewline(git(t, secondRoot, "rev-parse", "refs/heads/a3/live")); head != secondTarget {
+		t.Fatalf("second target branch advanced after failed recovery: got=%s want=%s", head, secondTarget)
+	}
+}
+
 func TestWorkspaceMaterializerRemovesBootstrappedTargetRefOnMergeFailure(t *testing.T) {
 	tmp := t.TempDir()
 	sourceRoot := createGitSource(t, tmp, "repo-alpha")
@@ -829,6 +963,64 @@ func createGitSource(t *testing.T, root string, name string) string {
 	git(t, sourceRoot, "commit", "-q", "-m", "initial commit")
 	git(t, sourceRoot, "branch", "a3/work/Portal-42", "HEAD")
 	return sourceRoot
+}
+
+func createRetainedContentConflict(t *testing.T, tmp string, sourceRoot string) (string, string, string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(sourceRoot, "conflict.txt"), []byte("base\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "conflict.txt")
+	gitTestCommit(t, sourceRoot, "base conflict file")
+	base := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
+	git(t, sourceRoot, "branch", "-f", "a3/live", base)
+	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", base)
+
+	git(t, sourceRoot, "checkout", "-q", "-B", "target-edit", "a3/live")
+	if err := os.WriteFile(filepath.Join(sourceRoot, "conflict.txt"), []byte("target\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "conflict.txt")
+	gitTestCommit(t, sourceRoot, "target edit")
+	targetHead := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
+	git(t, sourceRoot, "branch", "-f", "a3/live", targetHead)
+
+	git(t, sourceRoot, "checkout", "-q", "-B", "source-edit", base)
+	if err := os.WriteFile(filepath.Join(sourceRoot, "conflict.txt"), []byte("source\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "conflict.txt")
+	gitTestCommit(t, sourceRoot, "source edit")
+	sourceHead := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
+	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", sourceHead)
+
+	descriptor, execution := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": sourceRoot,
+		},
+	}.Merge(MergeRequest{
+		WorkspaceID: "merge-Portal-42",
+		Policy:      "ff_or_merge",
+		Slots: map[string]MergeSlotRequest{
+			"repo_alpha": {
+				Source: WorkspaceSourceRequest{
+					Kind:  "local_git",
+					Alias: "repo-alpha",
+				},
+				SourceRef: "refs/heads/a3/work/Portal-42",
+				TargetRef: "refs/heads/a3/live",
+			},
+		},
+	})
+	if execution.Status != "failed" {
+		t.Fatalf("expected retained merge conflict, got %#v", execution)
+	}
+	runtimePath, ok := descriptor.SlotDescriptors["repo_alpha"]["runtime_path"].(string)
+	if !ok || runtimePath == "" {
+		t.Fatalf("missing retained runtime path: %#v", descriptor.SlotDescriptors["repo_alpha"])
+	}
+	return targetHead, sourceHead, runtimePath
 }
 
 func git(t *testing.T, root string, args ...string) string {

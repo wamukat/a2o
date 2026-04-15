@@ -154,6 +154,40 @@ RSpec.describe A3::Domain::AgentJobRequest do
     expect(described_class.from_request_form(request.request_form)).to eq(request)
   end
 
+it "round-trips merge recovery requests" do
+  merge_recovery_request = {
+    "workspace_id" => "merge-Portal-42-run-merge-1",
+    "slots" => {
+      "repo_alpha" => {
+        "runtime_path" => "/agent/workspaces/merge-Portal-42-run-merge-1/repo-alpha",
+        "target_ref" => "refs/heads/main",
+        "source_ref" => "refs/heads/a3/work/Portal-42",
+        "merge_before_head" => "abc123",
+        "source_head_commit" => "def456",
+        "conflict_files" => ["docs/conflict.md"],
+        "commit_message" => "Recover Portal#42 merge"
+      }
+    }
+  }
+  request = described_class.new(
+    job_id: "job-portal-42-merge-recovery",
+    task_ref: "Portal#42",
+    phase: :merge,
+    runtime_profile: "host-local",
+    source_descriptor: source_descriptor,
+    merge_recovery_request: merge_recovery_request,
+    working_dir: ".",
+    command: "a3-agent-merge-recovery",
+    args: [],
+    env: {},
+    timeout_seconds: 600,
+    artifact_rules: []
+  )
+
+  expect(request.request_form.fetch("merge_recovery_request")).to eq(merge_recovery_request)
+  expect(described_class.from_request_form(request.request_form)).to eq(request)
+end
+
   it "fails closed on unsupported phases and non-positive timeouts" do
     expect do
       described_class.new(

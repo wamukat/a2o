@@ -253,12 +253,20 @@ RSpec.describe "A3 CLI worker gateway options" do
         agent_runtime_profile: "host-local",
         agent_source_aliases: {
           "repo_alpha" => "portal-alpha"
+        },
+        worker_command: "a3-worker",
+        worker_command_args: ["--run"],
+        agent_env: {
+          "A3_ENV" => "test"
         }
       },
       fallback: instance_double(A3::Infra::DisabledMergeRunner)
     )
 
     expect(runner).to be_a(A3::Infra::AgentMergeRunner)
+    expect(runner.instance_variable_get(:@merge_recovery_command)).to eq("a3-worker")
+    expect(runner.instance_variable_get(:@merge_recovery_args)).to eq(["--run"])
+    expect(runner.instance_variable_get(:@merge_recovery_env)).to eq("A3_ENV" => "test")
   end
 
   it "requires source aliases for the agent HTTP merge runner" do
