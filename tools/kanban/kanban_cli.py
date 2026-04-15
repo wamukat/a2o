@@ -430,10 +430,9 @@ def soloboard_find_lane_name(board_shell: dict[str, Any], lane_id: int) -> str |
 
 
 def soloboard_resolved(ticket: dict[str, Any]) -> bool:
-    for key in ("isResolved", "isDone", "isCompleted"):
-        if key in ticket:
-            return bool(ticket.get(key))
-    return False
+    if "isResolved" not in ticket:
+        raise RuntimeError("SoloBoard ticket response is missing isResolved.")
+    return bool(ticket["isResolved"])
 
 
 def soloboard_normalize_ticket(ticket: dict[str, Any], *, board_title: str, board_shell: dict[str, Any] | None = None) -> dict[str, Any]:

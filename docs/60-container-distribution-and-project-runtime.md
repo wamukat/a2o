@@ -1286,7 +1286,7 @@ SoloBoard は `board`, `lane`, `ticket`, `comment`, `label`, `blocker`, `parent/
 
 - step 1: `task kanban:api -- ...` の current contract を固定し、A3 Engine が実際に使う command/output shape を regression test で保護する
 - step 2: `a3-engine/tools/kanban/kanban_cli.py` の SoloBoard adapter 境界を維持し、A3 domain rule が SoloBoard API shape に漏れないことを regression test で保護する
-- step 3: `project -> board`, `status -> lane`, `done flag -> isResolved` を adapter 規約として固定し、canonical ref `Portal#123` を維持する。`isCompleted` は SoloBoard 側の legacy alias として読み取り fallback のみに留め、A3 からの更新 payload では使わない
+- step 3: `project -> board`, `status -> lane`, `done flag -> isResolved` を adapter 規約として固定し、canonical ref `Portal#123` を維持する。A3 は `isDone` / `isCompleted` を読まない。SoloBoard API contract から `isResolved` が欠落した場合は互換 fallback で隠さず、adapter/API 不整合として検出する
 - step 4: relation は現行利用が濃い `subtask` と blocking 系を優先し、workspace 実使用の薄い relation kind は必要になるまで広げない
 - step 5: `Taskfile` / bootstrap / doctor / up/down を SoloBoard runtime に差し替えて validation し、operator surface が維持されることを確認する
 - step 5a: bootstrap には board 作成だけでなく、lane 順序整備、tag 初期化、`Portal` / `OIDC` / `A3Engine` board の初期 seed、初回 ticket 作成まで含める
