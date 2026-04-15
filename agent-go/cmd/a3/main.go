@@ -72,14 +72,14 @@ func run(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer
 
 func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage:")
-	fmt.Fprintln(w, "  a3 version")
-	fmt.Fprintln(w, "  a3 project bootstrap --package DIR")
-	fmt.Fprintln(w, "  a3 runtime up [--build]")
-	fmt.Fprintln(w, "  a3 runtime doctor")
-	fmt.Fprintln(w, "  a3 runtime run-once [--max-steps N] [--agent-attempts N]")
-	fmt.Fprintln(w, "  a3 runtime loop [--interval DURATION] [--max-cycles N] [--max-steps N] [--agent-attempts N]")
-	fmt.Fprintln(w, "  a3 agent target")
-	fmt.Fprintln(w, "  a3 agent install --target auto --output PATH [--build]")
+	fmt.Fprintln(w, "  a2o version")
+	fmt.Fprintln(w, "  a2o project bootstrap --package DIR")
+	fmt.Fprintln(w, "  a2o runtime up [--build]")
+	fmt.Fprintln(w, "  a2o runtime doctor")
+	fmt.Fprintln(w, "  a2o runtime run-once [--max-steps N] [--agent-attempts N]")
+	fmt.Fprintln(w, "  a2o runtime loop [--interval DURATION] [--max-cycles N] [--max-steps N] [--agent-attempts N]")
+	fmt.Fprintln(w, "  a2o agent target")
+	fmt.Fprintln(w, "  a2o agent install --target auto --output PATH [--build]")
 }
 
 func runProject(args []string, stdout io.Writer, stderr io.Writer) int {
@@ -315,8 +315,9 @@ func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) er
 	}
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
 	fmt.Fprintf(stdout, "runtime_up=docker compose -p %s -f %s up -d %s soloboard\n", config.ComposeProject, config.ComposeFile, config.RuntimeService)
-	fmt.Fprintf(stdout, "agent_install=a3 agent install --target auto --output ./.work/a3-agent/bin/a3-agent\n")
-	fmt.Fprintf(stdout, "runtime_run_once=a3 runtime run-once\n")
+	fmt.Fprintf(stdout, "agent_install=a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent\n")
+	fmt.Fprintf(stdout, "runtime_run_once=a2o runtime run-once\n")
+	fmt.Fprintf(stdout, "runtime_loop=a2o runtime loop\n")
 	return nil
 }
 
@@ -571,12 +572,17 @@ func defaultComposeFile() string {
 	candidates := []string{}
 	if executablePath, err := os.Executable(); err == nil {
 		executableDir := filepath.Dir(executablePath)
-		candidates = append(candidates, filepath.Join(executableDir, "..", "share", "a3", "docker", "compose", "a3-portal-soloboard.yml"))
+		candidates = append(
+			candidates,
+			filepath.Join(executableDir, "..", "share", "a2o", "docker", "compose", "a3-portal-soloboard.yml"),
+			filepath.Join(executableDir, "..", "share", "a3", "docker", "compose", "a3-portal-soloboard.yml"),
+		)
 	}
 	candidates = append(candidates,
 		"a3-engine/docker/compose/a3-portal-soloboard.yml",
 		"docker/compose/a3-portal-soloboard.yml",
 		"../docker/compose/a3-portal-soloboard.yml",
+		"../share/a2o/docker/compose/a3-portal-soloboard.yml",
 		"../share/a3/docker/compose/a3-portal-soloboard.yml",
 	)
 	for _, candidate := range candidates {
@@ -592,9 +598,11 @@ func defaultRuntimeImage() string {
 		return value
 	}
 	if executablePath, err := os.Executable(); err == nil {
-		path := filepath.Join(filepath.Dir(executablePath), "..", "share", "a3", "runtime-image")
-		if body, err := os.ReadFile(path); err == nil {
-			return strings.TrimSpace(string(body))
+		for _, shareName := range []string{"a2o", "a3"} {
+			path := filepath.Join(filepath.Dir(executablePath), "..", "share", shareName, "runtime-image")
+			if body, err := os.ReadFile(path); err == nil {
+				return strings.TrimSpace(string(body))
+			}
 		}
 	}
 	return ""
@@ -644,7 +652,7 @@ func findInstanceConfig(start string) (string, error) {
 		}
 		parent := filepath.Dir(current)
 		if parent == current {
-			return "", fmt.Errorf("A3 runtime instance config not found; run `a3 project bootstrap --package ./a3-project` first")
+			return "", fmt.Errorf("A3 runtime instance config not found; run `a2o project bootstrap --package ./a2o-project` first")
 		}
 		current = parent
 	}
@@ -747,7 +755,12 @@ func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttem
 		overrides["A3_RUNTIME_RUN_ONCE_HOST_ROOT_DIR"] = config.WorkspaceRoot
 		overrides["A3_RUNTIME_RUN_ONCE_HOST_ROOT"] = filepath.Join(config.WorkspaceRoot, ".work", "a3", "runtime-host-agent")
 		overrides["A3_RUNTIME_RUN_ONCE_AGENT_WORKSPACE_ROOT"] = filepath.Join(config.WorkspaceRoot, ".work", "a3", "runtime-host-agent", "workspaces")
-		overrides["A3_HOST_AGENT_BIN"] = filepath.Join(config.WorkspaceRoot, ".work", "a3-agent", "bin", "a3-agent")
+		publicAgentPath := filepath.Join(config.WorkspaceRoot, ".work", "a2o-agent", "bin", "a2o-agent")
+		if _, err := os.Stat(publicAgentPath); err == nil {
+			overrides["A3_HOST_AGENT_BIN"] = publicAgentPath
+		} else {
+			overrides["A3_HOST_AGENT_BIN"] = filepath.Join(config.WorkspaceRoot, ".work", "a3-agent", "bin", "a3-agent")
+		}
 	}
 	if strings.TrimSpace(config.ComposeProject) != "" {
 		overrides["A3_BRANCH_NAMESPACE"] = config.ComposeProject

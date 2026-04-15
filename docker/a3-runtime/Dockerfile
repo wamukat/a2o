@@ -64,7 +64,8 @@ RUN cd /tmp/a3-engine \
 
 COPY --from=agent-builder /opt/a3/agents /opt/a3/agents
 
-RUN ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a3
+RUN ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a3 \
+    && ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a2o
 
 ENV A3_ROOT_DIR=/workspace
 ENV A3_AGENT_PACKAGE_DIR=/opt/a3/agents

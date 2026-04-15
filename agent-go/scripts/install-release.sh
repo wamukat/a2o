@@ -79,8 +79,10 @@ else
   exit 2
 fi
 
+install -m 0755 "${binary_source}" "${BIN_DIR}/a2o-agent"
 install -m 0755 "${binary_source}" "${BIN_DIR}/a3-agent"
-echo "installed ${BIN_DIR}/a3-agent"
-if ! command -v a3-agent >/dev/null 2>&1; then
+echo "installed ${BIN_DIR}/a2o-agent"
+echo "installed compatibility alias ${BIN_DIR}/a3-agent"
+if ! command -v a2o-agent >/dev/null 2>&1; then
   echo "note: ${BIN_DIR} is not currently on PATH"
 fi

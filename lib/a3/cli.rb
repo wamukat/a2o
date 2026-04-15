@@ -704,11 +704,15 @@ module A3
       installed_targets = install_host_launchers(package_dir: package_dir, output_dir: output_dir)
       installed_share_dir = install_host_share_assets(share_dir: share_dir)
       install_runtime_image_reference(share_dir: share_dir, runtime_image: options[:runtime_image])
-      wrapper_path = File.join(output_dir, "a3")
+      wrapper_path = File.join(output_dir, "a2o")
       File.write(wrapper_path, host_launcher_wrapper)
       FileUtils.chmod(0o755, wrapper_path)
+      compat_wrapper_path = File.join(output_dir, "a3")
+      File.write(compat_wrapper_path, host_launcher_wrapper)
+      FileUtils.chmod(0o755, compat_wrapper_path)
 
       out.puts("host_launcher_installed output=#{wrapper_path} targets=#{installed_targets.join(',')}")
+      out.puts("host_launcher_alias output=#{compat_wrapper_path}")
       out.puts("host_share_installed output=#{installed_share_dir}") if installed_share_dir
       out.puts("host_runtime_image=#{options[:runtime_image]}") if options[:runtime_image]
     end
@@ -786,6 +790,9 @@ module A3
         destination = File.join(output_dir, "a3-#{target}")
         FileUtils.cp(source, destination)
         FileUtils.chmod(0o755, destination)
+        public_destination = File.join(output_dir, "a2o-#{target}")
+        FileUtils.cp(source, public_destination)
+        FileUtils.chmod(0o755, public_destination)
         target
       end
       raise A3::Domain::ConfigurationError, "host launcher binaries not found under #{package_dir}" if targets.empty?
@@ -829,9 +836,13 @@ module A3
         esac
 
         dir="$(CDPATH= cd "$(dirname "$0")" && pwd)"
-        binary="$dir/a3-$os_part-$arch_part"
+        command_name="$(basename "$0")"
+        case "$command_name" in
+          a2o) binary="$dir/a2o-$os_part-$arch_part" ;;
+          *) binary="$dir/a3-$os_part-$arch_part" ;;
+        esac
         if [ ! -x "$binary" ]; then
-          echo "A3 host launcher not found for ${os_part}-${arch_part}: $binary" >&2
+          echo "A2O host launcher not found for ${os_part}-${arch_part}: $binary" >&2
           exit 1
         fi
         exec "$binary" "$@"

@@ -147,6 +147,38 @@ func TestRuntimeUpUsesBootstrappedInstanceConfig(t *testing.T) {
 	}
 }
 
+func TestRuntimeCommandPlanUsesPublicA2OCommands(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    filepath.Join(tempDir, "package"),
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "command-plan"}, &fakeRunner{}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	for _, want := range []string{
+		"agent_install=a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent",
+		"runtime_run_once=a2o runtime run-once",
+		"runtime_loop=a2o runtime loop",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("command plan missing %q in %q", want, output)
+		}
+	}
+}
+
 func TestAgentInstallUsesBootstrappedInstanceConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	outputPath := filepath.Join(tempDir, "bin", "a3-agent")
@@ -226,6 +258,44 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	}
 	if runner.lastEnv["A3_HOST_AGENT_BIN"] != filepath.Join(tempDir, ".work", "a3-agent", "bin", "a3-agent") {
 		t.Fatalf("agent bin env=%q", runner.lastEnv["A3_HOST_AGENT_BIN"])
+	}
+}
+
+func TestRuntimeRunOncePrefersPublicA2OAgentPath(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	writeRuntimeScript(t, packageDir)
+	publicAgentPath := filepath.Join(tempDir, ".work", "a2o-agent", "bin", "a2o-agent")
+	if err := os.MkdirAll(filepath.Dir(publicAgentPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(publicAgentPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if runner.lastEnv["A3_HOST_AGENT_BIN"] != publicAgentPath {
+		t.Fatalf("agent bin env=%q, want %q", runner.lastEnv["A3_HOST_AGENT_BIN"], publicAgentPath)
 	}
 }
 
