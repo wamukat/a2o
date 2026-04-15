@@ -65,6 +65,7 @@ module A3
 
           return :blocked
         end
+        return :retryable if run.phase == :merge && execution.merge_recovery_required?
         return :rework if run.phase == :review && execution.rework_required?
 
         :blocked

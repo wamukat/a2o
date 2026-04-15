@@ -555,6 +555,156 @@ func TestWorkspaceMaterializerRejectsUnknownMergePolicy(t *testing.T) {
 	}
 }
 
+func TestWorkspaceMaterializerRetainsMergeWorkspaceOnContentConflict(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "repo-alpha")
+	if err := os.WriteFile(filepath.Join(sourceRoot, "conflict.txt"), []byte("base\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "conflict.txt")
+	gitTestCommit(t, sourceRoot, "base conflict file")
+	base := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
+	git(t, sourceRoot, "branch", "-f", "a3/live", base)
+	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", base)
+
+	git(t, sourceRoot, "checkout", "-q", "-B", "target-edit", "a3/live")
+	if err := os.WriteFile(filepath.Join(sourceRoot, "conflict.txt"), []byte("target\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "conflict.txt")
+	gitTestCommit(t, sourceRoot, "target edit")
+	targetHead := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
+	git(t, sourceRoot, "branch", "-f", "a3/live", targetHead)
+
+	git(t, sourceRoot, "checkout", "-q", "-B", "source-edit", base)
+	if err := os.WriteFile(filepath.Join(sourceRoot, "conflict.txt"), []byte("source\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "conflict.txt")
+	gitTestCommit(t, sourceRoot, "source edit")
+	sourceHead := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
+	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", sourceHead)
+
+	descriptor, execution := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": sourceRoot,
+		},
+	}.Merge(MergeRequest{
+		WorkspaceID: "merge-Portal-42",
+		Policy:      "ff_or_merge",
+		Slots: map[string]MergeSlotRequest{
+			"repo_alpha": {
+				Source: WorkspaceSourceRequest{
+					Kind:  "local_git",
+					Alias: "repo-alpha",
+				},
+				SourceRef: "refs/heads/a3/work/Portal-42",
+				TargetRef: "refs/heads/a3/live",
+			},
+		},
+	})
+
+	if execution.Status != "failed" {
+		t.Fatalf("expected merge conflict failure, got %#v", execution)
+	}
+	slot := descriptor.SlotDescriptors["repo_alpha"]
+	if slot["merge_status"] != "conflicted" || slot["merge_recovery_candidate"] != true {
+		t.Fatalf("missing recovery candidate evidence: %#v", slot)
+	}
+	conflictFiles, ok := slot["conflict_files"].([]string)
+	if !ok || len(conflictFiles) != 1 || conflictFiles[0] != "conflict.txt" {
+		t.Fatalf("unexpected conflict files: %#v", slot["conflict_files"])
+	}
+	runtimePath, ok := slot["runtime_path"].(string)
+	if !ok || runtimePath == "" {
+		t.Fatalf("missing runtime path: %#v", slot)
+	}
+	if _, err := os.Stat(runtimePath); err != nil {
+		t.Fatalf("merge workspace was not retained: %v", err)
+	}
+	if head := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "refs/heads/a3/live")); head != targetHead {
+		t.Fatalf("target branch advanced during conflicted merge: got=%s want=%s", head, targetHead)
+	}
+	if status := git(t, runtimePath, "status", "--porcelain"); !strings.Contains(status, "UU conflict.txt") {
+		t.Fatalf("retained workspace does not contain unresolved conflict: %s", status)
+	}
+	if !strings.Contains(string(execution.CombinedLog), "CONFLICT") {
+		t.Fatalf("merge conflict log was not preserved: %s", execution.CombinedLog)
+	}
+}
+
+func TestWorkspaceMaterializerRollsBackNonRecoverableMergeConflict(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "repo-alpha")
+	base := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
+	git(t, sourceRoot, "branch", "-f", "a3/live", base)
+	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", base)
+
+	git(t, sourceRoot, "checkout", "-q", "-B", "target-edit", "a3/live")
+	if err := os.WriteFile(filepath.Join(sourceRoot, "duplicate.txt"), []byte("target\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "duplicate.txt")
+	gitTestCommit(t, sourceRoot, "target adds duplicate file")
+	targetHead := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
+	git(t, sourceRoot, "branch", "-f", "a3/live", targetHead)
+
+	git(t, sourceRoot, "checkout", "-q", "-B", "source-edit", base)
+	if err := os.WriteFile(filepath.Join(sourceRoot, "duplicate.txt"), []byte("source\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "duplicate.txt")
+	gitTestCommit(t, sourceRoot, "source adds duplicate file")
+	sourceHead := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
+	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", sourceHead)
+
+	descriptor, execution := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": sourceRoot,
+		},
+	}.Merge(MergeRequest{
+		WorkspaceID: "merge-Portal-42",
+		Policy:      "ff_or_merge",
+		Slots: map[string]MergeSlotRequest{
+			"repo_alpha": {
+				Source: WorkspaceSourceRequest{
+					Kind:  "local_git",
+					Alias: "repo-alpha",
+				},
+				SourceRef: "refs/heads/a3/work/Portal-42",
+				TargetRef: "refs/heads/a3/live",
+			},
+		},
+	})
+
+	if execution.Status != "failed" {
+		t.Fatalf("expected non-recoverable merge conflict failure, got %#v", execution)
+	}
+	slot := descriptor.SlotDescriptors["repo_alpha"]
+	if slot["merge_recovery_candidate"] != false || slot["merge_recovery_workspace_retained"] != false {
+		t.Fatalf("non-recoverable conflict must not be a recovery candidate: %#v", slot)
+	}
+	if slot["merge_status"] != "failed" {
+		t.Fatalf("expected failed merge status after rollback: %#v", slot)
+	}
+	statuses, ok := slot["conflict_statuses"].(map[string]string)
+	if !ok || statuses["duplicate.txt"] != "AA" {
+		t.Fatalf("unexpected conflict statuses: %#v", slot["conflict_statuses"])
+	}
+	runtimePath, ok := slot["runtime_path"].(string)
+	if !ok || runtimePath == "" {
+		t.Fatalf("missing runtime path: %#v", slot)
+	}
+	if _, err := os.Stat(runtimePath); !os.IsNotExist(err) {
+		t.Fatalf("non-recoverable merge workspace should be removed, stat err=%v", err)
+	}
+	if head := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "refs/heads/a3/live")); head != targetHead {
+		t.Fatalf("target branch advanced during failed merge: got=%s want=%s", head, targetHead)
+	}
+}
+
 func TestWorkspaceMaterializerRemovesBootstrappedTargetRefOnMergeFailure(t *testing.T) {
 	tmp := t.TempDir()
 	sourceRoot := createGitSource(t, tmp, "repo-alpha")
@@ -684,6 +834,13 @@ func createGitSource(t *testing.T, root string, name string) string {
 func git(t *testing.T, root string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+	cmd.Env = append(os.Environ(),
+		"GIT_CONFIG_COUNT=2",
+		"GIT_CONFIG_KEY_0=commit.gpgsign",
+		"GIT_CONFIG_VALUE_0=false",
+		"GIT_CONFIG_KEY_1=core.hooksPath",
+		"GIT_CONFIG_VALUE_1=/dev/null",
+	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v failed: %v: %s", args, err, out)
@@ -691,8 +848,20 @@ func git(t *testing.T, root string, args ...string) string {
 	return string(out)
 }
 
+func gitTestCommit(t *testing.T, root string, message string) string {
+	t.Helper()
+	return git(t, root, "-c", "commit.gpgsign=false", "commit", "--no-gpg-sign", "--no-verify", "-q", "-m", message)
+}
+
 func gitMaybe(root string, args ...string) (string, error) {
 	cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+	cmd.Env = append(os.Environ(),
+		"GIT_CONFIG_COUNT=2",
+		"GIT_CONFIG_KEY_0=commit.gpgsign",
+		"GIT_CONFIG_VALUE_0=false",
+		"GIT_CONFIG_KEY_1=core.hooksPath",
+		"GIT_CONFIG_VALUE_1=/dev/null",
+	)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }

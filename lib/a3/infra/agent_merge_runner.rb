@@ -27,7 +27,7 @@ module A3
         return completed if completed.is_a?(A3::Application::ExecutionResult)
 
         result = completed.result
-        return failed_merge_result(result) unless result.succeeded?
+        return failed_merge_result(merge_plan, result) unless result.succeeded?
 
         evidence = validate_merge_evidence(merge_plan, result)
         return evidence if evidence.is_a?(A3::Application::ExecutionResult)
@@ -130,20 +130,70 @@ module A3
         )
       end
 
-      def failed_merge_result(result)
+      def failed_merge_result(merge_plan, result)
+        recovery_candidate = merge_recovery_candidate(merge_plan, result)
+        diagnostics = {
+          "agent_job_result" => result.result_form,
+          "control_plane_url" => control_plane_url
+        }
+        response_bundle = {
+          "agent_job_result" => result.result_form
+        }
+        observed_state = result.status.to_s
+        if recovery_candidate
+          diagnostics["merge_recovery"] = recovery_candidate
+          response_bundle["merge_recovery"] = recovery_candidate
+          response_bundle["merge_recovery_required"] = true
+          observed_state = "merge_recovery_candidate"
+        end
+
         A3::Application::ExecutionResult.new(
           success: false,
           summary: result.summary,
           failing_command: "agent_merge_job",
-          observed_state: result.status.to_s,
-          diagnostics: {
-            "agent_job_result" => result.result_form,
-            "control_plane_url" => control_plane_url
-          },
-          response_bundle: {
-            "agent_job_result" => result.result_form
-          }
+          observed_state: observed_state,
+          diagnostics: diagnostics,
+          response_bundle: response_bundle
         )
+      end
+
+      def merge_recovery_candidate(merge_plan, result)
+        descriptors = result.workspace_descriptor&.slot_descriptors || {}
+        candidate_slots = descriptors.each_with_object([]) do |(slot_name, descriptor), slots|
+          next unless descriptor["merge_recovery_candidate"] == true
+
+          slots << {
+            "slot" => slot_name.to_s,
+            "runtime_path" => descriptor["runtime_path"],
+            "target_ref" => descriptor["merge_target_ref"],
+            "source_ref" => descriptor["merge_source_ref"],
+            "merge_before_head" => descriptor["merge_before_head"],
+            "source_head_commit" => descriptor["source_head_commit"],
+            "conflict_files" => Array(descriptor["conflict_files"]).map(&:to_s),
+            "resolved_conflict_files" => Array(descriptor["resolved_conflict_files"]).map(&:to_s)
+          }
+        end
+        return nil if candidate_slots.empty?
+
+        {
+          "required" => true,
+          "recovery_id" => "merge-recovery-#{safe_id(result.job_id)}",
+          "merge_run_ref" => merge_plan.run_ref,
+          "target_ref" => merge_plan.integration_target.target_ref,
+          "source_ref" => merge_plan.merge_source.source_ref,
+          "merge_before_head" => candidate_slots.map { |slot| slot["merge_before_head"] }.compact.first,
+          "source_head_commit" => candidate_slots.map { |slot| slot["source_head_commit"] }.compact.first,
+          "conflict_files" => candidate_slots.flat_map { |slot| Array(slot["conflict_files"]) }.uniq.sort,
+          "resolved_conflict_files" => candidate_slots.flat_map { |slot| Array(slot["resolved_conflict_files"]) }.uniq.sort,
+          "worker_result_ref" => nil,
+          "changed_files" => [],
+          "marker_scan_result" => nil,
+          "verification_run_ref" => nil,
+          "publish_before_head" => nil,
+          "publish_after_head" => nil,
+          "status" => result.status.to_s,
+          "slots" => candidate_slots
+        }
       end
 
       def validate_merge_evidence(merge_plan, result)

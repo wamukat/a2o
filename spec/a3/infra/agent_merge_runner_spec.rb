@@ -116,6 +116,74 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     expect(execution.diagnostics.fetch("validation_errors")).to include("repo_alpha.merge_status must be merged")
   end
 
+  it "surfaces conflicted agent merge evidence as a merge recovery candidate" do
+    client.on_fetch = lambda do |job_id|
+      client.complete(job_id, agent_result(
+        job_id,
+        workspace_descriptor(
+          "repo_alpha" => {
+            "runtime_path" => "/agent/workspaces/merge-Portal-42-run-merge-1/repo-alpha",
+            "source_alias" => "member-portal-starters",
+            "merge_source_ref" => "refs/heads/a3/work/Portal-42",
+            "merge_target_ref" => "refs/heads/main",
+            "merge_policy" => "ff_or_merge",
+            "merge_before_head" => "abc123",
+            "source_head_commit" => "def456",
+            "merge_status" => "conflicted",
+            "merge_recovery_candidate" => true,
+            "merge_recovery_workspace_retained" => true,
+            "conflict_files" => ["docs/conflict.md"],
+            "resolved_conflict_files" => []
+          }
+        ),
+        status: :failed,
+        exit_code: 1,
+        summary: "merge conflicted"
+      ))
+    end
+
+    execution = runner.run(merge_plan, workspace: workspace)
+
+    expect(execution).to have_attributes(
+      success?: false,
+      failing_command: "agent_merge_job",
+      observed_state: "merge_recovery_candidate"
+    )
+    recovery = execution.diagnostics.fetch("merge_recovery")
+    expect(recovery).to include(
+      "required" => true,
+      "recovery_id" => "merge-recovery-merge-run-merge-1-job-1",
+      "merge_run_ref" => "run-merge-1",
+      "target_ref" => "refs/heads/main",
+      "source_ref" => "refs/heads/a3/work/Portal-42",
+      "merge_before_head" => "abc123",
+      "source_head_commit" => "def456",
+      "conflict_files" => ["docs/conflict.md"],
+      "resolved_conflict_files" => [],
+      "worker_result_ref" => nil,
+      "changed_files" => [],
+      "marker_scan_result" => nil,
+      "verification_run_ref" => nil,
+      "publish_before_head" => nil,
+      "publish_after_head" => nil,
+      "status" => "failed"
+    )
+    expect(recovery.fetch("slots")).to contain_exactly(
+      include(
+        "slot" => "repo_alpha",
+        "runtime_path" => "/agent/workspaces/merge-Portal-42-run-merge-1/repo-alpha",
+        "target_ref" => "refs/heads/main",
+        "source_ref" => "refs/heads/a3/work/Portal-42",
+        "merge_before_head" => "abc123",
+        "source_head_commit" => "def456",
+        "conflict_files" => ["docs/conflict.md"],
+        "resolved_conflict_files" => []
+      )
+    )
+    expect(execution.response_bundle.fetch("merge_recovery")).to eq(recovery)
+    expect(execution.response_bundle.fetch("merge_recovery_required")).to be(true)
+  end
+
   it "rejects extra merge slot descriptors" do
     client.on_fetch = lambda do |job_id|
       client.complete(job_id, agent_result(job_id, workspace_descriptor(
@@ -171,14 +239,14 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     expect(execution.diagnostics.fetch("validation_errors")).to include("repo_alpha.source_alias must match configured agent source alias")
   end
 
-  def agent_result(job_id, workspace_descriptor)
+  def agent_result(job_id, workspace_descriptor, status: :succeeded, exit_code: 0, summary: "merge succeeded")
     A3::Domain::AgentJobResult.new(
       job_id: job_id,
-      status: :succeeded,
-      exit_code: 0,
+      status: status,
+      exit_code: exit_code,
       started_at: "2026-04-12T00:00:00Z",
       finished_at: "2026-04-12T00:00:01Z",
-      summary: "merge succeeded",
+      summary: summary,
       log_uploads: [],
       artifact_uploads: [],
       workspace_descriptor: workspace_descriptor,

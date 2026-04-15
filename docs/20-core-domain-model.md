@@ -128,6 +128,8 @@ phase は次の 4 つだけを正式採用する。
 - `verification`
 - `merge`
 
+`merge_recovery` は正式 phase ではない。Git merge conflict が recoverable class の場合だけ、`merge` phase 内の recovery lane として AI worker action を起動する。domain の phase order は増やさず、`merge` の terminal outcome を `completed` / `blocked` / `retryable` に分類する。
+
 ### 6.1 Single の phase order
 
 1. `implementation`

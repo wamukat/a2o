@@ -173,6 +173,45 @@ RSpec.describe A3::Application::RunMerge do
     expect(result.run.phase_records.last.blocked_diagnosis&.observed_state).to eq("non-fast-forward")
   end
 
+  it "keeps recoverable merge conflicts retryable for the merge recovery lane" do
+    allow(prepare_workspace).to receive(:call).and_return(
+      A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
+    )
+    allow(merge_runner).to receive(:run).with(
+      an_instance_of(A3::Domain::MergePlan),
+      workspace: prepared_workspace
+    ).and_return(
+      A3::Application::ExecutionResult.new(
+        success: false,
+        summary: "merge conflicted",
+        failing_command: "agent_merge_job",
+        observed_state: "merge_recovery_candidate",
+        diagnostics: {
+          "merge_recovery" => {
+            "required" => true,
+            "conflict_files" => ["docs/conflict.md"]
+          }
+        },
+        response_bundle: {
+          "merge_recovery_required" => true,
+          "merge_recovery" => {
+            "required" => true,
+            "conflict_files" => ["docs/conflict.md"]
+          }
+        }
+      )
+    )
+
+    result = use_case.call(task_ref: task.ref, run_ref: run.ref, project_context: project_context)
+
+    expect(result.task.status).to eq(:merging)
+    expect(result.run.terminal_outcome).to eq(:retryable)
+    expect(result.run.phase_records.last.blocked_diagnosis).to be_nil
+    expect(result.run.phase_records.last.execution_record).to have_attributes(
+      observed_state: "merge_recovery_candidate"
+    )
+  end
+
   it "records parent merge against the integration branch and completes to done" do
     parent_task = A3::Domain::Task.new(
       ref: "A3-v2#3022",

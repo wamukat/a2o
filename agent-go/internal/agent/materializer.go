@@ -48,6 +48,24 @@ type mergePlan struct {
 	createdRef  bool
 }
 
+type mergeConflictError struct {
+	plan mergePlan
+	err  error
+}
+
+type unmergedFile struct {
+	status string
+	path   string
+}
+
+func (e mergeConflictError) Error() string {
+	return e.err.Error()
+}
+
+func (e mergeConflictError) Unwrap() error {
+	return e.err
+}
+
 func (m WorkspaceMaterializer) Prepare(request WorkspaceRequest) (PreparedWorkspace, error) {
 	root, err := m.workspaceRoot(request.WorkspaceID)
 	if err != nil {
@@ -180,6 +198,16 @@ func (m WorkspaceMaterializer) prepareMergePlans(request MergeRequest, descripto
 			rollbackMergePlans(plans)
 			return nil, err
 		}
+		sourceHead, err := gitOutput(sourceRoot, "rev-parse", slot.SourceRef)
+		if err != nil {
+			rollbackMergePlans(append(plans, mergePlan{
+				sourceRoot: sourceRoot,
+				targetRef:  slot.TargetRef,
+				beforeHead: beforeHead,
+				createdRef: createdRef,
+			}))
+			return nil, err
+		}
 		worktree := filepath.Join(root, slotDirectory(slotName))
 		if err := os.RemoveAll(worktree); err != nil {
 			rollbackMergePlans(append(plans, mergePlan{
@@ -197,6 +225,7 @@ func (m WorkspaceMaterializer) prepareMergePlans(request MergeRequest, descripto
 			"merge_source_ref":     slot.SourceRef,
 			"merge_target_ref":     slot.TargetRef,
 			"merge_before_head":    beforeHead,
+			"source_head_commit":   sourceHead,
 			"merge_policy":         request.Policy,
 			"merge_status":         "prepared",
 			"dirty_before":         false,
@@ -227,6 +256,24 @@ func executeMergePlans(plans []mergePlan, policy string) error {
 		}
 		current.initialized = true
 		if err := runGit(current.worktree, mergeGitArgs(policy, current.sourceRef)...); err != nil {
+			if unmergedFiles, conflictErr := gitUnmergedFiles(current.worktree); conflictErr == nil && len(unmergedFiles) > 0 {
+				conflictFiles := unmergedPaths(unmergedFiles)
+				current.descriptor["merge_status"] = "conflicted"
+				current.descriptor["merge_error"] = err.Error()
+				current.descriptor["conflict_files"] = conflictFiles
+				current.descriptor["conflict_statuses"] = unmergedStatuses(unmergedFiles)
+				if recoverableContentConflict(unmergedFiles) {
+					current.descriptor["merge_recovery_candidate"] = true
+					current.descriptor["merge_recovery_workspace_retained"] = true
+					current.descriptor["resolved_conflict_files"] = []string{}
+					return errors.Join(mergeConflictError{plan: current, err: err}, rollbackMergePlans(merged))
+				}
+				rollbackErr := rollbackMergePlans(append(merged, current))
+				current.descriptor["merge_status"] = "failed"
+				current.descriptor["merge_recovery_candidate"] = false
+				current.descriptor["merge_recovery_workspace_retained"] = false
+				return errors.Join(err, rollbackErr)
+			}
 			return errors.Join(err, rollbackMergePlans(append(merged, current)))
 		}
 		afterHead, err := gitOutput(current.worktree, "rev-parse", "HEAD")
@@ -294,6 +341,75 @@ func cleanupMergeWorktrees(plans []mergePlan) error {
 		}
 	}
 	return cleanupErr
+}
+
+func gitUnmergedFiles(root string) ([]unmergedFile, error) {
+	out, err := gitOutput(root, "status", "--porcelain")
+	if err != nil {
+		return nil, err
+	}
+	if out == "" {
+		return []unmergedFile{}, nil
+	}
+	files := []unmergedFile{}
+	for _, line := range strings.FieldsFunc(out, func(char rune) bool { return char == '\n' || char == '\r' }) {
+		if len(line) < 4 {
+			continue
+		}
+		status := line[:2]
+		if !unmergedStatus(status) {
+			continue
+		}
+		files = append(files, unmergedFile{
+			status: status,
+			path:   strings.TrimSpace(line[3:]),
+		})
+	}
+	sort.Slice(files, func(left, right int) bool {
+		if files[left].path == files[right].path {
+			return files[left].status < files[right].status
+		}
+		return files[left].path < files[right].path
+	})
+	return files, nil
+}
+
+func unmergedStatus(status string) bool {
+	switch status {
+	case "DD", "AU", "UD", "UA", "DU", "AA", "UU":
+		return true
+	default:
+		return false
+	}
+}
+
+func recoverableContentConflict(files []unmergedFile) bool {
+	if len(files) == 0 {
+		return false
+	}
+	for _, file := range files {
+		if file.status != "UU" {
+			return false
+		}
+	}
+	return true
+}
+
+func unmergedPaths(files []unmergedFile) []string {
+	paths := make([]string, 0, len(files))
+	for _, file := range files {
+		paths = append(paths, file.path)
+	}
+	sort.Strings(paths)
+	return uniqueStrings(paths)
+}
+
+func unmergedStatuses(files []unmergedFile) map[string]string {
+	statuses := make(map[string]string, len(files))
+	for _, file := range files {
+		statuses[file.path] = file.status
+	}
+	return statuses
 }
 
 func ensureMergeTargetRef(root, targetRef, bootstrapRef string) (string, bool, error) {

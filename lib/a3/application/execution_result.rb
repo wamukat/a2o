@@ -23,6 +23,10 @@ module A3
         response_bundle.is_a?(Hash) && response_bundle["rework_required"] == true
       end
 
+      def merge_recovery_required?
+        response_bundle.is_a?(Hash) && response_bundle["merge_recovery_required"] == true
+      end
+
       def review_disposition
         return nil unless response_bundle.is_a?(Hash)
 
