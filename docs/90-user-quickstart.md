@@ -148,14 +148,14 @@ task a3:portal:runtime:run-once
 task a3:portal:runtime:watch-summary
 ```
 
-ただし、現時点の `a2o runtime run-once` は project package の `runtime/run_once.sh` を A2O launcher から呼ぶ互換実装である。利用者は script を直接叩かないが、後続実装で Engine の generic `runtime run-once` command に吸収する。
+`a2o runtime run-once` は A2O launcher 内の generic runtime command として実行される。Portal package の `runtime/run_once.sh` は削除済みであり、利用者も project package も実行 shell script を持たない。
 
 ## 残タスク
 
 - `a2o runtime loop` は A2O Engine の release command として実装済み。現時点では `run-once` を interval 実行する最小 loop であり、stale recovery / retention cleanup の cycle hook は後続 hardening として扱う。
 - project package loader と runtime instance config を実装し、root Taskfile 依存を release surface から外す。`a2o project bootstrap --package ./a2o-project` 後は package 指定不要とし、multi-project registry に見える `--project NAME` は標準入口にしない。
 - `a2o agent install` は release artifact に含め、runtime image から host/dev-env への binary export を利用者向け配布物として固定済み。release 前には正式 image ref で同手順を再 smoke する。
-- `scripts/a3-projects/portal/runtime/run_once.sh` の責務を Engine command へ移し、Portal 側を thin config package にする。現時点の `a2o runtime run-once` はこの script を隠蔽する互換入口である。
+- `scripts/a3-projects/portal/runtime/run_once.sh` の責務は Engine command へ移設済み。残りは Portal 固有値を project package config から読む範囲を広げ、hardcoded Portal default を減らすこと。
 - `A3_RUNTIME_RUN_ONCE_*` のような内部 env は project package / CLI option に寄せ、利用者の主要入口から隠す。
 - A2O/SoloBoard compose file は A2O 配布物として同梱し、project package 側に compose file 作成を要求しない。compose override は開発・診断用に限定する。
 - GHCR の正式 image ref が決まったら、この README の `ghcr.io/<a2o-owner>/a2o-engine:latest` placeholder を置換する。

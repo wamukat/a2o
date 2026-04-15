@@ -113,17 +113,17 @@ host launcher `a2o runtime run-once` が次を実行する。
 
 - `[done]` 利用者入口として `a2o runtime run-once` を追加する。
 - `[done]` bootstrap 済み runtime instance config から package / compose file / compose project / ports / workspace root を注入する。
-- `[done]` 現時点では project package の `runtime/run_once.sh` を呼び出し、利用者から script 直接実行を隠す。
+- `[done]` project package の `runtime/run_once.sh` 呼び出しを削除し、Go host launcher 内の generic runtime command で直接実行する。
 - `[done]` runtime instance の compose project name を `A3_BRANCH_NAMESPACE` として注入し、`refs/heads/a3/<namespace>/work/...` / `parent/...` を使う。
-- `[todo]` compose up
-- `[todo]` stale runtime process cleanup
-- `[todo]` Engine image から `a2o-agent` export/install
-- `[todo]` Engine container 内の internal `a3 agent-server` 起動
-- `[todo]` Engine container 内の internal `a3 execute-until-idle` 起動
-- `[todo]` host `a2o-agent` single-job loop
-- `[todo]` runtime log / agent log / exit code の集約
+- `[done]` compose up
+- `[done]` stale runtime process cleanup
+- `[done]` Engine image から `a2o-agent` export/install
+- `[done]` Engine container 内の internal `a3 agent-server` 起動
+- `[done]` Engine container 内の internal `a3 execute-until-idle` 起動
+- `[done]` host `a2o-agent` single-job loop
+- `[done]` runtime log / agent log / exit code の集約
 
-`scripts/a3-projects/portal/runtime/run_once.sh` は、この command を呼ぶ thin compatibility wrapper にする。
+`scripts/a3-projects/portal/runtime/run_once.sh` は削除済み。root Taskfile の互換入口は `go run ./a3-engine/agent-go/cmd/a3 runtime run-once` を呼ぶ。
 
 ### Slice 5: runtime loop
 
@@ -144,7 +144,7 @@ Portal root Taskfile は最終的に次だけを呼ぶ。
 a2o runtime run-once
 ```
 
-`scripts/a3-projects/portal/runtime/run_once.sh` は、互換期間後に削除する。Portal package に残すのは `inject/config`, `inject/hooks`, `maintenance` のみとする。
+Portal package に残すのは `inject/config`, `inject/hooks`, `maintenance` のみとし、runtime shell script は戻さない。
 
 ### Slice 7: release readiness closeout
 
@@ -165,7 +165,7 @@ a2o runtime run-once
 ## 完了条件
 
 - 利用者向け README の command が実装と一致している。
-- 利用者が `operator-tests` / `runtime/run_once.sh` の中身を読まなくても A3 を起動できる。
+- 利用者が `operator-tests` や project-local runtime shell script の中身を読まなくても A2O を起動できる。
 - Portal 固有値は project package にあり、A2O Engine core には Portal 固有 path / tag / port が焼き込まれていない。
 - `a2o-agent` は `--engine` だけで control plane URL を受け取れる。
 - `task a3:portal:runtime:run-once` は thin wrapper または削除済みであり、長い実行ロジックを保持しない。

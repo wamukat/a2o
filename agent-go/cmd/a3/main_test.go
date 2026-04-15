@@ -210,12 +210,7 @@ func TestAgentInstallUsesBootstrappedInstanceConfig(t *testing.T) {
 func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
-	runtimeDir := filepath.Join(packageDir, "runtime")
-	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	scriptPath := filepath.Join(runtimeDir, "run_once.sh")
-	if err := os.WriteFile(scriptPath, []byte("#!/usr/bin/env bash\n"), 0o755); err != nil {
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
@@ -240,9 +235,16 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 		}
 	})
 
-	assertCallContains(t, runner.joinedCalls(), "bash "+scriptPath)
-	if !strings.Contains(stdout.String(), "runtime_run_once_script="+scriptPath) {
-		t.Fatalf("stdout should describe run-once script, got %q", stdout.String())
+	joined := runner.joinedCalls()
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a3-runtime soloboard")
+	if hasCallPrefix(joined, "bash "+packageDir) {
+		t.Fatalf("run-once should not call project runtime script:\n%s", strings.Join(joined, "\n"))
+	}
+	if !strings.Contains(stdout.String(), "runtime_run_once=generic") {
+		t.Fatalf("stdout should describe generic run-once, got %q", stdout.String())
+	}
+	if !strings.Contains(strings.Join(joined, "\n"), "a3 execute-until-idle") {
+		t.Fatalf("run-once should start execute-until-idle directly, calls:\n%s", strings.Join(joined, "\n"))
 	}
 	if runner.lastEnv["A3_PORTAL_BUNDLE_COMPOSE_FILE"] != "compose.yml" {
 		t.Fatalf("compose env=%q", runner.lastEnv["A3_PORTAL_BUNDLE_COMPOSE_FILE"])
@@ -264,7 +266,9 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 func TestRuntimeRunOncePrefersPublicA2OAgentPath(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
-	writeRuntimeScript(t, packageDir)
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	publicAgentPath := filepath.Join(tempDir, ".work", "a2o-agent", "bin", "a2o-agent")
 	if err := os.MkdirAll(filepath.Dir(publicAgentPath), 0o755); err != nil {
 		t.Fatal(err)
@@ -299,10 +303,55 @@ func TestRuntimeRunOncePrefersPublicA2OAgentPath(t *testing.T) {
 	}
 }
 
+func TestRuntimeRunOnceAllowsEnvToOverrideStaleInstanceRuntimeValues(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("A3_COMPOSE_PROJECT", "env-project")
+	t.Setenv("A3_COMPOSE_FILE", "env-compose.yml")
+	t.Setenv("A3_BUNDLE_AGENT_PORT", "7555")
+	t.Setenv("PORTAL_A3_BUNDLE_STORAGE_DIR", "/var/lib/a3/env-runtime")
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "stale-compose.yml",
+		ComposeProject: "stale-project",
+		RuntimeService: "a3-runtime",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/stale-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once", "--max-steps", "1", "--agent-attempts", "1"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(joined, "docker compose -p env-project -f env-compose.yml up -d a3-runtime soloboard") {
+		t.Fatalf("run-once should use env compose override, calls:\n%s", joined)
+	}
+	if !strings.Contains(joined, "http://127.0.0.1:7555") {
+		t.Fatalf("run-once should use env agent port override, calls:\n%s", joined)
+	}
+	if !strings.Contains(joined, "/var/lib/a3/env-runtime") {
+		t.Fatalf("run-once should use env storage override, calls:\n%s", joined)
+	}
+}
+
 func TestRuntimeLoopRunsConfiguredCycles(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
-	writeRuntimeScript(t, packageDir)
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
 		SchemaVersion:  1,
 		PackagePath:    packageDir,
@@ -325,8 +374,8 @@ func TestRuntimeLoopRunsConfiguredCycles(t *testing.T) {
 		}
 	})
 
-	if count := runner.callCount("bash " + filepath.Join(packageDir, "runtime", "run_once.sh")); count != 2 {
-		t.Fatalf("run-once script call count=%d, want 2\ncalls:\n%s", count, runner.joinedCalls())
+	if count := runner.callCountContains("a3 execute-until-idle"); count != 2 {
+		t.Fatalf("execute-until-idle call count=%d, want 2\ncalls:\n%s", count, runner.joinedCalls())
 	}
 	if !strings.Contains(stdout.String(), "runtime_loop_finished cycles=2") {
 		t.Fatalf("stdout should report loop completion, got %q", stdout.String())
@@ -433,6 +482,8 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 			return []byte("\n"), nil
 		}
 		return []byte("container-123\n"), nil
+	case strings.Contains(joined, "cat '/tmp/a3-runtime-run-once.exit'"):
+		return []byte("0\n"), nil
 	case name == "docker" && len(args) >= 1 && args[0] == "cp":
 		destination := args[len(args)-1]
 		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
@@ -465,6 +516,16 @@ func (r fakeRunner) callCount(want string) int {
 	return count
 }
 
+func (r fakeRunner) callCountContains(want string) int {
+	count := 0
+	for _, call := range r.joinedCalls() {
+		if strings.Contains(call, want) {
+			count++
+		}
+	}
+	return count
+}
+
 func assertCallContains(t *testing.T, calls []string, want string) {
 	t.Helper()
 	for _, call := range calls {
@@ -473,6 +534,15 @@ func assertCallContains(t *testing.T, calls []string, want string) {
 		}
 	}
 	t.Fatalf("missing call %q in:\n%s", want, strings.Join(calls, "\n"))
+}
+
+func hasCallPrefix(calls []string, prefix string) bool {
+	for _, call := range calls {
+		if strings.HasPrefix(call, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestRunExternalIncludesOutputOnFailure(t *testing.T) {
@@ -496,18 +566,6 @@ func writeTestInstanceConfig(t *testing.T, dir string, config runtimeInstanceCon
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, body, 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func writeRuntimeScript(t *testing.T, packageDir string) {
-	t.Helper()
-	runtimeDir := filepath.Join(packageDir, "runtime")
-	if err := os.MkdirAll(runtimeDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	scriptPath := filepath.Join(runtimeDir, "run_once.sh")
-	if err := os.WriteFile(scriptPath, []byte("#!/usr/bin/env bash\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 }
