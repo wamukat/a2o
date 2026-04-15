@@ -429,6 +429,13 @@ def soloboard_find_lane_name(board_shell: dict[str, Any], lane_id: int) -> str |
     return None
 
 
+def soloboard_resolved(ticket: dict[str, Any]) -> bool:
+    for key in ("isResolved", "isDone", "isCompleted"):
+        if key in ticket:
+            return bool(ticket.get(key))
+    return False
+
+
 def soloboard_normalize_ticket(ticket: dict[str, Any], *, board_title: str, board_shell: dict[str, Any] | None = None) -> dict[str, Any]:
     lane_id = int(ticket.get("laneId") or 0)
     status = soloboard_find_lane_name(board_shell or {"lanes": []}, lane_id) if board_shell else None
@@ -438,7 +445,7 @@ def soloboard_normalize_ticket(ticket: dict[str, Any], *, board_title: str, boar
         "column_id": lane_id,
         "bucket_id": lane_id,
         "priority": int(ticket.get("priority") or 0),
-        "done": bool(ticket.get("isCompleted", False)),
+        "done": soloboard_resolved(ticket),
         "status": status,
         "title": ticket.get("title") or "",
         "description": ticket.get("bodyMarkdown") or "",
@@ -720,7 +727,7 @@ def enrich_task(task: dict[str, Any]) -> dict[str, Any]:
             "project_id": int(task.get("boardId") or 0),
             "column_id": int(task.get("laneId") or 0),
             "priority": int(task.get("priority") or 0),
-            "done": bool(task.get("isCompleted", False)),
+            "done": soloboard_resolved(task),
             "reference": task.get("ref") or "",
             "title": task.get("title") or "",
             "description": task.get("bodyMarkdown") or "",
@@ -757,7 +764,7 @@ def iterate_kanban_tasks(
     if search:
         query.append(f"q={urllib.parse.quote(search)}")
     if not include_closed:
-        query.append("completed=false")
+        query.append("resolved=false")
     path = f"/api/boards/{project_id}/tickets"
     if query:
         path += "?" + "&".join(query)
@@ -854,7 +861,7 @@ def update_task(base_url: str, token: str, task_id: int, changes: dict[str, Any]
     if "priority" in changes:
         payload["priority"] = changes["priority"]
     if "done" in changes:
-        payload["isCompleted"] = bool(changes["done"])
+        payload["isResolved"] = bool(changes["done"])
     updated = rest_request(base_url, token, "PATCH", f"/api/tickets/{task_id}", payload=payload)
     if not isinstance(updated, dict):
         raise RuntimeError(f"Task update failed: {task_id}")
@@ -937,11 +944,11 @@ def transition_task_status(
         raise RuntimeError(f"Task not found: {task_id}")
     payload: dict[str, Any] = {"laneName": status}
     target_is_done = status.strip().lower() == "done"
-    task_is_done = bool(task.get("isCompleted", False))
+    task_is_done = soloboard_resolved(task)
     if sync_done_state and target_is_done:
-        payload["isCompleted"] = True
+        payload["isResolved"] = True
     elif not target_is_done and (sync_done_state or task_is_done):
-        payload["isCompleted"] = False
+        payload["isResolved"] = False
     transitioned = rest_request(base_url, token, "PATCH", f"/api/tickets/{task_id}/transition", payload=payload)
     board_id = int(transitioned.get("boardId") or 0)
     board_shell = rest_request(base_url, token, "GET", f"/api/boards/{board_id}")
@@ -1701,8 +1708,8 @@ def build_parser() -> argparse.ArgumentParser:
         dest="sync_done_state",
         action="store_true",
         help=(
-            "Also synchronize Kanban's completion flag via closeTask/openTask. "
-            "Use this when moving to Done if you also want the task closed."
+            "Also synchronize Kanban's resolved flag. "
+            "Use this when moving to Done if you also want the task resolved."
         ),
     )
     task_transition.set_defaults(func=cmd_task_transition)
