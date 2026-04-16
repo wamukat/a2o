@@ -78,9 +78,6 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o kanban up [--build]")
 	fmt.Fprintln(w, "  a2o kanban doctor")
 	fmt.Fprintln(w, "  a2o kanban url")
-	fmt.Fprintln(w, "  a2o kanban run-once [--max-steps N] [--agent-attempts N]")
-	fmt.Fprintln(w, "  a2o kanban loop [--interval DURATION] [--max-cycles N] [--max-steps N] [--agent-attempts N]")
-	fmt.Fprintln(w, "  a2o kanban command-plan")
 	fmt.Fprintln(w, "  a2o agent target")
 	fmt.Fprintln(w, "  a2o agent install --target auto --output PATH [--build]")
 }
@@ -107,24 +104,6 @@ func runKanban(args []string, runner commandRunner, stdout io.Writer, stderr io.
 		return 0
 	case "url":
 		if err := runKanbanURL(args[1:], stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		return 0
-	case "command-plan":
-		if err := runRuntimeCommandPlan(args[1:], stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		return 0
-	case "run-once":
-		if err := runRuntimeRunOnce(args[1:], runner, stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		return 0
-	case "loop":
-		if err := runRuntimeLoop(args[1:], runner, stdout, stderr); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -317,24 +296,6 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
-	case "command-plan":
-		if err := runRuntimeCommandPlan(args[1:], stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		return 0
-	case "run-once":
-		if err := runRuntimeRunOnce(args[1:], runner, stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		return 0
-	case "loop":
-		if err := runRuntimeLoop(args[1:], runner, stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		return 0
 	default:
 		fmt.Fprintf(stderr, "unknown runtime subcommand: %s\n", args[0])
 		printUsage(stderr)
@@ -438,8 +399,6 @@ func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) er
 	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(*config))
 	fmt.Fprintf(stdout, "internal_runtime_up=docker compose -p %s -f %s up -d %s soloboard\n", config.ComposeProject, config.ComposeFile, config.RuntimeService)
 	fmt.Fprintf(stdout, "agent_install=a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent\n")
-	fmt.Fprintf(stdout, "kanban_run_once=a2o kanban run-once\n")
-	fmt.Fprintf(stdout, "kanban_loop=a2o kanban loop\n")
 	return nil
 }
 

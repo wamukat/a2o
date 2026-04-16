@@ -15,8 +15,8 @@ A2O 利用者に長い shell script を書かせない。
 
 利用者が意識する入口は次の 2 種類に絞る。
 
-- `a2o kanban ...`: A2O Engine / kanban service / runtime loop を操作する。
-- `a2o-agent ...`: project runtime 側で job を pull して実行する。通常は `a2o kanban run-once` または `a2o kanban loop` が起動補助するため、手動で直接叩く頻度は低い。
+- `a2o kanban ...`: kanban service の起動、診断、URL 確認を操作する。
+- `a2o-agent ...`: project runtime 側で job を pull して実行する。通常利用者が直接叩く頻度は低い。
 
 A2O runtime は、現行設計では「1 project package = 1 runtime instance」として扱う。1つの Engine instance に複数 project を登録して `--project NAME` で切り替える registry 型ではない。複数 project を同時に動かす場合は、project package ごとに compose project name / storage dir / port / workspace root を分けた別 runtime instance として起動する。
 
@@ -104,19 +104,15 @@ a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
 
 ## 日常実行
 
-手動で 1 cycle だけ流す場合は次だけにする。
+この slice の public surface では、利用者が通常触る kanban entrypoint は service lifecycle に限定する。
 
 ```bash
-a2o kanban run-once
+a2o kanban up
+a2o kanban doctor
+a2o kanban url
 ```
 
-繰り返し動かす場合は次にする。
-
-```bash
-a2o kanban loop
-```
-
-`run-once` は、kanban から対象 task を選び、必要な agent job を queue し、`a2o-agent` に実行させ、結果を runtime state / artifact store / kanban に反映する。利用者は `execute-until-idle` の詳細引数を直接組み立てない。
+kanban task selection、agent job queue、artifact store 反映は A2O 内部の runtime flow が担当する。利用者は `execute-until-idle` の詳細引数を直接組み立てない。
 
 ## 手動 agent 起動が必要な場合
 
@@ -130,14 +126,14 @@ a2o-agent --engine http://localhost:7393 --loop --poll-interval 2s
 
 ## Portal での現状
 
-現時点の Portal workspace では、`a2o project bootstrap` / `a2o kanban up` / `a2o kanban doctor` / `a2o agent install` / `a2o kanban run-once` は実装済みで、A2O Engine runtime image から host/dev-env 用 `a2o-agent` を export できる。内部互換として `a3 ...` も動作する。
+現時点の Portal workspace では、`a2o project bootstrap` / `a2o kanban up` / `a2o kanban doctor` / `a2o agent install` は実装済みで、A2O Engine runtime image から host/dev-env 用 `a2o-agent` を export できる。内部互換として `a3 ...` も動作する。
 
 ```bash
 a2o project bootstrap --package ./scripts/a3-projects/portal
 a2o kanban up
 a2o kanban doctor
+a2o kanban url
 a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
-a2o kanban run-once
 ```
 
 root Taskfile の互換入口も残っている。
@@ -149,11 +145,11 @@ task a3:portal:runtime:run-once
 task a3:portal:runtime:watch-summary
 ```
 
-`a2o kanban run-once` は A2O launcher 内の generic runtime command として実行される。Portal package の `runtime/run_once.sh` は削除済みであり、利用者も project package も実行 shell script を持たない。
+Portal package の `runtime/run_once.sh` は削除済みであり、利用者も project package も実行 shell script を持たない。
 
 ## 残タスク
 
-- `a2o kanban loop` は A2O Engine の release command として実装済み。現時点では `run-once` を interval 実行する最小 loop であり、stale recovery / retention cleanup の cycle hook は後続 hardening として扱う。
+- A2O Engine の execution loop は internal runtime flow として扱い、public kanban service surface へ不用意に露出しない。stale recovery / retention cleanup の cycle hook は後続 hardening として扱う。
 - project package loader と runtime instance config を実装し、root Taskfile 依存を release surface から外す。`a2o project bootstrap --package ./a2o-project` 後は package 指定不要とし、multi-project registry に見える `--project NAME` は標準入口にしない。
 - `a2o agent install` は release artifact に含め、runtime image から host/dev-env への binary export を利用者向け配布物として固定済み。release 前には正式 image ref で同手順を再 smoke する。
 - `scripts/a3-projects/portal/runtime/run_once.sh` の責務は Engine command へ移設済み。残りは Portal 固有値を project package config から読む範囲を広げ、hardcoded Portal default を減らすこと。
