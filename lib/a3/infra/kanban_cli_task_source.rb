@@ -14,9 +14,9 @@ module A3
         "Done" => :done
       }.freeze
 
-      def initialize(command_argv:, project:, repo_label_map:, trigger_labels:, blocked_label: "blocked", status: nil, working_dir: nil)
+      def initialize(command_argv: nil, project:, repo_label_map:, trigger_labels:, blocked_label: "blocked", status: nil, working_dir: nil, client: nil)
         @project = project.to_s
-        @client = KanbanCliCommandClient.new(command_argv: command_argv, project: @project, working_dir: working_dir)
+        @client = client || KanbanCommandClient.subprocess(command_argv: command_argv, project: @project, working_dir: working_dir)
         @repo_label_map = normalize_repo_label_map(repo_label_map)
         @trigger_labels = Array(trigger_labels).map(&:to_s).reject(&:empty?).freeze
         @blocked_label = blocked_label.to_s

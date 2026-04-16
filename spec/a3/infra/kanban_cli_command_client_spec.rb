@@ -57,3 +57,29 @@ RSpec.describe A3::Infra::KanbanCliCommandClient do
     expect(File.exist?(captured_path)).to be(false)
   end
 end
+
+RSpec.describe A3::Infra::KanbanCommandClient do
+  it "lets task adapters depend on the operation client without a subprocess argv" do
+    recording_client = Class.new(described_class) do
+      attr_reader :calls
+
+      def initialize(project:)
+        super
+        @calls = []
+      end
+
+      def run_json_command(*args)
+        @calls << args
+        [{ "id" => 42, "ref" => "Sample#42", "title" => "Ticket", "status" => "To do" }]
+      end
+    end
+
+    client = recording_client.new(project: "Sample")
+    reader = A3::Infra::KanbanCliTaskSnapshotReader.new(project: "Sample", client: client)
+
+    index = reader.load(task_refs: ["Sample#42"])
+
+    expect(index.by_ref.fetch("Sample#42").fetch("title")).to eq("Ticket")
+    expect(client.calls.fetch(0)).to eq(["task-watch-summary-list", "--project", "Sample", "--ignore-missing", "--task", "Sample#42"])
+  end
+end

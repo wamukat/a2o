@@ -14,9 +14,9 @@ module A3
         done: "Done"
       }.freeze
 
-      def initialize(command_argv:, project:, blocked_label: "blocked", working_dir: nil)
+      def initialize(command_argv: nil, project:, blocked_label: "blocked", working_dir: nil, client: nil)
         @project = project.to_s
-        @client = KanbanCliCommandClient.new(command_argv: command_argv, project: @project, working_dir: working_dir)
+        @client = client || KanbanCommandClient.subprocess(command_argv: command_argv, project: @project, working_dir: working_dir)
         @blocked_label = blocked_label.to_s
       end
 

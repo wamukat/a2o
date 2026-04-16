@@ -3,30 +3,27 @@
 require "json"
 require "open3"
 require "tempfile"
+require "tmpdir"
 
 module A3
   module Infra
-    class KanbanCliCommandClient
-      def initialize(command_argv:, project:, working_dir: nil)
-        @command_argv = Array(command_argv).map(&:to_s).freeze
+    class KanbanCommandClient
+      def self.subprocess(command_argv:, project:, working_dir: nil)
+        SubprocessKanbanCommandClient.new(command_argv: command_argv, project: project, working_dir: working_dir)
+      end
+
+      attr_reader :project
+
+      def initialize(project:)
         @project = project.to_s
-        @working_dir = working_dir && File.expand_path(working_dir)
       end
 
-      def run_json_command(*args)
-        stdout, stderr, status = Open3.capture3(*@command_argv, *args, chdir: @working_dir)
-        raise A3::Domain::ConfigurationError, build_command_error(stderr, status.exitstatus) unless status.success?
-
-        JSON.parse(stdout)
-      rescue JSON::ParserError => e
-        raise A3::Domain::ConfigurationError, "kanban command did not return valid JSON: #{args.join(' ')} (#{e.message})"
+      def run_json_command(*_args)
+        raise NotImplementedError, "#{self.class} must implement run_json_command"
       end
 
-      def run_command(*args)
-        _stdout, stderr, status = Open3.capture3(*@command_argv, *args, chdir: @working_dir)
-        raise A3::Domain::ConfigurationError, build_command_error(stderr, status.exitstatus) unless status.success?
-
-        nil
+      def run_command(*_args)
+        raise NotImplementedError, "#{self.class} must implement run_command"
       end
 
       def run_json_command_with_text_file_option(*args, option_name:, text:, file_option_name: "#{option_name}-file", tempfile_prefix: "a3-kanban-text")
@@ -81,11 +78,47 @@ module A3
       private
 
       def with_text_file(text, tempfile_prefix:)
-        Tempfile.create([tempfile_prefix, ".md"], @working_dir || Dir.tmpdir) do |file|
+        Tempfile.create([tempfile_prefix, ".md"], tempfile_dir) do |file|
           file.write(String(text))
           file.flush
           yield file.path
         end
+      end
+
+      def tempfile_dir
+        Dir.tmpdir
+      end
+    end
+
+    class SubprocessKanbanCommandClient < KanbanCommandClient
+      def initialize(command_argv:, project:, working_dir: nil)
+        super(project: project)
+        @command_argv = Array(command_argv).map(&:to_s).freeze
+        raise A3::Domain::ConfigurationError, "kanban command argv must not be empty" if @command_argv.empty?
+
+        @working_dir = working_dir && File.expand_path(working_dir)
+      end
+
+      def run_json_command(*args)
+        stdout, stderr, status = Open3.capture3(*@command_argv, *args, chdir: @working_dir)
+        raise A3::Domain::ConfigurationError, build_command_error(stderr, status.exitstatus) unless status.success?
+
+        JSON.parse(stdout)
+      rescue JSON::ParserError => e
+        raise A3::Domain::ConfigurationError, "kanban command did not return valid JSON: #{args.join(' ')} (#{e.message})"
+      end
+
+      def run_command(*args)
+        _stdout, stderr, status = Open3.capture3(*@command_argv, *args, chdir: @working_dir)
+        raise A3::Domain::ConfigurationError, build_command_error(stderr, status.exitstatus) unless status.success?
+
+        nil
+      end
+
+      private
+
+      def tempfile_dir
+        @working_dir || Dir.tmpdir
       end
 
       def build_command_error(stderr, exitstatus)
@@ -94,5 +127,7 @@ module A3
         detail.empty? ? message : "#{message}: #{detail}"
       end
     end
+
+    KanbanCliCommandClient = SubprocessKanbanCommandClient
   end
 end

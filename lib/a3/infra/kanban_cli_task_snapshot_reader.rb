@@ -5,9 +5,9 @@ module A3
     class KanbanCliTaskSnapshotReader
       SnapshotIndex = Struct.new(:by_ref, :by_id, keyword_init: true)
 
-      def initialize(command_argv:, project:, working_dir: nil)
+      def initialize(command_argv: nil, project:, working_dir: nil, client: nil)
         @project = project.to_s
-        @client = KanbanCliCommandClient.new(command_argv: command_argv, project: @project, working_dir: working_dir)
+        @client = client || KanbanCommandClient.subprocess(command_argv: command_argv, project: @project, working_dir: working_dir)
       end
 
       def load(task_ids: [], task_refs: [])

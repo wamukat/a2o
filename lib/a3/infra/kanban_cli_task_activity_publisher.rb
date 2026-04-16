@@ -5,11 +5,11 @@ module A3
     class KanbanCliTaskActivityPublisher
       attr_reader :command_argv, :project, :working_dir
 
-      def initialize(command_argv:, project:, working_dir: nil)
+      def initialize(command_argv: nil, project:, working_dir: nil, client: nil)
         @command_argv = Array(command_argv).map(&:to_s).freeze
         @project = project.to_s
         @working_dir = working_dir && File.expand_path(working_dir)
-        @client = KanbanCliCommandClient.new(command_argv: @command_argv, project: @project, working_dir: @working_dir)
+        @client = client || KanbanCommandClient.subprocess(command_argv: @command_argv, project: @project, working_dir: @working_dir)
       end
 
       def publish(task_ref:, body:, external_task_id: nil)

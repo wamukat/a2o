@@ -5,9 +5,9 @@ module A3
     class KanbanCliFollowUpChildWriter
       Result = Struct.new(:success?, :child_refs, :child_fingerprints, :summary, :diagnostics, keyword_init: true)
 
-      def initialize(command_argv:, project:, repo_label_map:, repo_scope_expansions: {}, follow_up_label: nil, working_dir: nil)
+      def initialize(command_argv: nil, project:, repo_label_map:, repo_scope_expansions: {}, follow_up_label: nil, working_dir: nil, client: nil)
         @project = project.to_s
-        @client = KanbanCliCommandClient.new(command_argv: command_argv, project: @project, working_dir: working_dir)
+        @client = client || KanbanCommandClient.subprocess(command_argv: command_argv, project: @project, working_dir: working_dir)
         @repo_labels_by_scope = repo_labels_by_scope(repo_label_map)
         @repo_scope_expansions = normalize_repo_scope_expansions(repo_scope_expansions)
         @follow_up_label = normalize_optional_label(follow_up_label, "follow_up_label")
