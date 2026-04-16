@@ -57,7 +57,7 @@ module A3
       end
 
       def quarantine_task(task_ref:)
-        source_root = task_workspace_root(task_ref)
+        source_root = task_workspace_root(task_ref, allow_nested_lookup: true)
         return nil unless source_root.exist?
 
         quarantine_root = base_dir.join("quarantine", slugify(task_ref))
@@ -72,9 +72,13 @@ module A3
         quarantine_root.to_s
       end
 
-      def cleanup_task(task_ref:, scopes:, dry_run: false)
-        task_slug = slugify(task_ref)
-        task_root = task_workspace_root(task_ref)
+      def cleanup_task(task_ref:, scopes:, dry_run: false, parent_ref: nil, workspace_ref: nil, parent_workspace_ref: nil)
+        task_root = cleanup_task_root(
+          task_ref: task_ref,
+          parent_ref: parent_ref,
+          workspace_ref: workspace_ref,
+          parent_workspace_ref: parent_workspace_ref
+        )
         cleaned_paths = Array(scopes).map(&:to_sym).each_with_object([]) do |scope, paths|
           path = cleanup_scope_path(task_root, scope)
           next unless path&.exist?
@@ -95,9 +99,28 @@ module A3
         base_dir.join("workspaces")
       end
 
-      def task_workspace_root(task_ref)
+      def cleanup_task_root(task_ref:, parent_ref:, workspace_ref:, parent_workspace_ref:)
+        if parent_ref
+          return task_workspace_root(
+            task_ref,
+            parent_ref: parent_ref,
+            parent_workspace_ref: parent_workspace_ref,
+            allow_nested_lookup: false
+          )
+        end
+
+        task_workspace_root(workspace_ref || task_ref, allow_nested_lookup: false)
+      end
+
+      def task_workspace_root(task_ref, parent_ref: nil, parent_workspace_ref: nil, allow_nested_lookup: false)
         task_slug = slugify(task_ref)
+        if parent_ref
+          parent_slug = slugify(parent_workspace_ref || parent_ref)
+          return workspaces_root.join(parent_slug, "children", task_slug)
+        end
+
         direct = workspaces_root.join(task_slug)
+        return direct unless allow_nested_lookup
         return direct if direct.exist?
 
         child_roots = workspaces_root.glob("*/children/#{task_slug}")
@@ -106,7 +129,7 @@ module A3
 
       def workspace_root(task, workspace_kind, artifact_owner)
         if child_owned_by_parent?(task, artifact_owner)
-          workspaces_root.join(slugify(artifact_owner.owner_ref), "children", slugify(task.ref), workspace_kind.to_s)
+          workspaces_root.join(slugify(parent_workspace_ref_for(artifact_owner.owner_ref)), "children", slugify(task.ref), workspace_kind.to_s)
         else
           workspaces_root.join(slugify(task.ref), workspace_kind.to_s)
         end
@@ -126,7 +149,7 @@ module A3
           ),
           slot_requirements: workspace_plan.slot_requirements
         )
-        parent_root = workspaces_root.join(slugify(artifact_owner.owner_ref), "runtime_workspace")
+        parent_root = workspaces_root.join(slugify(parent_workspace_ref_for(artifact_owner.owner_ref)), "runtime_workspace")
         parent_owner = A3::Domain::ArtifactOwner.new(
           owner_ref: artifact_owner.owner_ref,
           owner_scope: :parent,
@@ -352,6 +375,10 @@ module A3
         parts << "parent"
         parts << slugify(parent_ref)
         parts.join("/")
+      end
+
+      def parent_workspace_ref_for(parent_ref)
+        "#{parent_ref}-parent"
       end
 
       def normalize_branch_namespace(value)

@@ -515,6 +515,42 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     expect(quarantine_path).to exist
   end
 
+  it "cleans a parent-bound child workspace by exact parent ref" do
+    parent_root = Pathname(tmpdir).join("workspaces", "Portal-201-parent")
+    intended_child = parent_root.join("children", "Portal-202", "ticket_workspace")
+    other_child = Pathname(tmpdir).join("workspaces", "Portal-999-parent", "children", "Portal-202", "ticket_workspace")
+    FileUtils.mkdir_p(intended_child)
+    FileUtils.mkdir_p(other_child)
+
+    provisioner = described_class.new(base_dir: tmpdir, repo_sources: {})
+    cleaned_paths = provisioner.cleanup_task(
+      task_ref: "Portal#202",
+      parent_ref: "Portal#201",
+      parent_workspace_ref: "Portal#201-parent",
+      scopes: [:ticket_workspace],
+      dry_run: false
+    )
+
+    expect(cleaned_paths).to contain_exactly(intended_child.to_s)
+    expect(intended_child).not_to exist
+    expect(other_child).to exist
+  end
+
+  it "does not resolve parentless cleanup through ambiguous child glob fallback" do
+    child = Pathname(tmpdir).join("workspaces", "Portal-999", "children", "Portal-202", "ticket_workspace")
+    FileUtils.mkdir_p(child)
+
+    provisioner = described_class.new(base_dir: tmpdir, repo_sources: {})
+    cleaned_paths = provisioner.cleanup_task(
+      task_ref: "Portal#202",
+      scopes: [:ticket_workspace],
+      dry_run: false
+    )
+
+    expect(cleaned_paths).to be_empty
+    expect(child).to exist
+  end
+
   it "reports cleanup candidates during dry-run without deleting paths" do
     task_root = Pathname(tmpdir).join("workspaces", "A3-v2-3025")
     runtime_path = task_root.join("runtime_workspace")
@@ -668,9 +704,9 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
       bootstrap_marker: nil
     )
 
-    parent_root = Pathname(tmpdir).join("workspaces", "Portal-134", "runtime_workspace")
+    parent_root = Pathname(tmpdir).join("workspaces", "Portal-134-parent", "runtime_workspace")
     parent_slot = parent_root.join("repo-alpha")
-    expect(workspace.root_path).to eq(Pathname(tmpdir).join("workspaces", "Portal-134", "children", "Portal-135", "ticket_workspace"))
+    expect(workspace.root_path).to eq(Pathname(tmpdir).join("workspaces", "Portal-134-parent", "children", "Portal-135", "ticket_workspace"))
     expect(workspace.slot_paths.fetch(:repo_alpha)).to eq(workspace.root_path.join("repo-alpha"))
     expect(parent_slot).to exist
     expect(`git -C #{repo_root} worktree list --porcelain`).to include(parent_slot.to_s)
