@@ -429,6 +429,15 @@ def soloboard_find_lane_name(board_shell: dict[str, Any], lane_id: int) -> str |
     return None
 
 
+def soloboard_find_lane_id(board_shell: dict[str, Any], lane_name: str) -> int:
+    normalized = lane_name.strip().lower()
+    for lane in board_shell.get("lanes") or []:
+        if str(lane.get("name") or "").strip().lower() == normalized:
+            return int(lane.get("id") or 0)
+    available = ", ".join(str(lane.get("name") or "") for lane in board_shell.get("lanes") or [])
+    raise RuntimeError(f"Lane not found: {lane_name}. Available: {available}")
+
+
 def soloboard_resolved(ticket: dict[str, Any]) -> bool:
     if "isResolved" not in ticket:
         raise RuntimeError("SoloBoard ticket response is missing isResolved.")
@@ -451,6 +460,7 @@ def soloboard_normalize_ticket(ticket: dict[str, Any], *, board_title: str, boar
         "reference": ticket.get("ref") or canonical_human_task_ref(board_title, f"#{int(ticket['id'])}"),
         "identifier": ticket.get("shortRef") or f"#{int(ticket['id'])}",
         "index": int(ticket["id"]),
+        "position": int(ticket.get("position") or 0),
         "project": board_title,
         "date_modification": parse_iso_datetime_to_epoch(ticket.get("updatedAt")),
     }
@@ -957,6 +967,91 @@ def transition_task_status(
     return normalized
 
 
+def build_reordered_ticket_items(
+    tickets: list[dict[str, Any]],
+    *,
+    task_id: int,
+    target_lane_id: int,
+    target_position: int,
+    lane_ids: list[int],
+) -> list[dict[str, int]]:
+    if target_position < 0:
+        raise RuntimeError("--position must be zero or greater.")
+    ticket_by_id = {int(ticket.get("id") or 0): ticket for ticket in tickets}
+    target = ticket_by_id.get(task_id)
+    if target is None:
+        raise RuntimeError(f"Task is not reorderable in the active board ticket list: {task_id}")
+    lane_order = list(dict.fromkeys([*lane_ids, *[int(ticket.get("laneId") or 0) for ticket in tickets], target_lane_id]))
+    grouped: dict[int, list[dict[str, Any]]] = {lane_id: [] for lane_id in lane_order}
+    for ticket in sorted(tickets, key=lambda item: (int(item.get("position") or 0), int(item.get("id") or 0))):
+        current_id = int(ticket.get("id") or 0)
+        if current_id == task_id:
+            continue
+        lane_id = int(ticket.get("laneId") or 0)
+        grouped.setdefault(lane_id, []).append(ticket)
+    target_group = grouped.setdefault(target_lane_id, [])
+    bounded_position = min(target_position, len(target_group))
+    target_group.insert(bounded_position, {**target, "laneId": target_lane_id})
+
+    items: list[dict[str, int]] = []
+    for lane_id in lane_order:
+        for position, ticket in enumerate(grouped.get(lane_id, [])):
+            items.append(
+                {
+                    "ticketId": int(ticket["id"]),
+                    "laneId": lane_id,
+                    "position": position,
+                }
+            )
+    return items
+
+
+def reorder_task(
+    base_url: str,
+    token: str,
+    *,
+    task_id: int,
+    target_lane_id: int,
+    target_position: int,
+) -> dict[str, Any]:
+    task = rest_request(base_url, token, "GET", f"/api/tickets/{task_id}")
+    if not isinstance(task, dict):
+        raise RuntimeError(f"Task not found: {task_id}")
+    board_id = int(task.get("boardId") or 0)
+    board_shell = rest_request(base_url, token, "GET", f"/api/boards/{board_id}")
+    if not isinstance(board_shell, dict):
+        raise RuntimeError(f"Board not found: {board_id}")
+    summaries_response = rest_request(base_url, token, "GET", f"/api/boards/{board_id}/tickets")
+    tickets = summaries_response.get("tickets") if isinstance(summaries_response, dict) else None
+    if not isinstance(tickets, list):
+        raise RuntimeError("Unexpected tasks response.")
+    lane_ids = [int(lane.get("id") or 0) for lane in board_shell.get("lanes") or []]
+    if target_lane_id not in lane_ids:
+        raise RuntimeError(f"Lane does not belong to board: {target_lane_id}")
+    items = build_reordered_ticket_items(
+        tickets,
+        task_id=task_id,
+        target_lane_id=target_lane_id,
+        target_position=target_position,
+        lane_ids=lane_ids,
+    )
+    reordered = rest_request(
+        base_url,
+        token,
+        "POST",
+        f"/api/boards/{board_id}/tickets/reorder",
+        payload={"items": items},
+    )
+    updated_tickets = reordered.get("tickets") if isinstance(reordered, dict) else None
+    if not isinstance(updated_tickets, list):
+        raise RuntimeError("Unexpected task reorder response.")
+    updated = next((ticket for ticket in updated_tickets if int(ticket.get("id") or 0) == task_id), None)
+    if updated is None:
+        raise RuntimeError(f"Reordered task was not returned: {task_id}")
+    board_title = str(board_shell.get("board", {}).get("name") or board_id)
+    return soloboard_normalize_ticket(updated, board_title=board_title, board_shell=board_shell)
+
+
 def print_json(payload: Any) -> int:
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
@@ -1444,6 +1539,39 @@ def cmd_task_transition(args: argparse.Namespace) -> int:
     return print_json(normalize_task_detail(transitioned, project_title=project_title))
 
 
+def cmd_task_reorder(args: argparse.Namespace) -> int:
+    backend = resolve_backend_context(backend=getattr(args, "backend", None), base_url=args.base_url, token=args.token)
+    base_url = backend.base_url
+    token = backend.token
+    task_id = resolve_task_id_from_ref(
+        base_url,
+        token,
+        task_id=args.task_id,
+        task_ref=args.task,
+        project_id=args.project_id,
+        project_title=args.project,
+    )
+    current = get_task(base_url, token, task_id)
+    project_id = int(current["project_id"])
+    board_shell = rest_request(base_url, token, "GET", f"/api/boards/{project_id}")
+    if not isinstance(board_shell, dict):
+        raise RuntimeError(f"Board not found: {project_id}")
+    target_lane_id = args.lane_id
+    if target_lane_id is None:
+        target_lane_id = int(current.get("column_id") or 0)
+    if args.status is not None:
+        target_lane_id = soloboard_find_lane_id(board_shell, args.status)
+    reordered = reorder_task(
+        base_url,
+        token,
+        task_id=task_id,
+        target_lane_id=target_lane_id,
+        target_position=args.position,
+    )
+    project_title = resolve_project_title(base_url, token, project_id=int(reordered["project_id"]))
+    return print_json(normalize_task_detail(reordered, project_title=project_title))
+
+
 def cmd_task_relation_create(args: argparse.Namespace) -> int:
     backend = resolve_backend_context(backend=getattr(args, "backend", None), base_url=args.base_url, token=args.token)
     base_url = backend.base_url
@@ -1712,6 +1840,18 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     task_transition.set_defaults(func=cmd_task_transition)
+
+    task_reorder = subparsers.add_parser("task-reorder", help="Reorder a task within a kanban lane.")
+    task_reorder_group = task_reorder.add_mutually_exclusive_group(required=True)
+    task_reorder_group.add_argument("--task")
+    task_reorder_group.add_argument("--task-id", type=int)
+    task_reorder.add_argument("--project-id", type=int)
+    task_reorder.add_argument("--project")
+    target_lane_group = task_reorder.add_mutually_exclusive_group()
+    target_lane_group.add_argument("--status", help="Target lane name. Defaults to the task's current lane.")
+    target_lane_group.add_argument("--lane-id", "--bucket-id", "--column-id", dest="lane_id", type=int)
+    task_reorder.add_argument("--position", required=True, type=int, help="Zero-based position inside the target lane.")
+    task_reorder.set_defaults(func=cmd_task_reorder)
 
     task_relation_create = subparsers.add_parser("task-relation-create", help="Create a task relation.")
     task_relation_create_group = task_relation_create.add_mutually_exclusive_group(required=True)

@@ -103,6 +103,38 @@ class SoloBoardCliTest(unittest.TestCase):
         with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
             parser.parse_args(["--backend", "unsupported-backend", "task-get", "--task", "Portal#1"])
 
+    def test_parser_accepts_task_reorder_without_priority(self) -> None:
+        parser = kanban_cli.build_parser()
+        args = parser.parse_args(["task-reorder", "--task-id", "10", "--status", "To do", "--position", "0"])
+
+        self.assertEqual(kanban_cli.cmd_task_reorder, args.func)
+        self.assertEqual(10, args.task_id)
+        self.assertEqual("To do", args.status)
+        self.assertEqual(0, args.position)
+        self.assertFalse(hasattr(args, "priority"))
+
+    def test_build_reordered_ticket_items_moves_task_by_position(self) -> None:
+        items = kanban_cli.build_reordered_ticket_items(
+            [
+                {"id": 1, "laneId": 10, "position": 0},
+                {"id": 2, "laneId": 10, "position": 1},
+                {"id": 3, "laneId": 20, "position": 0},
+            ],
+            task_id=2,
+            target_lane_id=20,
+            target_position=0,
+            lane_ids=[10, 20],
+        )
+
+        self.assertEqual(
+            [
+                {"ticketId": 1, "laneId": 10, "position": 0},
+                {"ticketId": 2, "laneId": 20, "position": 0},
+                {"ticketId": 3, "laneId": 20, "position": 1},
+            ],
+            items,
+        )
+
     def test_trace_log_writes_timestamped_jsonl(self) -> None:
         path = Path(".work/kanban/test-trace.log")
         if path.exists():
