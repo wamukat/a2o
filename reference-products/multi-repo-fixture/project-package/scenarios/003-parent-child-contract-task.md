@@ -17,8 +17,8 @@ Create two child tasks and relate them to the parent before starting the flow:
 Relation setup:
 
 ```sh
-python3 tools/kanban/cli.py task-relation-create --project "A2O Reference Multi Repo" --task "<parent-ref>" --other-task "<catalog-child-ref>" --relation-kind subtask
-python3 tools/kanban/cli.py task-relation-create --project "A2O Reference Multi Repo" --task "<parent-ref>" --other-task "<storefront-child-ref>" --relation-kind subtask
+python3 tools/kanban/cli.py task-relation-create --project "A2OReferenceMultiRepo" --task "<parent-ref>" --other-task "<catalog-child-ref>" --relation-kind subtask
+python3 tools/kanban/cli.py task-relation-create --project "A2OReferenceMultiRepo" --task "<parent-ref>" --other-task "<storefront-child-ref>" --relation-kind subtask
 ```
 
 A2O derives parent and child task kind from these relations, not from `kind:*` labels.

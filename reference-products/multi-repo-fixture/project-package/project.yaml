@@ -1,7 +1,7 @@
 project: a2o-reference-multi-repo
 kanban:
   provider: soloboard
-  project: A2O Reference Multi Repo
+  project: A2OReferenceMultiRepo
   bootstrap: kanban/bootstrap.json
 repos:
   repo_alpha:

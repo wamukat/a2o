@@ -1,7 +1,7 @@
 project: a2o-reference-go-api-cli
 kanban:
   provider: soloboard
-  project: A2O Reference Go
+  project: A2OReferenceGo
   bootstrap: kanban/bootstrap.json
 repos:
   app:

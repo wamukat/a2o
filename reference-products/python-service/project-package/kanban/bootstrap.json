@@ -1,8 +1,8 @@
 {
   "boards": [
     {
-      "name": "A2O Reference Python",
-      "lanes": ["Backlog", "To do", "In progress", "In review", "Done"],
+      "name": "A2OReferencePython",
+      "lanes": ["Backlog", "To do", "In progress", "In review", "Inspection", "Merging", "Done"],
       "tags": [
         { "name": "trigger:auto-implement" },
         { "name": "repo:app" },

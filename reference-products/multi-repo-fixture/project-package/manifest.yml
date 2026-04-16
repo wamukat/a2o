@@ -12,9 +12,5 @@ core:
   merge_policy: ff_only
   merge_target_ref:
     default: refs/heads/main
-    variants:
-      task_kind:
-        parent:
-          default: refs/heads/integration
 project:
-  kanban_project: A2O Reference Multi Repo
+  kanban_project: A2OReferenceMultiRepo

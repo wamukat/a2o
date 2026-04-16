@@ -57,6 +57,27 @@ RSpec.describe A3::Infra::AgentHttpPullServer do
     expect(artifact_store.read("art-log-1")).to eq(content)
   end
 
+  it "ignores clients that disconnect while the response is being written" do
+    response = A3::Infra::AgentHttpPullHandler::Response.new(
+      status: 200,
+      headers: {"content-type" => "application/json"},
+      body: JSON.generate("ok" => true)
+    )
+    client = Class.new do
+      def closed?
+        false
+      end
+
+      def close; end
+
+      def write(_content)
+        raise Errno::ECONNRESET
+      end
+    end.new
+
+    expect { server.send(:write_response, client, response) }.not_to raise_error
+  end
+
   def post_json(uri, payload)
     request = Net::HTTP::Post.new(uri)
     request["content-type"] = "application/json"

@@ -1,7 +1,7 @@
 project: a2o-reference-python-service
 kanban:
   provider: soloboard
-  project: A2O Reference Python
+  project: A2OReferencePython
   bootstrap: kanban/bootstrap.json
 repos:
   app:

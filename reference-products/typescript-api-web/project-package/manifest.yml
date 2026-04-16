@@ -5,4 +5,4 @@ core:
   merge_policy: ff_only
   merge_target_ref: refs/heads/main
 project:
-  kanban_project: A2O Reference TypeScript
+  kanban_project: A2OReferenceTypeScript

@@ -1,8 +1,8 @@
 {
   "boards": [
     {
-      "name": "A2O Reference Multi Repo",
-      "lanes": ["Backlog", "To do", "In progress", "In review", "Done"],
+      "name": "A2OReferenceMultiRepo",
+      "lanes": ["Backlog", "To do", "In progress", "In review", "Inspection", "Merging", "Done"],
       "tags": [
         { "name": "trigger:auto-implement" },
         { "name": "trigger:auto-parent" },

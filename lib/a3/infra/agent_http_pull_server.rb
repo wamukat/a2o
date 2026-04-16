@@ -108,6 +108,8 @@ module A3
         client.write("connection: close\r\n")
         client.write("\r\n")
         client.write(body)
+      rescue Errno::ECONNRESET, Errno::EPIPE
+        nil
       end
     end
   end

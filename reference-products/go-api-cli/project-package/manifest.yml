@@ -5,4 +5,4 @@ core:
   merge_policy: ff_only
   merge_target_ref: refs/heads/main
 project:
-  kanban_project: A2O Reference Go
+  kanban_project: A2OReferenceGo
