@@ -56,6 +56,7 @@ COPY a3.gemspec /tmp/a3-engine/a3.gemspec
 COPY lib /tmp/a3-engine/lib
 COPY bin /tmp/a3-engine/bin
 COPY tools /tmp/a3-engine/tools
+COPY tools /opt/a3/share/tools
 COPY docker/compose /opt/a3/share/docker/compose
 RUN cp /opt/a3/share/docker/compose/a3-portal-soloboard.release.yml /opt/a3/share/docker/compose/a3-portal-soloboard.yml
 
