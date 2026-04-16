@@ -289,6 +289,118 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     expect(execution.response_bundle.fetch("merge_recovery_required")).to be(false)
   end
 
+
+  it "recovers a Portal#245-style validation docs conflict before verification" do
+    sequence = 0
+    portal_merge_plan = A3::Domain::MergePlan.new(
+      task_ref: "Portal#245",
+      run_ref: "run-merge-245",
+      merge_source: A3::Domain::MergeSource.new(source_ref: "refs/heads/a3/work/Portal-245"),
+      integration_target: A3::Domain::IntegrationTarget.new(target_ref: "refs/heads/main", bootstrap_ref: nil),
+      merge_policy: :ff_or_merge,
+      merge_slots: [:repo_alpha]
+    )
+    portal_workspace = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: :runtime_workspace,
+      root_path: "/tmp/a3-workspace/Portal-245",
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Portal#245", ref: "refs/heads/main"),
+      slot_paths: {}
+    )
+    recovery_runner = described_class.new(
+      control_plane_client: client,
+      runtime_profile: "host-local",
+      source_aliases: { repo_alpha: "member-portal-starters" },
+      poll_interval_seconds: 0,
+      job_id_generator: -> {
+        sequence += 1
+        "job-#{sequence}"
+      },
+      sleeper: ->(_seconds) {},
+      merge_recovery_command: "a3-merge-recovery-worker"
+    )
+
+    client.on_fetch = lambda do |job_id|
+      request = client.records.fetch(job_id).request
+      case request.command
+      when "a3-agent-merge"
+        client.complete(job_id, agent_result(
+          job_id,
+          workspace_descriptor(
+            {
+              "repo_alpha" => {
+                "runtime_path" => "/agent/workspaces/merge-Portal-245-run-merge-245/repo-alpha",
+                "source_alias" => "member-portal-starters",
+                "merge_source_ref" => "refs/heads/a3/work/Portal-245",
+                "merge_target_ref" => "refs/heads/main",
+                "merge_policy" => "ff_or_merge",
+                "merge_before_head" => "base245",
+                "source_head_commit" => "source245",
+                "merge_status" => "conflicted",
+                "merge_recovery_candidate" => true,
+                "conflict_files" => ["docs/10-ops/validation.md"],
+                "resolved_conflict_files" => []
+              }
+            },
+            workspace_id: "merge-Portal-245-run-merge-245",
+            task_ref: "Portal#245"
+          ),
+          status: :failed,
+          exit_code: 1,
+          summary: "Portal#245 validation docs conflict"
+        ))
+      when "a3-merge-recovery-worker"
+        expect(JSON.parse(request.env.fetch("A3_MERGE_RECOVERY"))).to include(
+          "target_ref" => "refs/heads/main",
+          "source_ref" => "refs/heads/a3/work/Portal-245",
+          "conflict_files" => ["docs/10-ops/validation.md"]
+        )
+        client.complete(job_id, agent_result(job_id, workspace_descriptor({}, workspace_id: "merge-Portal-245-run-merge-245", task_ref: "Portal#245"), summary: "resolved Portal#245 validation docs conflict"))
+      when "a3-agent-merge-recovery"
+        expect(request.merge_recovery_request.fetch("slots").fetch("repo_alpha")).to include(
+          "runtime_path" => "/agent/workspaces/merge-Portal-245-run-merge-245/repo-alpha",
+          "conflict_files" => ["docs/10-ops/validation.md"]
+        )
+        client.complete(job_id, agent_result(job_id, workspace_descriptor(
+          {
+            "repo_alpha" => {
+              "merge_status" => "recovered",
+              "publish_before_head" => "base245",
+              "publish_after_head" => "resolved245",
+              "merge_after_head" => "resolved245",
+              "resolved_head" => "resolved245",
+              "resolved_conflict_files" => ["docs/10-ops/validation.md"],
+              "changed_files" => ["docs/10-ops/validation.md"],
+              "marker_scan_result" => { "scanner" => "a3-agent-conflict-marker-scan", "unresolved_files" => [] }
+            }
+          },
+          workspace_id: "merge-Portal-245-run-merge-245",
+          task_ref: "Portal#245"
+        ), summary: "Portal#245 recovery finalized"))
+      else
+        raise "unexpected command: #{request.command}"
+      end
+    end
+
+    execution = recovery_runner.run(portal_merge_plan, workspace: portal_workspace)
+
+    expect(execution).to have_attributes(success?: true)
+    recovery = execution.diagnostics.fetch("merge_recovery")
+    expect(recovery).to include(
+      "status" => "recovered",
+      "target_ref" => "refs/heads/main",
+      "source_ref" => "refs/heads/a3/work/Portal-245",
+      "conflict_files" => ["docs/10-ops/validation.md"],
+      "changed_files" => ["docs/10-ops/validation.md"],
+      "publish_before_head" => "base245",
+      "publish_after_head" => "resolved245"
+    )
+    expect(execution.response_bundle).to include(
+      "merge_recovery_required" => false,
+      "merge_recovery_verification_required" => true,
+      "merge_recovery_verification_source_ref" => "refs/heads/main"
+    )
+  end
+
   it "keeps merge recovery retryable when recovery worker enqueue fails" do
     recovery_runner = described_class.new(
       control_plane_client: client,
@@ -448,12 +560,12 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     )
   end
 
-  def workspace_descriptor(slot_descriptors)
+  def workspace_descriptor(slot_descriptors, workspace_id: "merge-Portal-42-run-merge-1", task_ref: "Portal#42")
     A3::Domain::AgentWorkspaceDescriptor.new(
       workspace_kind: :runtime_workspace,
       runtime_profile: "host-local",
-      workspace_id: "merge-Portal-42-run-merge-1",
-      source_descriptor: A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Portal#42", ref: "refs/heads/main"),
+      workspace_id: workspace_id,
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: task_ref, ref: "refs/heads/main"),
       slot_descriptors: slot_descriptors
     )
   end

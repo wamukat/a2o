@@ -108,6 +108,17 @@ RSpec.describe A3::Application::RunMerge do
     )
   end
 
+  let(:live_project_context) do
+    A3::Domain::ProjectContext.new(
+      surface: project_context.surface,
+      merge_config: A3::Domain::MergeConfig.new(
+        target: :merge_to_live,
+        policy: :ff_or_merge,
+        target_ref: "refs/heads/main"
+      )
+    )
+  end
+
   before do
     task_repository.save(task)
     run_repository.save(run)
@@ -209,6 +220,146 @@ RSpec.describe A3::Application::RunMerge do
     expect(result.run.phase_records.last.blocked_diagnosis).to be_nil
     expect(result.run.phase_records.last.execution_record).to have_attributes(
       observed_state: "merge_recovery_candidate"
+    )
+  end
+
+
+  it "routes single-task merge recovery publish back to verification of the live target" do
+    single_task = A3::Domain::Task.new(
+      ref: "Portal#245",
+      kind: :single,
+      edit_scope: [:repo_alpha],
+      status: :merging,
+      current_run_ref: "run-single-merge-245"
+    )
+    single_run = A3::Domain::Run.new(
+      ref: "run-single-merge-245",
+      task_ref: single_task.ref,
+      phase: :merge,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: single_task.ref, ref: "refs/heads/a3/work/Portal-245"),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], ownership_scope: :task),
+      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: single_task.ref, owner_scope: :task, snapshot_version: "refs/heads/a3/work/Portal-245")
+    )
+    task_repository.save(single_task)
+    run_repository.save(single_run)
+
+    allow(prepare_workspace).to receive(:call).and_return(
+      A3::Application::PrepareWorkspace::Result.new(
+        workspace: A3::Domain::PreparedWorkspace.new(
+          workspace_kind: :runtime_workspace,
+          root_path: "/tmp/a3/workspaces/Portal-245/runtime_workspace",
+          source_descriptor: single_run.source_descriptor,
+          slot_paths: { repo_alpha: "/tmp/a3/workspaces/Portal-245/runtime_workspace/repo-alpha" }
+        )
+      )
+    )
+    captured_single_merge_plan = nil
+    allow(merge_runner).to receive(:run) do |merge_plan, workspace:|
+      captured_single_merge_plan = merge_plan
+      expect(workspace).to be_a(A3::Domain::PreparedWorkspace)
+      A3::Application::ExecutionResult.new(
+        success: true,
+        summary: "merge recovery published Portal#245 docs validation conflict",
+        diagnostics: {
+          "merge_recovery" => {
+            "status" => "recovered",
+            "target_ref" => "refs/heads/main",
+            "conflict_files" => ["docs/10-ops/validation.md"],
+            "changed_files" => ["docs/10-ops/validation.md"],
+            "publish_before_head" => "before245",
+            "publish_after_head" => "after245"
+          }
+        },
+        response_bundle: {
+          "merge_recovery_verification_required" => true,
+          "merge_recovery_verification_source_ref" => "refs/heads/main"
+        }
+      )
+    end
+
+    result = use_case.call(task_ref: single_task.ref, run_ref: single_run.ref, project_context: live_project_context)
+
+    expect(captured_single_merge_plan.integration_target.target_ref).to eq("refs/heads/main")
+    expect(captured_single_merge_plan.merge_source.source_ref).to eq("refs/heads/a3/work/Portal-245")
+    expect(result.task.status).to eq(:verifying)
+    expect(result.task.verification_source_ref).to eq("refs/heads/main")
+    expect(result.run.terminal_outcome).to eq(:verification_required)
+    expect(result.run.phase_records.last.execution_record.diagnostics.fetch("merge_recovery")).to include(
+      "conflict_files" => ["docs/10-ops/validation.md"],
+      "publish_after_head" => "after245"
+    )
+  end
+
+  it "routes parent merge recovery publish back to verification of the live target" do
+    parent_task = A3::Domain::Task.new(
+      ref: "Portal#201",
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      verification_scope: %i[repo_alpha repo_beta],
+      status: :merging,
+      current_run_ref: "run-parent-merge-201",
+      child_refs: %w[Portal#202 Portal#205]
+    )
+    parent_run = A3::Domain::Run.new(
+      ref: "run-parent-merge-201",
+      task_ref: parent_task.ref,
+      phase: :merge,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: parent_task.ref, ref: "refs/heads/a3/parent/Portal-201"),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: %i[repo_alpha repo_beta], verification_scope: %i[repo_alpha repo_beta], ownership_scope: :parent),
+      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: parent_task.ref, owner_scope: :parent, snapshot_version: "refs/heads/a3/parent/Portal-201")
+    )
+    task_repository.save(parent_task)
+    run_repository.save(parent_run)
+
+    allow(prepare_workspace).to receive(:call).and_return(
+      A3::Application::PrepareWorkspace::Result.new(
+        workspace: A3::Domain::PreparedWorkspace.new(
+          workspace_kind: :runtime_workspace,
+          root_path: "/tmp/a3/workspaces/Portal-201/runtime_workspace",
+          source_descriptor: parent_run.source_descriptor,
+          slot_paths: {
+            repo_alpha: "/tmp/a3/workspaces/Portal-201/runtime_workspace/repo-alpha",
+            repo_beta: "/tmp/a3/workspaces/Portal-201/runtime_workspace/repo-beta"
+          }
+        )
+      )
+    )
+    captured_parent_merge_plan = nil
+    allow(merge_runner).to receive(:run) do |merge_plan, workspace:|
+      captured_parent_merge_plan = merge_plan
+      expect(workspace).to be_a(A3::Domain::PreparedWorkspace)
+      A3::Application::ExecutionResult.new(
+        success: true,
+        summary: "parent merge recovery published",
+        diagnostics: {
+          "merge_recovery" => {
+            "status" => "recovered",
+            "target_ref" => "refs/heads/main",
+            "conflict_files" => ["docs/10-ops/validation.md"],
+            "changed_files" => ["docs/10-ops/validation.md"],
+            "publish_before_head" => "before201",
+            "publish_after_head" => "after201"
+          }
+        },
+        response_bundle: {
+          "merge_recovery_verification_required" => true,
+          "merge_recovery_verification_source_ref" => "refs/heads/main"
+        }
+      )
+    end
+
+    result = use_case.call(task_ref: parent_task.ref, run_ref: parent_run.ref, project_context: live_project_context)
+
+    expect(captured_parent_merge_plan.integration_target.target_ref).to eq("refs/heads/main")
+    expect(captured_parent_merge_plan.merge_source.source_ref).to eq("refs/heads/a3/parent/Portal-201")
+    expect(result.task.status).to eq(:verifying)
+    expect(result.task.verification_source_ref).to eq("refs/heads/main")
+    expect(result.run.terminal_outcome).to eq(:verification_required)
+    expect(result.run.phase_records.last.execution_record.diagnostics.fetch("merge_recovery")).to include(
+      "target_ref" => "refs/heads/main",
+      "publish_after_head" => "after201"
     )
   end
 
