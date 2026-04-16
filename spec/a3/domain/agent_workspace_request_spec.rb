@@ -58,6 +58,43 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
     expect(described_class.from_request_form(request.request_form)).to eq(request)
   end
 
+  it "round-trips parent-child workspace topology" do
+    request = described_class.new(
+      mode: :agent_materialized,
+      workspace_kind: :ticket_workspace,
+      workspace_id: "Portal-134-children-Portal-135-implementation-run-implementation",
+      freshness_policy: :reuse_if_clean_and_ref_matches,
+      cleanup_policy: :retain_until_a3_cleanup,
+      topology: {
+        kind: "parent_child",
+        parent_ref: "Portal#134",
+        child_ref: "Portal#135",
+        parent_workspace_id: "Portal-134-parent",
+        relative_path: "children/Portal-135/ticket_workspace"
+      },
+      slots: {
+        repo_alpha: {
+          source: { kind: "local_git", alias: "member-portal-starters" },
+          ref: "refs/heads/a3/work/Portal-135",
+          checkout: "worktree_branch",
+          access: "read_write",
+          sync_class: "eager",
+          ownership: "edit_target",
+          required: true
+        }
+      }
+    )
+
+    expect(request.request_form.fetch("topology")).to eq(
+      "kind" => "parent_child",
+      "parent_ref" => "Portal#134",
+      "child_ref" => "Portal#135",
+      "parent_workspace_id" => "Portal-134-parent",
+      "relative_path" => "children/Portal-135/ticket_workspace"
+    )
+    expect(described_class.from_request_form(request.request_form)).to eq(request)
+  end
+
   it "fails closed on unsupported source and checkout values" do
     expect do
       described_class.new(

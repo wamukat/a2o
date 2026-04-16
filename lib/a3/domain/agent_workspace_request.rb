@@ -13,15 +13,16 @@ module A3
         commit_all_edit_target_changes_on_success
       ].freeze
 
-      attr_reader :mode, :workspace_kind, :workspace_id, :freshness_policy, :cleanup_policy, :publish_policy, :slots
+      attr_reader :mode, :workspace_kind, :workspace_id, :freshness_policy, :cleanup_policy, :publish_policy, :slots, :topology
 
-      def initialize(mode:, workspace_kind:, workspace_id:, freshness_policy:, cleanup_policy:, slots:, publish_policy: nil)
+      def initialize(mode:, workspace_kind:, workspace_id:, freshness_policy:, cleanup_policy:, slots:, publish_policy: nil, topology: nil)
         @mode = normalize_symbol(mode, "mode", MODES)
         @workspace_kind = normalize_symbol(workspace_kind, "workspace_kind", WORKSPACE_KINDS)
         @workspace_id = required_string(workspace_id, "workspace_id")
         @freshness_policy = normalize_symbol(freshness_policy, "freshness_policy", FRESHNESS_POLICIES)
         @cleanup_policy = normalize_symbol(cleanup_policy, "cleanup_policy", CLEANUP_POLICIES)
         @publish_policy = normalize_publish_policy(publish_policy)
+        @topology = normalize_topology(topology)
         @slots = normalize_slots(slots)
         validate_slots!
         freeze
@@ -35,6 +36,7 @@ module A3
           freshness_policy: record.fetch("freshness_policy"),
           cleanup_policy: record.fetch("cleanup_policy"),
           publish_policy: record["publish_policy"],
+          topology: record["topology"],
           slots: record.fetch("slots")
         )
       end
@@ -49,6 +51,7 @@ module A3
           "slots" => slots
         }
         form["publish_policy"] = publish_policy if publish_policy
+        form["topology"] = topology if topology
         form
       end
 
@@ -91,6 +94,22 @@ module A3
         {
           "mode" => mode,
           "commit_message" => required_string(record.fetch("commit_message"), "publish policy commit_message")
+        }.freeze
+      end
+
+      def normalize_topology(value)
+        return nil if value.nil?
+
+        record = value.transform_keys(&:to_s)
+        kind = required_string(record.fetch("kind"), "topology kind")
+        raise ConfigurationError, "unsupported agent workspace topology kind: #{kind}" unless kind == "parent_child"
+
+        {
+          "kind" => kind,
+          "parent_ref" => required_string(record.fetch("parent_ref"), "topology parent_ref"),
+          "child_ref" => required_string(record.fetch("child_ref"), "topology child_ref"),
+          "parent_workspace_id" => required_string(record.fetch("parent_workspace_id"), "topology parent_workspace_id"),
+          "relative_path" => required_string(record.fetch("relative_path"), "topology relative_path")
         }.freeze
       end
 

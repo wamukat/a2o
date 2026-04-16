@@ -42,6 +42,7 @@ module A3
           workspace_kind: workspace.workspace_kind,
           workspace_id: workspace_id_for(task: task, run: run),
           freshness_policy: @freshness_policy,
+          topology: topology_for(task: task, workspace: workspace),
           cleanup_policy: @cleanup_policy,
           publish_policy: publish_policy_for(task: task, run: run, command_intent: command_intent),
           slots: slots
@@ -158,7 +159,25 @@ module A3
         raise A3::Domain::ConfigurationError, "unsupported agent command intent: #{value.inspect}"
       end
 
+      def topology_for(task:, workspace:)
+        return nil unless task.kind.to_sym == :child && task.parent_ref
+
+        {
+          kind: "parent_child",
+          parent_ref: task.parent_ref,
+          child_ref: task.ref,
+          parent_workspace_id: parent_workspace_id_for(task.parent_ref),
+          relative_path: File.join("children", safe_id(task.ref), workspace.workspace_kind.to_s)
+        }
+      end
+
+      def parent_workspace_id_for(parent_ref)
+        "#{safe_id(parent_ref)}-parent"
+      end
+
       def workspace_id_for(task:, run:)
+        return parent_workspace_id_for(task.ref) if task.kind.to_sym == :parent
+
         if task.kind.to_sym == :child && task.parent_ref
           return "#{safe_id(task.parent_ref)}-children-#{safe_id(task.ref)}-#{safe_id(run.phase)}-#{safe_id(run.ref)}"
         end

@@ -3,13 +3,14 @@
 module A3
   module Domain
     class AgentWorkspaceDescriptor
-      attr_reader :workspace_kind, :runtime_profile, :workspace_id, :source_descriptor, :slot_descriptors
+      attr_reader :workspace_kind, :runtime_profile, :workspace_id, :source_descriptor, :slot_descriptors, :topology
 
-      def initialize(workspace_kind:, runtime_profile:, workspace_id:, source_descriptor:, slot_descriptors:)
+      def initialize(workspace_kind:, runtime_profile:, workspace_id:, source_descriptor:, slot_descriptors:, topology: nil)
         @workspace_kind = workspace_kind.to_sym
         @runtime_profile = required_string(runtime_profile, "runtime_profile")
         @workspace_id = required_string(workspace_id, "workspace_id")
         @source_descriptor = source_descriptor
+        @topology = normalize_optional_descriptor(topology)
         @slot_descriptors = normalize_slot_descriptors(slot_descriptors)
         validate_workspace_kind!
         freeze
@@ -21,7 +22,8 @@ module A3
           runtime_profile: record.fetch("runtime_profile"),
           workspace_id: record.fetch("workspace_id"),
           source_descriptor: SourceDescriptor.from_persisted_form(record.fetch("source_descriptor")),
-          slot_descriptors: record.fetch("slot_descriptors")
+          slot_descriptors: record.fetch("slot_descriptors"),
+          topology: record["topology"]
         )
       end
 
@@ -32,7 +34,9 @@ module A3
           "workspace_id" => workspace_id,
           "source_descriptor" => source_descriptor.persisted_form,
           "slot_descriptors" => slot_descriptors
-        }
+        }.tap do |form|
+          form["topology"] = topology if topology
+        end
       end
 
       def ==(other)
@@ -41,7 +45,8 @@ module A3
           other.runtime_profile == runtime_profile &&
           other.workspace_id == workspace_id &&
           other.source_descriptor == source_descriptor &&
-          other.slot_descriptors == slot_descriptors
+          other.slot_descriptors == slot_descriptors &&
+          other.topology == topology
       end
       alias eql? ==
 
@@ -59,6 +64,12 @@ module A3
 
         raise ConfigurationError,
           "agent workspace kind #{workspace_kind} does not match source descriptor workspace kind #{source_descriptor.workspace_kind}"
+      end
+
+      def normalize_optional_descriptor(value)
+        return nil if value.nil?
+
+        normalize_descriptor(value)
       end
 
       def normalize_slot_descriptors(slot_descriptors)

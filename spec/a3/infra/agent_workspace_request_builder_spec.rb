@@ -84,6 +84,13 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     request = support_ref_builder.call(workspace: workspace, task: parented_task, run: parented_run)
 
     expect(request.workspace_id).to eq("Portal-134-children-Portal-135-implementation-run-implementation")
+    expect(request.topology).to eq(
+      "kind" => "parent_child",
+      "parent_ref" => "Portal#134",
+      "child_ref" => "Portal#135",
+      "parent_workspace_id" => "Portal-134-parent",
+      "relative_path" => "children/Portal-135/ticket_workspace"
+    )
     expect(request.slots.fetch("repo_alpha")).to include(
       "ref" => "refs/heads/a3/work/Portal-135",
       "bootstrap_ref" => "refs/heads/a3/parent/Portal-134",
@@ -155,6 +162,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       support_ref: "refs/heads/feature/prototype"
     ).call(workspace: workspace, task: parent_task, run: parent_run)
 
+    expect(request.workspace_id).to eq("Portal-173-parent")
     expect(request.slots.fetch("repo_alpha")).to include(
       "ref" => "refs/heads/a3/parent/Portal-173",
       "bootstrap_ref" => "refs/heads/feature/prototype",

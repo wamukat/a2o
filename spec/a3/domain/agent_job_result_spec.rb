@@ -101,6 +101,36 @@ RSpec.describe A3::Domain::AgentJobResult do
     )
   end
 
+  it "round-trips workspace descriptor topology" do
+    descriptor = A3::Domain::AgentWorkspaceDescriptor.new(
+      workspace_kind: :runtime_workspace,
+      runtime_profile: "host-local-agent",
+      workspace_id: "Portal-134-children-Portal-135-implementation-run-implementation",
+      source_descriptor: source_descriptor,
+      topology: {
+        kind: "parent_child",
+        parent_ref: "Portal#134",
+        child_ref: "Portal#135",
+        parent_workspace_id: "Portal-134-parent",
+        relative_path: "children/Portal-135/ticket_workspace"
+      },
+      slot_descriptors: {
+        repo_alpha: {
+          "runtime_path" => "/workspace/Portal-134-parent/children/Portal-135/ticket_workspace/repo-alpha"
+        }
+      }
+    )
+
+    expect(A3::Domain::AgentWorkspaceDescriptor.from_persisted_form(descriptor.persisted_form)).to eq(descriptor)
+    expect(descriptor.persisted_form.fetch("topology")).to eq(
+      "kind" => "parent_child",
+      "parent_ref" => "Portal#134",
+      "child_ref" => "Portal#135",
+      "parent_workspace_id" => "Portal-134-parent",
+      "relative_path" => "children/Portal-135/ticket_workspace"
+    )
+  end
+
   it "rejects local path-only log and artifact result fields" do
     result_form = {
       "job_id" => "job-portal-42-verification",

@@ -60,6 +60,57 @@ func TestWorkspaceMaterializerPreparesAndCleansWorktreeSlots(t *testing.T) {
 	}
 }
 
+func TestWorkspaceMaterializerUsesParentChildTopologyRoot(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"member-portal-starters": sourceRoot,
+		},
+	}
+	request := testWorkspaceRequest("member-portal-starters")
+	request.WorkspaceID = "Portal-134-children-Portal-135-implementation-run-implementation"
+	request.Topology = &WorkspaceTopology{
+		Kind:              "parent_child",
+		ParentRef:         "Portal#134",
+		ChildRef:          "Portal#135",
+		ParentWorkspaceID: "Portal-134-parent",
+		RelativePath:      "children/Portal-135/ticket_workspace",
+	}
+
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedRoot := filepath.Join(tmp, "agent-workspaces", "Portal-134-parent", "children", "Portal-135", "ticket_workspace")
+	if prepared.Root != expectedRoot {
+		t.Fatalf("unexpected topology root: got=%s want=%s", prepared.Root, expectedRoot)
+	}
+	workspaceMetadata := readJSON(t, filepath.Join(prepared.Root, ".a3", "workspace.json"))
+	topology, ok := workspaceMetadata["topology"].(map[string]any)
+	if !ok || topology["parent_workspace_id"] != "Portal-134-parent" || topology["relative_path"] != "children/Portal-135/ticket_workspace" {
+		t.Fatalf("unexpected topology metadata: %#v", workspaceMetadata)
+	}
+	if err := materializer.Cleanup(prepared); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWorkspaceMaterializerRejectsUnsafeParentChildTopologyPath(t *testing.T) {
+	request := testWorkspaceRequest("member-portal-starters")
+	request.Topology = &WorkspaceTopology{
+		Kind:              "parent_child",
+		ParentWorkspaceID: "Portal-134-parent",
+		RelativePath:      "../escape",
+	}
+	materializer := WorkspaceMaterializer{WorkspaceRoot: t.TempDir()}
+
+	if _, err := materializer.Prepare(request); err == nil || !strings.Contains(err.Error(), "relative_path must stay under parent workspace") {
+		t.Fatalf("expected unsafe relative_path failure, got %v", err)
+	}
+}
+
 func readJSON(t *testing.T, path string) map[string]any {
 	t.Helper()
 	content, err := os.ReadFile(path)

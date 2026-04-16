@@ -74,7 +74,7 @@ func (e mergeConflictError) Unwrap() error {
 }
 
 func (m WorkspaceMaterializer) Prepare(request WorkspaceRequest) (PreparedWorkspace, error) {
-	root, err := m.workspaceRoot(request.WorkspaceID)
+	root, err := m.workspaceRootForRequest(request)
 	if err != nil {
 		return PreparedWorkspace{}, err
 	}
@@ -981,6 +981,41 @@ func (m WorkspaceMaterializer) workspaceRoot(workspaceID string) (string, error)
 	return filepath.Abs(filepath.Join(m.WorkspaceRoot, safeID(workspaceID)))
 }
 
+func (m WorkspaceMaterializer) workspaceRootForRequest(request WorkspaceRequest) (string, error) {
+	if request.WorkspaceID == "" {
+		return "", fmt.Errorf("workspace id is required")
+	}
+	if request.Topology == nil {
+		return m.workspaceRoot(request.WorkspaceID)
+	}
+	if request.Topology.Kind != "parent_child" {
+		return "", fmt.Errorf("unsupported workspace topology kind: %s", request.Topology.Kind)
+	}
+	parentRoot, err := m.workspaceRoot(request.Topology.ParentWorkspaceID)
+	if err != nil {
+		return "", err
+	}
+	relativePath, err := safeRelativePath(request.Topology.RelativePath)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Abs(filepath.Join(parentRoot, relativePath))
+}
+
+func safeRelativePath(value string) (string, error) {
+	if value == "" {
+		return "", fmt.Errorf("workspace topology relative_path is required")
+	}
+	if filepath.IsAbs(value) {
+		return "", fmt.Errorf("workspace topology relative_path must be relative: %s", value)
+	}
+	clean := filepath.Clean(value)
+	if clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("workspace topology relative_path must stay under parent workspace: %s", value)
+	}
+	return clean, nil
+}
+
 func (m WorkspaceMaterializer) sourceRoot(alias string) (string, error) {
 	if alias == "" {
 		return "", fmt.Errorf("source alias is required")
@@ -1205,6 +1240,9 @@ func writeWorkspaceMetadata(root string, request WorkspaceRequest) error {
 		"source_type":       "branch_head",
 		"source_ref":        workspaceSourceRef(request),
 		"slot_requirements": requirements,
+	}
+	if request.Topology != nil {
+		payload["topology"] = request.Topology
 	}
 	return writeMetadataJSON(filepath.Join(metadataDir, "workspace.json"), payload)
 }

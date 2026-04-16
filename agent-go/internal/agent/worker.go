@@ -467,13 +467,17 @@ func requestedWorkspaceDescriptor(request JobRequest, slots map[string]map[strin
 	if slots == nil {
 		slots = map[string]map[string]any{}
 	}
-	return WorkspaceDescriptor{
+	descriptor := WorkspaceDescriptor{
 		WorkspaceKind:    workspaceKind,
 		RuntimeProfile:   request.RuntimeProfile,
 		WorkspaceID:      workspaceID,
 		SourceDescriptor: request.SourceDescriptor,
 		SlotDescriptors:  slots,
 	}
+	if request.WorkspaceRequest != nil {
+		descriptor.Topology = request.WorkspaceRequest.Topology
+	}
+	return descriptor
 }
 
 func writeWorkerProtocolRequest(workspaceRoot string, payload map[string]any) error {

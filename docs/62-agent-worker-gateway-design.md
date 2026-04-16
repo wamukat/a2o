@@ -305,6 +305,13 @@ Add an optional `workspace_request` object to `AgentJobRequest`.
     "workspace_id": "Portal-123-ticket",
     "freshness_policy": "reuse_if_clean_and_ref_matches",
     "cleanup_policy": "retain_until_a3_cleanup",
+    "topology": {
+      "kind": "parent_child",
+      "parent_ref": "Portal#122",
+      "child_ref": "Portal#123",
+      "parent_workspace_id": "Portal-122-parent",
+      "relative_path": "children/Portal-123/ticket_workspace"
+    },
     "slots": {
       "repo_alpha": {
         "source": {
@@ -327,7 +334,9 @@ Rules:
 
 - `workspace_request` is optional while same-path gateway remains supported.
 - If absent, agents keep current behavior and execute `working_dir` directly.
-- If present with `mode=agent_materialized`, `working_dir` is deprecated and ignored for materialization. The agent places `workspace_id` under its configured runtime-profile workspace root.
+- If present with `mode=agent_materialized`, `working_dir` is deprecated and ignored for materialization. The agent places `workspace_id` under its configured runtime-profile workspace root unless an explicit topology overrides the relative placement.
+- For child tasks, A3 emits `topology.kind=parent_child`. The agent materializes the child workspace under `<agent workspace root>/<parent_workspace_id>/<relative_path>` and rejects absolute paths or `..` escapes. This keeps child ticket workspaces physically under the parent workspace while preserving branch/ref ownership in each repo slot.
+- The agent must include accepted topology in `AgentWorkspaceDescriptor.topology` and workspace metadata so Engine cleanup/reconcile can trace parent/child workspace relation.
 - The agent must materialize all `required=true` slots before running the command.
 - For `local_git` sources, `source.alias` resolves through the agent runtime profile to a local project repo. The agent must create the slot as a dedicated branch worktree using `git worktree add --force <slot_path> <branch>`.
 - The agent must write worker protocol env paths under the materialized workspace root.

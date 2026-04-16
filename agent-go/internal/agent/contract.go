@@ -68,7 +68,16 @@ type WorkspaceRequest struct {
 	FreshnessPolicy string                          `json:"freshness_policy"`
 	CleanupPolicy   string                          `json:"cleanup_policy"`
 	PublishPolicy   *WorkspacePublishPolicy         `json:"publish_policy,omitempty"`
+	Topology        *WorkspaceTopology              `json:"topology,omitempty"`
 	Slots           map[string]WorkspaceSlotRequest `json:"slots"`
+}
+
+type WorkspaceTopology struct {
+	Kind              string `json:"kind"`
+	ParentRef         string `json:"parent_ref,omitempty"`
+	ChildRef          string `json:"child_ref,omitempty"`
+	ParentWorkspaceID string `json:"parent_workspace_id,omitempty"`
+	RelativePath      string `json:"relative_path,omitempty"`
 }
 
 type WorkspacePublishPolicy struct {
@@ -108,6 +117,7 @@ type WorkspaceDescriptor struct {
 	WorkspaceID      string                    `json:"workspace_id"`
 	SourceDescriptor SourceDescriptor          `json:"source_descriptor"`
 	SlotDescriptors  map[string]map[string]any `json:"slot_descriptors"`
+	Topology         *WorkspaceTopology        `json:"topology,omitempty"`
 }
 
 type JobResult struct {
