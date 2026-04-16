@@ -1,5 +1,14 @@
 {
-  "project": "A2O Reference TypeScript",
-  "lanes": ["Backlog", "To do", "In progress", "In review", "Done"],
-  "tags": ["a2o:ready", "repo:app", "kind:single", "blocked"]
+  "boards": [
+    {
+      "name": "A2O Reference TypeScript",
+      "lanes": ["Backlog", "To do", "In progress", "In review", "Done"],
+      "tags": [
+        { "name": "a2o:ready" },
+        { "name": "repo:app" },
+        { "name": "kind:single" },
+        { "name": "blocked" }
+      ]
+    }
+  ]
 }

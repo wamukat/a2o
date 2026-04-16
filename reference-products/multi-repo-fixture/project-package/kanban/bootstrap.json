@@ -1,14 +1,18 @@
 {
-  "project": "A2O Reference Multi Repo",
-  "lanes": ["Backlog", "To do", "In progress", "In review", "Done"],
-  "tags": [
-    "a2o:ready",
-    "repo:catalog",
-    "repo:storefront",
-    "repo:both",
-    "kind:single",
-    "kind:child",
-    "kind:parent",
-    "blocked"
+  "boards": [
+    {
+      "name": "A2O Reference Multi Repo",
+      "lanes": ["Backlog", "To do", "In progress", "In review", "Done"],
+      "tags": [
+        { "name": "a2o:ready" },
+        { "name": "repo:catalog" },
+        { "name": "repo:storefront" },
+        { "name": "repo:both" },
+        { "name": "kind:single" },
+        { "name": "kind:child" },
+        { "name": "kind:parent" },
+        { "name": "blocked" }
+      ]
+    }
   ]
 }
