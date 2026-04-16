@@ -4,13 +4,11 @@
       "name": "A2O Reference Multi Repo",
       "lanes": ["Backlog", "To do", "In progress", "In review", "Done"],
       "tags": [
-        { "name": "a2o:ready" },
+        { "name": "trigger:auto-implement" },
+        { "name": "trigger:auto-parent" },
         { "name": "repo:catalog" },
         { "name": "repo:storefront" },
         { "name": "repo:both" },
-        { "name": "kind:single" },
-        { "name": "kind:child" },
-        { "name": "kind:parent" },
         { "name": "blocked" }
       ]
     }

@@ -4,9 +4,8 @@
       "name": "A2O Reference Python",
       "lanes": ["Backlog", "To do", "In progress", "In review", "Done"],
       "tags": [
-        { "name": "a2o:ready" },
+        { "name": "trigger:auto-implement" },
         { "name": "repo:app" },
-        { "name": "kind:single" },
         { "name": "blocked" }
       ]
     }

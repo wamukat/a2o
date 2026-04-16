@@ -2,9 +2,8 @@
 
 Create a single task with labels:
 
-- `a2o:ready`
+- `trigger:auto-implement`
 - `repo:app`
-- `kind:single`
 
 Task body:
 
