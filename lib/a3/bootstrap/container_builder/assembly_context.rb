@@ -74,6 +74,10 @@ module A3
           @runtime_services.fetch(:register_completed_run)
         end
 
+        def reconcile_manual_merge_recovery
+          @runtime_services.fetch(:reconcile_manual_merge_recovery)
+        end
+
         def start_run
           @runtime_services.fetch(:start_run)
         end

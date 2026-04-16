@@ -29,6 +29,13 @@ module A3
             integration_ref_readiness_checker: integration_ref_readiness_checker,
             handle_parent_review_disposition: parent_review_disposition_handler
           )
+          reconcile_manual_merge_recovery = A3::Application::ReconcileManualMergeRecovery.new(
+            task_repository: repositories.fetch(:task_repository),
+            run_repository: repositories.fetch(:run_repository),
+            plan_next_phase: A3::Application::PlanNextPhase.new,
+            publish_external_task_status: external_task_status_publisher,
+            publish_external_task_activity: external_task_activity_publisher
+          )
           build_scope_snapshot = A3::Application::BuildScopeSnapshot.new
           build_artifact_owner = A3::Application::BuildArtifactOwner.new
           workspace_provisioner = A3::Infra::LocalWorkspaceProvisioner.new(
@@ -44,6 +51,7 @@ module A3
             start_phase: start_phase,
             register_started_run: register_started_run,
             register_completed_run: register_completed_run,
+            reconcile_manual_merge_recovery: reconcile_manual_merge_recovery,
             build_scope_snapshot: build_scope_snapshot,
             build_artifact_owner: build_artifact_owner,
             integration_ref_readiness_checker: integration_ref_readiness_checker,

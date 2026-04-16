@@ -1018,4 +1018,79 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("diagnostic.missing_path=/tmp/repo-beta")
     end
   end
+
+  it "reconciles manual merge recovery through json repositories" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))
+      run_repository = A3::Infra::JsonRunRepository.new(File.join(dir, "runs.json"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "Portal#245",
+          kind: :single,
+          edit_scope: [:repo_alpha],
+          status: :blocked,
+          external_task_id: 245
+        )
+      )
+      run_repository.save(
+        A3::Domain::Run.new(
+          ref: "run-merge-245",
+          task_ref: "Portal#245",
+          phase: :merge,
+          workspace_kind: :runtime_workspace,
+          source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Portal#245", ref: "refs/heads/a3/work/Portal-245"),
+          scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: %i[repo_alpha], verification_scope: %i[repo_alpha], ownership_scope: :task),
+          artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: "Portal#245", owner_scope: :task, snapshot_version: "merge-head")
+        ).append_phase_evidence(
+          phase: :merge,
+          source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Portal#245", ref: "refs/heads/a3/work/Portal-245"),
+          scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: %i[repo_alpha], verification_scope: %i[repo_alpha], ownership_scope: :task),
+          execution_record: A3::Domain::PhaseExecutionRecord.new(
+            summary: "merge conflict requires recovery",
+            observed_state: "merge_recovery_candidate",
+            diagnostics: {
+              "merge_recovery" => {
+                "status" => "failed",
+                "target_ref" => "refs/heads/main",
+                "source_ref" => "refs/heads/a3/work/Portal-245"
+              }
+            }
+          )
+        ).complete(outcome: :blocked)
+      )
+
+      out = StringIO.new
+      described_class.start(
+        [
+          "reconcile-merge-recovery",
+          "Portal#245",
+          "run-merge-245",
+          "--storage-dir", dir,
+          "--target-ref", "refs/heads/main",
+          "--source-ref", "refs/heads/a3/work/Portal-245",
+          "--publish-before-head", "before123",
+          "--publish-after-head", "after456"
+        ],
+        out: out,
+        run_id_generator: -> { "unused" }
+      )
+
+      persisted_task = task_repository.fetch("Portal#245")
+      persisted_run = run_repository.fetch("run-merge-245")
+
+      expect(out.string).to include("merge recovery reconciled for run-merge-245 on Portal#245")
+      expect(out.string).to include("verification_source_ref=refs/heads/main")
+      expect(persisted_task.status).to eq(:verifying)
+      expect(persisted_task.verification_source_ref).to eq("refs/heads/main")
+      expect(persisted_run.terminal_outcome).to eq(:verification_required)
+      expect(persisted_run.phase_records.last.execution_record.diagnostics.fetch("merge_recovery")).to include(
+        "status" => "manual_reconciled",
+        "target_ref" => "refs/heads/main",
+        "source_ref" => "refs/heads/a3/work/Portal-245",
+        "publish_before_head" => "before123",
+        "publish_after_head" => "after456"
+      )
+    end
+  end
+
 end

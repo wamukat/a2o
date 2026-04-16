@@ -30,6 +30,7 @@ module A3
         "complete-run" => Definition.new(handler: :handle_complete_run, session_kind: :storage),
         "plan-rerun" => Definition.new(handler: :handle_plan_rerun, session_kind: :storage),
         "recover-rerun" => Definition.new(handler: :handle_recover_rerun, session_kind: :storage_runtime_package),
+        "reconcile-merge-recovery" => Definition.new(handler: :handle_reconcile_merge_recovery, session_kind: :storage),
         "diagnose-blocked" => Definition.new(handler: :handle_diagnose_blocked, session_kind: :storage),
         "show-blocked-diagnosis" => Definition.new(handler: :handle_show_blocked_diagnosis, session_kind: :storage_runtime_package),
         "plan-next-runnable-task" => Definition.new(handler: :handle_plan_next_runnable_task, session_kind: :storage),

@@ -34,7 +34,8 @@ module A3
             ),
             show_scheduler_history: A3::Application::ShowSchedulerHistory.new(
               scheduler_cycle_repository: context.scheduler_cycle_repository
-            )
+            ),
+            reconcile_manual_merge_recovery: context.reconcile_manual_merge_recovery
           }
         end
       end

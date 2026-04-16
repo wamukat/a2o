@@ -163,6 +163,31 @@ module A3
       end
     end
 
+    def handle_reconcile_merge_recovery(argv, out:, run_id_generator:, command_runner:, merge_runner:)
+      with_storage_container(
+        argv: argv,
+        parse_with: :parse_reconcile_merge_recovery_options,
+        run_id_generator: run_id_generator,
+        command_runner: command_runner,
+        merge_runner: merge_runner
+      ) do |options, container|
+        result = container.fetch(:reconcile_manual_merge_recovery).call(
+          task_ref: options.fetch(:task_ref),
+          run_ref: options.fetch(:run_ref),
+          target_ref: options.fetch(:target_ref),
+          source_ref: options[:source_ref],
+          publish_before_head: options[:publish_before_head],
+          publish_after_head: options[:publish_after_head],
+          summary: options[:summary]
+        )
+
+        out.puts("merge recovery reconciled for #{result.run.ref} on #{result.task.ref}")
+        out.puts("status=#{result.task.status}")
+        out.puts("verification_source_ref=#{result.task.verification_source_ref}")
+        out.puts("merge_recovery_status=#{result.recovery.fetch('status')}")
+      end
+    end
+
     def handle_diagnose_blocked(argv, out:, run_id_generator:, command_runner:, merge_runner:)
       options = parse_diagnose_blocked_options(argv)
       container = build_storage_container(
@@ -943,6 +968,32 @@ module A3
       options.fetch(:review_base)
       options.fetch(:review_head)
       options.fetch(:snapshot_version)
+      options
+    end
+
+    def parse_reconcile_merge_recovery_options(argv)
+      options = {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        repo_sources: {},
+        kanban_repo_label_map: {},
+        kanban_trigger_labels: []
+      }
+
+      parser = OptionParser.new
+      parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      parser.on("--target-ref REF") { |value| options[:target_ref] = value }
+      parser.on("--source-ref REF") { |value| options[:source_ref] = value }
+      parser.on("--publish-before-head SHA") { |value| options[:publish_before_head] = value }
+      parser.on("--publish-after-head SHA") { |value| options[:publish_after_head] = value }
+      parser.on("--summary TEXT") { |value| options[:summary] = value }
+      add_kanban_bridge_options(parser, options)
+      remaining = parser.parse(argv)
+
+      options[:task_ref] = remaining.fetch(0)
+      options[:run_ref] = remaining.fetch(1)
       options
     end
 
