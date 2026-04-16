@@ -69,11 +69,11 @@ Install the host launcher from a published A2O Engine image:
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share"
 docker run --rm \
   -v "$HOME/.local:/install" \
-  ghcr.io/<a2o-owner>/a2o-engine:latest \
+  ghcr.io/wamukat/a2o-engine:latest \
   a2o host install \
     --output-dir /install/bin \
     --share-dir /install/share/a2o \
-    --runtime-image ghcr.io/<a2o-owner>/a2o-engine:latest
+    --runtime-image ghcr.io/wamukat/a2o-engine:latest
 ```
 
 The container command copies platform binaries such as `a2o-darwin-amd64` and `a2o-linux-amd64`, copies A2O distribution assets such as the standard compose file under `$HOME/.local/share/a2o`, records the runtime image used by later `a2o runtime ...` commands, then writes a host-side `a2o` shell wrapper that selects the right binary with `uname`. Compatibility `a3` launchers are also installed. Mount the install prefix, not only the `bin` directory, so the share assets are exported to the host. The host does not need Ruby.

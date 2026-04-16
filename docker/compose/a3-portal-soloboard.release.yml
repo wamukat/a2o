@@ -1,6 +1,6 @@
 services:
   a3-runtime:
-    image: ${A3_RUNTIME_IMAGE:-a3-portal-bundle-a3-runtime}
+    image: ${A3_RUNTIME_IMAGE:-ghcr.io/wamukat/a2o-engine:latest}
     working_dir: /workspace
     environment:
       A3_ROOT_DIR: /workspace

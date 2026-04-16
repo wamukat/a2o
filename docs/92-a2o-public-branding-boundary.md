@@ -9,7 +9,7 @@
 
 - Public brand: `A2O`
 - Public command: `a2o`
-- Public image: `ghcr.io/<a2o-owner>/a2o-engine:latest`
+- Public image: `ghcr.io/wamukat/a2o-engine:latest`
 - Public agent binary: `a2o-agent`
 - Internal engine name: `A3`
 - Internal command / module / env / state: `a3`, `A3_*`, `.a3`, `a3-runtime`
@@ -41,6 +41,5 @@ agent install は public path では `a2o-agent` を使う。binary の中身は
 
 ## Follow-up
 
-- registry owner が決まったら `ghcr.io/<a2o-owner>/a2o-engine:latest` を具体値へ置換する。
 - public docs に残る `a3` command 例は、internal / compatibility 文脈かどうかを棚卸しし、利用者向けは `a2o` に寄せる。
 - 将来 `.a3` / `A3_*` を rename する場合は、別 release の state migration として扱う。

@@ -85,11 +85,11 @@ A2O release 後の利用者コマンドは次の形にする。
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share"
 docker run --rm \
   -v "$HOME/.local:/install" \
-  ghcr.io/<a2o-owner>/a2o-engine:latest \
+  ghcr.io/wamukat/a2o-engine:latest \
   a2o host install \
     --output-dir /install/bin \
     --share-dir /install/share/a2o \
-    --runtime-image ghcr.io/<a2o-owner>/a2o-engine:latest
+    --runtime-image ghcr.io/wamukat/a2o-engine:latest
 export PATH="$HOME/.local/bin:$PATH"
 
 a2o project bootstrap --package ./a2o-project
@@ -158,4 +158,3 @@ task a3:portal:runtime:watch-summary
 - `scripts/a3-projects/portal/runtime/run_once.sh` の責務は Engine command へ移設済み。残りは Portal 固有値を project package config から読む範囲を広げ、hardcoded Portal default を減らすこと。
 - `A3_RUNTIME_RUN_ONCE_*` のような内部 env は project package / CLI option に寄せ、利用者の主要入口から隠す。
 - A2O/SoloBoard compose file は A2O 配布物として同梱し、project package 側に compose file 作成を要求しない。compose override は開発・診断用に限定する。
-- GHCR の正式 image ref が決まったら、この README の `ghcr.io/<a2o-owner>/a2o-engine:latest` placeholder を置換する。
