@@ -13,7 +13,10 @@ RSpec.describe PortalVerification do
   def write_slot_metadata(slot_path, repo_name)
     metadata_dir = slot_path.join(".a3")
     FileUtils.mkdir_p(metadata_dir)
-    File.write(metadata_dir.join("slot.json"), JSON.generate({ "repo_source_root" => "/tmp/#{repo_name}" }))
+    File.write(
+      metadata_dir.join("slot.json"),
+      JSON.generate({ "repo_source_root" => "/tmp/#{repo_name}", "access" => "read_write", "ownership" => "edit_target" })
+    )
   end
 
   def write_workspace_metadata(workspace_root, source_ref)
@@ -42,6 +45,7 @@ RSpec.describe PortalVerification do
       expected_env = {
         "AUTOMATION_ISSUE_WORKSPACE" => workspace_root.to_s,
         "MAVEN_REPO_LOCAL" => workspace_root.join(".work", "m2", "repository").to_s,
+        "A3_WORKSPACE_MAVEN_REPO" => workspace_root.join(".work", "m2", "repository").to_s,
         "A3_ROOT_DIR" => described_class::ROOT_DIR.to_s
       }
       expect(described_class).to have_received(:run_command).with(["task", "test:nullaway"], cwd: repo_alpha, env: expected_env).ordered
@@ -130,6 +134,7 @@ RSpec.describe PortalVerification do
       expected_env = {
         "AUTOMATION_ISSUE_WORKSPACE" => workspace_root.to_s,
         "MAVEN_REPO_LOCAL" => workspace_root.join(".work", "m2", "repository").to_s,
+        "A3_WORKSPACE_MAVEN_REPO" => workspace_root.join(".work", "m2", "repository").to_s,
         "A3_ROOT_DIR" => described_class::ROOT_DIR.to_s
       }
       expect(described_class).to have_received(:run_command).with(
