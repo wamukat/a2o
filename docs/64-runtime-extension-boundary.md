@@ -100,7 +100,7 @@ These files are not injected runtime hooks. `runtime/` contains Portal's current
 
 | Root file | Classification | Action | Reason / dependency |
 | --- | --- | --- | --- |
-| `scripts/a3-projects/portal/runtime/run_once.sh` | Portal runtime launcher | Keep as current Portal runtime surface behind `task a3:portal:runtime:run-once` | It binds Docker A3 runtime, SoloBoard port, Portal manifest, host `a3-agent` export, and Portal worker script for one manual runtime cycle. This is operational glue, not an operator test. |
+| `scripts/a3-projects/portal/runtime/run_once.sh` | Portal runtime launcher | Deleted | The generic A2O host launcher owns runtime execution; Portal packages do not carry runtime shell entrypoints. |
 | `scripts/a3-projects/portal/maintenance/prepare_portal_runtime_config.rb` | Portal root glue | Keep as support helper until Portal config is loaded as an external project package | It materializes project-injected shell env and working directory overrides for `doctor-env`, cleanup, and reconcile without tying the path to macOS LaunchAgent service support. |
 | `scripts/a3-projects/portal/maintenance/rebuild-maven-seed-cache.sh` | Project/operator cache helper | Keep as maintenance, not runtime injection | It prepares a Portal Maven seed cache from the operator environment. A3 may define cache injection contracts, but not own Portal dependency contents. |
 | `scripts/a3-projects/portal/runtime_agent_scheduler_ref_candidates.py` | Portal runtime diagnostic helper | Deleted | Dynamic candidate lookup was removed from `runtime/run_once.sh`; agent materialization now owns per-phase ref preparation. |

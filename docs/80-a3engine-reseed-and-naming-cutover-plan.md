@@ -15,7 +15,7 @@
 - 旧 backend 実験は破棄済みで、current generic backend は SoloBoard のみである
 - next の backend migration target は SoloBoard であり、Docker/runtime packaging は SoloBoard parity judgment の後に行う
 - 現行 `a3-engine` は旧実装の退避後に新しい current source として利用する
-- packaging freeze 入力として、current generic operator backend は SoloBoard、`task a3:portal:cutover:doctor` / `:observe` は current mainline 観測入口、`task a3:portal:runtime:*` は Docker 上 A3 runtime + SoloBoard の標準入口として扱う。旧 `task a3:portal:bundle:*` は短期 maintenance alias とする
+- packaging freeze 入力として、current generic operator backend は SoloBoard、`task a3:portal:cutover:doctor` / `:observe` は historical mainline 観測入口として扱う。Portal runtime Taskfile namespace と旧 `task a3:portal:bundle:*` は削除済みであり、A2O public surface には含めない
 
 ## A-AI 非依存コンセプト
 

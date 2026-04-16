@@ -200,7 +200,7 @@ This validation still avoids Maven / NullAway. Portal full verification is the n
 
 ### CLI Bundle Validation
 
-Status: historical Docker dev-env validation was implemented as `task a3:portal:runtime:agent-worker-gateway-validation`. 2026-04-13 の配布整理で Docker agent image と同 task は削除し、現行確認は host-local `a3-agent` と scheduler run-once に寄せる。
+Status: historical Docker dev-env validation was implemented as retired Portal runtime task (agent-worker-gateway-validation). 2026-04-13 の配布整理で Docker agent image と同 task は削除し、現行確認は host-local `a3-agent` と scheduler run-once に寄せる。
 
 Add a root-level bundle validation that proves the operator CLI path can use `agent-http`:
 
@@ -229,7 +229,7 @@ Operational constraint: the gateway command blocks while waiting for the agent j
 
 ### CLI Bundle Verification Validation
 
-Status: historical Docker dev-env verification validation was implemented as `task a3:portal:runtime:agent-verification-validation`. 2026-04-13 の配布整理で同 task は削除し、host-local `a3-agent` 経路を正規確認にする。
+Status: historical Docker dev-env verification validation was implemented as retired Portal runtime task (agent-verification-validation). 2026-04-13 の配布整理で同 task は削除し、host-local `a3-agent` 経路を正規確認にする。
 
 This validation proves the operator CLI path can run `run-verification --verification-command-runner agent-http` through the compose `a3-agent` service. The compose service intentionally uses the Portal dev-env agent image, not the generic Go-only image, because this path executes project commands (`ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/inject/portal_remediation.rb"` and `ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/inject/portal_verification.rb"`). The validation uses a small generated repo with a Taskfile to avoid Maven/NullAway cost while still exercising the real Portal remediation/verification script shape.
 
@@ -243,7 +243,7 @@ The validation asserts:
 
 Portal single-repo / parent full verification is now covered by host-local `a3-agent` scheduler and parent-topology validation. Historical Docker dev-env tasks (`agent-full-verification-validation`, `agent-ui-verification-validation`, `agent-parent-topology-validation`) were removed from the release surface after proving the protocol path.
 
-Uploaded agent artifacts are retained in the A3-managed artifact store and can be cleaned independently from workspace cleanup. `a3 agent-artifact-cleanup` applies retention by artifact class using metadata/blob mtimes, with separate TTLs for `diagnostic` and `evidence` artifacts, optional count caps (`--diagnostic-max-count` / `--evidence-max-count`), optional size caps (`--diagnostic-max-mb` / `--evidence-max-mb`), and a `--dry-run` mode for operator inspection. The Portal runtime exposes the same command as `task a3:portal:runtime:agent-artifact-cleanup`.
+Uploaded agent artifacts are retained in the A3-managed artifact store and can be cleaned independently from workspace cleanup. `a3 agent-artifact-cleanup` applies retention by artifact class using metadata/blob mtimes, with separate TTLs for `diagnostic` and `evidence` artifacts, optional count caps (`--diagnostic-max-count` / `--evidence-max-count`), optional size caps (`--diagnostic-max-mb` / `--evidence-max-mb`), and a `--dry-run` mode for operator inspection. The Portal runtime exposes the same command as retired Portal runtime task (agent-artifact-cleanup).
 
 ## Failure Policy
 

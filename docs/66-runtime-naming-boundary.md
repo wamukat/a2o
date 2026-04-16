@@ -7,21 +7,24 @@
 
 ## 方針
 
-- 利用者向けの入口名は `runtime run-once` / `runtime loop` に寄せる。
+- 利用者向けの入口名は `a2o project bootstrap` と `a2o kanban up` / `doctor` / `url` に限定する。
+- execution loop は internal runtime flow として扱い、public command surface へ露出しない。
 - `scheduler` は OS service 名ではなく、Engine-managed runtime loop の内部 cycle/state/store 名として扱う。
 - root `task --list` に出る公開IFへ `scheduler` を再導入しない。
 - 内部 class / command / storage 名の一括改名は、migration plan と state compatibility test が揃うまで行わない。
 
 ## 公開IFで使う名前
 
-- `task a3:portal:runtime:run-once`
-- `task a3:portal:runtime:watch-summary`
-- `task a3:portal:runtime:describe-state`
+- `a2o project bootstrap --package DIR`
+- `a2o kanban up`
+- `a2o kanban doctor`
+- `a2o kanban url`
+- `a2o agent install --target auto --output PATH`
 - Docker 上の A3 runtime command
 - Go release binary としての `a3-agent`
 - Engine image 同梱 agent package: `a3 agent package list/export/verify`
 
-公開ドキュメントでは、継続実行の概念を説明する場合も `runtime run loop` と呼ぶ。OS service 化は current release scope 外であり、`scheduler service` とは呼ばない。
+公開ドキュメントでは、継続実行の概念を説明する場合も internal runtime flow と呼び、利用者が直接起動する command としては案内しない。OS service 化は current release scope 外であり、`scheduler service` とは呼ばない。
 
 完成形では A3 Engine container が runtime loop process を持ち、kanban selection / run state / agent job queue を管理する。`a3-agent` は scheduler を持たず、host/project-dev-env 上で job を poll/execution する worker である。
 

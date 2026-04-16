@@ -136,14 +136,7 @@ a2o kanban url
 a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
 ```
 
-root Taskfile の互換入口も残っている。
-
-```bash
-task a3:portal:runtime:up
-task a3:portal:runtime:doctor
-task a3:portal:runtime:run-once
-task a3:portal:runtime:watch-summary
-```
+Portal workspace-local の Taskfile 互換入口は削除済みであり、利用者向け入口は `a2o project bootstrap` と `a2o kanban up` / `doctor` / `url` に限定する。
 
 Portal package の `runtime/run_once.sh` は削除済みであり、利用者も project package も実行 shell script を持たない。
 
