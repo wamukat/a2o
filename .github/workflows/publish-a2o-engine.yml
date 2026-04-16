@@ -1,0 +1,84 @@
+name: Publish A2O Engine Image
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/publish-a2o-engine.yml
+      - Dockerfile
+      - Gemfile
+      - Gemfile.lock
+      - a3.gemspec
+      - bin/**
+      - lib/**
+      - docker/a3-runtime/**
+      - docker/compose/**
+      - agent-go/**
+  pull_request:
+    paths:
+      - .github/workflows/publish-a2o-engine.yml
+      - Dockerfile
+      - Gemfile
+      - Gemfile.lock
+      - a3.gemspec
+      - bin/**
+      - lib/**
+      - docker/a3-runtime/**
+      - docker/compose/**
+      - agent-go/**
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-a2o-engine-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: ghcr.io/wamukat/a2o-engine
+
+jobs:
+  docker:
+    name: Build and publish runtime image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+
+      - name: Build runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/a3-runtime/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
