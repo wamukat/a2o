@@ -76,7 +76,7 @@ docker run --rm \
     --runtime-image ghcr.io/wamukat/a2o-engine:latest
 ```
 
-The container command copies platform binaries such as `a2o-darwin-amd64` and `a2o-linux-amd64`, copies A2O distribution assets such as the standard compose file under `$HOME/.local/share/a2o`, records the runtime image used by later `a2o runtime ...` commands, then writes a host-side `a2o` shell wrapper that selects the right binary with `uname`. Compatibility `a3` launchers are also installed. Mount the install prefix, not only the `bin` directory, so the share assets are exported to the host. The host does not need Ruby.
+The container command copies platform binaries such as `a2o-darwin-amd64` and `a2o-linux-amd64`, copies A2O distribution assets such as the standard compose file under `$HOME/.local/share/a2o`, records the runtime image used by later `a2o kanban ...` commands, then writes a host-side `a2o` shell wrapper that selects the right binary with `uname`. Compatibility `a3` launchers are also installed. Mount the install prefix, not only the `bin` directory, so the share assets are exported to the host. The host does not need Ruby.
 
 Detect the package target for the current host:
 
@@ -102,10 +102,10 @@ After `a2o project bootstrap --package ./a2o-project`, runtime commands discover
 ```sh
 a2o kanban up
 a2o kanban doctor
-a2o runtime run-once
+a2o kanban run-once
 ```
 
-`a2o runtime run-once` currently delegates to the project package `runtime/run_once.sh` while keeping that script out of the user-facing command path. Branch refs created by runtime jobs are namespaced by the compose project, for example `refs/heads/a3/a3-portal/work/Portal-1`, so isolated boards do not reuse historical live-repo branches with the same task number. The generic Go implementation will absorb that script in later slices.
+`a2o kanban run-once` currently delegates to the project package `runtime/run_once.sh` while keeping that script out of the user-facing command path. Branch refs created by runtime jobs are namespaced by the compose project, for example `refs/heads/a3/a3-portal/work/Portal-1`, so isolated boards do not reuse historical live-repo branches with the same task number. The generic Go implementation will absorb that script in later slices.
 
 ## Deployment Shapes
 

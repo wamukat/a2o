@@ -57,8 +57,6 @@ func run(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer
 		return 0
 	case "project":
 		return runProject(args[1:], stdout, stderr)
-	case "runtime":
-		return runRuntime(args[1:], runner, stdout, stderr)
 	case "kanban":
 		return runKanban(args[1:], runner, stdout, stderr)
 	case "agent":
@@ -80,8 +78,9 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o kanban up [--build]")
 	fmt.Fprintln(w, "  a2o kanban doctor")
 	fmt.Fprintln(w, "  a2o kanban url")
-	fmt.Fprintln(w, "  a2o runtime run-once [--max-steps N] [--agent-attempts N]")
-	fmt.Fprintln(w, "  a2o runtime loop [--interval DURATION] [--max-cycles N] [--max-steps N] [--agent-attempts N]")
+	fmt.Fprintln(w, "  a2o kanban run-once [--max-steps N] [--agent-attempts N]")
+	fmt.Fprintln(w, "  a2o kanban loop [--interval DURATION] [--max-cycles N] [--max-steps N] [--agent-attempts N]")
+	fmt.Fprintln(w, "  a2o kanban command-plan")
 	fmt.Fprintln(w, "  a2o agent target")
 	fmt.Fprintln(w, "  a2o agent install --target auto --output PATH [--build]")
 }
@@ -108,6 +107,24 @@ func runKanban(args []string, runner commandRunner, stdout io.Writer, stderr io.
 		return 0
 	case "url":
 		if err := runKanbanURL(args[1:], stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	case "command-plan":
+		if err := runRuntimeCommandPlan(args[1:], stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	case "run-once":
+		if err := runRuntimeRunOnce(args[1:], runner, stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	case "loop":
+		if err := runRuntimeLoop(args[1:], runner, stdout, stderr); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -421,8 +438,8 @@ func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) er
 	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(*config))
 	fmt.Fprintf(stdout, "internal_runtime_up=docker compose -p %s -f %s up -d %s soloboard\n", config.ComposeProject, config.ComposeFile, config.RuntimeService)
 	fmt.Fprintf(stdout, "agent_install=a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent\n")
-	fmt.Fprintf(stdout, "runtime_run_once=a2o runtime run-once\n")
-	fmt.Fprintf(stdout, "runtime_loop=a2o runtime loop\n")
+	fmt.Fprintf(stdout, "kanban_run_once=a2o kanban run-once\n")
+	fmt.Fprintf(stdout, "kanban_loop=a2o kanban loop\n")
 	return nil
 }
 
@@ -482,7 +499,7 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, age
 		return err
 	}
 	return withComposeEnv(config, func() error {
-		fmt.Fprintf(stdout, "runtime_run_once=generic\n")
+		fmt.Fprintf(stdout, "kanban_run_once=generic\n")
 		if _, err := runExternal(runner, "docker", append(plan.ComposePrefix, "up", "-d", config.RuntimeService, "soloboard")...); err != nil {
 			return err
 		}
@@ -511,7 +528,7 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, age
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "runtime_run_once_finished exit=%s\n", runtimeExit)
+		fmt.Fprintf(stdout, "kanban_run_once_finished exit=%s\n", runtimeExit)
 		if runtimeExit != "0" {
 			_ = printRuntimeDiagnostics(config, plan, runner, stdout)
 			return fmt.Errorf("runtime run-once failed with exit=%s", runtimeExit)
@@ -812,13 +829,13 @@ func runRuntimeLoop(args []string, runner commandRunner, stdout io.Writer, stder
 	cycle := 0
 	for {
 		cycle++
-		fmt.Fprintf(stdout, "runtime_loop_cycle_start cycle=%d\n", cycle)
+		fmt.Fprintf(stdout, "kanban_loop_cycle_start cycle=%d\n", cycle)
 		if err := runRuntimeRunOnce(buildRunOnceArgs(*maxSteps, *agentAttempts), runner, stdout, stderr); err != nil {
 			return fmt.Errorf("runtime loop cycle %d failed: %w", cycle, err)
 		}
-		fmt.Fprintf(stdout, "runtime_loop_cycle_done cycle=%d\n", cycle)
+		fmt.Fprintf(stdout, "kanban_loop_cycle_done cycle=%d\n", cycle)
 		if *maxCycles > 0 && cycle >= *maxCycles {
-			fmt.Fprintf(stdout, "runtime_loop_finished cycles=%d\n", cycle)
+			fmt.Fprintf(stdout, "kanban_loop_finished cycles=%d\n", cycle)
 			return nil
 		}
 		if sleepDuration > 0 {

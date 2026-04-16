@@ -116,10 +116,13 @@ func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
 	}
 }
 
-func TestRuntimeUpAndDoctorAreNotPublicEntrypoints(t *testing.T) {
+func TestRuntimeCommandIsNotPublicEntrypoint(t *testing.T) {
 	for _, command := range [][]string{
 		{"runtime", "up"},
 		{"runtime", "doctor"},
+		{"runtime", "run-once"},
+		{"runtime", "loop"},
+		{"runtime", "command-plan"},
 	} {
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
@@ -128,8 +131,8 @@ func TestRuntimeUpAndDoctorAreNotPublicEntrypoints(t *testing.T) {
 		if code == 0 {
 			t.Fatalf("run(%v) unexpectedly succeeded", command)
 		}
-		if !strings.Contains(stderr.String(), "unknown runtime subcommand") {
-			t.Fatalf("stderr should reject runtime lifecycle command, got %q", stderr.String())
+		if !strings.Contains(stderr.String(), "unknown command: runtime") {
+			t.Fatalf("stderr should reject runtime command, got %q", stderr.String())
 		}
 		if !strings.Contains(stderr.String(), "a2o kanban up [--build]") {
 			t.Fatalf("stderr should guide to kanban entrypoints, got %q", stderr.String())
@@ -151,14 +154,16 @@ func TestUsageAdvertisesKanbanEntrypoints(t *testing.T) {
 		"a2o kanban up [--build]",
 		"a2o kanban doctor",
 		"a2o kanban url",
+		"a2o kanban run-once [--max-steps N] [--agent-attempts N]",
+		"a2o kanban loop [--interval DURATION] [--max-cycles N] [--max-steps N] [--agent-attempts N]",
+		"a2o kanban command-plan",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("usage missing %q in %q", want, output)
 		}
 	}
 	for _, hidden := range []string{
-		"a2o runtime up",
-		"a2o runtime doctor",
+		"a2o runtime",
 	} {
 		if strings.Contains(output, hidden) {
 			t.Fatalf("usage should not advertise %q in %q", hidden, output)
@@ -234,8 +239,7 @@ func TestAgentReadmeUsesKanbanEntrypoints(t *testing.T) {
 		}
 	}
 	for _, hidden := range []string{
-		"a2o runtime up",
-		"a2o runtime doctor",
+		"a2o runtime",
 		"A2O/SoloBoard compose file",
 	} {
 		if strings.Contains(content, hidden) {
@@ -258,7 +262,7 @@ func TestRuntimeCommandPlanUsesPublicA2OCommands(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "command-plan"}, &fakeRunner{}, &stdout, &stderr)
+		code := run([]string{"kanban", "command-plan"}, &fakeRunner{}, &stdout, &stderr)
 		if code != 0 {
 			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
@@ -271,8 +275,8 @@ func TestRuntimeCommandPlanUsesPublicA2OCommands(t *testing.T) {
 		"kanban_url=http://localhost:3470/",
 		"internal_runtime_up=docker compose -p a3-test -f compose.yml up -d a3-runtime soloboard",
 		"agent_install=a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent",
-		"runtime_run_once=a2o runtime run-once",
-		"runtime_loop=a2o runtime loop",
+		"kanban_run_once=a2o kanban run-once",
+		"kanban_loop=a2o kanban loop",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("command plan missing %q in %q", want, output)
@@ -330,7 +334,7 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "run-once", "--max-steps", "1", "--agent-attempts", "2"}, runner, &stdout, &stderr)
+		code := run([]string{"kanban", "run-once", "--max-steps", "1", "--agent-attempts", "2"}, runner, &stdout, &stderr)
 		if code != 0 {
 			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
@@ -341,7 +345,7 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	if hasCallPrefix(joined, "bash "+packageDir) {
 		t.Fatalf("run-once should not call project runtime script:\n%s", strings.Join(joined, "\n"))
 	}
-	if !strings.Contains(stdout.String(), "runtime_run_once=generic") {
+	if !strings.Contains(stdout.String(), "kanban_run_once=generic") {
 		t.Fatalf("stdout should describe generic run-once, got %q", stdout.String())
 	}
 	if !strings.Contains(strings.Join(joined, "\n"), "a3 execute-until-idle") {
@@ -393,7 +397,7 @@ func TestRuntimeRunOncePrefersPublicA2OAgentPath(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		code := run([]string{"kanban", "run-once"}, runner, &stdout, &stderr)
 		if code != 0 {
 			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
@@ -429,7 +433,7 @@ func TestRuntimeRunOnceAllowsEnvToOverrideStaleInstanceRuntimeValues(t *testing.
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "run-once", "--max-steps", "1", "--agent-attempts", "1"}, runner, &stdout, &stderr)
+		code := run([]string{"kanban", "run-once", "--max-steps", "1", "--agent-attempts", "1"}, runner, &stdout, &stderr)
 		if code != 0 {
 			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
@@ -469,7 +473,7 @@ func TestRuntimeLoopRunsConfiguredCycles(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "loop", "--max-cycles", "2", "--interval", "0s", "--max-steps", "3", "--agent-attempts", "4"}, runner, &stdout, &stderr)
+		code := run([]string{"kanban", "loop", "--max-cycles", "2", "--interval", "0s", "--max-steps", "3", "--agent-attempts", "4"}, runner, &stdout, &stderr)
 		if code != 0 {
 			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
@@ -478,7 +482,7 @@ func TestRuntimeLoopRunsConfiguredCycles(t *testing.T) {
 	if count := runner.callCountContains("a3 execute-until-idle"); count != 2 {
 		t.Fatalf("execute-until-idle call count=%d, want 2\ncalls:\n%s", count, runner.joinedCalls())
 	}
-	if !strings.Contains(stdout.String(), "runtime_loop_finished cycles=2") {
+	if !strings.Contains(stdout.String(), "kanban_loop_finished cycles=2") {
 		t.Fatalf("stdout should report loop completion, got %q", stdout.String())
 	}
 	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"] != "3" {
@@ -493,7 +497,7 @@ func TestRuntimeLoopRejectsNegativeMaxCycles(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := run([]string{"runtime", "loop", "--max-cycles", "-1"}, &fakeRunner{}, &stdout, &stderr)
+	code := run([]string{"kanban", "loop", "--max-cycles", "-1"}, &fakeRunner{}, &stdout, &stderr)
 	if code == 0 {
 		t.Fatal("run should fail with negative max cycles")
 	}
