@@ -156,11 +156,8 @@ module A3
         expected_labels = [canonical.fetch("repo_label"), "trigger:auto-implement"]
         expected_labels << @follow_up_label if @follow_up_label
         expected_labels.sort!
-        relation_exists = Array(
-          @client.run_json_command("task-relation-list", "--project", @project, "--task-id", parent_external_task_id.to_s)
-        ).any? do |relation|
-          relation["task_id"] == parent_external_task_id && relation["related_task_id"] == task.fetch("id")
-        end
+        relations = @client.run_json_command("task-relation-list", "--project", @project, "--task-id", parent_external_task_id.to_s)
+        relation_exists = child_relation_exists?(relations, parent_task_id: parent_external_task_id, child_task_id: task.fetch("id"))
         return if actual_title == canonical.fetch("title") &&
                   actual_description == canonical.fetch("description") &&
                   labels == expected_labels &&
@@ -176,7 +173,7 @@ module A3
 
       def ensure_relation(parent_task_id, child_task_id)
         relations = @client.run_json_command("task-relation-list", "--project", @project, "--task-id", parent_task_id.to_s)
-        return if Array(relations).any? { |relation| relation["task_id"] == parent_task_id && relation["related_task_id"] == child_task_id }
+        return if child_relation_exists?(relations, parent_task_id: parent_task_id, child_task_id: child_task_id)
 
         @client.run_command(
           "task-relation-create",
@@ -185,6 +182,21 @@ module A3
           "--other-task-id", child_task_id.to_s,
           "--relation-kind", "subtask"
         )
+      end
+
+      def child_relation_exists?(relations, parent_task_id:, child_task_id:)
+        case relations
+        when Hash
+          Array(relations["subtask"]).any? { |relation| Integer(relation["id"]) == Integer(child_task_id) }
+        when Array
+          relations.any? do |relation|
+            relation["task_id"] == parent_task_id && relation["related_task_id"] == child_task_id
+          end
+        else
+          false
+        end
+      rescue ArgumentError, TypeError
+        false
       end
 
     end
