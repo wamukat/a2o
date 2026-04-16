@@ -34,13 +34,13 @@ Core validation は Portal ではなく、A2O 専用 reference product suite を
 
 代表入口:
 
-- `task a3:portal:bundle:up`
-- `task a3:portal:bundle:bootstrap`
-- `task a3:portal:bundle:doctor`
-- `task a3:portal:bundle:agent-loop`
-- `task a3:portal:bundle:observe`
+- `a2o project bootstrap --package <reference-product-package>`
+- `a2o kanban up`
+- `a2o kanban doctor`
+- `a2o kanban url`
+- `a2o agent install`
 
-`task a3:portal:bundle:run-once` は legacy direct-path diagnosis 用であり、通常検証には使わない。
+Reference product suite の具体 package / validation scenario は `A2O#255` から `A2O#258` で追加する。Portal workspace-local の旧 Taskfile 互換入口は通常の A2O core validation には使わず、Portal integration validation または historical diagnosis の文脈に限定する。
 
 ## 実装位置
 
