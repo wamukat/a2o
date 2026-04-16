@@ -10,6 +10,13 @@
 
 Current public surface では `scheduler` ではなく `runtime run-once` / `runtime run loop` を使う。`scheduler` は internal cycle/state/store 互換名、maintenance-only command、または historical evidence の文脈に限定する。詳細な分類は [66-runtime-naming-boundary.md](66-runtime-naming-boundary.md) を正本とする。
 
+## Reference Product Validation Boundary
+
+A2O core validation は Portal ではなく、A2O 専用の reference product suite を正本にする。
+Portal は実プロダクト integration validation として扱い、release candidate や Portal package 自体の確認が必要な場合に限定して使う。
+daily / focused / release-facing core validation で必要な scenario は、まず reference product suite へ切り出す。
+詳細は [68-reference-product-suite.md](68-reference-product-suite.md) を正本とする。
+
 ## 0. 進捗状況
 
 この文書は設計メモであると同時に、container distribution / project runtime 領域の実装進捗の正本でもある。

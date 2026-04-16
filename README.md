@@ -23,11 +23,14 @@
 6. [docs/40-project-surface-and-presets.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/40-project-surface-and-presets.md)
 7. [docs/50-evidence-and-rerun-diagnosis.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/50-evidence-and-rerun-diagnosis.md)
 8. [docs/60-container-distribution-and-project-runtime.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/60-container-distribution-and-project-runtime.md)
-9. [docs/70-implementation-status.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/70-implementation-status.md)
+9. [docs/68-reference-product-suite.md](docs/68-reference-product-suite.md)
+10. [docs/70-implementation-status.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/70-implementation-status.md)
 
 ## 配布 / runtime
 
 current packaging は `docker:a3 + bundled kanban service + Go a3-agent` の compose 形状を標準にする。kanban service は A3 image に内包せず、compose 上の service として扱う。現行 default provider は SoloBoard である。A3 Engine は Docker runtime command として提供し、host へ Ruby interpreter を要求しない。project command は host または dev-env container に install した Go release binary の `a3-agent` が pull 実行する。
+
+Core validation は Portal ではなく、A2O 専用 reference product suite を正本にする。Portal は実プロダクト integration validation として扱う。詳細は [docs/68-reference-product-suite.md](docs/68-reference-product-suite.md) を参照する。
 
 代表入口:
 
