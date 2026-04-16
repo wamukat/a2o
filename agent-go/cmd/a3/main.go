@@ -112,7 +112,7 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 	composeProject := flags.String("compose-project", "", "docker compose project name for this runtime instance")
 	composeFile := flags.String("compose-file", "", "A3 distribution compose file")
 	runtimeService := flags.String("runtime-service", "a3-runtime", "docker compose runtime service name")
-	soloBoardPort := flags.String("soloboard-port", "3470", "host SoloBoard port")
+	soloBoardPort := flags.String("soloboard-port", "3470", "host kanban service port")
 	agentPort := flags.String("agent-port", "7393", "host A3 agent control-plane port")
 	storageDir := flags.String("storage-dir", "/var/lib/a3/portal-runtime", "runtime storage dir inside the A3 runtime container")
 
@@ -315,7 +315,9 @@ func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) er
 		return err
 	}
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
-	fmt.Fprintf(stdout, "runtime_up=docker compose -p %s -f %s up -d %s soloboard\n", config.ComposeProject, config.ComposeFile, config.RuntimeService)
+	fmt.Fprintln(stdout, "runtime_up=a2o runtime up")
+	fmt.Fprintf(stdout, "kanban_url=http://localhost:%s/\n", envDefaultValue(config.SoloBoardPort, "3470"))
+	fmt.Fprintf(stdout, "internal_runtime_up=docker compose -p %s -f %s up -d %s soloboard\n", config.ComposeProject, config.ComposeFile, config.RuntimeService)
 	fmt.Fprintf(stdout, "agent_install=a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent\n")
 	fmt.Fprintf(stdout, "runtime_run_once=a2o runtime run-once\n")
 	fmt.Fprintf(stdout, "runtime_loop=a2o runtime loop\n")

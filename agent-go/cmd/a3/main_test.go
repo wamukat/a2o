@@ -169,6 +169,9 @@ func TestRuntimeCommandPlanUsesPublicA2OCommands(t *testing.T) {
 
 	output := stdout.String()
 	for _, want := range []string{
+		"runtime_up=a2o runtime up",
+		"kanban_url=http://localhost:3470/",
+		"internal_runtime_up=docker compose -p a3-test -f compose.yml up -d a3-runtime soloboard",
 		"agent_install=a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent",
 		"runtime_run_once=a2o runtime run-once",
 		"runtime_loop=a2o runtime loop",

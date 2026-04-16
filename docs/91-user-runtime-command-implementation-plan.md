@@ -48,7 +48,7 @@ a2o runtime loop
 - Project package
   - kanban bootstrap、repo slot、agent environment、phase hook を定義する。
   - 実行 shell script ではなく設定である。
-  - A2O/SoloBoard compose file を持たない。compose は A2O 配布物の一部であり、project package が持つのは bootstrap/config だけである。
+  - A2O runtime compose file を持たない。compose は A2O 配布物の一部であり、project package が持つのは bootstrap/config だけである。
 - Runtime instance config
   - `a2o project bootstrap --package ./a2o-project` により workspace 内へ生成される。実ファイル path は内部互換のため `.a3/runtime-instance.json` のままとする。
   - package path、compose project name、storage dir、ports、agent workspace root など、1 runtime instance 固有値を保持する。
@@ -97,7 +97,7 @@ Portal 固有値を `scripts/a3-projects/portal/runtime/run_once.sh` から proj
 - `[done]` `a2o runtime up` / `doctor` / `down` / `command-plan` は bootstrap 済み runtime instance config を読む。
 - `[done]` `a2o agent install` は bootstrap 済み runtime instance config から compose file / compose project / runtime service を読む。
 - `[todo]` compose file / project name / ports / storage dir
-- `[todo]` SoloBoard URL / internal URL
+- `[todo]` kanban service URL / provider internal URL
 - `[todo]` manifest path
 - `[todo]` live ref
 - `[todo]` repo source path

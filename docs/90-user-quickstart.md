@@ -15,7 +15,7 @@ A2O 利用者に長い shell script を書かせない。
 
 利用者が意識する入口は次の 2 種類に絞る。
 
-- `a2o runtime ...`: A2O Engine / SoloBoard / runtime loop を操作する。
+- `a2o runtime ...`: A2O Engine / kanban service / runtime loop を操作する。
 - `a2o-agent ...`: project runtime 側で job を pull して実行する。通常は `a2o runtime run-once` または `a2o runtime loop` が起動補助するため、手動で直接叩く頻度は低い。
 
 A2O runtime は、現行設計では「1 project package = 1 runtime instance」として扱う。1つの Engine instance に複数 project を登録して `--project NAME` で切り替える registry 型ではない。複数 project を同時に動かす場合は、project package ごとに compose project name / storage dir / port / workspace root を分けた別 runtime instance として起動する。
@@ -29,7 +29,7 @@ A2O runtime は、現行設計では「1 project package = 1 runtime instance」
 project package は次を持つ。
 
 - `project.yaml` または `project.json`: project 名、kanban project、repo slot、phase、trigger label、agent environment を定義する。
-- `kanban/bootstrap.json`: SoloBoard の board / lane / tag 初期化設定を定義する。
+- `kanban/bootstrap.json`: kanban board / lane / tag 初期化設定を定義する。
 - `hooks/`: project 固有の verification / remediation / bootstrap hook を置く。
 - `README.md`: project package の設定値と前提 toolchain を説明する。
 
@@ -39,7 +39,7 @@ A2O 利用者が作らないものは次である。
 - `execute-until-idle` の長い引数列。
 - `a2o agent package export` の checksum / target 判定 glue。
 - `a2o-agent` の workspace materializer 設定 script。
-- SoloBoard API を直接叩く wrapper。
+- kanban provider API を直接叩く wrapper。
 
 ## 最小 project package 例
 
@@ -157,4 +157,4 @@ task a3:portal:runtime:watch-summary
 - `a2o agent install` は release artifact に含め、runtime image から host/dev-env への binary export を利用者向け配布物として固定済み。release 前には正式 image ref で同手順を再 smoke する。
 - `scripts/a3-projects/portal/runtime/run_once.sh` の責務は Engine command へ移設済み。残りは Portal 固有値を project package config から読む範囲を広げ、hardcoded Portal default を減らすこと。
 - `A3_RUNTIME_RUN_ONCE_*` のような内部 env は project package / CLI option に寄せ、利用者の主要入口から隠す。
-- A2O/SoloBoard compose file は A2O 配布物として同梱し、project package 側に compose file 作成を要求しない。compose override は開発・診断用に限定する。
+- A2O runtime compose file は A2O 配布物として同梱し、project package 側に compose file 作成を要求しない。compose override は開発・診断用に限定する。

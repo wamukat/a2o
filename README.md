@@ -7,7 +7,7 @@
 
 ## 方針
 
-- A3 は V1 の局所修正の延長ではなく、SoloBoard と `a3-agent` を前提にした current runtime として扱う
+- A3 は V1 の局所修正の延長ではなく、bundled kanban service と `a3-agent` を前提にした current runtime として扱う
 - A3 本体は orchestration / scheduler / state / kanban adapter / agent control plane を持つ
 - project 固有 toolchain は A3 image へ bake せず、host または dev-env container に置いた `a3-agent` が実行する
 - project 固有知識は最小 injection surface と preset/template で表現する
@@ -27,7 +27,7 @@
 
 ## 配布 / runtime
 
-current packaging は `docker:a3 + docker:soloboard + Go a3-agent` の compose 形状を標準にする。SoloBoard は A3 image に内包せず、compose 上の bundled kanban service として扱う。A3 Engine は Docker runtime command として提供し、host へ Ruby interpreter を要求しない。project command は host または dev-env container に install した Go release binary の `a3-agent` が pull 実行する。
+current packaging は `docker:a3 + bundled kanban service + Go a3-agent` の compose 形状を標準にする。kanban service は A3 image に内包せず、compose 上の service として扱う。現行 default provider は SoloBoard である。A3 Engine は Docker runtime command として提供し、host へ Ruby interpreter を要求しない。project command は host または dev-env container に install した Go release binary の `a3-agent` が pull 実行する。
 
 代表入口:
 
