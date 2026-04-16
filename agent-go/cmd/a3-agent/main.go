@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -20,6 +21,9 @@ func main() {
 func run(args []string) int {
 	if len(args) > 0 && args[0] == "doctor" {
 		return runDoctor(args[1:])
+	}
+	if len(args) > 0 && args[0] == "cleanup-workspace" {
+		return runCleanupWorkspace(args[1:])
 	}
 
 	configPath := preScanConfigPath(args)
@@ -89,6 +93,13 @@ func run(args []string) int {
 	return 0
 }
 
+func printAgentUsage() {
+	fmt.Fprintln(os.Stderr, "usage:")
+	fmt.Fprintln(os.Stderr, "  a3-agent [--loop] [--control-plane-url URL]")
+	fmt.Fprintln(os.Stderr, "  a3-agent doctor --workspace-root PATH --source-path NAME=PATH")
+	fmt.Fprintln(os.Stderr, "  a3-agent cleanup-workspace --workspace-root PATH --descriptor PATH [--dry-run]")
+}
+
 func runDoctor(args []string) int {
 	configPath := preScanConfigPath(args)
 	config, err := agent.LoadRuntimeProfileConfig(configPath)
@@ -128,6 +139,68 @@ func runDoctor(args []string) int {
 		sourceAliases.String(),
 	)
 	return 0
+}
+
+func runCleanupWorkspace(args []string) int {
+	configPath := preScanConfigPath(args)
+	config, err := agent.LoadRuntimeProfileConfig(configPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	flags := flag.NewFlagSet("a3-agent cleanup-workspace", flag.ContinueOnError)
+	configFlag := flags.String("config", configPath, "runtime profile JSON file")
+	workspaceRoot := flags.String("workspace-root", defaultString("A3_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root")
+	descriptorPath := flags.String("descriptor", "", "workspace descriptor JSON file")
+	dryRun := flags.Bool("dry-run", false, "report cleanup candidates without deleting")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	_ = configFlag
+	if flags.NArg() != 0 {
+		fmt.Fprintf(os.Stderr, "unexpected arguments: %s\n", strings.Join(flags.Args(), " "))
+		return 2
+	}
+	if strings.TrimSpace(*workspaceRoot) == "" {
+		fmt.Fprintln(os.Stderr, "--workspace-root is required")
+		return 1
+	}
+	if strings.TrimSpace(*descriptorPath) == "" {
+		fmt.Fprintln(os.Stderr, "--descriptor is required")
+		return 1
+	}
+	descriptor, err := readWorkspaceDescriptor(*descriptorPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	result, err := (agent.WorkspaceMaterializer{WorkspaceRoot: *workspaceRoot}).CleanupDescriptor(descriptor, *dryRun)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("agent_workspace_cleanup=completed dry_run=%t workspace_root=%s worktrees=%d removed_workspace=%t\n",
+		result.DryRun,
+		result.WorkspaceRoot,
+		len(result.RemovedWorktrees),
+		result.RemovedWorkspace,
+	)
+	for _, worktree := range result.RemovedWorktrees {
+		fmt.Printf("removed_worktree=%s\n", worktree)
+	}
+	return 0
+}
+
+func readWorkspaceDescriptor(path string) (agent.WorkspaceDescriptor, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return agent.WorkspaceDescriptor{}, fmt.Errorf("read workspace descriptor: %w", err)
+	}
+	var descriptor agent.WorkspaceDescriptor
+	if err := json.Unmarshal(content, &descriptor); err != nil {
+		return agent.WorkspaceDescriptor{}, fmt.Errorf("parse workspace descriptor: %w", err)
+	}
+	return descriptor, nil
 }
 
 func resolveAgentToken(directToken, tokenFile, fallbackToken string) (string, error) {

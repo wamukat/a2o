@@ -22,6 +22,13 @@ type PreparedWorkspace struct {
 	cleanupOperations []cleanupOperation
 }
 
+type WorkspaceCleanupResult struct {
+	WorkspaceRoot    string
+	RemovedWorktrees []string
+	RemovedWorkspace bool
+	DryRun           bool
+}
+
 type cleanupOperation struct {
 	sourceRoot string
 	slotPath   string
@@ -681,6 +688,55 @@ func (m WorkspaceMaterializer) Cleanup(prepared PreparedWorkspace) error {
 	return firstErr
 }
 
+func (m WorkspaceMaterializer) CleanupDescriptor(descriptor WorkspaceDescriptor, dryRun bool) (WorkspaceCleanupResult, error) {
+	root, err := m.workspaceRootForDescriptor(descriptor)
+	if err != nil {
+		return WorkspaceCleanupResult{}, err
+	}
+	result := WorkspaceCleanupResult{
+		WorkspaceRoot:    root,
+		RemovedWorktrees: []string{},
+		DryRun:           dryRun,
+	}
+
+	slotNames := make([]string, 0, len(descriptor.SlotDescriptors))
+	for slotName := range descriptor.SlotDescriptors {
+		slotNames = append(slotNames, slotName)
+	}
+	sort.Strings(slotNames)
+	for _, slotName := range slotNames {
+		slotDescriptor := descriptor.SlotDescriptors[slotName]
+		runtimePath, ok := slotDescriptor["runtime_path"].(string)
+		if !ok || runtimePath == "" {
+			return result, fmt.Errorf("slot descriptor runtime_path is required for %s", slotName)
+		}
+		absRuntimePath, err := filepath.Abs(runtimePath)
+		if err != nil {
+			return result, fmt.Errorf("resolve runtime_path for %s: %w", slotName, err)
+		}
+		if !pathInside(root, absRuntimePath) {
+			return result, fmt.Errorf("slot %s runtime_path is outside workspace root: %s", slotName, runtimePath)
+		}
+		sourceRoot, err := repoSourceRootFromSlotMetadata(absRuntimePath)
+		if err != nil {
+			return result, fmt.Errorf("slot %s cleanup metadata: %w", slotName, err)
+		}
+		if !dryRun {
+			if err := runGit(sourceRoot, "worktree", "remove", "--force", absRuntimePath); err != nil {
+				return result, err
+			}
+		}
+		result.RemovedWorktrees = append(result.RemovedWorktrees, absRuntimePath)
+	}
+	if !dryRun {
+		if err := os.RemoveAll(root); err != nil {
+			return result, err
+		}
+	}
+	result.RemovedWorkspace = true
+	return result, nil
+}
+
 func RefreshWorkspaceEvidence(prepared PreparedWorkspace) error {
 	for _, descriptor := range prepared.SlotDescriptors {
 		runtimePath, ok := descriptor["runtime_path"].(string)
@@ -1002,6 +1058,27 @@ func (m WorkspaceMaterializer) workspaceRootForRequest(request WorkspaceRequest)
 	return filepath.Abs(filepath.Join(parentRoot, relativePath))
 }
 
+func (m WorkspaceMaterializer) workspaceRootForDescriptor(descriptor WorkspaceDescriptor) (string, error) {
+	if descriptor.WorkspaceID == "" {
+		return "", fmt.Errorf("workspace id is required")
+	}
+	if descriptor.Topology == nil {
+		return m.workspaceRoot(descriptor.WorkspaceID)
+	}
+	if descriptor.Topology.Kind != "parent_child" {
+		return "", fmt.Errorf("unsupported workspace topology kind: %s", descriptor.Topology.Kind)
+	}
+	parentRoot, err := m.workspaceRoot(descriptor.Topology.ParentWorkspaceID)
+	if err != nil {
+		return "", err
+	}
+	relativePath, err := safeRelativePath(descriptor.Topology.RelativePath)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Abs(filepath.Join(parentRoot, relativePath))
+}
+
 func safeRelativePath(value string) (string, error) {
 	if value == "" {
 		return "", fmt.Errorf("workspace topology relative_path is required")
@@ -1014,6 +1091,30 @@ func safeRelativePath(value string) (string, error) {
 		return "", fmt.Errorf("workspace topology relative_path must stay under parent workspace: %s", value)
 	}
 	return clean, nil
+}
+
+func pathInside(root string, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	return rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+func repoSourceRootFromSlotMetadata(slotPath string) (string, error) {
+	content, err := os.ReadFile(filepath.Join(slotPath, ".a3", "slot.json"))
+	if err != nil {
+		return "", err
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(content, &payload); err != nil {
+		return "", err
+	}
+	sourceRoot, ok := payload["repo_source_root"].(string)
+	if !ok || sourceRoot == "" {
+		return "", fmt.Errorf("repo_source_root is required")
+	}
+	return sourceRoot, nil
 }
 
 func (m WorkspaceMaterializer) sourceRoot(alias string) (string, error) {

@@ -97,6 +97,86 @@ func TestWorkspaceMaterializerUsesParentChildTopologyRoot(t *testing.T) {
 	}
 }
 
+func TestWorkspaceMaterializerCleansDescriptorWithParentChildTopology(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"member-portal-starters": sourceRoot,
+		},
+	}
+	request := testWorkspaceRequest("member-portal-starters")
+	request.WorkspaceID = "Portal-134-children-Portal-135-implementation-run-implementation"
+	request.Topology = &WorkspaceTopology{
+		Kind:              "parent_child",
+		ParentRef:         "Portal#134",
+		ChildRef:          "Portal#135",
+		ParentWorkspaceID: "Portal-134-parent",
+		RelativePath:      "children/Portal-135/ticket_workspace",
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	siblingPath := filepath.Join(tmp, "agent-workspaces", "Portal-999-parent", "children", "Portal-135", "ticket_workspace")
+	if err := os.MkdirAll(siblingPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	descriptor := WorkspaceDescriptor{
+		WorkspaceKind:    request.WorkspaceKind,
+		RuntimeProfile:   "host-local",
+		WorkspaceID:      request.WorkspaceID,
+		SourceDescriptor: SourceDescriptor{WorkspaceKind: request.WorkspaceKind, SourceType: "branch_head"},
+		SlotDescriptors:  prepared.SlotDescriptors,
+		Topology:         request.Topology,
+	}
+
+	result, err := materializer.CleanupDescriptor(descriptor, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.WorkspaceRoot != prepared.Root || !result.RemovedWorkspace || len(result.RemovedWorktrees) != 1 {
+		t.Fatalf("unexpected cleanup result: %#v", result)
+	}
+	if _, err := os.Stat(prepared.Root); !os.IsNotExist(err) {
+		t.Fatalf("workspace still exists: %v", err)
+	}
+	if _, err := os.Stat(siblingPath); err != nil {
+		t.Fatalf("sibling workspace was removed: %v", err)
+	}
+	if out := git(t, sourceRoot, "worktree", "list", "--porcelain"); contains(out, result.RemovedWorktrees[0]) {
+		t.Fatalf("worktree was not removed: %s", out)
+	}
+}
+
+func TestWorkspaceMaterializerRejectsDescriptorSlotOutsideTopologyRoot(t *testing.T) {
+	tmp := t.TempDir()
+	materializer := WorkspaceMaterializer{WorkspaceRoot: filepath.Join(tmp, "agent-workspaces")}
+	descriptor := WorkspaceDescriptor{
+		WorkspaceKind:    "ticket_workspace",
+		RuntimeProfile:   "host-local",
+		WorkspaceID:      "Portal-134-children-Portal-135-implementation-run-implementation",
+		SourceDescriptor: SourceDescriptor{WorkspaceKind: "ticket_workspace", SourceType: "branch_head"},
+		SlotDescriptors: map[string]map[string]any{
+			"repo_alpha": {
+				"runtime_path": filepath.Join(tmp, "agent-workspaces", "Portal-999-parent", "children", "Portal-135", "ticket_workspace", "repo-alpha"),
+			},
+		},
+		Topology: &WorkspaceTopology{
+			Kind:              "parent_child",
+			ParentRef:         "Portal#134",
+			ChildRef:          "Portal#135",
+			ParentWorkspaceID: "Portal-134-parent",
+			RelativePath:      "children/Portal-135/ticket_workspace",
+		},
+	}
+
+	if _, err := materializer.CleanupDescriptor(descriptor, true); err == nil || !strings.Contains(err.Error(), "outside workspace root") {
+		t.Fatalf("expected outside root rejection, got %v", err)
+	}
+}
+
 func TestWorkspaceMaterializerRejectsUnsafeParentChildTopologyPath(t *testing.T) {
 	request := testWorkspaceRequest("member-portal-starters")
 	request.Topology = &WorkspaceTopology{
