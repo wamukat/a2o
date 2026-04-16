@@ -59,6 +59,8 @@ func run(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer
 		return runProject(args[1:], stdout, stderr)
 	case "runtime":
 		return runRuntime(args[1:], runner, stdout, stderr)
+	case "kanban":
+		return runKanban(args[1:], runner, stdout, stderr)
 	case "agent":
 		return runAgent(args[1:], runner, stdout, stderr)
 	case "help", "-h", "--help":
@@ -75,12 +77,46 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage:")
 	fmt.Fprintln(w, "  a2o version")
 	fmt.Fprintln(w, "  a2o project bootstrap --package DIR")
-	fmt.Fprintln(w, "  a2o runtime up [--build]")
-	fmt.Fprintln(w, "  a2o runtime doctor")
+	fmt.Fprintln(w, "  a2o kanban up [--build]")
+	fmt.Fprintln(w, "  a2o kanban doctor")
+	fmt.Fprintln(w, "  a2o kanban url")
 	fmt.Fprintln(w, "  a2o runtime run-once [--max-steps N] [--agent-attempts N]")
 	fmt.Fprintln(w, "  a2o runtime loop [--interval DURATION] [--max-cycles N] [--max-steps N] [--agent-attempts N]")
 	fmt.Fprintln(w, "  a2o agent target")
 	fmt.Fprintln(w, "  a2o agent install --target auto --output PATH [--build]")
+}
+
+func runKanban(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "missing kanban subcommand")
+		printUsage(stderr)
+		return 2
+	}
+
+	switch args[0] {
+	case "up":
+		if err := runKanbanUp(args[1:], runner, stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	case "doctor":
+		if err := runKanbanDoctor(args[1:], runner, stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	case "url":
+		if err := runKanbanURL(args[1:], stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	default:
+		fmt.Fprintf(stderr, "unknown kanban subcommand: %s\n", args[0])
+		printUsage(stderr)
+		return 2
+	}
 }
 
 func runProject(args []string, stdout io.Writer, stderr io.Writer) int {
@@ -171,6 +207,83 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 
 	fmt.Fprintf(stdout, "project_bootstrapped package=%s instance_config=%s\n", config.PackagePath, filepath.Join(absWorkspaceRoot, instanceConfigRelativePath))
 	return nil
+}
+
+func runKanbanUp(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a3 kanban up", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	build := flags.Bool("build", false, "build the runtime image before starting services")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+
+	config, _, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	composePrefix := composeArgs(*config)
+	return withComposeEnv(*config, func() error {
+		if *build {
+			if _, err := runExternal(runner, "docker", append(composePrefix, "build", config.RuntimeService)...); err != nil {
+				return err
+			}
+		}
+		if _, err := runExternal(runner, "docker", append(composePrefix, "up", "-d", config.RuntimeService, "soloboard")...); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "kanban_up compose_project=%s url=%s\n", config.ComposeProject, kanbanPublicURL(*config))
+		return nil
+	})
+}
+
+func runKanbanDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a3 kanban doctor", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+
+	config, configPath, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
+	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(*config))
+	fmt.Fprintf(stdout, "compose_project=%s\n", config.ComposeProject)
+	output, err := runExternal(runner, "docker", append(composeArgs(*config), "ps", "soloboard")...)
+	if err != nil {
+		return err
+	}
+	fmt.Fprint(stdout, string(output))
+	return nil
+}
+
+func runKanbanURL(args []string, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a3 kanban url", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+
+	config, _, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(stdout, kanbanPublicURL(*config))
+	return nil
+}
+
+func kanbanPublicURL(config runtimeInstanceConfig) string {
+	return "http://localhost:" + envDefaultValue(config.SoloBoardPort, "3470") + "/"
 }
 
 func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) int {
@@ -315,8 +428,9 @@ func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) er
 		return err
 	}
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
-	fmt.Fprintln(stdout, "runtime_up=a2o runtime up")
-	fmt.Fprintf(stdout, "kanban_url=http://localhost:%s/\n", envDefaultValue(config.SoloBoardPort, "3470"))
+	fmt.Fprintln(stdout, "kanban_up=a2o kanban up")
+	fmt.Fprintln(stdout, "kanban_doctor=a2o kanban doctor")
+	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(*config))
 	fmt.Fprintf(stdout, "internal_runtime_up=docker compose -p %s -f %s up -d %s soloboard\n", config.ComposeProject, config.ComposeFile, config.RuntimeService)
 	fmt.Fprintf(stdout, "agent_install=a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent\n")
 	fmt.Fprintf(stdout, "runtime_run_once=a2o runtime run-once\n")

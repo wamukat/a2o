@@ -93,9 +93,9 @@ docker run --rm \
 export PATH="$HOME/.local/bin:$PATH"
 
 a2o project bootstrap --package ./a2o-project
-a2o runtime up
+a2o kanban up
+a2o kanban doctor
 a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
-a2o runtime doctor
 ```
 
 `a2o host install` は Docker image に同梱された Go host launcher と A2O 配布 asset を host へコピーする。container 内の Ruby Engine CLI は host に出ない。host 側の `$HOME/.local/bin/a2o` は POSIX shell wrapper で、`uname` により `a2o-darwin-amd64` / `a2o-linux-amd64` などの platform binary を選んで実行する。互換 alias として `$HOME/.local/bin/a3` も同時に配置される。標準 compose file は `$HOME/.local/share/a2o` 配下へ配置される。Docker から export するため、`bin` だけではなく `$HOME/.local` のような install prefix を mount する。`--runtime-image` は後続の `a2o runtime ...` が起動する Engine image を記録する。
@@ -130,11 +130,12 @@ a2o-agent --engine http://localhost:7393 --loop --poll-interval 2s
 
 ## Portal での現状
 
-現時点の Portal workspace では、`a2o project bootstrap` / `a2o runtime up` / `a2o agent install` / `a2o runtime run-once` は実装済みで、A2O Engine runtime image から host/dev-env 用 `a2o-agent` を export できる。内部互換として `a3 ...` も動作する。
+現時点の Portal workspace では、`a2o project bootstrap` / `a2o kanban up` / `a2o kanban doctor` / `a2o agent install` / `a2o runtime run-once` は実装済みで、A2O Engine runtime image から host/dev-env 用 `a2o-agent` を export できる。内部互換として `a3 ...` も動作する。
 
 ```bash
 a2o project bootstrap --package ./scripts/a3-projects/portal
-a2o runtime up
+a2o kanban up
+a2o kanban doctor
 a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
 a2o runtime run-once
 ```

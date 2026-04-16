@@ -147,6 +147,88 @@ func TestRuntimeUpUsesBootstrappedInstanceConfig(t *testing.T) {
 	}
 }
 
+func TestUsageAdvertisesKanbanEntrypoints(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"help"}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		"a2o kanban up [--build]",
+		"a2o kanban doctor",
+		"a2o kanban url",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("usage missing %q in %q", want, output)
+		}
+	}
+	for _, hidden := range []string{
+		"a2o runtime up",
+		"a2o runtime doctor",
+	} {
+		if strings.Contains(output, hidden) {
+			t.Fatalf("usage should not advertise %q in %q", hidden, output)
+		}
+	}
+}
+
+func TestKanbanUpUsesBootstrappedInstanceConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    filepath.Join(tempDir, "package"),
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+		SoloBoardPort:  "3480",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"kanban", "up", "--build"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := runner.joinedCalls()
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml build a3-runtime")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a3-runtime soloboard")
+	if !strings.Contains(stdout.String(), "kanban_up compose_project=a3-test url=http://localhost:3480/") {
+		t.Fatalf("stdout should describe kanban up, got %q", stdout.String())
+	}
+}
+
+func TestKanbanURLUsesBootstrappedInstanceConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion: 1,
+		PackagePath:   filepath.Join(tempDir, "package"),
+		WorkspaceRoot: tempDir,
+		SoloBoardPort: "3480",
+	})
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"kanban", "url"}, &fakeRunner{}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if strings.TrimSpace(stdout.String()) != "http://localhost:3480/" {
+		t.Fatalf("stdout=%q", stdout.String())
+	}
+}
+
 func TestRuntimeCommandPlanUsesPublicA2OCommands(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
@@ -169,7 +251,8 @@ func TestRuntimeCommandPlanUsesPublicA2OCommands(t *testing.T) {
 
 	output := stdout.String()
 	for _, want := range []string{
-		"runtime_up=a2o runtime up",
+		"kanban_up=a2o kanban up",
+		"kanban_doctor=a2o kanban doctor",
 		"kanban_url=http://localhost:3470/",
 		"internal_runtime_up=docker compose -p a3-test -f compose.yml up -d a3-runtime soloboard",
 		"agent_install=a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent",
