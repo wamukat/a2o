@@ -116,34 +116,24 @@ func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
 	}
 }
 
-func TestRuntimeUpUsesBootstrappedInstanceConfig(t *testing.T) {
-	tempDir := t.TempDir()
-	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
-		SchemaVersion:  1,
-		PackagePath:    filepath.Join(tempDir, "package"),
-		WorkspaceRoot:  tempDir,
-		ComposeFile:    "compose.yml",
-		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
-		SoloBoardPort:  "3480",
-		AgentPort:      "7394",
-	})
-	runner := &fakeRunner{}
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
+func TestRuntimeUpAndDoctorAreNotPublicEntrypoints(t *testing.T) {
+	for _, command := range [][]string{
+		{"runtime", "up"},
+		{"runtime", "doctor"},
+	} {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
 
-	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "up", "--build"}, runner, &stdout, &stderr)
-		if code != 0 {
-			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		code := run(command, &fakeRunner{}, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run(%v) unexpectedly succeeded", command)
 		}
-	})
-
-	joined := runner.joinedCalls()
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml build a3-runtime")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a3-runtime soloboard")
-	if !strings.Contains(stdout.String(), "runtime_up compose_project=a3-test") {
-		t.Fatalf("stdout should describe runtime up, got %q", stdout.String())
+		if !strings.Contains(stderr.String(), "unknown runtime subcommand") {
+			t.Fatalf("stderr should reject runtime lifecycle command, got %q", stderr.String())
+		}
+		if !strings.Contains(stderr.String(), "a2o kanban up [--build]") {
+			t.Fatalf("stderr should guide to kanban entrypoints, got %q", stderr.String())
+		}
 	}
 }
 

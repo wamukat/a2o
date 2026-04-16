@@ -294,18 +294,6 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 	}
 
 	switch args[0] {
-	case "up":
-		if err := runRuntimeUp(args[1:], runner, stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		return 0
-	case "doctor":
-		if err := runRuntimeDoctor(args[1:], runner, stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		return 0
 	case "down":
 		if err := runRuntimeDown(args[1:], runner, stdout, stderr); err != nil {
 			fmt.Fprintln(stderr, err)
