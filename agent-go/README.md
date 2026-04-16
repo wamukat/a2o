@@ -95,13 +95,13 @@ a2o agent install \
 
 This command starts the runtime service if needed, verifies the matching agent package inside the runtime container, exports it to the requested host path, and marks it executable. Use `--build` when validating local source changes against a freshly built runtime image. Omit `--build` when using a prebuilt release image.
 
-The standard compose file is an A2O distribution asset. Project packages provide bootstrap/config values; they do not provide the A2O/SoloBoard compose file. `--compose-file`, `--compose-project`, and `--runtime-service` remain available as development/diagnostic overrides, but they are not part of the normal user path.
+The standard compose file is an A2O distribution asset. Project packages provide bootstrap/config values; they do not provide the A2O runtime compose file. `--compose-file`, `--compose-project`, and `--runtime-service` remain available as development/diagnostic overrides, but they are not part of the normal user path.
 
 After `a2o project bootstrap --package ./a2o-project`, runtime commands discover `.a3/runtime-instance.json` from the current directory upward:
 
 ```sh
-a2o runtime up
-a2o runtime doctor
+a2o kanban up
+a2o kanban doctor
 a2o runtime run-once
 ```
 

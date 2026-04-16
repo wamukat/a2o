@@ -229,6 +229,31 @@ func TestKanbanURLUsesBootstrappedInstanceConfig(t *testing.T) {
 	}
 }
 
+func TestAgentReadmeUsesKanbanEntrypoints(t *testing.T) {
+	body, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
+	if err != nil {
+		t.Fatalf("read agent README: %v", err)
+	}
+	content := string(body)
+	for _, want := range []string{
+		"a2o kanban up",
+		"a2o kanban doctor",
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("agent README missing %q", want)
+		}
+	}
+	for _, hidden := range []string{
+		"a2o runtime up",
+		"a2o runtime doctor",
+		"A2O/SoloBoard compose file",
+	} {
+		if strings.Contains(content, hidden) {
+			t.Fatalf("agent README should not advertise %q", hidden)
+		}
+	}
+}
+
 func TestRuntimeCommandPlanUsesPublicA2OCommands(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
