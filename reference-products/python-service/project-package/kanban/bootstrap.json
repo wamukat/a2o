@@ -1,0 +1,5 @@
+{
+  "project": "A2O Reference Python",
+  "lanes": ["Backlog", "To do", "In progress", "In review", "Done"],
+  "tags": ["a2o:ready", "repo:app", "kind:single", "blocked"]
+}

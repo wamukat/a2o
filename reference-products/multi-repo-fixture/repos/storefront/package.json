@@ -1,0 +1,10 @@
+{
+  "name": "a2o-reference-storefront",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node src/render-storefront.js",
+    "test": "node tests/render-storefront.test.js"
+  }
+}

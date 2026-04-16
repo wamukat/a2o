@@ -1,0 +1,9 @@
+schema_version: "1"
+implementation_skill: skills/implementation/base.md
+review_skill:
+  default: skills/review/default.md
+verification_commands:
+  - commands/verify.sh
+remediation_commands:
+  - commands/format.sh
+workspace_hook: commands/bootstrap.sh

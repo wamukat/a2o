@@ -1,0 +1,8 @@
+[project]
+name = "a2o-reference-python-service"
+version = "0.1.0"
+requires-python = ">=3.11"
+description = "Python service reference product for A2O validation"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

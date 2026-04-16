@@ -7,3 +7,5 @@
 /.rspec_status
 /agent-go/dist/
 __pycache__/
+node_modules/
+dist/

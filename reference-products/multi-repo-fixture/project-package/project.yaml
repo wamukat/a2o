@@ -1,0 +1,24 @@
+project: a2o-reference-multi-repo
+kanban:
+  provider: soloboard
+  project: A2O Reference Multi Repo
+  bootstrap: kanban/bootstrap.json
+repos:
+  repo_alpha:
+    path: ../repos/catalog-service
+    role: product
+    label: repo:catalog
+  repo_beta:
+    path: ../repos/storefront
+    role: product
+    label: repo:storefront
+agent:
+  workspace_root: .work/a2o-agent/workspaces
+  required_bins:
+    - git
+    - node
+runtime:
+  kanban_status: To do
+  live_ref: refs/heads/main
+  max_steps: 40
+  agent_attempts: 300

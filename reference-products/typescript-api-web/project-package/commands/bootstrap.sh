@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+set -eu
+
+product_root="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$product_root"
+
+test -f package.json
+echo "typescript-api-web workspace ready: $product_root"

@@ -1,0 +1,20 @@
+presets:
+  - base
+core:
+  merge_target:
+    default: merge_to_live
+    variants:
+      task_kind:
+        child:
+          default: merge_to_parent
+        parent:
+          default: merge_to_live
+  merge_policy: ff_only
+  merge_target_ref:
+    default: refs/heads/main
+    variants:
+      task_kind:
+        parent:
+          default: refs/heads/integration
+project:
+  kanban_project: A2O Reference Multi Repo

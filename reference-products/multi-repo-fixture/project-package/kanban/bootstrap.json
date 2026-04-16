@@ -1,0 +1,14 @@
+{
+  "project": "A2O Reference Multi Repo",
+  "lanes": ["Backlog", "To do", "In progress", "In review", "Done"],
+  "tags": [
+    "a2o:ready",
+    "repo:catalog",
+    "repo:storefront",
+    "repo:both",
+    "kind:single",
+    "kind:child",
+    "kind:parent",
+    "blocked"
+  ]
+}

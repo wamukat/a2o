@@ -1,0 +1,20 @@
+project: a2o-reference-typescript-api-web
+kanban:
+  provider: soloboard
+  project: A2O Reference TypeScript
+  bootstrap: kanban/bootstrap.json
+repos:
+  app:
+    path: ..
+    role: product
+agent:
+  workspace_root: .work/a2o-agent/workspaces
+  required_bins:
+    - git
+    - node
+    - npm
+runtime:
+  kanban_status: To do
+  live_ref: refs/heads/main
+  max_steps: 20
+  agent_attempts: 200

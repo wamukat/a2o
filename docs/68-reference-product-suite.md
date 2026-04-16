@@ -40,6 +40,21 @@ Reference product suite は次の 4 パターンで構成する。
 各 reference product は小さく保つが、実プロダクト風の domain、test、build、agent が編集できる余地を持つ。
 単なる toy fixture ではなく、A2O の runtime contract が壊れたときに失敗として観測できる構造を持たせる。
 
+## Current Layout
+
+2026-04-16 時点の suite は `reference-products/` 配下に置く。
+
+| Ticket | Path | Package |
+|---|---|---|
+| `A2O#255` | `reference-products/typescript-api-web/` | `reference-products/typescript-api-web/project-package/` |
+| `A2O#256` | `reference-products/go-api-cli/` | `reference-products/go-api-cli/project-package/` |
+| `A2O#257` | `reference-products/python-service/` | `reference-products/python-service/project-package/` |
+| `A2O#258` | `reference-products/multi-repo-fixture/` | `reference-products/multi-repo-fixture/project-package/` |
+
+各 package は `manifest.yml`、`project.yaml`、`kanban/bootstrap.json`、`commands/`、`skills/`、`scenarios/` を持つ。
+初回 runtime-flow validation は、これらの package を bootstrap し isolated board に scenario task を作るところから始める。
+suite 作成 commit 自体では、A2O runtime の execution loop を開始しない。
+
 ## Acceptance Requirements
 
 各 reference product は少なくとも次を持つ。

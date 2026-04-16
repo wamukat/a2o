@@ -1,0 +1,16 @@
+schema_version: "1"
+implementation_skill: skills/implementation/base.md
+review_skill:
+  default: skills/review/default.md
+  variants:
+    task_kind:
+      parent:
+        repo_scope:
+          both:
+            phase:
+              review: skills/review/parent.md
+verification_commands:
+  - commands/verify-all.sh
+remediation_commands:
+  - commands/format.sh
+workspace_hook: commands/bootstrap.sh

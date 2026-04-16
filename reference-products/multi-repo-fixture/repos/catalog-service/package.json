@@ -1,0 +1,10 @@
+{
+  "name": "a2o-reference-catalog-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node src/catalog-service.js --summary",
+    "test": "node tests/catalog-service.test.js"
+  }
+}
