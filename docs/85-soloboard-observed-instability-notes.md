@@ -93,7 +93,7 @@ It only hardens the call sites where false negatives were actually observed.
 
 ## 2026-04-11 Bundle Agent Loop Evidence
 
-The bundle agent loop exercises the normal A3 distribution shape: `docker:a3` as control plane, `docker:soloboard` as kanban, and `docker:dev-env(a3-agent)` as project command runtime.
+This historical bundle agent loop exercised the former A3 distribution shape: `docker:a3` as control plane, `docker:soloboard` as kanban, and `docker:dev-env(a3-agent)` as project command runtime. Current public distribution uses host/project-dev-env `a2o-agent` instead of a Docker dev-env agent image.
 
 Observed evidence:
 
