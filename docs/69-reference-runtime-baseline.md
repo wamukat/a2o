@@ -18,7 +18,7 @@ The implementation and parent-review decisions in this baseline are deterministi
 - Workspace mode: `agent-materialized`
 - Branch namespace: product-specific `a2o-ref-*-baseline*`
 
-The public host launcher currently covers project bootstrap and kanban service operations. Full runtime execution still uses the internal engine CLI for this baseline.
+The public host launcher now covers project bootstrap, kanban service operations, and foreground runtime execution. This baseline was recorded before that public wrapper existed, so its reproduction notes still show the internal engine CLI path.
 
 ## Passing Baselines
 

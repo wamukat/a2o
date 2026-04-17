@@ -116,12 +116,13 @@ func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
 	}
 }
 
-func TestRuntimeCommandIsNotPublicEntrypoint(t *testing.T) {
+func TestUnsupportedRuntimeCommandsAreNotPublicEntrypoints(t *testing.T) {
 	for _, command := range [][]string{
 		{"runtime", "up"},
-		{"runtime", "doctor"},
-		{"runtime", "run-once"},
-		{"runtime", "loop"},
+		{"runtime", "down"},
+		{"runtime", "start"},
+		{"runtime", "stop"},
+		{"runtime", "status"},
 		{"runtime", "command-plan"},
 	} {
 		var stdout bytes.Buffer
@@ -131,16 +132,16 @@ func TestRuntimeCommandIsNotPublicEntrypoint(t *testing.T) {
 		if code == 0 {
 			t.Fatalf("run(%v) unexpectedly succeeded", command)
 		}
-		if !strings.Contains(stderr.String(), "unknown command: runtime") {
+		if !strings.Contains(stderr.String(), "unknown runtime subcommand") {
 			t.Fatalf("stderr should reject runtime command, got %q", stderr.String())
 		}
-		if !strings.Contains(stderr.String(), "a2o kanban up [--build]") {
-			t.Fatalf("stderr should guide to kanban entrypoints, got %q", stderr.String())
+		if !strings.Contains(stderr.String(), "a2o runtime run-once") {
+			t.Fatalf("stderr should guide to runtime entrypoints, got %q", stderr.String())
 		}
 	}
 }
 
-func TestUsageAdvertisesKanbanEntrypoints(t *testing.T) {
+func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -154,13 +155,18 @@ func TestUsageAdvertisesKanbanEntrypoints(t *testing.T) {
 		"a2o kanban up [--build]",
 		"a2o kanban doctor",
 		"a2o kanban url",
+		"a2o runtime doctor",
+		"a2o runtime run-once [--max-steps N] [--agent-attempts N]",
+		"a2o runtime loop [--interval DURATION] [--max-cycles N]",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("usage missing %q in %q", want, output)
 		}
 	}
 	for _, hidden := range []string{
-		"a2o runtime",
+		"a2o runtime start",
+		"a2o runtime stop",
+		"a2o runtime command-plan",
 		"a2o kanban run-once",
 		"a2o kanban loop",
 		"a2o kanban command-plan",
@@ -239,7 +245,6 @@ func TestAgentReadmeUsesKanbanEntrypoints(t *testing.T) {
 		}
 	}
 	for _, hidden := range []string{
-		"a2o runtime",
 		"a2o kanban run-once",
 		"a2o kanban loop",
 		"a2o kanban command-plan",
@@ -320,8 +325,9 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		if err := runRuntimeRunOnce([]string{"--max-steps", "1", "--agent-attempts", "2"}, runner, &stdout, &stderr); err != nil {
-			t.Fatalf("runRuntimeRunOnce returned error: %v, stderr=%s", err, stderr.String())
+		code := run([]string{"runtime", "run-once", "--max-steps", "1", "--agent-attempts", "2"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
 	})
 
@@ -409,13 +415,93 @@ func TestRuntimeRunOncePrefersPublicA2OAgentPath(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		if err := runRuntimeRunOnce(nil, runner, &stdout, &stderr); err != nil {
-			t.Fatalf("runRuntimeRunOnce returned error: %v, stderr=%s", err, stderr.String())
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
 	})
 
 	if runner.lastEnv["A3_HOST_AGENT_BIN"] != publicAgentPath {
 		t.Fatalf("agent bin env=%q, want %q", runner.lastEnv["A3_HOST_AGENT_BIN"], publicAgentPath)
+	}
+}
+
+func TestRuntimeRunOnceReadsProjectYaml(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "reference-products", "typescript-api-web", "project-package")
+	repoDir := filepath.Clean(filepath.Join(packageDir, ".."))
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(repoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectYaml := `project: a2o-reference-typescript-api-web
+kanban:
+  provider: soloboard
+  project: A2OReferenceTypeScript
+repos:
+  app:
+    path: ..
+    role: product
+agent:
+  workspace_root: .work/a2o-agent/workspaces
+  required_bins:
+    - git
+    - node
+    - npm
+runtime:
+  kanban_status: To do
+  live_ref: refs/heads/main
+  max_steps: 7
+  agent_attempts: 9
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	expected := []string{
+		"'--kanban-project' 'A2OReferenceTypeScript'",
+		"'--agent-source-path' 'app=" + repoDir + "'",
+		"'--agent-source-alias' 'app=app'",
+		"'--agent-required-bin' 'npm'",
+		"'--kanban-repo-label' 'repo:app=app'",
+		"'--repo-source' 'app=/workspace/reference-products/typescript-api-web'",
+		"'--agent-support-ref' 'refs/heads/main'",
+		"'--max-steps' '7'",
+	}
+	for _, want := range expected {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("run-once missing %q in:\n%s", want, joined)
+		}
+	}
+	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] != "" {
+		t.Fatalf("agent attempts should come from package plan, not env override, got %q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"])
+	}
+	if !strings.Contains(stdout.String(), "runtime_host_agent_loop attempts=9") {
+		t.Fatalf("stdout should use package agent_attempts, got %q", stdout.String())
 	}
 }
 
@@ -444,8 +530,9 @@ func TestRuntimeRunOnceAllowsEnvToOverrideStaleInstanceRuntimeValues(t *testing.
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		if err := runRuntimeRunOnce([]string{"--max-steps", "1", "--agent-attempts", "1"}, runner, &stdout, &stderr); err != nil {
-			t.Fatalf("runRuntimeRunOnce returned error: %v, stderr=%s", err, stderr.String())
+		code := run([]string{"runtime", "run-once", "--max-steps", "1", "--agent-attempts", "1"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
 	})
 
@@ -483,8 +570,9 @@ func TestRuntimeLoopRunsConfiguredCycles(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		if err := runRuntimeLoop([]string{"--max-cycles", "2", "--interval", "0s", "--max-steps", "3", "--agent-attempts", "4"}, runner, &stdout, &stderr); err != nil {
-			t.Fatalf("runRuntimeLoop returned error: %v, stderr=%s", err, stderr.String())
+		code := run([]string{"runtime", "loop", "--max-cycles", "2", "--interval", "0s", "--max-steps", "3", "--agent-attempts", "4"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
 	})
 

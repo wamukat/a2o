@@ -215,7 +215,6 @@ func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttem
 	if strings.TrimSpace(config.WorkspaceRoot) != "" {
 		overrides["A3_RUNTIME_RUN_ONCE_HOST_ROOT_DIR"] = config.WorkspaceRoot
 		overrides["A3_RUNTIME_RUN_ONCE_HOST_ROOT"] = filepath.Join(config.WorkspaceRoot, ".work", "a3", "runtime-host-agent")
-		overrides["A3_RUNTIME_RUN_ONCE_AGENT_WORKSPACE_ROOT"] = filepath.Join(config.WorkspaceRoot, ".work", "a3", "runtime-host-agent", "workspaces")
 		publicAgentPath := filepath.Join(config.WorkspaceRoot, ".work", "a2o-agent", "bin", "a2o-agent")
 		if _, err := os.Stat(publicAgentPath); err == nil {
 			overrides["A3_HOST_AGENT_BIN"] = publicAgentPath

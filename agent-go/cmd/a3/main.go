@@ -39,6 +39,8 @@ func run(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer
 		return runProject(args[1:], stdout, stderr)
 	case "kanban":
 		return runKanban(args[1:], runner, stdout, stderr)
+	case "runtime":
+		return runRuntime(args[1:], runner, stdout, stderr)
 	case "agent":
 		return runAgent(args[1:], runner, stdout, stderr)
 	case "help", "-h", "--help":
@@ -58,6 +60,9 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o kanban up [--build]")
 	fmt.Fprintln(w, "  a2o kanban doctor")
 	fmt.Fprintln(w, "  a2o kanban url")
+	fmt.Fprintln(w, "  a2o runtime doctor")
+	fmt.Fprintln(w, "  a2o runtime run-once [--max-steps N] [--agent-attempts N]")
+	fmt.Fprintln(w, "  a2o runtime loop [--interval DURATION] [--max-cycles N]")
 	fmt.Fprintln(w, "  a2o agent target")
 	fmt.Fprintln(w, "  a2o agent install --target auto --output PATH [--build]")
 }

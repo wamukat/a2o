@@ -57,7 +57,7 @@ CHECKSUM_FILE=dist/checksums.txt \
 ./scripts/install-release.sh dist/a3-agent-0.1.0-linux-amd64.tar.gz
 ```
 
-The installer installs `a2o-agent` and compatibility alias `a3-agent`. It does not install or enable OS service definitions. Standard A2O operation uses `a2o host install`, `a2o project bootstrap`, `a2o kanban ...`, and `a2o agent install`; direct agent loop commands are compatibility / diagnostic tools for operators and developers.
+The installer installs `a2o-agent` and compatibility alias `a3-agent`. It does not install or enable OS service definitions. Standard A2O operation uses `a2o host install`, `a2o project bootstrap`, `a2o kanban ...`, `a2o agent install`, and `a2o runtime ...`; direct agent loop commands are compatibility / diagnostic tools for operators and developers.
 
 ## Host Launcher
 
@@ -103,9 +103,12 @@ After `a2o project bootstrap --package ./a2o-project`, runtime commands discover
 a2o kanban up
 a2o kanban doctor
 a2o kanban url
+a2o runtime doctor
+a2o runtime run-once
+a2o runtime loop --interval 60s
 ```
 
-Execution-loop commands are intentionally not part of this public kanban service surface in this slice. Branch refs created by internal runtime jobs remain namespaced by the compose project, for example `refs/heads/a3/a2o-reference/work/A2OReference-1`, so isolated boards do not reuse existing live-repo branches with the same task number.
+Execution-loop commands live under `a2o runtime ...`, not `a2o kanban ...`. Branch refs created by internal runtime jobs remain namespaced by the compose project, for example `refs/heads/a3/a2o-reference/work/A2OReference-1`, so isolated boards do not reuse existing live-repo branches with the same task number.
 
 ## Deployment Shapes
 

@@ -39,4 +39,4 @@ Do not require users to author these names in normal setup docs. If they appear 
 
 ## Known Gap
 
-Some baseline reproduction commands still use the internal Engine CLI directly. The desired user-facing form is an A2O runtime command that owns execution loop setup without exposing internal flags. Track that work separately from documentation cleanup.
+User-facing runtime execution should use `a2o runtime run-once` or `a2o runtime loop`. If internal Engine CLI examples are needed for baseline reproduction, keep them in internal-context docs and do not make them the normal user path.

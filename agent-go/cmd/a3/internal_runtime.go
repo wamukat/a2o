@@ -13,9 +13,6 @@ import (
 	"time"
 )
 
-// Internal runtime helpers are intentionally kept outside the public command
-// router. They remain available to tests and future maintenance wiring without
-// advertising a runtime command as part of the A2O host launcher surface.
 func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "missing runtime subcommand")
@@ -24,8 +21,20 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 	}
 
 	switch args[0] {
-	case "down":
-		if err := runRuntimeDown(args[1:], runner, stdout, stderr); err != nil {
+	case "doctor":
+		if err := runRuntimeDoctor(args[1:], runner, stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	case "run-once":
+		if err := runRuntimeRunOnce(args[1:], runner, stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	case "loop":
+		if err := runRuntimeLoop(args[1:], runner, stdout, stderr); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -180,6 +189,7 @@ type runtimeRunOncePlan struct {
 	ServerPIDFile        string
 	ManifestPath         string
 	SoloBoardInternalURL string
+	LiveRef              string
 	AgentEnv             []string
 	AgentSourcePaths     []string
 	AgentRequiredBins    []string
@@ -244,10 +254,19 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 	if strings.TrimSpace(hostRootDir) == "" {
 		hostRootDir = "."
 	}
+	packageConfig, err := loadProjectPackageConfig(config.PackagePath)
+	if err != nil {
+		return runtimeRunOncePlan{}, err
+	}
 	hostRoot := envDefault("A3_RUNTIME_RUN_ONCE_HOST_ROOT", envDefault("A3_RUNTIME_SCHEDULER_HOST_ROOT", filepath.Join(hostRootDir, ".work", "a3", "runtime-host-agent")))
-	workspaceRoot := envDefault("A3_RUNTIME_RUN_ONCE_AGENT_WORKSPACE_ROOT", envDefault("A3_RUNTIME_SCHEDULER_AGENT_WORKSPACE_ROOT", filepath.Join(hostRoot, "workspaces")))
+	defaultWorkspaceRoot := filepath.Join(hostRoot, "workspaces")
+	if strings.TrimSpace(packageConfig.AgentWorkspaceRoot) != "" {
+		defaultWorkspaceRoot = resolvePackagePath(hostRootDir, packageConfig.AgentWorkspaceRoot)
+	}
+	workspaceRoot := envDefault("A3_RUNTIME_RUN_ONCE_AGENT_WORKSPACE_ROOT", envDefault("A3_RUNTIME_SCHEDULER_AGENT_WORKSPACE_ROOT", defaultWorkspaceRoot))
 	hostAgentBin := envDefault("A3_HOST_AGENT_BIN", resolveDefaultHostAgentBin(config, hostRootDir))
-	agentAttemptCount, err := parsePositiveInt(envDefaultValue(agentAttempts, envDefault("A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS", envDefault("A3_RUNTIME_SCHEDULER_AGENT_ATTEMPTS", "220"))), "agent attempts")
+	defaultAgentAttempts := envDefaultValue(packageConfig.AgentAttempts, "220")
+	agentAttemptCount, err := parsePositiveInt(envDefaultValue(agentAttempts, envDefault("A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS", envDefault("A3_RUNTIME_SCHEDULER_AGENT_ATTEMPTS", defaultAgentAttempts))), "agent attempts")
 	if err != nil {
 		return runtimeRunOncePlan{}, err
 	}
@@ -276,12 +295,18 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 	if strings.TrimSpace(referencePackagePath) == "" {
 		referencePackagePath = filepath.Join(hostRootDir, "reference-products", "multi-repo-fixture", "project-package")
 	}
-	referenceRoot := filepath.Clean(filepath.Join(referencePackagePath, ".."))
-	catalogPath := filepath.Join(referenceRoot, "repos", "catalog-service")
-	storefrontPath := filepath.Join(referenceRoot, "repos", "storefront")
+	agentSourcePaths, agentSourceAliases, localSourceAliases, repoSources, repoLabels := packageRuntimeRepoArgs(hostRootDir, referencePackagePath, packageConfig)
+	requiredBins := packageConfig.AgentRequiredBins
+	if len(requiredBins) == 0 {
+		requiredBins = []string{"git", "node"}
+	}
+	defaultMaxSteps := envDefaultValue(packageConfig.MaxSteps, "16")
+	defaultLiveRef := envDefaultValue(packageConfig.LiveRef, "refs/heads/feature/prototype")
+	defaultKanbanProject := envDefaultValue(packageConfig.KanbanProject, "A2OReferenceMultiRepo")
+	defaultKanbanStatus := envDefaultValue(packageConfig.KanbanStatus, "To do")
 	return runtimeRunOncePlan{
 		ComposePrefix:        composeArgs(config),
-		MaxSteps:             envDefaultValue(maxSteps, envDefault("A3_RUNTIME_RUN_ONCE_MAX_STEPS", envDefault("A3_RUNTIME_SCHEDULER_MAX_STEPS", "16"))),
+		MaxSteps:             envDefaultValue(maxSteps, envDefault("A3_RUNTIME_RUN_ONCE_MAX_STEPS", envDefault("A3_RUNTIME_SCHEDULER_MAX_STEPS", defaultMaxSteps))),
 		AgentAttempts:        agentAttemptCount,
 		AgentPort:            envDefault("A3_BUNDLE_AGENT_PORT", envDefaultValue(config.AgentPort, "7393")),
 		StorageDir:           envDefault("A3_BUNDLE_STORAGE_DIR", envDefaultValue(config.StorageDir, "/var/lib/a3/a2o-runtime")),
@@ -299,39 +324,74 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		ServerPIDFile:        envDefault("A3_RUNTIME_RUN_ONCE_SERVER_PID_FILE", envDefault("A3_RUNTIME_SCHEDULER_SERVER_PID_FILE", "/tmp/a3-runtime-run-once-agent-server.pid")),
 		ManifestPath:         envDefault("A3_RUNTIME_RUN_ONCE_MANIFEST", envDefault("A3_RUNTIME_SCHEDULER_MANIFEST", filepath.Join(referencePackagePath, "manifest.yml"))),
 		SoloBoardInternalURL: envDefault("A3_SOLOBOARD_INTERNAL_URL", "http://soloboard:3000"),
+		LiveRef:              envDefault("A3_RUNTIME_RUN_ONCE_LIVE_REF", envDefault("A3_RUNTIME_SCHEDULER_LIVE_REF", defaultLiveRef)),
 		AgentEnv: []string{
 			"A3_ROOT_DIR=" + hostRootDir,
 			"A3_MAVEN_WORKSPACE_BOOTSTRAP_MODE=" + envDefault("A3_RUNTIME_RUN_ONCE_MAVEN_WORKSPACE_BOOTSTRAP_MODE", envDefault("A3_RUNTIME_SCHEDULER_MAVEN_WORKSPACE_BOOTSTRAP_MODE", "empty")),
 		},
-		AgentSourcePaths: envDefaultList("A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS", []string{
-			"catalog-service=" + catalogPath,
-			"storefront=" + storefrontPath,
-		}),
-		AgentRequiredBins: envDefaultList("A3_RUNTIME_RUN_ONCE_AGENT_REQUIRED_BINS", "A3_RUNTIME_SCHEDULER_AGENT_REQUIRED_BINS", []string{"git", "node"}),
-		AgentSourceAliases: envDefaultList("A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_ALIASES", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_ALIASES", []string{
-			"repo_alpha=catalog-service",
-			"repo_beta=storefront",
-		}),
-		KanbanProject: envDefault("A3_RUNTIME_RUN_ONCE_KANBAN_PROJECT", envDefault("A3_RUNTIME_SCHEDULER_KANBAN_PROJECT", "A2OReferenceMultiRepo")),
-		KanbanStatus:  envDefault("A3_RUNTIME_RUN_ONCE_KANBAN_STATUS", envDefault("A3_RUNTIME_SCHEDULER_KANBAN_STATUS", "To do")),
-		KanbanRepoLabels: envDefaultList("A3_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A3_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", []string{
-			"repo:catalog=repo_alpha",
-			"repo:storefront=repo_beta",
-			"repo:both=repo_alpha,repo_beta",
-		}),
-		RepoSources: envDefaultList("A3_RUNTIME_RUN_ONCE_REPO_SOURCES", "A3_RUNTIME_SCHEDULER_REPO_SOURCES", []string{
-			"repo_alpha=/workspace/reference-products/multi-repo-fixture/repos/catalog-service",
-			"repo_beta=/workspace/reference-products/multi-repo-fixture/repos/storefront",
-		}),
-		LocalSourceAliases: envDefaultList("A3_RUNTIME_RUN_ONCE_LOCAL_SOURCE_ALIASES", "A3_RUNTIME_SCHEDULER_LOCAL_SOURCE_ALIASES", []string{
-			"catalog-service=" + catalogPath,
-			"storefront=" + storefrontPath,
-		}),
-		WorkerCommand:     workerCommand,
-		WorkerArgs:        workerArgs,
-		JobTimeoutSeconds: envDefault("A3_RUNTIME_RUN_ONCE_AGENT_JOB_TIMEOUT_SECONDS", envDefault("A3_RUNTIME_SCHEDULER_AGENT_JOB_TIMEOUT_SECONDS", "7200")),
-		BranchNamespace:   config.ComposeProject,
+		AgentSourcePaths:   envDefaultList("A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS", agentSourcePaths),
+		AgentRequiredBins:  envDefaultList("A3_RUNTIME_RUN_ONCE_AGENT_REQUIRED_BINS", "A3_RUNTIME_SCHEDULER_AGENT_REQUIRED_BINS", requiredBins),
+		AgentSourceAliases: envDefaultList("A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_ALIASES", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_ALIASES", agentSourceAliases),
+		KanbanProject:      envDefault("A3_RUNTIME_RUN_ONCE_KANBAN_PROJECT", envDefault("A3_RUNTIME_SCHEDULER_KANBAN_PROJECT", defaultKanbanProject)),
+		KanbanStatus:       envDefault("A3_RUNTIME_RUN_ONCE_KANBAN_STATUS", envDefault("A3_RUNTIME_SCHEDULER_KANBAN_STATUS", defaultKanbanStatus)),
+		KanbanRepoLabels:   envDefaultList("A3_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A3_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", repoLabels),
+		RepoSources:        envDefaultList("A3_RUNTIME_RUN_ONCE_REPO_SOURCES", "A3_RUNTIME_SCHEDULER_REPO_SOURCES", repoSources),
+		LocalSourceAliases: envDefaultList("A3_RUNTIME_RUN_ONCE_LOCAL_SOURCE_ALIASES", "A3_RUNTIME_SCHEDULER_LOCAL_SOURCE_ALIASES", localSourceAliases),
+		WorkerCommand:      workerCommand,
+		WorkerArgs:         workerArgs,
+		JobTimeoutSeconds:  envDefault("A3_RUNTIME_RUN_ONCE_AGENT_JOB_TIMEOUT_SECONDS", envDefault("A3_RUNTIME_SCHEDULER_AGENT_JOB_TIMEOUT_SECONDS", "7200")),
+		BranchNamespace:    config.ComposeProject,
 	}, nil
+}
+
+func packageRuntimeRepoArgs(hostRootDir string, packagePath string, config projectPackageConfig) ([]string, []string, []string, []string, []string) {
+	if len(config.Repos) == 0 {
+		referenceRoot := filepath.Clean(filepath.Join(packagePath, ".."))
+		catalogPath := filepath.Join(referenceRoot, "repos", "catalog-service")
+		storefrontPath := filepath.Join(referenceRoot, "repos", "storefront")
+		return []string{
+				"catalog-service=" + catalogPath,
+				"storefront=" + storefrontPath,
+			},
+			[]string{
+				"repo_alpha=catalog-service",
+				"repo_beta=storefront",
+			},
+			[]string{
+				"catalog-service=" + catalogPath,
+				"storefront=" + storefrontPath,
+			},
+			[]string{
+				"repo_alpha=/workspace/reference-products/multi-repo-fixture/repos/catalog-service",
+				"repo_beta=/workspace/reference-products/multi-repo-fixture/repos/storefront",
+			},
+			[]string{
+				"repo:catalog=repo_alpha",
+				"repo:storefront=repo_beta",
+				"repo:both=repo_alpha,repo_beta",
+			}
+	}
+
+	agentSourcePaths := []string{}
+	agentSourceAliases := []string{}
+	localSourceAliases := []string{}
+	repoSources := []string{}
+	repoLabels := []string{}
+	for _, alias := range sortedProjectRepoAliases(config.Repos) {
+		repo := config.Repos[alias]
+		sourceAlias := alias
+		hostPath := resolvePackagePath(packagePath, repo.Path)
+		agentSourcePaths = append(agentSourcePaths, sourceAlias+"="+hostPath)
+		agentSourceAliases = append(agentSourceAliases, alias+"="+sourceAlias)
+		localSourceAliases = append(localSourceAliases, sourceAlias+"="+hostPath)
+		repoSources = append(repoSources, alias+"="+workspaceContainerPath(hostRootDir, hostPath))
+		label := repo.Label
+		if strings.TrimSpace(label) == "" {
+			label = "repo:" + alias
+		}
+		repoLabels = append(repoLabels, label+"="+alias)
+	}
+	return agentSourcePaths, agentSourceAliases, localSourceAliases, repoSources, repoLabels
 }
 
 func envDefaultList(runOnceName string, schedulerName string, defaults []string) []string {
@@ -591,7 +651,7 @@ func executeUntilIdleArgs(plan runtimeRunOncePlan) []string {
 		"--agent-control-plane-url", "http://127.0.0.1:" + plan.AgentPort,
 		"--agent-runtime-profile", "host-local",
 		"--agent-shared-workspace-mode", "agent-materialized",
-		"--agent-support-ref", envDefault("A3_RUNTIME_RUN_ONCE_LIVE_REF", envDefault("A3_RUNTIME_SCHEDULER_LIVE_REF", "refs/heads/feature/prototype")),
+		"--agent-support-ref", plan.LiveRef,
 		"--agent-workspace-root", plan.WorkspaceRoot,
 		"--agent-workspace-cleanup-policy", "cleanup_after_job",
 		"--agent-job-timeout-seconds", plan.JobTimeoutSeconds,

@@ -32,11 +32,12 @@ a2o kanban up
 a2o kanban doctor
 a2o kanban url
 a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
+a2o runtime run-once
 ```
 
 runtime image の中では `bin/a3` が Engine CLI として残る。これは内部互換名であり、利用者向けの正規入口は `a2o` と `a2o-agent` である。公開名称と内部互換名の境界は [docs/92-a2o-public-branding-boundary.md](docs/92-a2o-public-branding-boundary.md) にまとめる。
 
-現行の公開 launcher は setup、kanban lifecycle、agent install までを提供する。task execution loop の利用者向け入口は A2O#267 の release blocker として扱い、実装前の runnable command としては記載しない。
+現行の公開 launcher は setup、kanban lifecycle、agent install、foreground runtime execution を提供する。常駐 scheduler の start/stop/status は A2O#271 の release blocker として扱う。
 
 ## 実装位置
 
