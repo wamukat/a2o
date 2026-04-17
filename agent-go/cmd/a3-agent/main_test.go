@@ -162,6 +162,7 @@ func TestRunWorkerStdinBundleExecutesConfiguredCommand(t *testing.T) {
 	}
 	if err := os.WriteFile(scriptPath, []byte(`#!/bin/sh
 set -eu
+[ "$3" = "$A2O_ROOT_DIR" ]
 cat > "$1"
 cat > "$2" <<'JSON'
 {
@@ -185,7 +186,7 @@ JSON
     "result": {"mode": "file"},
     "schema": {"mode": "file"},
     "default_profile": {
-      "command": ["` + scriptPath + `", "` + promptPath + `", "{{result_path}}"],
+      "command": ["` + scriptPath + `", "` + promptPath + `", "{{result_path}}", "{{a2o_root_dir}}"],
       "env": {}
     },
     "phase_profiles": {}
@@ -198,6 +199,7 @@ JSON
 	t.Setenv("A3_WORKER_REQUEST_PATH", requestPath)
 	t.Setenv("A3_WORKER_RESULT_PATH", resultPath)
 	t.Setenv("A3_ROOT_DIR", tmp)
+	t.Setenv("A2O_ROOT_DIR", tmp)
 	t.Setenv("A3_WORKSPACE_ROOT", workspace)
 
 	if code := run([]string{"worker", "stdin-bundle"}); code != 0 {

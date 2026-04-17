@@ -6,4 +6,4 @@ Review for:
 - Missing unit tests for changed behavior.
 - API responses that drift from the Web or domain model.
 - Build or typecheck commands that no longer cover the changed files.
-- Any hidden dependency on Portal or a local-only path.
+- Any hidden dependency on a legacy sample project or a local-only path.

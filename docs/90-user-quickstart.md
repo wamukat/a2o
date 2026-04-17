@@ -56,6 +56,22 @@ runtime:
   live_ref: refs/heads/main
   max_steps: 20
   agent_attempts: 200
+  executor:
+    kind: command
+    prompt_transport: stdin-bundle
+    result:
+      mode: file
+    schema:
+      mode: file
+    default_profile:
+      command:
+        - your-ai-worker
+        - "--schema"
+        - "{{schema_path}}"
+        - "--result"
+        - "{{result_path}}"
+      env: {}
+    phase_profiles: {}
   presets:
     - base
   surface:
@@ -72,6 +88,8 @@ runtime:
     policy: ff_only
     target_ref: refs/heads/main
 ```
+
+`runtime.executor` は implementation / review を実行する agent 側 command である。A2O は worker request を stdin bundle として渡し、executor は `{{result_path}}` に worker result JSON を書く。`{{schema_path}}`、`{{result_path}}`、`{{workspace_root}}`、`{{a2o_root_dir}}` を command placeholder として使える。
 
 `repos.*.path` と `agent.workspace_root` は agent が見える path として扱う。project 固有の build、test、verification は `commands/` と `scenarios/` に置く。
 

@@ -11,7 +11,9 @@ KNOWN_EXECUTOR_PHASES = %w[implementation review parent_review].freeze
 ALLOWED_EXECUTOR_PLACEHOLDERS = {
   "result_path" => :result_path,
   "schema_path" => :schema_path,
-  "workspace_root" => :workspace_root
+  "workspace_root" => :workspace_root,
+  "a2o_root_dir" => :a2o_root_dir,
+  "root_dir" => :root_dir
 }.freeze
 
 def load_json(path)
@@ -254,10 +256,13 @@ end
 
 def expand_executor_placeholders(command, result_path:, schema_path:)
   workspace_root = ENV["A3_WORKSPACE_ROOT"] || ROOT_DIR.to_s
+  root_dir = ENV["A2O_ROOT_DIR"] || ENV["A3_ROOT_DIR"] || workspace_root
   values = {
     "result_path" => result_path.to_s,
     "schema_path" => schema_path.to_s,
-    "workspace_root" => workspace_root
+    "workspace_root" => workspace_root,
+    "a2o_root_dir" => root_dir,
+    "root_dir" => root_dir
   }
 
   command.map do |arg|

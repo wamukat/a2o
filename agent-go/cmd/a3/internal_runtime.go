@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -21,6 +22,10 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 		fmt.Fprintln(stderr, "missing runtime subcommand")
 		printUsage(stderr)
 		return 2
+	}
+	if args[0] == "--help" || args[0] == "-h" || args[0] == "help" {
+		printUsage(stdout)
+		return 0
 	}
 
 	switch args[0] {
@@ -425,6 +430,8 @@ type runtimeRunOncePlan struct {
 	HostAgentSource      string
 	HostAgentTarget      string
 	HostAgentLog         string
+	LauncherConfigPath   string
+	LauncherConfig       map[string]any
 	ServerLog            string
 	RuntimeLog           string
 	RuntimeExitFile      string
@@ -465,6 +472,9 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, age
 		if err := cleanupRuntimeProcesses(config, plan, runner); err != nil {
 			return err
 		}
+		if err := ensureRuntimeLauncherConfig(plan, stdout); err != nil {
+			return err
+		}
 		if err := ensureRuntimeHostAgent(config, plan, runner, stdout); err != nil {
 			return err
 		}
@@ -491,6 +501,25 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, age
 		}
 		return printRuntimeSuccessTail(config, plan, runner, stdout)
 	})
+}
+
+func ensureRuntimeLauncherConfig(plan runtimeRunOncePlan, stdout io.Writer) error {
+	if len(plan.LauncherConfig) == 0 {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(plan.LauncherConfigPath), 0o755); err != nil {
+		return fmt.Errorf("create worker launcher config directory: %w", err)
+	}
+	payload := map[string]any{"executor": plan.LauncherConfig}
+	body, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode worker launcher config: %w", err)
+	}
+	if err := os.WriteFile(plan.LauncherConfigPath, append(body, '\n'), 0o600); err != nil {
+		return fmt.Errorf("write worker launcher config: %w", err)
+	}
+	fmt.Fprintf(stdout, "runtime_worker_launcher_config=%s\n", plan.LauncherConfigPath)
+	return nil
 }
 
 func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agentAttempts string) (runtimeRunOncePlan, error) {
@@ -548,6 +577,10 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 	defaultLiveRef := envDefaultValue(packageConfig.LiveRef, "refs/heads/feature/prototype")
 	defaultKanbanProject := packageConfig.KanbanProject
 	defaultKanbanStatus := envDefaultValue(packageConfig.KanbanStatus, "To do")
+	launcherConfigPath := envDefault("A3_WORKER_LAUNCHER_CONFIG_PATH", filepath.Join(hostRootDir, "launcher.json"))
+	if len(packageConfig.Executor) == 0 && strings.TrimSpace(envDefault("A3_WORKER_LAUNCHER_CONFIG_PATH", "")) == "" {
+		return runtimeRunOncePlan{}, fmt.Errorf("project.yaml runtime.executor is required for packaged a2o-agent worker execution")
+	}
 	return runtimeRunOncePlan{
 		ComposePrefix:        composeArgs(config),
 		MaxSteps:             envDefaultValue(maxSteps, envDefault("A3_RUNTIME_RUN_ONCE_MAX_STEPS", envDefault("A3_RUNTIME_SCHEDULER_MAX_STEPS", defaultMaxSteps))),
@@ -562,6 +595,8 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		HostAgentSource:      envDefault("A3_RUNTIME_RUN_ONCE_AGENT_SOURCE", envDefault("A3_RUNTIME_SCHEDULER_AGENT_SOURCE", "runtime-image")),
 		HostAgentTarget:      target,
 		HostAgentLog:         envDefault("A3_RUNTIME_RUN_ONCE_HOST_AGENT_LOG", envDefault("A3_RUNTIME_SCHEDULER_HOST_AGENT_LOG", filepath.Join(hostRoot, "agent.log"))),
+		LauncherConfigPath:   launcherConfigPath,
+		LauncherConfig:       packageConfig.Executor,
 		ServerLog:            envDefault("A3_RUNTIME_RUN_ONCE_SERVER_LOG", envDefault("A3_RUNTIME_SCHEDULER_SERVER_LOG", "/tmp/a3-runtime-run-once-agent-server.log")),
 		RuntimeLog:           envDefault("A3_RUNTIME_RUN_ONCE_LOG", envDefault("A3_RUNTIME_SCHEDULER_LOG", "/tmp/a3-runtime-run-once.log")),
 		RuntimeExitFile:      envDefault("A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefault("A3_RUNTIME_SCHEDULER_EXIT_FILE", "/tmp/a3-runtime-run-once.exit")),
@@ -574,6 +609,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		AgentEnv: []string{
 			"A3_ROOT_DIR=" + hostRootDir,
 			"A2O_ROOT_DIR=" + hostRootDir,
+			"A3_WORKER_LAUNCHER_CONFIG_PATH=" + launcherConfigPath,
 			"A3_MAVEN_WORKSPACE_BOOTSTRAP_MODE=" + envDefault("A3_RUNTIME_RUN_ONCE_MAVEN_WORKSPACE_BOOTSTRAP_MODE", envDefault("A3_RUNTIME_SCHEDULER_MAVEN_WORKSPACE_BOOTSTRAP_MODE", "empty")),
 		},
 		AgentSourcePaths:   envDefaultList("A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS", agentSourcePaths),

@@ -6,4 +6,4 @@ Review for:
 - Missing tests for changed inventory behavior.
 - API and CLI outputs that drift from shared domain logic.
 - Build commands that skip an entrypoint.
-- Any hidden dependency on Portal or a local-only path.
+- Any hidden dependency on a legacy sample project or a local-only path.

@@ -176,6 +176,22 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 	}
 }
 
+func TestRuntimeHelpPrintsUsage(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"runtime", "--help"}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "a2o runtime run-once [--max-steps N] [--agent-attempts N]") {
+		t.Fatalf("runtime help should print usage, got %q", stdout.String())
+	}
+	if strings.Contains(stderr.String(), "unknown runtime subcommand") {
+		t.Fatalf("runtime help should not be an unknown subcommand, got %q", stderr.String())
+	}
+}
+
 func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -1125,6 +1141,19 @@ runtime:
   live_ref: refs/heads/main
   max_steps: 7
   agent_attempts: 9
+  executor:
+    kind: command
+    prompt_transport: stdin-bundle
+    result:
+      mode: file
+    schema:
+      mode: file
+    default_profile:
+      command:
+        - ruby
+        - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
+      env: {}
+    phase_profiles: {}
 `
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
 		t.Fatal(err)
@@ -1166,6 +1195,17 @@ runtime:
 		if !strings.Contains(joined, want) {
 			t.Fatalf("run-once missing %q in:\n%s", want, joined)
 		}
+	}
+	launcherPath := filepath.Join(tempDir, "launcher.json")
+	launcherBody, err := os.ReadFile(launcherPath)
+	if err != nil {
+		t.Fatalf("launcher config should be written: %v", err)
+	}
+	if !strings.Contains(string(launcherBody), "deterministic_worker.rb") {
+		t.Fatalf("launcher config should contain project executor, got %s", launcherBody)
+	}
+	if !strings.Contains(joined, "'--agent-env' 'A3_WORKER_LAUNCHER_CONFIG_PATH="+launcherPath+"'") {
+		t.Fatalf("run-once should pass launcher config path to agent jobs, calls:\n%s", joined)
 	}
 	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] != "" {
 		t.Fatalf("agent attempts should come from package plan, not env override, got %q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"])
@@ -1574,6 +1614,19 @@ runtime:
   live_ref: refs/heads/main
   max_steps: 40
   agent_attempts: 300
+  executor:
+    kind: command
+    prompt_transport: stdin-bundle
+    result:
+      mode: file
+    schema:
+      mode: file
+    default_profile:
+      command:
+        - ruby
+        - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
+      env: {}
+    phase_profiles: {}
 `
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)

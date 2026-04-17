@@ -172,6 +172,7 @@ runtime を実行する前に、`project.yaml`、`kanban/bootstrap.json`、`comm
 - `repos` に対象 repo slot がある。
 - `agent.required_bins` に agent が使う binary がある。
 - `runtime.presets` が配列である。
+- `runtime.executor` がある。default worker を使う場合、executor は stdin bundle を受け取り `{{result_path}}` に worker result JSON を書く command として定義する。
 - `runtime.presets` が参照する preset、または `runtime.surface` のどちらかで、実行可能な `verification_commands` を定義している。
 - `runtime.merge.target`、`runtime.merge.policy`、`runtime.merge.target_ref` がある。
 - 利用者が編集する schema に内部 coordination label を書いていない。

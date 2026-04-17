@@ -1,12 +1,14 @@
 package main
 
 import (
-	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 type projectPackageConfig struct {
@@ -20,6 +22,7 @@ type projectPackageConfig struct {
 	AgentAttempts      string
 	AgentWorkspaceRoot string
 	AgentRequiredBins  []string
+	Executor           map[string]any
 	Repos              map[string]projectPackageRepo
 }
 
@@ -37,126 +40,30 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	} else if err != nil && !os.IsNotExist(err) {
 		return config, fmt.Errorf("inspect legacy manifest: %w", err)
 	}
-	file, err := os.Open(projectFile)
+	body, err := os.ReadFile(projectFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return config, fmt.Errorf("project package config not found: %s", projectFile)
 		}
 		return config, fmt.Errorf("read project package config: %w", err)
 	}
-	defer file.Close()
-
-	section := ""
-	subsection := ""
-	currentRepo := ""
-	currentList := ""
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		rawLine := stripProjectConfigComment(scanner.Text())
-		if strings.TrimSpace(rawLine) == "" {
-			continue
-		}
-		indent := leadingSpaces(rawLine)
-		line := strings.TrimSpace(rawLine)
-		if indent == 0 {
-			currentRepo = ""
-			currentList = ""
-			subsection = ""
-			key, value, hasValue := splitProjectConfigKey(line)
-			if !hasValue {
-				section = key
-				continue
-			}
-			if key == "schema_version" {
-				config.SchemaVersion = value
-			}
-			continue
-		}
-		switch section {
-		case "package":
-			if indent == 2 {
-				key, value, hasValue := splitProjectConfigKey(line)
-				if hasValue && key == "name" {
-					config.PackageName = value
-				}
-			}
-		case "kanban":
-			if indent == 2 {
-				key, value, hasValue := splitProjectConfigKey(line)
-				subsection = ""
-				if hasValue && key == "project" {
-					config.KanbanProject = value
-				} else if hasValue && key == "bootstrap" {
-					config.KanbanBootstrap = value
-				} else if !hasValue && key == "selection" {
-					subsection = key
-				}
-			} else if indent == 4 && subsection == "selection" {
-				key, value, hasValue := splitProjectConfigKey(line)
-				if hasValue && key == "status" {
-					config.KanbanStatus = value
-				}
-			}
-		case "runtime":
-			if indent == 2 {
-				key, value, hasValue := splitProjectConfigKey(line)
-				if !hasValue {
-					continue
-				}
-				switch key {
-				case "live_ref":
-					config.LiveRef = value
-				case "max_steps":
-					config.MaxSteps = value
-				case "agent_attempts":
-					config.AgentAttempts = value
-				}
-			}
-		case "agent":
-			if indent == 2 {
-				key, value, hasValue := splitProjectConfigKey(line)
-				currentList = ""
-				if !hasValue {
-					if key == "required_bins" {
-						currentList = key
-					}
-					continue
-				}
-				if key == "workspace_root" {
-					config.AgentWorkspaceRoot = value
-				} else if key == "required_bins" {
-					config.AgentRequiredBins = parseProjectConfigList(value)
-				}
-			} else if indent == 4 && currentList == "required_bins" && strings.HasPrefix(line, "- ") {
-				config.AgentRequiredBins = append(config.AgentRequiredBins, strings.TrimSpace(strings.TrimPrefix(line, "- ")))
-			}
-		case "repos":
-			if indent == 2 {
-				key, _, hasValue := splitProjectConfigKey(line)
-				if !hasValue {
-					currentRepo = key
-					if _, ok := config.Repos[currentRepo]; !ok {
-						config.Repos[currentRepo] = projectPackageRepo{}
-					}
-				}
-			} else if indent == 4 && currentRepo != "" {
-				key, value, hasValue := splitProjectConfigKey(line)
-				if !hasValue {
-					continue
-				}
-				repo := config.Repos[currentRepo]
-				switch key {
-				case "path":
-					repo.Path = value
-				case "label":
-					repo.Label = value
-				}
-				config.Repos[currentRepo] = repo
-			}
-		}
+	var payload projectPackageYAML
+	if err := yaml.Unmarshal(body, &payload); err != nil {
+		return config, fmt.Errorf("parse project package config %s: %w", projectFile, err)
 	}
-	if err := scanner.Err(); err != nil {
-		return config, fmt.Errorf("scan project package config: %w", err)
+	config.SchemaVersion = scalarString(payload.SchemaVersion)
+	config.PackageName = payload.Package.Name
+	config.KanbanProject = payload.Kanban.Project
+	config.KanbanBootstrap = payload.Kanban.Bootstrap
+	config.KanbanStatus = payload.Kanban.Selection.Status
+	config.LiveRef = scalarString(payload.Runtime.LiveRef)
+	config.MaxSteps = scalarString(payload.Runtime.MaxSteps)
+	config.AgentAttempts = scalarString(payload.Runtime.AgentAttempts)
+	config.AgentWorkspaceRoot = payload.Agent.WorkspaceRoot
+	config.AgentRequiredBins = payload.Agent.RequiredBins
+	config.Executor = normalizeYAMLValue(payload.Runtime.Executor)
+	for alias, repo := range payload.Repos {
+		config.Repos[alias] = projectPackageRepo{Path: repo.Path, Label: repo.Label}
 	}
 	if strings.TrimSpace(config.SchemaVersion) == "" {
 		return config, fmt.Errorf("project package config %s is missing schema_version", projectFile)
@@ -176,61 +83,68 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	return config, nil
 }
 
-func stripProjectConfigComment(line string) string {
-	if index := strings.Index(line, "#"); index >= 0 {
-		return line[:index]
-	}
-	return line
+type projectPackageYAML struct {
+	SchemaVersion any `yaml:"schema_version"`
+	Package       struct {
+		Name string `yaml:"name"`
+	} `yaml:"package"`
+	Kanban struct {
+		Project   string `yaml:"project"`
+		Bootstrap string `yaml:"bootstrap"`
+		Selection struct {
+			Status string `yaml:"status"`
+		} `yaml:"selection"`
+	} `yaml:"kanban"`
+	Repos map[string]struct {
+		Path  string `yaml:"path"`
+		Label string `yaml:"label"`
+	} `yaml:"repos"`
+	Agent struct {
+		WorkspaceRoot string   `yaml:"workspace_root"`
+		RequiredBins  []string `yaml:"required_bins"`
+	} `yaml:"agent"`
+	Runtime struct {
+		LiveRef       any            `yaml:"live_ref"`
+		MaxSteps      any            `yaml:"max_steps"`
+		AgentAttempts any            `yaml:"agent_attempts"`
+		Executor      map[string]any `yaml:"executor"`
+	} `yaml:"runtime"`
 }
 
-func leadingSpaces(line string) int {
-	count := 0
-	for _, char := range line {
-		if char != ' ' {
-			return count
+func scalarString(value any) string {
+	switch typed := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return typed
+	case int:
+		return fmt.Sprintf("%d", typed)
+	case int64:
+		return fmt.Sprintf("%d", typed)
+	case uint64:
+		return fmt.Sprintf("%d", typed)
+	case float64:
+		return fmt.Sprintf("%.0f", typed)
+	case bool:
+		if typed {
+			return "true"
 		}
-		count++
+		return "false"
+	default:
+		return fmt.Sprintf("%v", typed)
 	}
-	return count
 }
 
-func splitProjectConfigKey(line string) (string, string, bool) {
-	parts := strings.SplitN(line, ":", 2)
-	key := strings.TrimSpace(parts[0])
-	if len(parts) == 1 {
-		return key, "", false
+func normalizeYAMLValue[T any](value T) T {
+	body, err := json.Marshal(value)
+	if err != nil {
+		return value
 	}
-	value := strings.TrimSpace(parts[1])
-	if value == "" {
-		return key, "", false
+	var normalized T
+	if err := json.Unmarshal(body, &normalized); err != nil {
+		return value
 	}
-	return key, trimProjectConfigScalar(value), true
-}
-
-func trimProjectConfigScalar(value string) string {
-	value = strings.TrimSpace(value)
-	value = strings.Trim(value, "\"'")
-	return value
-}
-
-func parseProjectConfigList(value string) []string {
-	trimmed := strings.TrimSpace(value)
-	if !strings.HasPrefix(trimmed, "[") || !strings.HasSuffix(trimmed, "]") {
-		return nil
-	}
-	inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "["), "]"))
-	if inner == "" {
-		return []string{}
-	}
-	parts := strings.Split(inner, ",")
-	values := make([]string, 0, len(parts))
-	for _, part := range parts {
-		value := trimProjectConfigScalar(part)
-		if value != "" {
-			values = append(values, value)
-		}
-	}
-	return values
+	return normalized
 }
 
 func sortedProjectRepoAliases(repos map[string]projectPackageRepo) []string {

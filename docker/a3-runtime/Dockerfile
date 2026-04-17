@@ -7,6 +7,7 @@ ARG A3_AGENT_VERSION=dev
 WORKDIR /src/agent-go
 
 COPY agent-go/go.mod ./go.mod
+COPY agent-go/go.sum ./go.sum
 COPY agent-go/cmd ./cmd
 COPY agent-go/internal ./internal
 COPY agent-go/scripts ./scripts

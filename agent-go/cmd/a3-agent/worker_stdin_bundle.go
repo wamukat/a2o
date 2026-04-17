@@ -355,12 +355,24 @@ func expandWorkerPlaceholder(arg string, resultPath string, schemaPath string) (
 		"{{result_path}}", resultPath,
 		"{{schema_path}}", schemaPath,
 		"{{workspace_root}}", workerWorkspaceRoot(),
+		"{{a2o_root_dir}}", workerRootDir(),
+		"{{root_dir}}", workerRootDir(),
 	)
 	expanded := replacer.Replace(arg)
 	if strings.Contains(expanded, "{{") || strings.Contains(expanded, "}}") {
 		return "", fmt.Errorf("unknown executor command placeholder in %q", arg)
 	}
 	return expanded, nil
+}
+
+func workerRootDir() string {
+	if root := strings.TrimSpace(os.Getenv("A2O_ROOT_DIR")); root != "" {
+		return root
+	}
+	if root := strings.TrimSpace(os.Getenv("A3_ROOT_DIR")); root != "" {
+		return root
+	}
+	return workerWorkspaceRoot()
 }
 
 func runWorkerExecutor(command []string, commandEnv map[string]string, workspaceRoot string) (string, string, int, error) {

@@ -185,7 +185,7 @@ RSpec.describe "worker:stdin-bundle" do
       request_path.write(JSON.generate(request))
       write_launcher_config(
         launcher_config,
-        command: ["runner", "--result", "{{result_path}}", "--schema", "{{schema_path}}", "--cwd", "{{workspace_root}}"]
+        command: ["runner", "--result", "{{result_path}}", "--schema", "{{schema_path}}", "--cwd", "{{workspace_root}}", "--root", "{{a2o_root_dir}}"]
       )
 
       ruby = <<~RUBY
@@ -201,12 +201,13 @@ RSpec.describe "worker:stdin-bundle" do
         env: {
           "A3_WORKER_REQUEST_PATH" => request_path.to_s,
           "A3_WORKER_RESULT_PATH" => result_path.to_s,
-          "A3_WORKSPACE_ROOT" => workspace_root.to_s
+          "A3_WORKSPACE_ROOT" => workspace_root.to_s,
+          "A2O_ROOT_DIR" => temp_dir.to_s
         }
       )
 
       expect(status.success?).to eq(true), "#{stdout}\n#{stderr}"
-      expect(JSON.parse(stdout)).to eq(["runner", "--result", result_path.to_s, "--schema", "/tmp/schema.json", "--cwd", workspace_root.to_s])
+      expect(JSON.parse(stdout)).to eq(["runner", "--result", result_path.to_s, "--schema", "/tmp/schema.json", "--cwd", workspace_root.to_s, "--root", temp_dir.to_s])
     end
   end
 
