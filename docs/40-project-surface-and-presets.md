@@ -2,7 +2,6 @@
 
 対象読者: A3 設計者 / PJ manifest 設計者 / 実装者
 文書種別: 設計メモ
-対応 ticket: `A3-v2#3026` (historical ref)
 
 この文書は、A3 における PJ 固有知識の表現面を最小集合に絞り、
 巨大な product surface にならないようにするためのもの。

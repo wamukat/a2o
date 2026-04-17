@@ -1,201 +1,31 @@
-# A3 Engine Implementation Status
+# Implementation Status
 
-## 目的
+対象読者: A2O 利用者 / 実装者 / reviewer
+文書種別: current status
 
-このドキュメントは、A3 Engine で実装すべき機能の全体像と、各機能の現在の完成状態をチェックリストで管理するためのものです。
-旧 `a3-v2` から current A2O/A3 Engine へ seed 済みの implementation status を管理する。2026-04-11 時点で `a3-v2/` source tree と legacy automation scripts は削除済みであり、現行の通常利用者向け正本は Go host launcher `a2o`、Docker runtime image、`a2o-agent`、project package である。Ruby `bin/a3` は Docker runtime 内の Engine command として扱う。
+Date: 2026-04-17
 
-- 設計方針の正本: `docs/75-engine-redesign.md`
-- cutover / naming plan の正本: `docs/80-a3engine-reseed-and-naming-cutover-plan.md`
-- current runtime / operator surface の正本: `docs/60-container-distribution-and-project-runtime.md`
-- 実装進捗の正本: このファイル
+## Ready
 
-## 読み方
+- Host launcher install: `a2o host install`
+- Project bootstrap: `a2o project bootstrap --package DIR`
+- Kanban service lifecycle: `a2o kanban up`, `doctor`, `url`
+- Agent binary export: `a2o agent install`
+- SoloBoard adapter and bootstrap tooling
+- Agent HTTP worker gateway
+- Agent-materialized workspace mode
+- Reference product packages for TypeScript, Go, Python, and multi-repo scenarios
+- Full RSpec release gate passing locally
 
-- この文書は reseed 前の `a3-engine` 実装証跡を current base 側へ持ち込むための seeded status である
-- `a3_engine/*` や `scripts/a3/run.py` などの Python path / command は、cutover 前の implementation provenance を保持するために残している
-- current operator entrypoint や live runtime の正本は `docs/60-container-distribution-and-project-runtime.md`、`docs/90-user-quickstart.md`、Go host launcher `a2o` を参照する
-- cutover 実行 slice は進行済みであり、この文書中の Python path / old command は provenance としてだけ残す。current public surface は `a2o` / `a2o-agent` / project package docs を参照する
-- root Taskfile / Portal workspace-local runtime entrypoint への記述は historical / maintenance-only evidence として読む。current public surface ではない。
+## Current Baseline
 
-## ステータスの見方
+[69-reference-runtime-baseline.md](69-reference-runtime-baseline.md) records the latest reference suite runtime proof. It validates single-repo and multi-repo task flows through kanban, agent gateway, verification, merge, and evidence persistence.
 
-- `- [x]`: 基本機能が実装済みで、回帰 test または実運用相当の確認がある
-- `- [ ]`: 未完了。未着手と進行中の両方を含む
+## Productization Gaps
 
-補足が必要な項目は、直下に「現状」「残課題」を短く書く。
+- `A2O#267` Public runtime execution command: the baseline still exposes the internal Engine CLI for the full execution loop.
+- `A2O#268` Published image smoke: release candidate validation should be repeated against the published GHCR image, not only a local equivalent.
+- `A2O#269` Package schema consolidation: `manifest.yml` and `project.yaml` responsibilities should be documented and validated consistently.
+- `A2O#270` User-facing diagnostics: internal A3 names can remain, but normal manuals should avoid requiring users to author them.
 
-## Core
-
-- [x] project manifest schema / validation
-  現状: 外部 JSON manifest の load / validate / normalize が可能。
-  根拠: `a3_engine/manifest.py`, `tests/test_manifest.py`
-
-- [x] repo selection / trigger resolution
-  現状: label route と `team_plan.repos` から対象 repo を解決できる。
-  根拠: `a3_engine/runtime.py`, `a3_engine/cli.py`
-
-- [x] runtime context / phase planning
-  現状: `describe-context` / `plan-run` / `describe-phase-plan` が動く。
-  根拠: `a3_engine/runtime.py`, `a3_engine/runner.py`
-
-- [x] semantic verification intent
-  現状: manifest 上の intent を repo-local command に解決できる。
-
-- [x] preflight guard evaluation
-  現状: read-only guard 評価と structured output がある。
-  根拠: `a3_engine/preflight.py`, `tests/test_preflight.py`
-
-- [x] phase executor
-  現状: preflight 通過後に verification command を順次実行できる。
-  根拠: `a3_engine/phase_executor.py`, `tests/test_phase_executor.py`
-
-- [x] branch contract materialization
-  現状: engine が `source_workspace` / `runtime_workspace` を resolved binding として materialize し、preflight / phase executor が `execution_path` を消費する。`work_branch_ref` / `integration_branch_ref` を読める受け皿はあるが、Portal live runtime で child work branch と parent integration branch を実際に分離して走らせる段階までは未完了。
-  根拠: `a3_engine/runtime.py`, `a3_engine/preflight.py`, `a3_engine/phase_executor.py`
-
-- [x] merge/apply executor
-  現状: trigger 別 merge policy を使って isolated repo 上の fast-forward merge を実行できる。
-  根拠: `a3_engine/merge_executor.py`, `tests/test_merge_executor.py`
-
-- [x] parent integration judgment contract
-  現状: parent finalize / merge は structured integration judgment を前提にし、script-only finalize path を正規経路としない。
-  根拠: `a3_engine/run_once_executor.py`, `a3_engine/worker_executor.py`, `tests/test_run_once_executor.py`, `tests/test_worker_executor.py`
-
-- [x] active-run persistence
-  現状: active-run refs を file-backed store に load/save でき、selection / dry-run mutation planning が persisted active refs を消費できる。
-  根拠: `a3_engine/active_run_store.py`, `a3_engine/runner.py`, `tests/test_active_run_store.py`, `tests/test_orchestration.py`
-
-- [x] blocked recovery / kanban orchestration
-  現状: kanban read/write adapter、task snapshot planner、active-run selection、active-run persistence、real kanban mutation adapter が揃い、snapshot load -> selection -> mutation apply を end-to-end 化できた。`commit-preserving workspace refresh failed` は `blocked_refresh_failure` / `Backlog` に自動正規化され、lane unclogging を operator の手作業に依存しない。
-  根拠: `a3_engine/orchestration.py`, `a3_engine/active_run_store.py`, `a3_engine/kanban_adapter.py`, `tests/test_orchestration.py`, `tests/test_active_run_store.py`, `tests/test_kanban_adapter.py`
-
-- [x] kanban task snapshot acquisition
-  現状: real kanban adapter から `task-list` / `task-get` / `task-label-list` を読み、scheduler 用 `TaskSnapshot` を構築できる。
-  根拠: `a3_engine/kanban_adapter.py`, `a3_engine/launcher.py`, `tests/test_kanban_adapter.py`
-
-- [x] worker prompt handoff / structured result persistence
-  現状: implementation の `worker-execution` action を ai-cli executor へ渡し、per-run result bundle を `.work/a3/results/...` へ保存できる。review worker payload は次段の slice で扱う。
-  根拠: `a3_engine/worker_executor.py`, `tests/test_worker_executor.py`
-
-- [x] integrated run-once execution
-  現状: `plan-run-once -> execute-worker-action -> apply-worker-result` を 1 本の `execute-run-once` で実行できる。
-  根拠: `a3_engine/run_once_executor.py`, `tests/test_run_once_executor.py`
-
-- [x] review-phase integrated run-once routing
-  現状: `In review` の worker action も integrated run-once で処理でき、review worker の structured result から `comment + desired_status` を kanban mutation へ反映できる。
-  根拠: `a3_engine/worker_executor.py`, `a3_engine/worker_result_handler.py`, `a3_engine/run_once_executor.py`, `tests/test_worker_executor.py`, `tests/test_worker_result_handler.py`, `tests/test_run_once_executor.py`
-
-- [x] watch loop / Portal live cutover integration
-  現状: `portal` live launcher config は `execute-run-once` を呼ぶ launchd package を持ち、root から manual run と launchd install / uninstall / reload / status を操作できる。launchd helper は macOS 専用で、非 macOS では fail-fast する。
-  根拠: `scripts/a3-projects/portal/inject/config/portal/launcher.json`, root `Taskfile.yml`, retired launchd surface notes
-
-## Runtime / Launcher
-
-- [x] launcher config schema
-  現状: project manifest と machine-local config を分離済み。
-  根拠: `a3_engine/launcher_config.py`, `tests/test_launcher.py`
-
-- [x] shell/env policy
-  現状: shell, env files, overrides, inherit policy を扱える。
-  根拠: `a3_engine/runtime_env.py`
-
-- [x] executor adapter abstraction
-  現状: `ai-cli` naming と implementation-specific detail は historical v2 status 上の整理として完了済み。current runtime ではさらに、A3 Engine core が provider adapter / model / reasoning option を意味解釈しない方針へ更新した。Portal profile は当面 `codex exec --json ...` を command argv として使うが、これは project-selected executor command であり A3 core dependency ではない。root thin worker は `executor.kind=command`、stdin bundle、result/schema file、placeholder 展開だけを扱い、config 不備時の `codex exec --json` fallback は持たない。
-  根拠: `a3_engine/executor.py`, `a3-engine/bin/a3 worker:stdin-bundle`, `scripts/a3-projects/portal/inject/config/portal/launcher.json`, `docs/60-container-distribution-and-project-runtime.md` の `0.4.6`
-
-- [x] scheduler adapter abstraction
-  現状: scheduler descriptor / launcher plan はある。
-  根拠: `a3_engine/scheduler.py`, `a3_engine/launcher.py`
-
-- [x] real scheduler packaging
-  現状: launchd / cron / systemd-timer backend について、launcher config から deterministic な packaging artifact を describe/materialize できる。
-  根拠: `a3_engine/scheduler_packaging.py`, `tests/test_scheduler_packaging.py`, `scripts/a3/run.py`
-
-## Next Design Slice
-
-- [ ] single / child 向け phase redesign slice
-  現状: fresh な `single` / `child` は `implementation completed -> verification` へ進み、kanban status も `Inspection` へ遷移する。implementation worker は optional `review_disposition(kind=completed)` を返せるようになり、self-review clean の evidence は implementation run record と operator view に保持できる。あわせて `single` / `child` では `review` を canonical support phase から外し、Kanban 由来の `In review` も child/single では `Inspection` 相当へ正規化するようにした。watch-summary は canonical 4 phase を維持しつつ、current runtime / CLI / manual worker flow / operator read model から child review 前提は撤去済みである。残りは current 3-phase child flow を実 validation で継続確認しつつ、backend adapter 差し替え時に phase rule が backend 固有都合で汚染されないことを検証すること。
-  根拠: `docs/60-container-distribution-and-project-runtime.md` の `0.4.5.2` と `0.4.5.3`
-
-- [ ] SoloBoard bundled kanban and agent runtime packaging
-  現状: SoloBoard は `comments`, `relations`, `transition`, `ref` / `shortRef` を含む API を公開しており、A3 Engine が現在使う kanban compatibility surface を adapter 経由で受け止められる。local Docker spike では `http://127.0.0.1:3460` で board / lane / tag / ticket / relation / comment / transition / list 系 API の疎通を確認済みで、workspace root では `task soloboard:doctor`, `task soloboard:api`, `task soloboard:bootstrap`, `task soloboard:validation` と generic `task kanban:*` / `task kanban:validation` の既定 backend を SoloBoard に寄せた。SoloBoard 起動は upstream GHCR image `ghcr.io/wamukat/soloboard:latest` を既定に切り替え済みで、local source checkout build には依存しない。完成形では `docker:a3` は汎用 control plane、`docker:soloboard` は bundled kanban、project command 実行は host または project dev-env に配置した public `a2o-agent` release binary が担当する。2026-04-13 の配布整理で root `docker/a3-agent` / `docker/a3-portal-agent` image は削除し、A3 runtime Dockerfile は `a3-engine/docker/a3-runtime/Dockerfile` へ移した。A3 Engine command は Docker image 内の `/usr/local/bin/a3` として提供し、host Ruby executable として配布しない。
-  2026-04-16 以降の core validation は Portal ではなく A2O reference product suite を正本にする。Portal 由来の証跡は historical evidence として保持するが、新しい daily / focused / release-facing core validation は [68-reference-product-suite.md](68-reference-product-suite.md) の境界に従い、Portal 固有検証は実プロダクト integration validation として扱う。
-  2026-04-11 の実チケット validation では、`Portal#37` が worker gateway 経由で `Inspection -> Done`、`Portal#39` が agent verification command runner 経由で `Merging -> Done`、`Portal#40` が child `Portal#41/#42` を集約する parent topology で `Done` まで到達した。`Portal#38` は synthetic non-Maven fixture に対する Maven bootstrap/prefetch が原因で blocked になったが、root commit `47dda1f` で non-Maven verification slot を skip するよう修正し、superseded validation として recovery comment / blocked label removal 後に `Done` 化した。
-  さらに `ITERATIONS=6 INTERVAL_SECONDS=30 <retired Portal runtime observe task>` で runtime doctor / watch-summary / show-state / disk usage を約 3 分間反復観測し、全 iteration で active / queued / blocked が 0 の idle 状態を確認した。legacy direct retired Portal runtime task (run-once) は docker:a3 内で project verification を実行しうるため、diagnostic validation `Portal#43` で失敗条件を確認した後、後続整理で entrypoint 自体を削除した。Docker dev-env agent loop は historical validation として完了し、2026-04-13 以降の通常検証は host-local agent 経路に固定した。
-  2026-04-12 の再確認では standalone `task soloboard:doctor/bootstrap/validation`、runtime `retired Portal runtime task (doctor)/bootstrap`、Docker dev-env agent validation 群、retired Portal runtime task (agent-artifact-cleanup) dry-run、`task a3:portal:cleanup`、`ITERATIONS=1 INTERVAL_SECONDS=1 <retired Portal runtime observe task>` を連続実行した。これらの Docker dev-env task は 2026-04-13 の配布整理で削除済みで、証跡だけを historical evidence として保持する。
-  同日の diagnostic / retention surface 確認では、archived `Portal#43` blocked run (`572a705b-3d81-4409-b370-38cc34963b18`) を scratch copy へ複製し、`show-run`, `show-blocked-diagnosis`, `doctor-runtime`, `repair-runs` dry-run, `show-state`, `cleanup-terminal-workspaces` dry-run, `quarantine-terminal-workspaces` を実行した。blocked diagnosis は `JAVA_HOME environment variable is not defined correctly` まで追跡でき、scratch は削除、archive 正本は保持した。さらに cap 指定 artifact cleanup dry-run と `ITERATIONS=4 INTERVAL_SECONDS=45 <retired Portal runtime observe task>` も成功し、全 iteration で active / queued / blocked は 0、host disk 空きは約 89GiB を維持した。
-  同日の operator command surface 最終棚卸しでは、`show-project-surface`, `show-project-context`, `show-phase-runtime-config`, `show-runtime-package`, `migrate-scheduler-store`, `show-scheduler-state`, `show-scheduler-history` を scratch state で実行し、archived `Portal#43` scratch copy では `show-task`, `plan-rerun`, `recover-rerun`, `diagnose-blocked`, `show-blocked-diagnosis` まで確認した。low-level phase execution / run mutation commands は validation harness 用に分類し、通常 operator entrypoint からは外す方針を `docs/60-container-distribution-and-project-runtime.md` に固定した。
-  2026-04-16 の方針更新で、A2O core validation は reference product suite を標準対象にする。Portal source の `repo:both` parent/full verification は実プロダクト integration validation として別枠に置き、日常の軽量 validation や A2O core completion gate には含めない。
-  残課題:
-  - current A3 がまだ使っていない command surface を parity 確認する。standalone SoloBoard validation、bundled agent validation sweep、archived blocked diagnosis の診断/cleanup/repair dry-run surface、runtime inspection surface、rerun recovery surface は再確認済みで、残りは validation harness 専用 command を通常 operator runbook へ露出しない整理に限られる
-  - repeated scheduler-loop と長時間運用で read-after-write 揺れが追加 hardening を要しないか確認する。短時間の idle repeated observation、agent 正規経路の 2 周 mutation loop、2026-04-12 の 3 iteration runtime observe、runtime archive-state による active storage 退避、post-archive idle 確認、post-archive recovery validation、runtime agent validation sweep 後の idle observe、diagnostic surface 確認後の 4 iteration observe は完了済みで、残りは必要なら overnight 相当の常駐 loop 観測に限られる
-  - 旧 backend compatibility path は削除する。current kanban runtime は SoloBoard のみとし、過去の旧 backend baseline は文書上の証跡としてだけ残す
-  - host local `a2o-agent` と Docker 上 A2O runtime の protocol validation を reference product package で固定し、final validation matrix の `R0` から `R6` を host-local agent 主経路の軽量 validation として通す
-  - 実 Portal source の `repo:both` parent/full verification validation は Portal integration validation として必要時に実行する。A2O core completion gate や毎回の回帰 validation には含めない
-  - `bundle` という operator-facing task 名と旧 `a3:portal:bundle:*` は historical / maintenance-only surface として扱う。現在の user-facing runbook は `a2o project bootstrap` / `a2o kanban ...` / `a2o agent ...` と reference product package を正規入口にする
-  - A3 image から project 固有 JDK / Maven / verification runtime を剥がした状態で runtime doctor / validation を継続確認する
-  - `a3-agent` の JobRequest / JobResult / lifecycle / policy / transport を実装可能な粒度で固定する。特に HTTP transport では log/artifact を local path 参照ではなく A3-managed artifact store へ upload/stream する。Ruby domain 側では `AgentJobRequest` / `AgentJobResult` / upload-backed artifact reference / agent workspace descriptor の最小 contract を追加済みで、JSON-backed job store、file-backed artifact store、pull handler、artifact upload endpoint、`a3 agent-server` の最小 HTTP entrypoint、Ruby reference agent class の 1 job worker loop も spec fixture として追加済み。ただし `a3-agent` executable は配布対象にせず、Go 側の `agent-go` module を release binary の正本とする。Go 側は 1 job worker loop を標準 library のみで build / test できる scaffold まで追加済み。さらに worker phase と HTTP pull agent を接続する `AgentWorkerGateway` を追加し、既存 worker request/result protocol を `WorkerProtocol` に抽出した。`agent-http` gateway は `same-path` と `agent-materialized` を明示 mode として扱い、agent job 完了後も worker protocol result を正本として validation / `changed_files` canonicalization を行う。verification は `AgentCommandRunner` と CLI `--verification-command-runner agent-http` で agent job 化できるようになり、focused validation と bundle validation で materialized workspace 上の remediation / verification command execution、log upload、cleanup を確認済み
-  - workspace materialization / dirty check / cleanup の owner を agent runtime として実装し、A3 は source descriptor と workspace descriptor / evidence を検証する形に寄せる。Ruby `AgentWorkspaceRequest`、`AgentJobRequest.workspace_request`、Go `WorkspaceRequest` JSON shape、Go agent 側の `local_git` alias + `worktree_detached` materializer、HTTP worker loop への materializer 接続、worker protocol transport、A3-side `AgentWorkspaceRequestBuilder`、CLI の `--agent-shared-workspace-mode agent-materialized` / `--agent-source-alias` まで追加済み。2026-04-14 に `AgentJobRequest.agent_environment` / Go `JobRequest.agent_environment` を追加し、Engine-managed `workspace_root` / `source_paths` / `env` / `required_bins` を job payload として agent へ渡す契約を実装した。`AgentWorkerGateway`、`AgentCommandRunner`、`AgentMergeRunner` はこの payload を enqueue し、Go agent は payload がある場合に agent-local profile より優先して materialization / merge / cleanup に使う。さらに `a2o-agent doctor --workspace-root ... --source-path ALIAS=PATH --required-bin ...` を追加し、profile file なしで Engine-managed agent environment 相当を検査できるようにした。`agent-go/scripts/validation-materialized-worker-protocol.sh`、`agent-go/scripts/validation-materialized-agent-gateway.sh`、`agent-go/scripts/validation-materialized-command-runner.sh` で、Go agent の materialized workspace と A3 gateway / command runner の end-to-end path を確認済み。runtime package は A3 側の `slot -> alias` contract と worker gateway option summary を公開し、Go agent は runtime profile JSON (`alias -> local path`) と `a3-agent doctor -config ...` を後方互換 fallback として持つ。retired Portal runtime task (agent-parent-topology-validation) で synthetic `repo:both` parent と 2 child relation、parent integration ref の 2 slot materialization、agent-http parent verification、parent merge の `Done` 到達まで確認済み。`a3 agent-artifact-cleanup` と runtime task retired Portal runtime task (agent-artifact-cleanup) で diagnostic/evidence artifact retention cleanup を追加済み。TTL に加え、count cap と size cap で disk pressure 時の上限を operator command から制御できる。direct `a2o-agent --loop --poll-interval ...` の起動/停止手順は dev-env residency、diagnostic、operator-controlled fallback として `60-container-distribution-and-project-runtime.md` に整理済み。2026-04-12 の runtime artifact cleanup dry-run、runtime observe、host cleanup dry-run はすべて idle / candidate 0 を確認済みで、次は Engine-issued agent environment doctor job と長時間運用で retention / evidence / failure recovery の実測を進める
-  - Go single binary agent の scaffold と installer 方針を固定する。`agent-go/scripts/build-release.sh`、`agent-go/scripts/install-release.sh`、`agent-go/scripts/install-local.sh`、Ruby control plane との protocol validation は追加済み。`build-release.sh` は macOS / Linux archive を標準対象とし、Windows は WSL2 Ubuntu 上で Linux archive を使う。`install-release.sh` は Go のない target host で release archive から binary install でき、`CHECKSUM_FILE=dist/checksums.txt` 指定時は install 前に archive SHA-256 を検証する。2026-04-14 に `a3 agent package list/export/verify` と runtime image への `/opt/a3/agents` 同梱を追加し、Engine image から checksum verified `a2o-agent` binary を host/project-dev-env へ取り出す導線を固定した。`agent-go/scripts/validation-release-package-doctor.sh` は release archive を生成し、`a3 agent package verify/export` で取り出した binary を profile file なしの doctor flags で実行する focused validation として追加済み。`agent-go/scripts/validation-runtime-image-agent-export.sh` は Docker runtime image を rebuild/recreate し、container 内 `/opt/a3/agents` から export/copy した binary で同じ doctor validation を実行する release-facing check として追加済み。通常利用者向け setup は `a2o host install` / `a2o project bootstrap` / `a2o kanban ...` / `a2o agent install` に寄せ、`a2o-agent --loop --poll-interval ...` は dev-env residency、diagnostic、operator-controlled fallback として扱う。OS service template / install / load / enable は不要と判断し、A3 distribution から外した。`a3-agent` は内部互換名としてだけ扱う。auth は agent-side token (`A3_AGENT_TOKEN` / `A3_AGENT_TOKEN_FILE` / `--agent-token` / `--agent-token-file` / profile `agent_token` / `agent_token_file`) と optional control-side token (`A3_AGENT_CONTROL_TOKEN` / `A3_AGENT_CONTROL_TOKEN_FILE` / `--agent-control-token` / `--agent-control-token-file`) による scoped bearer token を最小 contract として追加済み
-  - Docker compose runtime を `docker:a3` + `docker:soloboard` の形へ整理する。project command は compose 内 agent image ではなく host/project-dev-env の public `a2o-agent` release binary が担当する。historical Docker dev-env validation は protocol evidence として残すが、current release surface からは削除済み
-  - Portal starters / UI app の単独 full verification は、それぞれ実 source repo で `a3-agent` 経由確認済み。`repo:both` parent topology validation は synthetic source repo で確認済み。実 Portal source の `repo:both` full verification は重い PR前/統合前 validation として扱う
-  根拠: `docs/60-container-distribution-and-project-runtime.md` の `0.4.5.1` と `0.4.5.1b`
-
-## Portal Runtime 実運用トラック
-
-- [ ] parent/child branch topology
-  現状: agent-materialized workspace は `worktree_branch` を使うが、2026-04-13 の final validation で scheduler 起動時に batch 内の全 `a3/work/*` / `a3/parent/*` ref を一括 `update-ref` していたため、`Portal#203` / `Portal#205` の parent branch が先行 single merge (`Portal#201` / `Portal#202`) 後の live head ではなく、batch 開始時点の live head から始まる defect を確認した。
-  残課題:
-  - Portal live manifest / launcher で new child + new parent を distinct branch refs で materialize する
-  - child implementation / verification を shared issue branch ではなく child work branch に閉じる
-  - `workspace_request.slots[*].bootstrap_ref` / `bootstrap_base_ref` を使い、single は live target、parent は live target、child は parent integration branch から materialize 時に missing branch を作る。最初の child で parent integration branch も未作成の場合は live target から parent integration branch を作ってから child work branch を切る
-  - scheduler の batch 事前 ref 作成を default off にし、phase-local bootstrap を正規経路にする
-  - live Portal parent-child validation で separated branch model を完走させる
-  根拠: live Portal final validation observation
-
-- [x] portal-dev isolated track retirement
-  現状: `portal-dev` は過去の隔離 clone 検証 profile であり、current Docker runtime + host-local `a2o-agent` public surface には不要。root Taskfile entry、project config、bootstrap helper、関連 spec は削除済み。
-
-## Root Integration
-
-- [x] root launcher
-  現状: root から manifest / launcher config を注入して A3 CLI を呼べる。
-  根拠: `scripts/a3/run.py`
-
-- [x] root task entrypoints
-  現状: `task a3:portal:*` と runtime / maintenance 入口を持つ。
-  根拠: root `Taskfile.yml`
-
-- [x] root docs/skills migration
-  現状: root `README.md` / `AGENTS.md` を A3 前提の責務分担へ追従済み。legacy automation skills は削除済みで、現行運用 skill は kanban / scheduler / pre-commit 系に寄せた。
-  根拠: root `README.md`, root `AGENTS.md`, `.agents/skills/*`
-
-## 直近の優先実装順
-
-- [x] additional scheduler backends を adapter 実装へ広げる
-- [x] root docs/skills migration を実運用フローに追従させる
-- [x] active-run persistence を local store と CLI に接続する
-- [x] blocked recovery / kanban orchestration の real kanban mutation adapter を実装する
-- [x] kanban task snapshot acquisition を real kanban adapter に接続する
-- [x] recovery prerequisite / sidecar task category を scheduling policy に取り込む
-  現状: manifest の `recovery_sidecar_labels` から run planning が `normal / recovery-sidecar` を区別できる。
-- [x] watch loop / Portal live cutover integration を実装する
-- [x] review-phase integrated run-once routing を実装する
-
-## 完成判定の目安
-
-- [x] project manifest だけで implementation / inspection / merge の phase contract を表現できる
-- [x] root launcher から manifest と launcher config を注入して一連の phase を起動できる
-- [ ] parent/child flow の branch contract が engine 実装に反映されている
-  現状: 実運用で separated branch model は未導入。設計方針は `docs/issue-workspace-worktree-migration-design.md` を正本とする。
-  残課題:
-  - authoritative branch ownership の抽出
-  - workspace backend abstraction の導入
-  - runtime workspace の detached source 化
-  - merge phase の branch-diff / integration-commit contract 明確化
-- [x] merge preflight と merge/apply が engine 内で扱える
-- [x] isolated repo から live repo への handoff が safety guard 付きで定義・実装されている
-- [x] shell/env/scheduler 差を launcher config と adapter で吸収できる
-
-このセクションがすべて `- [x]` になったら、Portal 実運用トラックは一通り成立したと見なせる。
+Each gap should be tracked as a kanban ticket before implementation. External behavior changes require owner discussion before coding.

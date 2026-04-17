@@ -3,73 +3,50 @@
 対象読者: A2O runtime 実装者 / validation 設計者 / operator
 文書種別: validation 方針
 
-この文書は、A2O core validation で使う reference product suite の方針を定義する。
-Portal は実プロダクトであり、A2O 開発の実験台として日常的に使わない。
+This document defines the owned sample products used for A2O core validation.
 
-## 目的
+## Purpose
 
-A2O は OSS として、特定の顧客プロダクトや Java/Spring Boot/Maven 構成に依存しない runtime / agent / kanban / parent-child flow を検証できる必要がある。
-そのため、A2O 専用の小さな reference product を複数用意し、core validation の正本にする。
-
-## Validation Boundary
-
-A2O core validation は reference product suite を使う。
-Portal 固有の validation は、A2O core validation ではなく実プロダクト integration validation として扱う。
-
-この境界により、A2O の通常開発では次を避ける。
-
-- Portal の business domain や repo-local command を A2O core の前提にすること
-- Portal 固有の Java / Maven / Node runtime を A2O runtime image へ戻すこと
-- Portal の実 source repo を軽量 regression の実験台にすること
-- Portal 固有の失敗を A2O 汎用 contract と誤認すること
-
-Portal validation を実行してよいのは、release candidate、実プロダクト integration 確認、または Portal package 自体の変更確認に限る。
-その場合も A2O core の完成条件とは別に記録する。
+A2O must work across common product shapes rather than depending on one stack. The reference suite gives A2O small, reviewable projects that exercise runtime, agent, kanban, verification, merge, and parent-child flows.
 
 ## Suite Shape
 
-Reference product suite は次の 4 パターンで構成する。
-
-| Ticket | Pattern | Purpose |
+| Product | Path | Purpose |
 |---|---|---|
-| `A2O#255` | TypeScript / Node.js API + Web UI | Web UI と API を持つ一般的な full-stack product を検証する |
-| `A2O#256` | Go API + CLI | single binary / CLI / API server の組み合わせを検証する |
-| `A2O#257` | Python service | lightweight service と Python toolchain を検証する |
-| `A2O#258` | Multi-repo cross-product fixture | parent-child flow、repo slot、cross-repo merge / verification を検証する |
+| TypeScript API/Web | `reference-products/typescript-api-web/` | API and browser UI in one repository |
+| Go API/CLI | `reference-products/go-api-cli/` | server and CLI in one Go module |
+| Python Service | `reference-products/python-service/` | lightweight service and Python verification |
+| Multi-repo Fixture | `reference-products/multi-repo-fixture/` | parent-child and cross-repo validation |
 
-各 reference product は小さく保つが、実プロダクト風の domain、test、build、agent が編集できる余地を持つ。
-単なる toy fixture ではなく、A2O の runtime contract が壊れたときに失敗として観測できる構造を持たせる。
+Each product keeps its package at `project-package/`.
 
-## Current Layout
+## Package Contract
 
-2026-04-16 時点の suite は `reference-products/` 配下に置く。
+Each package should include:
 
-| Ticket | Path | Package |
-|---|---|---|
-| `A2O#255` | `reference-products/typescript-api-web/` | `reference-products/typescript-api-web/project-package/` |
-| `A2O#256` | `reference-products/go-api-cli/` | `reference-products/go-api-cli/project-package/` |
-| `A2O#257` | `reference-products/python-service/` | `reference-products/python-service/project-package/` |
-| `A2O#258` | `reference-products/multi-repo-fixture/` | `reference-products/multi-repo-fixture/project-package/` |
+- `README.md`
+- `manifest.yml`
+- `project.yaml`
+- `kanban/bootstrap.json`
+- `commands/`
+- `skills/`
+- `scenarios/`
 
-各 package は `manifest.yml`、`project.yaml`、`kanban/bootstrap.json`、`commands/`、`skills/`、`scenarios/` を持つ。
-初回 runtime-flow validation は、これらの package を bootstrap し isolated board に scenario task を作るところから始める。
-suite 作成 commit 自体では、A2O runtime の execution loop を開始しない。
+The package must define a deterministic test or build command, agent prerequisites, editable source boundaries, and at least one scenario task that can be placed on the kanban board.
 
-## Acceptance Requirements
+## Validation Boundary
 
-各 reference product は少なくとも次を持つ。
+Core validation starts with the reference suite. If a runtime, workspace, worker gateway, verification, merge, or package preset change cannot be validated against at least one reference product, create a ticket to add or improve a reference scenario before relying on external product evidence.
 
-- README または project manifest に、domain、主要 command、validation intent を明記する
-- deterministic な test / build command
-- agent が編集してよい source file と、編集してはいけない generated / cache file の境界
-- A2O runtime が task を作成し、実装、検証、必要なら merge まで進められる最小 kanban scenario
-- A2O の外部仕様変更が必要になった場合に、実装前に owner と協議する明記
+External behavior changes found while improving the suite require owner discussion before implementation.
 
-## Migration Rule
+## Baseline
 
-今後の A2O runtime / agent validation は、まず reference product suite に追加する。
-Portal でしか再現しない事象は、reference product へ切り出せる最小ケースを先に作る。
-切り出せない場合だけ Portal integration validation として実行し、A2O core の汎用要件とは分けて扱う。
+The latest recorded runtime baseline is [69-reference-runtime-baseline.md](69-reference-runtime-baseline.md). It proves that the suite can exercise:
 
-Portal 由来の historical evidence は削除しない。
-ただし、新しい daily / focused / release-facing core validation の入口には Portal を正本として追加しない。
+- single-repo implementation / verification / merge
+- multi-repo child implementation and verification
+- child-to-parent merge
+- parent review and verification
+- parent live merge
+- evidence persistence

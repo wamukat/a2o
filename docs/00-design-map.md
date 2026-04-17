@@ -1,98 +1,80 @@
-# A3 Design Map
+# A2O Design Map
 
-対象読者: A3 設計者 / 実装者
+対象読者: A2O 設計者 / 実装者 / reviewer
 文書種別: 設計導線
 
-この文書は、A3 の設計資料が何を扱うかと、どの順序で読むかを示す。
+この文書は、A2O の設計資料が何を扱うかと、どの順序で読むかを示す。
 
 ## 目的
 
-- DDD を前提に、domain / application / infrastructure / project surface の責務境界を先に固定する
-- 旧実装の局所的な rescue 分岐や workspace 依存を、current A3 へ持ち込まない
-- 後続の Ruby 実装が、設計書に従って自然に分割されるようにする
+- domain / application / infrastructure / project surface の責務境界を固定する。
+- project 固有の rescue 分岐や workspace 依存を Engine core へ持ち込まない。
+- 利用者向け surface と内部互換名の境界を明確にする。
+- reference product suite を core validation の正本にする。
 
 ## 設計資料一覧
 
-### 0. 実装規律
+### 0. 利用者導線
+
+- [90-user-quickstart.md](90-user-quickstart.md)
+- [92-a2o-public-branding-boundary.md](92-a2o-public-branding-boundary.md)
+
+`90` は A2O を導入する利用者向けのマニュアルである。`92` は公開名称 `A2O` と内部互換名 `A3` の境界を扱う。
+
+### 1. 実装規律
 
 - [05-engineering-rulebook.md](05-engineering-rulebook.md)
 
-ここでは immutable、TDD、リファクタリング、必要修正から逃げないことを固定する。
+immutable、TDD、リファクタリング、必要修正から逃げないことを固定する。
 
-### 1. 用語と bounded context
+### 2. 用語と bounded context
 
 - [10-bounded-context-and-language.md](10-bounded-context-and-language.md)
-- 対応 ticket: `A3-v2#3023`
 
-ここでは task kind、phase、workspace、repo slot、evidence などの用語を固定する。
+task kind、phase、workspace、repo slot、evidence などの用語を固定する。
 
-### 2. core domain model
+### 3. core domain model
 
 - [20-core-domain-model.md](20-core-domain-model.md)
-- 対応 ticket: `A3-v2#3024`
 
-ここでは aggregate / entity / value object と状態遷移を扱う。
+aggregate / entity / value object と状態遷移を扱う。
 
-### 3. workspace / repo-slot / lifecycle
+### 4. workspace / repo-slot / lifecycle
 
 - [30-workspace-and-repo-slot-model.md](30-workspace-and-repo-slot-model.md)
-- [35-repo-worktree-and-merge-flow-diagrams.md](35-repo-worktree-and-merge-flow-diagrams.md)
-- 対応 ticket: `A3-v2#3025`
 
-ここでは fixed repo slot、同期方針、freshness、retention、GC に加え、repo / worktree / merge model を扱う。
-repo slot ごとの ref、merge workspace、publish 完了条件まで追いたい場合は `35` を読む。
+fixed repo slot、同期方針、freshness、retention、GC、merge workspace を扱う。
 
-### 4. project surface / presets
+### 5. project surface / presets
 
 - [40-project-surface-and-presets.md](40-project-surface-and-presets.md)
-- 対応 ticket: `A3-v2#3026`
+- [64-runtime-extension-boundary.md](64-runtime-extension-boundary.md)
 
-ここでは PJ 注入面の最小集合と preset/template を扱う。
+project package、project 固有 command、repo slot、verification、bootstrap hook の境界を扱う。
 
-### 5. evidence / rerun / blocked diagnosis
+### 6. evidence / rerun / blocked diagnosis
 
 - [50-evidence-and-rerun-diagnosis.md](50-evidence-and-rerun-diagnosis.md)
-- 対応 ticket: `A3-v2#3027`
 
-ここでは review / merge / rerun / blocked 調査の再現性を支える内部 evidence を扱う。
+review / merge / rerun / blocked 調査の再現性を支える内部 evidence を扱う。
 
-### 6. container distribution / project runtime packaging
+### 7. runtime distribution
 
 - [60-container-distribution-and-project-runtime.md](60-container-distribution-and-project-runtime.md)
+- [62-agent-worker-gateway-design.md](62-agent-worker-gateway-design.md)
 - [66-runtime-naming-boundary.md](66-runtime-naming-boundary.md)
+
+Docker runtime image、host launcher、bundled kanban service、agent gateway、内部互換名の境界を扱う。
+
+### 8. reference validation
+
 - [68-reference-product-suite.md](68-reference-product-suite.md)
+- [69-reference-runtime-baseline.md](69-reference-runtime-baseline.md)
 
-ここでは A3 を Docker image として配布し、案件ごとの runtime package と永続 state をどう分離するかを扱う。
-`66` では current public surface の `runtime` 用語と、内部互換として残る `scheduler` 用語の境界を扱う。
-`68` では Portal を core validation の実験台から外し、A2O 専用 reference product suite を validation 正本にする方針を扱う。
+core validation で使う sample product と、runtime baseline の現状を扱う。
 
-### 7. implementation status
+### 9. implementation status
 
 - [70-implementation-status.md](70-implementation-status.md)
 
-ここでは future A3Engine base に seed された current implementation status を追う。
-
-### 8. engine redesign
-
-- [75-engine-redesign.md](75-engine-redesign.md)
-
-ここでは engine redesign の設計方針を追う。
-
-### 9. cutover plan
-
-- [80-a3engine-reseed-and-naming-cutover-plan.md](80-a3engine-reseed-and-naming-cutover-plan.md)
-
-ここでは `a3-engine-legacy` 退避、新 `a3-engine` seed、naming cutover の実行計画を追う。
-
-### 10. user quickstart
-
-- [90-user-quickstart.md](90-user-quickstart.md)
-- [91-user-runtime-command-implementation-plan.md](91-user-runtime-command-implementation-plan.md)
-
-ここでは A3 release を受け取る利用者が、project package と短い runtime command で A3 を使うための入口と、その実装計画を扱う。
-
-## 実装前提
-
-- Ruby 実装は、上記 1-5 が揃ってから本格着手する
-- `A3-v2#3028` は設計をコードへ落とす初手として扱う
-- 設計未確定のまま orchestration コードを書き始めない
+公開前に残っている productization gap と検証状態を追う。

@@ -2,7 +2,7 @@
 
 Date: 2026-04-17
 
-This baseline proves A2O core runtime flows against the dedicated reference product suite, not Portal.
+This baseline proves A2O core runtime flows against the dedicated reference product suite.
 
 The implementation and parent-review decisions in this baseline are deterministic on purpose. `tools/reference_validation/deterministic_worker.rb` applies known scenario changes and returns known review dispositions so the baseline isolates A2O runtime behavior from model variability. The exercised runtime surfaces are still real: SoloBoard pickup and transitions, branch namespace creation, agent-materialized workspace preparation, worker gateway transport, agent-side publication, verification command execution, child-to-parent merge, parent review handoff, parent verification, live merge, and evidence persistence.
 
@@ -38,12 +38,12 @@ Evidence state was retained under `.work/reference-baseline/`. These files are r
 
 ## Fixes Captured By Baseline
 
-- Reference board names must be branch-ref safe. Names with spaces produced invalid refs such as `refs/heads/a3/.../A2O Reference TypeScript-1`.
+- Reference board names must be branch-ref safe. Names with spaces produced invalid refs.
 - Reference boards need the runtime lanes `Inspection` and `Merging`, not only user-facing planning lanes.
 - `agent-materialized` implementation must run through `worker-gateway=agent-http`; local worker publication is correctly rejected.
 - Single task materialization needs `--agent-support-ref SLOT=refs/heads/main` so the agent can create the first work branch from a known base.
 - Agent HTTP server must ignore client disconnects while writing responses; otherwise an `ECONNRESET` can terminate the control plane and make later job fetches fail.
-- Multi-repo package verification must remain a package-owned script while supporting materialized slot directory names (`repo-alpha`, `repo-beta`).
+- Multi-repo package verification must remain a package-owned script while supporting materialized slot directory names.
 - Multi-repo parent live merge target is `refs/heads/main`; the parent integration ref remains an internal source ref, not the final live target.
 
 ## Reproduction Notes

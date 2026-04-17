@@ -2,7 +2,6 @@
 
 対象読者: A3 設計者 / 実装者
 文書種別: 設計メモ
-対応 ticket: `A3-v2#3025` (historical ref)
 
 この文書は、A3 の workspace topology、repo slot、同期方針、freshness、retention/GC を固定するためのもの。
 V1 の `support clone + bridge healing` を不要化し、phase ごとの path ぶれや存在判定漏れを防ぐ。

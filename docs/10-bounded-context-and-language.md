@@ -2,7 +2,6 @@
 
 対象読者: A3 設計者 / 実装者 / reviewer
 文書種別: 設計メモ
-対応 ticket: `A3-v2#3023` (historical ref)
 
 この文書は、A3 の用語と bounded context を先に固定するためのもの。
 後続の core domain model、workspace model、evidence model、Ruby 実装は、この文書の語彙と境界を前提にする。

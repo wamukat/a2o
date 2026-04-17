@@ -105,7 +105,7 @@ a2o kanban doctor
 a2o kanban url
 ```
 
-Execution-loop commands are intentionally not part of this public kanban service surface in this slice. Branch refs created by internal runtime jobs remain namespaced by the compose project, for example `refs/heads/a3/a2o-reference/work/A2OReference-1`, so isolated boards do not reuse historical live-repo branches with the same task number.
+Execution-loop commands are intentionally not part of this public kanban service surface in this slice. Branch refs created by internal runtime jobs remain namespaced by the compose project, for example `refs/heads/a3/a2o-reference/work/A2OReference-1`, so isolated boards do not reuse existing live-repo branches with the same task number.
 
 ## Deployment Shapes
 

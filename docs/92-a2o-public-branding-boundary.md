@@ -22,7 +22,7 @@
 - `A3_*` environment variables
 - Ruby module / Go package / internal class / internal file path
 - runtime storage schema / artifact schema / job schema
-- kanban comment に残る historical `A3 実行開始` / `A3 実行完了`
+- 既存 kanban comment に残る `A3 実行開始` / `A3 実行完了`
 - internal evidence に含まれる `a3-agent` / `project_repo_mutator=a3-agent`
 
 これらを rename すると state migration と既存 evidence の読み替えが必要になり、release candidate の安定性を落とす。外向き alias と packaging で吸収する。
@@ -37,7 +37,7 @@ agent install は public path では `a2o-agent` を使う。binary の中身は
 
 ## Documentation Rule
 
-利用者向け docs / quickstart / release note では `A2O` / `a2o` / `a2o-agent` を使う。内部設計、実装詳細、historical evidence、既存 runtime state を説明する場合だけ `A3` を使い、近傍で internal engine name であることを明示する。
+利用者向け docs / quickstart / release note では `A2O` / `a2o` / `a2o-agent` を使う。内部設計、実装詳細、既存 evidence、既存 runtime state を説明する場合だけ `A3` を使い、近傍で internal engine name であることを明示する。
 
 ## Follow-up
 

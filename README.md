@@ -1,56 +1,57 @@
-# A3 Engine
+# A2O Engine
 
-対象読者: A3 実装者 / 設計者 / reviewer / operator
+対象読者: A2O 利用者 / 実装者 / reviewer / operator
 文書種別: リポジトリ入口
 
-このリポジトリは current A2O/A3 Engine の本体実装と設計資料を集約する。旧 `a3-v2/` source tree と Portal workspace-local Taskfile runtime entrypoint は削除済みであり、現在の通常利用者向け正本は Go host launcher `a2o`、Docker runtime image、`a2o-agent`、project package である。
+A2O は kanban 上の task を読み取り、作業用 workspace、agent 実行、検証、merge、evidence 記録までを管理する automation engine である。
+
+このリポジトリは A2O Engine 本体、Go host launcher、Go agent、Docker runtime image、reference product package、設計資料を含む。通常利用者向けの入口は `a2o`、`a2o-agent`、project package、bundled kanban service である。
 
 ## 方針
 
-- A3 は V1 の局所修正の延長ではなく、bundled kanban service と `a2o-agent` を前提にした current runtime として扱う
-- A3 本体は orchestration / scheduler / state / kanban adapter / agent control plane を持つ
-- project 固有 toolchain は A3 image へ bake せず、host または dev-env container に置いた `a2o-agent` が実行する
-- project 固有知識は最小 injection surface と preset/template で表現する
-- workspace / rerun / blocked recovery の複雑性を、domain model と evidence model で抑える
+- A2O は bundled kanban service と `a2o-agent` を前提にした runtime として扱う。
+- A2O Engine は orchestration、state、kanban adapter、agent control plane、evidence を持つ。
+- project 固有 toolchain は runtime image に bake せず、host または dev-env に置いた `a2o-agent` が実行する。
+- project 固有知識は project package で宣言し、Engine core へ埋め込まない。
+- core validation は `reference-products/` の小さな複数プロダクトで行う。
 
 ## 読み順
 
-1. [docs/00-design-map.md](docs/00-design-map.md)
-2. [docs/05-engineering-rulebook.md](docs/05-engineering-rulebook.md)
-3. [docs/10-bounded-context-and-language.md](docs/10-bounded-context-and-language.md)
-4. [docs/20-core-domain-model.md](docs/20-core-domain-model.md)
-5. [docs/30-workspace-and-repo-slot-model.md](docs/30-workspace-and-repo-slot-model.md)
-6. [docs/40-project-surface-and-presets.md](docs/40-project-surface-and-presets.md)
-7. [docs/50-evidence-and-rerun-diagnosis.md](docs/50-evidence-and-rerun-diagnosis.md)
-8. [docs/60-container-distribution-and-project-runtime.md](docs/60-container-distribution-and-project-runtime.md)
-9. [docs/68-reference-product-suite.md](docs/68-reference-product-suite.md)
-10. [docs/70-implementation-status.md](docs/70-implementation-status.md)
+1. [docs/90-user-quickstart.md](docs/90-user-quickstart.md)
+2. [docs/68-reference-product-suite.md](docs/68-reference-product-suite.md)
+3. [docs/60-container-distribution-and-project-runtime.md](docs/60-container-distribution-and-project-runtime.md)
+4. [docs/00-design-map.md](docs/00-design-map.md)
+5. [docs/70-implementation-status.md](docs/70-implementation-status.md)
 
-## 配布 / runtime
+## 代表入口
 
-current packaging は `docker:a3 + bundled kanban service + Go a2o-agent` の compose 形状を標準にする。kanban service は A3 image に内包せず、compose 上の service として扱う。現行 default provider は SoloBoard である。A3 Engine は Docker runtime command として提供し、host へ Ruby interpreter を要求しない。project command は host または dev-env container に install した Go release binary の `a2o-agent` が pull 実行する。内部実装名としての `a3-agent` は互換名であり、通常利用者向け surface では `a2o-agent` を使う。
+```sh
+a2o host install
+a2o project bootstrap --package ./reference-products/typescript-api-web/project-package
+a2o kanban up
+a2o kanban doctor
+a2o kanban url
+a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
+```
 
-Core validation は Portal ではなく、A2O 専用 reference product suite を正本にする。Portal は実プロダクト integration validation として扱う。詳細は [docs/68-reference-product-suite.md](docs/68-reference-product-suite.md) を参照する。
-
-代表入口:
-
-- `a2o host install`
-- `a2o project bootstrap --package <reference-product-package>`
-- `a2o kanban up`
-- `a2o kanban doctor`
-- `a2o kanban url`
-- `a2o agent install`
-
-Reference product suite の package / validation scenario は `reference-products/` と [docs/68-reference-product-suite.md](docs/68-reference-product-suite.md) を正本にする。Portal workspace-local の旧 Taskfile 互換入口は通常の A2O core validation には使わず、Portal integration validation または historical diagnosis の文脈に限定する。
+runtime image の中では `bin/a3` が Engine CLI として残る。これは内部互換名であり、利用者向けの正規入口は `a2o` と `a2o-agent` である。公開名称と内部互換名の境界は [docs/92-a2o-public-branding-boundary.md](docs/92-a2o-public-branding-boundary.md) にまとめる。
 
 ## 実装位置
 
-- A3 本体実装: `lib/a3/`, `bin/a3`, `spec/` (`bin/a3` は Docker runtime 内の engine command)
-- Go agent: `agent-go/`
-- Docker runtime assets: `docker/` (`docker/a3-runtime/Dockerfile` exposes `/usr/local/bin/a3` inside the image)
+- Engine core: `lib/a3/`, `bin/a3`, `spec/`
+- Host launcher / agent: `agent-go/`
+- Docker runtime assets: `docker/`
+- Kanban tooling: `tools/kanban/`
 - Reference product packages: `reference-products/`
-- 設計 / 進捗正本: `docs/60-container-distribution-and-project-runtime.md`, `docs/70-implementation-status.md`
+- 利用者マニュアル: [docs/90-user-quickstart.md](docs/90-user-quickstart.md)
 
-## 参照元
+## Validation
 
-- Historical product/design notes live outside this repository. They are provenance, not current operator runbooks.
+reference product suite は次の 4 パターンを持つ。
+
+- `reference-products/typescript-api-web/`
+- `reference-products/go-api-cli/`
+- `reference-products/python-service/`
+- `reference-products/multi-repo-fixture/`
+
+各 product は `project-package/` を持ち、`a2o project bootstrap --package <package>` で runtime instance を作成できる。suite の目的と現行 baseline は [docs/68-reference-product-suite.md](docs/68-reference-product-suite.md) と [docs/69-reference-runtime-baseline.md](docs/69-reference-runtime-baseline.md) を参照する。

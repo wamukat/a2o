@@ -2,7 +2,6 @@
 
 対象読者: A3 設計者 / 実装者
 文書種別: 設計メモ
-対応 ticket: `A3-v2#3024` (historical ref)
 
 この文書は、A3 の core domain model を固定するためのもの。
 目的は、task / run / phase / evidence / workspace に関する知識を domain に集約し、
