@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 from datetime import datetime, timezone
 
-DEFAULT_PROJECT_TITLE = "Portal"
+DEFAULT_PROJECT_TITLE = "A2O"
 DEFAULT_AUTOMATION_TRIGGER_LABEL = "trigger:auto-implement"
 DEFAULT_LOCK_RETRY_COUNT = 8
 DEFAULT_LOCK_RETRY_DELAY_SECONDS = 0.25

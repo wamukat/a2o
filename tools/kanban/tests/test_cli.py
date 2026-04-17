@@ -79,9 +79,9 @@ class SoloBoardCliTest(unittest.TestCase):
                 "http://localhost:3460",
                 "",
                 task_id=None,
-                task_ref="Portal#123",
+                task_ref="A2O#123",
                 project_id=None,
-                project_title="Portal",
+                project_title="A2O",
             ),
         )
         self.assertEqual(
@@ -92,16 +92,16 @@ class SoloBoardCliTest(unittest.TestCase):
                 task_id=None,
                 task_ref="#123",
                 project_id=None,
-                project_title="Portal",
+                project_title="A2O",
             ),
         )
 
     def test_parser_backend_choice_is_soloboard_only(self) -> None:
         parser = kanban_cli.build_parser()
-        args = parser.parse_args(["--backend", "soloboard", "task-get", "--task", "Portal#1"])
+        args = parser.parse_args(["--backend", "soloboard", "task-get", "--task", "A2O#1"])
         self.assertEqual("soloboard", args.backend)
         with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
-            parser.parse_args(["--backend", "unsupported-backend", "task-get", "--task", "Portal#1"])
+            parser.parse_args(["--backend", "unsupported-backend", "task-get", "--task", "A2O#1"])
 
     def test_parser_accepts_task_reorder_without_priority(self) -> None:
         parser = kanban_cli.build_parser()

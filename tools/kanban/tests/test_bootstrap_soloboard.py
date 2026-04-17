@@ -33,7 +33,7 @@ class SoloBoardBootstrapTest(unittest.TestCase):
                     {
                         "boards": [
                             {
-                                "name": "Portal",
+                                "name": "A2OReference",
                                 "lanes": ["To do", "Done"],
                                 "tags": [{"name": "blocked", "color": "#cc3f3f"}],
                             }
@@ -48,7 +48,7 @@ class SoloBoardBootstrapTest(unittest.TestCase):
                 patch.object(bootstrap_soloboard, "ensure_board", return_value={"id": 10}),
                 patch.object(bootstrap_soloboard, "ensure_lanes", return_value={"bucket_ids_by_name": {"To do": 1, "Done": 2}}),
                 patch.object(bootstrap_soloboard, "ensure_tags", return_value=[{"title": "blocked"}]),
-                patch("sys.argv", ["bootstrap_soloboard.py", "--config", str(config), "--board", "Portal"]),
+                patch("sys.argv", ["bootstrap_soloboard.py", "--config", str(config), "--board", "A2OReference"]),
             ):
                 context.return_value.base_url = "http://localhost:3460"
                 context.return_value.token = ""

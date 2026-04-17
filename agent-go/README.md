@@ -105,7 +105,7 @@ a2o kanban doctor
 a2o kanban url
 ```
 
-Execution-loop commands are intentionally not part of this public kanban service surface in this slice. Branch refs created by internal runtime jobs remain namespaced by the compose project, for example `refs/heads/a3/a3-portal/work/Portal-1`, so isolated boards do not reuse historical live-repo branches with the same task number.
+Execution-loop commands are intentionally not part of this public kanban service surface in this slice. Branch refs created by internal runtime jobs remain namespaced by the compose project, for example `refs/heads/a3/a2o-reference/work/A2OReference-1`, so isolated boards do not reuse historical live-repo branches with the same task number.
 
 ## Deployment Shapes
 
@@ -147,7 +147,8 @@ Create a runtime profile for the host or dev-env where commands will run:
   "agent_token_file": "/run/secrets/a2o-agent-token",
   "workspace_root": "/tmp/a2o-agent-workspaces",
   "source_aliases": {
-    "member-portal-starters": "/path/to/scratch-parent-repo"
+    "catalog-service": "/path/to/reference-products/multi-repo-fixture/repos/catalog-service",
+    "storefront": "/path/to/reference-products/multi-repo-fixture/repos/storefront"
   }
 }
 ```
@@ -172,7 +173,8 @@ The individual flags remain available as overrides:
   --engine http://127.0.0.1:7393 \
   -agent-token-file /run/secrets/a2o-agent-token \
   -workspace-root /tmp/a2o-agent-workspaces \
-  -source-alias member-portal-starters=/path/to/scratch-parent-repo
+  -source-alias catalog-service=/path/to/reference-products/multi-repo-fixture/repos/catalog-service \
+  -source-alias storefront=/path/to/reference-products/multi-repo-fixture/repos/storefront
 ```
 
 `--engine` is the user-facing alias for `--control-plane-url`. Both flags are accepted for normal execution and `doctor`.
