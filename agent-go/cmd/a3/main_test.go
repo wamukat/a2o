@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -446,9 +447,8 @@ func TestRuntimeStartLaunchesForegroundLoopInBackground(t *testing.T) {
 
 	joined := strings.Join(runner.joinedCalls(), "\n")
 	for _, want := range []string{
-		"bash -lc",
-		"runtime' 'loop' '--interval' '5s' '--max-steps' '2' '--agent-attempts' '3'",
-		filepath.Join(tempDir, ".work", "a2o-runtime", "scheduler.pid"),
+		"start-background",
+		"runtime loop --interval 5s --max-steps 2 --agent-attempts 3",
 		filepath.Join(tempDir, ".work", "a2o-runtime", "scheduler.log"),
 	} {
 		if !strings.Contains(joined, want) {
@@ -457,6 +457,121 @@ func TestRuntimeStartLaunchesForegroundLoopInBackground(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "runtime_scheduler_started") {
 		t.Fatalf("stdout should report scheduler start, got %q", stdout.String())
+	}
+	pidBody, err := os.ReadFile(filepath.Join(tempDir, ".work", "a2o-runtime", "scheduler.pid"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(pidBody)) != "12345" {
+		t.Fatalf("pid file should contain background pid, got %q", string(pidBody))
+	}
+}
+
+func TestRuntimeStartRejectsInvalidOptionsBeforeBackgroundLaunch(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "start", "--interval", "not-a-duration"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail for invalid interval")
+		}
+	})
+
+	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "start-background") {
+		t.Fatalf("runtime start should fail before background launch, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+	}
+	if !strings.Contains(stderr.String(), "parse --interval") {
+		t.Fatalf("stderr should mention invalid interval, got %q", stderr.String())
+	}
+}
+
+func TestRuntimeStartRequiresProjectConfigBeforeBackgroundLaunch(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "start"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail without project.yaml")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "project package config not found") {
+		t.Fatalf("stderr should mention missing project.yaml, got %q", stderr.String())
+	}
+	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "start-background") {
+		t.Fatalf("runtime start should fail before background launch, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+	}
+}
+
+func TestRuntimeStartRejectsAlreadyRunningScheduler(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
+	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(paths.PIDFile, []byte("12345\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{processCommands: map[int]string{12345: "a2o runtime loop --interval 60s"}}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "start"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail when scheduler is already running")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "runtime scheduler already running pid=12345") {
+		t.Fatalf("stderr should mention running scheduler, got %q", stderr.String())
+	}
+	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "start-background") {
+		t.Fatalf("runtime start should not launch a duplicate scheduler, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
 	}
 }
 
@@ -482,7 +597,7 @@ func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
 	if err := os.WriteFile(paths.PIDFile, []byte("12345\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	runner := &fakeRunner{}
+	runner := &fakeRunner{processCommands: map[int]string{12345: "a2o runtime loop --interval 60s"}}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -496,7 +611,87 @@ func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
 	if !strings.Contains(stdout.String(), "runtime_scheduler_status=running pid=12345") {
 		t.Fatalf("stdout should report running scheduler, got %q", stdout.String())
 	}
-	assertCallContains(t, runner.joinedCalls(), "kill -0 12345")
+	assertCallContains(t, runner.joinedCalls(), "process-running 12345")
+	assertCallContains(t, runner.joinedCalls(), "process-command 12345")
+}
+
+func TestRuntimeStatusReportsStaleForUnrelatedReusedPID(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
+	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(paths.PIDFile, []byte("12345\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{processCommands: map[int]string{12345: "sleep 999"}}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "status"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "runtime_scheduler_status=stale pid=12345") {
+		t.Fatalf("stdout should report stale scheduler, got %q", stdout.String())
+	}
+	assertCallContains(t, runner.joinedCalls(), "process-running 12345")
+	assertCallContains(t, runner.joinedCalls(), "process-command 12345")
+}
+
+func TestRuntimeStatusRejectsInvalidPIDFile(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
+	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(paths.PIDFile, []byte("not-a-pid\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "status"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail for invalid pid file")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "invalid scheduler pid file") {
+		t.Fatalf("stderr should mention invalid pid file, got %q", stderr.String())
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("invalid pid file should fail before process inspection, got:\n%s", runner.joinedCalls())
+	}
 }
 
 func TestRuntimeStopKillsSchedulerAndRemovesPID(t *testing.T) {
@@ -521,7 +716,7 @@ func TestRuntimeStopKillsSchedulerAndRemovesPID(t *testing.T) {
 	if err := os.WriteFile(paths.PIDFile, []byte("12345\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	runner := &fakeRunner{}
+	runner := &fakeRunner{processCommands: map[int]string{12345: "a2o runtime loop --interval 60s"}}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -532,13 +727,54 @@ func TestRuntimeStopKillsSchedulerAndRemovesPID(t *testing.T) {
 		}
 	})
 
-	assertCallContains(t, runner.joinedCalls(), "kill -0 12345")
-	assertCallContains(t, runner.joinedCalls(), "kill 12345")
+	assertCallContains(t, runner.joinedCalls(), "process-running 12345")
+	assertCallContains(t, runner.joinedCalls(), "process-command 12345")
+	assertCallContains(t, runner.joinedCalls(), "terminate-process-group 12345")
 	if _, err := os.Stat(paths.PIDFile); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("pid file should be removed, stat err=%v", err)
 	}
 	if !strings.Contains(stdout.String(), "runtime_scheduler_stopped pid=12345") {
 		t.Fatalf("stdout should report scheduler stop, got %q", stdout.String())
+	}
+}
+
+func TestRuntimeStopDoesNotTerminateUnrelatedReusedPID(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
+	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(paths.PIDFile, []byte("12345\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{processCommands: map[int]string{12345: "sleep 999"}}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "stop"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if runner.callCount("terminate-process-group 12345") != 0 {
+		t.Fatalf("runtime stop must not terminate unrelated process, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+	}
+	if _, err := os.Stat(paths.PIDFile); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("pid file should be removed after stale stop, stat err=%v", err)
 	}
 }
 
@@ -873,10 +1109,12 @@ func TestAgentInstallRequiresInstanceConfigOrExplicitCompose(t *testing.T) {
 }
 
 type fakeRunner struct {
-	calls          [][]string
-	emptyContainer bool
-	err            error
-	lastEnv        map[string]string
+	calls           [][]string
+	emptyContainer  bool
+	err             error
+	lastEnv         map[string]string
+	nextPID         int
+	processCommands map[int]string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -916,6 +1154,47 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	default:
 		return []byte{}, nil
 	}
+}
+
+func (r *fakeRunner) StartBackground(name string, args []string, logPath string) (int, error) {
+	call := []string{"start-background", name}
+	call = append(call, args...)
+	call = append(call, logPath)
+	r.calls = append(r.calls, call)
+	if r.err != nil {
+		return 0, r.err
+	}
+	pid := r.nextPID
+	if pid == 0 {
+		pid = 12345
+	}
+	if r.processCommands == nil {
+		r.processCommands = map[int]string{}
+	}
+	command := append([]string{name}, args...)
+	r.processCommands[pid] = strings.Join(command, " ")
+	r.nextPID = pid + 1
+	return pid, nil
+}
+
+func (r *fakeRunner) ProcessRunning(pid int) bool {
+	r.calls = append(r.calls, []string{"process-running", strconv.Itoa(pid)})
+	_, ok := r.processCommands[pid]
+	return ok
+}
+
+func (r *fakeRunner) ProcessCommand(pid int) string {
+	r.calls = append(r.calls, []string{"process-command", strconv.Itoa(pid)})
+	return r.processCommands[pid]
+}
+
+func (r *fakeRunner) TerminateProcessGroup(pid int) error {
+	r.calls = append(r.calls, []string{"terminate-process-group", strconv.Itoa(pid)})
+	delete(r.processCommands, pid)
+	if r.err != nil {
+		return r.err
+	}
+	return nil
 }
 
 func (r fakeRunner) joinedCalls() []string {

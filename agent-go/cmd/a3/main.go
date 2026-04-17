@@ -5,6 +5,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
+	"syscall"
 )
 
 const version = "dev"
@@ -12,6 +15,10 @@ const instanceConfigRelativePath = ".a3/runtime-instance.json"
 
 type commandRunner interface {
 	Run(name string, args ...string) ([]byte, error)
+	StartBackground(name string, args []string, logPath string) (int, error)
+	ProcessRunning(pid int) bool
+	ProcessCommand(pid int) string
+	TerminateProcessGroup(pid int) error
 }
 
 type execRunner struct{}
@@ -19,6 +26,44 @@ type execRunner struct{}
 func (execRunner) Run(name string, args ...string) ([]byte, error) {
 	cmd := exec.Command(name, args...)
 	return cmd.CombinedOutput()
+}
+
+func (execRunner) StartBackground(name string, args []string, logPath string) (int, error) {
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+		return 0, err
+	}
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return 0, err
+	}
+	defer logFile.Close()
+	cmd := exec.Command(name, args...)
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := cmd.Start(); err != nil {
+		return 0, err
+	}
+	return cmd.Process.Pid, nil
+}
+
+func (execRunner) ProcessRunning(pid int) bool {
+	return syscall.Kill(pid, 0) == nil
+}
+
+func (execRunner) ProcessCommand(pid int) string {
+	output, err := exec.Command("ps", "-p", fmt.Sprintf("%d", pid), "-o", "command=").CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+func (execRunner) TerminateProcessGroup(pid int) error {
+	if err := syscall.Kill(-pid, syscall.SIGTERM); err == nil {
+		return nil
+	}
+	return syscall.Kill(pid, syscall.SIGTERM)
 }
 
 func main() {

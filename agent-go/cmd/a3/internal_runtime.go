@@ -94,29 +94,47 @@ func runRuntimeStart(args []string, runner commandRunner, stdout io.Writer, stde
 	if _, err := time.ParseDuration(*interval); err != nil {
 		return fmt.Errorf("parse --interval: %w", err)
 	}
+	if strings.TrimSpace(*maxSteps) != "" {
+		if _, err := parsePositiveInt(*maxSteps, "max steps"); err != nil {
+			return err
+		}
+	}
+	if strings.TrimSpace(*agentAttempts) != "" {
+		if _, err := parsePositiveInt(*agentAttempts, "agent attempts"); err != nil {
+			return err
+		}
+	}
 
 	config, _, err := loadInstanceConfigFromWorkingTree()
 	if err != nil {
 		return err
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	if _, err := buildRuntimeRunOncePlan(effectiveConfig, *maxSteps, *agentAttempts); err != nil {
+		return err
+	}
 	paths := schedulerPaths(effectiveConfig)
 	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
 		return fmt.Errorf("create scheduler dir: %w", err)
+	}
+	if pid, ok, err := readRunningScheduler(paths.PIDFile, runner); err != nil {
+		return err
+	} else if ok {
+		return fmt.Errorf("runtime scheduler already running pid=%d", pid)
 	}
 	executable, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("resolve executable: %w", err)
 	}
-	loopArgs := []string{executable, "runtime", "loop", "--interval", *interval}
+	loopArgs := []string{"runtime", "loop", "--interval", *interval}
 	loopArgs = append(loopArgs, buildRunOnceArgs(*maxSteps, *agentAttempts)...)
-	script := strings.Join([]string{
-		"if [ -f " + shellQuote(paths.PIDFile) + " ] && kill -0 $(cat " + shellQuote(paths.PIDFile) + ") 2>/dev/null; then echo 'runtime scheduler already running pid='$(cat " + shellQuote(paths.PIDFile) + ") >&2; exit 17; fi",
-		"mkdir -p " + shellQuote(paths.Dir),
-		"nohup " + shellJoin(loopArgs) + " >> " + shellQuote(paths.LogFile) + " 2>&1 & echo $! > " + shellQuote(paths.PIDFile),
-	}, "; ")
-	if _, err := runExternal(runner, "bash", "-lc", script); err != nil {
+	pid, err := runner.StartBackground(executable, loopArgs, paths.LogFile)
+	if err != nil {
 		return err
+	}
+	if err := os.WriteFile(paths.PIDFile, []byte(fmt.Sprintf("%d\n", pid)), 0o644); err != nil {
+		_ = runner.TerminateProcessGroup(pid)
+		return fmt.Errorf("write scheduler pid file: %w", err)
 	}
 	fmt.Fprintf(stdout, "runtime_scheduler_started pid_file=%s log=%s\n", paths.PIDFile, paths.LogFile)
 	return nil
@@ -145,15 +163,18 @@ func runRuntimeStop(args []string, runner commandRunner, stdout io.Writer, stder
 		}
 		return err
 	}
-	if _, err := runner.Run("kill", "-0", pid); err == nil {
-		if _, err := runExternal(runner, "kill", pid); err != nil {
+	if schedulerProcessRunning(pid, runner) {
+		if err := runner.TerminateProcessGroup(pid); err != nil {
 			return err
+		}
+		if plan, err := buildRuntimeRunOncePlan(pathsConfig(config), "", ""); err == nil {
+			_ = cleanupRuntimeProcesses(pathsConfig(config), plan, runner)
 		}
 	}
 	if err := os.Remove(paths.PIDFile); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("remove scheduler pid file: %w", err)
 	}
-	fmt.Fprintf(stdout, "runtime_scheduler_stopped pid=%s pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
+	fmt.Fprintf(stdout, "runtime_scheduler_stopped pid=%d pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
 	return nil
 }
 
@@ -180,22 +201,49 @@ func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, std
 		}
 		return err
 	}
-	if _, err := runner.Run("kill", "-0", pid); err == nil {
-		fmt.Fprintf(stdout, "runtime_scheduler_status=running pid=%s pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
+	if schedulerProcessRunning(pid, runner) {
+		fmt.Fprintf(stdout, "runtime_scheduler_status=running pid=%d pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
 		return nil
 	}
-	fmt.Fprintf(stdout, "runtime_scheduler_status=stale pid=%s pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
+	fmt.Fprintf(stdout, "runtime_scheduler_status=stale pid=%d pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
 	return nil
 }
 
-func readSchedulerPID(path string) (string, error) {
+func pathsConfig(config *runtimeInstanceConfig) runtimeInstanceConfig {
+	return applyAgentInstallOverrides(*config, "", "", "")
+}
+
+func readRunningScheduler(pidFile string, runner commandRunner) (int, bool, error) {
+	pid, err := readSchedulerPID(pidFile)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return 0, false, nil
+		}
+		return 0, false, err
+	}
+	return pid, schedulerProcessRunning(pid, runner), nil
+}
+
+func schedulerProcessRunning(pid int, runner commandRunner) bool {
+	if !runner.ProcessRunning(pid) {
+		return false
+	}
+	command := runner.ProcessCommand(pid)
+	return strings.Contains(command, "runtime") && strings.Contains(command, "loop")
+}
+
+func readSchedulerPID(path string) (int, error) {
 	body, err := os.ReadFile(path)
 	if err != nil {
-		return "", err
+		return 0, err
 	}
-	pid := strings.TrimSpace(string(body))
-	if pid == "" {
-		return "", fmt.Errorf("scheduler pid file is empty: %s", path)
+	pidText := strings.TrimSpace(string(body))
+	if pidText == "" {
+		return 0, fmt.Errorf("scheduler pid file is empty: %s", path)
+	}
+	pid, err := parsePositiveInt(pidText, "scheduler pid")
+	if err != nil {
+		return 0, fmt.Errorf("invalid scheduler pid file %s: %w", path, err)
 	}
 	return pid, nil
 }
