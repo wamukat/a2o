@@ -32,12 +32,11 @@ a2o kanban up
 a2o kanban doctor
 a2o kanban url
 a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
-a2o runtime run --until-idle
 ```
 
 runtime image の中では `bin/a3` が Engine CLI として残る。これは内部互換名であり、利用者向けの正規入口は `a2o` と `a2o-agent` である。公開名称と内部互換名の境界は [docs/92-a2o-public-branding-boundary.md](docs/92-a2o-public-branding-boundary.md) にまとめる。
 
-`a2o runtime run --until-idle` は利用者向けに必要な完成形の入口であり、現行 baseline ではまだ内部 Engine CLI で再現している。公開 release では A2O#267 でこの差分を閉じる。
+現行の公開 launcher は setup、kanban lifecycle、agent install までを提供する。task execution loop の利用者向け入口は A2O#267 の release blocker として扱い、実装前の runnable command としては記載しない。
 
 ## 実装位置
 
