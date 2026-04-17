@@ -59,24 +59,43 @@ RSpec.describe A3::Bootstrap do
         )
 
         expect(session).to be_frozen
-      expect(session.runtime_package).to be_a(A3::Domain::RuntimePackageDescriptor)
-      expect(session.runtime_package.operator_summary.fetch("mount")).to include("state_root=#{dir}")
-      expect(session.runtime_package.repo_source_summary.fetch("strategy")).to eq(:explicit_map)
-      expect(session.runtime_package.operator_summary.fetch("distribution")).to eq("image_ref=a3-engine:dev runtime_entrypoint=bin/a3 doctor_entrypoint=bin/a3 doctor-runtime")
-      expect(session.runtime_package.operator_summary.fetch("schema_contract")).to eq("manifest_schema_version=1 required_manifest_schema_version=1")
-      expect(session.runtime_package.operator_summary.fetch("preset_schema_contract")).to eq("required_preset_schema_version=1 preset_schema_versions=")
-      expect(session.runtime_package.operator_summary.fetch("repo_source_contract")).to eq("repo_source_strategy=explicit_map repo_source_slots=repo_alpha")
-      expect(session.runtime_package.operator_summary.fetch("repo_source_action")).to eq("provide writable repo sources for repo_alpha")
-      expect(session.runtime_package.operator_summary.fetch("preset_schema_action")).to eq("no preset schema action required")
-      expect(session.runtime_package.operator_summary.fetch("secret_contract")).to eq("secret_delivery_mode=environment_variable secret_reference=A3_SECRET")
-      expect(session.runtime_package.operator_summary.fetch("migration_contract")).to eq("scheduler_store_migration_state=not_required")
-      expect(session.runtime_package.operator_summary.fetch("runtime_contract")).to eq("manifest_schema_version=1 required_manifest_schema_version=1 required_preset_schema_version=1 preset_schema_versions= repo_source_strategy=explicit_map repo_source_slots=repo_alpha secret_delivery_mode=environment_variable secret_reference=A3_SECRET scheduler_store_migration_state=not_required")
-      expect(session.runtime_package.operator_summary.fetch("secret_delivery_action")).to eq("provide secrets via environment variable A3_SECRET")
-      expect(session.runtime_package.operator_summary.fetch("scheduler_store_migration_action")).to eq("scheduler store migration not required")
-      expect(session.runtime_package.operator_summary.fetch("startup_checklist")).to eq("provide writable repo sources for repo_alpha; provide secrets via environment variable A3_SECRET; scheduler store migration not required")
-      expect(session.runtime_package.operator_summary.fetch("descriptor_startup_readiness")).to eq("descriptor_ready")
-      expect(session.runtime_package.operator_summary.fetch("operator_action")).to eq("provide writable repo sources for repo_alpha; provide secrets via environment variable A3_SECRET; scheduler store migration not required")
+        expect(session.runtime_package).to be_a(A3::Domain::RuntimePackageDescriptor)
+        expect(session.runtime_package.operator_summary.fetch("mount")).to include("state_root=#{dir}")
+        expect(session.runtime_package.repo_source_summary.fetch("strategy")).to eq(:explicit_map)
+        expect(session.runtime_package.operator_summary.fetch("distribution")).to eq("image_ref=a3-engine:dev runtime_entrypoint=bin/a3 doctor_entrypoint=bin/a3 doctor-runtime")
+        expect(session.runtime_package.operator_summary.fetch("schema_contract")).to eq("manifest_schema_version=1 required_manifest_schema_version=1")
+        expect(session.runtime_package.operator_summary.fetch("preset_schema_contract")).to eq("required_preset_schema_version=1 preset_schema_versions=")
+        expect(session.runtime_package.operator_summary.fetch("repo_source_contract")).to eq("repo_source_strategy=explicit_map repo_source_slots=repo_alpha")
+        expect(session.runtime_package.operator_summary.fetch("repo_source_action")).to eq("provide writable repo sources for repo_alpha")
+        expect(session.runtime_package.operator_summary.fetch("preset_schema_action")).to eq("no preset schema action required")
+        expect(session.runtime_package.operator_summary.fetch("secret_contract")).to eq("secret_delivery_mode=environment_variable secret_reference=A3_SECRET")
+        expect(session.runtime_package.operator_summary.fetch("migration_contract")).to eq("scheduler_store_migration_state=not_required")
+        expect(session.runtime_package.operator_summary.fetch("runtime_contract")).to eq("manifest_schema_version=1 required_manifest_schema_version=1 required_preset_schema_version=1 preset_schema_versions= repo_source_strategy=explicit_map repo_source_slots=repo_alpha secret_delivery_mode=environment_variable secret_reference=A3_SECRET scheduler_store_migration_state=not_required")
+        expect(session.runtime_package.operator_summary.fetch("secret_delivery_action")).to eq("provide secrets via environment variable A3_SECRET")
+        expect(session.runtime_package.operator_summary.fetch("scheduler_store_migration_action")).to eq("scheduler store migration not required")
+        expect(session.runtime_package.operator_summary.fetch("startup_checklist")).to eq("provide writable repo sources for repo_alpha; provide secrets via environment variable A3_SECRET; scheduler store migration not required")
+        expect(session.runtime_package.operator_summary.fetch("descriptor_startup_readiness")).to eq("descriptor_ready")
+        expect(session.runtime_package.operator_summary.fetch("operator_action")).to eq("provide writable repo sources for repo_alpha; provide secrets via environment variable A3_SECRET; scheduler store migration not required")
+      end
     end
-  end
+
+    it "rejects legacy manifest.yml runtime package paths" do
+      Dir.mktmpdir do |dir|
+        manifest_path = File.join(dir, "manifest.yml")
+        preset_dir = File.join(dir, "presets")
+        FileUtils.mkdir_p(preset_dir)
+        File.write(manifest_path, YAML.dump({ "schema_version" => 1, "runtime" => { "presets" => [] } }))
+
+        expect do
+          described_class.runtime_package_session(
+            manifest_path: manifest_path,
+            preset_dir: preset_dir,
+            storage_backend: :sqlite,
+            storage_dir: dir,
+            repo_sources: {}
+          )
+        end.to raise_error(A3::Domain::ConfigurationError, "manifest.yml is no longer supported; use project.yaml")
+      end
+    end
   end
 end

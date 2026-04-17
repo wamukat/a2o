@@ -185,6 +185,14 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     end.to raise_error(FrozenError)
   end
 
+  it "rejects legacy manifest.yml paths" do
+    project_config_path = File.join(@tmpdir, "manifest.yml")
+    File.write(project_config_path, YAML.dump({ "schema_version" => 1, "runtime" => { "presets" => [] } }))
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "manifest.yml is no longer supported; use project.yaml")
+  end
+
   private
 
   def write_project_config(payload)

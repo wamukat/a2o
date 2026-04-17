@@ -169,6 +169,14 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
     expect(context.merge_config_for(task: parent_task, phase: :merge).target_ref).to eq("refs/heads/feature/prototype")
   end
 
+  it "rejects legacy manifest.yml paths" do
+    project_config_path = File.join(@tmpdir, "manifest.yml")
+    File.write(project_config_path, YAML.dump({ "schema_version" => 1, "runtime" => { "presets" => [] } }))
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "manifest.yml is no longer supported; use project.yaml")
+  end
+
   private
 
   def write_project_config(payload)

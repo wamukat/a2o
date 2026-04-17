@@ -217,6 +217,9 @@ module A3
     private_class_method :required_preset_schema_version
 
     def manifest_document(manifest_path)
+      if Pathname(manifest_path).basename.to_s == "manifest.yml"
+        raise A3::Domain::ConfigurationError, "manifest.yml is no longer supported; use project.yaml"
+      end
       YAML.safe_load(Pathname(manifest_path).read, permitted_classes: [], aliases: false)
     end
     private_class_method :manifest_document

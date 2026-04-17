@@ -37,6 +37,9 @@ module A3
       private
 
       def load_project_config(path)
+        if File.basename(path) == "manifest.yml"
+          raise A3::Domain::ConfigurationError, "manifest.yml is no longer supported; use project.yaml"
+        end
         payload = YAML.safe_load(File.read(path), permitted_classes: [], aliases: false)
         unless payload.is_a?(Hash)
           raise A3::Domain::ConfigurationError, "project.yaml must contain a mapping"
