@@ -3,7 +3,7 @@
 対象読者: A3 実装者 / 設計者 / reviewer / operator
 文書種別: リポジトリ入口
 
-このディレクトリは current A3 Engine の本体実装と設計資料を集約する。旧 `a3-v2/` source tree は削除済みであり、現在の正本はこの `a3-engine` と workspace root の `scripts/a3` / `Taskfile.yml` である。
+このリポジトリは current A2O/A3 Engine の本体実装と設計資料を集約する。旧 `a3-v2/` source tree と Portal workspace-local Taskfile runtime entrypoint は削除済みであり、現在の通常利用者向け正本は Go host launcher `a2o`、Docker runtime image、`a2o-agent`、project package である。
 
 ## 方針
 
@@ -15,16 +15,16 @@
 
 ## 読み順
 
-1. [docs/00-design-map.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/00-design-map.md)
-2. [docs/05-engineering-rulebook.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/05-engineering-rulebook.md)
-3. [docs/10-bounded-context-and-language.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/10-bounded-context-and-language.md)
-4. [docs/20-core-domain-model.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/20-core-domain-model.md)
-5. [docs/30-workspace-and-repo-slot-model.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/30-workspace-and-repo-slot-model.md)
-6. [docs/40-project-surface-and-presets.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/40-project-surface-and-presets.md)
-7. [docs/50-evidence-and-rerun-diagnosis.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/50-evidence-and-rerun-diagnosis.md)
-8. [docs/60-container-distribution-and-project-runtime.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/60-container-distribution-and-project-runtime.md)
+1. [docs/00-design-map.md](docs/00-design-map.md)
+2. [docs/05-engineering-rulebook.md](docs/05-engineering-rulebook.md)
+3. [docs/10-bounded-context-and-language.md](docs/10-bounded-context-and-language.md)
+4. [docs/20-core-domain-model.md](docs/20-core-domain-model.md)
+5. [docs/30-workspace-and-repo-slot-model.md](docs/30-workspace-and-repo-slot-model.md)
+6. [docs/40-project-surface-and-presets.md](docs/40-project-surface-and-presets.md)
+7. [docs/50-evidence-and-rerun-diagnosis.md](docs/50-evidence-and-rerun-diagnosis.md)
+8. [docs/60-container-distribution-and-project-runtime.md](docs/60-container-distribution-and-project-runtime.md)
 9. [docs/68-reference-product-suite.md](docs/68-reference-product-suite.md)
-10. [docs/70-implementation-status.md](/Users/takuma/workspace/mypage-prototype/a3-engine/docs/70-implementation-status.md)
+10. [docs/70-implementation-status.md](docs/70-implementation-status.md)
 
 ## 配布 / runtime
 
@@ -34,23 +34,23 @@ Core validation は Portal ではなく、A2O 専用 reference product suite を
 
 代表入口:
 
+- `a2o host install`
 - `a2o project bootstrap --package <reference-product-package>`
 - `a2o kanban up`
 - `a2o kanban doctor`
 - `a2o kanban url`
 - `a2o agent install`
 
-Reference product suite の具体 package / validation scenario は `A2O#255` から `A2O#258` で追加する。Portal workspace-local の旧 Taskfile 互換入口は通常の A2O core validation には使わず、Portal integration validation または historical diagnosis の文脈に限定する。
+Reference product suite の package / validation scenario は `reference-products/` と [docs/68-reference-product-suite.md](docs/68-reference-product-suite.md) を正本にする。Portal workspace-local の旧 Taskfile 互換入口は通常の A2O core validation には使わず、Portal integration validation または historical diagnosis の文脈に限定する。
 
 ## 実装位置
 
 - A3 本体実装: `lib/a3/`, `bin/a3`, `spec/` (`bin/a3` は Docker runtime 内の engine command)
 - Go agent: `agent-go/`
 - Docker runtime assets: `docker/` (`docker/a3-runtime/Dockerfile` exposes `/usr/local/bin/a3` inside the image)
+- Reference product packages: `reference-products/`
 - 設計 / 進捗正本: `docs/60-container-distribution-and-project-runtime.md`, `docs/70-implementation-status.md`
 
 ## 参照元
 
-- [A3-2 Product Specification](/Users/takuma/workspace/mypage-prototype/docs/10-ops/10-08-a3-2-product-spec.md)
-- [A3 Parent-Child Stabilization Plan](/Users/takuma/workspace/mypage-prototype/docs/10-ops/10-06-a3-parent-child-stabilization-plan.md)
-- [A3 Cutover Decision Ledger](/Users/takuma/workspace/mypage-prototype/docs/10-ops/10-04-a3-cutover-decision-ledger.md)
+- Historical product/design notes live outside this repository. They are provenance, not current operator runbooks.

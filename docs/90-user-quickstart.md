@@ -13,9 +13,12 @@ A2O 利用者に長い shell script を書かせない。
 
 利用者が作るものは project package であり、実行ロジックではない。Docker compose 起動、A2O Engine command、agent package export、agent control plane、runtime loop、agent polling loop は A2O 側の release surface が持つ。
 
-利用者が意識する入口は次の 2 種類に絞る。
+利用者が意識する入口は次に絞る。
 
+- `a2o host install`: runtime image から host launcher と配布 asset を install する。
+- `a2o project bootstrap --package DIR`: project package から runtime instance config を作成する。
 - `a2o kanban ...`: kanban service の起動、診断、URL 確認を操作する。
+- `a2o agent install`: runtime image から host/dev-env 用 `a2o-agent` を export する。
 - `a2o-agent ...`: project runtime 側で job を pull して実行する。通常利用者が直接叩く頻度は低い。
 
 A2O runtime は、現行設計では「1 project package = 1 runtime instance」として扱う。1つの Engine instance に複数 project を登録して `--project NAME` で切り替える registry 型ではない。複数 project を同時に動かす場合は、project package ごとに compose project name / storage dir / port / workspace root を分けた別 runtime instance として起動する。
@@ -126,7 +129,7 @@ a2o-agent --engine http://localhost:7393 --loop --poll-interval 2s
 
 ## Portal での現状
 
-現時点の Portal workspace では、`a2o project bootstrap` / `a2o kanban up` / `a2o kanban doctor` / `a2o agent install` は実装済みで、A2O Engine runtime image から host/dev-env 用 `a2o-agent` を export できる。内部互換として `a3 ...` も動作する。
+Portal は実プロダクト integration validation として扱う。現行 A2O core validation の標準対象は `reference-products/` の project package である。Portal package を使う場合でも、入口は `a2o project bootstrap` / `a2o kanban up` / `a2o kanban doctor` / `a2o agent install` であり、Portal workspace-local Taskfile は通常導線ではない。内部互換として `a3 ...` も動作する。
 
 ```bash
 a2o project bootstrap --package ./scripts/a3-projects/portal
@@ -143,8 +146,8 @@ Portal package の `runtime/run_once.sh` は削除済みであり、利用者も
 ## 残タスク
 
 - A2O Engine の execution loop は internal runtime flow として扱い、public kanban service surface へ不用意に露出しない。stale recovery / retention cleanup の cycle hook は後続 hardening として扱う。
-- project package loader と runtime instance config を実装し、root Taskfile 依存を release surface から外す。`a2o project bootstrap --package ./a2o-project` 後は package 指定不要とし、multi-project registry に見える `--project NAME` は標準入口にしない。
+- project package loader と runtime instance config は実装済みであり、`a2o project bootstrap --package ./a2o-project` 後は package 指定不要で `a2o kanban ...` / `a2o agent install` が instance config を探索する。今後も multi-project registry に見える `--project NAME` は標準入口にしない。
 - `a2o agent install` は release artifact に含め、runtime image から host/dev-env への binary export を利用者向け配布物として固定済み。release 前には正式 image ref で同手順を再 smoke する。
-- `scripts/a3-projects/portal/runtime/run_once.sh` の責務は Engine command へ移設済み。残りは Portal 固有値を project package config から読む範囲を広げ、hardcoded Portal default を減らすこと。
+- Portal runtime shell script の責務は Engine command へ移設済み。残りは Portal 固有値を project package config から読む範囲を広げ、hardcoded Portal default を減らすこと。
 - `A3_RUNTIME_RUN_ONCE_*` のような内部 env は project package / CLI option に寄せ、利用者の主要入口から隠す。
 - A2O runtime compose file は A2O 配布物として同梱し、project package 側に compose file 作成を要求しない。compose override は開発・診断用に限定する。
