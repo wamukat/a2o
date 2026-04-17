@@ -47,7 +47,7 @@ func TestRunDoctorValidatesRuntimeProfile(t *testing.T) {
   "control_plane_url": "http://a3-runtime:7393",
   "workspace_root": "`+filepath.ToSlash(filepath.Join(tmp, "workspaces"))+`",
   "source_aliases": {
-    "member-portal-starters": "`+filepath.ToSlash(sourceRoot)+`"
+    "sample-catalog-service": "`+filepath.ToSlash(sourceRoot)+`"
   }
 }`), 0o644); err != nil {
 		t.Fatal(err)
@@ -67,7 +67,7 @@ func TestRunDoctorAcceptsEngineManagedEnvironmentFlags(t *testing.T) {
 		"--agent", "dev-env",
 		"--control-plane-url", "http://a3-runtime:7393",
 		"--workspace-root", filepath.Join(tmp, "workspaces"),
-		"--source-path", "member-portal-starters=" + sourceRoot,
+		"--source-path", "sample-catalog-service=" + sourceRoot,
 		"--required-bin", "git",
 	})
 	if code != 0 {
@@ -84,7 +84,7 @@ func TestRunDoctorAcceptsEngineAlias(t *testing.T) {
 		"--agent", "dev-env",
 		"--engine", "http://a3-runtime:7393",
 		"--workspace-root", filepath.Join(tmp, "workspaces"),
-		"--source-path", "member-portal-starters=" + sourceRoot,
+		"--source-path", "sample-catalog-service=" + sourceRoot,
 		"--required-bin", "git",
 	})
 	if code != 0 {
@@ -99,7 +99,7 @@ func TestRunDoctorRejectsMissingRequiredBin(t *testing.T) {
 	code := run([]string{
 		"doctor",
 		"--workspace-root", filepath.Join(tmp, "workspaces"),
-		"--source-path", "member-portal-starters=" + sourceRoot,
+		"--source-path", "sample-catalog-service=" + sourceRoot,
 		"--required-bin", "a3-missing-required-bin-for-test",
 	})
 	if code == 0 {

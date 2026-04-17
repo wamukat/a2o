@@ -5,19 +5,19 @@ require "spec_helper"
 RSpec.describe A3::Domain::AgentJobRequest do
   let(:source_descriptor) do
     A3::Domain::SourceDescriptor.runtime_detached_commit(
-      task_ref: "Portal#42",
+      task_ref: "Sample#42",
       ref: "abc123"
     )
   end
 
   it "serializes the job contract without shell-specific command strings" do
     request = described_class.new(
-      job_id: "job-portal-42-verification",
-      task_ref: "Portal#42",
+      job_id: "job-sample-42-verification",
+      task_ref: "Sample#42",
       phase: :verification,
       runtime_profile: "host-local-agent",
       source_descriptor: source_descriptor,
-      working_dir: "/workspace/member-portal-starters",
+      working_dir: "/workspace/sample-catalog-service",
       command: "task",
       args: ["ops:flow:standard"],
       env: { A3_ROOT_DIR: "/workspace" },
@@ -32,12 +32,12 @@ RSpec.describe A3::Domain::AgentJobRequest do
     )
 
     expect(request.request_form).to eq(
-      "job_id" => "job-portal-42-verification",
-      "task_ref" => "Portal#42",
+      "job_id" => "job-sample-42-verification",
+      "task_ref" => "Sample#42",
       "phase" => "verification",
       "runtime_profile" => "host-local-agent",
       "source_descriptor" => source_descriptor.persisted_form,
-      "working_dir" => "/workspace/member-portal-starters",
+      "working_dir" => "/workspace/sample-catalog-service",
       "command" => "task",
       "args" => ["ops:flow:standard"],
       "env" => { "A3_ROOT_DIR" => "/workspace" },
@@ -56,13 +56,13 @@ RSpec.describe A3::Domain::AgentJobRequest do
     workspace_request = A3::Domain::AgentWorkspaceRequest.new(
       mode: :agent_materialized,
       workspace_kind: :ticket_workspace,
-      workspace_id: "Portal-42-ticket",
+      workspace_id: "Sample-42-ticket",
       freshness_policy: :reuse_if_clean_and_ref_matches,
       cleanup_policy: :retain_until_a3_cleanup,
       slots: {
         repo_alpha: {
-          source: { kind: "local_git", alias: "member-portal-starters" },
-          ref: "refs/heads/a3/work/Portal-42",
+          source: { kind: "local_git", alias: "sample-catalog-service" },
+          ref: "refs/heads/a3/work/Sample-42",
           checkout: "worktree_branch",
           access: "read_write",
           sync_class: "eager",
@@ -72,21 +72,21 @@ RSpec.describe A3::Domain::AgentJobRequest do
       }
     )
     request = described_class.new(
-      job_id: "job-portal-42-implementation",
-      task_ref: "Portal#42",
+      job_id: "job-sample-42-implementation",
+      task_ref: "Sample#42",
       phase: "implementation",
       runtime_profile: "host-local",
-      source_descriptor: A3::Domain::SourceDescriptor.implementation(task_ref: "Portal#42", ref: "feature/a3"),
+      source_descriptor: A3::Domain::SourceDescriptor.implementation(task_ref: "Sample#42", ref: "feature/a3"),
       workspace_request: workspace_request,
       worker_protocol_request: {
-        task_ref: "Portal#42",
+        task_ref: "Sample#42",
         run_ref: "run-42",
         phase: "implementation"
       },
       agent_environment: {
         workspace_root: "/agent/workspaces",
         source_paths: {
-          "member-portal-starters" => "/agent/repos/starters"
+          "sample-catalog-service" => "/agent/repos/starters"
         },
         env: {
           A3_ROOT_DIR: "/agent/a3"
@@ -103,14 +103,14 @@ RSpec.describe A3::Domain::AgentJobRequest do
 
     expect(request.request_form.fetch("workspace_request")).to eq(workspace_request.request_form)
     expect(request.request_form.fetch("worker_protocol_request")).to eq(
-      "task_ref" => "Portal#42",
+      "task_ref" => "Sample#42",
       "run_ref" => "run-42",
       "phase" => "implementation"
     )
     expect(request.request_form.fetch("agent_environment")).to eq(
       "workspace_root" => "/agent/workspaces",
       "source_paths" => {
-        "member-portal-starters" => "/agent/repos/starters"
+        "sample-catalog-service" => "/agent/repos/starters"
       },
       "env" => {
         "A3_ROOT_DIR" => "/agent/a3"
@@ -122,22 +122,22 @@ RSpec.describe A3::Domain::AgentJobRequest do
 
   it "round-trips merge requests" do
     merge_request = {
-      "workspace_id" => "merge-Portal-42",
+      "workspace_id" => "merge-Sample-42",
       "policy" => "ff_only",
       "slots" => {
         "repo_alpha" => {
           "source" => {
             "kind" => "local_git",
-            "alias" => "member-portal-starters"
+            "alias" => "sample-catalog-service"
           },
-          "source_ref" => "refs/heads/a3/work/Portal-42",
+          "source_ref" => "refs/heads/a3/work/Sample-42",
           "target_ref" => "refs/heads/main"
         }
       }
     }
     request = described_class.new(
-      job_id: "job-portal-42-merge",
-      task_ref: "Portal#42",
+      job_id: "job-sample-42-merge",
+      task_ref: "Sample#42",
       phase: :merge,
       runtime_profile: "host-local",
       source_descriptor: source_descriptor,
@@ -156,22 +156,22 @@ RSpec.describe A3::Domain::AgentJobRequest do
 
 it "round-trips merge recovery requests" do
   merge_recovery_request = {
-    "workspace_id" => "merge-Portal-42-run-merge-1",
+    "workspace_id" => "merge-Sample-42-run-merge-1",
     "slots" => {
       "repo_alpha" => {
-        "runtime_path" => "/agent/workspaces/merge-Portal-42-run-merge-1/repo-alpha",
+        "runtime_path" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo-alpha",
         "target_ref" => "refs/heads/main",
-        "source_ref" => "refs/heads/a3/work/Portal-42",
+        "source_ref" => "refs/heads/a3/work/Sample-42",
         "merge_before_head" => "abc123",
         "source_head_commit" => "def456",
         "conflict_files" => ["docs/conflict.md"],
-        "commit_message" => "Recover Portal#42 merge"
+        "commit_message" => "Recover Sample#42 merge"
       }
     }
   }
   request = described_class.new(
-    job_id: "job-portal-42-merge-recovery",
-    task_ref: "Portal#42",
+    job_id: "job-sample-42-merge-recovery",
+    task_ref: "Sample#42",
     phase: :merge,
     runtime_profile: "host-local",
     source_descriptor: source_descriptor,
@@ -192,7 +192,7 @@ end
     expect do
       described_class.new(
         job_id: "job-1",
-        task_ref: "Portal#42",
+        task_ref: "Sample#42",
         phase: :deploy,
         runtime_profile: "host-local",
         source_descriptor: source_descriptor,
@@ -208,7 +208,7 @@ end
     expect do
       described_class.new(
         job_id: "job-1",
-        task_ref: "Portal#42",
+        task_ref: "Sample#42",
         phase: :verification,
         runtime_profile: "host-local",
         source_descriptor: source_descriptor,

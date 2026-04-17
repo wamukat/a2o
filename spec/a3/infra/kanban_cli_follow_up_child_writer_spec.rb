@@ -6,7 +6,7 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
   subject(:writer) do
     described_class.new(
       command_argv: %w[task kanban:api --],
-      project: "Portal",
+      project: "Sample",
       repo_label_map: { "repo:starters" => ["repo_alpha"], "repo:ui-app" => ["repo_beta"] },
       follow_up_label: "a3:follow-up-child",
       working_dir: "/tmp"
@@ -27,9 +27,9 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
 
   it "creates a new follow-up child and attaches it to the parent" do
     description = <<~DESC.strip
-      Parent: Portal#3140
+      Parent: Sample#3140
       Repo scope: repo_beta
-      Fingerprint: Portal#3140|run-parent-review-1|repo_beta|finding-1
+      Fingerprint: Sample#3140|run-parent-review-1|repo_beta|finding-1
 
       Summary:
       redirect regression
@@ -40,7 +40,7 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
     captured_argv = []
     responses = [
       ["[]", "", success_status], # task-find
-      [JSON.generate({ "id" => 3200, "ref" => "Portal#3200", "title" => "Follow-up for Portal#3140 (repo_beta): redirect regression", "description" => description }), "", success_status],
+      [JSON.generate({ "id" => 3200, "ref" => "Sample#3200", "title" => "Follow-up for Sample#3140 (repo_beta): redirect regression", "description" => description }), "", success_status],
       ["{}", "", success_status], # label-ensure repo
       ["{}", "", success_status], # label-add repo
       ["{}", "", success_status], # label-ensure trigger
@@ -56,15 +56,15 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
     end
 
     result = writer.call(
-      parent_task_ref: "Portal#3140",
+      parent_task_ref: "Sample#3140",
       parent_external_task_id: 3140,
       review_run_ref: "run-parent-review-1",
       disposition: disposition
     )
 
     expect(result.success?).to be(true)
-    expect(result.child_refs).to eq(["Portal#3200"])
-    expect(result.child_fingerprints).to eq(["Portal#3140|run-parent-review-1|repo_beta|finding-1"])
+    expect(result.child_refs).to eq(["Sample#3200"])
+    expect(result.child_fingerprints).to eq(["Sample#3140|run-parent-review-1|repo_beta|finding-1"])
     task_create_argv = captured_argv.find { |args| args.include?("task-create") }
     expect(task_create_argv).to include("--description-file")
     expect(task_create_argv).not_to include("--description")
@@ -72,11 +72,11 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
 
   it "blocks when an existing fingerprinted child has mismatched canonical payload" do
     allow(Open3).to receive(:capture3).and_return(
-      [JSON.generate([{ "id" => 3200, "ref" => "Portal#3200", "title" => "wrong", "description" => "Fingerprint: Portal#3140|run-parent-review-1|repo_beta|finding-1" }]), "", success_status]
+      [JSON.generate([{ "id" => 3200, "ref" => "Sample#3200", "title" => "wrong", "description" => "Fingerprint: Sample#3140|run-parent-review-1|repo_beta|finding-1" }]), "", success_status]
     )
 
     result = writer.call(
-      parent_task_ref: "Portal#3140",
+      parent_task_ref: "Sample#3140",
       parent_external_task_id: 3140,
       review_run_ref: "run-parent-review-1",
       disposition: disposition
@@ -88,9 +88,9 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
 
   it "blocks when an existing fingerprinted child has relation drift" do
     description = <<~DESC.strip
-      Parent: Portal#3140
+      Parent: Sample#3140
       Repo scope: repo_beta
-      Fingerprint: Portal#3140|run-parent-review-1|repo_beta|finding-1
+      Fingerprint: Sample#3140|run-parent-review-1|repo_beta|finding-1
 
       Summary:
       redirect regression
@@ -99,13 +99,13 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
       legacy malformed params should redirect
     DESC
     allow(Open3).to receive(:capture3).and_return(
-      [JSON.generate([{ "id" => 3200, "ref" => "Portal#3200", "title" => "Follow-up for Portal#3140 (repo_beta): redirect regression", "description" => description }]), "", success_status],
+      [JSON.generate([{ "id" => 3200, "ref" => "Sample#3200", "title" => "Follow-up for Sample#3140 (repo_beta): redirect regression", "description" => description }]), "", success_status],
       [JSON.generate([{ "title" => "a3:follow-up-child" }, { "title" => "repo:ui-app" }, { "title" => "trigger:auto-implement" }]), "", success_status],
       ["[]", "", success_status]
     )
 
     result = writer.call(
-      parent_task_ref: "Portal#3140",
+      parent_task_ref: "Sample#3140",
       parent_external_task_id: 3140,
       review_run_ref: "run-parent-review-1",
       disposition: disposition
@@ -118,7 +118,7 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
   it "fails closed when no repo label is configured for the disposition scope" do
     writer = described_class.new(
       command_argv: %w[task kanban:api --],
-      project: "Portal",
+      project: "Sample",
       repo_label_map: { "repo:starters" => ["repo_alpha"] },
       follow_up_label: "a3:follow-up-child",
       working_dir: "/tmp"
@@ -128,7 +128,7 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
     )
 
     result = writer.call(
-      parent_task_ref: "Portal#3140",
+      parent_task_ref: "Sample#3140",
       parent_external_task_id: 3140,
       review_run_ref: "run-parent-review-1",
       disposition: disposition

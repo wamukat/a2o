@@ -14,13 +14,13 @@ RSpec.describe "worker:stdin-bundle" do
 
   def base_request
     {
-      "task_ref" => "Portal#3112",
+      "task_ref" => "Sample#3112",
       "run_ref" => "run-1",
       "phase" => "implementation",
       "phase_runtime" => { "implementation_skill" => "skill.md" },
       "slot_paths" => { "repo_alpha" => "/tmp/workspace/repo-alpha" },
       "task_packet" => {
-        "ref" => "Portal#3112",
+        "ref" => "Sample#3112",
         "title" => "DB操作をJDBCからMyBatisへ変更する",
         "description" => "JDBC 実装を MyBatis に置き換える。",
         "status" => "In progress",
@@ -66,7 +66,7 @@ RSpec.describe "worker:stdin-bundle" do
           { "success" => true }
         else
           {
-            "task_ref" => "Portal#3112",
+            "task_ref" => "Sample#3112",
             "run_ref" => "run-1",
             "phase" => "implementation",
             "success" => true,
@@ -255,7 +255,7 @@ RSpec.describe "worker:stdin-bundle" do
   it "normalizes review disposition repo scope only through injected aliases" do
     request = base_request
     payload = {
-      "task_ref" => "Portal#3112",
+      "task_ref" => "Sample#3112",
       "run_ref" => "run-1",
       "phase" => "implementation",
       "success" => true,
@@ -306,10 +306,10 @@ RSpec.describe "worker:stdin-bundle" do
     end
   end
 
-  it "does not hardcode Portal repo label aliases in the engine worker" do
+  it "does not hardcode project-specific repo label aliases in the engine worker" do
     request = base_request
     payload = {
-      "task_ref" => "Portal#3112",
+      "task_ref" => "Sample#3112",
       "run_ref" => "run-1",
       "phase" => "implementation",
       "success" => true,
@@ -426,7 +426,7 @@ RSpec.describe "worker:stdin-bundle" do
 
   it "requires review_disposition in the parent review schema" do
     request = {
-      "task_ref" => "Portal#3140",
+      "task_ref" => "Sample#3140",
       "run_ref" => "run-parent-review-1",
       "phase" => "review",
       "phase_runtime" => { "task_kind" => "parent", "review_skill" => "skill.md" },

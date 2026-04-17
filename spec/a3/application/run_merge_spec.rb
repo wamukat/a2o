@@ -226,7 +226,7 @@ RSpec.describe A3::Application::RunMerge do
 
   it "routes single-task merge recovery publish back to verification of the live target" do
     single_task = A3::Domain::Task.new(
-      ref: "Portal#245",
+      ref: "Sample#245",
       kind: :single,
       edit_scope: [:repo_alpha],
       status: :merging,
@@ -237,9 +237,9 @@ RSpec.describe A3::Application::RunMerge do
       task_ref: single_task.ref,
       phase: :merge,
       workspace_kind: :runtime_workspace,
-      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: single_task.ref, ref: "refs/heads/a3/work/Portal-245"),
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: single_task.ref, ref: "refs/heads/a3/work/Sample-245"),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], ownership_scope: :task),
-      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: single_task.ref, owner_scope: :task, snapshot_version: "refs/heads/a3/work/Portal-245")
+      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: single_task.ref, owner_scope: :task, snapshot_version: "refs/heads/a3/work/Sample-245")
     )
     task_repository.save(single_task)
     run_repository.save(single_run)
@@ -248,9 +248,9 @@ RSpec.describe A3::Application::RunMerge do
       A3::Application::PrepareWorkspace::Result.new(
         workspace: A3::Domain::PreparedWorkspace.new(
           workspace_kind: :runtime_workspace,
-          root_path: "/tmp/a3/workspaces/Portal-245/runtime_workspace",
+          root_path: "/tmp/a3/workspaces/Sample-245/runtime_workspace",
           source_descriptor: single_run.source_descriptor,
-          slot_paths: { repo_alpha: "/tmp/a3/workspaces/Portal-245/runtime_workspace/repo-alpha" }
+          slot_paths: { repo_alpha: "/tmp/a3/workspaces/Sample-245/runtime_workspace/repo-alpha" }
         )
       )
     )
@@ -260,7 +260,7 @@ RSpec.describe A3::Application::RunMerge do
       expect(workspace).to be_a(A3::Domain::PreparedWorkspace)
       A3::Application::ExecutionResult.new(
         success: true,
-        summary: "merge recovery published Portal#245 docs validation conflict",
+        summary: "merge recovery published Sample#245 docs validation conflict",
         diagnostics: {
           "merge_recovery" => {
             "status" => "recovered",
@@ -281,7 +281,7 @@ RSpec.describe A3::Application::RunMerge do
     result = use_case.call(task_ref: single_task.ref, run_ref: single_run.ref, project_context: live_project_context)
 
     expect(captured_single_merge_plan.integration_target.target_ref).to eq("refs/heads/main")
-    expect(captured_single_merge_plan.merge_source.source_ref).to eq("refs/heads/a3/work/Portal-245")
+    expect(captured_single_merge_plan.merge_source.source_ref).to eq("refs/heads/a3/work/Sample-245")
     expect(result.task.status).to eq(:verifying)
     expect(result.task.verification_source_ref).to eq("refs/heads/main")
     expect(result.run.terminal_outcome).to eq(:verification_required)
@@ -293,22 +293,22 @@ RSpec.describe A3::Application::RunMerge do
 
   it "routes parent merge recovery publish back to verification of the live target" do
     parent_task = A3::Domain::Task.new(
-      ref: "Portal#201",
+      ref: "Sample#201",
       kind: :parent,
       edit_scope: %i[repo_alpha repo_beta],
       verification_scope: %i[repo_alpha repo_beta],
       status: :merging,
       current_run_ref: "run-parent-merge-201",
-      child_refs: %w[Portal#202 Portal#205]
+      child_refs: %w[Sample#202 Sample#205]
     )
     parent_run = A3::Domain::Run.new(
       ref: "run-parent-merge-201",
       task_ref: parent_task.ref,
       phase: :merge,
       workspace_kind: :runtime_workspace,
-      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: parent_task.ref, ref: "refs/heads/a3/parent/Portal-201"),
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: parent_task.ref, ref: "refs/heads/a3/parent/Sample-201"),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: %i[repo_alpha repo_beta], verification_scope: %i[repo_alpha repo_beta], ownership_scope: :parent),
-      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: parent_task.ref, owner_scope: :parent, snapshot_version: "refs/heads/a3/parent/Portal-201")
+      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: parent_task.ref, owner_scope: :parent, snapshot_version: "refs/heads/a3/parent/Sample-201")
     )
     task_repository.save(parent_task)
     run_repository.save(parent_run)
@@ -317,11 +317,11 @@ RSpec.describe A3::Application::RunMerge do
       A3::Application::PrepareWorkspace::Result.new(
         workspace: A3::Domain::PreparedWorkspace.new(
           workspace_kind: :runtime_workspace,
-          root_path: "/tmp/a3/workspaces/Portal-201/runtime_workspace",
+          root_path: "/tmp/a3/workspaces/Sample-201/runtime_workspace",
           source_descriptor: parent_run.source_descriptor,
           slot_paths: {
-            repo_alpha: "/tmp/a3/workspaces/Portal-201/runtime_workspace/repo-alpha",
-            repo_beta: "/tmp/a3/workspaces/Portal-201/runtime_workspace/repo-beta"
+            repo_alpha: "/tmp/a3/workspaces/Sample-201/runtime_workspace/repo-alpha",
+            repo_beta: "/tmp/a3/workspaces/Sample-201/runtime_workspace/repo-beta"
           }
         )
       )
@@ -353,7 +353,7 @@ RSpec.describe A3::Application::RunMerge do
     result = use_case.call(task_ref: parent_task.ref, run_ref: parent_run.ref, project_context: live_project_context)
 
     expect(captured_parent_merge_plan.integration_target.target_ref).to eq("refs/heads/main")
-    expect(captured_parent_merge_plan.merge_source.source_ref).to eq("refs/heads/a3/parent/Portal-201")
+    expect(captured_parent_merge_plan.merge_source.source_ref).to eq("refs/heads/a3/parent/Sample-201")
     expect(result.task.status).to eq(:verifying)
     expect(result.task.verification_source_ref).to eq("refs/heads/main")
     expect(result.run.terminal_outcome).to eq(:verification_required)

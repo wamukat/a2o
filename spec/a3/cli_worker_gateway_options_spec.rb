@@ -62,7 +62,7 @@ RSpec.describe "A3 CLI worker gateway options" do
         agent_shared_workspace_mode: "same-path",
         agent_workspace_root: "/agent/workspaces",
         agent_source_paths: {
-          "member-portal-starters" => "/agent/repos/starters"
+          "sample-catalog-service" => "/agent/repos/starters"
         },
         agent_env: {
           "A3_ROOT_DIR" => "/agent/a3"
@@ -75,7 +75,7 @@ RSpec.describe "A3 CLI worker gateway options" do
     expect(gateway.instance_variable_get(:@agent_environment)).to eq(
       "workspace_root" => "/agent/workspaces",
       "source_paths" => {
-        "member-portal-starters" => "/agent/repos/starters"
+        "sample-catalog-service" => "/agent/repos/starters"
       },
       "env" => {
         "A3_ROOT_DIR" => "/agent/a3"
@@ -95,8 +95,8 @@ RSpec.describe "A3 CLI worker gateway options" do
         agent_runtime_profile: "host-local",
         agent_shared_workspace_mode: "agent-materialized",
         agent_source_aliases: {
-          "repo_alpha" => "portal-alpha",
-          "repo_beta" => "portal-beta"
+          "repo_alpha" => "sample-alpha",
+          "repo_beta" => "sample-beta"
         },
         agent_support_ref: "refs/heads/feature/prototype",
         agent_workspace_cleanup_policy: :cleanup_after_job
@@ -120,8 +120,8 @@ RSpec.describe "A3 CLI worker gateway options" do
         agent_runtime_profile: "host-local",
         agent_shared_workspace_mode: "agent-materialized",
         agent_source_aliases: {
-          "repo_alpha" => "portal-alpha",
-          "repo_beta" => "portal-beta"
+          "repo_alpha" => "sample-alpha",
+          "repo_beta" => "sample-beta"
         },
         agent_support_refs: {
           "repo_beta" => "refs/heads/support/beta"
@@ -223,7 +223,7 @@ RSpec.describe "A3 CLI worker gateway options" do
         agent_runtime_profile: "host-local",
         agent_shared_workspace_mode: "agent-materialized",
         agent_source_aliases: {
-          "repo_alpha" => "portal-alpha"
+          "repo_alpha" => "sample-alpha"
         }
       },
       fallback: instance_double(A3::Infra::LocalCommandRunner)
@@ -252,7 +252,7 @@ RSpec.describe "A3 CLI worker gateway options" do
         agent_control_plane_url: "http://127.0.0.1:4567",
         agent_runtime_profile: "host-local",
         agent_source_aliases: {
-          "repo_alpha" => "portal-alpha"
+          "repo_alpha" => "sample-alpha"
         },
         worker_command: "a3-worker",
         worker_command_args: ["--run"],
@@ -306,11 +306,11 @@ RSpec.describe "A3 CLI worker gateway options" do
       agent_runtime_profile: "host-local",
       agent_shared_workspace_mode: "agent-materialized",
       agent_source_aliases: {
-        "repo_alpha" => "member-portal-starters"
+        "repo_alpha" => "sample-catalog-service"
       },
       agent_workspace_root: "/agent/workspaces",
       agent_source_paths: {
-        "member-portal-starters" => "/agent/repos/starters"
+        "sample-catalog-service" => "/agent/repos/starters"
       }
     }
 
@@ -328,7 +328,7 @@ RSpec.describe "A3 CLI worker gateway options" do
     expect(command_runner.instance_variable_get(:@agent_environment)).to eq(
       "workspace_root" => "/agent/workspaces",
       "source_paths" => {
-        "member-portal-starters" => "/agent/repos/starters"
+        "sample-catalog-service" => "/agent/repos/starters"
       }
     )
     expect(merge_runner.instance_variable_get(:@agent_environment)).to eq(command_runner.instance_variable_get(:@agent_environment))

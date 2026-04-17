@@ -11,15 +11,15 @@ import (
 
 func TestWorkspaceMaterializerPreparesAndCleansWorktreeSlots(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	materializer := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 		SourceAliases: map[string]string{
-			"member-portal-starters": sourceRoot,
+			"sample-catalog-service": sourceRoot,
 		},
 	}
 
-	prepared, err := materializer.Prepare(testWorkspaceRequest("member-portal-starters"))
+	prepared, err := materializer.Prepare(testWorkspaceRequest("sample-catalog-service"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,17 +28,17 @@ func TestWorkspaceMaterializerPreparesAndCleansWorktreeSlots(t *testing.T) {
 		t.Fatal(err)
 	}
 	descriptor := prepared.SlotDescriptors["repo_alpha"]
-	if descriptor["source_alias"] != "member-portal-starters" {
+	if descriptor["source_alias"] != "sample-catalog-service" {
 		t.Fatalf("unexpected descriptor: %#v", descriptor)
 	}
-	if descriptor["branch_ref"] != "refs/heads/a3/work/Portal-42" {
+	if descriptor["branch_ref"] != "refs/heads/a3/work/Sample-42" {
 		t.Fatalf("unexpected branch descriptor: %#v", descriptor)
 	}
 	if descriptor["dirty_before"] != false || descriptor["dirty_after"] != false {
 		t.Fatalf("unexpected dirty descriptor: %#v", descriptor)
 	}
 	workspaceMetadata := readJSON(t, filepath.Join(prepared.Root, ".a3", "workspace.json"))
-	if workspaceMetadata["workspace_kind"] != "ticket_workspace" || workspaceMetadata["source_ref"] != "refs/heads/a3/work/Portal-42" {
+	if workspaceMetadata["workspace_kind"] != "ticket_workspace" || workspaceMetadata["source_ref"] != "refs/heads/a3/work/Sample-42" {
 		t.Fatalf("unexpected workspace metadata: %#v", workspaceMetadata)
 	}
 	slotMetadata := readJSON(t, filepath.Join(slotPath, ".a3", "slot.json"))
@@ -62,34 +62,34 @@ func TestWorkspaceMaterializerPreparesAndCleansWorktreeSlots(t *testing.T) {
 
 func TestWorkspaceMaterializerUsesParentChildTopologyRoot(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	materializer := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 		SourceAliases: map[string]string{
-			"member-portal-starters": sourceRoot,
+			"sample-catalog-service": sourceRoot,
 		},
 	}
-	request := testWorkspaceRequest("member-portal-starters")
-	request.WorkspaceID = "Portal-134-children-Portal-135-implementation-run-implementation"
+	request := testWorkspaceRequest("sample-catalog-service")
+	request.WorkspaceID = "Sample-134-children-Sample-135-implementation-run-implementation"
 	request.Topology = &WorkspaceTopology{
 		Kind:              "parent_child",
-		ParentRef:         "Portal#134",
-		ChildRef:          "Portal#135",
-		ParentWorkspaceID: "Portal-134-parent",
-		RelativePath:      "children/Portal-135/ticket_workspace",
+		ParentRef:         "Sample#134",
+		ChildRef:          "Sample#135",
+		ParentWorkspaceID: "Sample-134-parent",
+		RelativePath:      "children/Sample-135/ticket_workspace",
 	}
 
 	prepared, err := materializer.Prepare(request)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedRoot := filepath.Join(tmp, "agent-workspaces", "Portal-134-parent", "children", "Portal-135", "ticket_workspace")
+	expectedRoot := filepath.Join(tmp, "agent-workspaces", "Sample-134-parent", "children", "Sample-135", "ticket_workspace")
 	if prepared.Root != expectedRoot {
 		t.Fatalf("unexpected topology root: got=%s want=%s", prepared.Root, expectedRoot)
 	}
 	workspaceMetadata := readJSON(t, filepath.Join(prepared.Root, ".a3", "workspace.json"))
 	topology, ok := workspaceMetadata["topology"].(map[string]any)
-	if !ok || topology["parent_workspace_id"] != "Portal-134-parent" || topology["relative_path"] != "children/Portal-135/ticket_workspace" {
+	if !ok || topology["parent_workspace_id"] != "Sample-134-parent" || topology["relative_path"] != "children/Sample-135/ticket_workspace" {
 		t.Fatalf("unexpected topology metadata: %#v", workspaceMetadata)
 	}
 	if err := materializer.Cleanup(prepared); err != nil {
@@ -99,27 +99,27 @@ func TestWorkspaceMaterializerUsesParentChildTopologyRoot(t *testing.T) {
 
 func TestWorkspaceMaterializerCleansDescriptorWithParentChildTopology(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	materializer := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 		SourceAliases: map[string]string{
-			"member-portal-starters": sourceRoot,
+			"sample-catalog-service": sourceRoot,
 		},
 	}
-	request := testWorkspaceRequest("member-portal-starters")
-	request.WorkspaceID = "Portal-134-children-Portal-135-implementation-run-implementation"
+	request := testWorkspaceRequest("sample-catalog-service")
+	request.WorkspaceID = "Sample-134-children-Sample-135-implementation-run-implementation"
 	request.Topology = &WorkspaceTopology{
 		Kind:              "parent_child",
-		ParentRef:         "Portal#134",
-		ChildRef:          "Portal#135",
-		ParentWorkspaceID: "Portal-134-parent",
-		RelativePath:      "children/Portal-135/ticket_workspace",
+		ParentRef:         "Sample#134",
+		ChildRef:          "Sample#135",
+		ParentWorkspaceID: "Sample-134-parent",
+		RelativePath:      "children/Sample-135/ticket_workspace",
 	}
 	prepared, err := materializer.Prepare(request)
 	if err != nil {
 		t.Fatal(err)
 	}
-	siblingPath := filepath.Join(tmp, "agent-workspaces", "Portal-999-parent", "children", "Portal-135", "ticket_workspace")
+	siblingPath := filepath.Join(tmp, "agent-workspaces", "Sample-999-parent", "children", "Sample-135", "ticket_workspace")
 	if err := os.MkdirAll(siblingPath, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -156,19 +156,19 @@ func TestWorkspaceMaterializerRejectsDescriptorSlotOutsideTopologyRoot(t *testin
 	descriptor := WorkspaceDescriptor{
 		WorkspaceKind:    "ticket_workspace",
 		RuntimeProfile:   "host-local",
-		WorkspaceID:      "Portal-134-children-Portal-135-implementation-run-implementation",
+		WorkspaceID:      "Sample-134-children-Sample-135-implementation-run-implementation",
 		SourceDescriptor: SourceDescriptor{WorkspaceKind: "ticket_workspace", SourceType: "branch_head"},
 		SlotDescriptors: map[string]map[string]any{
 			"repo_alpha": {
-				"runtime_path": filepath.Join(tmp, "agent-workspaces", "Portal-999-parent", "children", "Portal-135", "ticket_workspace", "repo-alpha"),
+				"runtime_path": filepath.Join(tmp, "agent-workspaces", "Sample-999-parent", "children", "Sample-135", "ticket_workspace", "repo-alpha"),
 			},
 		},
 		Topology: &WorkspaceTopology{
 			Kind:              "parent_child",
-			ParentRef:         "Portal#134",
-			ChildRef:          "Portal#135",
-			ParentWorkspaceID: "Portal-134-parent",
-			RelativePath:      "children/Portal-135/ticket_workspace",
+			ParentRef:         "Sample#134",
+			ChildRef:          "Sample#135",
+			ParentWorkspaceID: "Sample-134-parent",
+			RelativePath:      "children/Sample-135/ticket_workspace",
 		},
 	}
 
@@ -178,10 +178,10 @@ func TestWorkspaceMaterializerRejectsDescriptorSlotOutsideTopologyRoot(t *testin
 }
 
 func TestWorkspaceMaterializerRejectsUnsafeParentChildTopologyPath(t *testing.T) {
-	request := testWorkspaceRequest("member-portal-starters")
+	request := testWorkspaceRequest("sample-catalog-service")
 	request.Topology = &WorkspaceTopology{
 		Kind:              "parent_child",
-		ParentWorkspaceID: "Portal-134-parent",
+		ParentWorkspaceID: "Sample-134-parent",
 		RelativePath:      "../escape",
 	}
 	materializer := WorkspaceMaterializer{WorkspaceRoot: t.TempDir()}
@@ -206,32 +206,32 @@ func readJSON(t *testing.T, path string) map[string]any {
 
 func TestWorkspaceMaterializerFailsBeforeCommandForDirtySource(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	if err := os.WriteFile(filepath.Join(sourceRoot, "dirty.txt"), []byte("dirty\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	materializer := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 		SourceAliases: map[string]string{
-			"member-portal-starters": sourceRoot,
+			"sample-catalog-service": sourceRoot,
 		},
 	}
 
-	if _, err := materializer.Prepare(testWorkspaceRequest("member-portal-starters")); err == nil {
+	if _, err := materializer.Prepare(testWorkspaceRequest("sample-catalog-service")); err == nil {
 		t.Fatal("expected dirty source failure")
 	}
 }
 
 func TestWorkspaceMaterializerRejectsMissingSlotMetadata(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	materializer := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 		SourceAliases: map[string]string{
-			"member-portal-starters": sourceRoot,
+			"sample-catalog-service": sourceRoot,
 		},
 	}
-	request := testWorkspaceRequest("member-portal-starters")
+	request := testWorkspaceRequest("sample-catalog-service")
 	slot := request.Slots["repo_alpha"]
 	slot.SyncClass = ""
 	request.Slots["repo_alpha"] = slot
@@ -243,14 +243,14 @@ func TestWorkspaceMaterializerRejectsMissingSlotMetadata(t *testing.T) {
 
 func TestWorkspaceMaterializerRejectsNonBranchRefs(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	materializer := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 		SourceAliases: map[string]string{
-			"member-portal-starters": sourceRoot,
+			"sample-catalog-service": sourceRoot,
 		},
 	}
-	request := testWorkspaceRequest("member-portal-starters")
+	request := testWorkspaceRequest("sample-catalog-service")
 	slot := request.Slots["repo_alpha"]
 	slot.Ref = "HEAD"
 	request.Slots["repo_alpha"] = slot
@@ -262,18 +262,18 @@ func TestWorkspaceMaterializerRejectsNonBranchRefs(t *testing.T) {
 
 func TestWorkspaceMaterializerBootstrapsMissingWorktreeBranchAtMaterialization(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	git(t, sourceRoot, "branch", "feature/prototype", "HEAD")
 	liveHead := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "HEAD"))
-	request := testWorkspaceRequest("member-portal-starters")
+	request := testWorkspaceRequest("sample-catalog-service")
 	slot := request.Slots["repo_alpha"]
-	slot.Ref = "refs/heads/a3/work/Portal-99"
+	slot.Ref = "refs/heads/a3/work/Sample-99"
 	slot.BootstrapRef = "refs/heads/feature/prototype"
 	request.Slots["repo_alpha"] = slot
 	materializer := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 		SourceAliases: map[string]string{
-			"member-portal-starters": sourceRoot,
+			"sample-catalog-service": sourceRoot,
 		},
 	}
 
@@ -285,7 +285,7 @@ func TestWorkspaceMaterializerBootstrapsMissingWorktreeBranchAtMaterialization(t
 	if descriptor["bootstrapped_ref"] != true || descriptor["bootstrap_head"] != liveHead {
 		t.Fatalf("unexpected bootstrap descriptor: %#v", descriptor)
 	}
-	if head := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "refs/heads/a3/work/Portal-99")); head != liveHead {
+	if head := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "refs/heads/a3/work/Sample-99")); head != liveHead {
 		t.Fatalf("branch was not bootstrapped from live head: got=%s want=%s", head, liveHead)
 	}
 	if err := materializer.Cleanup(prepared); err != nil {
@@ -295,15 +295,15 @@ func TestWorkspaceMaterializerBootstrapsMissingWorktreeBranchAtMaterialization(t
 
 func TestWorkspaceMaterializerRequiresBootstrapForMissingWorktreeBranch(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
-	request := testWorkspaceRequest("member-portal-starters")
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
+	request := testWorkspaceRequest("sample-catalog-service")
 	slot := request.Slots["repo_alpha"]
-	slot.Ref = "refs/heads/a3/work/Portal-99"
+	slot.Ref = "refs/heads/a3/work/Sample-99"
 	request.Slots["repo_alpha"] = slot
 	materializer := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 		SourceAliases: map[string]string{
-			"member-portal-starters": sourceRoot,
+			"sample-catalog-service": sourceRoot,
 		},
 	}
 
@@ -314,19 +314,19 @@ func TestWorkspaceMaterializerRequiresBootstrapForMissingWorktreeBranch(t *testi
 
 func TestWorkspaceMaterializerBootstrapsMissingParentThenChildBranch(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	git(t, sourceRoot, "branch", "feature/prototype", "HEAD")
 	liveHead := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "HEAD"))
-	request := testWorkspaceRequest("member-portal-starters")
+	request := testWorkspaceRequest("sample-catalog-service")
 	slot := request.Slots["repo_alpha"]
-	slot.Ref = "refs/heads/a3/work/Portal-204"
-	slot.BootstrapRef = "refs/heads/a3/parent/Portal-203"
+	slot.Ref = "refs/heads/a3/work/Sample-204"
+	slot.BootstrapRef = "refs/heads/a3/parent/Sample-203"
 	slot.BootstrapBaseRef = "refs/heads/feature/prototype"
 	request.Slots["repo_alpha"] = slot
 	materializer := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 		SourceAliases: map[string]string{
-			"member-portal-starters": sourceRoot,
+			"sample-catalog-service": sourceRoot,
 		},
 	}
 
@@ -338,10 +338,10 @@ func TestWorkspaceMaterializerBootstrapsMissingParentThenChildBranch(t *testing.
 	if descriptor["bootstrapped_ref"] != true || descriptor["bootstrapped_base_ref"] != true {
 		t.Fatalf("unexpected chained bootstrap descriptor: %#v", descriptor)
 	}
-	if parentHead := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "refs/heads/a3/parent/Portal-203")); parentHead != liveHead {
+	if parentHead := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "refs/heads/a3/parent/Sample-203")); parentHead != liveHead {
 		t.Fatalf("parent branch was not bootstrapped from live head: got=%s want=%s", parentHead, liveHead)
 	}
-	if childHead := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "refs/heads/a3/work/Portal-204")); childHead != liveHead {
+	if childHead := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "refs/heads/a3/work/Sample-204")); childHead != liveHead {
 		t.Fatalf("child branch was not bootstrapped from parent head: got=%s want=%s", childHead, liveHead)
 	}
 	if err := materializer.Cleanup(prepared); err != nil {
@@ -359,7 +359,7 @@ func TestPublishWorkspaceChangesValidatesAllSlotsBeforeCommitting(t *testing.T) 
 			Kind:  "local_git",
 			Alias: "repo-beta",
 		},
-		Ref:       "refs/heads/a3/work/Portal-42",
+		Ref:       "refs/heads/a3/work/Sample-42",
 		Checkout:  "worktree_branch",
 		Access:    "read_write",
 		SyncClass: "eager",
@@ -377,7 +377,7 @@ func TestPublishWorkspaceChangesValidatesAllSlotsBeforeCommitting(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	alphaHead := git(t, alphaRoot, "rev-parse", "a3/work/Portal-42")
+	alphaHead := git(t, alphaRoot, "rev-parse", "a3/work/Sample-42")
 	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-alpha", "alpha.txt"), []byte("alpha\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -396,7 +396,7 @@ func TestPublishWorkspaceChangesValidatesAllSlotsBeforeCommitting(t *testing.T) 
 	if err == nil || !strings.Contains(err.Error(), "repo_beta changed files do not match worker result") {
 		t.Fatalf("expected repo_beta changed files mismatch, got %v", err)
 	}
-	if head := git(t, alphaRoot, "rev-parse", "a3/work/Portal-42"); head != alphaHead {
+	if head := git(t, alphaRoot, "rev-parse", "a3/work/Sample-42"); head != alphaHead {
 		t.Fatalf("repo_alpha branch advanced before all slots validated: before=%s after=%s", alphaHead, head)
 	}
 }
@@ -408,11 +408,11 @@ func TestPublishWorkspaceChangesCommitsAllEditTargetChangesOnCommandSuccess(t *t
 	request := testWorkspaceRequest("repo-alpha")
 	request.PublishPolicy = &WorkspacePublishPolicy{
 		Mode:          "commit_all_edit_target_changes_on_success",
-		CommitMessage: "A3 remediation update for Portal#42",
+		CommitMessage: "A3 remediation update for Sample#42",
 	}
 	request.Slots["repo_beta"] = WorkspaceSlotRequest{
 		Source:    WorkspaceSourceRequest{Kind: "local_git", Alias: "repo-beta"},
-		Ref:       "refs/heads/a3/work/Portal-42",
+		Ref:       "refs/heads/a3/work/Sample-42",
 		Checkout:  "worktree_branch",
 		Access:    "read_only",
 		SyncClass: "lazy_but_guaranteed",
@@ -443,7 +443,7 @@ func TestPublishWorkspaceChangesCommitsAllEditTargetChangesOnCommandSuccess(t *t
 	if alphaSlot["publish_status"] != "committed" || alphaSlot["published"] != true {
 		t.Fatalf("expected remediation commit evidence: %#v", alphaSlot)
 	}
-	if head := trimTrailingNewline(git(t, alphaRoot, "rev-parse", "a3/work/Portal-42")); head != alphaSlot["publish_after_head"] {
+	if head := trimTrailingNewline(git(t, alphaRoot, "rev-parse", "a3/work/Sample-42")); head != alphaSlot["publish_after_head"] {
 		t.Fatalf("source branch was not advanced by remediation: head=%s slot=%#v", head, alphaSlot)
 	}
 	if betaSlot := prepared.SlotDescriptors["repo_beta"]; betaSlot["publish_status"] != "skipped" || betaSlot["published"] != false {
@@ -457,7 +457,7 @@ func TestPublishWorkspaceChangesCommitsAllEditTargetChangesOnWorkerSuccess(t *te
 	request := testWorkspaceRequest("repo-alpha")
 	request.PublishPolicy = &WorkspacePublishPolicy{
 		Mode:          "commit_all_edit_target_changes_on_worker_success",
-		CommitMessage: "A3 implementation update for Portal#42",
+		CommitMessage: "A3 implementation update for Sample#42",
 	}
 	materializer := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
@@ -492,7 +492,7 @@ func TestPublishWorkspaceChangesCommitsAllEditTargetChangesOnWorkerSuccess(t *te
 	if join(published) != "declared.txt,generated.txt" {
 		t.Fatalf("expected actual edit-target changes to be published, got %#v", published)
 	}
-	commitFiles := git(t, alphaRoot, "show", "--name-only", "--format=", "a3/work/Portal-42")
+	commitFiles := git(t, alphaRoot, "show", "--name-only", "--format=", "a3/work/Sample-42")
 	if !strings.Contains(commitFiles, "declared.txt") || !strings.Contains(commitFiles, "generated.txt") {
 		t.Fatalf("implementation commit did not include actual changes: %s", commitFiles)
 	}
@@ -506,7 +506,7 @@ func TestPublishWorkspaceChangesRejectsSupportSlotChangesDuringCommandPublish(t 
 	request.PublishPolicy = &WorkspacePublishPolicy{Mode: "commit_all_edit_target_changes_on_success", CommitMessage: "remediate"}
 	request.Slots["repo_beta"] = WorkspaceSlotRequest{
 		Source:    WorkspaceSourceRequest{Kind: "local_git", Alias: "repo-beta"},
-		Ref:       "refs/heads/a3/work/Portal-42",
+		Ref:       "refs/heads/a3/work/Sample-42",
 		Checkout:  "worktree_branch",
 		Access:    "read_only",
 		SyncClass: "lazy_but_guaranteed",
@@ -546,7 +546,7 @@ func TestPublishWorkspaceChangesRollsBackAlreadyCommittedSlots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	alphaHead := git(t, alphaRoot, "rev-parse", "a3/work/Portal-42")
+	alphaHead := git(t, alphaRoot, "rev-parse", "a3/work/Sample-42")
 	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-alpha", "alpha.txt"), []byte("alpha\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -560,7 +560,7 @@ func TestPublishWorkspaceChangesRollsBackAlreadyCommittedSlots(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "rev-parse") {
 		t.Fatalf("expected publish failure after first commit, got %v", err)
 	}
-	if head := git(t, alphaRoot, "rev-parse", "a3/work/Portal-42"); head != alphaHead {
+	if head := git(t, alphaRoot, "rev-parse", "a3/work/Sample-42"); head != alphaHead {
 		t.Fatalf("repo_alpha branch was not rolled back: before=%s after=%s", alphaHead, head)
 	}
 	if resolved := prepared.SlotDescriptors["repo_alpha"]["resolved_head"]; resolved != trimTrailingNewline(alphaHead) {
@@ -614,10 +614,10 @@ func TestWorkspaceMaterializerMergesBranchRefs(t *testing.T) {
 	}
 	git(t, sourceRoot, "add", "feature.txt")
 	git(t, sourceRoot, "commit", "-q", "-m", "feature")
-	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", "HEAD")
+	git(t, sourceRoot, "branch", "-f", "a3/work/Sample-42", "HEAD")
 	git(t, sourceRoot, "branch", "a3/live", "HEAD~1")
 	before := git(t, sourceRoot, "rev-parse", "refs/heads/a3/live")
-	source := git(t, sourceRoot, "rev-parse", "refs/heads/a3/work/Portal-42")
+	source := git(t, sourceRoot, "rev-parse", "refs/heads/a3/work/Sample-42")
 
 	descriptor, execution := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
@@ -625,7 +625,7 @@ func TestWorkspaceMaterializerMergesBranchRefs(t *testing.T) {
 			"repo-alpha": sourceRoot,
 		},
 	}.Merge(MergeRequest{
-		WorkspaceID: "merge-Portal-42",
+		WorkspaceID: "merge-Sample-42",
 		Policy:      "ff_only",
 		Slots: map[string]MergeSlotRequest{
 			"repo_alpha": {
@@ -633,7 +633,7 @@ func TestWorkspaceMaterializerMergesBranchRefs(t *testing.T) {
 					Kind:  "local_git",
 					Alias: "repo-alpha",
 				},
-				SourceRef: "refs/heads/a3/work/Portal-42",
+				SourceRef: "refs/heads/a3/work/Sample-42",
 				TargetRef: "refs/heads/a3/live",
 			},
 		},
@@ -652,7 +652,7 @@ func TestWorkspaceMaterializerMergesBranchRefs(t *testing.T) {
 	if slot["merge_status"] != "merged" || slot["project_repo_mutator"] != "a3-agent" {
 		t.Fatalf("missing agent merge evidence: %#v", slot)
 	}
-	if out := git(t, sourceRoot, "worktree", "list", "--porcelain"); strings.Contains(out, "merge-Portal-42") {
+	if out := git(t, sourceRoot, "worktree", "list", "--porcelain"); strings.Contains(out, "merge-Sample-42") {
 		t.Fatalf("merge worktree leaked: %s", out)
 	}
 }
@@ -667,7 +667,7 @@ func TestWorkspaceMaterializerRejectsUnknownMergePolicy(t *testing.T) {
 			"repo-alpha": sourceRoot,
 		},
 	}.Merge(MergeRequest{
-		WorkspaceID: "merge-Portal-42",
+		WorkspaceID: "merge-Sample-42",
 		Policy:      "surprising_policy",
 		Slots: map[string]MergeSlotRequest{
 			"repo_alpha": {
@@ -675,7 +675,7 @@ func TestWorkspaceMaterializerRejectsUnknownMergePolicy(t *testing.T) {
 					Kind:  "local_git",
 					Alias: "repo-alpha",
 				},
-				SourceRef: "refs/heads/a3/work/Portal-42",
+				SourceRef: "refs/heads/a3/work/Sample-42",
 				TargetRef: "refs/heads/a3/live",
 			},
 		},
@@ -696,7 +696,7 @@ func TestWorkspaceMaterializerRetainsMergeWorkspaceOnContentConflict(t *testing.
 	gitTestCommit(t, sourceRoot, "base conflict file")
 	base := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
 	git(t, sourceRoot, "branch", "-f", "a3/live", base)
-	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", base)
+	git(t, sourceRoot, "branch", "-f", "a3/work/Sample-42", base)
 
 	git(t, sourceRoot, "checkout", "-q", "-B", "target-edit", "a3/live")
 	if err := os.WriteFile(filepath.Join(sourceRoot, "conflict.txt"), []byte("target\n"), 0o644); err != nil {
@@ -714,7 +714,7 @@ func TestWorkspaceMaterializerRetainsMergeWorkspaceOnContentConflict(t *testing.
 	git(t, sourceRoot, "add", "conflict.txt")
 	gitTestCommit(t, sourceRoot, "source edit")
 	sourceHead := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
-	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", sourceHead)
+	git(t, sourceRoot, "branch", "-f", "a3/work/Sample-42", sourceHead)
 
 	descriptor, execution := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
@@ -722,7 +722,7 @@ func TestWorkspaceMaterializerRetainsMergeWorkspaceOnContentConflict(t *testing.
 			"repo-alpha": sourceRoot,
 		},
 	}.Merge(MergeRequest{
-		WorkspaceID: "merge-Portal-42",
+		WorkspaceID: "merge-Sample-42",
 		Policy:      "ff_or_merge",
 		Slots: map[string]MergeSlotRequest{
 			"repo_alpha": {
@@ -730,7 +730,7 @@ func TestWorkspaceMaterializerRetainsMergeWorkspaceOnContentConflict(t *testing.
 					Kind:  "local_git",
 					Alias: "repo-alpha",
 				},
-				SourceRef: "refs/heads/a3/work/Portal-42",
+				SourceRef: "refs/heads/a3/work/Sample-42",
 				TargetRef: "refs/heads/a3/live",
 			},
 		},
@@ -770,7 +770,7 @@ func TestWorkspaceMaterializerRollsBackNonRecoverableMergeConflict(t *testing.T)
 	sourceRoot := createGitSource(t, tmp, "repo-alpha")
 	base := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
 	git(t, sourceRoot, "branch", "-f", "a3/live", base)
-	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", base)
+	git(t, sourceRoot, "branch", "-f", "a3/work/Sample-42", base)
 
 	git(t, sourceRoot, "checkout", "-q", "-B", "target-edit", "a3/live")
 	if err := os.WriteFile(filepath.Join(sourceRoot, "duplicate.txt"), []byte("target\n"), 0o644); err != nil {
@@ -788,7 +788,7 @@ func TestWorkspaceMaterializerRollsBackNonRecoverableMergeConflict(t *testing.T)
 	git(t, sourceRoot, "add", "duplicate.txt")
 	gitTestCommit(t, sourceRoot, "source adds duplicate file")
 	sourceHead := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
-	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", sourceHead)
+	git(t, sourceRoot, "branch", "-f", "a3/work/Sample-42", sourceHead)
 
 	descriptor, execution := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
@@ -796,7 +796,7 @@ func TestWorkspaceMaterializerRollsBackNonRecoverableMergeConflict(t *testing.T)
 			"repo-alpha": sourceRoot,
 		},
 	}.Merge(MergeRequest{
-		WorkspaceID: "merge-Portal-42",
+		WorkspaceID: "merge-Sample-42",
 		Policy:      "ff_or_merge",
 		Slots: map[string]MergeSlotRequest{
 			"repo_alpha": {
@@ -804,7 +804,7 @@ func TestWorkspaceMaterializerRollsBackNonRecoverableMergeConflict(t *testing.T)
 					Kind:  "local_git",
 					Alias: "repo-alpha",
 				},
-				SourceRef: "refs/heads/a3/work/Portal-42",
+				SourceRef: "refs/heads/a3/work/Sample-42",
 				TargetRef: "refs/heads/a3/live",
 			},
 		},
@@ -845,16 +845,16 @@ func TestWorkspaceMaterializerFinalizesRecoveredMergeWorkspace(t *testing.T) {
 	}
 
 	descriptor, execution := WorkspaceMaterializer{}.RecoverMerge(MergeRecoveryRequest{
-		WorkspaceID: "merge-Portal-42",
+		WorkspaceID: "merge-Sample-42",
 		Slots: map[string]MergeRecoverySlotRequest{
 			"repo_alpha": {
 				RuntimePath:      runtimePath,
 				TargetRef:        "refs/heads/a3/live",
-				SourceRef:        "refs/heads/a3/work/Portal-42",
+				SourceRef:        "refs/heads/a3/work/Sample-42",
 				MergeBeforeHead:  targetHead,
 				SourceHeadCommit: sourceHead,
 				ConflictFiles:    []string{"conflict.txt"},
-				CommitMessage:    "Recover Portal#42 merge",
+				CommitMessage:    "Recover Sample#42 merge",
 			},
 		},
 	})
@@ -891,12 +891,12 @@ func TestWorkspaceMaterializerRejectsRecoveredMergeWithConflictMarkers(t *testin
 	targetHead, sourceHead, runtimePath := createRetainedContentConflict(t, tmp, sourceRoot)
 
 	descriptor, execution := WorkspaceMaterializer{}.RecoverMerge(MergeRecoveryRequest{
-		WorkspaceID: "merge-Portal-42",
+		WorkspaceID: "merge-Sample-42",
 		Slots: map[string]MergeRecoverySlotRequest{
 			"repo_alpha": {
 				RuntimePath:      runtimePath,
 				TargetRef:        "refs/heads/a3/live",
-				SourceRef:        "refs/heads/a3/work/Portal-42",
+				SourceRef:        "refs/heads/a3/work/Sample-42",
 				MergeBeforeHead:  targetHead,
 				SourceHeadCommit: sourceHead,
 				ConflictFiles:    []string{"conflict.txt"},
@@ -935,12 +935,12 @@ func TestWorkspaceMaterializerDoesNotPartiallyPublishRecoveredMergeSlots(t *test
 	secondTarget, secondSource, secondRuntime := createRetainedContentConflict(t, filepath.Join(tmp, "second"), secondRoot)
 
 	descriptor, execution := WorkspaceMaterializer{}.RecoverMerge(MergeRecoveryRequest{
-		WorkspaceID: "merge-Portal-42",
+		WorkspaceID: "merge-Sample-42",
 		Slots: map[string]MergeRecoverySlotRequest{
 			"repo_alpha": {
 				RuntimePath:      firstRuntime,
 				TargetRef:        "refs/heads/a3/live",
-				SourceRef:        "refs/heads/a3/work/Portal-42",
+				SourceRef:        "refs/heads/a3/work/Sample-42",
 				MergeBeforeHead:  firstTarget,
 				SourceHeadCommit: firstSource,
 				ConflictFiles:    []string{"conflict.txt"},
@@ -948,7 +948,7 @@ func TestWorkspaceMaterializerDoesNotPartiallyPublishRecoveredMergeSlots(t *test
 			"repo_beta": {
 				RuntimePath:      secondRuntime,
 				TargetRef:        "refs/heads/a3/live",
-				SourceRef:        "refs/heads/a3/work/Portal-42",
+				SourceRef:        "refs/heads/a3/work/Sample-42",
 				MergeBeforeHead:  secondTarget,
 				SourceHeadCommit: secondSource,
 				ConflictFiles:    []string{"conflict.txt"},
@@ -978,7 +978,7 @@ func TestWorkspaceMaterializerRemovesBootstrappedTargetRefOnMergeFailure(t *test
 	}
 	git(t, sourceRoot, "add", "feature.txt")
 	git(t, sourceRoot, "commit", "-q", "-m", "feature")
-	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", "HEAD")
+	git(t, sourceRoot, "branch", "-f", "a3/work/Sample-42", "HEAD")
 
 	_, execution := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
@@ -986,7 +986,7 @@ func TestWorkspaceMaterializerRemovesBootstrappedTargetRefOnMergeFailure(t *test
 			"repo-alpha": sourceRoot,
 		},
 	}.Merge(MergeRequest{
-		WorkspaceID: "merge-Portal-42",
+		WorkspaceID: "merge-Sample-42",
 		Policy:      "ff_only",
 		Slots: map[string]MergeSlotRequest{
 			"repo_alpha": {
@@ -1019,7 +1019,7 @@ func TestWorkspaceMaterializerRollsBackBootstrappedTargetRefWhenLaterSlotIsInval
 			"repo-alpha": sourceRoot,
 		},
 	}.Merge(MergeRequest{
-		WorkspaceID: "merge-Portal-42",
+		WorkspaceID: "merge-Sample-42",
 		Policy:      "ff_only",
 		Slots: map[string]MergeSlotRequest{
 			"repo_alpha": {
@@ -1027,7 +1027,7 @@ func TestWorkspaceMaterializerRollsBackBootstrappedTargetRefWhenLaterSlotIsInval
 					Kind:  "local_git",
 					Alias: "repo-alpha",
 				},
-				SourceRef:    "refs/heads/a3/work/Portal-42",
+				SourceRef:    "refs/heads/a3/work/Sample-42",
 				TargetRef:    "refs/heads/a3/live",
 				BootstrapRef: "HEAD",
 			},
@@ -1036,7 +1036,7 @@ func TestWorkspaceMaterializerRollsBackBootstrappedTargetRefWhenLaterSlotIsInval
 					Kind:  "unsupported",
 					Alias: "repo-alpha",
 				},
-				SourceRef: "refs/heads/a3/work/Portal-42",
+				SourceRef: "refs/heads/a3/work/Sample-42",
 				TargetRef: "refs/heads/a3/live-beta",
 			},
 		},
@@ -1054,12 +1054,12 @@ func testWorkspaceRequest(sourceAlias string) WorkspaceRequest {
 	return WorkspaceRequest{
 		Mode:            "agent_materialized",
 		WorkspaceKind:   "ticket_workspace",
-		WorkspaceID:     "Portal-42-ticket",
+		WorkspaceID:     "Sample-42-ticket",
 		FreshnessPolicy: "reuse_if_clean_and_ref_matches",
 		CleanupPolicy:   "retain_until_a3_cleanup",
 		PublishPolicy: &WorkspacePublishPolicy{
 			Mode:          "commit_declared_changes_on_success",
-			CommitMessage: "A3 implementation update for Portal#42",
+			CommitMessage: "A3 implementation update for Sample#42",
 		},
 		Slots: map[string]WorkspaceSlotRequest{
 			"repo_alpha": {
@@ -1067,7 +1067,7 @@ func testWorkspaceRequest(sourceAlias string) WorkspaceRequest {
 					Kind:  "local_git",
 					Alias: sourceAlias,
 				},
-				Ref:       "refs/heads/a3/work/Portal-42",
+				Ref:       "refs/heads/a3/work/Sample-42",
 				Checkout:  "worktree_branch",
 				Access:    "read_write",
 				SyncClass: "eager",
@@ -1092,7 +1092,7 @@ func createGitSource(t *testing.T, root string, name string) string {
 	}
 	git(t, sourceRoot, "add", "README.md")
 	git(t, sourceRoot, "commit", "-q", "-m", "initial commit")
-	git(t, sourceRoot, "branch", "a3/work/Portal-42", "HEAD")
+	git(t, sourceRoot, "branch", "a3/work/Sample-42", "HEAD")
 	return sourceRoot
 }
 
@@ -1105,7 +1105,7 @@ func createRetainedContentConflict(t *testing.T, tmp string, sourceRoot string) 
 	gitTestCommit(t, sourceRoot, "base conflict file")
 	base := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
 	git(t, sourceRoot, "branch", "-f", "a3/live", base)
-	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", base)
+	git(t, sourceRoot, "branch", "-f", "a3/work/Sample-42", base)
 
 	git(t, sourceRoot, "checkout", "-q", "-B", "target-edit", "a3/live")
 	if err := os.WriteFile(filepath.Join(sourceRoot, "conflict.txt"), []byte("target\n"), 0o644); err != nil {
@@ -1123,7 +1123,7 @@ func createRetainedContentConflict(t *testing.T, tmp string, sourceRoot string) 
 	git(t, sourceRoot, "add", "conflict.txt")
 	gitTestCommit(t, sourceRoot, "source edit")
 	sourceHead := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
-	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", sourceHead)
+	git(t, sourceRoot, "branch", "-f", "a3/work/Sample-42", sourceHead)
 
 	descriptor, execution := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
@@ -1131,7 +1131,7 @@ func createRetainedContentConflict(t *testing.T, tmp string, sourceRoot string) 
 			"repo-alpha": sourceRoot,
 		},
 	}.Merge(MergeRequest{
-		WorkspaceID: "merge-Portal-42",
+		WorkspaceID: "merge-Sample-42",
 		Policy:      "ff_or_merge",
 		Slots: map[string]MergeSlotRequest{
 			"repo_alpha": {
@@ -1139,7 +1139,7 @@ func createRetainedContentConflict(t *testing.T, tmp string, sourceRoot string) 
 					Kind:  "local_git",
 					Alias: "repo-alpha",
 				},
-				SourceRef: "refs/heads/a3/work/Portal-42",
+				SourceRef: "refs/heads/a3/work/Sample-42",
 				TargetRef: "refs/heads/a3/live",
 			},
 		},

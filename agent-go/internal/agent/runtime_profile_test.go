@@ -15,7 +15,7 @@ func TestLoadRuntimeProfileConfig(t *testing.T) {
   "agent_token_file": "/run/secrets/a3-agent-token",
 		"workspace_root": "/work/a3-agent",
 		"source_aliases": {
-			"member-portal-starters": "/src/member-portal-starters"
+			"sample-catalog-service": "/src/sample-catalog-service"
 		},
 		"required_bins": ["git", "task"]
 	}`), 0o644); err != nil {
@@ -42,7 +42,7 @@ func TestLoadRuntimeProfileConfig(t *testing.T) {
 	if config.WorkspaceRoot != "/work/a3-agent" {
 		t.Fatalf("workspace root = %s", config.WorkspaceRoot)
 	}
-	if config.SourceAliases["member-portal-starters"] != "/src/member-portal-starters" {
+	if config.SourceAliases["sample-catalog-service"] != "/src/sample-catalog-service" {
 		t.Fatalf("source aliases = %#v", config.SourceAliases)
 	}
 	if len(config.RequiredBins) != 2 || config.RequiredBins[0] != "git" {
@@ -54,7 +54,7 @@ func TestRuntimeProfileConfigRequiresWorkspaceRootForAliases(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "agent-profile.json")
 	if err := os.WriteFile(path, []byte(`{
   "source_aliases": {
-    "member-portal-starters": "/src/member-portal-starters"
+    "sample-catalog-service": "/src/sample-catalog-service"
   }
 }`), 0o644); err != nil {
 		t.Fatal(err)

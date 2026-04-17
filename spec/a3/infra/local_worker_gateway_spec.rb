@@ -459,7 +459,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     )
     FileUtils.mkdir_p(parent_workspace.slot_paths.fetch(:repo_alpha))
     parent_task = A3::Domain::Task.new(
-      ref: "Portal#3140",
+      ref: "Sample#3140",
       kind: :parent,
       edit_scope: %i[repo_alpha repo_beta],
       verification_scope: %i[repo_alpha repo_beta]
@@ -552,7 +552,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     )
     FileUtils.mkdir_p(parent_workspace.slot_paths.fetch(:repo_alpha))
     parent_task = A3::Domain::Task.new(
-      ref: "Portal#3140",
+      ref: "Sample#3140",
       kind: :parent,
       edit_scope: %i[repo_alpha repo_beta],
       verification_scope: %i[repo_alpha repo_beta]
@@ -684,7 +684,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   it "fails fast when parent review disposition uses a non-canonical kind" do
     result_path = workspace.root_path.join(".a3", "worker-result.json")
     parent_task = A3::Domain::Task.new(
-      ref: "Portal#3140",
+      ref: "Sample#3140",
       kind: :parent,
       edit_scope: %i[repo_alpha repo_beta],
       verification_scope: %i[repo_alpha repo_beta]

@@ -7,7 +7,7 @@ RSpec.describe A3::Application::HandleParentReviewDisposition do
 
   let(:task) do
     A3::Domain::Task.new(
-      ref: "Portal#3140",
+      ref: "Sample#3140",
       kind: :parent,
       edit_scope: %i[repo_alpha repo_beta],
       status: :in_review,
@@ -25,7 +25,7 @@ RSpec.describe A3::Application::HandleParentReviewDisposition do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/Portal-3140",
+        ref: "refs/heads/a3/parent/Sample-3140",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -58,8 +58,8 @@ RSpec.describe A3::Application::HandleParentReviewDisposition do
     allow(writer).to receive(:call).and_return(
       A3::Infra::KanbanCliFollowUpChildWriter::Result.new(
         success?: true,
-        child_refs: ["Portal#3200"],
-        child_fingerprints: ["Portal#3140|run-parent-review-1|repo_beta|finding-1"]
+        child_refs: ["Sample#3200"],
+        child_fingerprints: ["Sample#3140|run-parent-review-1|repo_beta|finding-1"]
       )
     )
 
@@ -67,8 +67,8 @@ RSpec.describe A3::Application::HandleParentReviewDisposition do
 
     expect(result.terminal_status).to eq(:todo)
     expect(result.terminal_outcome).to eq(:follow_up_child)
-    expect(result.follow_up_child_refs).to eq(["Portal#3200"])
-    expect(result.follow_up_child_fingerprints).to eq(["Portal#3140|run-parent-review-1|repo_beta|finding-1"])
+    expect(result.follow_up_child_refs).to eq(["Sample#3200"])
+    expect(result.follow_up_child_fingerprints).to eq(["Sample#3140|run-parent-review-1|repo_beta|finding-1"])
   end
 
   it "returns blocked for unresolved findings" do

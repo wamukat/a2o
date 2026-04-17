@@ -7,7 +7,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
       nil,
       [
         Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
-          "Portal#1",
+          "Sample#1",
           nil,
           "Parent task",
           false,
@@ -20,8 +20,8 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
           []
         ),
         Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
-          "Portal#2",
-          "Portal#1",
+          "Sample#2",
+          "Sample#1",
           "Blocked child",
           true,
           false,
@@ -33,7 +33,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
           ["review blocked"]
         )
       ],
-      ["Portal#1"],
+      ["Sample#1"],
       []
     )
 
@@ -51,19 +51,19 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
 
   it "shows review-phase tasks as running when running_entry is present" do
     running_entry = Struct.new(:task_ref, :phase, :internal_phase, :state, :heartbeat_age_seconds, :detail).new(
-      "Portal#3141",
+      "Sample#3141",
       "review",
       "review",
       "running_command",
       nil,
-      "refs/heads/a3/work/Portal-3141"
+      "refs/heads/a3/work/Sample-3141"
     )
     summary = Struct.new(:scheduler_paused, :scheduler_paused_at, :tasks, :next_candidates, :running_entries).new(
       false,
       nil,
       [
         Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
-          "Portal#3141",
+          "Sample#3141",
           nil,
           "Review task",
           false,
@@ -88,7 +88,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
 
   it "shows scheduler as running when a running entry exists" do
     running_entry = Struct.new(:task_ref, :phase, :internal_phase, :state, :heartbeat_age_seconds, :detail).new(
-      "Portal#3141",
+      "Sample#3141",
       "review",
       "review",
       "running_command",
@@ -112,7 +112,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
       nil,
       [
         Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
-          "Portal#3179",
+          "Sample#3179",
           nil,
           "Parent task",
           false,
@@ -125,8 +125,8 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
           []
         ),
         Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
-          "Portal#3166",
-          "Portal#3165",
+          "Sample#3166",
+          "Sample#3165",
           "Orphan child",
           false,
           false,

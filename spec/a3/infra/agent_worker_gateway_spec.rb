@@ -731,7 +731,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     A3::Domain::AgentWorkspaceRequest.new(
       mode: :agent_materialized,
       workspace_kind: :runtime_workspace,
-      workspace_id: "Portal-42-runtime",
+      workspace_id: "Sample-42-runtime",
       freshness_policy: :reuse_if_clean_and_ref_matches,
       cleanup_policy: :retain_until_a3_cleanup,
       publish_policy: publish ? {
@@ -742,9 +742,9 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
         repo_beta: {
           source: {
             kind: "local_git",
-            alias: "member-portal-starters"
+            alias: "sample-catalog-service"
           },
-          ref: "refs/heads/a3/work/Portal-42",
+          ref: "refs/heads/a3/work/Sample-42",
           checkout: "worktree_branch",
           access: "read_write",
           sync_class: "eager",
@@ -759,7 +759,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     A3::Domain::AgentWorkspaceRequest.new(
       mode: :agent_materialized,
       workspace_kind: :runtime_workspace,
-      workspace_id: "Portal-42-runtime",
+      workspace_id: "Sample-42-runtime",
       freshness_policy: :reuse_if_clean_and_ref_matches,
       cleanup_policy: :retain_until_a3_cleanup,
       publish_policy: {
@@ -770,9 +770,9 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
         repo_alpha: {
           source: {
             kind: "local_git",
-            alias: "member-portal-ui-app"
+            alias: "sample-storefront"
           },
-          ref: "refs/heads/a3/work/Portal-42",
+          ref: "refs/heads/a3/work/Sample-42",
           checkout: "worktree_branch",
           access: "read_only",
           sync_class: "lazy_but_guaranteed",
@@ -782,9 +782,9 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
         repo_beta: {
           source: {
             kind: "local_git",
-            alias: "member-portal-starters"
+            alias: "sample-catalog-service"
           },
-          ref: "refs/heads/a3/work/Portal-42",
+          ref: "refs/heads/a3/work/Sample-42",
           checkout: "worktree_branch",
           access: "read_write",
           sync_class: "eager",
@@ -859,7 +859,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
   end
 
   def source_descriptor
-    A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: task.ref, ref: "refs/heads/a3/work/Portal-42")
+    A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: task.ref, ref: "refs/heads/a3/work/Sample-42")
   end
 
   def workspace_descriptor(slot_descriptors = {})
@@ -899,7 +899,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
 
   def materialized_support_slot_descriptor
     materialized_slot_descriptor.merge(
-      "source_alias" => "member-portal-ui-app",
+      "source_alias" => "sample-storefront",
       "access" => "read_only",
       "sync_class" => "lazy_but_guaranteed",
       "ownership" => "support",
@@ -909,12 +909,12 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
 
   def materialized_slot_descriptor_without_changed_files
     {
-      "runtime_path" => "/agent/workspaces/Portal-42-runtime/repo-beta",
+      "runtime_path" => "/agent/workspaces/Sample-42-runtime/repo-beta",
       "source_kind" => "local_git",
-      "source_alias" => "member-portal-starters",
+      "source_alias" => "sample-catalog-service",
       "checkout" => "worktree_branch",
-      "requested_ref" => "refs/heads/a3/work/Portal-42",
-      "branch_ref" => "refs/heads/a3/work/Portal-42",
+      "requested_ref" => "refs/heads/a3/work/Sample-42",
+      "branch_ref" => "refs/heads/a3/work/Sample-42",
       "resolved_head" => "abc123",
       "dirty_before" => false,
       "dirty_after" => true,

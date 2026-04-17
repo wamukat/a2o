@@ -386,12 +386,12 @@ RSpec.describe A3::Application::RegisterCompletedRun do
 
   it "routes parent review follow-up findings into new child work without returning the parent to implementation" do
     parent_task = A3::Domain::Task.new(
-      ref: "Portal#3140",
+      ref: "Sample#3140",
       kind: :parent,
       edit_scope: %i[repo_alpha repo_beta],
       status: :in_review,
       current_run_ref: "run-parent-review-1",
-      child_refs: %w[Portal#3138 Portal#3141],
+      child_refs: %w[Sample#3138 Sample#3141],
       external_task_id: 3140
     )
     parent_run = A3::Domain::Run.new(
@@ -402,7 +402,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/Portal-3140",
+        ref: "refs/heads/a3/parent/Sample-3140",
         task_ref: parent_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -427,7 +427,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       repo_scope: :repo_beta,
       summary: "add redirect fallback follow-up",
       description: "legacy malformed params should redirect to /points",
-      finding_key: "portal-3140-repo-beta-1"
+      finding_key: "sample-3140-repo-beta-1"
     )
     execution = A3::Application::ExecutionResult.new(
       success: false,
@@ -448,9 +448,9 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     handler_result = A3::Application::HandleParentReviewDisposition::Result.new(
       terminal_status: :todo,
       terminal_outcome: :follow_up_child,
-      follow_up_child_refs: ["Portal#3200"],
-      follow_up_child_fingerprints: ["Portal#3140|run-parent-review-1|repo_beta|portal-3140-repo-beta-1"],
-      comment_lines: ["follow_up_children: Portal#3200"]
+      follow_up_child_refs: ["Sample#3200"],
+      follow_up_child_fingerprints: ["Sample#3140|run-parent-review-1|repo_beta|sample-3140-repo-beta-1"],
+      comment_lines: ["follow_up_children: Sample#3200"]
     )
     handler = instance_double(A3::Application::HandleParentReviewDisposition, call: handler_result)
     task_repository.save(parent_task)
@@ -477,7 +477,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(activity_publisher).to receive(:publish).with(
       task_ref: parent_task.ref,
       external_task_id: 3140,
-      body: a_string_matching(/follow_up_children: Portal#3200/)
+      body: a_string_matching(/follow_up_children: Sample#3200/)
     )
 
     result = overridden_use_case.call(task_ref: parent_task.ref, run_ref: parent_run.ref, outcome: :follow_up_child, execution: execution)
@@ -486,7 +486,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(result.task.current_run_ref).to be_nil
     expect(result.run.terminal_outcome).to eq(:follow_up_child)
     expect(result.run.phase_records.last.execution_record.follow_up_child_fingerprints).to eq(
-      ["Portal#3140|run-parent-review-1|repo_beta|portal-3140-repo-beta-1"]
+      ["Sample#3140|run-parent-review-1|repo_beta|sample-3140-repo-beta-1"]
     )
     expect(handler).to have_received(:call).with(
       task: parent_task,
@@ -503,12 +503,12 @@ RSpec.describe A3::Application::RegisterCompletedRun do
 
   it "fails closed when parent review re-enters through rework without a canonical disposition handler" do
     parent_task = A3::Domain::Task.new(
-      ref: "Portal#3140",
+      ref: "Sample#3140",
       kind: :parent,
       edit_scope: %i[repo_alpha repo_beta],
       status: :in_review,
       current_run_ref: "run-parent-review-1",
-      child_refs: %w[Portal#3138 Portal#3141],
+      child_refs: %w[Sample#3138 Sample#3141],
       external_task_id: 3140
     )
     parent_run = A3::Domain::Run.new(
@@ -519,7 +519,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/Portal-3140",
+        ref: "refs/heads/a3/parent/Sample-3140",
         task_ref: parent_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -548,12 +548,12 @@ RSpec.describe A3::Application::RegisterCompletedRun do
 
   it "preserves the latest execution diagnostics when parent review is blocked by disposition handling" do
     parent_task = A3::Domain::Task.new(
-      ref: "Portal#3140",
+      ref: "Sample#3140",
       kind: :parent,
       edit_scope: %i[repo_alpha repo_beta],
       status: :in_review,
       current_run_ref: "run-parent-review-2",
-      child_refs: %w[Portal#3138 Portal#3141],
+      child_refs: %w[Sample#3138 Sample#3141],
       external_task_id: 3140
     )
     execution_record = A3::Domain::PhaseExecutionRecord.new(
@@ -570,7 +570,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/Portal-3140",
+        ref: "refs/heads/a3/parent/Sample-3140",
         task_ref: parent_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -589,7 +589,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/Portal-3140",
+        ref: "refs/heads/a3/parent/Sample-3140",
         task_ref: parent_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(

@@ -113,19 +113,19 @@ RSpec.describe A3::Domain::RuntimePackageDescriptor do
       agent_control_plane_url: "http://a3-runtime:7393",
       agent_profile_path: "/profiles/dev-env-agent.json",
       agent_source_aliases: {
-        repo_alpha: "member-portal-starters",
-        repo_beta: "member-portal-ui-app"
+        repo_alpha: "sample-catalog-service",
+        repo_beta: "sample-storefront"
       },
       agent_workspace_cleanup_policy: :cleanup_after_job
     )
 
     expect(descriptor.agent_runtime_profile_summary.fetch("source_aliases")).to eq(
-      "repo_alpha" => "member-portal-starters",
-      "repo_beta" => "member-portal-ui-app"
+      "repo_alpha" => "sample-catalog-service",
+      "repo_beta" => "sample-storefront"
     )
     expect(descriptor.agent_runtime_profile_summary.fetch("agent_command")).to eq("a3-agent -config /profiles/dev-env-agent.json")
-    expect(descriptor.operator_summary.fetch("agent_runtime_profile")).to include("source_aliases=repo_alpha=member-portal-starters,repo_beta=member-portal-ui-app")
-    expect(descriptor.operator_summary.fetch("agent_worker_gateway_options")).to include("--agent-source-alias repo_alpha=member-portal-starters")
+    expect(descriptor.operator_summary.fetch("agent_runtime_profile")).to include("source_aliases=repo_alpha=sample-catalog-service,repo_beta=sample-storefront")
+    expect(descriptor.operator_summary.fetch("agent_worker_gateway_options")).to include("--agent-source-alias repo_alpha=sample-catalog-service")
     expect(descriptor.operator_summary.fetch("agent_worker_gateway_options")).not_to include("/repos/alpha")
   end
 

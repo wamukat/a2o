@@ -7,20 +7,20 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
     request = described_class.new(
       mode: :agent_materialized,
       workspace_kind: :ticket_workspace,
-      workspace_id: "Portal-42-ticket",
+      workspace_id: "Sample-42-ticket",
       freshness_policy: :reuse_if_clean_and_ref_matches,
       cleanup_policy: :retain_until_a3_cleanup,
       publish_policy: {
         mode: "commit_declared_changes_on_success",
-        commit_message: "A3 implementation update for Portal#42"
+        commit_message: "A3 implementation update for Sample#42"
       },
       slots: {
         repo_alpha: {
           source: {
             kind: "local_git",
-            alias: "member-portal-starters"
+            alias: "sample-catalog-service"
           },
-          ref: "refs/heads/a3/work/Portal-42",
+          ref: "refs/heads/a3/work/Sample-42",
           checkout: "worktree_branch",
           access: "read_write",
           sync_class: "eager",
@@ -33,20 +33,20 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
     expect(request.request_form).to eq(
       "mode" => "agent_materialized",
       "workspace_kind" => "ticket_workspace",
-      "workspace_id" => "Portal-42-ticket",
+      "workspace_id" => "Sample-42-ticket",
       "freshness_policy" => "reuse_if_clean_and_ref_matches",
       "cleanup_policy" => "retain_until_a3_cleanup",
       "publish_policy" => {
         "mode" => "commit_declared_changes_on_success",
-        "commit_message" => "A3 implementation update for Portal#42"
+        "commit_message" => "A3 implementation update for Sample#42"
       },
       "slots" => {
         "repo_alpha" => {
           "source" => {
             "kind" => "local_git",
-            "alias" => "member-portal-starters"
+            "alias" => "sample-catalog-service"
           },
-          "ref" => "refs/heads/a3/work/Portal-42",
+          "ref" => "refs/heads/a3/work/Sample-42",
           "checkout" => "worktree_branch",
           "access" => "read_write",
           "sync_class" => "eager",
@@ -62,20 +62,20 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
     request = described_class.new(
       mode: :agent_materialized,
       workspace_kind: :ticket_workspace,
-      workspace_id: "Portal-134-children-Portal-135-implementation-run-implementation",
+      workspace_id: "Sample-134-children-Sample-135-implementation-run-implementation",
       freshness_policy: :reuse_if_clean_and_ref_matches,
       cleanup_policy: :retain_until_a3_cleanup,
       topology: {
         kind: "parent_child",
-        parent_ref: "Portal#134",
-        child_ref: "Portal#135",
-        parent_workspace_id: "Portal-134-parent",
-        relative_path: "children/Portal-135/ticket_workspace"
+        parent_ref: "Sample#134",
+        child_ref: "Sample#135",
+        parent_workspace_id: "Sample-134-parent",
+        relative_path: "children/Sample-135/ticket_workspace"
       },
       slots: {
         repo_alpha: {
-          source: { kind: "local_git", alias: "member-portal-starters" },
-          ref: "refs/heads/a3/work/Portal-135",
+          source: { kind: "local_git", alias: "sample-catalog-service" },
+          ref: "refs/heads/a3/work/Sample-135",
           checkout: "worktree_branch",
           access: "read_write",
           sync_class: "eager",
@@ -87,10 +87,10 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
 
     expect(request.request_form.fetch("topology")).to eq(
       "kind" => "parent_child",
-      "parent_ref" => "Portal#134",
-      "child_ref" => "Portal#135",
-      "parent_workspace_id" => "Portal-134-parent",
-      "relative_path" => "children/Portal-135/ticket_workspace"
+      "parent_ref" => "Sample#134",
+      "child_ref" => "Sample#135",
+      "parent_workspace_id" => "Sample-134-parent",
+      "relative_path" => "children/Sample-135/ticket_workspace"
     )
     expect(described_class.from_request_form(request.request_form)).to eq(request)
   end
@@ -100,13 +100,13 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       described_class.new(
         mode: :agent_materialized,
         workspace_kind: :ticket_workspace,
-        workspace_id: "Portal-42-ticket",
+        workspace_id: "Sample-42-ticket",
         freshness_policy: :reuse_if_clean_and_ref_matches,
         cleanup_policy: :retain_until_a3_cleanup,
         slots: {
           repo_alpha: {
-            source: { kind: "remote_git", alias: "member-portal-starters" },
-            ref: "refs/heads/a3/work/Portal-42",
+            source: { kind: "remote_git", alias: "sample-catalog-service" },
+            ref: "refs/heads/a3/work/Sample-42",
             checkout: "clone",
             access: "read_write",
             sync_class: "eager",
@@ -123,13 +123,13 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       described_class.new(
         mode: :agent_materialized,
         workspace_kind: :ticket_workspace,
-        workspace_id: "Portal-42-ticket",
+        workspace_id: "Sample-42-ticket",
         freshness_policy: :reuse_if_clean_and_ref_matches,
         cleanup_policy: :retain_until_a3_cleanup,
         slots: {
           repo_alpha: {
-            source: { kind: "local_git", alias: "member-portal-starters" },
-            ref: "refs/heads/a3/work/Portal-42",
+            source: { kind: "local_git", alias: "sample-catalog-service" },
+            ref: "refs/heads/a3/work/Sample-42",
             checkout: "worktree_branch",
             access: "read_write",
             required: true
@@ -144,12 +144,12 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       described_class.new(
         mode: :agent_materialized,
         workspace_kind: :ticket_workspace,
-        workspace_id: "Portal-42-ticket",
+        workspace_id: "Sample-42-ticket",
         freshness_policy: :reuse_if_clean_and_ref_matches,
         cleanup_policy: :retain_until_a3_cleanup,
         slots: {
           repo_alpha: {
-            source: { kind: "local_git", alias: "member-portal-starters" },
+            source: { kind: "local_git", alias: "sample-catalog-service" },
             ref: "abc123",
             checkout: "worktree_branch",
             access: "read_write",
@@ -167,7 +167,7 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       described_class.new(
         mode: :agent_materialized,
         workspace_kind: :ticket_workspace,
-        workspace_id: "Portal-42-ticket",
+        workspace_id: "Sample-42-ticket",
         freshness_policy: :reuse_if_clean_and_ref_matches,
         cleanup_policy: :retain_until_a3_cleanup,
         publish_policy: {
@@ -176,8 +176,8 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
         },
         slots: {
           repo_alpha: {
-            source: { kind: "local_git", alias: "member-portal-starters" },
-            ref: "refs/heads/a3/work/Portal-42",
+            source: { kind: "local_git", alias: "sample-catalog-service" },
+            ref: "refs/heads/a3/work/Sample-42",
             checkout: "worktree_branch",
             access: "read_write",
             sync_class: "eager",

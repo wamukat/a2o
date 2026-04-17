@@ -10,36 +10,36 @@ RSpec.describe A3::CLI do
 
       task_repository.save(
         A3::Domain::Task.new(
-          ref: "Portal#3138",
+          ref: "Sample#3138",
           kind: :child,
           edit_scope: [:repo_alpha],
           verification_scope: [:repo_alpha],
           status: :in_progress,
           current_run_ref: "run-1",
-          parent_ref: "Portal#3140"
+          parent_ref: "Sample#3140"
         )
       )
       task_repository.save(
         A3::Domain::Task.new(
-          ref: "Portal#3141",
+          ref: "Sample#3141",
           kind: :child,
           edit_scope: [:repo_beta],
           verification_scope: [:repo_beta],
           status: :todo,
-          parent_ref: "Portal#3140"
+          parent_ref: "Sample#3140"
         )
       )
       run_repository.save(
         A3::Domain::Run.new(
           ref: "run-1",
-          task_ref: "Portal#3138",
+          task_ref: "Sample#3138",
           phase: :implementation,
           workspace_kind: :ticket_workspace,
           source_descriptor: A3::Domain::SourceDescriptor.new(
             workspace_kind: :ticket_workspace,
             source_type: :branch_head,
-            ref: "refs/heads/a3/work/Portal-3138",
-            task_ref: "Portal#3138"
+            ref: "refs/heads/a3/work/Sample-3138",
+            task_ref: "Sample#3138"
           ),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(
             edit_scope: [:repo_alpha],
@@ -47,9 +47,9 @@ RSpec.describe A3::CLI do
             ownership_scope: :task
           ),
           artifact_owner: A3::Domain::ArtifactOwner.new(
-            owner_ref: "Portal#3140",
+            owner_ref: "Sample#3140",
             owner_scope: :task,
-            snapshot_version: "refs/heads/a3/work/Portal-3138"
+            snapshot_version: "refs/heads/a3/work/Sample-3138"
           )
         )
       )
@@ -82,7 +82,7 @@ RSpec.describe A3::CLI do
       run_repository = A3::Infra::JsonRunRepository.new(File.join(dir, "runs.json"))
       task_repository.save(
         A3::Domain::Task.new(
-          ref: "Portal#3138",
+          ref: "Sample#3138",
           kind: :child,
           edit_scope: [:repo_alpha],
           verification_scope: [:repo_alpha],
@@ -96,14 +96,14 @@ RSpec.describe A3::CLI do
         snapshots: [
           {
             "id" => 3138,
-            "ref" => "Portal#3138",
+            "ref" => "Sample#3138",
             "title" => "Kanban title",
             "status" => "To do",
             "labels" => []
           },
           {
             "id" => 4000,
-            "ref" => "Portal#4000",
+            "ref" => "Sample#4000",
             "title" => "Unrelated task",
             "status" => "To do",
             "labels" => []
@@ -120,7 +120,7 @@ RSpec.describe A3::CLI do
             "--storage-dir", dir,
             "--kanban-command", "ruby",
             "--kanban-command-arg", fake_cli.fetch(:script_path),
-            "--kanban-project", "Portal",
+            "--kanban-project", "Sample",
             "--kanban-working-dir", dir,
             "--kanban-repo-label", "repo:ui-app=repo_beta"
           ],

@@ -20,7 +20,7 @@ RSpec.describe A3Diagnostics do
           described_class.main(
             [
               "describe-state",
-              "--project", "portal",
+              "--project", "sample",
               "--root-dir", root.to_s,
               "--active-runs-file", active_runs.to_s,
               "--worker-runs-file", worker_runs.to_s
@@ -49,12 +49,12 @@ RSpec.describe A3Diagnostics do
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
       current_iso = Time.now.utc.iso8601
-      active_runs.write(JSON.generate({ "active_task_refs" => ["Portal#1"] }))
+      active_runs.write(JSON.generate({ "active_task_refs" => ["Sample#1"] }))
       worker_runs.write(
         JSON.generate(
           "runs" => {
-            "Portal#1" => {
-              "task_ref" => "Portal#1",
+            "Sample#1" => {
+              "task_ref" => "Sample#1",
               "task_id" => 1,
               "team" => "implementation",
               "phase" => "implementation",
@@ -68,14 +68,14 @@ RSpec.describe A3Diagnostics do
       )
 
       report = described_class.describe_state(
-        project: "portal",
+        project: "sample",
         root_dir: root,
         active_runs_file: active_runs,
         worker_runs_file: worker_runs
       )
 
-      expect(report.fetch("active_refs")).to eq(["Portal#1"])
-      expect(report.fetch("running_runs").first.fetch("task_ref")).to eq("Portal#1")
+      expect(report.fetch("active_refs")).to eq(["Sample#1"])
+      expect(report.fetch("running_runs").first.fetch("task_ref")).to eq("Sample#1")
     end
   end
 
@@ -88,7 +88,7 @@ RSpec.describe A3Diagnostics do
       worker_runs.write("{")
 
       report = described_class.describe_state(
-        project: "portal",
+        project: "sample",
         root_dir: root,
         active_runs_file: active_runs,
         worker_runs_file: worker_runs
@@ -106,25 +106,25 @@ RSpec.describe A3Diagnostics do
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
       current_iso = Time.now.utc.iso8601
-      active_runs.write(JSON.generate({ "active_task_refs" => ["Portal#10", "Portal#11"] }))
+      active_runs.write(JSON.generate({ "active_task_refs" => ["Sample#10", "Sample#11"] }))
       worker_runs.write(
         JSON.generate(
           "runs" => {
-            "Portal#10" => {
-              "task_ref" => "Portal#10", "task_id" => 10, "team" => "implementation", "phase" => "implementation",
+            "Sample#10" => {
+              "task_ref" => "Sample#10", "task_id" => 10, "team" => "implementation", "phase" => "implementation",
               "state" => "selected", "started_at" => current_iso, "heartbeat_at" => current_iso, "updated_at_epoch_ms" => 30
             },
-            "Portal#11" => {
-              "task_ref" => "Portal#11", "task_id" => 11, "team" => "inspection", "phase" => "inspection",
+            "Sample#11" => {
+              "task_ref" => "Sample#11", "task_id" => 11, "team" => "inspection", "phase" => "inspection",
               "state" => "started", "started_at" => current_iso, "heartbeat_at" => current_iso, "updated_at_epoch_ms" => 20
             }
           }
         )
       )
 
-      report = described_class.describe_state(project: "portal", root_dir: root, active_runs_file: active_runs, worker_runs_file: worker_runs)
+      report = described_class.describe_state(project: "sample", root_dir: root, active_runs_file: active_runs, worker_runs_file: worker_runs)
 
-      expect(report.fetch("selected_pending_refs")).to eq(["Portal#10"])
+      expect(report.fetch("selected_pending_refs")).to eq(["Sample#10"])
       expect(report.fetch("running_runs").first.fetch("state")).to eq("launch_started")
     end
   end
@@ -135,19 +135,19 @@ RSpec.describe A3Diagnostics do
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
       current_iso = Time.now.utc.iso8601
-      active_runs.write(JSON.generate({ "active_task_refs" => ["Portal#20"] }))
+      active_runs.write(JSON.generate({ "active_task_refs" => ["Sample#20"] }))
       worker_runs.write(
         JSON.generate(
           "runs" => {
-            "Portal#20::integration_judgment::integration_judgment" => {
-              "task_ref" => "Portal#20", "task_id" => 20, "team" => "review", "phase" => "integration_judgment",
+            "Sample#20::integration_judgment::integration_judgment" => {
+              "task_ref" => "Sample#20", "task_id" => 20, "team" => "review", "phase" => "integration_judgment",
               "state" => "running_command", "started_at" => current_iso, "heartbeat_at" => current_iso, "updated_at_epoch_ms" => 20
             }
           }
         )
       )
 
-      report = described_class.describe_state(project: "portal", root_dir: root, active_runs_file: active_runs, worker_runs_file: worker_runs)
+      report = described_class.describe_state(project: "sample", root_dir: root, active_runs_file: active_runs, worker_runs_file: worker_runs)
       running = report.fetch("running_runs").first
       expect(running.fetch("phase")).to eq("merge")
       expect(running.fetch("internal_phase")).to eq("integration_judgment")
@@ -177,7 +177,7 @@ RSpec.describe A3Diagnostics do
     Dir.mktmpdir("a3-diagnostics-") do |dir|
       root = Pathname(dir)
       launcher = root.join("launcher.json")
-      env_file = root.join("portal.env")
+      env_file = root.join("sample.env")
       env_file.write("TOKEN=test\n")
       launcher.write(
         JSON.pretty_generate(

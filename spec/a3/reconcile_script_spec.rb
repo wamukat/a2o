@@ -18,7 +18,7 @@ RSpec.describe A3Reconcile do
         expect(
           described_class.main(
             [
-              "--project", "portal",
+              "--project", "sample",
               "--active-runs-file", active_runs.to_s,
               "--worker-runs-file", worker_runs.to_s,
               "--live-process-pattern", "unlikely-a3-test-process-pattern"
@@ -46,12 +46,12 @@ RSpec.describe A3Reconcile do
       root = Pathname(dir)
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
-      active_runs.write(JSON.generate({ "active_task_refs" => ["Portal#1", "Portal#2"] }))
+      active_runs.write(JSON.generate({ "active_task_refs" => ["Sample#1", "Sample#2"] }))
       worker_runs.write(
         JSON.generate(
           "runs" => {
-            "Portal#1" => {
-              "task_ref" => "Portal#1", "task_id" => 1, "team" => "implementation", "phase" => "implementation",
+            "Sample#1" => {
+              "task_ref" => "Sample#1", "task_id" => 1, "team" => "implementation", "phase" => "implementation",
               "state" => "completed", "started_at" => "2026-03-23T00:00:00+00:00", "heartbeat_at" => "2026-03-23T00:00:01+00:00",
               "updated_at_epoch_ms" => 1
             }
@@ -60,14 +60,14 @@ RSpec.describe A3Reconcile do
       )
       allow(described_class).to receive(:live_scheduler_processes).and_return([])
 
-      payload = described_class.inspect_stale_active_runs(project: "portal", active_runs_file: active_runs, worker_runs_file: worker_runs)
+      payload = described_class.inspect_stale_active_runs(project: "sample", active_runs_file: active_runs, worker_runs_file: worker_runs)
       reasons = payload.fetch("stale_active_runs").each_with_object({}) { |item, acc| acc[item.fetch("task_ref")] = item.fetch("reason") }
       ids = payload.fetch("stale_active_runs").each_with_object({}) { |item, acc| acc[item.fetch("task_ref")] = item["task_id"] }
 
-      expect(reasons["Portal#1"]).to eq("latest_run_terminal")
-      expect(reasons["Portal#2"]).to eq("missing_worker_run")
-      expect(ids["Portal#1"]).to eq(1)
-      expect(ids["Portal#2"]).to be_nil
+      expect(reasons["Sample#1"]).to eq("latest_run_terminal")
+      expect(reasons["Sample#2"]).to eq("missing_worker_run")
+      expect(ids["Sample#1"]).to eq(1)
+      expect(ids["Sample#2"]).to be_nil
       expect(payload.fetch("active_refs_after")).to eq([])
     end
   end
@@ -77,12 +77,12 @@ RSpec.describe A3Reconcile do
       root = Pathname(dir)
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
-      active_runs.write(JSON.generate({ "active_task_refs" => ["Portal#9"] }))
+      active_runs.write(JSON.generate({ "active_task_refs" => ["Sample#9"] }))
       worker_runs.write(
         JSON.generate(
           "runs" => {
-            "Portal#9" => {
-              "task_ref" => "Portal#9", "task_id" => 9, "team" => "implementation", "phase" => "implementation",
+            "Sample#9" => {
+              "task_ref" => "Sample#9", "task_id" => 9, "team" => "implementation", "phase" => "implementation",
               "state" => "running", "started_at" => "2026-03-23T00:00:00+00:00", "heartbeat_at" => "2026-03-23T00:10:00+00:00",
               "updated_at_epoch_ms" => 10
             }
@@ -91,14 +91,14 @@ RSpec.describe A3Reconcile do
       )
       allow(described_class).to receive(:live_scheduler_processes).and_return([])
 
-      payload = described_class.apply_stale_active_run_reconciliation(project: "portal", active_runs_file: active_runs, worker_runs_file: worker_runs)
+      payload = described_class.apply_stale_active_run_reconciliation(project: "sample", active_runs_file: active_runs, worker_runs_file: worker_runs)
 
       expect(payload.fetch("applied")).to eq(true)
-      expect(payload.fetch("stale_active_runs").map { |item| item.fetch("task_ref") }).to eq(["Portal#9"])
+      expect(payload.fetch("stale_active_runs").map { |item| item.fetch("task_ref") }).to eq(["Sample#9"])
       expect(JSON.parse(active_runs.read)).to eq({ "active_task_refs" => [] })
       worker_payload = JSON.parse(worker_runs.read)
-      expect(worker_payload.fetch("runs").fetch("Portal#9").fetch("state")).to eq("failed")
-      expect(worker_payload.fetch("runs").fetch("Portal#9").fetch("detail")).to include("reconciled_stale_run(reason=stale_worker_run)")
+      expect(worker_payload.fetch("runs").fetch("Sample#9").fetch("state")).to eq("failed")
+      expect(worker_payload.fetch("runs").fetch("Sample#9").fetch("detail")).to include("reconciled_stale_run(reason=stale_worker_run)")
     end
   end
 
@@ -111,8 +111,8 @@ RSpec.describe A3Reconcile do
       worker_runs.write(
         JSON.generate(
           "runs" => {
-            "Portal#2561" => {
-              "task_ref" => "Portal#2561", "task_id" => 2561, "team" => "implementation", "phase" => "implementation",
+            "Sample#2561" => {
+              "task_ref" => "Sample#2561", "task_id" => 2561, "team" => "implementation", "phase" => "implementation",
               "state" => "running", "started_at" => "2026-03-23T00:00:00+00:00", "heartbeat_at" => "2026-03-23T00:10:00+00:00",
               "updated_at_epoch_ms" => 10
             }
@@ -121,9 +121,9 @@ RSpec.describe A3Reconcile do
       )
       allow(described_class).to receive(:live_scheduler_processes).and_return([])
 
-      payload = described_class.inspect_stale_active_runs(project: "portal", active_runs_file: active_runs, worker_runs_file: worker_runs)
+      payload = described_class.inspect_stale_active_runs(project: "sample", active_runs_file: active_runs, worker_runs_file: worker_runs)
       expect(payload.fetch("stale_active_runs")).to eq([
-        { "task_ref" => "Portal#2561", "task_id" => 2561, "reason" => "stale_worker_run", "latest_state" => "running" }
+        { "task_ref" => "Sample#2561", "task_id" => 2561, "reason" => "stale_worker_run", "latest_state" => "running" }
       ])
     end
   end
@@ -132,12 +132,12 @@ RSpec.describe A3Reconcile do
     Dir.mktmpdir("a3-reconcile-") do |dir|
       root = Pathname(dir)
       launcher_config = root.join("launcher.json")
-      env_file = root.join("portal.env")
+      env_file = root.join("sample.env")
       env_file.write("KANBAN_API_TOKEN=test-token\nPATH=/usr/bin:/bin\n")
       launcher_config.write(
         JSON.pretty_generate(
           "executor" => { "kind" => "ai-cli", "implementation" => "openai-codex" },
-          "scheduler" => { "backend" => "manual", "job_name" => "dev.a3.portal.watch", "command_argv" => ["/bin/sh", "-lc", "true"] },
+          "scheduler" => { "backend" => "manual", "job_name" => "dev.a3.sample.watch", "command_argv" => ["/bin/sh", "-lc", "true"] },
           "runtime_env" => { "required_bins" => [], "path_entries" => [] },
           "shell" => { "executable" => "/bin/sh", "login" => false, "interactive" => false, "inherit_env" => false, "env_files" => [env_file.to_s], "env_overrides" => { "JAVA_HOME" => "/opt/jdk-25" } },
           "kanban" => { "backend" => "subprocess-cli", "command_argv" => ["task", "kanban:api", "--"], "working_directory" => root.to_s }
@@ -150,7 +150,7 @@ RSpec.describe A3Reconcile do
         true
       end
 
-      described_class.apply_status_reset(launcher_config: launcher_config, task_ref: "Portal#2561", task_id: 2561, status: "To do")
+      described_class.apply_status_reset(launcher_config: launcher_config, task_ref: "Sample#2561", task_id: 2561, status: "To do")
 
       expect(received[:argv]).to eq(["task", "kanban:api", "--", "task-transition", "--task-id", "2561", "--status", "To do"])
       expect(received[:kwargs][:chdir]).to eq(root.to_s)
@@ -163,7 +163,7 @@ RSpec.describe A3Reconcile do
     Dir.mktmpdir("a3-reconcile-") do |dir|
       root = Pathname(dir)
       launcher_config = root.join("launcher.json")
-      env_file = root.join("portal.env")
+      env_file = root.join("sample.env")
       ai_cli_home = root.join(".ai-cli-home")
       vendor_dir = ai_cli_home.join("vendor", "ripgrep")
       vendor_dir.mkpath
@@ -185,7 +185,7 @@ RSpec.describe A3Reconcile do
         true
       end
 
-      described_class.apply_status_reset(launcher_config: launcher_config, task_ref: "Portal#2561", task_id: 2561, status: "To do")
+      described_class.apply_status_reset(launcher_config: launcher_config, task_ref: "Sample#2561", task_id: 2561, status: "To do")
       expect(received.fetch("PATH").split(":").first).to eq(vendor_dir.to_s)
     end
   end

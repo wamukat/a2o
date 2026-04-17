@@ -248,7 +248,7 @@ RSpec.describe A3::Application::PlanNextPhase do
 
   it "routes merge recovery completion back to verification" do
     task = A3::Domain::Task.new(
-      ref: "Portal#1",
+      ref: "Sample#1",
       kind: :single,
       edit_scope: [:repo_alpha],
       status: :merging

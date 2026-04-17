@@ -9,10 +9,10 @@ RSpec.describe A3::Agent::RunOnceWorker do
   let(:request) do
     A3::Domain::AgentJobRequest.new(
       job_id: "job-1",
-      task_ref: "Portal#42",
+      task_ref: "Sample#42",
       phase: :verification,
       runtime_profile: "host-local",
-      source_descriptor: A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Portal#42", ref: "abc123"),
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Sample#42", ref: "abc123"),
       working_dir: working_dir,
       command: "task",
       args: ["test:all"],

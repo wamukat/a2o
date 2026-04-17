@@ -67,10 +67,10 @@ RSpec.describe A3::Infra::AgentControlPlaneClient do
   def agent_job_request(job_id)
     A3::Domain::AgentJobRequest.new(
       job_id: job_id,
-      task_ref: "Portal#42",
+      task_ref: "Sample#42",
       phase: :implementation,
       runtime_profile: "host-local",
-      source_descriptor: A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Portal#42", ref: "abc123"),
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Sample#42", ref: "abc123"),
       working_dir: tmpdir,
       command: "ruby",
       args: ["-e", "puts :ok"],

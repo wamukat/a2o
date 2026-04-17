@@ -454,7 +454,7 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     Pathname(repo_sources.fetch(:repo_beta)).join("README.md").write("plain repo-beta\n")
 
     task = A3::Domain::Task.new(
-      ref: "Portal#3140",
+      ref: "Sample#3140",
       kind: :parent,
       edit_scope: %i[repo_alpha repo_beta]
     )
@@ -516,17 +516,17 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
   end
 
   it "cleans a parent-bound child workspace by exact parent ref" do
-    parent_root = Pathname(tmpdir).join("workspaces", "Portal-201-parent")
-    intended_child = parent_root.join("children", "Portal-202", "ticket_workspace")
-    other_child = Pathname(tmpdir).join("workspaces", "Portal-999-parent", "children", "Portal-202", "ticket_workspace")
+    parent_root = Pathname(tmpdir).join("workspaces", "Sample-201-parent")
+    intended_child = parent_root.join("children", "Sample-202", "ticket_workspace")
+    other_child = Pathname(tmpdir).join("workspaces", "Sample-999-parent", "children", "Sample-202", "ticket_workspace")
     FileUtils.mkdir_p(intended_child)
     FileUtils.mkdir_p(other_child)
 
     provisioner = described_class.new(base_dir: tmpdir, repo_sources: {})
     cleaned_paths = provisioner.cleanup_task(
-      task_ref: "Portal#202",
-      parent_ref: "Portal#201",
-      parent_workspace_ref: "Portal#201-parent",
+      task_ref: "Sample#202",
+      parent_ref: "Sample#201",
+      parent_workspace_ref: "Sample#201-parent",
       scopes: [:ticket_workspace],
       dry_run: false
     )
@@ -537,12 +537,12 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
   end
 
   it "does not resolve parentless cleanup through ambiguous child glob fallback" do
-    child = Pathname(tmpdir).join("workspaces", "Portal-999", "children", "Portal-202", "ticket_workspace")
+    child = Pathname(tmpdir).join("workspaces", "Sample-999", "children", "Sample-202", "ticket_workspace")
     FileUtils.mkdir_p(child)
 
     provisioner = described_class.new(base_dir: tmpdir, repo_sources: {})
     cleaned_paths = provisioner.cleanup_task(
-      task_ref: "Portal#202",
+      task_ref: "Sample#202",
       scopes: [:ticket_workspace],
       dry_run: false
     )
@@ -674,17 +674,17 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     repo_root = Pathname(File.join(tmpdir, "repo-alpha"))
     create_git_repo_source(tmpdir, name: "repo-alpha")
     task = A3::Domain::Task.new(
-      ref: "Portal#135",
+      ref: "Sample#135",
       kind: :child,
       edit_scope: [:repo_alpha],
-      parent_ref: "Portal#134"
+      parent_ref: "Sample#134"
     )
     workspace_plan = A3::Domain::WorkspacePlan.new(
       workspace_kind: :ticket_workspace,
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/Portal-135",
+        ref: "refs/heads/a3/work/Sample-135",
         task_ref: task.ref
       ),
       slot_requirements: [
@@ -697,19 +697,19 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
       task: task,
       workspace_plan: workspace_plan,
       artifact_owner: A3::Domain::ArtifactOwner.new(
-        owner_ref: "Portal#134",
+        owner_ref: "Sample#134",
         owner_scope: :task,
-        snapshot_version: "refs/heads/a3/work/Portal-135"
+        snapshot_version: "refs/heads/a3/work/Sample-135"
       ),
       bootstrap_marker: nil
     )
 
-    parent_root = Pathname(tmpdir).join("workspaces", "Portal-134-parent", "runtime_workspace")
+    parent_root = Pathname(tmpdir).join("workspaces", "Sample-134-parent", "runtime_workspace")
     parent_slot = parent_root.join("repo-alpha")
-    expect(workspace.root_path).to eq(Pathname(tmpdir).join("workspaces", "Portal-134-parent", "children", "Portal-135", "ticket_workspace"))
+    expect(workspace.root_path).to eq(Pathname(tmpdir).join("workspaces", "Sample-134-parent", "children", "Sample-135", "ticket_workspace"))
     expect(workspace.slot_paths.fetch(:repo_alpha)).to eq(workspace.root_path.join("repo-alpha"))
     expect(parent_slot).to exist
     expect(`git -C #{repo_root} worktree list --porcelain`).to include(parent_slot.to_s)
-    expect(`git -C #{repo_root} rev-parse refs/heads/a3/parent/Portal-134`.strip).to eq(`git -C #{parent_slot} rev-parse HEAD`.strip)
+    expect(`git -C #{repo_root} rev-parse refs/heads/a3/parent/Sample-134`.strip).to eq(`git -C #{parent_slot} rev-parse HEAD`.strip)
   end
 end

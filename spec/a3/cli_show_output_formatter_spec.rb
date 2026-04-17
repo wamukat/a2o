@@ -702,25 +702,25 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
   it "formats merge recovery evidence in run lines" do
     run_view = A3::Domain::OperatorInspectionReadModel::RunView.new(
       ref: "run-merge",
-      task_ref: "Portal#245",
+      task_ref: "Sample#245",
       task_kind: :child,
       phase: :merge,
       workspace_kind: :runtime_workspace,
       source_type: :integration_record,
-      source_ref: "refs/heads/a3/parent/Portal-201",
+      source_ref: "refs/heads/a3/parent/Sample-201",
       terminal_outcome: :verification_required,
       evidence_summary: A3::Domain::OperatorInspectionReadModel::EvidenceSummary.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        source_ref: "refs/heads/a3/parent/Portal-201",
+        source_ref: "refs/heads/a3/parent/Sample-201",
         review_base: nil,
         review_head: nil,
         edit_scope: [:repo_alpha],
         verification_scope: [:repo_alpha],
         ownership_scope: :task,
-        artifact_owner_ref: "Portal#201",
+        artifact_owner_ref: "Sample#201",
         artifact_owner_scope: :task,
-        artifact_snapshot_version: "refs/heads/a3/parent/Portal-201",
+        artifact_snapshot_version: "refs/heads/a3/parent/Sample-201",
         phase_records_count: 1
       ),
       latest_execution: A3::Domain::OperatorInspectionReadModel::RunView::ExecutionSnapshot.new(
@@ -732,8 +732,8 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
         diagnostics: {
           "merge_recovery" => {
             "status" => "recovered",
-            "target_ref" => "refs/heads/a3/parent/Portal-201",
-            "source_ref" => "refs/heads/a3/work/Portal-245",
+            "target_ref" => "refs/heads/a3/parent/Sample-201",
+            "source_ref" => "refs/heads/a3/work/Sample-245",
             "worker_result_ref" => "worker-1",
             "publish_before_head" => "abc123",
             "publish_after_head" => "def456",
@@ -746,8 +746,8 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
         review_disposition: nil,
         merge_recovery: {
           "status" => "recovered",
-          "target_ref" => "refs/heads/a3/parent/Portal-201",
-          "source_ref" => "refs/heads/a3/work/Portal-245",
+          "target_ref" => "refs/heads/a3/parent/Sample-201",
+          "source_ref" => "refs/heads/a3/work/Sample-245",
           "worker_result_ref" => "worker-1",
           "publish_before_head" => "abc123",
           "publish_after_head" => "def456",
@@ -762,7 +762,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
 
     result = described_class.run_lines(run_view)
 
-    expect(result).to include("merge_recovery status=recovered target_ref=refs/heads/a3/parent/Portal-201 source_ref=refs/heads/a3/work/Portal-245")
+    expect(result).to include("merge_recovery status=recovered target_ref=refs/heads/a3/parent/Sample-201 source_ref=refs/heads/a3/work/Sample-245")
     expect(result).to include("merge_recovery_worker_result_ref=worker-1")
     expect(result).to include("merge_recovery_publish=abc123..def456")
     expect(result).to include("merge_recovery_conflict_files=docs/conflict.md")

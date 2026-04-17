@@ -5,7 +5,7 @@ require "spec_helper"
 RSpec.describe A3::Domain::AgentJobResult do
   let(:source_descriptor) do
     A3::Domain::SourceDescriptor.runtime_detached_commit(
-      task_ref: "Portal#42",
+      task_ref: "Sample#42",
       ref: "abc123"
     )
   end
@@ -14,11 +14,11 @@ RSpec.describe A3::Domain::AgentJobResult do
     A3::Domain::AgentWorkspaceDescriptor.new(
       workspace_kind: :runtime_workspace,
       runtime_profile: "host-local-agent",
-      workspace_id: "workspace-portal-42",
+      workspace_id: "workspace-sample-42",
       source_descriptor: source_descriptor,
       slot_descriptors: {
         repo_alpha: {
-          "runtime_path" => "/workspace/member-portal-starters",
+          "runtime_path" => "/workspace/sample-catalog-service",
           "head_ref" => "abc123",
           "dirty" => false
         }
@@ -45,7 +45,7 @@ RSpec.describe A3::Domain::AgentJobResult do
     )
 
     result = described_class.new(
-      job_id: "job-portal-42-verification",
+      job_id: "job-sample-42-verification",
       status: :failed,
       exit_code: 1,
       started_at: "2026-04-11T08:00:00+09:00",
@@ -58,7 +58,7 @@ RSpec.describe A3::Domain::AgentJobResult do
     )
 
     expect(result.result_form).to include(
-      "job_id" => "job-portal-42-verification",
+      "job_id" => "job-sample-42-verification",
       "status" => "failed",
       "exit_code" => 1,
       "summary" => "task ops:flow:standard failed"
@@ -70,7 +70,7 @@ RSpec.describe A3::Domain::AgentJobResult do
 
   it "round-trips from the result form" do
     result = described_class.new(
-      job_id: "job-portal-42-verification",
+      job_id: "job-sample-42-verification",
       status: "succeeded",
       exit_code: 0,
       started_at: "2026-04-11T08:00:00+09:00",
@@ -89,7 +89,7 @@ RSpec.describe A3::Domain::AgentJobResult do
       workspace_descriptor: workspace_descriptor,
       worker_protocol_result: {
         status: "succeeded",
-        task_ref: "Portal#42"
+        task_ref: "Sample#42"
       },
       heartbeat: nil
     )
@@ -97,7 +97,7 @@ RSpec.describe A3::Domain::AgentJobResult do
     expect(described_class.from_result_form(result.result_form)).to eq(result)
     expect(result.result_form.fetch("worker_protocol_result")).to eq(
       "status" => "succeeded",
-      "task_ref" => "Portal#42"
+      "task_ref" => "Sample#42"
     )
   end
 
@@ -105,18 +105,18 @@ RSpec.describe A3::Domain::AgentJobResult do
     descriptor = A3::Domain::AgentWorkspaceDescriptor.new(
       workspace_kind: :runtime_workspace,
       runtime_profile: "host-local-agent",
-      workspace_id: "Portal-134-children-Portal-135-implementation-run-implementation",
+      workspace_id: "Sample-134-children-Sample-135-implementation-run-implementation",
       source_descriptor: source_descriptor,
       topology: {
         kind: "parent_child",
-        parent_ref: "Portal#134",
-        child_ref: "Portal#135",
-        parent_workspace_id: "Portal-134-parent",
-        relative_path: "children/Portal-135/ticket_workspace"
+        parent_ref: "Sample#134",
+        child_ref: "Sample#135",
+        parent_workspace_id: "Sample-134-parent",
+        relative_path: "children/Sample-135/ticket_workspace"
       },
       slot_descriptors: {
         repo_alpha: {
-          "runtime_path" => "/workspace/Portal-134-parent/children/Portal-135/ticket_workspace/repo-alpha"
+          "runtime_path" => "/workspace/Sample-134-parent/children/Sample-135/ticket_workspace/repo-alpha"
         }
       }
     )
@@ -124,16 +124,16 @@ RSpec.describe A3::Domain::AgentJobResult do
     expect(A3::Domain::AgentWorkspaceDescriptor.from_persisted_form(descriptor.persisted_form)).to eq(descriptor)
     expect(descriptor.persisted_form.fetch("topology")).to eq(
       "kind" => "parent_child",
-      "parent_ref" => "Portal#134",
-      "child_ref" => "Portal#135",
-      "parent_workspace_id" => "Portal-134-parent",
-      "relative_path" => "children/Portal-135/ticket_workspace"
+      "parent_ref" => "Sample#134",
+      "child_ref" => "Sample#135",
+      "parent_workspace_id" => "Sample-134-parent",
+      "relative_path" => "children/Sample-135/ticket_workspace"
     )
   end
 
   it "rejects local path-only log and artifact result fields" do
     result_form = {
-      "job_id" => "job-portal-42-verification",
+      "job_id" => "job-sample-42-verification",
       "status" => "failed",
       "exit_code" => 1,
       "started_at" => "2026-04-11T08:00:00+09:00",
@@ -171,7 +171,7 @@ RSpec.describe A3::Domain::AgentJobResult do
       A3::Domain::AgentWorkspaceDescriptor.new(
         workspace_kind: :ticket_workspace,
         runtime_profile: "host-local-agent",
-        workspace_id: "workspace-portal-42",
+        workspace_id: "workspace-sample-42",
         source_descriptor: source_descriptor,
         slot_descriptors: {}
       )

@@ -50,14 +50,14 @@ func TestWorkerUploadsLogsArtifactsAndResult(t *testing.T) {
 
 func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	request := testRequest(".")
 	request.Phase = "implementation"
 	request.SourceDescriptor.WorkspaceKind = "ticket_workspace"
-	request.WorkspaceRequest = ptr(testWorkspaceRequest("member-portal-starters"))
+	request.WorkspaceRequest = ptr(testWorkspaceRequest("sample-catalog-service"))
 	request.WorkspaceRequest.CleanupPolicy = "cleanup_after_job"
 	request.WorkerProtocolRequest = map[string]any{
-		"task_ref": "Portal#42",
+		"task_ref": "Sample#42",
 		"phase":    "implementation",
 	}
 	client := &fakeClient{request: &request}
@@ -69,7 +69,7 @@ func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T)
 		Materializer: WorkspaceMaterializer{
 			WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 			SourceAliases: map[string]string{
-				"member-portal-starters": sourceRoot,
+				"sample-catalog-service": sourceRoot,
 			},
 		},
 		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
@@ -80,7 +80,7 @@ func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T)
 	if idle {
 		t.Fatal("expected job result, got idle")
 	}
-	if result.WorkspaceDescriptor.WorkspaceID != "Portal-42-ticket" {
+	if result.WorkspaceDescriptor.WorkspaceID != "Sample-42-ticket" {
 		t.Fatalf("unexpected workspace descriptor: %#v", result.WorkspaceDescriptor)
 	}
 	if result.WorkerProtocolResult["status"] != "succeeded" {
@@ -99,33 +99,33 @@ func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T)
 	if slot["publish_before_head"] == slot["publish_after_head"] {
 		t.Fatalf("expected publish head to advance: %#v", slot)
 	}
-	if head := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "a3/work/Portal-42")); head != slot["publish_after_head"] {
+	if head := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "a3/work/Sample-42")); head != slot["publish_after_head"] {
 		t.Fatalf("source branch was not advanced: head=%s slot=%#v", head, slot)
 	}
 	if roles := uploadRoles(client.uploads); !bytes.Equal([]byte(roles), []byte("combined-log,worker-result")) {
 		t.Fatalf("unexpected upload roles: %s", roles)
 	}
-	if _, err := os.Stat(filepath.Join(tmp, "agent-workspaces", "Portal-42-ticket")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(tmp, "agent-workspaces", "Sample-42-ticket")); !os.IsNotExist(err) {
 		t.Fatalf("workspace was not cleaned up: %v", err)
 	}
 }
 
 func TestWorkerUsesEngineProvidedAgentEnvironmentForMaterialization(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	request := testRequest(".")
 	request.Phase = "implementation"
 	request.SourceDescriptor.WorkspaceKind = "ticket_workspace"
-	request.WorkspaceRequest = ptr(testWorkspaceRequest("member-portal-starters"))
+	request.WorkspaceRequest = ptr(testWorkspaceRequest("sample-catalog-service"))
 	request.WorkspaceRequest.CleanupPolicy = "cleanup_after_job"
 	request.WorkerProtocolRequest = map[string]any{
-		"task_ref": "Portal#42",
+		"task_ref": "Sample#42",
 		"phase":    "implementation",
 	}
 	request.AgentEnvironment = &AgentEnvironment{
 		WorkspaceRoot: filepath.Join(tmp, "engine-managed-workspaces"),
 		SourcePaths: map[string]string{
-			"member-portal-starters": sourceRoot,
+			"sample-catalog-service": sourceRoot,
 		},
 		Env: map[string]string{
 			"A3_ENGINE_MANAGED_ENV": "true",
@@ -148,23 +148,23 @@ func TestWorkerUsesEngineProvidedAgentEnvironmentForMaterialization(t *testing.T
 	if result.Status != "succeeded" {
 		t.Fatalf("expected success from engine-managed environment, got %#v", result)
 	}
-	if result.WorkspaceDescriptor.WorkspaceID != "Portal-42-ticket" {
+	if result.WorkspaceDescriptor.WorkspaceID != "Sample-42-ticket" {
 		t.Fatalf("unexpected workspace descriptor: %#v", result.WorkspaceDescriptor)
 	}
-	if _, err := os.Stat(filepath.Join(tmp, "engine-managed-workspaces", "Portal-42-ticket")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(tmp, "engine-managed-workspaces", "Sample-42-ticket")); !os.IsNotExist(err) {
 		t.Fatalf("workspace was not cleaned up: %v", err)
 	}
 }
 
 func TestWorkerRejectsPublishWhenWorkerResultOmitsChangedFiles(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	request := testRequest(".")
 	request.Phase = "implementation"
 	request.SourceDescriptor.WorkspaceKind = "ticket_workspace"
-	request.WorkspaceRequest = ptr(testWorkspaceRequest("member-portal-starters"))
+	request.WorkspaceRequest = ptr(testWorkspaceRequest("sample-catalog-service"))
 	request.WorkerProtocolRequest = map[string]any{
-		"task_ref": "Portal#42",
+		"task_ref": "Sample#42",
 		"phase":    "implementation",
 	}
 	client := &fakeClient{request: &request}
@@ -176,7 +176,7 @@ func TestWorkerRejectsPublishWhenWorkerResultOmitsChangedFiles(t *testing.T) {
 		Materializer: WorkspaceMaterializer{
 			WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 			SourceAliases: map[string]string{
-				"member-portal-starters": sourceRoot,
+				"sample-catalog-service": sourceRoot,
 			},
 		},
 		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
@@ -193,20 +193,20 @@ func TestWorkerRejectsPublishWhenWorkerResultOmitsChangedFiles(t *testing.T) {
 	if result.WorkerProtocolResult["failing_command"] != "agent_workspace_publish" {
 		t.Fatalf("unexpected failure payload: %#v", result.WorkerProtocolResult)
 	}
-	if head := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "a3/work/Portal-42")); head == "" || head != result.WorkspaceDescriptor.SlotDescriptors["repo_alpha"]["resolved_head"] {
+	if head := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "a3/work/Sample-42")); head == "" || head != result.WorkspaceDescriptor.SlotDescriptors["repo_alpha"]["resolved_head"] {
 		t.Fatalf("source branch should not advance on publish failure: head=%s descriptor=%#v", head, result.WorkspaceDescriptor.SlotDescriptors["repo_alpha"])
 	}
 }
 
 func TestWorkerSubmitsFailedResultWhenMaterializationFails(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	if err := os.WriteFile(filepath.Join(sourceRoot, "dirty.txt"), []byte("dirty\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	request := testRequest(".")
 	request.SourceDescriptor.WorkspaceKind = "ticket_workspace"
-	request.WorkspaceRequest = ptr(testWorkspaceRequest("member-portal-starters"))
+	request.WorkspaceRequest = ptr(testWorkspaceRequest("sample-catalog-service"))
 	client := &fakeClient{request: &request}
 
 	result, idle, err := Worker{
@@ -216,7 +216,7 @@ func TestWorkerSubmitsFailedResultWhenMaterializationFails(t *testing.T) {
 		Materializer: WorkspaceMaterializer{
 			WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 			SourceAliases: map[string]string{
-				"member-portal-starters": sourceRoot,
+				"sample-catalog-service": sourceRoot,
 			},
 		},
 		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
@@ -237,23 +237,23 @@ func TestWorkerSubmitsFailedResultWhenMaterializationFails(t *testing.T) {
 
 func TestWorkerRunsNativeMergeJobs(t *testing.T) {
 	tmp := t.TempDir()
-	sourceRoot := createGitSource(t, tmp, "member-portal-starters")
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	if err := os.WriteFile(filepath.Join(sourceRoot, "feature.txt"), []byte("feature\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	git(t, sourceRoot, "add", "feature.txt")
 	git(t, sourceRoot, "commit", "-q", "-m", "feature")
-	git(t, sourceRoot, "branch", "-f", "a3/work/Portal-42", "HEAD")
+	git(t, sourceRoot, "branch", "-f", "a3/work/Sample-42", "HEAD")
 	git(t, sourceRoot, "branch", "a3/live", "HEAD~1")
 	request := testRequest(".")
 	request.Phase = "merge"
 	request.MergeRequest = &MergeRequest{
-		WorkspaceID: "merge-Portal-42",
+		WorkspaceID: "merge-Sample-42",
 		Policy:      "ff_only",
 		Slots: map[string]MergeSlotRequest{
 			"repo_alpha": {
-				Source:    WorkspaceSourceRequest{Kind: "local_git", Alias: "member-portal-starters"},
-				SourceRef: "refs/heads/a3/work/Portal-42",
+				Source:    WorkspaceSourceRequest{Kind: "local_git", Alias: "sample-catalog-service"},
+				SourceRef: "refs/heads/a3/work/Sample-42",
 				TargetRef: "refs/heads/a3/live",
 			},
 		},
@@ -267,7 +267,7 @@ func TestWorkerRunsNativeMergeJobs(t *testing.T) {
 		Materializer: WorkspaceMaterializer{
 			WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 			SourceAliases: map[string]string{
-				"member-portal-starters": sourceRoot,
+				"sample-catalog-service": sourceRoot,
 			},
 		},
 		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
@@ -445,14 +445,14 @@ func (f *fakeClient) SubmitResult(result JobResult) error {
 func testRequest(workingDir string) JobRequest {
 	return JobRequest{
 		JobID:          "job-1",
-		TaskRef:        "Portal#42",
+		TaskRef:        "Sample#42",
 		Phase:          "verification",
 		RuntimeProfile: "host-local",
 		SourceDescriptor: SourceDescriptor{
 			WorkspaceKind: "runtime_workspace",
 			SourceType:    "detached_commit",
 			Ref:           "abc123",
-			TaskRef:       "Portal#42",
+			TaskRef:       "Sample#42",
 		},
 		WorkingDir:     workingDir,
 		Command:        "task",
@@ -471,7 +471,7 @@ func testRequest(workingDir string) JobRequest {
 }
 
 func TestSafeID(t *testing.T) {
-	got := safeID("Portal#42 junit/report.xml")
+	got := safeID("Sample#42 junit/report.xml")
 	if bytes.ContainsAny([]byte(got), "#/ ") {
 		t.Fatalf("unsafe id: %s", got)
 	}

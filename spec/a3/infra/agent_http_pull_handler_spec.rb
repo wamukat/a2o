@@ -220,11 +220,11 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
   def agent_job_request(job_id)
     A3::Domain::AgentJobRequest.new(
       job_id: job_id,
-      task_ref: "Portal#42",
+      task_ref: "Sample#42",
       phase: :verification,
       runtime_profile: "host-local-agent",
       source_descriptor: source_descriptor,
-      working_dir: "/workspace/member-portal-starters",
+      working_dir: "/workspace/sample-catalog-service",
       command: "task",
       args: ["ops:flow:standard"],
       env: {},
@@ -257,14 +257,14 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
   end
 
   def source_descriptor
-    A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Portal#42", ref: "abc123")
+    A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Sample#42", ref: "abc123")
   end
 
   def workspace_descriptor
     A3::Domain::AgentWorkspaceDescriptor.new(
       workspace_kind: :runtime_workspace,
       runtime_profile: "host-local-agent",
-      workspace_id: "workspace-portal-42",
+      workspace_id: "workspace-sample-42",
       source_descriptor: source_descriptor,
       slot_descriptors: {}
     )

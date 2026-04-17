@@ -157,7 +157,7 @@ RSpec.describe A3::Domain::Task do
   describe "#runnable_phase" do
     it "does not re-enter implementation for parent tasks that somehow hold in_progress" do
       task = described_class.new(
-        ref: "Portal#3140",
+        ref: "Sample#3140",
         kind: :parent,
         edit_scope: %i[repo_alpha repo_beta],
         status: :in_progress
@@ -168,7 +168,7 @@ RSpec.describe A3::Domain::Task do
 
     it "does not resume child review from in_review anymore" do
       task = described_class.new(
-        ref: "Portal#3141",
+        ref: "Sample#3141",
         kind: :child,
         edit_scope: [:repo_alpha],
         status: :in_review

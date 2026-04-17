@@ -236,8 +236,8 @@ RSpec.describe A3::Application::PhaseExecutionOrchestrator do
     handler_result = A3::Application::HandleParentReviewDisposition::Result.new(
       terminal_status: :todo,
       terminal_outcome: :follow_up_child,
-      follow_up_child_refs: ["Portal#3200"],
-      comment_lines: ["follow_up_children: Portal#3200"]
+      follow_up_child_refs: ["Sample#3200"],
+      comment_lines: ["follow_up_children: Sample#3200"]
     )
     handler = instance_double(A3::Application::HandleParentReviewDisposition, call: handler_result)
     overridden_register_completed_run = A3::Application::RegisterCompletedRun.new(
@@ -253,7 +253,7 @@ RSpec.describe A3::Application::PhaseExecutionOrchestrator do
       prepare_workspace: prepare_workspace
     )
     parent_task = A3::Domain::Task.new(
-      ref: "Portal#3140",
+      ref: "Sample#3140",
       kind: :parent,
       edit_scope: %i[repo_alpha repo_beta],
       verification_scope: %i[repo_alpha repo_beta],
@@ -268,7 +268,7 @@ RSpec.describe A3::Application::PhaseExecutionOrchestrator do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/Portal-3140",
+        ref: "refs/heads/a3/parent/Sample-3140",
         task_ref: parent_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(

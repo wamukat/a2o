@@ -8,32 +8,32 @@ import (
 func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 	payload := []byte(`{
 		"job_id": "job-1",
-		"task_ref": "Portal#42",
+		"task_ref": "Sample#42",
 		"phase": "implementation",
 		"runtime_profile": "host-local",
 		"source_descriptor": {
 			"workspace_kind": "ticket_workspace",
 			"source_type": "branch_head",
-			"ref": "refs/heads/a3/work/Portal-42",
-			"task_ref": "Portal#42"
+			"ref": "refs/heads/a3/work/Sample-42",
+			"task_ref": "Sample#42"
 		},
 		"workspace_request": {
 			"mode": "agent_materialized",
 			"workspace_kind": "ticket_workspace",
-			"workspace_id": "Portal-42-ticket",
+			"workspace_id": "Sample-42-ticket",
 			"freshness_policy": "reuse_if_clean_and_ref_matches",
 			"cleanup_policy": "retain_until_a3_cleanup",
 			"publish_policy": {
 				"mode": "commit_all_edit_target_changes_on_worker_success",
-				"commit_message": "A3 implementation update for Portal#42"
+				"commit_message": "A3 implementation update for Sample#42"
 			},
 			"slots": {
 				"repo_alpha": {
 					"source": {
 						"kind": "local_git",
-						"alias": "member-portal-starters"
+						"alias": "sample-catalog-service"
 					},
-					"ref": "refs/heads/a3/work/Portal-42",
+					"ref": "refs/heads/a3/work/Sample-42",
 					"bootstrap_ref": "refs/heads/feature/prototype",
 					"checkout": "worktree_branch",
 					"access": "read_write",
@@ -44,13 +44,13 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 			}
 		},
 		"worker_protocol_request": {
-			"task_ref": "Portal#42",
+			"task_ref": "Sample#42",
 			"phase": "implementation"
 		},
 		"agent_environment": {
 			"workspace_root": "/agent/workspaces",
 			"source_paths": {
-				"member-portal-starters": "/agent/repos/starters"
+				"sample-catalog-service": "/agent/repos/starters"
 			},
 			"env": {
 				"A3_ROOT_DIR": "/agent/a3"
@@ -75,13 +75,13 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 	if request.WorkspaceRequest.PublishPolicy == nil || request.WorkspaceRequest.PublishPolicy.Mode != "commit_all_edit_target_changes_on_worker_success" {
 		t.Fatalf("workspace publish policy was not decoded: %#v", request.WorkspaceRequest.PublishPolicy)
 	}
-	if request.WorkerProtocolRequest["task_ref"] != "Portal#42" {
+	if request.WorkerProtocolRequest["task_ref"] != "Sample#42" {
 		t.Fatalf("worker protocol request was not decoded: %#v", request.WorkerProtocolRequest)
 	}
 	if request.AgentEnvironment == nil || request.AgentEnvironment.WorkspaceRoot != "/agent/workspaces" {
 		t.Fatalf("agent environment was not decoded: %#v", request.AgentEnvironment)
 	}
-	if request.AgentEnvironment.SourcePaths["member-portal-starters"] != "/agent/repos/starters" {
+	if request.AgentEnvironment.SourcePaths["sample-catalog-service"] != "/agent/repos/starters" {
 		t.Fatalf("agent source paths were not decoded: %#v", request.AgentEnvironment.SourcePaths)
 	}
 	if request.AgentEnvironment.Env["A3_ROOT_DIR"] != "/agent/a3" {
@@ -91,7 +91,7 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 		t.Fatalf("agent required bins were not decoded: %#v", request.AgentEnvironment.RequiredBins)
 	}
 	slot := request.WorkspaceRequest.Slots["repo_alpha"]
-	if slot.Source.Alias != "member-portal-starters" || slot.Checkout != "worktree_branch" || slot.SyncClass != "eager" || slot.Ownership != "edit_target" {
+	if slot.Source.Alias != "sample-catalog-service" || slot.Checkout != "worktree_branch" || slot.SyncClass != "eager" || slot.Ownership != "edit_target" {
 		t.Fatalf("unexpected slot request: %#v", slot)
 	}
 	if slot.BootstrapRef != "refs/heads/feature/prototype" {
@@ -106,13 +106,13 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 	if err := json.Unmarshal(encoded, &roundTrip); err != nil {
 		t.Fatal(err)
 	}
-	if roundTrip.WorkspaceRequest == nil || roundTrip.WorkspaceRequest.WorkspaceID != "Portal-42-ticket" {
+	if roundTrip.WorkspaceRequest == nil || roundTrip.WorkspaceRequest.WorkspaceID != "Sample-42-ticket" {
 		t.Fatalf("unexpected roundtrip request: %#v", roundTrip.WorkspaceRequest)
 	}
 	if roundTrip.WorkerProtocolRequest["phase"] != "implementation" {
 		t.Fatalf("unexpected roundtrip worker protocol request: %#v", roundTrip.WorkerProtocolRequest)
 	}
-	if roundTrip.AgentEnvironment == nil || roundTrip.AgentEnvironment.SourcePaths["member-portal-starters"] != "/agent/repos/starters" {
+	if roundTrip.AgentEnvironment == nil || roundTrip.AgentEnvironment.SourcePaths["sample-catalog-service"] != "/agent/repos/starters" {
 		t.Fatalf("unexpected roundtrip agent environment: %#v", roundTrip.AgentEnvironment)
 	}
 }
@@ -130,18 +130,18 @@ func TestJobResultWorkerProtocolResultRoundTrip(t *testing.T) {
 		"workspace_descriptor": {
 			"workspace_kind": "ticket_workspace",
 			"runtime_profile": "host-local",
-			"workspace_id": "Portal-42-ticket",
+			"workspace_id": "Sample-42-ticket",
 			"source_descriptor": {
 				"workspace_kind": "ticket_workspace",
 				"source_type": "branch_head",
-				"ref": "refs/heads/a3/work/Portal-42",
-				"task_ref": "Portal#42"
+				"ref": "refs/heads/a3/work/Sample-42",
+				"task_ref": "Sample#42"
 			},
 			"slot_descriptors": {}
 		},
 		"worker_protocol_result": {
 			"status": "succeeded",
-			"task_ref": "Portal#42"
+			"task_ref": "Sample#42"
 		}
 	}`)
 
@@ -160,7 +160,7 @@ func TestJobResultWorkerProtocolResultRoundTrip(t *testing.T) {
 	if err := json.Unmarshal(encoded, &roundTrip); err != nil {
 		t.Fatal(err)
 	}
-	if roundTrip.WorkerProtocolResult["task_ref"] != "Portal#42" {
+	if roundTrip.WorkerProtocolResult["task_ref"] != "Sample#42" {
 		t.Fatalf("unexpected roundtrip worker protocol result: %#v", roundTrip.WorkerProtocolResult)
 	}
 }

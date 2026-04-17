@@ -14,19 +14,19 @@ RSpec.describe A3RerunReadiness do
   it "reports cleanup paths and blocked labels as not ready" do
     Dir.mktmpdir("a3-rerun-readiness-") do |dir|
       root = Pathname(dir)
-      issue_workspace = root.join(".work", "a3", "issues", "portal", "portal-2981")
+      issue_workspace = root.join(".work", "a3", "issues", "sample", "sample-2981")
       FileUtils.mkdir_p(issue_workspace.join(".work"))
-      File.symlink(".support/member-portal-ui-app/member-portal-starters", issue_workspace.join("member-portal-starters"))
+      File.symlink(".support/sample-storefront/sample-catalog-service", issue_workspace.join("sample-catalog-service"))
 
-      active_runs = root.join(".work", "a3", "state", "portal", "active-runs.json")
-      worker_runs = root.join(".work", "a3", "state", "portal", "worker-runs.json")
+      active_runs = root.join(".work", "a3", "state", "sample", "active-runs.json")
+      worker_runs = root.join(".work", "a3", "state", "sample", "worker-runs.json")
       write_json(active_runs, { "active_task_refs" => [] })
       write_json(
         worker_runs,
         {
           "runs" => {
-            "Portal#2981" => {
-              "task_ref" => "Portal#2981",
+            "Sample#2981" => {
+              "task_ref" => "Sample#2981",
               "task_id" => 2981,
               "team" => "review",
               "phase" => "review",
@@ -43,16 +43,16 @@ RSpec.describe A3RerunReadiness do
 
       result = described_class.inspect_rerun_readiness(
         root_dir: root,
-        project: "portal",
-        task_ref: "Portal#2981",
+        project: "sample",
+        task_ref: "Sample#2981",
         active_runs_file: active_runs,
         worker_runs_file: worker_runs,
-        kanban_project: "Portal"
+        kanban_project: "Sample"
       )
 
       expect(result.fetch("ready")).to eq(false)
       expect(result.fetch("cleanup_paths")).to include(issue_workspace.join(".work").to_s)
-      expect(result.fetch("cleanup_paths")).to include(issue_workspace.join("member-portal-starters").to_s)
+      expect(result.fetch("cleanup_paths")).to include(issue_workspace.join("sample-catalog-service").to_s)
       by_name = result.fetch("checks").each_with_object({}) { |item, acc| acc[item.fetch("name")] = item }
       expect(by_name.fetch("broken_support_bridges_cleared").fetch("ok")).to eq(false)
       expect(by_name.fetch("rerun_cleanup_paths_cleared").fetch("ok")).to eq(false)
@@ -63,15 +63,15 @@ RSpec.describe A3RerunReadiness do
   it "allows blocked labels for explicit reruns" do
     Dir.mktmpdir("a3-rerun-readiness-") do |dir|
       root = Pathname(dir)
-      active_runs = root.join(".work", "a3", "state", "portal", "active-runs.json")
-      worker_runs = root.join(".work", "a3", "state", "portal", "worker-runs.json")
+      active_runs = root.join(".work", "a3", "state", "sample", "active-runs.json")
+      worker_runs = root.join(".work", "a3", "state", "sample", "worker-runs.json")
       write_json(active_runs, { "active_task_refs" => [] })
       write_json(
         worker_runs,
         {
           "runs" => {
-            "Portal#2981" => {
-              "task_ref" => "Portal#2981",
+            "Sample#2981" => {
+              "task_ref" => "Sample#2981",
               "task_id" => 2981,
               "team" => "review",
               "phase" => "review",
@@ -88,11 +88,11 @@ RSpec.describe A3RerunReadiness do
 
       result = described_class.inspect_rerun_readiness(
         root_dir: root,
-        project: "portal",
-        task_ref: "Portal#2981",
+        project: "sample",
+        task_ref: "Sample#2981",
         active_runs_file: active_runs,
         worker_runs_file: worker_runs,
-        kanban_project: "Portal",
+        kanban_project: "Sample",
         allow_blocked_label: true
       )
 
