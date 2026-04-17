@@ -18,6 +18,7 @@ Date: 2026-04-17
 - Agent HTTP worker gateway
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo scenarios
+- Published GHCR image smoke for the reference product packages
 - Full RSpec release gate passing locally
 
 ## Current Baseline
@@ -26,7 +27,6 @@ Date: 2026-04-17
 
 ## Productization Gaps
 
-- `A2O#268` Published image smoke: release candidate validation should be repeated against the published GHCR image, not only a local equivalent.
 - `A2O#269` Package schema consolidation: `manifest.yml` and `project.yaml` responsibilities should be documented and validated consistently.
 - `A2O#270` User-facing diagnostics: internal A3 names can remain, but normal manuals should avoid requiring users to author them.
 
