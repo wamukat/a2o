@@ -23,7 +23,7 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 		printUsage(stderr)
 		return 2
 	}
-	if args[0] == "--help" || args[0] == "-h" || args[0] == "help" {
+	if isHelpArg(args[0]) {
 		printUsage(stdout)
 		return 0
 	}

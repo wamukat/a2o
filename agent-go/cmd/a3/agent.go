@@ -17,6 +17,10 @@ func runAgent(args []string, runner commandRunner, stdout io.Writer, stderr io.W
 		printUsage(stderr)
 		return 2
 	}
+	if isHelpArg(args[0]) {
+		printUsage(stdout)
+		return 0
+	}
 
 	switch args[0] {
 	case "target":

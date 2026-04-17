@@ -176,19 +176,23 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 	}
 }
 
-func TestRuntimeHelpPrintsUsage(t *testing.T) {
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
+func TestGroupHelpPrintsUsage(t *testing.T) {
+	for _, group := range []string{"project", "kanban", "runtime", "agent"} {
+		t.Run(group, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
 
-	code := run([]string{"runtime", "--help"}, &fakeRunner{}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
-	}
-	if !strings.Contains(stdout.String(), "a2o runtime run-once [--max-steps N] [--agent-attempts N]") {
-		t.Fatalf("runtime help should print usage, got %q", stdout.String())
-	}
-	if strings.Contains(stderr.String(), "unknown runtime subcommand") {
-		t.Fatalf("runtime help should not be an unknown subcommand, got %q", stderr.String())
+			code := run([]string{group, "--help"}, &fakeRunner{}, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+			}
+			if !strings.Contains(stdout.String(), "a2o "+group+" ") {
+				t.Fatalf("%s help should print group usage, got %q", group, stdout.String())
+			}
+			if strings.Contains(stderr.String(), "unknown "+group+" subcommand") {
+				t.Fatalf("%s help should not be an unknown subcommand, got %q", group, stderr.String())
+			}
+		})
 	}
 }
 

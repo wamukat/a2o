@@ -98,6 +98,10 @@ func run(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer
 	}
 }
 
+func isHelpArg(arg string) bool {
+	return arg == "help" || arg == "-h" || arg == "--help"
+}
+
 func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage:")
 	fmt.Fprintln(w, "  a2o version")

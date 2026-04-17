@@ -16,6 +16,10 @@ func runProject(args []string, stdout io.Writer, stderr io.Writer) int {
 		printUsage(stderr)
 		return 2
 	}
+	if isHelpArg(args[0]) {
+		printUsage(stdout)
+		return 0
+	}
 	switch args[0] {
 	case "bootstrap":
 		if err := runProjectBootstrap(args[1:], stdout, stderr); err != nil {
