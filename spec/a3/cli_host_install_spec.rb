@@ -16,7 +16,7 @@ RSpec.describe "A3 host install CLI" do
     write_host_launcher(package_dir, "darwin-amd64", "darwin launcher\n")
     write_host_launcher(package_dir, "linux-arm64", "linux launcher\n")
     share_source_dir = File.join(@tmp_dir, "share-source")
-    write_share_asset(share_source_dir, "docker/compose/a3-portal-soloboard.yml", "services: {}\n")
+    write_share_asset(share_source_dir, "docker/compose/a2o-soloboard.yml", "services: {}\n")
     output_dir = File.join(@tmp_dir, "out")
     share_dir = File.join(@tmp_dir, "share-out")
     out = StringIO.new
@@ -42,7 +42,7 @@ RSpec.describe "A3 host install CLI" do
     expect(File.executable?(File.join(output_dir, "a2o"))).to be(true)
     expect(File.read(File.join(output_dir, "a3"))).to include("exec \"$binary\" \"$@\"")
     expect(File.executable?(File.join(output_dir, "a3"))).to be(true)
-    expect(File.read(File.join(share_dir, "docker/compose/a3-portal-soloboard.yml"))).to eq("services: {}\n")
+    expect(File.read(File.join(share_dir, "docker/compose/a2o-soloboard.yml"))).to eq("services: {}\n")
     expect(File.read(File.join(share_dir, "runtime-image"))).to eq("example/a3-engine:latest\n")
   end
 

@@ -348,11 +348,26 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime pgrep -f a3 execute-until-idle")
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime cat /tmp/a3-runtime-run-once.exit")
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime tail -n 160 /tmp/a3-runtime-run-once.log")
-	if runner.lastEnv["A3_PORTAL_BUNDLE_COMPOSE_FILE"] != "compose.yml" {
-		t.Fatalf("compose env=%q", runner.lastEnv["A3_PORTAL_BUNDLE_COMPOSE_FILE"])
+	if strings.Contains(strings.Join(joined, "\n"), "portal") {
+		t.Fatalf("run-once should not use Portal defaults:\n%s", strings.Join(joined, "\n"))
 	}
-	if runner.lastEnv["A3_PORTAL_BUNDLE_PROJECT"] != "a3-test" {
-		t.Fatalf("project env=%q", runner.lastEnv["A3_PORTAL_BUNDLE_PROJECT"])
+	joinedText := strings.Join(joined, "\n")
+	for _, want := range []string{
+		"'--kanban-project' 'A2OReferenceMultiRepo'",
+		"'--agent-source-path' 'catalog-service=",
+		"'--agent-source-path' 'storefront=",
+		"'--kanban-repo-label' 'repo:catalog=repo_alpha'",
+		"'--repo-source' 'repo_alpha=/workspace/reference-products/multi-repo-fixture/repos/catalog-service'",
+	} {
+		if !strings.Contains(joinedText, want) {
+			t.Fatalf("run-once missing %q in:\n%s", want, joinedText)
+		}
+	}
+	if runner.lastEnv["A3_BUNDLE_COMPOSE_FILE"] != "compose.yml" {
+		t.Fatalf("compose env=%q", runner.lastEnv["A3_BUNDLE_COMPOSE_FILE"])
+	}
+	if runner.lastEnv["A3_BUNDLE_PROJECT"] != "a3-test" {
+		t.Fatalf("project env=%q", runner.lastEnv["A3_BUNDLE_PROJECT"])
 	}
 	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"] != "1" {
 		t.Fatalf("max steps env=%q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"])
@@ -413,7 +428,7 @@ func TestRuntimeRunOnceAllowsEnvToOverrideStaleInstanceRuntimeValues(t *testing.
 	t.Setenv("A3_COMPOSE_PROJECT", "env-project")
 	t.Setenv("A3_COMPOSE_FILE", "env-compose.yml")
 	t.Setenv("A3_BUNDLE_AGENT_PORT", "7555")
-	t.Setenv("PORTAL_A3_BUNDLE_STORAGE_DIR", "/var/lib/a3/env-runtime")
+	t.Setenv("A3_BUNDLE_STORAGE_DIR", "/var/lib/a3/env-runtime")
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
 		SchemaVersion:  1,
 		PackagePath:    packageDir,
@@ -508,7 +523,7 @@ func TestRuntimeContainerProcessBuildsQuotedBackgroundScript(t *testing.T) {
 			"A3_ROOT_DIR":         "/workspace",
 		},
 		EnvShell: map[string]string{
-			"A3_SECRET": "${A3_SECRET:-portal-runtime-secret}",
+			"A3_SECRET": "${A3_SECRET:-a2o-runtime-secret}",
 		},
 		Args:        []string{"a3", "execute-until-idle", "--storage-dir", "/var/lib/a3/test runtime"},
 		StdoutPath:  "/tmp/a3 runtime.log",
@@ -519,7 +534,7 @@ func TestRuntimeContainerProcessBuildsQuotedBackgroundScript(t *testing.T) {
 
 	for _, want := range []string{
 		"cd '/workspace' &&",
-		"export A3_BRANCH_NAMESPACE='branch with space' A3_ROOT_DIR='/workspace' A3_SECRET=${A3_SECRET:-portal-runtime-secret}",
+		"export A3_BRANCH_NAMESPACE='branch with space' A3_ROOT_DIR='/workspace' A3_SECRET=${A3_SECRET:-a2o-runtime-secret}",
 		"'--storage-dir' '/var/lib/a3/test runtime'",
 		"> '/tmp/a3 runtime.log' 2>&1",
 		"echo $? > '/tmp/a3 runtime.exit'",
@@ -621,8 +636,8 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	call := append([]string{name}, args...)
 	r.calls = append(r.calls, call)
 	r.lastEnv = map[string]string{
-		"A3_PORTAL_BUNDLE_COMPOSE_FILE":      os.Getenv("A3_PORTAL_BUNDLE_COMPOSE_FILE"),
-		"A3_PORTAL_BUNDLE_PROJECT":           os.Getenv("A3_PORTAL_BUNDLE_PROJECT"),
+		"A3_BUNDLE_COMPOSE_FILE":             os.Getenv("A3_BUNDLE_COMPOSE_FILE"),
+		"A3_BUNDLE_PROJECT":                  os.Getenv("A3_BUNDLE_PROJECT"),
 		"A3_RUNTIME_RUN_ONCE_MAX_STEPS":      os.Getenv("A3_RUNTIME_RUN_ONCE_MAX_STEPS"),
 		"A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS": os.Getenv("A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"),
 		"A3_BRANCH_NAMESPACE":                os.Getenv("A3_BRANCH_NAMESPACE"),

@@ -26,16 +26,16 @@ func defaultComposeFile() string {
 		executableDir := filepath.Dir(executablePath)
 		candidates = append(
 			candidates,
-			filepath.Join(executableDir, "..", "share", "a2o", "docker", "compose", "a3-portal-soloboard.yml"),
-			filepath.Join(executableDir, "..", "share", "a3", "docker", "compose", "a3-portal-soloboard.yml"),
+			filepath.Join(executableDir, "..", "share", "a2o", "docker", "compose", "a2o-soloboard.yml"),
+			filepath.Join(executableDir, "..", "share", "a3", "docker", "compose", "a2o-soloboard.yml"),
 		)
 	}
 	candidates = append(candidates,
-		"a3-engine/docker/compose/a3-portal-soloboard.yml",
-		"docker/compose/a3-portal-soloboard.yml",
-		"../docker/compose/a3-portal-soloboard.yml",
-		"../share/a2o/docker/compose/a3-portal-soloboard.yml",
-		"../share/a3/docker/compose/a3-portal-soloboard.yml",
+		"a3-engine/docker/compose/a2o-soloboard.yml",
+		"docker/compose/a2o-soloboard.yml",
+		"../docker/compose/a2o-soloboard.yml",
+		"../share/a2o/docker/compose/a2o-soloboard.yml",
+		"../share/a3/docker/compose/a2o-soloboard.yml",
 	)
 	for _, candidate := range candidates {
 		if _, err := os.Stat(candidate); err == nil {
@@ -149,7 +149,7 @@ func defaultComposeProjectName(packagePath string) string {
 
 func applyAgentInstallOverrides(config runtimeInstanceConfig, composeProject string, composeFile string, runtimeService string) runtimeInstanceConfig {
 	if strings.TrimSpace(config.ComposeProject) == "" {
-		config.ComposeProject = envDefault("A3_COMPOSE_PROJECT", "a3-portal-bundle")
+		config.ComposeProject = envDefault("A3_COMPOSE_PROJECT", "a2o-runtime")
 	}
 	if strings.TrimSpace(config.ComposeFile) == "" {
 		config.ComposeFile = envDefault("A3_COMPOSE_FILE", defaultComposeFile())
@@ -207,10 +207,10 @@ func composeEnv(config runtimeInstanceConfig) map[string]string {
 
 func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttempts string) map[string]string {
 	overrides := composeEnv(config)
-	overrides["A3_PORTAL_BUNDLE_COMPOSE_FILE"] = config.ComposeFile
-	overrides["A3_PORTAL_BUNDLE_PROJECT"] = config.ComposeProject
-	if storageDir := envDefault("PORTAL_A3_BUNDLE_STORAGE_DIR", config.StorageDir); strings.TrimSpace(storageDir) != "" {
-		overrides["PORTAL_A3_BUNDLE_STORAGE_DIR"] = storageDir
+	overrides["A3_BUNDLE_COMPOSE_FILE"] = config.ComposeFile
+	overrides["A3_BUNDLE_PROJECT"] = config.ComposeProject
+	if storageDir := envDefault("A3_BUNDLE_STORAGE_DIR", config.StorageDir); strings.TrimSpace(storageDir) != "" {
+		overrides["A3_BUNDLE_STORAGE_DIR"] = storageDir
 	}
 	if strings.TrimSpace(config.WorkspaceRoot) != "" {
 		overrides["A3_RUNTIME_RUN_ONCE_HOST_ROOT_DIR"] = config.WorkspaceRoot

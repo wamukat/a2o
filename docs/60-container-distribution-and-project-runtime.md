@@ -349,7 +349,7 @@ agents:
 
 host 上で agent を動かす場合、agent 起動時の `--engine` は `http://127.0.0.1:<published-port>` のような loopback URL にする。project dev-env container 内で agent を動かす場合、`http://a3-runtime:<port>` のような compose service name を使う。`source_paths` は agent が実際に見える local path であり、A3 Engine container path ではない。
 
-host-local agent へ worker / verification / remediation job を委譲する場合、A3 runtime container 内の `A3_ROOT_DIR=/workspace` をそのまま渡してはいけない。host agent は host filesystem 上で command を実行するため、A3 runtime は `--agent-env A3_ROOT_DIR=<host workspace root>` を明示し、`ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/inject/portal_verification.rb"` のような project helper が host 側で解決できる状態にする。
+host-local agent へ worker / verification / remediation job を委譲する場合、A3 runtime container 内の `A3_ROOT_DIR=/workspace` をそのまま渡してはいけない。host agent は host filesystem 上で command を実行するため、A3 runtime は `--agent-env A3_ROOT_DIR=<host workspace root>` を明示し、project package から渡された verification / remediation command が host 側で解決できる状態にする。
 
 #### 0.1.1a.1 Final validation variation matrix
 
@@ -473,7 +473,7 @@ live validation と scheduler surface の検証結果に加え、workspace root 
   - legacy automation 向け skill / runbook / redesign メモ
   - root surface では `task automation*` を fail-fast sentinel とし、実行系 / mutation 系 entrypoint は残さない
 - `keep`
-  - `scripts/a3-projects/portal/maintenance/prepare_portal_runtime_config.rb`
+  - historical evidence only. current root utility spec は `spec/fixtures/a3/` の generic runtime config fixture を使う。
 
 判断理由は次のとおりである。
 
@@ -483,7 +483,7 @@ live validation と scheduler surface の検証結果に加え、workspace root 
   - `a3-v2/` と `scripts/automation/*` は current operator surface では実行しないため、git history へ委ねて物理削除した
 - `keep`
   - `portal-dev` root local utility / config と `bootstrap_portal_dev_repos.rb` は current runtime surface から削除済み
-  - `scripts/a3-projects/portal/maintenance/prepare_portal_runtime_config.rb` は `portal` doctor-env / cleanup / reconcile の internal helper と related spec からまだ参照される
+  - `prepare_portal_runtime_config.rb` は current runtime surface から削除済み。doctor-env / cleanup / reconcile の active spec は generic fixture を使う。
 
 この時点で `A3-v2#3160` の acceptance は満たしており、compatibility 資産の扱いは「retire したもの」「delete 済みのもの」「current root utility を支えるため keep するもの」に分かれた。2026-04-12 の判断で旧 backend compatibility path も current runtime から物理削除する。以後の残件は、A3 / SoloBoard / public `a2o-agent` 配布導線を固定し、実 Portal source の `repo:both` parent/full verification validation を完了条件として通すことである。
 

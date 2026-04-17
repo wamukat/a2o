@@ -191,26 +191,26 @@ RSpec.describe A3Reconcile do
   end
 
 
-  it "ignores unrelated AI executor processes when checking portal liveness" do
+  it "ignores unrelated AI executor processes when checking scheduler liveness" do
     allow(IO).to receive(:popen).and_return("ai-runner --json -\n")
 
-    expect(described_class.live_scheduler_processes("portal")).to eq([])
+    expect(described_class.live_scheduler_processes("a2o-reference")).to eq([])
   end
 
-  it "recognizes current portal scheduler shot processes" do
+  it "recognizes current scheduler shot processes" do
     allow(IO).to receive(:popen).and_return(<<~PS)
-      bash scripts/a3-projects/portal/runtime/run_once.sh
-      ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/portal-kanban-scheduler-auto scripts/a3-projects/portal/inject/config/portal/a3-runtime-manifest.yml
+      a2o-runtime-run-once
+      ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/a2o-reference-kanban-scheduler-auto reference-products/multi-repo-fixture/project-package/manifest.yml
     PS
 
     matches = described_class.live_scheduler_processes(
-      "portal",
-      patterns: ["scripts/a3-projects/portal/runtime/run_once.sh", "portal-kanban-scheduler-auto"]
+      "a2o-reference",
+      patterns: ["a2o-runtime-run-once", "a2o-reference-kanban-scheduler-auto"]
     )
     expect(matches).to eq(
       [
-        "bash scripts/a3-projects/portal/runtime/run_once.sh",
-        "ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/portal-kanban-scheduler-auto scripts/a3-projects/portal/inject/config/portal/a3-runtime-manifest.yml"
+        "a2o-runtime-run-once",
+        "ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/a2o-reference-kanban-scheduler-auto reference-products/multi-repo-fixture/project-package/manifest.yml"
       ]
     )
   end

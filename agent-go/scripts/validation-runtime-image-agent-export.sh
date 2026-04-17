@@ -5,8 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENGINE_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"
 WORKSPACE_ROOT="$(cd "${ENGINE_ROOT}/.." && pwd)"
 
-COMPOSE_PROJECT="${COMPOSE_PROJECT:-a3-portal-bundle}"
-COMPOSE_FILE="${COMPOSE_FILE:-${ENGINE_ROOT}/docker/compose/a3-portal-soloboard.yml}"
+COMPOSE_PROJECT="${COMPOSE_PROJECT:-a2o-runtime}"
+COMPOSE_FILE="${COMPOSE_FILE:-${ENGINE_ROOT}/docker/compose/a2o-soloboard.yml}"
 RUNTIME_SERVICE="${RUNTIME_SERVICE:-a3-runtime}"
 
 detect_host_target() {
@@ -35,7 +35,7 @@ cleanup() {
 trap cleanup EXIT
 
 exported_agent="${work_dir}/a3-agent"
-source_root="${work_dir}/source/member-portal-starters"
+source_root="${work_dir}/source/catalog-service"
 workspace_root="${work_dir}/workspaces"
 
 SOLOBOARD_IMAGE="${SOLOBOARD_IMAGE:-ghcr.io/wamukat/soloboard:latest}" \
@@ -63,7 +63,7 @@ git -C "${source_root}" commit -q -m "initial runtime image validation source"
 "${exported_agent}" doctor \
   --control-plane-url http://127.0.0.1:7393 \
   --workspace-root "${workspace_root}" \
-  --source-path "member-portal-starters=${source_root}" \
+  --source-path "catalog-service=${source_root}" \
   --required-bin git
 
 echo "runtime_image_agent_export_validation=ok target=${target} workspace=${WORKSPACE_ROOT}"

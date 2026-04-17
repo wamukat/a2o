@@ -1,0 +1,17 @@
+{
+  "scheduler": {
+    "backend": "manual"
+  },
+  "kanban": {
+    "backend": "subprocess-cli"
+  },
+  "shell": {
+    "inherit_env": true,
+    "env_files": [],
+    "env_overrides": {}
+  },
+  "runtime_env": {
+    "required_bins": [],
+    "path_entries": []
+  }
+}

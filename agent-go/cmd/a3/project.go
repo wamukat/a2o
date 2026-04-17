@@ -41,7 +41,7 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 	runtimeService := flags.String("runtime-service", "a3-runtime", "docker compose runtime service name")
 	soloBoardPort := flags.String("soloboard-port", "3470", "host kanban service port")
 	agentPort := flags.String("agent-port", "7393", "host A3 agent control-plane port")
-	storageDir := flags.String("storage-dir", "/var/lib/a3/portal-runtime", "runtime storage dir inside the A3 runtime container")
+	storageDir := flags.String("storage-dir", "/var/lib/a3/a2o-runtime", "runtime storage dir inside the A3 runtime container")
 
 	if err := flags.Parse(args); err != nil {
 		return err

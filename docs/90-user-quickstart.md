@@ -27,7 +27,7 @@ A2O runtime は、現行設計では「1 project package = 1 runtime instance」
 
 ## 利用者が用意するもの
 
-利用者が用意するのは project package である。Portal でいえば root repo の `scripts/a3-projects/portal/` に相当する。
+利用者が用意するのは project package である。A2O core validation では `reference-products/multi-repo-fixture/project-package` を標準サンプルとして扱う。
 
 project package は次を持つ。
 
@@ -127,21 +127,21 @@ a2o-agent --engine http://localhost:7393 --loop --poll-interval 2s
 
 この場合でも repo path、workspace root、required bins は agent local profile ではなく、Engine 側 project package から job payload として渡す。
 
-## Portal での現状
+## Reference Product での現状
 
-Portal は実プロダクト integration validation として扱う。現行 A2O core validation の標準対象は `reference-products/` の project package である。Portal package を使う場合でも、入口は `a2o project bootstrap` / `a2o kanban up` / `a2o kanban doctor` / `a2o agent install` であり、Portal workspace-local Taskfile は通常導線ではない。内部互換として `a3 ...` も動作する。
+現行 A2O core validation の標準対象は `reference-products/` の project package である。入口は `a2o project bootstrap` / `a2o kanban up` / `a2o kanban doctor` / `a2o agent install` であり、製品 workspace-local Taskfile は通常導線ではない。内部互換として `a3 ...` も動作する。
 
 ```bash
-a2o project bootstrap --package ./scripts/a3-projects/portal
+a2o project bootstrap --package ./reference-products/multi-repo-fixture/project-package
 a2o kanban up
 a2o kanban doctor
 a2o kanban url
 a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
 ```
 
-Portal workspace-local の Taskfile 互換入口は削除済みであり、利用者向け入口は `a2o project bootstrap` と `a2o kanban up` / `doctor` / `url` に限定する。
+製品 workspace-local の Taskfile 互換入口は削除済みであり、利用者向け入口は `a2o project bootstrap` と `a2o kanban up` / `doctor` / `url` に限定する。
 
-Portal package の `runtime/run_once.sh` は削除済みであり、利用者も project package も実行 shell script を持たない。
+project package の `runtime/run_once.sh` は不要であり、利用者も project package も実行 shell script を持たない。
 
 ## 残タスク
 

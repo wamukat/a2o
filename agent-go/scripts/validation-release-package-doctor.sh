@@ -38,7 +38,7 @@ trap cleanup EXIT
 
 dist_dir="${DIST_DIR:-"${work_dir}/dist"}"
 exported_agent="${work_dir}/bin/a3-agent"
-source_root="${work_dir}/source/member-portal-starters"
+source_root="${work_dir}/source/catalog-service"
 workspace_root="${work_dir}/workspaces"
 
 TARGETS="${goos}/${goarch}" VERSION="${VERSION:-validation}" DIST_DIR="${dist_dir}" "${ROOT_DIR}/scripts/build-release.sh"
@@ -63,7 +63,7 @@ git -C "${source_root}" commit -q -m "initial release validation source"
 "${exported_agent}" doctor \
   --control-plane-url http://127.0.0.1:7393 \
   --workspace-root "${workspace_root}" \
-  --source-path "member-portal-starters=${source_root}" \
+  --source-path "catalog-service=${source_root}" \
   --required-bin git
 
 echo "release_package_validation=ok target=${target} package_dir=${dist_dir}"
