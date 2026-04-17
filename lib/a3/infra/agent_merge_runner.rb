@@ -482,7 +482,11 @@ module A3
 
       def marker_scan_clean?(marker_scan_result)
         return false unless marker_scan_result.is_a?(Hash)
-        return false unless marker_scan_result["scanner"] == "a3-agent-conflict-marker-scan"
+        valid_scanners = %w[
+          a2o-agent-conflict-marker-scan
+          a3-agent-conflict-marker-scan
+        ]
+        return false unless valid_scanners.include?(marker_scan_result["scanner"])
 
         unresolved = marker_scan_result["unresolved_files"]
         unresolved.is_a?(Array) && unresolved.empty?

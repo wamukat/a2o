@@ -261,7 +261,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
             "resolved_conflict_files" => ["docs/conflict.md"],
             "changed_files" => ["docs/conflict.md"],
             "marker_scan_result" => {
-              "scanner" => "a3-agent-conflict-marker-scan",
+              "scanner" => "a2o-agent-conflict-marker-scan",
               "unresolved_files" => []
             }
           }
@@ -370,7 +370,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
               "resolved_head" => "resolved245",
               "resolved_conflict_files" => ["docs/10-ops/validation.md"],
               "changed_files" => ["docs/10-ops/validation.md"],
-              "marker_scan_result" => { "scanner" => "a3-agent-conflict-marker-scan", "unresolved_files" => [] }
+              "marker_scan_result" => { "scanner" => "a2o-agent-conflict-marker-scan", "unresolved_files" => [] }
             }
           },
           workspace_id: "merge-Sample-245-run-merge-245",
