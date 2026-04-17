@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -293,15 +295,29 @@ func archiveRuntimeStateIfRequested(config runtimeInstanceConfig, plan runtimeRu
 		return nil
 	}
 	fmt.Fprintf(stdout, "runtime_archive_state storage=%s\n", plan.StorageDir)
-	script := fmt.Sprintf("set -euo pipefail\nstorage=%s\narchive_root=/var/lib/a3/archive\nstamp=\"$(date -u +%%Y%%m%%dT%%H%%M%%SZ)\"\nmkdir -p \"$archive_root\"\nif [ -e \"$storage\" ]; then mv \"$storage\" \"$archive_root/$(basename \"$storage\")-$stamp\"; fi\nmkdir -p \"$storage\"\n", shellQuote(plan.StorageDir))
-	_, err := runExternal(runner, "docker", append(plan.ComposePrefix, "exec", "-T", config.RuntimeService, "bash", "-lc", script)...)
-	return err
+	if err := dockerComposeExec(config, plan, runner, "mkdir", "-p", "/var/lib/a3/archive"); err != nil {
+		return err
+	}
+	if _, err := dockerComposeExecOutput(config, plan, runner, "test", "-e", plan.StorageDir); err == nil {
+		stampBytes, err := dockerComposeExecOutput(config, plan, runner, "date", "-u", "+%Y%m%dT%H%M%SZ")
+		if err != nil {
+			return err
+		}
+		stamp := strings.TrimSpace(string(stampBytes))
+		archivePath := path.Join("/var/lib/a3/archive", path.Base(plan.StorageDir)+"-"+stamp)
+		if err := dockerComposeExec(config, plan, runner, "mv", plan.StorageDir, archivePath); err != nil {
+			return err
+		}
+	}
+	return dockerComposeExec(config, plan, runner, "mkdir", "-p", plan.StorageDir)
 }
 
 func cleanupRuntimeProcesses(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner) error {
-	script := fmt.Sprintf("set -e\nps -eo pid=,args= | awk '/[[:space:]]a3 execute-until-idle/ && !/awk/ { print $1 }' | xargs -r kill >/dev/null 2>&1 || true\nps -eo pid=,args= | awk '/[[:space:]]a3 agent-server/ && !/awk/ { print $1 }' | xargs -r kill >/dev/null 2>&1 || true\nif [ -f %s ]; then kill \"$(cat %s)\" >/dev/null 2>&1 || true; rm -f %s; fi\nif [ -f %s ]; then kill \"$(cat %s)\" >/dev/null 2>&1 || true; rm -f %s; fi\nrm -f %s %s %s\n", shellQuote(plan.RuntimePIDFile), shellQuote(plan.RuntimePIDFile), shellQuote(plan.RuntimePIDFile), shellQuote(plan.ServerPIDFile), shellQuote(plan.ServerPIDFile), shellQuote(plan.ServerPIDFile), shellQuote(plan.RuntimeExitFile), shellQuote(plan.ServerLog), shellQuote(plan.RuntimeLog))
-	_, err := runExternal(runner, "docker", append(plan.ComposePrefix, "exec", "-T", config.RuntimeService, "bash", "-lc", script)...)
-	return err
+	killRuntimeProcessesByPattern(config, plan, runner, "a3 execute-until-idle")
+	killRuntimeProcessesByPattern(config, plan, runner, "a3 agent-server")
+	killRuntimePIDFile(config, plan, runner, plan.RuntimePIDFile)
+	killRuntimePIDFile(config, plan, runner, plan.ServerPIDFile)
+	return dockerComposeExec(config, plan, runner, "rm", "-f", plan.RuntimeExitFile, plan.ServerLog, plan.RuntimeLog)
 }
 
 func ensureRuntimeHostAgent(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
@@ -350,11 +366,123 @@ func runtimeContainerID(config runtimeInstanceConfig, plan runtimeRunOncePlan, r
 	return containerID, nil
 }
 
+func dockerComposeExecArgs(config runtimeInstanceConfig, plan runtimeRunOncePlan, argv ...string) []string {
+	args := append([]string{}, plan.ComposePrefix...)
+	args = append(args, "exec", "-T", config.RuntimeService)
+	args = append(args, argv...)
+	return args
+}
+
+func dockerComposeExec(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, argv ...string) error {
+	_, err := dockerComposeExecOutput(config, plan, runner, argv...)
+	return err
+}
+
+func dockerComposeExecOutput(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, argv ...string) ([]byte, error) {
+	return runExternal(runner, "docker", dockerComposeExecArgs(config, plan, argv...)...)
+}
+
+func dockerComposeExecShell(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, script string) error {
+	return dockerComposeExec(config, plan, runner, "bash", "-lc", script)
+}
+
+func dockerComposeExecBestEffort(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, argv ...string) []byte {
+	output, _ := runner.Run("docker", dockerComposeExecArgs(config, plan, argv...)...)
+	return output
+}
+
+type runtimeContainerProcess struct {
+	WorkingDir  string
+	Env         map[string]string
+	EnvShell    map[string]string
+	Args        []string
+	StdoutPath  string
+	PIDFile     string
+	ExitFile    string
+	StderrToOut bool
+}
+
+func (process runtimeContainerProcess) shellScript() string {
+	command := shellJoin(process.Args)
+	if process.StdoutPath != "" {
+		command += " > " + shellQuote(process.StdoutPath)
+		if process.StderrToOut {
+			command += " 2>&1"
+		}
+	}
+
+	prefix := process.envExport()
+	if process.ExitFile != "" {
+		if prefix != "" {
+			command = prefix + "; " + command
+		}
+		command = "(" + command + "; echo $? > " + shellQuote(process.ExitFile) + ")"
+	} else if prefix != "" {
+		command = "(" + prefix + "; " + command + ")"
+	}
+
+	if process.WorkingDir != "" {
+		command = "cd " + shellQuote(process.WorkingDir) + " && " + command
+	}
+	if process.PIDFile != "" {
+		command += " & echo $! > " + shellQuote(process.PIDFile)
+	}
+	return command
+}
+
+func (process runtimeContainerProcess) envExport() string {
+	if len(process.Env) == 0 && len(process.EnvShell) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(process.Env))
+	for key := range process.Env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	assignments := make([]string, 0, len(keys))
+	for _, key := range keys {
+		assignments = append(assignments, key+"="+shellQuote(process.Env[key]))
+	}
+	shellKeys := make([]string, 0, len(process.EnvShell))
+	for key := range process.EnvShell {
+		shellKeys = append(shellKeys, key)
+	}
+	sort.Strings(shellKeys)
+	for _, key := range shellKeys {
+		assignments = append(assignments, key+"="+process.EnvShell[key])
+	}
+	return "export " + strings.Join(assignments, " ")
+}
+
+func killRuntimeProcessesByPattern(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, pattern string) {
+	output, err := dockerComposeExecOutput(config, plan, runner, "pgrep", "-f", pattern)
+	if err != nil {
+		return
+	}
+	for _, pid := range strings.Fields(string(output)) {
+		_ = dockerComposeExec(config, plan, runner, "kill", pid)
+	}
+}
+
+func killRuntimePIDFile(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, pidFile string) {
+	output, err := dockerComposeExecOutput(config, plan, runner, "cat", pidFile)
+	if err == nil {
+		if pid := strings.TrimSpace(string(output)); pid != "" {
+			_ = dockerComposeExec(config, plan, runner, "kill", pid)
+		}
+	}
+	_ = dockerComposeExec(config, plan, runner, "rm", "-f", pidFile)
+}
+
 func startRuntimeAgentServer(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
 	fmt.Fprintf(stdout, "runtime_agent_server_start port=%s\n", plan.AgentPort)
-	script := fmt.Sprintf("cd /workspace && a3 agent-server --storage-dir %s --host 0.0.0.0 --port %s > %s 2>&1 & echo $! > %s", shellQuote(plan.StorageDir), shellQuote(plan.AgentPort), shellQuote(plan.ServerLog), shellQuote(plan.ServerPIDFile))
-	_, err := runExternal(runner, "docker", append(plan.ComposePrefix, "exec", "-T", config.RuntimeService, "bash", "-lc", script)...)
-	return err
+	return dockerComposeExecShell(config, plan, runner, runtimeContainerProcess{
+		WorkingDir:  "/workspace",
+		Args:        []string{"a3", "agent-server", "--storage-dir", plan.StorageDir, "--host", "0.0.0.0", "--port", plan.AgentPort},
+		StdoutPath:  plan.ServerLog,
+		StderrToOut: true,
+		PIDFile:     plan.ServerPIDFile,
+	}.shellScript())
 }
 
 func waitForRuntimeControlPlane(plan runtimeRunOncePlan, runner commandRunner) error {
@@ -373,10 +501,23 @@ func waitForRuntimeControlPlane(plan runtimeRunOncePlan, runner commandRunner) e
 
 func startRuntimeExecuteUntilIdle(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
 	fmt.Fprintf(stdout, "runtime_execute_until_idle_start max_steps=%s\n", plan.MaxSteps)
-	args := executeUntilIdleArgs(plan)
-	command := "cd /workspace && (export A3_ROOT_DIR=/workspace KANBAN_BACKEND=soloboard A3_BRANCH_NAMESPACE=" + shellQuote(plan.BranchNamespace) + " A3_SECRET_REFERENCE=\"${A3_SECRET_REFERENCE:-A3_SECRET}\" A3_SECRET=\"${A3_SECRET:-portal-runtime-secret}\"; " + shellJoin(args) + " > " + shellQuote(plan.RuntimeLog) + " 2>&1; echo $? > " + shellQuote(plan.RuntimeExitFile) + ") & echo $! > " + shellQuote(plan.RuntimePIDFile)
-	_, err := runExternal(runner, "docker", append(plan.ComposePrefix, "exec", "-T", config.RuntimeService, "bash", "-lc", command)...)
-	return err
+	return dockerComposeExecShell(config, plan, runner, runtimeContainerProcess{
+		WorkingDir: "/workspace",
+		Env: map[string]string{
+			"A3_BRANCH_NAMESPACE": plan.BranchNamespace,
+			"A3_ROOT_DIR":         "/workspace",
+			"KANBAN_BACKEND":      "soloboard",
+		},
+		EnvShell: map[string]string{
+			"A3_SECRET":           "${A3_SECRET:-portal-runtime-secret}",
+			"A3_SECRET_REFERENCE": "${A3_SECRET_REFERENCE:-A3_SECRET}",
+		},
+		Args:        executeUntilIdleArgs(plan),
+		StdoutPath:  plan.RuntimeLog,
+		StderrToOut: true,
+		ExitFile:    plan.RuntimeExitFile,
+		PIDFile:     plan.RuntimePIDFile,
+	}.shellScript())
 }
 
 func executeUntilIdleArgs(plan runtimeRunOncePlan) []string {
@@ -468,7 +609,7 @@ func runtimeExitExists(config runtimeInstanceConfig, plan runtimeRunOncePlan, ru
 }
 
 func readRuntimeExit(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner) (string, error) {
-	output, err := runExternal(runner, "docker", append(plan.ComposePrefix, "exec", "-T", config.RuntimeService, "bash", "-lc", "cat "+shellQuote(plan.RuntimeExitFile))...)
+	output, err := dockerComposeExecOutput(config, plan, runner, "cat", plan.RuntimeExitFile)
 	if err != nil {
 		return "", err
 	}
@@ -480,17 +621,17 @@ func readRuntimeExit(config runtimeInstanceConfig, plan runtimeRunOncePlan, runn
 }
 
 func printRuntimeDiagnostics(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
-	script := fmt.Sprintf("echo '--- runtime log ---'; tail -n 220 %s || true; echo '--- server log ---'; tail -n 120 %s || true", shellQuote(plan.RuntimeLog), shellQuote(plan.ServerLog))
-	output, err := runExternal(runner, "docker", append(plan.ComposePrefix, "exec", "-T", config.RuntimeService, "bash", "-lc", script)...)
-	fmt.Fprint(stdout, string(output))
-	return err
+	fmt.Fprintln(stdout, "--- runtime log ---")
+	fmt.Fprint(stdout, string(dockerComposeExecBestEffort(config, plan, runner, "tail", "-n", "220", plan.RuntimeLog)))
+	fmt.Fprintln(stdout, "--- server log ---")
+	fmt.Fprint(stdout, string(dockerComposeExecBestEffort(config, plan, runner, "tail", "-n", "120", plan.ServerLog)))
+	return nil
 }
 
 func printRuntimeSuccessTail(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
-	script := fmt.Sprintf("echo '--- runtime log tail ---'; tail -n 160 %s || true", shellQuote(plan.RuntimeLog))
-	output, err := runExternal(runner, "docker", append(plan.ComposePrefix, "exec", "-T", config.RuntimeService, "bash", "-lc", script)...)
-	fmt.Fprint(stdout, string(output))
-	return err
+	fmt.Fprintln(stdout, "--- runtime log tail ---")
+	fmt.Fprint(stdout, string(dockerComposeExecBestEffort(config, plan, runner, "tail", "-n", "160", plan.RuntimeLog)))
+	return nil
 }
 
 func runRuntimeLoop(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {

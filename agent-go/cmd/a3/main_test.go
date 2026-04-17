@@ -336,6 +336,18 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	if !strings.Contains(strings.Join(joined, "\n"), "a3 execute-until-idle") {
 		t.Fatalf("run-once should start execute-until-idle directly, calls:\n%s", strings.Join(joined, "\n"))
 	}
+	for _, forbidden := range []string{
+		"ps -eo pid=,args=",
+		"bash -lc cat ",
+		"bash -lc echo '--- runtime log tail ---'; tail",
+	} {
+		if strings.Contains(strings.Join(joined, "\n"), forbidden) {
+			t.Fatalf("run-once should use structured cleanup/read/log commands, found %q in:\n%s", forbidden, strings.Join(joined, "\n"))
+		}
+	}
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime pgrep -f a3 execute-until-idle")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime cat /tmp/a3-runtime-run-once.exit")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime tail -n 160 /tmp/a3-runtime-run-once.log")
 	if runner.lastEnv["A3_PORTAL_BUNDLE_COMPOSE_FILE"] != "compose.yml" {
 		t.Fatalf("compose env=%q", runner.lastEnv["A3_PORTAL_BUNDLE_COMPOSE_FILE"])
 	}
@@ -488,6 +500,63 @@ func TestRuntimeLoopRejectsNegativeMaxCycles(t *testing.T) {
 	}
 }
 
+func TestRuntimeContainerProcessBuildsQuotedBackgroundScript(t *testing.T) {
+	script := runtimeContainerProcess{
+		WorkingDir: "/workspace",
+		Env: map[string]string{
+			"A3_BRANCH_NAMESPACE": "branch with space",
+			"A3_ROOT_DIR":         "/workspace",
+		},
+		EnvShell: map[string]string{
+			"A3_SECRET": "${A3_SECRET:-portal-runtime-secret}",
+		},
+		Args:        []string{"a3", "execute-until-idle", "--storage-dir", "/var/lib/a3/test runtime"},
+		StdoutPath:  "/tmp/a3 runtime.log",
+		StderrToOut: true,
+		ExitFile:    "/tmp/a3 runtime.exit",
+		PIDFile:     "/tmp/a3 runtime.pid",
+	}.shellScript()
+
+	for _, want := range []string{
+		"cd '/workspace' &&",
+		"export A3_BRANCH_NAMESPACE='branch with space' A3_ROOT_DIR='/workspace' A3_SECRET=${A3_SECRET:-portal-runtime-secret}",
+		"'--storage-dir' '/var/lib/a3/test runtime'",
+		"> '/tmp/a3 runtime.log' 2>&1",
+		"echo $? > '/tmp/a3 runtime.exit'",
+		"& echo $! > '/tmp/a3 runtime.pid'",
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("script missing %q in %q", want, script)
+		}
+	}
+}
+
+func TestArchiveRuntimeStateUsesStructuredDockerCommands(t *testing.T) {
+	t.Setenv("A3_RUNTIME_RUN_ONCE_ARCHIVE_STATE", "1")
+	config := runtimeInstanceConfig{RuntimeService: "a3-runtime"}
+	plan := runtimeRunOncePlan{
+		ComposePrefix: []string{"compose", "-p", "a3-test", "-f", "compose.yml"},
+		StorageDir:    "/var/lib/a3/test-runtime",
+	}
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+
+	if err := archiveRuntimeStateIfRequested(config, plan, runner, &stdout); err != nil {
+		t.Fatalf("archiveRuntimeStateIfRequested returned error: %v", err)
+	}
+
+	joined := runner.joinedCalls()
+	for _, forbidden := range []string{"bash -lc", "basename \"$storage\""} {
+		if strings.Contains(strings.Join(joined, "\n"), forbidden) {
+			t.Fatalf("archive should use structured docker commands, found %q in:\n%s", forbidden, strings.Join(joined, "\n"))
+		}
+	}
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime mkdir -p /var/lib/a3/archive")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime test -e /var/lib/a3/test-runtime")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime mv /var/lib/a3/test-runtime /var/lib/a3/archive/test-runtime-20260417T000000Z")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime mkdir -p /var/lib/a3/test-runtime")
+}
+
 func TestAgentInstallRequiresOutput(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -569,7 +638,9 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 			return []byte("\n"), nil
 		}
 		return []byte("container-123\n"), nil
-	case strings.Contains(joined, "cat '/tmp/a3-runtime-run-once.exit'"):
+	case strings.Contains(joined, " date -u +%Y%m%dT%H%M%SZ"):
+		return []byte("20260417T000000Z\n"), nil
+	case strings.Contains(joined, " cat /tmp/a3-runtime-run-once.exit"):
 		return []byte("0\n"), nil
 	case name == "docker" && len(args) >= 1 && args[0] == "cp":
 		destination := args[len(args)-1]
