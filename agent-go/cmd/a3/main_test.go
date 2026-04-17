@@ -120,9 +120,6 @@ func TestUnsupportedRuntimeCommandsAreNotPublicEntrypoints(t *testing.T) {
 	for _, command := range [][]string{
 		{"runtime", "up"},
 		{"runtime", "down"},
-		{"runtime", "start"},
-		{"runtime", "stop"},
-		{"runtime", "status"},
 		{"runtime", "command-plan"},
 	} {
 		var stdout bytes.Buffer
@@ -155,6 +152,9 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o kanban up [--build]",
 		"a2o kanban doctor",
 		"a2o kanban url",
+		"a2o runtime start [--interval DURATION]",
+		"a2o runtime stop",
+		"a2o runtime status",
 		"a2o runtime doctor",
 		"a2o runtime run-once [--max-steps N] [--agent-attempts N]",
 		"a2o runtime loop [--interval DURATION] [--max-cycles N]",
@@ -164,8 +164,6 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		}
 	}
 	for _, hidden := range []string{
-		"a2o runtime start",
-		"a2o runtime stop",
 		"a2o runtime command-plan",
 		"a2o kanban run-once",
 		"a2o kanban loop",
@@ -417,6 +415,130 @@ func TestRuntimeRunOnceFailsWithoutProjectYaml(t *testing.T) {
 	}
 	if len(runner.calls) != 0 {
 		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
+	}
+}
+
+func TestRuntimeStartLaunchesForegroundLoopInBackground(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "start", "--interval", "5s", "--max-steps", "2", "--agent-attempts", "3"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"bash -lc",
+		"runtime' 'loop' '--interval' '5s' '--max-steps' '2' '--agent-attempts' '3'",
+		filepath.Join(tempDir, ".work", "a2o-runtime", "scheduler.pid"),
+		filepath.Join(tempDir, ".work", "a2o-runtime", "scheduler.log"),
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("runtime start missing %q in:\n%s", want, joined)
+		}
+	}
+	if !strings.Contains(stdout.String(), "runtime_scheduler_started") {
+		t.Fatalf("stdout should report scheduler start, got %q", stdout.String())
+	}
+}
+
+func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
+	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(paths.PIDFile, []byte("12345\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "status"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "runtime_scheduler_status=running pid=12345") {
+		t.Fatalf("stdout should report running scheduler, got %q", stdout.String())
+	}
+	assertCallContains(t, runner.joinedCalls(), "kill -0 12345")
+}
+
+func TestRuntimeStopKillsSchedulerAndRemovesPID(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
+	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(paths.PIDFile, []byte("12345\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "stop"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	assertCallContains(t, runner.joinedCalls(), "kill -0 12345")
+	assertCallContains(t, runner.joinedCalls(), "kill 12345")
+	if _, err := os.Stat(paths.PIDFile); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("pid file should be removed, stat err=%v", err)
+	}
+	if !strings.Contains(stdout.String(), "runtime_scheduler_stopped pid=12345") {
+		t.Fatalf("stdout should report scheduler stop, got %q", stdout.String())
 	}
 }
 

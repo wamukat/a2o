@@ -27,6 +27,7 @@ a2o kanban doctor
 a2o kanban url
 a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
 a2o runtime run-once
+a2o runtime start
 ```
 
 複数 product を同時に動かす場合は、package ごとに workspace、storage dir、compose project name、port を分ける。
@@ -63,7 +64,7 @@ Project package が持たないもの:
 
 The current baseline exercises the reference product suite through SoloBoard, agent-materialized workspaces, agent-http worker gateway, verification, merge, and evidence persistence. The recorded baseline is [69-reference-runtime-baseline.md](69-reference-runtime-baseline.md).
 
-The public launcher covers host install, project bootstrap, kanban service lifecycle, kanban diagnosis, URL discovery, agent install, one-shot runtime execution, foreground runtime loop, and runtime diagnosis. Resident scheduler start/stop/status is tracked separately as release hardening.
+The public launcher covers host install, project bootstrap, kanban service lifecycle, kanban diagnosis, URL discovery, agent install, one-shot runtime execution, foreground runtime loop, resident scheduler start/stop/status, and runtime diagnosis.
 
 ## Operator Notes
 

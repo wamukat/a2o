@@ -85,6 +85,7 @@ a2o kanban doctor
 a2o kanban url
 a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
 a2o runtime run-once
+a2o runtime start
 ```
 
 bootstrap 後は、カレント workspace の runtime instance config を `a2o` が探索する。通常操作で `--package` を毎回指定しない。
@@ -157,6 +158,14 @@ foreground で繰り返し実行する場合:
 a2o runtime loop --interval 60s
 ```
 
+常駐 scheduler として自動実行する場合:
+
+```sh
+a2o runtime start --interval 60s
+a2o runtime status
+a2o runtime stop
+```
+
 状態確認:
 
 ```sh
@@ -168,14 +177,14 @@ a2o runtime doctor
 1. `a2o kanban url` で board を開く。
 2. `project-package/scenarios/` をもとに task を作成する。
 3. task に trigger label と repo label を付ける。
-4. `a2o runtime run-once` または `a2o runtime loop` を実行する。
+4. `a2o runtime start` で常駐 scheduler を開始する。focused validation では `a2o runtime run-once` または `a2o runtime loop` を使う。
 5. A2O が workspace を作成し、`a2o-agent` に implementation / verification / merge job を渡す。
 6. A2O が kanban comment、phase transition、evidence、branch publication を記録する。
 7. task が `Done` または `Blocked` になったことを board と evidence で確認する。
 
 利用者は `execute-until-idle` の引数、agent control plane、workspace materializer、merge runner を直接組み立てない。
 
-`runtime loop` は前景プロセスであり、terminal や CI job が生きている間だけ動く。release で必須の resident scheduler ON/OFF は A2O#271 で追加する。
+`runtime loop` は前景プロセスであり、terminal や CI job が生きている間だけ動く。通常運用では `runtime start` / `status` / `stop` を使う。
 
 ## Multi-repo Package
 
@@ -197,9 +206,9 @@ task は repo label を使って対象 slot を指定する。parent-child flow 
 
 ## 現在の注意点
 
-- Full runtime execution は `a2o runtime run-once` / `a2o runtime loop` で開始できる。常駐 scheduler の ON/OFF は A2O#271 の release blocker として残る。
+- Full runtime execution は `a2o runtime start` / `stop` / `status` または focused validation 用の `a2o runtime run-once` / `loop` で開始できる。
 - runtime state には `.a3` や `refs/heads/a3/...` など内部互換名が残る。通常の manual では編集対象にしない。
 - project package schema は `manifest.yml` と `project.yaml` の責務をさらに明確化する余地がある。
 - published image での release smoke は、公開前の独立した gate として実行する。
 
-これらは A2O の設計ギャップとして `A2O#268`、`A2O#269`、`A2O#270` と、常駐 scheduler ON/OFF 用の `A2O#271` で追跡する。
+これらは A2O の設計ギャップとして `A2O#268`、`A2O#269`、`A2O#270` で追跡する。

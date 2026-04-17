@@ -21,6 +21,24 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 	}
 
 	switch args[0] {
+	case "start":
+		if err := runRuntimeStart(args[1:], runner, stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	case "stop":
+		if err := runRuntimeStop(args[1:], runner, stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	case "status":
+		if err := runRuntimeStatus(args[1:], runner, stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
 	case "doctor":
 		if err := runRuntimeDoctor(args[1:], runner, stdout, stderr); err != nil {
 			fmt.Fprintln(stderr, err)
@@ -44,6 +62,142 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 		printUsage(stderr)
 		return 2
 	}
+}
+
+type runtimeSchedulerPaths struct {
+	Dir     string
+	PIDFile string
+	LogFile string
+}
+
+func schedulerPaths(config runtimeInstanceConfig) runtimeSchedulerPaths {
+	dir := filepath.Join(config.WorkspaceRoot, ".work", "a2o-runtime")
+	return runtimeSchedulerPaths{
+		Dir:     dir,
+		PIDFile: filepath.Join(dir, "scheduler.pid"),
+		LogFile: filepath.Join(dir, "scheduler.log"),
+	}
+}
+
+func runRuntimeStart(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a2o runtime start", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	interval := flags.String("interval", "60s", "duration between scheduler cycles")
+	maxSteps := flags.String("max-steps", "", "maximum runtime steps for each cycle")
+	agentAttempts := flags.String("agent-attempts", "", "maximum host agent attempts for each cycle")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+	if _, err := time.ParseDuration(*interval); err != nil {
+		return fmt.Errorf("parse --interval: %w", err)
+	}
+
+	config, _, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	paths := schedulerPaths(effectiveConfig)
+	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
+		return fmt.Errorf("create scheduler dir: %w", err)
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolve executable: %w", err)
+	}
+	loopArgs := []string{executable, "runtime", "loop", "--interval", *interval}
+	loopArgs = append(loopArgs, buildRunOnceArgs(*maxSteps, *agentAttempts)...)
+	script := strings.Join([]string{
+		"if [ -f " + shellQuote(paths.PIDFile) + " ] && kill -0 $(cat " + shellQuote(paths.PIDFile) + ") 2>/dev/null; then echo 'runtime scheduler already running pid='$(cat " + shellQuote(paths.PIDFile) + ") >&2; exit 17; fi",
+		"mkdir -p " + shellQuote(paths.Dir),
+		"nohup " + shellJoin(loopArgs) + " >> " + shellQuote(paths.LogFile) + " 2>&1 & echo $! > " + shellQuote(paths.PIDFile),
+	}, "; ")
+	if _, err := runExternal(runner, "bash", "-lc", script); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "runtime_scheduler_started pid_file=%s log=%s\n", paths.PIDFile, paths.LogFile)
+	return nil
+}
+
+func runRuntimeStop(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a2o runtime stop", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+
+	config, _, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	paths := schedulerPaths(applyAgentInstallOverrides(*config, "", "", ""))
+	pid, err := readSchedulerPID(paths.PIDFile)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(stdout, "runtime_scheduler_status=stopped pid_file=%s log=%s\n", paths.PIDFile, paths.LogFile)
+			return nil
+		}
+		return err
+	}
+	if _, err := runner.Run("kill", "-0", pid); err == nil {
+		if _, err := runExternal(runner, "kill", pid); err != nil {
+			return err
+		}
+	}
+	if err := os.Remove(paths.PIDFile); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove scheduler pid file: %w", err)
+	}
+	fmt.Fprintf(stdout, "runtime_scheduler_stopped pid=%s pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
+	return nil
+}
+
+func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a2o runtime status", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+
+	config, _, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	paths := schedulerPaths(applyAgentInstallOverrides(*config, "", "", ""))
+	pid, err := readSchedulerPID(paths.PIDFile)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(stdout, "runtime_scheduler_status=stopped pid_file=%s log=%s\n", paths.PIDFile, paths.LogFile)
+			return nil
+		}
+		return err
+	}
+	if _, err := runner.Run("kill", "-0", pid); err == nil {
+		fmt.Fprintf(stdout, "runtime_scheduler_status=running pid=%s pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
+		return nil
+	}
+	fmt.Fprintf(stdout, "runtime_scheduler_status=stale pid=%s pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
+	return nil
+}
+
+func readSchedulerPID(path string) (string, error) {
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	pid := strings.TrimSpace(string(body))
+	if pid == "" {
+		return "", fmt.Errorf("scheduler pid file is empty: %s", path)
+	}
+	return pid, nil
 }
 
 func runRuntimeUp(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
