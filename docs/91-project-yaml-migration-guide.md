@@ -107,7 +107,7 @@ runtime:
     target_ref: refs/heads/main
 ```
 
-`runtime.surface` は package-local override である。既存の `presets/base.yml` を使う場合でも、利用者がすぐに読めるように package の標準 skill / command / hook をここへ明示してよい。
+`runtime.surface` は package-local override である。旧 package で skill / command / hook が `presets/base.yml` などの preset file に定義されている場合、その preset file はそのまま使える。利用者がすぐに読めるように package の標準 skill / command / hook を `runtime.surface` へ明示してもよい。
 
 ## Field Mapping
 
@@ -119,11 +119,13 @@ runtime:
 | `manifest.yml.core.merge_target` | `runtime.merge.target` |
 | `manifest.yml.core.merge_policy` | `runtime.merge.policy` |
 | `manifest.yml.core.merge_target_ref` | `runtime.merge.target_ref` |
-| `manifest.yml.implementation_skill` | `runtime.surface.implementation_skill` |
-| `manifest.yml.review_skill` | `runtime.surface.review_skill` |
-| `manifest.yml.verification_commands` | `runtime.surface.verification_commands` |
-| `manifest.yml.remediation_commands` | `runtime.surface.remediation_commands` |
-| `manifest.yml.workspace_hook` | `runtime.surface.workspace_hook` |
+| `manifest.yml` top-level `implementation_skill`, if present | `runtime.surface.implementation_skill` |
+| `manifest.yml` top-level `review_skill`, if present | `runtime.surface.review_skill` |
+| `manifest.yml` top-level `verification_commands`, if present | `runtime.surface.verification_commands` |
+| `manifest.yml` top-level `remediation_commands`, if present | `runtime.surface.remediation_commands` |
+| `manifest.yml` top-level `workspace_hook`, if present | `runtime.surface.workspace_hook` |
+
+旧 `presets/*.yml` にある `implementation_skill`、`review_skill`、`verification_commands`、`remediation_commands`、`workspace_hook` は preset 定義であり、`runtime.presets` から参照される。移行時に必ず `runtime.surface` へ移す必要はない。
 
 `schema_version: 1` は必須である。値は文字列でも数値でも読めるが、利用者向けの標準表記は数値の `1` とする。
 
@@ -134,7 +136,7 @@ runtime:
 3. `runtime.kanban_status` を `kanban.selection.status` に移す。
 4. `manifest.yml` の `presets` を `runtime.presets` に移す。
 5. `manifest.yml` の `core.merge_*` を `runtime.merge.*` に移す。
-6. `manifest.yml` にあった skill、verification、remediation、workspace hook を `runtime.surface` に移す。
+6. `manifest.yml` top-level に project-specific な skill、verification、remediation、workspace hook override がある場合は `runtime.surface` に移す。`presets/*.yml` にある共通定義はそのまま残せる。
 7. `schema_version: 1` を top-level に追加する。
 8. `manifest.yml` を削除する。
 9. reference product と同じ path 形式で command / skill / hook の参照先を確認する。
