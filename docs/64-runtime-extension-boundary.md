@@ -34,9 +34,9 @@ A2O Engine core must stay project-neutral. Project-specific behavior enters thro
 4. If two or more reference products need the same behavior, consider promoting it to a documented preset.
 5. Do not add fallback defaults that silently recreate a project package when config is missing.
 
-## Package Layout
+## Current Package Layout
 
-A package should use this shape:
+Until `A2O#272` is implemented, reference packages use this shape:
 
 ```text
 project-package/
@@ -50,6 +50,8 @@ project-package/
 ```
 
 `project.yaml` is the runtime-facing package config. `manifest.yml` is release and review metadata. `commands/` contains project-owned scripts when declarative commands are not enough. `scenarios/` contains kanban task templates used for validation.
+
+The target single-file schema is proposed in [42-single-file-project-package-schema.md](42-single-file-project-package-schema.md). After owner approval and implementation, `project.yaml` should become the only author-facing package config file.
 
 ## Review Checklist
 

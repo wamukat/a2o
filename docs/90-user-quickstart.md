@@ -211,4 +211,4 @@ task は repo label を使って対象 slot を指定する。parent-child flow 
 - project package schema は `manifest.yml` と `project.yaml` の責務をさらに明確化する余地がある。
 - published image での release smoke は、公開前の独立した gate として digest 固定で実行する。
 
-残る設計ギャップは `A2O#269` と `A2O#270` で追跡する。
+残る gap は `A2O#272` と `A2O#270` で追跡する。`A2O#269` は single-file schema proposal を扱う。

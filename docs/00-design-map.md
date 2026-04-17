@@ -48,9 +48,10 @@ fixed repo slot、同期方針、freshness、retention、GC、merge workspace �
 ### 5. project surface / presets
 
 - [40-project-surface-and-presets.md](40-project-surface-and-presets.md)
+- [42-single-file-project-package-schema.md](42-single-file-project-package-schema.md)
 - [64-runtime-extension-boundary.md](64-runtime-extension-boundary.md)
 
-project package、project 固有 command、repo slot、verification、bootstrap hook の境界を扱う。
+project package schema、project 固有 command、repo slot、verification、bootstrap hook の境界を扱う。
 
 ### 6. evidence / rerun / blocked diagnosis
 

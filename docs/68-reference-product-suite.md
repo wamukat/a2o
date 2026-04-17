@@ -22,7 +22,7 @@ Each product keeps its package at `project-package/`.
 
 ## Package Contract
 
-Each package should include:
+Until `A2O#272` is implemented, each package includes:
 
 - `README.md`
 - `manifest.yml`
@@ -33,6 +33,8 @@ Each package should include:
 - `scenarios/`
 
 The package must define a deterministic test or build command, agent prerequisites, editable source boundaries, and at least one scenario task that can be placed on the kanban board.
+
+The target package schema is a single `project.yaml` file proposed in [42-single-file-project-package-schema.md](42-single-file-project-package-schema.md). Reference products should be migrated after owner approval.
 
 ## Validation Boundary
 

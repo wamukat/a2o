@@ -27,7 +27,7 @@ Date: 2026-04-17
 
 ## Productization Gaps
 
-- `A2O#269` Package schema consolidation: `manifest.yml` and `project.yaml` responsibilities should be documented and validated consistently.
+- `A2O#272` Package schema consolidation implementation: convert loaders, docs, and reference packages after owner approval of the `A2O#269` design proposal.
 - `A2O#270` User-facing diagnostics: internal A3 names can remain, but normal manuals should avoid requiring users to author them.
 
 Each gap should be tracked as a kanban ticket before implementation. External behavior changes require owner discussion before coding.
