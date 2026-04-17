@@ -23,7 +23,7 @@ A2O 利用者に長い shell script を書かせない。
 
 A2O runtime は、現行設計では「1 project package = 1 runtime instance」として扱う。1つの Engine instance に複数 project を登録して `--project NAME` で切り替える registry 型ではない。複数 project を同時に動かす場合は、project package ごとに compose project name / storage dir / port / workspace root を分けた別 runtime instance として起動する。
 
-`a2o project bootstrap --package ./a2o-project` は、カレント workspace に runtime instance config を作成する。実ファイルは内部互換のため `.a3/runtime-instance.json` である。bootstrap 後の通常操作では package path を毎回指定しない。`a2o kanban ...` と `a2o agent install` は、カレントディレクトリから上方向に instance config を探索して、対象 package と runtime instance を解決する。runtime instance の compose project name を branch namespace として注入するため、isolated board で同じ `Portal#1` が作られても既存 live repo の historical `a3/work/Portal-1` branch を再利用しない。
+`a2o project bootstrap --package ./a2o-project` は、カレント workspace に runtime instance config を作成する。実ファイルは内部互換のため `.a3/runtime-instance.json` である。bootstrap 後の通常操作では package path を毎回指定しない。`a2o kanban ...` と `a2o agent install` は、カレントディレクトリから上方向に instance config を探索して、対象 package と runtime instance を解決する。runtime instance の compose project name を branch namespace として注入するため、isolated board で同じ task ref が作られても既存 live repo の historical branch を再利用しない。
 
 ## 利用者が用意するもの
 
@@ -47,35 +47,34 @@ A2O 利用者が作らないものは次である。
 ## 最小 project package 例
 
 ```yaml
-project: portal
+project: a2o-reference-multi-repo
 
 kanban:
   provider: soloboard
-  project: Portal
+  project: A2OReferenceMultiRepo
   bootstrap: kanban/bootstrap.json
 
 repos:
-  member-portal-starters:
-    path: /Users/example/workspace/mypage-prototype/member-portal-starters
-    role: support
-  member-portal-ui-app:
-    path: /Users/example/workspace/mypage-prototype/member-portal-ui-app
+  repo_alpha:
+    path: ../repos/catalog-service
     role: product
+    label: repo:catalog
+  repo_beta:
+    path: ../repos/storefront
+    role: product
+    label: repo:storefront
 
 agent:
-  workspace_root: /Users/example/workspace/mypage-prototype/.work/a2o-agent/workspaces
+  workspace_root: .work/a2o-agent/workspaces
   required_bins:
     - git
-    - task
-    - ruby
-  env:
-    A3_MAVEN_WORKSPACE_BOOTSTRAP_MODE: empty
+    - node
 
 runtime:
   kanban_status: To do
-  live_ref: refs/heads/feature/prototype
-  max_steps: 50
-  agent_attempts: 500
+  live_ref: refs/heads/main
+  max_steps: 40
+  agent_attempts: 300
 ```
 
 `repos.*.path` と `agent.workspace_root` は agent から見た path である。A2O Engine container から見た path ではない。
@@ -148,6 +147,6 @@ project package の `runtime/run_once.sh` は不要であり、利用者も proj
 - A2O Engine の execution loop は internal runtime flow として扱い、public kanban service surface へ不用意に露出しない。stale recovery / retention cleanup の cycle hook は後続 hardening として扱う。
 - project package loader と runtime instance config は実装済みであり、`a2o project bootstrap --package ./a2o-project` 後は package 指定不要で `a2o kanban ...` / `a2o agent install` が instance config を探索する。今後も multi-project registry に見える `--project NAME` は標準入口にしない。
 - `a2o agent install` は release artifact に含め、runtime image から host/dev-env への binary export を利用者向け配布物として固定済み。release 前には正式 image ref で同手順を再 smoke する。
-- Portal runtime shell script の責務は Engine command へ移設済み。残りは Portal 固有値を project package config から読む範囲を広げ、hardcoded Portal default を減らすこと。
+- runtime shell script の責務は Engine command へ移設済み。残りは project package config から読む範囲を広げ、hardcoded project default を減らすこと。
 - `A3_RUNTIME_RUN_ONCE_*` のような内部 env は project package / CLI option に寄せ、利用者の主要入口から隠す。
 - A2O runtime compose file は A2O 配布物として同梱し、project package 側に compose file 作成を要求しない。compose override は開発・診断用に限定する。
