@@ -634,6 +634,62 @@ repos:
 	}
 }
 
+func TestRuntimeRunOnceRejectsMalformedProjectExecutor(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  executor:
+    kind: command
+    prompt_transport: stdin-bundle
+    result:
+      mode: file
+    schema:
+      mode: file
+    default_profile:
+      env: {}
+    phase_profiles: {}
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail with malformed runtime.executor")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "invalid runtime.executor") || !strings.Contains(stderr.String(), "default_profile.command") {
+		t.Fatalf("stderr should mention malformed executor command, got %q", stderr.String())
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
+	}
+}
+
 func TestRuntimeStartLaunchesForegroundLoopInBackground(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -1141,6 +1197,7 @@ agent:
     - git
     - node
     - npm
+    - ruby
 runtime:
   live_ref: refs/heads/main
   max_steps: 7
@@ -1614,6 +1671,7 @@ agent:
   required_bins:
     - git
     - node
+    - ruby
 runtime:
   live_ref: refs/heads/main
   max_steps: 40

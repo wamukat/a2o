@@ -57,11 +57,28 @@ agent:
     - git
     - node
     - npm
+    - your-ai-worker
 
 runtime:
   live_ref: refs/heads/main
   max_steps: 20
   agent_attempts: 200
+  executor:
+    kind: command
+    prompt_transport: stdin-bundle
+    result:
+      mode: file
+    schema:
+      mode: file
+    default_profile:
+      command:
+        - your-ai-worker
+        - "--schema"
+        - "{{schema_path}}"
+        - "--result"
+        - "{{result_path}}"
+      env: {}
+    phase_profiles: {}
   presets:
     - base
   surface:
@@ -92,13 +109,13 @@ scenarios:
 
 `repos` defines stable repo slots. Slot keys are runtime identities. `path` is relative to the package directory unless absolute. `label` maps kanban labels to repo slots. If omitted, the implementation may derive `repo:<slot>`.
 
-`agent` owns host-side workspace and toolchain requirements. `required_bins` remains declarative because the agent can validate prerequisites before work starts.
+`agent` owns host-side workspace, product toolchain requirements, and executor command requirements. `required_bins` remains declarative because the agent can validate prerequisites before work starts.
 
 `runtime` owns execution defaults and the project surface that the Ruby runtime formerly read from `manifest.yml` plus presets.
 
 `runtime.executor` owns the agent-side implementation/review command. It is required for packaged `a2o runtime run-once`, `runtime loop`, and `runtime start` when using the default `a2o-agent worker stdin-bundle` worker. A2O renders this public `project.yaml` section into an internal compatibility launcher config; users should not create a separate `launcher.json`.
 
-The executor command receives the worker bundle on stdin and must write worker result JSON to `{{result_path}}`. Supported command placeholders are `{{result_path}}`, `{{schema_path}}`, `{{workspace_root}}`, and `{{a2o_root_dir}}`.
+The executor command receives the worker bundle on stdin and must write worker result JSON to `{{result_path}}`. Supported command placeholders are `{{result_path}}`, `{{schema_path}}`, `{{workspace_root}}`, `{{a2o_root_dir}}`, and `{{root_dir}}`.
 
 `runtime.presets` keeps the current preset model. Presets are still useful for common A2O behavior, but package-local overrides live beside the rest of the package config.
 
@@ -127,7 +144,7 @@ repos:
     path: ..
     role: product
 agent:
-  required_bins: [git, node, npm]
+  required_bins: [git, node, npm, your-ai-worker]
 runtime:
   live_ref: refs/heads/main
   max_steps: 20
@@ -170,11 +187,20 @@ repos:
   app:
     path: ..
 agent:
-  required_bins: [git, go]
+  required_bins: [git, go, your-ai-worker]
 runtime:
   live_ref: refs/heads/main
   max_steps: 20
   agent_attempts: 200
+  executor:
+    kind: command
+    prompt_transport: stdin-bundle
+    result: {mode: file}
+    schema: {mode: file}
+    default_profile:
+      command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
+      env: {}
+    phase_profiles: {}
   presets: [base]
   surface:
     verification_commands:
@@ -202,11 +228,20 @@ repos:
   app:
     path: ..
 agent:
-  required_bins: [git, python3]
+  required_bins: [git, python3, your-ai-worker]
 runtime:
   live_ref: refs/heads/main
   max_steps: 20
   agent_attempts: 200
+  executor:
+    kind: command
+    prompt_transport: stdin-bundle
+    result: {mode: file}
+    schema: {mode: file}
+    default_profile:
+      command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
+      env: {}
+    phase_profiles: {}
   presets: [base]
   surface:
     verification_commands:
@@ -240,11 +275,20 @@ repos:
     role: product
     label: repo:storefront
 agent:
-  required_bins: [git, node]
+  required_bins: [git, node, your-ai-worker]
 runtime:
   live_ref: refs/heads/main
   max_steps: 40
   agent_attempts: 300
+  executor:
+    kind: command
+    prompt_transport: stdin-bundle
+    result: {mode: file}
+    schema: {mode: file}
+    default_profile:
+      command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
+      env: {}
+    phase_profiles: {}
   presets: [base]
   surface:
     review_skill:

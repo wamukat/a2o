@@ -21,6 +21,7 @@ agent:
   required_bins:
     - git
     - node
+    - ruby
 runtime:
   live_ref: refs/heads/main
   max_steps: 40

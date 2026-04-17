@@ -80,6 +80,11 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	if len(config.Repos) == 0 {
 		return config, fmt.Errorf("project package config %s is missing repos", projectFile)
 	}
+	if len(config.Executor) > 0 {
+		if err := validateProjectExecutorConfig(config.Executor); err != nil {
+			return config, fmt.Errorf("project package config %s has invalid runtime.executor: %w", projectFile, err)
+		}
+	}
 	return config, nil
 }
 
@@ -145,6 +150,89 @@ func normalizeYAMLValue[T any](value T) T {
 		return value
 	}
 	return normalized
+}
+
+func validateProjectExecutorConfig(executor map[string]any) error {
+	if scalarString(executor["kind"]) != "command" {
+		return fmt.Errorf("kind must be command")
+	}
+	if scalarString(executor["prompt_transport"]) != "stdin-bundle" {
+		return fmt.Errorf("prompt_transport must be stdin-bundle")
+	}
+	result, ok := executor["result"].(map[string]any)
+	if !ok || scalarString(result["mode"]) != "file" {
+		return fmt.Errorf("result.mode must be file")
+	}
+	schema, ok := executor["schema"].(map[string]any)
+	if !ok || !containsString([]string{"file", "none"}, scalarString(schema["mode"])) {
+		return fmt.Errorf("schema.mode must be file or none")
+	}
+	if err := validateProjectExecutorProfile(executor["default_profile"], "default_profile"); err != nil {
+		return err
+	}
+	phaseProfiles := map[string]any{}
+	if raw, ok := executor["phase_profiles"].(map[string]any); ok {
+		phaseProfiles = raw
+	} else if executor["phase_profiles"] != nil {
+		return fmt.Errorf("phase_profiles must be an object")
+	}
+	for phase, rawProfile := range phaseProfiles {
+		if !containsString([]string{"implementation", "review", "parent_review"}, phase) {
+			return fmt.Errorf("phase_profiles contains unknown phase: %s", phase)
+		}
+		if err := validateProjectExecutorProfile(rawProfile, "phase_profiles."+phase); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateProjectExecutorProfile(raw any, label string) error {
+	profile, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s must be an object", label)
+	}
+	command, ok := profile["command"].([]any)
+	if !ok || len(command) == 0 {
+		return fmt.Errorf("%s.command must be a non-empty array of non-empty strings", label)
+	}
+	for _, entry := range command {
+		if scalarString(entry) == "" {
+			return fmt.Errorf("%s.command must be a non-empty array of non-empty strings", label)
+		}
+	}
+	if err := validateProjectStringMap(profile["env"], label+".env"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateProjectStringMap(raw any, label string) error {
+	if raw == nil {
+		return nil
+	}
+	values, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s must be an object", label)
+	}
+	for key, value := range values {
+		if key == "" {
+			return fmt.Errorf("%s keys must be non-empty strings", label)
+		}
+		if _, ok := value.(string); !ok {
+			return fmt.Errorf("%s.%s must be a string", label, key)
+		}
+	}
+	return nil
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func sortedProjectRepoAliases(repos map[string]projectPackageRepo) []string {

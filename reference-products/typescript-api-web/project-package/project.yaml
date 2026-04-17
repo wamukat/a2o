@@ -17,6 +17,7 @@ agent:
     - git
     - node
     - npm
+    - ruby
 runtime:
   live_ref: refs/heads/main
   max_steps: 20

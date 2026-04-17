@@ -52,6 +52,7 @@ agent:
     - git
     - node
     - npm
+    - your-ai-worker
 runtime:
   live_ref: refs/heads/main
   max_steps: 20
@@ -89,7 +90,7 @@ runtime:
     target_ref: refs/heads/main
 ```
 
-`runtime.executor` は implementation / review を実行する agent 側 command である。A2O は worker request を stdin bundle として渡し、executor は `{{result_path}}` に worker result JSON を書く。`{{schema_path}}`、`{{result_path}}`、`{{workspace_root}}`、`{{a2o_root_dir}}` を command placeholder として使える。
+`runtime.executor` は implementation / review を実行する agent 側 command である。A2O は worker request を stdin bundle として渡し、executor は `{{result_path}}` に worker result JSON を書く。`{{schema_path}}`、`{{result_path}}`、`{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` を command placeholder として使える。
 
 `repos.*.path` と `agent.workspace_root` は agent が見える path として扱う。project 固有の build、test、verification は `commands/` と `scenarios/` に置く。
 
@@ -158,7 +159,7 @@ a2o kanban url
 a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
 ```
 
-agent は project toolchain がある場所で動かす。たとえば Node product なら `node` と `npm`、Go product なら `go`、Python product なら `python3` が agent 側に必要である。必要な binary は `project.yaml` の `agent.required_bins` に書く。
+agent は project toolchain と `runtime.executor` command がある場所で動かす。たとえば Node product なら `node` と `npm`、Go product なら `go`、Python product なら `python3` が agent 側に必要である。executor が使う AI CLI や helper binary も含め、必要な binary は `project.yaml` の `agent.required_bins` に書く。
 
 ## Task Scenario
 

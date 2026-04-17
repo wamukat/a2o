@@ -16,6 +16,7 @@ agent:
   required_bins:
     - git
     - python3
+    - ruby
 runtime:
   live_ref: refs/heads/main
   max_steps: 20

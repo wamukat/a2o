@@ -89,10 +89,27 @@ agent:
   required_bins:
     - git
     - go
+    - your-ai-worker
 runtime:
   live_ref: refs/heads/main
   max_steps: 20
   agent_attempts: 200
+  executor:
+    kind: command
+    prompt_transport: stdin-bundle
+    result:
+      mode: file
+    schema:
+      mode: file
+    default_profile:
+      command:
+        - your-ai-worker
+        - "--schema"
+        - "{{schema_path}}"
+        - "--result"
+        - "{{result_path}}"
+      env: {}
+    phase_profiles: {}
   presets:
     - base
   surface:
@@ -170,7 +187,7 @@ runtime を実行する前に、`project.yaml`、`kanban/bootstrap.json`、`comm
 - `package.name` がある。
 - `kanban.project` と `kanban.selection.status` がある。
 - `repos` に対象 repo slot がある。
-- `agent.required_bins` に agent が使う binary がある。
+- `agent.required_bins` に product toolchain と `runtime.executor` が使う binary がある。
 - `runtime.presets` が配列である。
 - `runtime.executor` がある。default worker を使う場合、executor は stdin bundle を受け取り `{{result_path}}` に worker result JSON を書く command として定義する。
 - `runtime.presets` が参照する preset、または `runtime.surface` のどちらかで、実行可能な `verification_commands` を定義している。
