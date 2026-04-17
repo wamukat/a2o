@@ -4,6 +4,7 @@
 
 この文書は、旧 A3-v2 を current `A3Engine` として入れ直し、`v2` 呼称を廃止する cutover の実行計画と残件を整理するためのものです。
 2026-04-11 時点で、current source は `a3-engine` 側へ seed 済みであり、`a3-v2/` source tree と legacy automation scripts は削除済みである。
+2026-04-17 以降、この文書は historical cutover provenance として扱う。本文中の `current` は原則として cutover 当時の current を指し、現行 A2O の通常利用者向け surface は `a2o` / `a2o-agent` / project package docs を正本にする。
 
 - 対象読者: 製品開発者
 - 文書種別: 設計 / 手順
@@ -34,7 +35,7 @@ A3 は特定 AI の wrapper ではなく、kanban task、workspace、phase、evi
 3. 進行中: `v2` / `a3-v2` / `A3-v2` を runtime / docs / kanban / operator surface から除去する
 4. 進行中: current docs に残る旧名称は historical ref / migration note に限定する
 5. 進行中: executor を Codex 固定から command template contract へ移行する
-6. 次段: SoloBoard + A3 runtime + `a3-agent` の配布導線、service 化、retention hardening を閉じる
+6. 次段: SoloBoard + A3 runtime + public `a2o-agent` の配布導線、service 化、retention hardening を閉じる
 
 ## 実施項目
 
@@ -139,7 +140,7 @@ Cutover target:
   - `launcher.json` の operator guidance
 - retired root `scripts/a3-projects/portal/inject/config/portal-dev/*`
   - `portal-dev` isolated clone compatibility profile は current runtime surface から削除済み
-- retired root `scripts/a3/run.rb`; current user-facing root entrypoint is `task a3:*`, and the release-bound engine entrypoint is Docker A3 runtime command, not a host Ruby `a3`
+- retired root `scripts/a3/run.rb`; cutover-time root entrypoint was `task a3:*`, and the release-bound engine entrypoint was Docker A3 runtime command, not a host Ruby `a3`
   - legacy disabled message の `task a3:portal-v2:*`, `a3-v2/bin/a3`
 - internal defaults
   - `a3-v2/lib/a3/cli.rb` の `tmp/a3-v2`
@@ -418,9 +419,9 @@ Stop:
 
 ### Operator Surface
 
-- current task / runbook が `task a3:portal:*` を案内していること
-- launcher / manifest / helper script の current 導線が `/a3-engine/bin/a3` と新 `/a3-engine` を向いていること
-- cutover 後の標準コマンドとして `task a3:portal:*` が runbook 通りに実行できること
+- cutover-time task / runbook が `task a3:portal:*` を案内していること
+- launcher / manifest / helper script の cutover-time 導線が `/a3-engine/bin/a3` と新 `/a3-engine` を向いていること
+- cutover 当時の標準コマンドとして `task a3:portal:*` が runbook 通りに実行できること
 
 ### Kanban / References
 
@@ -438,7 +439,7 @@ Pass:
 Fail:
 
 - current 導線のどこかが旧 path / 旧名称へ依存している
-- `task a3:portal:*` と `/a3-engine/bin/a3` のどちらかが current 正規入口として成立しない
+- `task a3:portal:*` と `/a3-engine/bin/a3` のどちらかが cutover-time 正規入口として成立しない
 - canonical ref と project 運用が cutover 後も二重化している
 
 ### Rollback Trigger
@@ -573,7 +574,7 @@ Stop:
 
 - `task kanban:api -- task-find --project 'A3Engine' --query ''`
 - `task kanban:api -- task-find --project 'A3-v2' --query ''`
-- current operator surface の代表コマンドとして `task a3:portal:*`
+- cutover-time operator surface の代表コマンドとして `task a3:portal:*`
 - A3 CLI の代表コマンドとして `/a3-engine/bin/a3`
 
 ### Stop / Go Reference
@@ -731,7 +732,7 @@ Stop:
 
 - docs map が current `/a3-engine/docs/*` を正規導線として案内していること
 - implementation status が current 名称に揃っていること
-- root operator docs が `task a3:portal:*` など current surface を正規入口として案内していること
+- root operator docs が `task a3:portal:*` など cutover-time surface を正規入口として案内していること
 - archive docs と current docs が混在していないこと
 
 ### Documentation Sign-Off

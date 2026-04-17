@@ -7,9 +7,9 @@
 
 ## 方針
 
-- A3 は V1 の局所修正の延長ではなく、bundled kanban service と `a3-agent` を前提にした current runtime として扱う
+- A3 は V1 の局所修正の延長ではなく、bundled kanban service と `a2o-agent` を前提にした current runtime として扱う
 - A3 本体は orchestration / scheduler / state / kanban adapter / agent control plane を持つ
-- project 固有 toolchain は A3 image へ bake せず、host または dev-env container に置いた `a3-agent` が実行する
+- project 固有 toolchain は A3 image へ bake せず、host または dev-env container に置いた `a2o-agent` が実行する
 - project 固有知識は最小 injection surface と preset/template で表現する
 - workspace / rerun / blocked recovery の複雑性を、domain model と evidence model で抑える
 

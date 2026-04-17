@@ -8,7 +8,7 @@
 
 ## Runtime Naming Boundary
 
-Current public surface は `a2o project bootstrap` / `a2o kanban ...` / `a2o agent ...` / `a2o-agent ...` と project package を正規入口にする。`runtime run-once` / `runtime run loop` は Engine 内部 flow または maintenance-only command の文脈で扱い、通常利用者向け入口としては露出しない。`scheduler` は internal cycle/state/store 互換名、maintenance-only command、または historical evidence の文脈に限定する。詳細な分類は [66-runtime-naming-boundary.md](66-runtime-naming-boundary.md) を正本とする。
+Current public surface は `a2o host install` / `a2o project bootstrap` / `a2o kanban ...` / `a2o agent ...` / `a2o-agent ...` と project package を正規入口にする。`runtime run-once` / `runtime run loop` は Engine 内部 flow または maintenance-only command の文脈で扱い、通常利用者向け入口としては露出しない。`scheduler` は internal cycle/state/store 互換名、maintenance-only command、または historical evidence の文脈に限定する。詳細な分類は [66-runtime-naming-boundary.md](66-runtime-naming-boundary.md) を正本とする。
 
 ## Reference Product Validation Boundary
 
@@ -294,7 +294,7 @@ docker run --rm \
 整理の進め方:
 
 - 実装削除前に `current surface`, `transitional internal`, `historical evidence`, `delete` の 4 分類へ棚卸しする。
-- `current surface` は Engine image / Go `a3-agent` / project injection config のいずれかへ配置先を決める。
+- `current surface` は Engine image / public Go `a2o-agent` / project injection config のいずれかへ配置先を決める。内部互換名 `a3-agent` は compatibility surface として分類する。
 - `transitional internal` は fail-closed にし、公開 Taskfile / runbook / README から見えない状態にする。
 - `historical evidence` は文書だけに残し、実行可能 script / task / compose file としては残さない。
 - `delete` は git history に委ね、workspace root や project injection package に runtime から参照されない file を残さない。
@@ -488,7 +488,7 @@ live validation と scheduler surface の検証結果に加え、workspace root 
   - `portal-dev` root local utility / config と `bootstrap_portal_dev_repos.rb` は current runtime surface から削除済み
   - `scripts/a3-projects/portal/maintenance/prepare_portal_runtime_config.rb` は `portal` doctor-env / cleanup / reconcile の internal helper と related spec からまだ参照される
 
-この時点で `A3-v2#3160` の acceptance は満たしており、compatibility 資産の扱いは「retire したもの」「delete 済みのもの」「current root utility を支えるため keep するもの」に分かれた。2026-04-12 の判断で旧 backend compatibility path も current runtime から物理削除する。以後の残件は、A3 / SoloBoard / a3-agent 配布導線を固定し、実 Portal source の `repo:both` parent/full verification validation を完了条件として通すことである。
+この時点で `A3-v2#3160` の acceptance は満たしており、compatibility 資産の扱いは「retire したもの」「delete 済みのもの」「current root utility を支えるため keep するもの」に分かれた。2026-04-12 の判断で旧 backend compatibility path も current runtime から物理削除する。以後の残件は、A3 / SoloBoard / public `a2o-agent` 配布導線を固定し、実 Portal source の `repo:both` parent/full verification validation を完了条件として通すことである。
 
 ### 0.2 直近の実装証跡
 

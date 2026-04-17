@@ -155,7 +155,7 @@
   根拠: live Portal final validation observation
 
 - [x] portal-dev isolated track retirement
-  現状: `portal-dev` は過去の隔離 clone 検証 profile であり、current Docker runtime + host-local `a3-agent` surface には不要。root Taskfile entry、project config、bootstrap helper、関連 spec は削除済み。
+  現状: `portal-dev` は過去の隔離 clone 検証 profile であり、current Docker runtime + host-local `a2o-agent` public surface には不要。root Taskfile entry、project config、bootstrap helper、関連 spec は削除済み。
 
 ## Root Integration
 
