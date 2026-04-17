@@ -57,7 +57,7 @@ CHECKSUM_FILE=dist/checksums.txt \
 ./scripts/install-release.sh dist/a3-agent-0.1.0-linux-amd64.tar.gz
 ```
 
-The installer installs `a2o-agent` and compatibility alias `a3-agent`. It does not install or enable OS service definitions. Standard A2O operation starts the agent manually in loop mode from an operator terminal or from the project dev-env container.
+The installer installs `a2o-agent` and compatibility alias `a3-agent`. It does not install or enable OS service definitions. Standard A2O operation uses `a2o host install`, `a2o project bootstrap`, `a2o kanban ...`, and `a2o agent install`; direct agent loop commands are compatibility / diagnostic tools for operators and developers.
 
 ## Host Launcher
 
@@ -125,7 +125,7 @@ Supported shapes:
   - Install from release archive during the job setup step.
   - Use a job-local `workspace_root` and token files mounted from CI secrets.
 
-In all shapes, the runtime profile is the local contract. Internal A3 job payloads carry repo slots and source aliases; they do not carry host-specific source paths. Logs and artifacts are uploaded to the internal A3-managed artifact store and must not be returned as host-local paths in `JobResult`.
+In all shapes, Engine-managed job payloads and doctor inputs are the standard contract. Agent-local runtime profile files remain as fallback compatibility for diagnostics and older validation fixtures. Logs and artifacts are uploaded to the internal A3-managed artifact store and must not be returned as host-local paths in `JobResult`.
 
 Out of scope for the current runtime:
 
@@ -134,7 +134,9 @@ Out of scope for the current runtime:
 - multi-tenant agent registry / capability scheduling
 - remote artifact routing outside the local internal A3-managed artifact store
 
-## Run Once
+## Compatibility Single Poll
+
+This section is developer / diagnostic guidance, not the normal A2O user path. Standard users install the agent with `a2o agent install` and let the Engine-managed project package provide workspace root, source paths, required bins, and environment through job payloads and doctor jobs.
 
 Create a runtime profile for the host or dev-env where commands will run:
 
@@ -182,13 +184,15 @@ The current command runs a single poll cycle:
 - `PUT /v1/agent/artifacts/{artifact_id}` for combined logs and matched artifact rules
 - `POST /v1/agent/jobs/{job_id}/result`
 
-The runtime profile file is the host/dev-env side `alias -> local path` contract. Internal A3 job payloads still carry only `slot -> alias`; they do not carry these local paths.
+The runtime profile file is a compatibility fallback for the host/dev-env side `alias -> local path` contract. The standard path should use Engine-managed agent environment config rendered into doctor flags and job payloads.
 
 `agent_token` is optional for local-only development. When the internal A3 control plane is started with `--agent-token` / `--agent-token-file` or `A3_AGENT_TOKEN` / `A3_AGENT_TOKEN_FILE`, the Go agent must provide the same agent token through `A3_AGENT_TOKEN`, `-agent-token`, `agent_token_file`, `A3_AGENT_TOKEN_FILE`, `-agent-token-file`, or the inline profile `agent_token`. A3-side enqueue/fetch clients may use a separate control token (`--agent-control-token-file` or `A3_AGENT_CONTROL_TOKEN_FILE`) while the Go agent continues to use only the agent token. Prefer token files for service manager / container operation so tokens are not exposed through process arguments.
 
 The runtime profile rejects remote `http://` control-plane URLs by default. Loopback URLs (`127.0.0.1` / `localhost`) and single-label Docker service names such as `http://a3-runtime:7393` are treated as local topology. Remote deployment is out of scope for the current runtime; `allow_insecure_remote` is only a diagnostic escape hatch and should not appear in the standard runbook.
 
-## Manual Loop Mode
+## Compatibility Manual Loop Mode
+
+This mode is for local diagnostics, validation fixtures, or operator-controlled troubleshooting. It is not the primary A2O setup flow.
 
 Run the same profile in loop mode from a terminal while A2O is operating:
 
@@ -202,4 +206,4 @@ Useful flags and environment overrides:
 - `--poll-interval` / `A3_AGENT_POLL_INTERVAL`: idle sleep duration, for example `2s`.
 - `--max-iterations` / `A3_AGENT_MAX_ITERATIONS`: bounded loop count for manual verification; `0` means unlimited.
 
-Loop mode exits non-zero on control-plane or job execution errors. If an operator wants OS-managed restart later, they can wrap this command outside A2O. The current A2O distribution intentionally does not own systemd, launchd, or Windows service registration. Windows users run A2O through WSL2 Ubuntu and use the same manual loop path.
+Loop mode exits non-zero on control-plane or job execution errors. If an operator wants OS-managed restart later, they can wrap this command outside A2O. The current A2O distribution intentionally does not own systemd, launchd, or Windows service registration. Windows users run A2O through WSL2 Ubuntu and should still start from the standard `a2o ...` lifecycle commands.
