@@ -5,6 +5,8 @@
 
 A2O は kanban task を起点に、workspace 作成、agent 実行、検証、merge、evidence 記録を進める automation engine である。利用者は project package を用意し、A2O の公開コマンドで runtime を起動する。
 
+既存 package を `manifest.yml` と `project.yaml` の 2 ファイル構成から移行する場合は、先に [91-project-yaml-migration-guide.md](91-project-yaml-migration-guide.md) を読む。
+
 ## A2O が持つもの
 
 - bundled kanban service lifecycle
