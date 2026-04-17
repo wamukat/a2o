@@ -413,6 +413,7 @@ type runtimeRunOncePlan struct {
 	MaxSteps             string
 	AgentAttempts        int
 	AgentPort            string
+	AgentInternalPort    string
 	StorageDir           string
 	HostRootDir          string
 	HostRoot             string
@@ -548,6 +549,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		MaxSteps:             envDefaultValue(maxSteps, envDefault("A3_RUNTIME_RUN_ONCE_MAX_STEPS", envDefault("A3_RUNTIME_SCHEDULER_MAX_STEPS", defaultMaxSteps))),
 		AgentAttempts:        agentAttemptCount,
 		AgentPort:            envDefault("A3_BUNDLE_AGENT_PORT", envDefaultValue(config.AgentPort, "7393")),
+		AgentInternalPort:    envDefault("A3_RUNTIME_RUN_ONCE_AGENT_INTERNAL_PORT", envDefault("A3_RUNTIME_SCHEDULER_AGENT_INTERNAL_PORT", "7393")),
 		StorageDir:           envDefault("A3_BUNDLE_STORAGE_DIR", envDefaultValue(config.StorageDir, "/var/lib/a3/a2o-runtime")),
 		HostRootDir:          hostRootDir,
 		HostRoot:             hostRoot,
@@ -806,10 +808,10 @@ func killRuntimePIDFile(config runtimeInstanceConfig, plan runtimeRunOncePlan, r
 }
 
 func startRuntimeAgentServer(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
-	fmt.Fprintf(stdout, "runtime_agent_server_start port=%s\n", plan.AgentPort)
+	fmt.Fprintf(stdout, "runtime_agent_server_start port=%s host_port=%s\n", plan.AgentInternalPort, plan.AgentPort)
 	return dockerComposeExecShell(config, plan, runner, runtimeContainerProcess{
 		WorkingDir:  "/workspace",
-		Args:        []string{"a3", "agent-server", "--storage-dir", plan.StorageDir, "--host", "0.0.0.0", "--port", plan.AgentPort},
+		Args:        []string{"a3", "agent-server", "--storage-dir", plan.StorageDir, "--host", "0.0.0.0", "--port", plan.AgentInternalPort},
 		StdoutPath:  plan.ServerLog,
 		StderrToOut: true,
 		PIDFile:     plan.ServerPIDFile,
@@ -860,7 +862,7 @@ func executeUntilIdleArgs(plan runtimeRunOncePlan) []string {
 		"--worker-gateway", "agent-http",
 		"--verification-command-runner", "agent-http",
 		"--merge-runner", "agent-http",
-		"--agent-control-plane-url", "http://127.0.0.1:" + plan.AgentPort,
+		"--agent-control-plane-url", "http://127.0.0.1:" + plan.AgentInternalPort,
 		"--agent-runtime-profile", "host-local",
 		"--agent-shared-workspace-mode", "agent-materialized",
 		"--agent-support-ref", plan.LiveRef,

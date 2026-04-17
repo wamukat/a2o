@@ -354,10 +354,22 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime pgrep -f a3 execute-until-idle")
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime cat /tmp/a3-runtime-run-once.exit")
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime tail -n 160 /tmp/a3-runtime-run-once.log")
+	joinedText := strings.Join(joined, "\n")
+	if !strings.Contains(joinedText, "'a3' 'agent-server' '--storage-dir' '/var/lib/a3/test-runtime' '--host' '0.0.0.0' '--port' '7393'") {
+		t.Fatalf("agent-server should listen on container-internal port 7393, calls:\n%s", joinedText)
+	}
+	if !strings.Contains(joinedText, "curl -fsS http://127.0.0.1:7394/v1/agent/jobs/next?agent=probe") {
+		t.Fatalf("host readiness probe should use configured host agent port, calls:\n%s", joinedText)
+	}
+	if !strings.Contains(joinedText, "'--agent-control-plane-url' 'http://127.0.0.1:7393'") {
+		t.Fatalf("container execute-until-idle should use internal agent port, calls:\n%s", joinedText)
+	}
+	if !strings.Contains(joinedText, " -agent host-local -control-plane-url http://127.0.0.1:7394") {
+		t.Fatalf("host agent should use configured host agent port, calls:\n%s", joinedText)
+	}
 	if strings.Contains(strings.Join(joined, "\n"), "portal") {
 		t.Fatalf("run-once should not use Portal defaults:\n%s", strings.Join(joined, "\n"))
 	}
-	joinedText := strings.Join(joined, "\n")
 	for _, want := range []string{
 		"'--kanban-project' 'A2OReferenceMultiRepo'",
 		"'--agent-source-path' 'repo_alpha=",
