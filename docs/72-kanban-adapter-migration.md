@@ -25,7 +25,7 @@ Use a Ruby operation client boundary first, then move provider implementations b
 
 ## Runtime Python Dependency
 
-Decision for `A2O#253`: keep `python3` and `python3-venv` in `docker/a3-runtime/Dockerfile` for now.
+Decision for `A2O#253`: keep `python3` in `docker/a3-runtime/Dockerfile` for now, but remove `python3-venv`.
 
 The current runtime still has an Engine-owned Python dependency:
 
@@ -35,6 +35,8 @@ The current runtime still has an Engine-owned Python dependency:
 - `SubprocessKanbanCommandClient` is still the only production SoloBoard implementation behind `KanbanCommandClient`
 
 Therefore removing Python from the runtime image today would break the standard `a2o kanban ...` runtime path even though the Ruby side now has a seam for a native adapter.
+
+No runtime-owned path creates a Python virtual environment, and `tools/kanban/cli.py` is executed directly by `python3`. `python3-venv` is therefore not part of the runtime requirement and should stay out of the image unless a future runtime-owned command proves it needs venv support.
 
 The blocker for removal is explicit: add and validate a Ruby-native SoloBoard implementation behind `KanbanCommandClient`, then change the runtime default away from `subprocess-cli`. After that, keep `tools/kanban/cli.py` as a developer/operator compatibility CLI outside the runtime hot path and remove Python from the runtime image if no other runtime-owned command still requires it.
 

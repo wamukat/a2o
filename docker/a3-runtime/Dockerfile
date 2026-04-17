@@ -33,7 +33,6 @@ RUN apt-get update \
       pkg-config \
       procps \
       python3 \
-      python3-venv \
       ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
