@@ -117,9 +117,9 @@ a2o kanban url
 
 kanban task selection、agent job queue、artifact store 反映は A2O 内部の runtime flow が担当する。利用者は `execute-until-idle` の詳細引数を直接組み立てない。
 
-## 手動 agent 起動が必要な場合
+## agent fallback / diagnostic 起動が必要な場合
 
-通常は `a2o agent install` と `a2o kanban ...` が agent の導入と runtime 接続確認を補助する。ただし、project dev-env container の中で agent を常駐させたい場合は、利用者が次のように起動してよい。
+通常の導入と接続確認は `a2o agent install` と `a2o kanban ...` で行う。direct `a2o-agent --loop` は標準導線ではなく、project dev-env residency、diagnostic、operator-controlled fallback が必要な場合だけ使う。
 
 ```bash
 a2o-agent --engine http://localhost:7393 --loop --poll-interval 2s
