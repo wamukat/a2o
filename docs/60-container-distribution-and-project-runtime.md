@@ -371,10 +371,10 @@ reference product suite が未実装の間は、下記 `R*` を acceptance targe
 Portal integration validation は別枠で管理し、A2O core final validation の必須条件にはしない。
 実 Portal source の `repo:both` parent full verification は「Portal integration が A2O release candidate と互換か」の証跡であり、「A2O core が完成したか」の標準回帰テストではない。
 
-runtime / agent loop の運用ルール:
+runtime / agent fallback loop の運用ルール:
 
 - 起動前に `a2o-agent doctor --engine <control-plane-url> --token-file <path>` と Engine-managed agent environment doctor を実行し、control-plane URL、workspace root、source paths、required bins を検証する
-- agent 起動は `a2o-agent --engine <control-plane-url> --token-file <path> --loop --poll-interval 2s` を標準とする。短時間 validation のみ `--max-iterations` を使う
+- 通常の agent 導入と接続確認は `a2o agent install` と A2O public lifecycle command に寄せる。direct `a2o-agent --engine <control-plane-url> --token-file <path> --loop --poll-interval 2s` は dev-env residency、diagnostic、operator-controlled fallback に限定し、短時間 validation のみ `--max-iterations` を使う
 - Engine loop 起動は compose-managed `a3-runtime` container process とする。host OS の service manager へ A3 が直接登録しない
 - 停止は runtime instance の compose stop/down または loop process の graceful stop を標準とする。強制 kill 後は A2O runtime state / watch-summary inspection で active / queued / blocked を確認する
 - agent loop が非 0 exit した場合は、A3 側の `agent_jobs.json` と uploaded combined log を見てから再起動する。job result が submit 済みか不明な場合は、同じ agent を即再起動する前に `describe-state` を確認する
