@@ -147,8 +147,8 @@ Create a runtime profile for the host or dev-env where commands will run:
   "agent_token_file": "/run/secrets/a2o-agent-token",
   "workspace_root": "/tmp/a2o-agent-workspaces",
   "source_aliases": {
-    "catalog-service": "/path/to/reference-products/multi-repo-fixture/repos/catalog-service",
-    "storefront": "/path/to/reference-products/multi-repo-fixture/repos/storefront"
+    "repo_alpha": "/path/to/reference-products/multi-repo-fixture/repos/catalog-service",
+    "repo_beta": "/path/to/reference-products/multi-repo-fixture/repos/storefront"
   }
 }
 ```
@@ -173,8 +173,8 @@ The individual flags remain available as overrides:
   --engine http://127.0.0.1:7393 \
   -agent-token-file /run/secrets/a2o-agent-token \
   -workspace-root /tmp/a2o-agent-workspaces \
-  -source-alias catalog-service=/path/to/reference-products/multi-repo-fixture/repos/catalog-service \
-  -source-alias storefront=/path/to/reference-products/multi-repo-fixture/repos/storefront
+  -source-alias repo_alpha=/path/to/reference-products/multi-repo-fixture/repos/catalog-service \
+  -source-alias repo_beta=/path/to/reference-products/multi-repo-fixture/repos/storefront
 ```
 
 `--engine` is the user-facing alias for `--control-plane-url`. Both flags are accepted for normal execution and `doctor`.
