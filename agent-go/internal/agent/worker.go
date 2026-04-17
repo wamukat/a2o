@@ -102,7 +102,7 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 	}
 	runRequest, prepared, workspaceDescriptor, err := w.prepareRequest(*request)
 	if err != nil {
-		result, idle, submitErr := w.submitFailure(*request, workspaceDescriptor, startedAt, fmt.Sprintf("A3 agent workspace preparation failed: %v\n", err))
+		result, idle, submitErr := w.submitFailure(*request, workspaceDescriptor, startedAt, fmt.Sprintf("A2O agent workspace preparation failed: %v\n", err))
 		cleanupErr := w.cleanupPrepared(*request, prepared)
 		if submitErr != nil {
 			return result, idle, submitErr
@@ -125,7 +125,7 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 			if refreshErr := RefreshWorkspaceEvidence(*prepared); refreshErr == nil {
 				workspaceDescriptor = requestedWorkspaceDescriptor(runRequest, prepared.SlotDescriptors)
 			}
-			result := postExecutionFailureResult(*request, workspaceDescriptor, startedAt, finishedAt, logUpload, artifactUploads, "A3 agent workspace publish failed", "agent_workspace_publish", err)
+			result := postExecutionFailureResult(*request, workspaceDescriptor, startedAt, finishedAt, logUpload, artifactUploads, "A2O agent workspace publish failed", "agent_workspace_publish", err)
 			submitErr := w.Client.SubmitResult(result)
 			cleanupErr := w.cleanupPrepared(*request, prepared)
 			if submitErr != nil {

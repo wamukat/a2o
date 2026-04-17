@@ -19,11 +19,21 @@ func main() {
 }
 
 func run(args []string) int {
+	if len(args) > 0 && (args[0] == "help" || args[0] == "-h" || args[0] == "--help") {
+		printAgentUsage()
+		return 0
+	}
 	if len(args) > 0 && args[0] == "doctor" {
 		return runDoctor(args[1:])
 	}
 	if len(args) > 0 && args[0] == "cleanup-workspace" {
 		return runCleanupWorkspace(args[1:])
+	}
+	if len(args) > 0 && (args[0] == "worker:stdin-bundle" || args[0] == "worker-stdin-bundle") {
+		return runWorkerStdinBundle(args[1:])
+	}
+	if len(args) > 1 && args[0] == "worker" && args[1] == "stdin-bundle" {
+		return runWorkerStdinBundle(args[2:])
 	}
 
 	configPath := preScanConfigPath(args)
@@ -33,14 +43,15 @@ func run(args []string) int {
 		return 1
 	}
 
-	flags := flag.NewFlagSet("a3-agent", flag.ContinueOnError)
+	flags := flag.NewFlagSet("a2o-agent", flag.ContinueOnError)
+	flags.Usage = printAgentUsage
 	configFlag := flags.String("config", configPath, "runtime profile JSON file")
-	agentName := flags.String("agent", defaultString("A3_AGENT_NAME", config.AgentName, "local-agent"), "agent name used when polling the A3 control plane")
+	agentName := flags.String("agent", defaultString("A3_AGENT_NAME", config.AgentName, "local-agent"), "agent name used when polling the A2O control plane")
 	controlPlaneURL := defaultString("A3_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393")
-	flags.StringVar(&controlPlaneURL, "control-plane-url", controlPlaneURL, "A3 control plane base URL")
+	flags.StringVar(&controlPlaneURL, "control-plane-url", controlPlaneURL, "A2O control plane base URL")
 	flags.StringVar(&controlPlaneURL, "engine", controlPlaneURL, "alias for --control-plane-url")
-	agentToken := flags.String("agent-token", os.Getenv("A3_AGENT_TOKEN"), "bearer token for the A3 control plane")
-	agentTokenFile := flags.String("agent-token-file", defaultString("A3_AGENT_TOKEN_FILE", config.AgentTokenFile, ""), "file containing bearer token for the A3 control plane")
+	agentToken := flags.String("agent-token", os.Getenv("A3_AGENT_TOKEN"), "bearer token for the A2O control plane")
+	agentTokenFile := flags.String("agent-token-file", defaultString("A3_AGENT_TOKEN_FILE", config.AgentTokenFile, ""), "file containing bearer token for the A2O control plane")
 	workspaceRoot := flags.String("workspace-root", defaultString("A3_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root for materialized jobs")
 	loop := flags.Bool("loop", false, "run continuously until interrupted")
 	pollInterval := flags.Duration("poll-interval", envDuration("A3_AGENT_POLL_INTERVAL", time.Second), "idle poll interval for loop mode")
@@ -95,9 +106,10 @@ func run(args []string) int {
 
 func printAgentUsage() {
 	fmt.Fprintln(os.Stderr, "usage:")
-	fmt.Fprintln(os.Stderr, "  a3-agent [--loop] [--control-plane-url URL]")
-	fmt.Fprintln(os.Stderr, "  a3-agent doctor --workspace-root PATH --source-path NAME=PATH")
-	fmt.Fprintln(os.Stderr, "  a3-agent cleanup-workspace --workspace-root PATH --descriptor PATH [--dry-run]")
+	fmt.Fprintln(os.Stderr, "  a2o-agent [--loop] [--control-plane-url URL]")
+	fmt.Fprintln(os.Stderr, "  a2o-agent doctor --workspace-root PATH --source-path NAME=PATH")
+	fmt.Fprintln(os.Stderr, "  a2o-agent cleanup-workspace --workspace-root PATH --descriptor PATH [--dry-run]")
+	fmt.Fprintln(os.Stderr, "  a2o-agent worker stdin-bundle")
 }
 
 func runDoctor(args []string) int {
@@ -107,11 +119,12 @@ func runDoctor(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	flags := flag.NewFlagSet("a3-agent doctor", flag.ContinueOnError)
+	flags := flag.NewFlagSet("a2o-agent doctor", flag.ContinueOnError)
+	flags.Usage = printAgentUsage
 	configFlag := flags.String("config", configPath, "runtime profile JSON file")
 	agentName := flags.String("agent", defaultString("A3_AGENT_NAME", config.AgentName, "local-agent"), "agent name")
 	controlPlaneURL := defaultString("A3_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393")
-	flags.StringVar(&controlPlaneURL, "control-plane-url", controlPlaneURL, "A3 control plane base URL")
+	flags.StringVar(&controlPlaneURL, "control-plane-url", controlPlaneURL, "A2O control plane base URL")
 	flags.StringVar(&controlPlaneURL, "engine", controlPlaneURL, "alias for --control-plane-url")
 	workspaceRoot := flags.String("workspace-root", defaultString("A3_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root for materialized jobs")
 	sourceAliases := sourceAliasFlag(mergeSourceAliases(config.SourceAliases, parseSourceAliases(os.Getenv("A3_AGENT_SOURCE_ALIASES"))))
@@ -148,7 +161,8 @@ func runCleanupWorkspace(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	flags := flag.NewFlagSet("a3-agent cleanup-workspace", flag.ContinueOnError)
+	flags := flag.NewFlagSet("a2o-agent cleanup-workspace", flag.ContinueOnError)
+	flags.Usage = printAgentUsage
 	configFlag := flags.String("config", configPath, "runtime profile JSON file")
 	workspaceRoot := flags.String("workspace-root", defaultString("A3_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root")
 	descriptorPath := flags.String("descriptor", "", "workspace descriptor JSON file")

@@ -22,8 +22,7 @@
 - `A3_*` environment variables
 - Ruby module / Go package / internal class / internal file path
 - runtime storage schema / artifact schema / job schema
-- 既存 kanban comment に残る `A3 実行開始` / `A3 実行完了`
-- internal evidence に含まれる `a3-agent` / `project_repo_mutator=a3-agent`
+- 過去の internal evidence に含まれる legacy `a3-agent` identifier
 
 これらを rename すると state migration と既存 evidence の読み替えが必要になり、release candidate の安定性を落とす。外向き alias と packaging で吸収する。
 

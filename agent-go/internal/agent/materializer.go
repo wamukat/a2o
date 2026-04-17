@@ -159,7 +159,7 @@ func (m WorkspaceMaterializer) Merge(request MergeRequest) (WorkspaceDescriptor,
 	if err := executeMergePlans(plans, request.Policy); err != nil {
 		return descriptor, failedMergeExecution(err)
 	}
-	return descriptor, ExecutionResult{Status: "succeeded", ExitCode: intPtr(0), CombinedLog: []byte("A3 agent merge completed\n")}
+	return descriptor, ExecutionResult{Status: "succeeded", ExitCode: intPtr(0), CombinedLog: []byte("A2O agent merge completed\n")}
 }
 
 func (m WorkspaceMaterializer) RecoverMerge(request MergeRecoveryRequest) (WorkspaceDescriptor, ExecutionResult) {
@@ -189,7 +189,7 @@ func (m WorkspaceMaterializer) RecoverMerge(request MergeRecoveryRequest) (Works
 			"source_head_commit":   slot.SourceHeadCommit,
 			"conflict_files":       normalizePathList(slot.ConflictFiles),
 			"merge_status":         "recovery_prepared",
-			"project_repo_mutator": "a3-agent",
+			"project_repo_mutator": "a2o-agent",
 		}
 		descriptor.SlotDescriptors[slotName] = slotDescriptor
 		plan, err := prepareMergeRecoverySlot(slotName, slot, slotDescriptor)
@@ -201,7 +201,7 @@ func (m WorkspaceMaterializer) RecoverMerge(request MergeRecoveryRequest) (Works
 	if err := commitRecoveredMergePlans(plans); err != nil {
 		return descriptor, failedMergeExecution(err)
 	}
-	return descriptor, ExecutionResult{Status: "succeeded", ExitCode: intPtr(0), CombinedLog: []byte("A3 agent merge recovery completed\n")}
+	return descriptor, ExecutionResult{Status: "succeeded", ExitCode: intPtr(0), CombinedLog: []byte("A2O agent merge recovery completed\n")}
 }
 
 func (m WorkspaceMaterializer) prepareMergePlans(request MergeRequest, descriptors map[string]map[string]any) ([]mergePlan, error) {
@@ -286,7 +286,7 @@ func (m WorkspaceMaterializer) prepareMergePlans(request MergeRequest, descripto
 			"merge_status":         "prepared",
 			"dirty_before":         false,
 			"workspace_ownership":  "agent",
-			"project_repo_mutator": "a3-agent",
+			"project_repo_mutator": "a2o-agent",
 		}
 		descriptors[slotName] = descriptor
 		plans = append(plans, mergePlan{
@@ -475,9 +475,9 @@ func commitRecoveredMergePlans(plans []mergeRecoveryPlan) error {
 	for _, plan := range plans {
 		message := strings.TrimSpace(plan.slot.CommitMessage)
 		if message == "" {
-			message = "A3 agent merge recovery"
+			message = "A2O agent merge recovery"
 		}
-		if err := runGit(plan.slot.RuntimePath, "-c", "user.name=A3 Agent", "-c", "user.email=a3-agent@example.invalid", "commit", "--no-gpg-sign", "--no-verify", "-m", message); err != nil {
+		if err := runGit(plan.slot.RuntimePath, "-c", "user.name=A3 Agent", "-c", "user.email=a2o-agent@example.invalid", "commit", "--no-gpg-sign", "--no-verify", "-m", message); err != nil {
 			plan.descriptor["merge_status"] = "recovery_failed"
 			return errors.Join(err, rollbackRecoveredMergePlans(committed))
 		}
@@ -528,7 +528,7 @@ func scanConflictMarkers(root string, paths []string) (map[string]any, error) {
 		}
 	}
 	return map[string]any{
-		"scanner":          "a3-agent-conflict-marker-scan",
+		"scanner":          "a2o-agent-conflict-marker-scan",
 		"unresolved_files": unresolved,
 	}, nil
 }
@@ -668,7 +668,7 @@ func branchNameMust(ref string) string {
 }
 
 func failedMergeExecution(err error) ExecutionResult {
-	return ExecutionResult{Status: "failed", ExitCode: intPtr(1), CombinedLog: []byte("A3 agent merge failed: " + err.Error() + "\n")}
+	return ExecutionResult{Status: "failed", ExitCode: intPtr(1), CombinedLog: []byte("A2O agent merge failed: " + err.Error() + "\n")}
 }
 
 func intPtr(value int) *int {
@@ -863,7 +863,7 @@ func buildPublishPlans(prepared PreparedWorkspace, request WorkspaceRequest, cha
 
 func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commitMessage string) error {
 	if commitMessage == "" {
-		commitMessage = "A3 agent implementation update"
+		commitMessage = "A2O agent implementation update"
 	}
 	published := []publishPlan{}
 	beforeHeads := map[string]string{}
@@ -891,7 +891,7 @@ func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commit
 			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
 			return err
 		}
-		if err := runGit(plan.runtimePath, "-c", "user.name=A3 Agent", "-c", "user.email=a3-agent@example.invalid", "commit", "--no-gpg-sign", "--no-verify", "-m", commitMessage); err != nil {
+		if err := runGit(plan.runtimePath, "-c", "user.name=A3 Agent", "-c", "user.email=a2o-agent@example.invalid", "commit", "--no-gpg-sign", "--no-verify", "-m", commitMessage); err != nil {
 			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
 			return err
 		}

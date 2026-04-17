@@ -16,6 +16,10 @@ module A3
 
     def start(argv, out: $stdout, run_id_generator: -> { SecureRandom.uuid }, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::DisabledMergeRunner.new, worker_gateway: nil)
       command = argv.shift
+      if command.nil? || %w[help -h --help].include?(command)
+        print_public_usage(out)
+        return
+      end
       dispatched = CommandRouter.dispatch(
         self,
         command: command,
@@ -27,8 +31,17 @@ module A3
         worker_gateway: worker_gateway
       )
       unless dispatched
-        out.puts("A3 CLI placeholder: #{argv.join(' ')}")
+        out.puts("unknown command: #{command}")
+        print_public_usage(out)
       end
+    end
+
+    def print_public_usage(out)
+      out.puts("usage:")
+      out.puts("  a2o host install --output-dir DIR --share-dir DIR [--runtime-image IMAGE]")
+      out.puts("  a2o agent package list|verify|export")
+      out.puts("  a2o execute-until-idle [options] project.yaml")
+      out.puts("  a2o worker:stdin-bundle")
     end
 
     def handle_start_run(argv, out:, run_id_generator:, command_runner:, merge_runner:)
@@ -1805,7 +1818,7 @@ module A3
       return unless uri.scheme == "http"
       return if allow_insecure_remote || local_http_host?(uri.host)
 
-      raise ArgumentError, "--agent-control-plane-url uses remote HTTP; current A3 supports local topology only, use loopback/compose service URL or set --agent-allow-insecure-remote-http for an explicit diagnostic exception"
+      raise ArgumentError, "--agent-control-plane-url uses remote HTTP; current A2O supports local topology only, use loopback/compose service URL or set --agent-allow-insecure-remote-http for an explicit diagnostic exception"
     end
 
     def local_http_host?(host)

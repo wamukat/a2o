@@ -438,6 +438,8 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 		"ps -eo pid=,args=",
 		"bash -lc cat ",
 		"bash -lc echo '--- runtime log tail ---'; tail",
+		"a3-engine/bin/a3",
+		"a3-engine/lib",
 	} {
 		if strings.Contains(strings.Join(joined, "\n"), forbidden) {
 			t.Fatalf("run-once should use structured cleanup/read/log commands, found %q in:\n%s", forbidden, strings.Join(joined, "\n"))
@@ -458,6 +460,12 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	}
 	if !strings.Contains(joinedText, " -agent host-local -control-plane-url http://127.0.0.1:7394") {
 		t.Fatalf("host agent should use configured host agent port, calls:\n%s", joinedText)
+	}
+	if !strings.Contains(joinedText, "'--worker-command' '"+filepath.Join(tempDir, ".work", "a2o-agent", "bin", "a2o-agent")+"'") {
+		t.Fatalf("run-once should use packaged a2o-agent as worker command, calls:\n%s", joinedText)
+	}
+	if !strings.Contains(joinedText, "'--worker-command-arg' 'worker'") || !strings.Contains(joinedText, "'--worker-command-arg' 'stdin-bundle'") {
+		t.Fatalf("run-once should use built-in a2o-agent stdin-bundle worker, calls:\n%s", joinedText)
 	}
 	if strings.Contains(strings.Join(joined, "\n"), "portal") {
 		t.Fatalf("run-once should not use Portal defaults:\n%s", strings.Join(joined, "\n"))
@@ -487,7 +495,7 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	if runner.lastEnv["A3_BRANCH_NAMESPACE"] != "a3-test" {
 		t.Fatalf("branch namespace env=%q", runner.lastEnv["A3_BRANCH_NAMESPACE"])
 	}
-	if runner.lastEnv["A3_HOST_AGENT_BIN"] != filepath.Join(tempDir, ".work", "a3-agent", "bin", "a3-agent") {
+	if runner.lastEnv["A3_HOST_AGENT_BIN"] != filepath.Join(tempDir, ".work", "a2o-agent", "bin", "a2o-agent") {
 		t.Fatalf("agent bin env=%q", runner.lastEnv["A3_HOST_AGENT_BIN"])
 	}
 }

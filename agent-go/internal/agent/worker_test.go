@@ -279,7 +279,7 @@ func TestWorkerRunsNativeMergeJobs(t *testing.T) {
 		t.Fatalf("expected merge success, idle=%v result=%#v", idle, result)
 	}
 	slot := result.WorkspaceDescriptor.SlotDescriptors["repo_alpha"]
-	if slot["merge_status"] != "merged" || slot["project_repo_mutator"] != "a3-agent" {
+	if slot["merge_status"] != "merged" || slot["project_repo_mutator"] != "a2o-agent" {
 		t.Fatalf("missing merge evidence: %#v", slot)
 	}
 }

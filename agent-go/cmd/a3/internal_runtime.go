@@ -526,8 +526,8 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		}
 		target = detected
 	}
-	workerCommand := envDefault("A3_RUNTIME_RUN_ONCE_WORKER_COMMAND", envDefault("A3_RUNTIME_SCHEDULER_WORKER_COMMAND", "ruby"))
-	workerArgs := []string{"-I", filepath.Join(hostRootDir, "a3-engine", "lib"), filepath.Join(hostRootDir, "a3-engine", "bin", "a3"), "worker:stdin-bundle"}
+	workerCommand := envDefault("A3_RUNTIME_RUN_ONCE_WORKER_COMMAND", envDefault("A3_RUNTIME_SCHEDULER_WORKER_COMMAND", hostAgentBin))
+	workerArgs := []string{"worker", "stdin-bundle"}
 	if override := envDefault("A3_RUNTIME_RUN_ONCE_WORKER_ARGS", envDefault("A3_RUNTIME_SCHEDULER_WORKER_ARGS", "")); strings.TrimSpace(override) != "" {
 		workerArgs = strings.Fields(override)
 	}

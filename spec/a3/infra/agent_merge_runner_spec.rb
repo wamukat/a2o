@@ -64,7 +64,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
           "merge_after_head" => "def456",
           "resolved_head" => "def456",
           "merge_status" => "merged",
-          "project_repo_mutator" => "a3-agent"
+          "project_repo_mutator" => "a2o-agent"
         }
       )))
     end
@@ -501,7 +501,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
           "merge_after_head" => "def456",
           "resolved_head" => "def456",
           "merge_status" => "merged",
-          "project_repo_mutator" => "a3-agent"
+          "project_repo_mutator" => "a2o-agent"
         },
         "repo_beta" => {
           "merge_status" => "merged"
@@ -531,7 +531,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
           "merge_after_head" => "def456",
           "resolved_head" => "def456",
           "merge_status" => "merged",
-          "project_repo_mutator" => "a3-agent"
+          "project_repo_mutator" => "a2o-agent"
         }
       )))
     end

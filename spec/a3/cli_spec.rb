@@ -20,6 +20,16 @@ RSpec.describe A3::CLI do
     expect(described_class).to respond_to(:start)
   end
 
+  it "prints public A2O usage for --help" do
+    out = StringIO.new
+
+    described_class.start(["--help"], out: out)
+
+    expect(out.string).to include("usage:")
+    expect(out.string).to include("a2o host install")
+    expect(out.string).not_to include("A3 CLI placeholder")
+  end
+
   it "routes known commands through the command dispatcher" do
     out = StringIO.new
     allow(described_class).to receive(:handle_show_task)

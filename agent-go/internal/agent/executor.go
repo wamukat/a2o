@@ -31,7 +31,7 @@ func (Executor) Execute(request JobRequest) ExecutionResult {
 
 	err := cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
-		combined.WriteString("A3 agent command timed out\n")
+		combined.WriteString("A2O agent command timed out\n")
 		return ExecutionResult{Status: "timed_out", ExitCode: nil, CombinedLog: combined.Bytes()}
 	}
 	if err == nil {

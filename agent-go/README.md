@@ -126,19 +126,19 @@ Supported shapes:
 - Dev-env container agent
   - Copy or install the release archive into the project dev-env image.
   - Point `workspace_root` and `source_aliases` at paths inside that container.
-  - Use the compose service name for the internal A3 control plane, for example `http://a3-runtime:7393`.
+  - Use the compose service name for the internal A2O control plane, for example `http://a3-runtime:7393`.
 - CI runner agent
   - Install from release archive during the job setup step.
   - Use a job-local `workspace_root` and token files mounted from CI secrets.
 
-In all shapes, Engine-managed job payloads and doctor inputs are the standard contract. Agent-local runtime profile files remain as fallback compatibility for diagnostics and older validation fixtures. Logs and artifacts are uploaded to the internal A3-managed artifact store and must not be returned as host-local paths in `JobResult`.
+In all shapes, Engine-managed job payloads and doctor inputs are the standard contract. Agent-local runtime profile files remain as fallback compatibility for diagnostics and older validation fixtures. Logs and artifacts are uploaded to the internal A2O-managed artifact store and must not be returned as host-local paths in `JobResult`.
 
 Out of scope for the current runtime:
 
 - central A2O server operation
 - remote worker pools across multiple machines
 - multi-tenant agent registry / capability scheduling
-- remote artifact routing outside the local internal A3-managed artifact store
+- remote artifact routing outside the local internal A2O-managed artifact store
 
 ## Compatibility Single Poll
 
@@ -194,7 +194,7 @@ The current command runs a single poll cycle:
 
 The runtime profile file is a compatibility fallback for the host/dev-env side `alias -> local path` contract. The standard path should use Engine-managed agent environment config rendered into doctor flags and job payloads.
 
-`agent_token` is optional for local-only development. When the internal A3 control plane is started with `--agent-token` / `--agent-token-file` or `A3_AGENT_TOKEN` / `A3_AGENT_TOKEN_FILE`, the Go agent must provide the same agent token through `A3_AGENT_TOKEN`, `-agent-token`, `agent_token_file`, `A3_AGENT_TOKEN_FILE`, `-agent-token-file`, or the inline profile `agent_token`. A3-side enqueue/fetch clients may use a separate control token (`--agent-control-token-file` or `A3_AGENT_CONTROL_TOKEN_FILE`) while the Go agent continues to use only the agent token. Prefer token files for service manager / container operation so tokens are not exposed through process arguments.
+`agent_token` is optional for local-only development. When the internal A2O control plane is started with `--agent-token` / `--agent-token-file` or `A3_AGENT_TOKEN` / `A3_AGENT_TOKEN_FILE`, the Go agent must provide the same agent token through `A3_AGENT_TOKEN`, `-agent-token`, `agent_token_file`, `A3_AGENT_TOKEN_FILE`, `-agent-token-file`, or the inline profile `agent_token`. Engine-side enqueue/fetch clients may use a separate control token (`--agent-control-token-file` or `A3_AGENT_CONTROL_TOKEN_FILE`) while the Go agent continues to use only the agent token. Prefer token files for service manager / container operation so tokens are not exposed through process arguments.
 
 The runtime profile rejects remote `http://` control-plane URLs by default. Loopback URLs (`127.0.0.1` / `localhost`) and single-label Docker service names such as `http://a3-runtime:7393` are treated as local topology. Remote deployment is out of scope for the current runtime; `allow_insecure_remote` is only a diagnostic escape hatch and should not appear in the standard runbook.
 

@@ -439,7 +439,9 @@ module A3
           errors << "#{slot_name}.merge_before_head must be present" unless present_string?(descriptor["merge_before_head"])
           errors << "#{slot_name}.merge_after_head must be present" unless present_string?(descriptor["merge_after_head"])
           errors << "#{slot_name}.resolved_head must match merge_after_head" unless descriptor["resolved_head"] == descriptor["merge_after_head"]
-          errors << "#{slot_name}.project_repo_mutator must be a3-agent" unless descriptor["project_repo_mutator"] == "a3-agent"
+          unless %w[a2o-agent a3-agent].include?(descriptor["project_repo_mutator"])
+            errors << "#{slot_name}.project_repo_mutator must be a2o-agent"
+          end
           merged_slots << {
             "slot" => slot_name.to_s,
             "target_ref" => descriptor["merge_target_ref"],

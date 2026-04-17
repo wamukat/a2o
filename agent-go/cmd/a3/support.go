@@ -57,7 +57,7 @@ func resolveDefaultHostAgentBin(config runtimeInstanceConfig, hostRootDir string
 			return publicWorkspaceAgentPath
 		}
 	}
-	return filepath.Join(hostRootDir, ".work", "a3-agent", "bin", "a3-agent")
+	return publicAgentPath
 }
 
 func shellQuote(value string) string {

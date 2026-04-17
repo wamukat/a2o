@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -134,6 +136,87 @@ func TestResolveAgentTokenPrefersDirectToken(t *testing.T) {
 	}
 	if token != "direct-token" {
 		t.Fatalf("token = %q", token)
+	}
+}
+
+func TestRunWorkerStdinBundleExecutesConfiguredCommand(t *testing.T) {
+	tmp := t.TempDir()
+	requestPath := filepath.Join(tmp, "request.json")
+	resultPath := filepath.Join(tmp, "result.json")
+	promptPath := filepath.Join(tmp, "prompt.json")
+	launcherPath := filepath.Join(tmp, "launcher.json")
+	scriptPath := filepath.Join(tmp, "executor.sh")
+
+	if err := os.WriteFile(requestPath, []byte(`{
+  "task_ref": "A2O#2",
+  "run_ref": "run-1",
+  "phase": "review",
+  "phase_runtime": {},
+  "task_packet": {"title": "review me"}
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(scriptPath, []byte(`#!/bin/sh
+set -eu
+cat > "$1"
+cat > "$2" <<'JSON'
+{
+  "task_ref": "A2O#2",
+  "run_ref": "run-1",
+  "phase": "review",
+  "success": true,
+  "summary": "review clean",
+  "failing_command": null,
+  "observed_state": null,
+  "rework_required": false
+}
+JSON
+`), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	launcher := `{
+  "executor": {
+    "kind": "command",
+    "prompt_transport": "stdin-bundle",
+    "result": {"mode": "file"},
+    "schema": {"mode": "file"},
+    "default_profile": {
+      "command": ["` + scriptPath + `", "` + promptPath + `", "{{result_path}}"],
+      "env": {}
+    },
+    "phase_profiles": {}
+  }
+}`
+	if err := os.WriteFile(launcherPath, []byte(launcher), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("A3_WORKER_REQUEST_PATH", requestPath)
+	t.Setenv("A3_WORKER_RESULT_PATH", resultPath)
+	t.Setenv("A3_WORKER_LAUNCHER_CONFIG_PATH", launcherPath)
+	t.Setenv("A3_WORKSPACE_ROOT", tmp)
+
+	if code := run([]string{"worker", "stdin-bundle"}); code != 0 {
+		t.Fatalf("worker exit code = %d", code)
+	}
+
+	resultBody, err := os.ReadFile(resultPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(resultBody, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result["success"] != true || result["summary"] != "review clean" {
+		t.Fatalf("unexpected result: %s", resultBody)
+	}
+	promptBody, err := os.ReadFile(promptPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(promptBody), "You are the A2O worker") || !strings.Contains(string(promptBody), "A2O#2") {
+		t.Fatalf("prompt should contain A2O worker bundle, got %s", promptBody)
 	}
 }
 

@@ -649,7 +649,7 @@ func TestWorkspaceMaterializerMergesBranchRefs(t *testing.T) {
 	if slot["merge_before_head"] != trimTrailingNewline(before) || slot["merge_after_head"] != trimTrailingNewline(source) {
 		t.Fatalf("unexpected merge descriptor: %#v", slot)
 	}
-	if slot["merge_status"] != "merged" || slot["project_repo_mutator"] != "a3-agent" {
+	if slot["merge_status"] != "merged" || slot["project_repo_mutator"] != "a2o-agent" {
 		t.Fatalf("missing agent merge evidence: %#v", slot)
 	}
 	if out := git(t, sourceRoot, "worktree", "list", "--porcelain"); strings.Contains(out, "merge-Sample-42") {

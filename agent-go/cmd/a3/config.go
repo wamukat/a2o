@@ -219,7 +219,7 @@ func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttem
 		if _, err := os.Stat(publicAgentPath); err == nil {
 			overrides["A3_HOST_AGENT_BIN"] = publicAgentPath
 		} else {
-			overrides["A3_HOST_AGENT_BIN"] = filepath.Join(config.WorkspaceRoot, ".work", "a3-agent", "bin", "a3-agent")
+			overrides["A3_HOST_AGENT_BIN"] = publicAgentPath
 		}
 	}
 	if strings.TrimSpace(config.ComposeProject) != "" {

@@ -73,7 +73,7 @@ func validateControlPlaneURL(rawURL string, allowInsecureRemote bool) error {
 	if allowInsecureRemote || isLocalHTTPHost(parsed.Hostname()) {
 		return nil
 	}
-	return fmt.Errorf("control_plane_url uses remote HTTP; current A3 supports local topology only, use loopback/compose service URL or set allow_insecure_remote for an explicit diagnostic exception")
+	return fmt.Errorf("control_plane_url uses remote HTTP; current A2O supports local topology only, use loopback/compose service URL or set allow_insecure_remote for an explicit diagnostic exception")
 }
 
 func isLocalHTTPHost(host string) bool {
