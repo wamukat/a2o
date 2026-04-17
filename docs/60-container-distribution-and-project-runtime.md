@@ -8,7 +8,7 @@
 
 ## Runtime Naming Boundary
 
-Current public surface では `scheduler` ではなく `runtime run-once` / `runtime run loop` を使う。`scheduler` は internal cycle/state/store 互換名、maintenance-only command、または historical evidence の文脈に限定する。詳細な分類は [66-runtime-naming-boundary.md](66-runtime-naming-boundary.md) を正本とする。
+Current public surface は `a2o project bootstrap` / `a2o kanban ...` / `a2o agent ...` / `a2o-agent ...` と project package を正規入口にする。`runtime run-once` / `runtime run loop` は Engine 内部 flow または maintenance-only command の文脈で扱い、通常利用者向け入口としては露出しない。`scheduler` は internal cycle/state/store 互換名、maintenance-only command、または historical evidence の文脈に限定する。詳細な分類は [66-runtime-naming-boundary.md](66-runtime-naming-boundary.md) を正本とする。
 
 ## Reference Product Validation Boundary
 

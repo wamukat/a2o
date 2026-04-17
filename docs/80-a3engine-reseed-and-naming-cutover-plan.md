@@ -86,7 +86,7 @@ Cutover target:
 - `a3-v2/` source tree と `.agents/skills/a3-v2-checkpoint-review` は削除済み
 - `scripts/automation/*` と legacy automation skills/runbook は削除済み
 - root `task automation*` は legacy disabled sentinel としてだけ残す
-- current runtime / operator surface は `task a3:*`, `scripts/a3/*.rb`, `a3-engine` を正規とする
+- 当時の runtime / operator surface は `task a3:*`, `scripts/a3/*.rb`, `a3-engine` を正規としていたが、これは cutover 当時の historical provenance として扱う。現行の通常利用者向け surface は `a2o` / `a2o-agent` / project package であり、root Taskfile 系は current public run path ではない
 - 旧 backend compatibility path は削除し、current generic backend は SoloBoard のみとする
 
 ## Rename Inventory

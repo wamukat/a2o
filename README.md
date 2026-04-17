@@ -28,7 +28,7 @@
 
 ## 配布 / runtime
 
-current packaging は `docker:a3 + bundled kanban service + Go a3-agent` の compose 形状を標準にする。kanban service は A3 image に内包せず、compose 上の service として扱う。現行 default provider は SoloBoard である。A3 Engine は Docker runtime command として提供し、host へ Ruby interpreter を要求しない。project command は host または dev-env container に install した Go release binary の `a3-agent` が pull 実行する。
+current packaging は `docker:a3 + bundled kanban service + Go a2o-agent` の compose 形状を標準にする。kanban service は A3 image に内包せず、compose 上の service として扱う。現行 default provider は SoloBoard である。A3 Engine は Docker runtime command として提供し、host へ Ruby interpreter を要求しない。project command は host または dev-env container に install した Go release binary の `a2o-agent` が pull 実行する。内部実装名としての `a3-agent` は互換名であり、通常利用者向け surface では `a2o-agent` を使う。
 
 Core validation は Portal ではなく、A2O 専用 reference product suite を正本にする。Portal は実プロダクト integration validation として扱う。詳細は [docs/68-reference-product-suite.md](docs/68-reference-product-suite.md) を参照する。
 

@@ -12,7 +12,7 @@
 - `ai-cli` のような vendor-neutral な executor naming に寄せる
 - 特定 OS やローカル実行環境への依存を減らす
 
-これは設計メモであり、現行の運用契約そのものではありません。current runtime / operator surface の正本は `docs/60-container-distribution-and-project-runtime.md`、root `Taskfile.yml`、`scripts/a3/*.rb` を参照します。legacy automation docs は historical reference としてだけ扱います。
+これは設計メモであり、現行の運用契約そのものではありません。current runtime / operator surface の正本は `docs/60-container-distribution-and-project-runtime.md`、`docs/90-user-quickstart.md`、Go host launcher `a2o`、`a2o-agent`、project package を参照します。root `Taskfile.yml` や `scripts/a3/*.rb` に関する記述は historical / maintenance-only reference としてだけ扱います。
 
 ## 現状の痛み
 
