@@ -230,4 +230,4 @@ task は repo label を使って対象 slot を指定する。parent-child flow 
 - project package の公開 config は `project.yaml` に一本化されている。`manifest.yml` はサポート対象外である。
 - published image での release smoke は、公開前の独立した gate として digest 固定で実行する。
 
-残る user-facing diagnostics の整理は `A2O#270` で追跡する。`A2O#269` は single-file schema proposal を扱う。
+User-facing diagnostics は A2O/project.yaml の語彙に寄せる。内部互換名が必要な場合も、通常の導入手順では編集対象として扱わない。

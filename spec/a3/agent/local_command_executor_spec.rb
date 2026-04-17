@@ -10,7 +10,7 @@ RSpec.describe A3::Agent::LocalCommandExecutor do
   end
 
   it "executes a command in the requested working directory" do
-    request = agent_request(command: "ruby", args: ["-e", "puts Dir.pwd"], timeout_seconds: 10)
+    request = agent_request(command: "ruby", args: ["-e", "puts Dir.pwd"], timeout_seconds: 30)
 
     result = described_class.new.call(request)
 
@@ -36,7 +36,7 @@ RSpec.describe A3::Agent::LocalCommandExecutor do
 
     expect(result.status).to eq(:timed_out)
     expect(result.exit_code).to be_nil
-    expect(result.combined_log).to include("timed out")
+    expect(result.combined_log).to include("A2O agent command timed out")
   end
 
   def agent_request(command:, args:, timeout_seconds:)

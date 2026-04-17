@@ -31,17 +31,17 @@ func runProject(args []string, stdout io.Writer, stderr io.Writer) int {
 }
 
 func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) error {
-	flags := flag.NewFlagSet("a3 project bootstrap", flag.ContinueOnError)
+	flags := flag.NewFlagSet("a2o project bootstrap", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 
 	packagePath := flags.String("package", "", "project package directory")
 	workspaceRoot := flags.String("workspace", ".", "workspace root where .a3/runtime-instance.json is written")
 	composeProject := flags.String("compose-project", "", "docker compose project name for this runtime instance")
-	composeFile := flags.String("compose-file", "", "A3 distribution compose file")
+	composeFile := flags.String("compose-file", "", "A2O distribution compose file")
 	runtimeService := flags.String("runtime-service", "a3-runtime", "docker compose runtime service name")
 	soloBoardPort := flags.String("soloboard-port", "3470", "host kanban service port")
-	agentPort := flags.String("agent-port", "7393", "host A3 agent control-plane port")
-	storageDir := flags.String("storage-dir", "/var/lib/a3/a2o-runtime", "runtime storage dir inside the A3 runtime container")
+	agentPort := flags.String("agent-port", "7393", "host A2O agent control-plane port")
+	storageDir := flags.String("storage-dir", "/var/lib/a3/a2o-runtime", "runtime storage dir inside the A2O runtime container")
 
 	if err := flags.Parse(args); err != nil {
 		return err

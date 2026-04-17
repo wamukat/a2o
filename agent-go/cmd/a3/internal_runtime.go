@@ -289,7 +289,7 @@ func readSchedulerPID(path string) (int, error) {
 }
 
 func runRuntimeUp(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
-	flags := flag.NewFlagSet("a3 runtime up", flag.ContinueOnError)
+	flags := flag.NewFlagSet("a2o runtime up", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	build := flags.Bool("build", false, "build the runtime image before starting services")
 	if err := flags.Parse(args); err != nil {
@@ -319,7 +319,7 @@ func runRuntimeUp(args []string, runner commandRunner, stdout io.Writer, stderr 
 }
 
 func runRuntimeDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
-	flags := flag.NewFlagSet("a3 runtime doctor", flag.ContinueOnError)
+	flags := flag.NewFlagSet("a2o runtime doctor", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -344,7 +344,7 @@ func runRuntimeDoctor(args []string, runner commandRunner, stdout io.Writer, std
 }
 
 func runRuntimeDown(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
-	flags := flag.NewFlagSet("a3 runtime down", flag.ContinueOnError)
+	flags := flag.NewFlagSet("a2o runtime down", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -365,7 +365,7 @@ func runRuntimeDown(args []string, runner commandRunner, stdout io.Writer, stder
 }
 
 func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) error {
-	flags := flag.NewFlagSet("a3 runtime command-plan", flag.ContinueOnError)
+	flags := flag.NewFlagSet("a2o runtime command-plan", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -388,7 +388,7 @@ func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) er
 }
 
 func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
-	flags := flag.NewFlagSet("a3 runtime run-once", flag.ContinueOnError)
+	flags := flag.NewFlagSet("a2o runtime run-once", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	maxSteps := flags.String("max-steps", "", "maximum runtime steps for this cycle")
 	agentAttempts := flags.String("agent-attempts", "", "maximum host agent attempts for this cycle")
@@ -976,7 +976,7 @@ func printRuntimeSuccessTail(config runtimeInstanceConfig, plan runtimeRunOncePl
 }
 
 func runRuntimeLoop(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
-	flags := flag.NewFlagSet("a3 runtime loop", flag.ContinueOnError)
+	flags := flag.NewFlagSet("a2o runtime loop", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	interval := flags.String("interval", "60s", "duration between run-once cycles")
 	maxCycles := flags.Int("max-cycles", 0, "maximum cycles to run; 0 means forever")

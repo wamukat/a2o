@@ -44,7 +44,7 @@ func runKanban(args []string, runner commandRunner, stdout io.Writer, stderr io.
 }
 
 func runKanbanUp(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
-	flags := flag.NewFlagSet("a3 kanban up", flag.ContinueOnError)
+	flags := flag.NewFlagSet("a2o kanban up", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	build := flags.Bool("build", false, "build the runtime image before starting services")
 	if err := flags.Parse(args); err != nil {
@@ -119,7 +119,7 @@ func runKanbanBootstrapWithRetry(runner commandRunner, args []string) error {
 }
 
 func runKanbanDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
-	flags := flag.NewFlagSet("a3 kanban doctor", flag.ContinueOnError)
+	flags := flag.NewFlagSet("a2o kanban doctor", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -144,7 +144,7 @@ func runKanbanDoctor(args []string, runner commandRunner, stdout io.Writer, stde
 }
 
 func runKanbanURL(args []string, stdout io.Writer, stderr io.Writer) error {
-	flags := flag.NewFlagSet("a3 kanban url", flag.ContinueOnError)
+	flags := flag.NewFlagSet("a2o kanban url", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	if err := flags.Parse(args); err != nil {
 		return err

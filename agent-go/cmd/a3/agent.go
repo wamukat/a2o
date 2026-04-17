@@ -41,7 +41,7 @@ func runAgent(args []string, runner commandRunner, stdout io.Writer, stderr io.W
 }
 
 func runAgentInstall(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
-	flags := flag.NewFlagSet("a3 agent install", flag.ContinueOnError)
+	flags := flag.NewFlagSet("a2o agent install", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 
 	target := flags.String("target", "auto", "agent package target, or auto")

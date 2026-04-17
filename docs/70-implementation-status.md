@@ -28,6 +28,4 @@ Date: 2026-04-17
 
 ## Productization Gaps
 
-- `A2O#270` User-facing diagnostics: internal A3 names can remain, but normal manuals should avoid requiring users to author them.
-
-Each gap should be tracked as a kanban ticket before implementation. External behavior changes require owner discussion before coding.
+Productization gaps are tracked on the A2O kanban before implementation. External behavior changes require owner discussion before coding.

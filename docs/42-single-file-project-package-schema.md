@@ -272,7 +272,7 @@ runtime:
 4. The four reference packages use single-file `project.yaml`.
 5. User docs and reference package docs no longer ask authors to create `manifest.yml`.
 6. Package loading rejects old split files.
-7. Package schema and docs use A2O-facing names; broader diagnostics wording remains tracked by `A2O#270`.
+7. Package schema, docs, and normal diagnostics use A2O-facing names.
 
 ## Implementation Notes
 

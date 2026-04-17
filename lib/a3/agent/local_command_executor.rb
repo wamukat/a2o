@@ -34,7 +34,7 @@ module A3
             remaining = deadline - Time.now
             if remaining <= 0
               terminate(wait_thread.pid)
-              return [stdout, stderr + "A3 agent command timed out after #{request.timeout_seconds}s\n", :timed_out, nil]
+              return [stdout, stderr + "A2O agent command timed out after #{request.timeout_seconds}s\n", :timed_out, nil]
             end
 
             ready = IO.select(readers.keys, nil, nil, [remaining, 0.1].min)

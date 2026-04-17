@@ -176,6 +176,42 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 	}
 }
 
+func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "project bootstrap", args: []string{"project", "bootstrap", "-bad"}, want: "Usage of a2o project bootstrap:"},
+		{name: "kanban up", args: []string{"kanban", "up", "-bad"}, want: "Usage of a2o kanban up:"},
+		{name: "kanban doctor", args: []string{"kanban", "doctor", "-bad"}, want: "Usage of a2o kanban doctor:"},
+		{name: "kanban url", args: []string{"kanban", "url", "-bad"}, want: "Usage of a2o kanban url:"},
+		{name: "runtime start", args: []string{"runtime", "start", "-bad"}, want: "Usage of a2o runtime start:"},
+		{name: "runtime stop", args: []string{"runtime", "stop", "-bad"}, want: "Usage of a2o runtime stop:"},
+		{name: "runtime status", args: []string{"runtime", "status", "-bad"}, want: "Usage of a2o runtime status:"},
+		{name: "runtime doctor", args: []string{"runtime", "doctor", "-bad"}, want: "Usage of a2o runtime doctor:"},
+		{name: "runtime run-once", args: []string{"runtime", "run-once", "-bad"}, want: "Usage of a2o runtime run-once:"},
+		{name: "runtime loop", args: []string{"runtime", "loop", "-bad"}, want: "Usage of a2o runtime loop:"},
+		{name: "agent install", args: []string{"agent", "install", "-bad"}, want: "Usage of a2o agent install:"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+
+			code := run(tc.args, &fakeRunner{}, &stdout, &stderr)
+			if code == 0 {
+				t.Fatalf("run unexpectedly succeeded")
+			}
+			if !strings.Contains(stderr.String(), tc.want) {
+				t.Fatalf("stderr should contain %q, got %q", tc.want, stderr.String())
+			}
+			if strings.Contains(stderr.String(), "Usage of a3 ") {
+				t.Fatalf("stderr should not expose internal usage name, got %q", stderr.String())
+			}
+		})
+	}
+}
+
 func TestKanbanUpUsesBootstrappedInstanceConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
