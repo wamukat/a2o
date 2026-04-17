@@ -657,6 +657,8 @@ runtime:
     schema:
       mode: file
     default_profile:
+      command:
+        - 123
       env: {}
     phase_profiles: {}
 `

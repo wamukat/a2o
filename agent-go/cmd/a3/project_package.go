@@ -153,18 +153,18 @@ func normalizeYAMLValue[T any](value T) T {
 }
 
 func validateProjectExecutorConfig(executor map[string]any) error {
-	if scalarString(executor["kind"]) != "command" {
+	if projectConfigString(executor["kind"]) != "command" {
 		return fmt.Errorf("kind must be command")
 	}
-	if scalarString(executor["prompt_transport"]) != "stdin-bundle" {
+	if projectConfigString(executor["prompt_transport"]) != "stdin-bundle" {
 		return fmt.Errorf("prompt_transport must be stdin-bundle")
 	}
 	result, ok := executor["result"].(map[string]any)
-	if !ok || scalarString(result["mode"]) != "file" {
+	if !ok || projectConfigString(result["mode"]) != "file" {
 		return fmt.Errorf("result.mode must be file")
 	}
 	schema, ok := executor["schema"].(map[string]any)
-	if !ok || !containsString([]string{"file", "none"}, scalarString(schema["mode"])) {
+	if !ok || !containsString([]string{"file", "none"}, projectConfigString(schema["mode"])) {
 		return fmt.Errorf("schema.mode must be file or none")
 	}
 	if err := validateProjectExecutorProfile(executor["default_profile"], "default_profile"); err != nil {
@@ -197,7 +197,7 @@ func validateProjectExecutorProfile(raw any, label string) error {
 		return fmt.Errorf("%s.command must be a non-empty array of non-empty strings", label)
 	}
 	for _, entry := range command {
-		if scalarString(entry) == "" {
+		if projectConfigString(entry) == "" {
 			return fmt.Errorf("%s.command must be a non-empty array of non-empty strings", label)
 		}
 	}
@@ -205,6 +205,11 @@ func validateProjectExecutorProfile(raw any, label string) error {
 		return err
 	}
 	return nil
+}
+
+func projectConfigString(value any) string {
+	text, _ := value.(string)
+	return text
 }
 
 func validateProjectStringMap(raw any, label string) error {
