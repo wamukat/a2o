@@ -78,7 +78,7 @@ func run(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer
 
 	switch args[0] {
 	case "version":
-		fmt.Fprintf(stdout, "a3 version=%s\n", version)
+		fmt.Fprintf(stdout, "a2o version=%s\n", version)
 		return 0
 	case "project":
 		return runProject(args[1:], stdout, stderr)

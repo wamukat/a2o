@@ -1333,7 +1333,7 @@ func TestAgentInstallRequiresInstanceConfigOrExplicitCompose(t *testing.T) {
 			t.Fatalf("run should fail without an instance config")
 		}
 	})
-	if !strings.Contains(stderr.String(), "A3 runtime instance config not found") {
+	if !strings.Contains(stderr.String(), "A2O runtime instance config not found") {
 		t.Fatalf("stderr should mention missing instance config, got %q", stderr.String())
 	}
 }

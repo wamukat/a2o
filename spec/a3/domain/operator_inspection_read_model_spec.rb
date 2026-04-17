@@ -12,7 +12,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
         rerun_hint: "diagnose blocked state and choose a fresh rerun source",
         package_expectation: :inspect_runtime_package,
         runtime_package_guidance: "run doctor-runtime and inspect repo sources, secret delivery, and scheduler store migration before rerun",
-        runtime_package_contract_health: "manifest_schema=ok preset_schema=ok repo_sources=missing secret_delivery=missing scheduler_store_migration=ok",
+        runtime_package_contract_health: "project_config_schema=ok preset_schema=ok repo_sources=missing secret_delivery=missing scheduler_store_migration=ok",
         runtime_package_execution_modes: nil,
         runtime_package_execution_mode_contract: nil,
         runtime_package_schema_action: "no schema action required",
@@ -38,7 +38,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
         runtime_package_persistent_state_model: "scheduler_state_root=/tmp/runtime/state/scheduler",
         runtime_package_retention_policy: "terminal_workspace_cleanup=retention_policy_controlled",
         runtime_package_materialization_model: "repo_slot_namespace=task_workspace_fixed",
-        runtime_package_runtime_configuration_model: "manifest_path=required",
+        runtime_package_runtime_configuration_model: "project_config_path=required",
         runtime_package_repository_metadata_model: "repository_metadata=runtime_package_scoped",
         runtime_package_branch_resolution_model: "authoritative_branch_resolution=runtime_package_scoped",
         runtime_package_credential_boundary_model: "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
@@ -46,7 +46,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
         runtime_package_deployment_shape: "runtime_package=single_project",
         runtime_package_networking_boundary: "outbound=git",
         runtime_package_upgrade_contract: "state_migration=explicit",
-        runtime_package_fail_fast_policy: "manifest_schema_mismatch=fail_fast"
+        runtime_package_fail_fast_policy: "project_config_schema_mismatch=fail_fast"
       )
     when :requires_new_implementation
       A3::Domain::OperatorInspectionReadModel::RunView::RecoveryView.new(
@@ -57,7 +57,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
         rerun_hint: "start a new implementation run and regenerate review evidence",
         package_expectation: :refresh_runtime_package,
         runtime_package_guidance: "refresh runtime package inputs before the next implementation run and rerun doctor-runtime",
-        runtime_package_contract_health: "manifest_schema=ok preset_schema=ok repo_sources=missing secret_delivery=missing scheduler_store_migration=ok",
+        runtime_package_contract_health: "project_config_schema=ok preset_schema=ok repo_sources=missing secret_delivery=missing scheduler_store_migration=ok",
         runtime_package_execution_modes: nil,
         runtime_package_execution_mode_contract: nil,
         runtime_package_schema_action: "no schema action required",
@@ -83,7 +83,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
         runtime_package_persistent_state_model: "scheduler_state_root=/tmp/runtime/state/scheduler",
         runtime_package_retention_policy: "terminal_workspace_cleanup=retention_policy_controlled",
         runtime_package_materialization_model: "repo_slot_namespace=task_workspace_fixed",
-        runtime_package_runtime_configuration_model: "manifest_path=required",
+        runtime_package_runtime_configuration_model: "project_config_path=required",
         runtime_package_repository_metadata_model: "repository_metadata=runtime_package_scoped",
         runtime_package_branch_resolution_model: "authoritative_branch_resolution=runtime_package_scoped",
         runtime_package_credential_boundary_model: "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
@@ -91,7 +91,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
         runtime_package_deployment_shape: "runtime_package=single_project",
         runtime_package_networking_boundary: "outbound=git",
         runtime_package_upgrade_contract: "state_migration=explicit",
-        runtime_package_fail_fast_policy: "manifest_schema_mismatch=fail_fast"
+        runtime_package_fail_fast_policy: "project_config_schema_mismatch=fail_fast"
       )
     else
       raise ArgumentError, "unsupported recovery decision: #{decision}"

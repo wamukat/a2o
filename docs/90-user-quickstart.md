@@ -226,7 +226,7 @@ task は repo label を使って対象 slot を指定する。parent-child flow 
 ## 現在の注意点
 
 - Full runtime execution は `a2o runtime start` / `stop` / `status` または focused validation 用の `a2o runtime run-once` / `loop` で開始できる。
-- runtime state には `.a3` や `refs/heads/a3/...` など内部互換名が残る。通常の manual では編集対象にしない。
+- runtime state には内部互換名が残る場合がある。通常の manual では編集対象にしない。
 - project package の公開 config は `project.yaml` に一本化されている。`manifest.yml` はサポート対象外である。
 - published image での release smoke は、公開前の独立した gate として digest 固定で実行する。
 

@@ -14,8 +14,8 @@ module A3
       def call
         descriptor = @runtime_package
         checks = [
-          file_check(:manifest_path, descriptor.manifest_path),
-          manifest_schema_check(descriptor),
+          file_check(:project_config_path, descriptor.manifest_path),
+          project_config_schema_check(descriptor),
           preset_schema_check(descriptor),
           directory_check(:preset_dir, descriptor.preset_dir),
           mounted_directory_check(:project_runtime_root, descriptor.project_runtime_root),
@@ -177,11 +177,11 @@ module A3
         end
       end
 
-      def manifest_schema_check(descriptor)
+      def project_config_schema_check(descriptor)
         if descriptor.manifest_schema_version == descriptor.required_manifest_schema_version
-          PathCheck.new(name: :manifest_schema, path: descriptor.manifest_path, status: :ok, detail: "manifest schema #{descriptor.manifest_schema_version} matches runtime requirement")
+          PathCheck.new(name: :project_config_schema, path: descriptor.manifest_path, status: :ok, detail: "project.yaml schema #{descriptor.manifest_schema_version} matches runtime requirement")
         else
-          PathCheck.new(name: :manifest_schema, path: descriptor.manifest_path, status: :invalid, detail: "manifest schema #{descriptor.manifest_schema_version} does not match required #{descriptor.required_manifest_schema_version}")
+          PathCheck.new(name: :project_config_schema, path: descriptor.manifest_path, status: :invalid, detail: "project.yaml schema #{descriptor.manifest_schema_version} does not match required #{descriptor.required_manifest_schema_version}")
         end
       end
 
@@ -193,17 +193,17 @@ module A3
       end
 
       def contract_health_summary(checks)
-        schema_status = checks.find { |check| check.name == :manifest_schema }&.status || :unknown
+        schema_status = checks.find { |check| check.name == :project_config_schema }&.status || :unknown
         preset_schema_status = checks.find { |check| check.name == :preset_schema }&.status || :unknown
         repo_source_status = repo_source_health(checks)
         secret_status = checks.find { |check| check.name == :secret_delivery }&.status || :unknown
         migration_status = checks.find { |check| check.name == :scheduler_store_migration }&.status || :unknown
-        "manifest_schema=#{schema_status} preset_schema=#{preset_schema_status} repo_sources=#{repo_source_status} secret_delivery=#{secret_status} scheduler_store_migration=#{migration_status}"
+        "project_config_schema=#{schema_status} preset_schema=#{preset_schema_status} repo_sources=#{repo_source_status} secret_delivery=#{secret_status} scheduler_store_migration=#{migration_status}"
       end
 
       def operator_guidance(descriptor, checks)
         actions = []
-        schema_check = checks.find { |check| check.name == :manifest_schema }
+        schema_check = checks.find { |check| check.name == :project_config_schema }
         preset_schema_check = checks.find { |check| check.name == :preset_schema }
         repo_source_status = repo_source_health(checks)
         agent_runtime_status = agent_runtime_health(checks)
@@ -287,7 +287,7 @@ module A3
 
       def startup_blockers_summary(checks)
         blockers = []
-        blockers << :manifest_schema if checks.any? { |check| check.name == :manifest_schema && check.status != :ok }
+        blockers << :project_config_schema if checks.any? { |check| check.name == :project_config_schema && check.status != :ok }
         blockers << :preset_schema if checks.any? { |check| check.name == :preset_schema && check.status != :ok }
         blockers << :runtime_paths if checks.any? { |check| runtime_path_check?(check) && check.status != :ok }
         blockers << :repo_sources unless repo_source_health(checks) == :ok
@@ -320,7 +320,7 @@ module A3
       end
 
       def runtime_path_check?(check)
-        check.name == :manifest_path ||
+        check.name == :project_config_path ||
           check.name == :preset_dir ||
           check.name == :project_runtime_root ||
           check.name == :state_root ||

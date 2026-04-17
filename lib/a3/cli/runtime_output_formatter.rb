@@ -44,7 +44,7 @@ module A3
       def package_lines(descriptor:)
         lines = []
         lines << "image_version=#{descriptor.image_version}"
-        lines << "manifest_path=#{descriptor.manifest_path}"
+        lines << "project_config_path=#{descriptor.manifest_path}"
         lines << "project_runtime_root=#{descriptor.project_runtime_root}"
         lines.concat(descriptor_runtime_summary_lines(descriptor))
         lines.concat(distribution_lines(descriptor.distribution_summary))
@@ -213,8 +213,8 @@ module A3
           "distribution_summary.runtime_entrypoint=#{distribution_summary.fetch('runtime_entrypoint')}",
           "distribution_summary.doctor_entrypoint=#{distribution_summary.fetch('doctor_entrypoint')}",
           "distribution_summary.migration_entrypoint=#{distribution_summary.fetch('migration_entrypoint')}",
-          "distribution_summary.manifest_schema_version=#{distribution_summary.fetch('manifest_schema_version')}",
-          "distribution_summary.required_manifest_schema_version=#{distribution_summary.fetch('required_manifest_schema_version')}",
+          "distribution_summary.project_config_schema_version=#{distribution_summary.fetch('project_config_schema_version')}",
+          "distribution_summary.required_project_config_schema_version=#{distribution_summary.fetch('required_project_config_schema_version')}",
           "distribution_summary.schema_contract=#{distribution_summary.fetch('schema_contract')}",
           "distribution_summary.preset_chain=#{distribution_summary.fetch('preset_chain').join(',')}",
           "distribution_summary.preset_schema_versions=#{distribution_summary.fetch('preset_schema_versions').map { |preset, version| "#{preset}=#{version}" }.join(',')}",

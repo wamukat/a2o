@@ -18,7 +18,7 @@ RSpec.describe A3::Application::ResolveRunRecovery do
       A3::Application::DoctorRuntimeEnvironment::Result,
       execution_modes_summary: "one_shot_cli=bin/a3 doctor-runtime /tmp/project.yaml ; scheduler_loop=bin/a3 execute-until-idle /tmp/project.yaml ; doctor_inspect=bin/a3 doctor-runtime /tmp/project.yaml",
       execution_mode_contract_summary: "one_shot_cli=operator_driven_doctor_migration_runtime ; scheduler_loop=continuous_runnable_processing_after_runtime_ready ; doctor_inspect=configuration_and_mount_validation_only",
-      contract_health: "manifest_schema=ok preset_schema=ok repo_sources=ok secret_delivery=ok scheduler_store_migration=ok",
+      contract_health: "project_config_schema=ok preset_schema=ok repo_sources=ok secret_delivery=ok scheduler_store_migration=ok",
       schema_action_summary: "no schema action required",
       preset_schema_action_summary: "no preset schema action required",
       repo_source_action_summary: "no repo source action required",
@@ -39,15 +39,15 @@ RSpec.describe A3::Application::ResolveRunRecovery do
         "persistent_state_model" => "scheduler_state_root=/tmp/runtime/state/scheduler task_repository_root=/tmp/runtime/state/tasks run_repository_root=/tmp/runtime/state/runs evidence_root=/tmp/runtime/state/evidence blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses artifact_owner_cache_root=/tmp/runtime/state/artifact_owner_cache logs_root=/tmp/runtime/state/logs workspace_root=/tmp/runtime/state/workspaces artifact_root=/tmp/runtime/state/artifacts",
         "retention_policy" => "terminal_workspace_cleanup=retention_policy_controlled blocked_evidence_retention=independent_from_scheduler_cleanup image_upgrade_cleanup_trigger=none",
         "materialization_model" => "repo_slot_namespace=task_workspace_fixed implementation_workspace=ticket_workspace review_workspace=runtime_workspace verification_workspace=runtime_workspace merge_workspace=runtime_workspace missing_repo_rescue=forbidden source_descriptor_alignment=required_before_phase_start",
-        "runtime_configuration_model" => "manifest_path=required preset_dir=required storage_backend=required state_root=required workspace_root=required artifact_root=required repo_source_strategy=required repository_metadata=required authoritative_branch_resolution=required integration_target_resolution=required secret_reference=required",
+        "runtime_configuration_model" => "project_config_path=required preset_dir=required storage_backend=required state_root=required workspace_root=required artifact_root=required repo_source_strategy=required repository_metadata=required authoritative_branch_resolution=required integration_target_resolution=required secret_reference=required",
         "repository_metadata_model" => "repository_metadata=runtime_package_scoped source_descriptor_ref_resolution=required review_target_resolution=evidence_driven",
         "branch_resolution_model" => "authoritative_branch_resolution=runtime_package_scoped integration_target_resolution=runtime_package_scoped branch_integration_inputs=required",
         "credential_boundary_model" => "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
         "observability_boundary_model" => "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence validation_output=stdout_only workspace_debug_reference=path_only",
         "deployment_shape" => "runtime_package=single_project writable_state=isolated scheduler_instance=single_project state_boundary=project secret_boundary=project",
         "networking_boundary" => "outbound=git,issue_api,package_registry,llm_gateway,verification_service secret_source=secret_store token_scope=project",
-        "upgrade_contract" => "image_upgrade=independent manifest_schema_version=1 preset_schema_version=1 state_migration=explicit",
-        "fail_fast_policy" => "manifest_schema_mismatch=fail_fast preset_schema_conflict=fail_fast writable_mount_missing=fail_fast secret_missing=fail_fast scheduler_store_migration_pending=fail_fast"
+        "upgrade_contract" => "image_upgrade=independent project_config_schema_version=1 preset_schema_version=1 state_migration=explicit",
+        "fail_fast_policy" => "project_config_schema_mismatch=fail_fast preset_schema_conflict=fail_fast writable_mount_missing=fail_fast secret_missing=fail_fast scheduler_store_migration_pending=fail_fast"
       }
     )
   end
@@ -143,7 +143,7 @@ RSpec.describe A3::Application::ResolveRunRecovery do
       A3::Application::DoctorRuntimeEnvironment::Result,
       execution_modes_summary: "one_shot_cli=bin/a3 doctor-runtime /tmp/project.yaml | bin/a3 migrate-scheduler-store /tmp/project.yaml | bin/a3 execute-until-idle /tmp/project.yaml ; scheduler_loop=bin/a3 execute-until-idle /tmp/project.yaml ; doctor_inspect=bin/a3 doctor-runtime /tmp/project.yaml",
       execution_mode_contract_summary: "one_shot_cli=operator_driven_doctor_migration_runtime ; scheduler_loop=continuous_runnable_processing_after_runtime_ready ; doctor_inspect=configuration_and_mount_validation_only",
-      contract_health: "manifest_schema=ok preset_schema=ok repo_sources=ok secret_delivery=ok scheduler_store_migration=pending",
+      contract_health: "project_config_schema=ok preset_schema=ok repo_sources=ok secret_delivery=ok scheduler_store_migration=pending",
       schema_action_summary: "no schema action required",
       preset_schema_action_summary: "no preset schema action required",
       repo_source_action_summary: "no repo source action required",
@@ -164,15 +164,15 @@ RSpec.describe A3::Application::ResolveRunRecovery do
         "persistent_state_model" => "scheduler_state_root=/tmp/runtime/state/scheduler task_repository_root=/tmp/runtime/state/tasks run_repository_root=/tmp/runtime/state/runs evidence_root=/tmp/runtime/state/evidence blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses artifact_owner_cache_root=/tmp/runtime/state/artifact_owner_cache logs_root=/tmp/runtime/state/logs workspace_root=/tmp/runtime/state/workspaces artifact_root=/tmp/runtime/state/artifacts",
         "retention_policy" => "terminal_workspace_cleanup=retention_policy_controlled blocked_evidence_retention=independent_from_scheduler_cleanup image_upgrade_cleanup_trigger=none",
         "materialization_model" => "repo_slot_namespace=task_workspace_fixed implementation_workspace=ticket_workspace review_workspace=runtime_workspace verification_workspace=runtime_workspace merge_workspace=runtime_workspace missing_repo_rescue=forbidden source_descriptor_alignment=required_before_phase_start",
-        "runtime_configuration_model" => "manifest_path=required preset_dir=required storage_backend=required state_root=required workspace_root=required artifact_root=required repo_source_strategy=required repository_metadata=required authoritative_branch_resolution=required integration_target_resolution=required secret_reference=required",
+        "runtime_configuration_model" => "project_config_path=required preset_dir=required storage_backend=required state_root=required workspace_root=required artifact_root=required repo_source_strategy=required repository_metadata=required authoritative_branch_resolution=required integration_target_resolution=required secret_reference=required",
         "repository_metadata_model" => "repository_metadata=runtime_package_scoped source_descriptor_ref_resolution=required review_target_resolution=evidence_driven",
         "branch_resolution_model" => "authoritative_branch_resolution=runtime_package_scoped integration_target_resolution=runtime_package_scoped branch_integration_inputs=required",
         "credential_boundary_model" => "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
         "observability_boundary_model" => "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence validation_output=stdout_only workspace_debug_reference=path_only",
         "deployment_shape" => "runtime_package=single_project writable_state=isolated scheduler_instance=single_project state_boundary=project secret_boundary=project",
         "networking_boundary" => "outbound=git,issue_api,package_registry,llm_gateway,verification_service secret_source=secret_store token_scope=project",
-        "upgrade_contract" => "image_upgrade=independent manifest_schema_version=1 preset_schema_version=1 state_migration=explicit",
-        "fail_fast_policy" => "manifest_schema_mismatch=fail_fast preset_schema_conflict=fail_fast writable_mount_missing=fail_fast secret_missing=fail_fast scheduler_store_migration_pending=fail_fast"
+        "upgrade_contract" => "image_upgrade=independent project_config_schema_version=1 preset_schema_version=1 state_migration=explicit",
+        "fail_fast_policy" => "project_config_schema_mismatch=fail_fast preset_schema_conflict=fail_fast writable_mount_missing=fail_fast secret_missing=fail_fast scheduler_store_migration_pending=fail_fast"
       }
     )
     allow(A3::Application::DoctorRuntimeEnvironment).to receive(:new).with(runtime_package: runtime_package).and_return(
@@ -183,7 +183,7 @@ RSpec.describe A3::Application::ResolveRunRecovery do
 
     expect(result.recovery).to have_attributes(
       runtime_package_guidance: "startup blocked by scheduler_store_migration; apply scheduler store migration before startup; run bin/a3 doctor-runtime /tmp/project.yaml",
-      runtime_package_contract_health: "manifest_schema=ok preset_schema=ok repo_sources=ok secret_delivery=ok scheduler_store_migration=pending",
+      runtime_package_contract_health: "project_config_schema=ok preset_schema=ok repo_sources=ok secret_delivery=ok scheduler_store_migration=pending",
       runtime_package_execution_modes: "one_shot_cli=bin/a3 doctor-runtime /tmp/project.yaml | bin/a3 migrate-scheduler-store /tmp/project.yaml | bin/a3 execute-until-idle /tmp/project.yaml ; scheduler_loop=bin/a3 execute-until-idle /tmp/project.yaml ; doctor_inspect=bin/a3 doctor-runtime /tmp/project.yaml",
       runtime_package_execution_mode_contract: "one_shot_cli=operator_driven_doctor_migration_runtime ; scheduler_loop=continuous_runnable_processing_after_runtime_ready ; doctor_inspect=configuration_and_mount_validation_only",
       runtime_package_schema_action: "no schema action required",
@@ -205,7 +205,7 @@ RSpec.describe A3::Application::ResolveRunRecovery do
       runtime_package_startup_blockers: "scheduler_store_migration",
       runtime_package_retention_policy: "terminal_workspace_cleanup=retention_policy_controlled blocked_evidence_retention=independent_from_scheduler_cleanup image_upgrade_cleanup_trigger=none",
       runtime_package_materialization_model: "repo_slot_namespace=task_workspace_fixed implementation_workspace=ticket_workspace review_workspace=runtime_workspace verification_workspace=runtime_workspace merge_workspace=runtime_workspace missing_repo_rescue=forbidden source_descriptor_alignment=required_before_phase_start",
-      runtime_package_runtime_configuration_model: "manifest_path=required preset_dir=required storage_backend=required state_root=required workspace_root=required artifact_root=required repo_source_strategy=required repository_metadata=required authoritative_branch_resolution=required integration_target_resolution=required secret_reference=required",
+      runtime_package_runtime_configuration_model: "project_config_path=required preset_dir=required storage_backend=required state_root=required workspace_root=required artifact_root=required repo_source_strategy=required repository_metadata=required authoritative_branch_resolution=required integration_target_resolution=required secret_reference=required",
       runtime_package_credential_boundary_model: "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
       runtime_package_observability_boundary_model: "operator_logs_root=/tmp/runtime/state/logs blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses evidence_root=/tmp/runtime/state/evidence validation_output=stdout_only workspace_debug_reference=path_only"
     )

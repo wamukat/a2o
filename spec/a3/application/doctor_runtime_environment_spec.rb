@@ -57,12 +57,12 @@ runtime:
         "runtime_entrypoint" => "bin/a3",
         "doctor_entrypoint" => "bin/a3 doctor-runtime",
         "migration_entrypoint" => "bin/a3 migrate-scheduler-store",
-        "manifest_schema_version" => "1",
-        "required_manifest_schema_version" => "1",
+        "project_config_schema_version" => "1",
+        "required_project_config_schema_version" => "1",
         "preset_chain" => [],
         "preset_schema_versions" => {},
         "required_preset_schema_version" => "1",
-        "schema_contract" => "manifest_schema_version=1 required_manifest_schema_version=1",
+        "schema_contract" => "project_config_schema_version=1 required_project_config_schema_version=1",
         "preset_schema_contract" => "required_preset_schema_version=1 preset_schema_versions=",
         "secret_delivery_mode" => :environment_variable,
         "secret_reference" => "A3_SECRET",
@@ -73,21 +73,21 @@ runtime:
         "persistent_state_model" => "scheduler_state_root=#{Pathname(dir).join('scheduler')} task_repository_root=#{Pathname(dir).join('tasks')} run_repository_root=#{Pathname(dir).join('runs')} evidence_root=#{Pathname(dir).join('evidence')} blocked_diagnosis_root=#{Pathname(dir).join('blocked_diagnoses')} artifact_owner_cache_root=#{Pathname(dir).join('artifact_owner_cache')} logs_root=#{Pathname(dir).join('logs')} workspace_root=#{Pathname(dir).join('workspaces')} artifact_root=#{Pathname(dir).join('artifacts')}",
         "retention_policy" => "terminal_workspace_cleanup=retention_policy_controlled blocked_evidence_retention=independent_from_scheduler_cleanup image_upgrade_cleanup_trigger=none",
         "materialization_model" => "repo_slot_namespace=task_workspace_fixed implementation_workspace=ticket_workspace review_workspace=runtime_workspace verification_workspace=runtime_workspace merge_workspace=runtime_workspace missing_repo_rescue=forbidden source_descriptor_alignment=required_before_phase_start",
-        "runtime_configuration_model" => "manifest_path=required preset_dir=required storage_backend=required state_root=required workspace_root=required artifact_root=required repo_source_strategy=required repository_metadata=required authoritative_branch_resolution=required integration_target_resolution=required secret_reference=required",
+        "runtime_configuration_model" => "project_config_path=required preset_dir=required storage_backend=required state_root=required workspace_root=required artifact_root=required repo_source_strategy=required repository_metadata=required authoritative_branch_resolution=required integration_target_resolution=required secret_reference=required",
         "repository_metadata_model" => "repository_metadata=runtime_package_scoped source_descriptor_ref_resolution=required review_target_resolution=evidence_driven",
         "branch_resolution_model" => "authoritative_branch_resolution=runtime_package_scoped integration_target_resolution=runtime_package_scoped branch_integration_inputs=required",
         "credential_boundary_model" => "secret_reference=runtime_package_scoped token_reference=runtime_package_scoped credential_persistence=forbidden_in_workspace secret_injection=external_only",
         "observability_boundary_model" => "operator_logs_root=#{Pathname(dir).join('logs')} blocked_diagnosis_root=#{Pathname(dir).join('blocked_diagnoses')} evidence_root=#{Pathname(dir).join('evidence')} validation_output=stdout_only workspace_debug_reference=path_only",
         "deployment_shape" => "runtime_package=single_project writable_state=isolated scheduler_instance=single_project state_boundary=project secret_boundary=project",
         "networking_boundary" => "outbound=git,issue_api,package_registry,llm_gateway,verification_service secret_source=secret_store token_scope=project",
-        "upgrade_contract" => "image_upgrade=independent manifest_schema_version=1 preset_schema_version=1 state_migration=explicit",
-        "fail_fast_policy" => "manifest_schema_mismatch=fail_fast preset_schema_conflict=fail_fast writable_mount_missing=fail_fast secret_missing=fail_fast scheduler_store_migration_pending=fail_fast"
+        "upgrade_contract" => "image_upgrade=independent project_config_schema_version=1 preset_schema_version=1 state_migration=explicit",
+        "fail_fast_policy" => "project_config_schema_mismatch=fail_fast preset_schema_conflict=fail_fast writable_mount_missing=fail_fast secret_missing=fail_fast scheduler_store_migration_pending=fail_fast"
       )
-      expect(result.schema_contract_summary).to eq("manifest_schema_version=1 required_manifest_schema_version=1")
+      expect(result.schema_contract_summary).to eq("project_config_schema_version=1 required_project_config_schema_version=1")
       expect(result.preset_schema_contract_summary).to eq("required_preset_schema_version=1 preset_schema_versions=")
       expect(result.secret_contract_summary).to eq("secret_delivery_mode=environment_variable secret_reference=A3_SECRET")
       expect(result.migration_contract_summary).to eq("scheduler_store_migration_state=not_required")
-      expect(result.contract_health).to eq("manifest_schema=ok preset_schema=ok repo_sources=ok secret_delivery=ok scheduler_store_migration=ok")
+      expect(result.contract_health).to eq("project_config_schema=ok preset_schema=ok repo_sources=ok secret_delivery=ok scheduler_store_migration=ok")
       expect(result.startup_readiness).to eq(:ready)
       expect(result.startup_blockers).to eq("none")
       expect(result.execution_modes_summary).to eq("one_shot_cli=bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} | bin/a3 migrate-scheduler-store #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} | bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} ; scheduler_loop=bin/a3 execute-until-idle #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir} ; doctor_inspect=bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
@@ -132,9 +132,9 @@ runtime:
     expect(result.mount_summary.fetch("state_root").to_s).to eq("/tmp/a3-v2-missing/state")
     expect(result.repo_source_summary.fetch("strategy")).to eq(:none)
     expect(result.distribution_summary.fetch("image_ref")).to eq("a3-engine:a3:v2.1.0")
-    manifest_schema_check = result.checks.find { |check| check.name == :manifest_schema }
+    manifest_schema_check = result.checks.find { |check| check.name == :project_config_schema }
     expect(manifest_schema_check).to have_attributes(status: :invalid)
-    expect(result.checks.reject { |check| %i[manifest_schema preset_schema].include?(check.name) }.map(&:status)).to all(eq(:missing).or(eq(:ok)))
+    expect(result.checks.reject { |check| %i[project_config_schema preset_schema].include?(check.name) }.map(&:status)).to all(eq(:missing).or(eq(:ok)))
   end
 
   it "reports ok when state root does not exist yet but can be created" do
@@ -293,7 +293,7 @@ runtime:
       expect(result.repo_source_contract_summary).to eq("repo_source_strategy=explicit_map repo_source_slots=repo_alpha")
       repo_check = result.checks.find { |check| check.name == :"repo_source.repo_alpha" }
       expect(repo_check).to have_attributes(status: :missing)
-      expect(result.contract_health).to eq("manifest_schema=ok preset_schema=ok repo_sources=missing secret_delivery=missing scheduler_store_migration=ok")
+      expect(result.contract_health).to eq("project_config_schema=ok preset_schema=ok repo_sources=missing secret_delivery=missing scheduler_store_migration=ok")
       expect(result.startup_blockers).to eq("repo_sources,secret_delivery")
       expect(result.next_command).to eq("bin/a3 doctor-runtime #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}")
       expect(result.recommended_execution_mode).to eq(:doctor_inspect)
@@ -333,7 +333,7 @@ runtime:
       expect(result.status).to eq(:invalid_runtime)
       repo_check = result.checks.find { |check| check.name == :"repo_source.repo_alpha" }
       expect(repo_check).to have_attributes(status: :not_writable)
-      expect(result.contract_health).to eq("manifest_schema=ok preset_schema=ok repo_sources=not_writable secret_delivery=missing scheduler_store_migration=ok")
+      expect(result.contract_health).to eq("project_config_schema=ok preset_schema=ok repo_sources=not_writable secret_delivery=missing scheduler_store_migration=ok")
     ensure
       FileUtils.chmod(0o755, repo_source_dir) if File.exist?(repo_source_dir)
     end
@@ -400,7 +400,7 @@ runtime:
       migration_check = result.checks.find { |check| check.name == :scheduler_store_migration }
       expect(migration_check).to have_attributes(status: :pending)
       expect(result.distribution_summary.fetch("scheduler_store_migration_state")).to eq(:pending)
-      expect(result.contract_health).to eq("manifest_schema=ok preset_schema=ok repo_sources=ok secret_delivery=ok scheduler_store_migration=pending")
+      expect(result.contract_health).to eq("project_config_schema=ok preset_schema=ok repo_sources=ok secret_delivery=ok scheduler_store_migration=pending")
       expect(result.startup_readiness).to eq(:blocked)
       expect(result.startup_blockers).to eq("scheduler_store_migration")
       expect(result.recommended_execution_mode).to eq(:one_shot_cli)
@@ -481,7 +481,7 @@ runtime:
         expect(result.status).to eq(:invalid_runtime)
         secret_check = result.checks.find { |check| check.name == :secret_delivery }
         expect(secret_check).to have_attributes(status: :missing)
-        expect(result.contract_health).to eq("manifest_schema=ok preset_schema=ok repo_sources=ok secret_delivery=missing scheduler_store_migration=ok")
+        expect(result.contract_health).to eq("project_config_schema=ok preset_schema=ok repo_sources=ok secret_delivery=missing scheduler_store_migration=ok")
         expect(result.startup_readiness).to eq(:invalid)
         expect(result.startup_blockers).to eq("secret_delivery")
         expect(result.recommended_execution_mode).to eq(:doctor_inspect)

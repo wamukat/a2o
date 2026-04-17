@@ -140,8 +140,8 @@ module A3
           "runtime_entrypoint" => runtime_entrypoint,
           "doctor_entrypoint" => doctor_entrypoint,
           "migration_entrypoint" => migration_entrypoint,
-          "manifest_schema_version" => manifest_schema_version,
-          "required_manifest_schema_version" => required_manifest_schema_version,
+          "project_config_schema_version" => manifest_schema_version,
+          "required_project_config_schema_version" => required_manifest_schema_version,
           "preset_chain" => preset_chain,
           "preset_schema_versions" => preset_schema_versions,
           "required_preset_schema_version" => required_preset_schema_version,
@@ -259,11 +259,11 @@ module A3
       end
 
       def schema_contract_summary
-        "manifest_schema_version=#{manifest_schema_version} required_manifest_schema_version=#{required_manifest_schema_version}"
+        "project_config_schema_version=#{manifest_schema_version} required_project_config_schema_version=#{required_manifest_schema_version}"
       end
 
       def schema_action_summary
-        "update runtime package manifest schema to #{required_manifest_schema_version}"
+        "update project.yaml schema to #{required_manifest_schema_version}"
       end
 
       def preset_schema_contract_summary
@@ -347,7 +347,7 @@ module A3
 
       def runtime_configuration_model_summary
         [
-          "manifest_path=required",
+          "project_config_path=required",
           "preset_dir=required",
           "storage_backend=required",
           "state_root=required",
@@ -407,7 +407,7 @@ module A3
       def upgrade_contract_summary
         [
           "image_upgrade=independent",
-          "manifest_schema_version=#{required_manifest_schema_version}",
+          "project_config_schema_version=#{required_manifest_schema_version}",
           "preset_schema_version=#{required_preset_schema_version}",
           "state_migration=explicit"
         ].join(" ")
@@ -415,7 +415,7 @@ module A3
 
       def fail_fast_policy_summary
         [
-          "manifest_schema_mismatch=fail_fast",
+          "project_config_schema_mismatch=fail_fast",
           "preset_schema_conflict=fail_fast",
           "writable_mount_missing=fail_fast",
           "secret_missing=fail_fast",
