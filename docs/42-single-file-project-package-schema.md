@@ -3,7 +3,7 @@
 対象読者: A2O 設計者 / project package author / reviewer
 文書種別: schema proposal
 
-Status: proposal for owner review. Implementation is tracked by `A2O#272`.
+Status: owner-approved direction for `A2O#272` implementation.
 
 ## Decision
 
@@ -11,7 +11,12 @@ The canonical project package config file should be `project.yaml`.
 
 `manifest.yml` should be deprecated as a separate author-facing file. Its current responsibilities should move into `project.yaml` under explicit runtime sections. This keeps the existing public package command shape, avoids introducing a second new name such as `a2o.yaml`, and removes the confusing split between "project config" and "manifest" for package authors.
 
-Implementation must not start until the owner accepts this schema direction.
+The owner decisions for implementation are:
+
+- `project.yaml` is the canonical file name.
+- `manifest.yml` compatibility is not required for the new schema.
+- User-facing schema and diagnostics should use A2O names. A3 names may remain only as internal compatibility details.
+- Internal follow-up labels such as `a3:follow-up-child` should not be exposed in normal user-authored schema.
 
 ## Current Split
 
@@ -39,7 +44,6 @@ kanban:
     trigger_labels:
       - trigger:auto-implement
       - trigger:auto-parent
-    follow_up_label: a3:follow-up-child
 
 repos:
   app:
@@ -84,7 +88,7 @@ scenarios:
 
 `package` identifies the package, not the product repository. `package.name` replaces the current top-level scalar `project`.
 
-`kanban` owns provider selection, board name, bootstrap config, task selection, and labels used by the runtime bridge. The default provider remains `soloboard`.
+`kanban` owns provider selection, board name, bootstrap config, task selection, and user-authored trigger labels used by the runtime bridge. The default provider remains `soloboard`. Internal coordination labels are runtime implementation details and should not be required in normal package schema.
 
 `repos` defines stable repo slots. Slot keys are runtime identities. `path` is relative to the package directory unless absolute. `label` maps kanban labels to repo slots. If omitted, the implementation may derive `repo:<slot>`.
 
@@ -240,9 +244,9 @@ runtime:
                 phase:
                   review: skills/review/parent.md
     verification_commands:
-      - "$A3_ROOT_DIR/reference-products/multi-repo-fixture/project-package/commands/verify-all.sh"
+      - "$A2O_ROOT_DIR/reference-products/multi-repo-fixture/project-package/commands/verify-all.sh"
     remediation_commands:
-      - "$A3_ROOT_DIR/reference-products/multi-repo-fixture/project-package/commands/format.sh"
+      - "$A2O_ROOT_DIR/reference-products/multi-repo-fixture/project-package/commands/format.sh"
     workspace_hook: reference-products/multi-repo-fixture
   merge:
     target:
@@ -261,18 +265,17 @@ runtime:
 ## Migration Plan
 
 1. Add a single loader that reads `project.yaml` schema version `1`.
-2. Teach the runtime bridge to derive the old manifest payload from `runtime.presets`, `runtime.surface`, and `runtime.merge`.
-3. Keep temporary read compatibility for existing two-file packages only during migration.
+2. Teach the runtime bridge to derive the internal runtime package payload from `runtime.presets`, `runtime.surface`, and `runtime.merge`.
+3. Remove `manifest.yml` from the reference product packages.
 4. Convert the four reference packages to single-file `project.yaml`.
-5. Update user docs and reference package docs to remove `manifest.yml`.
-6. Add validation errors for packages that provide both single-file fields and legacy `manifest.yml` after the compatibility window.
-7. Remove legacy `manifest.yml` support in a later cleanup ticket if compatibility is no longer needed.
+5. Update user docs and reference package docs to remove author-facing `manifest.yml`.
+6. Add validation errors when package authors provide old split files or misplaced fields.
+7. Map any remaining internal A3 names, environment variables, or labels behind A2O-facing schema and diagnostics.
 
-`A2O#272` should implement steps 1 through 5. Steps 6 and 7 can be part of `A2O#272` only if the owner accepts a breaking change immediately; otherwise create a follow-up compatibility-removal ticket.
+`A2O#272` should implement these steps. If step 7 uncovers broader diagnostics wording outside package loading, keep the package schema A2O-facing and track remaining diagnostic cleanup under `A2O#270`.
 
-## Owner Discussion Points
+## Implementation Notes
 
-- Confirm `project.yaml` as the canonical file name instead of `a2o.yaml`.
-- Confirm whether `manifest.yml` compatibility should be temporary or removed in the first implementation.
-- Confirm whether `runtime.surface` should expose current internal names such as `implementation_skill` and `review_skill`, or whether `A2O#270` should rename them in the same user-facing schema before implementation.
-- Confirm whether `a3:follow-up-child` remains acceptable as a default internal label or should move behind an A2O-facing alias as part of diagnostics cleanup.
+- The new loader should reject packages that still require `manifest.yml`.
+- The schema may translate A2O-facing fields into current internal Ruby runtime structures, but errors and docs should not ask users to author A3 names.
+- Internal follow-up labels should have runtime defaults. Add advanced overrides only if a real product needs them later.
