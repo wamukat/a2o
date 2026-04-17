@@ -206,6 +206,57 @@ func TestKanbanUpUsesBootstrappedInstanceConfig(t *testing.T) {
 	}
 }
 
+func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "reference", "project-package")
+	if err := os.MkdirAll(filepath.Join(packageDir, "kanban"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectYaml := strings.Join([]string{
+		"project: reference",
+		"kanban:",
+		"  provider: soloboard",
+		"  project: A2OReference",
+		"  bootstrap: kanban/bootstrap.json",
+		"repos:",
+		"  app:",
+		"    path: ..",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "kanban", "bootstrap.json"), []byte(`{"boards":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+		SoloBoardPort:  "3480",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"kanban", "up"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := runner.joinedCalls()
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a3-runtime soloboard")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime python3 /opt/a3/share/tools/kanban/bootstrap_soloboard.py --config /workspace/reference/project-package/kanban/bootstrap.json --base-url http://soloboard:3000 --board A2OReference")
+	if !strings.Contains(stdout.String(), "kanban_bootstrapped project=A2OReference") {
+		t.Fatalf("stdout should describe kanban bootstrap, got %q", stdout.String())
+	}
+}
+
 func TestKanbanURLUsesBootstrappedInstanceConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
@@ -377,6 +428,7 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 		"'--kanban-repo-label' 'repo:catalog=repo_alpha'",
 		"'--repo-source' 'repo_alpha=/workspace/repos/catalog-service'",
 		"'--preset-dir' '/tmp/a3-engine/config/presets'",
+		"'--kanban-command-arg' '/opt/a3/share/tools/kanban/cli.py'",
 	} {
 		if !strings.Contains(joinedText, want) {
 			t.Fatalf("run-once missing %q in:\n%s", want, joinedText)

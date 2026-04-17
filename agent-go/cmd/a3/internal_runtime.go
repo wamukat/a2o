@@ -13,6 +13,9 @@ import (
 	"time"
 )
 
+const packagedKanbanCLIPath = "/opt/a3/share/tools/kanban/cli.py"
+const packagedKanbanBootstrapPath = "/opt/a3/share/tools/kanban/bootstrap_soloboard.py"
+
 func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "missing runtime subcommand")
@@ -891,7 +894,7 @@ func executeUntilIdleArgs(plan runtimeRunOncePlan) []string {
 	}
 	args = append(args,
 		"--kanban-command", "python3",
-		"--kanban-command-arg", "a3-engine/tools/kanban/cli.py",
+		"--kanban-command-arg", packagedKanbanCLIPath,
 		"--kanban-command-arg", "--backend",
 		"--kanban-command-arg", "soloboard",
 		"--kanban-command-arg", "--base-url",

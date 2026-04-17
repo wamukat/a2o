@@ -12,6 +12,7 @@ import (
 type projectPackageConfig struct {
 	Project            string
 	KanbanProject      string
+	KanbanBootstrap    string
 	KanbanStatus       string
 	LiveRef            string
 	MaxSteps           string
@@ -68,6 +69,8 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 				key, value, hasValue := splitProjectConfigKey(line)
 				if hasValue && key == "project" {
 					config.KanbanProject = value
+				} else if hasValue && key == "bootstrap" {
+					config.KanbanBootstrap = value
 				}
 			}
 		case "runtime":

@@ -4,7 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 func runKanban(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) int {
@@ -65,9 +68,54 @@ func runKanbanUp(args []string, runner commandRunner, stdout io.Writer, stderr i
 		if _, err := runExternal(runner, "docker", append(composePrefix, "up", "-d", config.RuntimeService, "soloboard")...); err != nil {
 			return err
 		}
+		if err := runKanbanBootstrap(*config, runner, stdout); err != nil {
+			return err
+		}
 		fmt.Fprintf(stdout, "kanban_up compose_project=%s url=%s\n", config.ComposeProject, kanbanPublicURL(*config))
 		return nil
 	})
+}
+
+func runKanbanBootstrap(config runtimeInstanceConfig, runner commandRunner, stdout io.Writer) error {
+	projectFile := filepath.Join(config.PackagePath, "project.yaml")
+	if _, err := os.Stat(projectFile); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("inspect project package config: %w", err)
+	}
+	packageConfig, err := loadProjectPackageConfig(config.PackagePath)
+	if err != nil {
+		return err
+	}
+	bootstrapPath := strings.TrimSpace(packageConfig.KanbanBootstrap)
+	if bootstrapPath == "" {
+		return nil
+	}
+	hostConfigPath := resolvePackagePath(config.PackagePath, bootstrapPath)
+	containerConfigPath := workspaceContainerPath(config.WorkspaceRoot, hostConfigPath)
+	args := append(composeArgs(config), "exec", "-T", config.RuntimeService, "python3", packagedKanbanBootstrapPath, "--config", containerConfigPath, "--base-url", "http://soloboard:3000")
+	if strings.TrimSpace(packageConfig.KanbanProject) != "" {
+		args = append(args, "--board", packageConfig.KanbanProject)
+	}
+	if err := runKanbanBootstrapWithRetry(runner, args); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "kanban_bootstrapped project=%s config=%s\n", packageConfig.KanbanProject, hostConfigPath)
+	return nil
+}
+
+func runKanbanBootstrapWithRetry(runner commandRunner, args []string) error {
+	var lastErr error
+	for attempt := 0; attempt < 40; attempt++ {
+		if _, err := runExternal(runner, "docker", args...); err == nil {
+			return nil
+		} else {
+			lastErr = err
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return fmt.Errorf("bootstrap kanban project: %w", lastErr)
 }
 
 func runKanbanDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
