@@ -23,7 +23,7 @@ Date: 2026-04-17
 
 ## Productization Gaps
 
-- `A2O#267` Public runtime execution command: the baseline still exposes the internal Engine CLI for the full execution loop.
+- `A2O#267` Public runtime execution command: the baseline still exposes the internal Engine CLI for the full execution loop. The intended user-facing shape is `a2o runtime run --until-idle` or an equivalent A2O-owned command that reads runtime instance config.
 - `A2O#268` Published image smoke: release candidate validation should be repeated against the published GHCR image, not only a local equivalent.
 - `A2O#269` Package schema consolidation: `manifest.yml` and `project.yaml` responsibilities should be documented and validated consistently.
 - `A2O#270` User-facing diagnostics: internal A3 names can remain, but normal manuals should avoid requiring users to author them.
