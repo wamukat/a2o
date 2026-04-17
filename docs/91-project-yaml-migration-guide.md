@@ -61,6 +61,9 @@ core:
   merge_target: merge_to_live
   merge_policy: ff_only
   merge_target_ref: refs/heads/main
+project:
+  review_skill:
+    default: skills/review/default.md
 ```
 
 ## 移行後
@@ -119,11 +122,11 @@ runtime:
 | `manifest.yml.core.merge_target` | `runtime.merge.target` |
 | `manifest.yml.core.merge_policy` | `runtime.merge.policy` |
 | `manifest.yml.core.merge_target_ref` | `runtime.merge.target_ref` |
-| `manifest.yml` top-level `implementation_skill`, if present | `runtime.surface.implementation_skill` |
-| `manifest.yml` top-level `review_skill`, if present | `runtime.surface.review_skill` |
-| `manifest.yml` top-level `verification_commands`, if present | `runtime.surface.verification_commands` |
-| `manifest.yml` top-level `remediation_commands`, if present | `runtime.surface.remediation_commands` |
-| `manifest.yml` top-level `workspace_hook`, if present | `runtime.surface.workspace_hook` |
+| `manifest.yml.project.implementation_skill`, if present | `runtime.surface.implementation_skill` |
+| `manifest.yml.project.review_skill`, if present | `runtime.surface.review_skill` |
+| `manifest.yml.project.verification_commands`, if present | `runtime.surface.verification_commands` |
+| `manifest.yml.project.remediation_commands`, if present | `runtime.surface.remediation_commands` |
+| `manifest.yml.project.workspace_hook`, if present | `runtime.surface.workspace_hook` |
 
 旧 `presets/*.yml` にある `implementation_skill`、`review_skill`、`verification_commands`、`remediation_commands`、`workspace_hook` は preset 定義であり、`runtime.presets` から参照される。移行時に必ず `runtime.surface` へ移す必要はない。
 
@@ -136,7 +139,7 @@ runtime:
 3. `runtime.kanban_status` を `kanban.selection.status` に移す。
 4. `manifest.yml` の `presets` を `runtime.presets` に移す。
 5. `manifest.yml` の `core.merge_*` を `runtime.merge.*` に移す。
-6. `manifest.yml` top-level に project-specific な skill、verification、remediation、workspace hook override がある場合は `runtime.surface` に移す。`presets/*.yml` にある共通定義はそのまま残せる。
+6. `manifest.yml.project` に project-specific な skill、verification、remediation、workspace hook override がある場合は `runtime.surface` に移す。`presets/*.yml` にある共通定義はそのまま残せる。
 7. `schema_version: 1` を top-level に追加する。
 8. `manifest.yml` を削除する。
 9. reference product と同じ path 形式で command / skill / hook の参照先を確認する。
