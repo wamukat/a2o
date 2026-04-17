@@ -105,10 +105,15 @@ scenarios:
 ### TypeScript API/Web
 
 ```yaml
+schema_version: 1
 package:
   name: a2o-reference-typescript-api-web
 kanban:
+  provider: soloboard
   project: A2OReferenceTypeScript
+  bootstrap: kanban/bootstrap.json
+  selection:
+    status: To do
 repos:
   app:
     path: ..
@@ -135,10 +140,15 @@ runtime:
 ### Go API/CLI
 
 ```yaml
+schema_version: 1
 package:
   name: a2o-reference-go-api-cli
 kanban:
+  provider: soloboard
   project: A2OReferenceGo
+  bootstrap: kanban/bootstrap.json
+  selection:
+    status: To do
 repos:
   app:
     path: ..
@@ -162,10 +172,15 @@ runtime:
 ### Python Service
 
 ```yaml
+schema_version: 1
 package:
   name: a2o-reference-python-service
 kanban:
+  provider: soloboard
   project: A2OReferencePython
+  bootstrap: kanban/bootstrap.json
+  selection:
+    status: To do
 repos:
   app:
     path: ..
@@ -189,10 +204,15 @@ runtime:
 ### Multi-Repo Fixture
 
 ```yaml
+schema_version: 1
 package:
   name: a2o-reference-multi-repo
 kanban:
+  provider: soloboard
   project: A2OReferenceMultiRepo
+  bootstrap: kanban/bootstrap.json
+  selection:
+    status: To do
 repos:
   repo_alpha:
     path: ../repos/catalog-service
