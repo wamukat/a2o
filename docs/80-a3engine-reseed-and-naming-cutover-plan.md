@@ -828,4 +828,4 @@ Rollback:
 - `v2` 呼称廃止の rename inventory が揃い、current 実行経路から旧名称が除去されている
 - `a3-v2/` source tree と legacy automation scripts が current 資産として残っていない
 - current docs に残る `A3-v2` は historical ticket ref / migration note に限定されている
-- 次段の配布計画が SoloBoard + A3 runtime + `a3-agent` 前提へ整理されている
+- 次段の配布計画が SoloBoard + A3 runtime + public `a2o-agent` 前提へ整理され、`a3-agent` は内部互換名として分離されている
