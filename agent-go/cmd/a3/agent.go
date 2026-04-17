@@ -49,7 +49,7 @@ func runAgentInstall(args []string, runner commandRunner, stdout io.Writer, stde
 	composeProject := flags.String("compose-project", "", "docker compose project name")
 	composeFile := flags.String("compose-file", "", "docker compose file")
 	runtimeService := flags.String("runtime-service", "", "docker compose runtime service name")
-	runtimeOutput := flags.String("runtime-output", "/tmp/a3-agent-export", "temporary output path inside the runtime container")
+	runtimeOutput := flags.String("runtime-output", "/tmp/a2o-agent-export", "temporary output path inside the runtime container")
 	build := flags.Bool("build", false, "build the runtime image before exporting the agent")
 
 	if err := flags.Parse(args); err != nil {

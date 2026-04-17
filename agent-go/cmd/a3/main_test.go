@@ -68,8 +68,8 @@ func TestAgentInstallExportsAgentFromRuntimeImage(t *testing.T) {
 	assertCallContains(t, joined, "docker compose -p test-project -f compose.yml up -d --no-deps a3-runtime")
 	assertCallContains(t, joined, "docker compose -p test-project -f compose.yml ps -q a3-runtime")
 	assertCallContains(t, joined, "docker exec container-123 a3 agent package verify --target darwin-amd64")
-	assertCallContains(t, joined, "docker exec container-123 a3 agent package export --target darwin-amd64 --output /tmp/a3-agent-export")
-	assertCallContains(t, joined, "docker cp container-123:/tmp/a3-agent-export "+outputPath)
+	assertCallContains(t, joined, "docker exec container-123 a3 agent package export --target darwin-amd64 --output /tmp/a2o-agent-export")
+	assertCallContains(t, joined, "docker cp container-123:/tmp/a2o-agent-export "+outputPath)
 }
 
 func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
@@ -208,7 +208,7 @@ func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
 			if strings.Contains(stderr.String(), "Usage of a3 ") {
 				t.Fatalf("stderr should not expose internal usage name, got %q", stderr.String())
 			}
-			if strings.Contains(stderr.String(), "a3-agent binary") {
+			if strings.Contains(stderr.String(), "a3-agent") {
 				t.Fatalf("stderr should use public agent binary name, got %q", stderr.String())
 			}
 		})
