@@ -14,7 +14,7 @@ A3 release assets are managed in the `a3-engine` repository. Workspace root file
 These belong in `a3-engine`:
 
 - A3 Engine Ruby code and CLI.
-- Go `a3-agent` source, build scripts, installer scripts, and release packaging.
+- Go `a2o-agent` source, build scripts, installer scripts, and release packaging. `a3-agent` is an internal compatibility name.
 - Generic runtime Docker assets, for example `docker/a3-runtime/Dockerfile`.
 - Generic compose templates for A3 runtime + bundled kanban, when they do not encode a product repo layout.
 - Kanban adapter contracts and generic protocol helpers, including `tools/kanban/cli.py`.
@@ -55,7 +55,7 @@ This section is the current file-level inventory for `scripts/a3`. Use it before
 
 | Root file | Classification | Action | Reason / dependency |
 | --- | --- | --- | --- |
-| `scripts/a3/run.rb` | Retired wrapper | Deleted after `a3-engine/bin/a3 root-utility` became the operator facade | Users must not invoke Ruby directly. Root Taskfile may set project-injected env, but the release boundary is Docker A3 runtime command + Go `a3-agent` release binary. |
+| `scripts/a3/run.rb` | Retired wrapper | Deleted after `a3-engine/bin/a3 root-utility` became the operator facade | Users must not invoke Ruby directly. Root Taskfile may set project-injected env, but the release boundary is Docker A3 runtime command + Go `a2o-agent` release binary. |
 
 ### Retired from `scripts/a3`
 

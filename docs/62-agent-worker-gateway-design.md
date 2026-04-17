@@ -16,7 +16,7 @@ A3 already has two separate contracts:
   - validates worker result schema and canonicalizes implementation `changed_files`
 - agent pull transport
   - stores `AgentJobRequest`
-  - lets a local host/dev-env `a3-agent` claim and execute a command
+- lets a local host/dev-env `a2o-agent` claim and execute a command
   - uploads logs/artifacts to A3-managed artifact storage
   - records `AgentJobResult`
 
@@ -36,7 +36,7 @@ A3 already has two separate contracts:
 - `A3::Domain::AgentJobRequest` already carries `working_dir`, `command`, `args`, `env`, `timeout_seconds`, and `artifact_rules`.
 - `A3::Infra::AgentHttpPullHandler` currently supports enqueue, claim next, artifact upload, and result submit.
 - `A3::Infra::JsonAgentJobStore` already supports `fetch(job_id)`, but the HTTP handler does not expose `GET /v1/agent/jobs/{job_id}` yet.
-- The compose validation already proves that an `a3-runtime` control-plane container can send a command job to an `a3-agent` container and receive uploaded result artifacts.
+- The historical compose validation proved that an `a3-runtime` control-plane container could send a command job to an `a3-agent` container and receive uploaded result artifacts. That `a3-agent` container was a retired validation service; the current public agent binary is `a2o-agent`.
 
 ## Proposed Shape
 
@@ -158,7 +158,7 @@ Add a focused validation that proves the full bridge:
 1. Start `a3 agent-server` with JSON job store and artifact store.
 2. Prepare a temporary workspace containing a minimal worker script.
 3. Run `AgentWorkerGateway#run` in one thread/process.
-4. Run one `a3-agent` job against the server.
+4. Run one `a2o-agent` job against the server.
 5. Assert the returned `ExecutionResult` came from `.a3/worker-result.json`.
 6. Assert uploaded combined log artifact exists.
 
@@ -173,7 +173,7 @@ Add a focused validation that proves the real A3-side materialized bridge:
 1. Start `a3 agent-server` with JSON job store and artifact store.
 2. Prepare a tiny clean local Git source repository.
 3. Run `AgentWorkerGateway#run` in `agent-materialized` mode in a background Ruby process.
-4. Run one Go `a3-agent` process with `--workspace-root` and `--source-alias`.
+4. Run one Go `a2o-agent` process with `--workspace-root` and `--source-alias`.
 5. Assert the gateway exits successfully from `AgentJobResult.worker_protocol_result`.
 6. Assert the worker payload intentionally lied about `changed_files`, and A3 replaced it with descriptor-derived canonical `changed_files`.
 7. Assert descriptor evidence for source alias, checkout mode, requested ref, access, dirty state, and changed files.
@@ -186,12 +186,12 @@ This validation uses `sh` as the worker command and does not invoke Portal-speci
 
 Status: implemented as `agent-go/scripts/validation-materialized-command-runner.sh`.
 
-`VerificationExecutionStrategy` can now use `AgentCommandRunner` through CLI option `--verification-command-runner agent-http`. This keeps verification as command execution, not worker protocol execution, while moving the actual process execution to the configured `a3-agent` runtime.
+`VerificationExecutionStrategy` can now use `AgentCommandRunner` through CLI option `--verification-command-runner agent-http`. This keeps verification as command execution, not worker protocol execution, while moving the actual process execution to the configured `a2o-agent` runtime.
 
 The focused validation proves:
 
 1. A3 enqueues a verification command job through the HTTP control plane.
-2. Go `a3-agent` materializes the requested repo slot from `source_alias`.
+2. Go `a2o-agent` materializes the requested repo slot from `source_alias`.
 3. The materialized workspace includes `.a3/workspace.json` and per-slot `.a3/slot.json` metadata needed by Portal verification scripts.
 4. The command exits through the agent result contract and uploads the combined log into A3-managed artifact storage.
 5. `cleanup_after_job` removes the agent-owned Git worktree registration.
@@ -200,7 +200,7 @@ This validation still avoids Maven / NullAway. Portal full verification is the n
 
 ### CLI Bundle Validation
 
-Status: historical Docker dev-env validation was implemented as retired Portal runtime task (agent-worker-gateway-validation). 2026-04-13 の配布整理で Docker agent image と同 task は削除し、現行確認は host-local `a3-agent` と scheduler run-once に寄せる。
+Status: historical Docker dev-env validation was implemented as retired Portal runtime task (agent-worker-gateway-validation). 2026-04-13 の配布整理で Docker agent image と同 task は削除し、現行確認は host-local `a2o-agent` と current public lifecycle / reference package validation に寄せる。
 
 Add a root-level bundle validation that proves the operator CLI path can use `agent-http`:
 
@@ -216,22 +216,22 @@ Add a root-level bundle validation that proves the operator CLI path can use `ag
    - `--worker-command sh`
    - `--worker-command-arg -lc`
    - `--worker-command-arg <inline worker-result writer>`
-6. Run the compose `a3-agent` service against `http://a3-runtime:<port>` until the gateway process finishes.
+6. Historical validation only: run the compose `a3-agent` service against `http://a3-runtime:<port>` until the gateway process finishes. Current release validation uses host/dev-env `a2o-agent`.
 7. Assert:
    - gateway output reports executed work
    - the agent job is completed
    - the task reached `Inspection` after the single implementation step
    - combined log artifact exists
 
-This validation must remain separate from Portal full verification. It validates the control-plane/agent/worker-gateway CLI wiring only; Maven, Java, Ruby worker scripts, NullAway, and full Portal verification stay in later slices. Docker-distributed agent images are no longer part of the release surface; the Go `a3-agent` is installed as a release binary on the host or inside a project-owned dev-env.
+This validation must remain separate from Portal full verification. It validates the control-plane/agent/worker-gateway CLI wiring only; Maven, Java, Ruby worker scripts, NullAway, and full Portal verification stay in later slices. Docker-distributed agent images are no longer part of the release surface; the Go `a2o-agent` is installed as a release binary on the host or inside a project-owned dev-env. `a3-agent` is an internal compatibility name.
 
-Operational constraint: the gateway command blocks while waiting for the agent job, so the validation must run the gateway in the background, then run one or more `a3-agent` single-job executions, then wait for the gateway process and fail with captured `server_log`, `gateway_log`, and `agent_log` if it does not exit. Use a dedicated validation storage directory under `/workspace/.work/...`, not the regular bundle validation storage, because the first slice requires the A3-prepared workspace path to be visible at the same path from both `a3-runtime` and `a3-agent`.
+Operational constraint: the gateway command blocks while waiting for the agent job, so the validation must run the gateway in the background, then run one or more `a2o-agent` single-job executions, then wait for the gateway process and fail with captured `server_log`, `gateway_log`, and `agent_log` if it does not exit. Use a dedicated validation storage directory under `/workspace/.work/...`, not the regular bundle validation storage, because the first slice requires the A3-prepared workspace path to be visible at the same path from both `a3-runtime` and `a2o-agent`.
 
 ### CLI Bundle Verification Validation
 
-Status: historical Docker dev-env verification validation was implemented as retired Portal runtime task (agent-verification-validation). 2026-04-13 の配布整理で同 task は削除し、host-local `a3-agent` 経路を正規確認にする。
+Status: historical Docker dev-env verification validation was implemented as retired Portal runtime task (agent-verification-validation). 2026-04-13 の配布整理で同 task は削除し、host-local `a2o-agent` 経路を正規確認にする。
 
-This validation proves the operator CLI path can run `run-verification --verification-command-runner agent-http` through the compose `a3-agent` service. The compose service intentionally uses the Portal dev-env agent image, not the generic Go-only image, because this path executes project commands (`ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/inject/portal_remediation.rb"` and `ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/inject/portal_verification.rb"`). The validation uses a small generated repo with a Taskfile to avoid Maven/NullAway cost while still exercising the real Portal remediation/verification script shape.
+This historical validation proved the operator CLI path could run `run-verification --verification-command-runner agent-http` through the compose `a3-agent` service. The compose service intentionally used the Portal dev-env agent image, not the generic Go-only image, because this path executed project commands (`ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/inject/portal_remediation.rb"` and `ruby "$A3_ROOT_DIR/scripts/a3-projects/portal/inject/portal_verification.rb"`). The validation used a small generated repo with a Taskfile to avoid Maven/NullAway cost while still exercising the real Portal remediation/verification script shape.
 
 The validation asserts:
 
@@ -241,7 +241,7 @@ The validation asserts:
 4. The Go agent materializes the repo slot, writes `.a3/workspace.json` and `.a3/slot.json`, executes both commands, uploads combined logs, and cleans up the worktree registration.
 5. A3 completes the verification run and transitions the task to `Merging`; the validation then moves the synthetic task to `Done` as cleanup.
 
-Portal single-repo / parent full verification is now covered by host-local `a3-agent` scheduler and parent-topology validation. Historical Docker dev-env tasks (`agent-full-verification-validation`, `agent-ui-verification-validation`, `agent-parent-topology-validation`) were removed from the release surface after proving the protocol path.
+Portal single-repo / parent full verification is now covered by host-local `a2o-agent` and parent-topology validation. Historical Docker dev-env tasks (`agent-full-verification-validation`, `agent-ui-verification-validation`, `agent-parent-topology-validation`) were removed from the release surface after proving the protocol path.
 
 Uploaded agent artifacts are retained in the A3-managed artifact store and can be cleaned independently from workspace cleanup. `a3 agent-artifact-cleanup` applies retention by artifact class using metadata/blob mtimes, with separate TTLs for `diagnostic` and `evidence` artifacts, optional count caps (`--diagnostic-max-count` / `--evidence-max-count`), optional size caps (`--diagnostic-max-mb` / `--evidence-max-mb`), and a `--dry-run` mode for operator inspection. The Portal runtime exposes the same command as retired Portal runtime task (agent-artifact-cleanup).
 
@@ -256,9 +256,9 @@ Uploaded agent artifacts are retained in the A3-managed artifact store and can b
 
 ## Security Boundary
 
-The HTTP pull transport is local-first. It is designed for A3, SoloBoard, and `a3-agent` running on the same host or in the same compose/dev-env network. It is not a central A3 server protocol for remote multi-agent pools.
+The HTTP pull transport is local-first. It is designed for A3, SoloBoard, and public `a2o-agent` running on the same host or in the same compose/dev-env network. It is not a central A3 server protocol for remote multi-agent pools.
 
-As a minimum local hardening step, the control plane and agents support optional bearer tokens. A3 `agent-server` accepts an agent token (`--agent-token`, `--agent-token-file`, `A3_AGENT_TOKEN`, `A3_AGENT_TOKEN_FILE`) for agent-side pull/upload/result endpoints and an optional control token (`--agent-control-token`, `--agent-control-token-file`, `A3_AGENT_CONTROL_TOKEN`, `A3_AGENT_CONTROL_TOKEN_FILE`) for A3-side enqueue/fetch endpoints. If no control token is configured, control endpoints fall back to the agent token for local/backward-compatible operation. Go `a3-agent` reads profile `agent_token_file` / `agent_token`, `A3_AGENT_TOKEN_FILE`, `A3_AGENT_TOKEN`, `-agent-token-file`, or `-agent-token`; A3-side `agent-http` gateway clients use the control token options and fall back to agent token options when no control token is configured. When configured, all pull API calls must include `Authorization: Bearer <token>`. Prefer token files for service manager / container operation so the token is not exposed through process arguments. Long-running `a3-agent` and `a3 agent-server` reload token files for each request, so local token replacement can be performed by atomically replacing the token file without restarting the process.
+As a minimum local hardening step, the control plane and agents support optional bearer tokens. A3 `agent-server` accepts an agent token (`--agent-token`, `--agent-token-file`, `A3_AGENT_TOKEN`, `A3_AGENT_TOKEN_FILE`) for agent-side pull/upload/result endpoints and an optional control token (`--agent-control-token`, `--agent-control-token-file`, `A3_AGENT_CONTROL_TOKEN`, `A3_AGENT_CONTROL_TOKEN_FILE`) for A3-side enqueue/fetch endpoints. If no control token is configured, control endpoints fall back to the agent token for local/backward-compatible operation. Go `a2o-agent` reads profile `agent_token_file` / `agent_token`, `A3_AGENT_TOKEN_FILE`, `A3_AGENT_TOKEN`, `-agent-token-file`, or `-agent-token`; A3-side `agent-http` gateway clients use the control token options and fall back to agent token options when no control token is configured. When configured, all pull API calls must include `Authorization: Bearer <token>`. Prefer token files for service manager / container operation so the token is not exposed through process arguments. Long-running `a2o-agent` and `a3 agent-server` reload token files for each request, so local token replacement can be performed by atomically replacing the token file without restarting the process.
 
 Client-side transport errors are intentionally redacted: Ruby and Go control-plane clients report operation name and HTTP status only, not raw response bodies. This keeps unexpected proxy/server bodies, malformed job payloads, and environment values out of local exception strings while preserving enough status for operator diagnosis.
 
@@ -444,14 +444,14 @@ The first operator-facing bridge is explicit CLI configuration, not implicit inf
 The runtime package surface exposes two separate command shapes:
 
 - A3-side worker gateway options: `--worker-gateway agent-http --agent-shared-workspace-mode agent-materialized --agent-source-alias SLOT=ALIAS --agent-workspace-root PATH --agent-source-path ALIAS=PATH ...`
-- Agent-side worker command: `a3-agent --engine <control-plane-url> --agent-token-file <path> --loop ...`
+- Agent-side worker command: `a2o-agent --engine <control-plane-url> --agent-token-file <path> --loop ...`
 
 The first part, `slot -> alias`, is A3 job construction data. The second part, `alias -> local path`, is host/dev-env environment data but is still configured in Engine-side project config and transmitted per job as `agent_environment`. A3 doctor validates schema, alias coverage, and policy values; Engine-issued agent doctor jobs validate local filesystem accessibility from the agent runtime.
 
-For direct preflight without an agent-local profile file, `a3-agent doctor` accepts the same agent-visible environment shape:
+For direct preflight without an agent-local profile file, `a2o-agent doctor` accepts the same agent-visible environment shape:
 
 ```text
-a3-agent doctor \
+a2o-agent doctor \
   --control-plane-url http://a3-runtime:7393 \
   --workspace-root /path/from/agent/workspaces \
   --source-path member-portal-starters=/path/from/agent/member-portal-starters \
@@ -467,9 +467,9 @@ agent-go/scripts/validation-release-package-doctor.sh
 agent-go/scripts/validation-runtime-image-agent-export.sh
 ```
 
-The first command builds the host-target release archive, verifies it through `a3 agent package verify`, exports it through `a3 agent package export`, and runs the exported `a3-agent doctor` against a temporary local git source without using an agent-local profile file.
+The first command builds the host-target release archive, verifies it through `a3 agent package verify`, exports it through `a3 agent package export`, and runs the exported `a2o-agent doctor` against a temporary local git source without using an agent-local profile file.
 
-The second command rebuilds/recreates the Docker A3 runtime image, verifies the image-bundled `/opt/a3/agents` package, exports `a3-agent` from inside the runtime container, copies it to the host, and runs the same profile-free doctor validation. This is the release-facing check that the Docker-distributed Engine can supply a usable host/dev-env agent binary.
+The second command rebuilds/recreates the Docker A3 runtime image, verifies the image-bundled `/opt/a3/agents` package, exports `a2o-agent` from inside the runtime container, copies it to the host, and runs the same profile-free doctor validation. This is the release-facing check that the Docker-distributed Engine can supply a usable host/dev-env agent binary.
 
 ### Non-Goals For This Slice
 
