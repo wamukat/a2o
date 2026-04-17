@@ -560,7 +560,9 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     )
   end
 
-  def workspace_descriptor(slot_descriptors, workspace_id: "merge-Portal-42-run-merge-1", task_ref: "Portal#42")
+  def workspace_descriptor(slot_descriptors = {}, workspace_id: "merge-Portal-42-run-merge-1", task_ref: "Portal#42", **slot_descriptor_keywords)
+    slot_descriptors = slot_descriptor_keywords.transform_keys(&:to_s) unless slot_descriptor_keywords.empty?
+
     A3::Domain::AgentWorkspaceDescriptor.new(
       workspace_kind: :runtime_workspace,
       runtime_profile: "host-local",

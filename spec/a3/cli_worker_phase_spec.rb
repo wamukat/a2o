@@ -8,6 +8,10 @@ RSpec.describe A3::CLI do
   let(:worker_gateway) { instance_double("WorkerGateway") }
   let(:command_runner) { instance_double(A3::Infra::LocalCommandRunner) }
 
+  before do
+    allow(worker_gateway).to receive(:agent_owned_publication?).and_return(true)
+  end
+
   it "runs implementation worker end-to-end through sqlite backend" do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)
@@ -194,7 +198,7 @@ RSpec.describe A3::CLI do
     end
   end
 
-  it "uses the default local worker gateway and passes worker request env through bootstrap wiring" do
+  it "uses an explicit local worker gateway and blocks engine-side publication after passing worker request env" do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)
       seed_context(dir)
@@ -292,15 +296,17 @@ RSpec.describe A3::CLI do
             "--kanban-command-arg", fake_cli.fetch(:script_path),
             "--kanban-project", "A3-v2",
             "--kanban-repo-label", "repo:alpha=repo_alpha",
-            "--kanban-working-dir", dir
+            "--kanban-working-dir", dir,
+            "--worker-gateway", "local"
           ],
           out: out,
           command_runner: command_runner
         )
       end
 
-      expect(out.string).to include("worker phase completed run-default-gateway-1")
-      expect(task_repository.fetch("A3-v2#3027").status).to eq(:verifying)
+      expect(command_runner).to have_received(:run)
+      expect(out.string).to include("worker phase completed run-default-gateway-1 with outcome blocked")
+      expect(task_repository.fetch("A3-v2#3027").status).to eq(:blocked)
     end
   end
 

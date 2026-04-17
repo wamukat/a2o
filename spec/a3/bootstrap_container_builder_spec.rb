@@ -34,6 +34,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder do
       run_worker_phase: instance_double(A3::Application::RunWorkerPhase),
       run_merge: instance_double(A3::Application::RunMerge),
       register_completed_run: instance_double(A3::Application::RegisterCompletedRun),
+      reconcile_manual_merge_recovery: instance_double(A3::Application::ReconcileManualMergeRecovery),
       start_run: instance_double(A3::Application::StartRun),
       workspace_provisioner: instance_double(A3::Infra::LocalWorkspaceProvisioner)
     }
@@ -131,6 +132,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder do
       :run_worker_phase,
       :run_merge,
       :register_completed_run,
+      :reconcile_manual_merge_recovery,
       :start_run,
       :execute_next_runnable_task,
       :execute_until_idle,

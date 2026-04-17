@@ -7,9 +7,9 @@ require "tmpdir"
 require_relative "../../lib/a3/operator/stdin_bundle_worker"
 
 RSpec.describe "worker:stdin-bundle" do
-  STDIN_WORKER_SPEC_ROOT_DIR = Pathname(__dir__).join("..", "..", "..").expand_path
-  STDIN_WORKER_ENTRYPOINT = STDIN_WORKER_SPEC_ROOT_DIR.join("a3-engine", "bin", "a3")
-  STDIN_WORKER_LIB_DIR = STDIN_WORKER_SPEC_ROOT_DIR.join("a3-engine", "lib")
+  STDIN_WORKER_SPEC_ROOT_DIR = Pathname(__dir__).join("..", "..").expand_path
+  STDIN_WORKER_ENTRYPOINT = STDIN_WORKER_SPEC_ROOT_DIR.join("bin", "a3")
+  STDIN_WORKER_LIB_DIR = STDIN_WORKER_SPEC_ROOT_DIR.join("lib")
   STDIN_WORKER_LIB = STDIN_WORKER_LIB_DIR.join("a3", "operator", "stdin_bundle_worker.rb")
 
   def base_request

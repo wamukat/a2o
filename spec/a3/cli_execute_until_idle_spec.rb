@@ -9,6 +9,10 @@ RSpec.describe A3::CLI do
   let(:command_runner) { instance_double("CommandRunner") }
   let(:merge_runner) { instance_double("MergeRunner") }
 
+  before do
+    allow(worker_gateway).to receive(:agent_owned_publication?).and_return(true)
+  end
+
   it "executes runnable tasks until idle through sqlite backend" do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)

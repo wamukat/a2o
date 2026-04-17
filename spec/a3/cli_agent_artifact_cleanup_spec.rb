@@ -61,10 +61,10 @@ RSpec.describe A3::CLI do
       )
 
       expect(out.string).to include("agent_artifact_cleanup=completed")
-      expect(out.string).to include("deleted_count=2")
+      expect(out.string).to include("deleted_count=3")
       expect { store.read("diagnostic-1") }.to raise_error(A3::Domain::RecordNotFound)
       expect { store.read("diagnostic-2") }.to raise_error(A3::Domain::RecordNotFound)
-      expect(store.read("diagnostic-3")).to eq("333")
+      expect { store.read("diagnostic-3") }.to raise_error(A3::Domain::RecordNotFound)
     end
   end
 
