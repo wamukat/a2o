@@ -10,7 +10,8 @@ import (
 )
 
 type projectPackageConfig struct {
-	Project            string
+	SchemaVersion      string
+	PackageName        string
 	KanbanProject      string
 	KanbanBootstrap    string
 	KanbanStatus       string
@@ -30,6 +31,12 @@ type projectPackageRepo struct {
 func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) {
 	config := projectPackageConfig{Repos: map[string]projectPackageRepo{}}
 	projectFile := filepath.Join(packagePath, "project.yaml")
+	legacyManifest := filepath.Join(packagePath, "manifest.yml")
+	if _, err := os.Stat(legacyManifest); err == nil {
+		return config, fmt.Errorf("manifest.yml is no longer supported; move runtime config into project.yaml: %s", legacyManifest)
+	} else if err != nil && !os.IsNotExist(err) {
+		return config, fmt.Errorf("inspect legacy manifest: %w", err)
+	}
 	file, err := os.Open(projectFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -40,6 +47,7 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	defer file.Close()
 
 	section := ""
+	subsection := ""
 	currentRepo := ""
 	currentList := ""
 	scanner := bufio.NewScanner(file)
@@ -53,24 +61,40 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 		if indent == 0 {
 			currentRepo = ""
 			currentList = ""
+			subsection = ""
 			key, value, hasValue := splitProjectConfigKey(line)
 			if !hasValue {
 				section = key
 				continue
 			}
-			if key == "project" {
-				config.Project = value
+			if key == "schema_version" {
+				config.SchemaVersion = value
 			}
 			continue
 		}
 		switch section {
+		case "package":
+			if indent == 2 {
+				key, value, hasValue := splitProjectConfigKey(line)
+				if hasValue && key == "name" {
+					config.PackageName = value
+				}
+			}
 		case "kanban":
 			if indent == 2 {
 				key, value, hasValue := splitProjectConfigKey(line)
+				subsection = ""
 				if hasValue && key == "project" {
 					config.KanbanProject = value
 				} else if hasValue && key == "bootstrap" {
 					config.KanbanBootstrap = value
+				} else if !hasValue && key == "selection" {
+					subsection = key
+				}
+			} else if indent == 4 && subsection == "selection" {
+				key, value, hasValue := splitProjectConfigKey(line)
+				if hasValue && key == "status" {
+					config.KanbanStatus = value
 				}
 			}
 		case "runtime":
@@ -80,8 +104,6 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 					continue
 				}
 				switch key {
-				case "kanban_status":
-					config.KanbanStatus = value
 				case "live_ref":
 					config.LiveRef = value
 				case "max_steps":
@@ -102,6 +124,8 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 				}
 				if key == "workspace_root" {
 					config.AgentWorkspaceRoot = value
+				} else if key == "required_bins" {
+					config.AgentRequiredBins = parseProjectConfigList(value)
 				}
 			} else if indent == 4 && currentList == "required_bins" && strings.HasPrefix(line, "- ") {
 				config.AgentRequiredBins = append(config.AgentRequiredBins, strings.TrimSpace(strings.TrimPrefix(line, "- ")))
@@ -133,6 +157,15 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	}
 	if err := scanner.Err(); err != nil {
 		return config, fmt.Errorf("scan project package config: %w", err)
+	}
+	if strings.TrimSpace(config.SchemaVersion) == "" {
+		return config, fmt.Errorf("project package config %s is missing schema_version", projectFile)
+	}
+	if config.SchemaVersion != "1" {
+		return config, fmt.Errorf("project package config %s has unsupported schema_version: %s", projectFile, config.SchemaVersion)
+	}
+	if strings.TrimSpace(config.PackageName) == "" {
+		return config, fmt.Errorf("project package config %s is missing package.name", projectFile)
 	}
 	if strings.TrimSpace(config.KanbanProject) == "" {
 		return config, fmt.Errorf("project package config %s is missing kanban.project", projectFile)
@@ -178,6 +211,26 @@ func trimProjectConfigScalar(value string) string {
 	value = strings.TrimSpace(value)
 	value = strings.Trim(value, "\"'")
 	return value
+}
+
+func parseProjectConfigList(value string) []string {
+	trimmed := strings.TrimSpace(value)
+	if !strings.HasPrefix(trimmed, "[") || !strings.HasSuffix(trimmed, "]") {
+		return nil
+	}
+	inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "["), "]"))
+	if inner == "" {
+		return []string{}
+	}
+	parts := strings.Split(inner, ",")
+	values := make([]string, 0, len(parts))
+	for _, part := range parts {
+		value := trimProjectConfigScalar(part)
+		if value != "" {
+			values = append(values, value)
+		}
+	}
+	return values
 }
 
 func sortedProjectRepoAliases(repos map[string]projectPackageRepo) []string {

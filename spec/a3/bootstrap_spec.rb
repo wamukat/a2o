@@ -46,10 +46,10 @@ RSpec.describe A3::Bootstrap do
   describe ".runtime_package_session" do
     it "assembles a runtime package descriptor without project surface or container assembly" do
       Dir.mktmpdir do |dir|
-        manifest_path = File.join(dir, "manifest.yml")
+        manifest_path = File.join(dir, "project.yaml")
         preset_dir = File.join(dir, "presets")
         FileUtils.mkdir_p(preset_dir)
-        File.write(manifest_path, "schema_version: 1\npresets: []\n")
+        File.write(manifest_path, YAML.dump({ "schema_version" => 1, "runtime" => { "presets" => [] } }))
         session = described_class.runtime_package_session(
           manifest_path: manifest_path,
           preset_dir: preset_dir,

@@ -179,14 +179,15 @@ module A3
 
     def preset_chain(manifest_path)
       document = manifest_document(manifest_path)
-      unless document.is_a?(Hash) && document.key?("presets")
-        raise A3::Domain::ConfigurationError, "manifest presets must be provided"
+      runtime = document.is_a?(Hash) ? document["runtime"] : nil
+      unless runtime.is_a?(Hash) && runtime.key?("presets")
+        raise A3::Domain::ConfigurationError, "project.yaml runtime.presets must be provided"
       end
-      unless document["presets"].is_a?(Array)
-        raise A3::Domain::ConfigurationError, "manifest presets must be an array"
+      unless runtime["presets"].is_a?(Array)
+        raise A3::Domain::ConfigurationError, "project.yaml runtime.presets must be an array"
       end
 
-      document.fetch("presets").map(&:to_s).freeze
+      runtime.fetch("presets").map(&:to_s).freeze
     end
     private_class_method :preset_chain
 

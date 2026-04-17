@@ -10,21 +10,24 @@ module A3
       end
 
       def load(manifest_path)
-        manifest = YAML.load_file(manifest_path)
+        project_config = load_project_config(manifest_path)
         surface = A3::Adapters::ProjectSurfaceLoader.new(preset_dir: @preset_dir).load(manifest_path)
-        core = manifest.fetch("core") do
-          raise A3::Domain::ConfigurationError, "manifest core.merge_target and core.merge_policy must be provided"
+        runtime = project_config.fetch("runtime") do
+          raise A3::Domain::ConfigurationError, "project.yaml runtime must be provided"
         end
-        merge_target = core.fetch("merge_target") do
-          raise A3::Domain::ConfigurationError, "manifest core.merge_target must be provided"
+        merge = runtime.fetch("merge") do
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.merge.target and runtime.merge.policy must be provided"
         end
-        merge_policy = core.fetch("merge_policy") do
-          raise A3::Domain::ConfigurationError, "manifest core.merge_policy must be provided"
+        merge_target = merge.fetch("target") do
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.merge.target must be provided"
         end
-        merge_target_ref = core.fetch("merge_target_ref") do
-          raise A3::Domain::ConfigurationError, "manifest core.merge_target_ref must be provided"
+        merge_policy = merge.fetch("policy") do
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.merge.policy must be provided"
         end
-        raise A3::Domain::ConfigurationError, "manifest core.merge_target_ref must not be blank" if String(merge_target_ref).strip.empty?
+        merge_target_ref = merge.fetch("target_ref") do
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.merge.target_ref must be provided"
+        end
+        raise A3::Domain::ConfigurationError, "project.yaml runtime.merge.target_ref must not be blank" if String(merge_target_ref).strip.empty?
 
         merge_config_resolver = A3::Domain::MergeConfigResolver.new(
           target_spec: merge_target,
@@ -37,6 +40,24 @@ module A3
           merge_config: merge_config_resolver.default_merge_config,
           merge_config_resolver: merge_config_resolver
         )
+      end
+
+      private
+
+      def load_project_config(path)
+        payload = YAML.safe_load(File.read(path), permitted_classes: [], aliases: false)
+        unless payload.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml must contain a mapping"
+        end
+        schema_version = payload["schema_version"].to_s
+        if schema_version.empty?
+          raise A3::Domain::ConfigurationError, "project.yaml schema_version must be provided"
+        end
+        unless schema_version == "1"
+          raise A3::Domain::ConfigurationError, "project.yaml schema_version is unsupported: #{schema_version}"
+        end
+
+        payload
       end
     end
   end

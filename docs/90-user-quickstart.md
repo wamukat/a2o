@@ -21,7 +21,6 @@ A2O は kanban task を起点に、workspace 作成、agent 実行、検証、me
 ```text
 project-package/
   README.md
-  manifest.yml
   project.yaml
   kanban/bootstrap.json
   commands/
@@ -29,14 +28,18 @@ project-package/
   scenarios/
 ```
 
-`project.yaml` は runtime config である。
+`project.yaml` は project package の唯一の公開 config である。
 
 ```yaml
-project: a2o-reference-typescript-api-web
+schema_version: 1
+package:
+  name: a2o-reference-typescript-api-web
 kanban:
   provider: soloboard
   project: A2OReferenceTypeScript
   bootstrap: kanban/bootstrap.json
+  selection:
+    status: To do
 repos:
   app:
     path: ..
@@ -48,10 +51,24 @@ agent:
     - node
     - npm
 runtime:
-  kanban_status: To do
   live_ref: refs/heads/main
   max_steps: 20
   agent_attempts: 200
+  presets:
+    - base
+  surface:
+    implementation_skill: skills/implementation/base.md
+    review_skill:
+      default: skills/review/default.md
+    verification_commands:
+      - app/project-package/commands/verify.sh
+    remediation_commands:
+      - app/project-package/commands/format.sh
+    workspace_hook: app/project-package/commands/bootstrap.sh
+  merge:
+    target: merge_to_live
+    policy: ff_only
+    target_ref: refs/heads/main
 ```
 
 `repos.*.path` と `agent.workspace_root` は agent が見える path として扱う。project 固有の build、test、verification は `commands/` と `scenarios/` に置く。
@@ -208,7 +225,7 @@ task は repo label を使って対象 slot を指定する。parent-child flow 
 
 - Full runtime execution は `a2o runtime start` / `stop` / `status` または focused validation 用の `a2o runtime run-once` / `loop` で開始できる。
 - runtime state には `.a3` や `refs/heads/a3/...` など内部互換名が残る。通常の manual では編集対象にしない。
-- project package schema は `manifest.yml` と `project.yaml` の責務をさらに明確化する余地がある。
+- project package の公開 config は `project.yaml` に一本化されている。`manifest.yml` はサポート対象外である。
 - published image での release smoke は、公開前の独立した gate として digest 固定で実行する。
 
-残る gap は `A2O#272` と `A2O#270` で追跡する。`A2O#269` は single-file schema proposal を扱う。
+残る user-facing diagnostics の整理は `A2O#270` で追跡する。`A2O#269` は single-file schema proposal を扱う。

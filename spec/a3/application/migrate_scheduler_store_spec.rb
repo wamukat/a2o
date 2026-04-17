@@ -5,10 +5,10 @@ require "tmpdir"
 RSpec.describe A3::Application::MigrateSchedulerStore do
   it "writes a migration marker when scheduler store migration is pending" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       FileUtils.mkdir_p(preset_dir)
-      File.write(manifest_path, "presets: []\n")
+      File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
       runtime_package = A3::Domain::RuntimePackageDescriptor.build(
         image_version: "a3:v2.1.0",
         manifest_path: manifest_path,
@@ -36,10 +36,10 @@ RSpec.describe A3::Application::MigrateSchedulerStore do
 
   it "is a no-op when migration is not required" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       FileUtils.mkdir_p(preset_dir)
-      File.write(manifest_path, "presets: []\n")
+      File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
       runtime_package = A3::Domain::RuntimePackageDescriptor.build(
         image_version: "a3:v2.1.0",
         manifest_path: manifest_path,

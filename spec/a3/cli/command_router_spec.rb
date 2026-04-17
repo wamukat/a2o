@@ -80,7 +80,7 @@ RSpec.describe A3::CLI::CommandRouter do
       dispatched = described_class.dispatch(
         cli,
         command: "show-project-surface",
-        argv: ["manifest.yml"],
+        argv: ["project.yaml"],
         out: out,
         run_id_generator: -> { "run-1" },
         command_runner: A3::Infra::LocalCommandRunner.new,
@@ -89,7 +89,7 @@ RSpec.describe A3::CLI::CommandRouter do
       )
 
       expect(dispatched).to be(true)
-      expect(out.string).to include("manifest=manifest.yml")
+      expect(out.string).to include("manifest=project.yaml")
     end
 
     it "dispatches runtime package commands without injecting container dependencies" do
@@ -104,7 +104,7 @@ RSpec.describe A3::CLI::CommandRouter do
       dispatched = described_class.dispatch(
         cli,
         command: "doctor-runtime",
-        argv: ["manifest.yml"],
+        argv: ["project.yaml"],
         out: out,
         run_id_generator: -> { "run-1" },
         command_runner: A3::Infra::LocalCommandRunner.new,
@@ -113,7 +113,7 @@ RSpec.describe A3::CLI::CommandRouter do
       )
 
       expect(dispatched).to be(true)
-      expect(out.string).to include("runtime_package=manifest.yml")
+      expect(out.string).to include("runtime_package=project.yaml")
     end
   end
 end

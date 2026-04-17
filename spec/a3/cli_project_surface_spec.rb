@@ -36,12 +36,15 @@ RSpec.describe A3::CLI do
           }
         )
       )
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       File.write(
         manifest_path,
         YAML.dump(
           {
-            "presets" => ["base"]
+            "schema_version" => 1,
+            "runtime" => {
+              "presets" => ["base"]
+            }
           }
         )
       )
@@ -81,8 +84,8 @@ RSpec.describe A3::CLI do
           }
         )
       )
-      manifest_path = File.join(dir, "manifest.yml")
-      File.write(manifest_path, YAML.dump({ "presets" => ["base"] }))
+      manifest_path = File.join(dir, "project.yaml")
+      File.write(manifest_path, YAML.dump({ "schema_version" => 1, "runtime" => { "presets" => ["base"] } }))
 
       out = StringIO.new
 

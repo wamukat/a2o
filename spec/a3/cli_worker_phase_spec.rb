@@ -84,7 +84,7 @@ RSpec.describe A3::CLI do
             "run-worker-phase",
             "A3-v2#3025",
             "run-worker-1",
-            File.join(dir, "manifest.yml"),
+            File.join(dir, "project.yaml"),
             "--storage-backend", "sqlite",
             "--storage-dir", dir,
             *repo_source_args(repo_sources),
@@ -175,7 +175,7 @@ RSpec.describe A3::CLI do
               "run-worker-phase",
               "A3-v2#3026",
               "run-review-1",
-              File.join(dir, "manifest.yml"),
+              File.join(dir, "project.yaml"),
               "--storage-backend", "sqlite",
               "--storage-dir", dir,
               *repo_source_args(repo_sources),
@@ -287,7 +287,7 @@ RSpec.describe A3::CLI do
             "run-worker-phase",
             "A3-v2#3027",
             "run-default-gateway-1",
-            File.join(dir, "manifest.yml"),
+            File.join(dir, "project.yaml"),
             "--storage-backend", "sqlite",
             "--storage-dir", dir,
             *repo_source_args(repo_sources),
@@ -327,16 +327,9 @@ RSpec.describe A3::CLI do
       )
     )
     File.write(
-      File.join(dir, "manifest.yml"),
+      File.join(dir, "project.yaml"),
       YAML.dump(
-        {
-          "presets" => ["base"],
-          "core" => {
-            "merge_target" => "merge_to_parent",
-            "merge_policy" => "ff_only",
-            "merge_target_ref" => "refs/heads/a3/parent/default"
-          }
-        }
+        { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/a3/parent/default" } } }
       )
     )
   end

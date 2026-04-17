@@ -4,7 +4,7 @@ RSpec.describe A3::Domain::RuntimePackageDescriptor do
   it "derives a distribution contract from the image version by default" do
     descriptor = described_class.build(
       image_version: "a3:v2.1.0",
-      manifest_path: "/tmp/runtime/manifest.yml",
+      manifest_path: "/tmp/runtime/project.yaml",
       preset_dir: "/tmp/runtime/presets",
       storage_backend: :sqlite,
       storage_dir: "/tmp/runtime/state",
@@ -85,20 +85,20 @@ RSpec.describe A3::Domain::RuntimePackageDescriptor do
     expect(descriptor.operator_summary.fetch("networking_boundary")).to eq("outbound=git,issue_api,package_registry,llm_gateway,verification_service secret_source=secret_store token_scope=project")
     expect(descriptor.operator_summary.fetch("upgrade_contract")).to eq("image_upgrade=independent manifest_schema_version=1 preset_schema_version=1 state_migration=explicit")
     expect(descriptor.operator_summary.fetch("fail_fast_policy")).to eq("manifest_schema_mismatch=fail_fast preset_schema_conflict=fail_fast writable_mount_missing=fail_fast secret_missing=fail_fast scheduler_store_migration_pending=fail_fast")
-    expect(descriptor.operator_summary.fetch("execution_modes")).to eq("one_shot_cli=bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state | bin/a3 migrate-scheduler-store /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state | bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state ; scheduler_loop=bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state ; doctor_inspect=bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
+    expect(descriptor.operator_summary.fetch("execution_modes")).to eq("one_shot_cli=bin/a3 doctor-runtime /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state | bin/a3 migrate-scheduler-store /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state | bin/a3 execute-until-idle /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state ; scheduler_loop=bin/a3 execute-until-idle /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state ; doctor_inspect=bin/a3 doctor-runtime /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
     expect(descriptor.operator_summary.fetch("execution_mode_contract")).to eq("one_shot_cli=operator_driven_doctor_migration_runtime ; scheduler_loop=continuous_runnable_processing_after_runtime_ready ; doctor_inspect=configuration_and_mount_validation_only")
     expect(descriptor.operator_summary.fetch("descriptor_startup_readiness")).to eq("descriptor_ready")
-    expect(descriptor.operator_summary.fetch("doctor_command")).to eq("bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
-    expect(descriptor.operator_summary.fetch("migration_command")).to eq("bin/a3 migrate-scheduler-store /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
-    expect(descriptor.operator_summary.fetch("runtime_command")).to eq("bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
-    expect(descriptor.operator_summary.fetch("runtime_validation_command")).to eq("bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state && bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
-    expect(descriptor.operator_summary.fetch("startup_sequence")).to eq("doctor=bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state migrate=skip runtime=bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
+    expect(descriptor.operator_summary.fetch("doctor_command")).to eq("bin/a3 doctor-runtime /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
+    expect(descriptor.operator_summary.fetch("migration_command")).to eq("bin/a3 migrate-scheduler-store /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
+    expect(descriptor.operator_summary.fetch("runtime_command")).to eq("bin/a3 execute-until-idle /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
+    expect(descriptor.operator_summary.fetch("runtime_validation_command")).to eq("bin/a3 doctor-runtime /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state && bin/a3 execute-until-idle /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
+    expect(descriptor.operator_summary.fetch("startup_sequence")).to eq("doctor=bin/a3 doctor-runtime /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state migrate=skip runtime=bin/a3 execute-until-idle /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
   end
 
   it "keeps agent source aliases as slot to alias contract without agent local paths" do
     descriptor = described_class.build(
       image_version: "a3:v2.1.0",
-      manifest_path: "/tmp/runtime/manifest.yml",
+      manifest_path: "/tmp/runtime/project.yaml",
       preset_dir: "/tmp/runtime/presets",
       storage_backend: :sqlite,
       storage_dir: "/tmp/runtime/state",
@@ -132,7 +132,7 @@ RSpec.describe A3::Domain::RuntimePackageDescriptor do
   it "accepts an explicit distribution contract" do
     descriptor = described_class.build(
       image_version: "a3:v2.1.0",
-      manifest_path: "/tmp/runtime/manifest.yml",
+      manifest_path: "/tmp/runtime/project.yaml",
       preset_dir: "/tmp/runtime/presets",
       storage_backend: :sqlite,
       storage_dir: "/tmp/runtime/state",
@@ -165,7 +165,7 @@ RSpec.describe A3::Domain::RuntimePackageDescriptor do
   it "derives operator guidance from runtime contract" do
     descriptor = described_class.build(
       image_version: "a3:v2.1.0",
-      manifest_path: "/tmp/runtime/manifest.yml",
+      manifest_path: "/tmp/runtime/project.yaml",
       preset_dir: "/tmp/runtime/presets",
       storage_backend: :sqlite,
       storage_dir: "/tmp/runtime/state",
@@ -183,8 +183,8 @@ RSpec.describe A3::Domain::RuntimePackageDescriptor do
     expect(descriptor.operator_summary.fetch("runtime_contract")).to eq("manifest_schema_version=0 required_manifest_schema_version=1 required_preset_schema_version=1 preset_schema_versions= repo_source_strategy=none repo_source_slots= secret_delivery_mode=environment_variable secret_reference=A3_SECRET scheduler_store_migration_state=pending")
     expect(descriptor.operator_summary.fetch("operator_action")).to eq("update runtime package manifest schema to 1; provide secrets via environment variable A3_SECRET; apply scheduler store migration before startup")
     expect(descriptor.operator_summary.fetch("descriptor_startup_readiness")).to eq("operator_action_required")
-    expect(descriptor.operator_summary.fetch("runtime_validation_command")).to eq("bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state && bin/a3 migrate-scheduler-store /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state && bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
-    expect(descriptor.operator_summary.fetch("startup_sequence")).to eq("doctor=bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state migrate=bin/a3 migrate-scheduler-store /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state runtime=bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
+    expect(descriptor.operator_summary.fetch("runtime_validation_command")).to eq("bin/a3 doctor-runtime /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state && bin/a3 migrate-scheduler-store /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state && bin/a3 execute-until-idle /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
+    expect(descriptor.operator_summary.fetch("startup_sequence")).to eq("doctor=bin/a3 doctor-runtime /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state migrate=bin/a3 migrate-scheduler-store /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state runtime=bin/a3 execute-until-idle /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state")
     expect(descriptor.operator_summary.fetch("execution_mode_contract")).to eq("one_shot_cli=operator_driven_doctor_migration_runtime ; scheduler_loop=continuous_runnable_processing_after_runtime_ready ; doctor_inspect=configuration_and_mount_validation_only")
   end
 
@@ -192,7 +192,7 @@ RSpec.describe A3::Domain::RuntimePackageDescriptor do
     expect do
       described_class.new(
         image_version: "a3:v2.1.0",
-        manifest_path: "/tmp/runtime/manifest.yml",
+        manifest_path: "/tmp/runtime/project.yaml",
         project_runtime_root: "/tmp/runtime",
         preset_dir: "/tmp/runtime/presets",
         storage_backend: :sqlite,

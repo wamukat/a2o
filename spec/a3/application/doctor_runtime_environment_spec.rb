@@ -19,10 +19,12 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
   it "reports ok when manifest, preset dir, and state root exist" do
     with_env("A3_SECRET" => "token") do
       Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       FileUtils.mkdir_p(preset_dir)
-      File.write(manifest_path, "presets: []
+      File.write(manifest_path, "schema_version: 1
+runtime:
+  presets: []
 ")
       runtime_package = A3::Domain::RuntimePackageDescriptor.build(
         image_version: "a3:v2.1.0",
@@ -109,7 +111,7 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
   it "reports invalid_runtime when required runtime paths are missing" do
     runtime_package = A3::Domain::RuntimePackageDescriptor.build(
       image_version: "a3:v2.1.0",
-      manifest_path: "/tmp/a3-v2-missing/manifest.yml",
+      manifest_path: "/tmp/a3-v2-missing/project.yaml",
       preset_dir: "/tmp/a3-v2-missing/presets",
       storage_backend: :json,
       storage_dir: "/tmp/a3-v2-missing/state",
@@ -138,11 +140,11 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
   it "reports ok when state root does not exist yet but can be created" do
     with_env("A3_SECRET" => "token") do
       Dir.mktmpdir do |dir|
-        manifest_path = File.join(dir, "manifest.yml")
+        manifest_path = File.join(dir, "project.yaml")
         preset_dir = File.join(dir, "presets")
         state_dir = File.join(dir, "state")
         FileUtils.mkdir_p(preset_dir)
-        File.write(manifest_path, "presets: []\n")
+        File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
 
         runtime_package = A3::Domain::RuntimePackageDescriptor.build(
           image_version: "a3:v2.1.0",
@@ -172,11 +174,11 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
 
   it "reports invalid_runtime when project runtime root is blocked by a file" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       project_runtime_root = File.join(dir, "project-root")
       FileUtils.mkdir_p(preset_dir)
-      File.write(manifest_path, "presets: []\n")
+      File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
       File.write(project_runtime_root, "not a directory\n")
 
       runtime_package = A3::Domain::RuntimePackageDescriptor.new(
@@ -215,12 +217,12 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
 
   it "accepts a non-writable project runtime root when it exists as a directory" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       project_runtime_root = File.join(dir, "project-root")
       FileUtils.mkdir_p(preset_dir)
       FileUtils.mkdir_p(project_runtime_root)
-      File.write(manifest_path, "presets: []\n")
+      File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
       FileUtils.chmod(0o555, project_runtime_root)
 
       runtime_package = A3::Domain::RuntimePackageDescriptor.new(
@@ -260,10 +262,12 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
 
   it "reports invalid_runtime when explicit repo sources are missing" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       FileUtils.mkdir_p(preset_dir)
-      File.write(manifest_path, "presets: []
+      File.write(manifest_path, "schema_version: 1
+runtime:
+  presets: []
 ")
       runtime_package = A3::Domain::RuntimePackageDescriptor.build(
         image_version: "a3:v2.1.0",
@@ -301,12 +305,12 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
 
   it "reports invalid_runtime when explicit repo sources are not writable" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       repo_source_dir = File.join(dir, "repos", "repo-alpha")
       FileUtils.mkdir_p(preset_dir)
       FileUtils.mkdir_p(repo_source_dir)
-      File.write(manifest_path, "presets: []\n")
+      File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
       FileUtils.chmod(0o555, repo_source_dir)
 
       runtime_package = A3::Domain::RuntimePackageDescriptor.build(
@@ -337,11 +341,11 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
 
   it "reports invalid_runtime when a writable root is blocked by a file" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       workspace_root = File.join(dir, "workspaces")
       FileUtils.mkdir_p(preset_dir)
-      File.write(manifest_path, "presets: []\n")
+      File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
       File.write(workspace_root, "not a directory\n")
       runtime_package = A3::Domain::RuntimePackageDescriptor.build(
         image_version: "a3:v2.1.0",
@@ -369,10 +373,10 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
   it "reports invalid_runtime when scheduler store migration is pending" do
     with_env("A3_SECRET" => "token") do
       Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       FileUtils.mkdir_p(preset_dir)
-      File.write(manifest_path, "presets: []\n")
+      File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
 
       runtime_package = A3::Domain::RuntimePackageDescriptor.build(
         image_version: "a3:v2.1.0",
@@ -413,10 +417,10 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
   it "reports ok when a pending scheduler store migration marker is present" do
     with_env("A3_SECRET" => "token") do
       Dir.mktmpdir do |dir|
-        manifest_path = File.join(dir, "manifest.yml")
+        manifest_path = File.join(dir, "project.yaml")
         preset_dir = File.join(dir, "presets")
         FileUtils.mkdir_p(preset_dir)
-        File.write(manifest_path, "presets: []\n")
+        File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
 
         runtime_package = A3::Domain::RuntimePackageDescriptor.build(
           image_version: "a3:v2.1.0",
@@ -452,10 +456,10 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
   it "reports invalid_runtime when environment variable secret delivery is missing" do
     with_env("A3_SECRET" => nil) do
       Dir.mktmpdir do |dir|
-        manifest_path = File.join(dir, "manifest.yml")
+        manifest_path = File.join(dir, "project.yaml")
         preset_dir = File.join(dir, "presets")
         FileUtils.mkdir_p(preset_dir)
-        File.write(manifest_path, "presets: []\n")
+        File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
 
         runtime_package = A3::Domain::RuntimePackageDescriptor.build(
           image_version: "a3:v2.1.0",
@@ -489,12 +493,12 @@ RSpec.describe A3::Application::DoctorRuntimeEnvironment do
 
   it "reports ok when file mounted secret exists and is readable" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       secret_path = File.join(dir, "secrets", "a3-runtime")
       FileUtils.mkdir_p(preset_dir)
       FileUtils.mkdir_p(File.dirname(secret_path))
-      File.write(manifest_path, "presets: []\n")
+      File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
       File.write(secret_path, "token\n")
 
       runtime_package = A3::Domain::RuntimePackageDescriptor.build(

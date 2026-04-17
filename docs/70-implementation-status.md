@@ -14,6 +14,7 @@ Date: 2026-04-17
 - Foreground runtime execution: `a2o runtime run-once`, `a2o runtime loop`
 - Resident scheduler lifecycle: `a2o runtime start`, `stop`, `status`
 - Runtime diagnosis: `a2o runtime doctor`
+- Single-file project package config: `project.yaml`
 - SoloBoard adapter and bootstrap tooling
 - Agent HTTP worker gateway
 - Agent-materialized workspace mode
@@ -27,7 +28,6 @@ Date: 2026-04-17
 
 ## Productization Gaps
 
-- `A2O#272` Package schema consolidation implementation: convert loaders, docs, and reference packages after owner approval of the `A2O#269` design proposal.
 - `A2O#270` User-facing diagnostics: internal A3 names can remain, but normal manuals should avoid requiring users to author them.
 
 Each gap should be tracked as a kanban ticket before implementation. External behavior changes require owner discussion before coding.

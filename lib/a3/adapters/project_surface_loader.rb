@@ -11,15 +11,18 @@ module A3
       end
 
       def load(manifest_path)
-        manifest = YAML.load_file(manifest_path)
-        presets = manifest.fetch("presets")
+        project_config = load_project_config(manifest_path)
+        runtime = project_config.fetch("runtime") do
+          raise A3::Domain::ConfigurationError, "project.yaml runtime must be provided"
+        end
+        presets = runtime.fetch("presets")
         unless presets.is_a?(Array)
-          raise A3::Domain::ConfigurationError, "manifest presets must be an array"
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.presets must be an array"
         end
         preset_payload = presets.reduce({}) do |merged, preset_name|
           merge_preset(merged, load_preset(preset_name))
         end
-        project_payload = manifest.fetch("project", {})
+        project_payload = runtime.fetch("surface", {})
         payload = preset_payload.merge(project_payload)
 
         A3::Domain::ProjectSurface.new(
@@ -33,8 +36,24 @@ module A3
 
       private
 
+      def load_project_config(path)
+        payload = YAML.safe_load(File.read(path), permitted_classes: [], aliases: false)
+        unless payload.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml must contain a mapping"
+        end
+        schema_version = payload["schema_version"].to_s
+        if schema_version.empty?
+          raise A3::Domain::ConfigurationError, "project.yaml schema_version must be provided"
+        end
+        unless schema_version == "1"
+          raise A3::Domain::ConfigurationError, "project.yaml schema_version is unsupported: #{schema_version}"
+        end
+
+        payload
+      end
+
       def load_preset(name)
-        payload = YAML.load_file(File.join(@preset_dir, "#{name}.yml"))
+        payload = YAML.safe_load(File.read(File.join(@preset_dir, "#{name}.yml")), permitted_classes: [], aliases: false)
         schema_version = payload["schema_version"].to_s
         if schema_version.empty? || schema_version != @required_preset_schema_version
           raise A3::Domain::ConfigurationError, "preset #{name} schema_version must be #{@required_preset_schema_version}"

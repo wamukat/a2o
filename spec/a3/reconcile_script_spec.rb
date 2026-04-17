@@ -200,7 +200,7 @@ RSpec.describe A3Reconcile do
   it "recognizes current scheduler shot processes" do
     allow(IO).to receive(:popen).and_return(<<~PS)
       a2o-runtime-run-once
-      ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/a2o-reference-kanban-scheduler-auto reference-products/multi-repo-fixture/project-package/manifest.yml
+      ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/a2o-reference-kanban-scheduler-auto reference-products/multi-repo-fixture/project-package/project.yaml
     PS
 
     matches = described_class.live_scheduler_processes(
@@ -210,7 +210,7 @@ RSpec.describe A3Reconcile do
     expect(matches).to eq(
       [
         "a2o-runtime-run-once",
-        "ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/a2o-reference-kanban-scheduler-auto reference-products/multi-repo-fixture/project-package/manifest.yml"
+        "ruby -I a3-engine/lib a3-engine/bin/a3 execute-until-idle --storage-dir .work/a3/a2o-reference-kanban-scheduler-auto reference-products/multi-repo-fixture/project-package/project.yaml"
       ]
     )
   end

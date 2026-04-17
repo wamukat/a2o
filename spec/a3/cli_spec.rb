@@ -44,7 +44,7 @@ RSpec.describe A3::CLI do
       options: {
         task_ref: "A3-v2#3025",
         run_ref: "run-1",
-        manifest_path: "/tmp/manifest.yml",
+        manifest_path: "/tmp/project.yaml",
         preset_dir: "/tmp/presets"
       },
       container: {
@@ -66,7 +66,7 @@ RSpec.describe A3::CLI do
     allow(described_class).to receive(:with_runtime_session).and_yield(session)
 
     described_class.start(
-      ["show-merge-plan", "A3-v2#3025", "run-1", "/tmp/manifest.yml", "--preset-dir", "/tmp/presets"],
+      ["show-merge-plan", "A3-v2#3025", "run-1", "/tmp/project.yaml", "--preset-dir", "/tmp/presets"],
       out: out
     )
 
@@ -85,7 +85,7 @@ RSpec.describe A3::CLI do
   it "uses a shared default storage dir for execute-until-idle parsing" do
     allow(Dir).to receive(:pwd).and_return("/tmp/current")
 
-    options = described_class.send(:parse_execute_until_idle_options, ["/tmp/runtime/manifest.yml"])
+    options = described_class.send(:parse_execute_until_idle_options, ["/tmp/runtime/project.yaml"])
 
     expect(options.fetch(:storage_dir)).to eq("/tmp/current/tmp/a3")
   end
@@ -93,7 +93,7 @@ RSpec.describe A3::CLI do
   it "keeps explicit storage-dir overrides after centralizing defaults" do
     options = described_class.send(
       :parse_execute_until_idle_options,
-      ["--storage-dir", "/tmp/custom-state", "/tmp/runtime/manifest.yml"]
+      ["--storage-dir", "/tmp/custom-state", "/tmp/runtime/project.yaml"]
     )
 
     expect(options.fetch(:storage_dir)).to eq("/tmp/custom-state")
@@ -145,12 +145,12 @@ RSpec.describe A3::CLI do
   it "reports runtime doctor status through the shared runtime session helper" do
     with_env("A3_SECRET" => "token") do
       Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, 'manifest.yml')
+      manifest_path = File.join(dir, 'project.yaml')
       preset_dir = File.join(dir, 'presets')
       repo_source_dir = File.join(dir, 'repos', 'repo-alpha')
       FileUtils.mkdir_p(preset_dir)
       FileUtils.mkdir_p(repo_source_dir)
-      File.write(manifest_path, "schema_version: 1\npresets: []\n")
+      File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
       out = StringIO.new
       descriptor = A3::Domain::RuntimePackageDescriptor.build(
         image_version: 'a3:v2.1.0',
@@ -271,7 +271,7 @@ RSpec.describe A3::CLI do
     out = StringIO.new
     descriptor = A3::Domain::RuntimePackageDescriptor.build(
       image_version: 'a3:v2.1.0',
-      manifest_path: '/tmp/runtime/manifest.yml',
+      manifest_path: '/tmp/runtime/project.yaml',
       preset_dir: '/tmp/runtime/presets',
       storage_backend: :sqlite,
       storage_dir: '/tmp/runtime/state',
@@ -285,7 +285,7 @@ RSpec.describe A3::CLI do
     )
     session = Struct.new(:options, :runtime_package, keyword_init: true).new(
       options: {
-        manifest_path: '/tmp/runtime/manifest.yml',
+        manifest_path: '/tmp/runtime/project.yaml',
         preset_dir: '/tmp/runtime/presets',
         storage_backend: :sqlite,
         storage_dir: '/tmp/runtime/state'
@@ -295,13 +295,13 @@ RSpec.describe A3::CLI do
     allow(described_class).to receive(:with_runtime_package_session).and_yield(session)
 
     described_class.start(
-      ['show-runtime-package', '/tmp/runtime/manifest.yml', '--preset-dir', '/tmp/runtime/presets', '--storage-backend', 'sqlite', '--storage-dir', '/tmp/runtime/state'],
+      ['show-runtime-package', '/tmp/runtime/project.yaml', '--preset-dir', '/tmp/runtime/presets', '--storage-backend', 'sqlite', '--storage-dir', '/tmp/runtime/state'],
       out: out
     )
 
     expect(described_class).to have_received(:with_runtime_package_session)
     expect(out.string).to include('image_version=a3:v2.1.0')
-    expect(out.string).to include('manifest_path=/tmp/runtime/manifest.yml')
+    expect(out.string).to include('manifest_path=/tmp/runtime/project.yaml')
     expect(out.string).to include('project_runtime_root=/tmp/runtime')
     expect(out.string).to include('runtime_summary.mount=state_root=/tmp/runtime/state logs_root=/tmp/runtime/state/logs workspace_root=/tmp/runtime/state/workspaces artifact_root=/tmp/runtime/state/artifacts migration_marker_path=/tmp/runtime/state/.a3/scheduler-store-migration.applied')
     expect(out.string).to include('runtime_summary.writable_roots=/tmp/runtime/state,/tmp/runtime/state/workspaces,/tmp/runtime/state/artifacts')
@@ -331,11 +331,11 @@ RSpec.describe A3::CLI do
     expect(out.string).to include("runtime_summary.execution_modes=#{descriptor.operator_summary.fetch('execution_modes')}")
     expect(out.string).to include("runtime_summary.execution_mode_contract=#{descriptor.operator_summary.fetch('execution_mode_contract')}")
     expect(out.string).to include('runtime_summary.descriptor_startup_readiness=descriptor_ready')
-    expect(out.string).to include('runtime_summary.doctor_command=bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
-    expect(out.string).to include('runtime_summary.migration_command=bin/a3 migrate-scheduler-store /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
-    expect(out.string).to include('runtime_summary.runtime_command=bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
-    expect(out.string).to include('runtime_summary.runtime_validation_command=bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state && bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
-    expect(out.string).to include('runtime_summary.startup_sequence=doctor=bin/a3 doctor-runtime /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state migrate=skip runtime=bin/a3 execute-until-idle /tmp/runtime/manifest.yml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
+    expect(out.string).to include('runtime_summary.doctor_command=bin/a3 doctor-runtime /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
+    expect(out.string).to include('runtime_summary.migration_command=bin/a3 migrate-scheduler-store /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
+    expect(out.string).to include('runtime_summary.runtime_command=bin/a3 execute-until-idle /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
+    expect(out.string).to include('runtime_summary.runtime_validation_command=bin/a3 doctor-runtime /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state && bin/a3 execute-until-idle /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
+    expect(out.string).to include('runtime_summary.startup_sequence=doctor=bin/a3 doctor-runtime /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state migrate=skip runtime=bin/a3 execute-until-idle /tmp/runtime/project.yaml --preset-dir /tmp/runtime/presets --storage-backend sqlite --storage-dir /tmp/runtime/state')
     expect(out.string).to include('runtime_summary.operator_action=provide writable repo sources for repo_alpha,repo_beta; provide secrets via environment variable A3_SECRET; scheduler store migration not required')
     expect(out.string).to include('distribution_summary.image_ref=a3-engine:a3:v2.1.0')
     expect(out.string).to include('distribution_summary.runtime_entrypoint=bin/a3')
@@ -367,7 +367,7 @@ RSpec.describe A3::CLI do
     )
     session = Struct.new(:options, :runtime_package, keyword_init: true).new(
       options: {
-        manifest_path: "/tmp/runtime/manifest.yml",
+        manifest_path: "/tmp/runtime/project.yaml",
         preset_dir: "/tmp/runtime/presets",
         storage_backend: :sqlite,
         storage_dir: "/tmp/runtime/state"
@@ -386,7 +386,7 @@ RSpec.describe A3::CLI do
     )
 
     described_class.start(
-      ["migrate-scheduler-store", "/tmp/runtime/manifest.yml", "--preset-dir", "/tmp/runtime/presets", "--storage-backend", "sqlite", "--storage-dir", "/tmp/runtime/state"],
+      ["migrate-scheduler-store", "/tmp/runtime/project.yaml", "--preset-dir", "/tmp/runtime/presets", "--storage-backend", "sqlite", "--storage-dir", "/tmp/runtime/state"],
       out: out
     )
 
@@ -413,7 +413,7 @@ RSpec.describe A3::CLI do
     allow(described_class).to receive(:with_manifest_session).and_yield(session)
 
     described_class.start(
-      ["show-project-context", "/tmp/manifest.yml", "--preset-dir", "/tmp/presets", "--task-kind", "child", "--repo-scope", "repo_alpha", "--phase", "review"],
+      ["show-project-context", "/tmp/project.yaml", "--preset-dir", "/tmp/presets", "--task-kind", "child", "--repo-scope", "repo_alpha", "--phase", "review"],
       out: out
     )
 
@@ -433,12 +433,12 @@ RSpec.describe A3::CLI do
     allow(A3::Bootstrap).to receive(:manifest_session).and_return(bootstrap_session)
 
     described_class.start(
-      ["show-project-context", "/tmp/manifest.yml", "--preset-dir", "/tmp/presets", "--task-kind", "child", "--repo-scope", "repo_alpha", "--phase", "review"],
+      ["show-project-context", "/tmp/project.yaml", "--preset-dir", "/tmp/presets", "--task-kind", "child", "--repo-scope", "repo_alpha", "--phase", "review"],
       out: out
     )
 
     expect(A3::Bootstrap).to have_received(:manifest_session).with(
-      manifest_path: "/tmp/manifest.yml",
+      manifest_path: "/tmp/project.yaml",
       preset_dir: "/tmp/presets"
     )
     expect(out.string).to include("merge_target=merge_to_parent")
@@ -706,10 +706,10 @@ RSpec.describe A3::CLI do
 
   it "prints actionable persisted rerun recovery through sqlite repositories" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       FileUtils.mkdir_p(preset_dir)
-      File.write(manifest_path, "schema_version: 1\npresets: []\n")
+      File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
       run_repository = A3::Infra::SqliteRunRepository.new(File.join(dir, "a3.sqlite3"))
       task_repository.save(
@@ -884,10 +884,10 @@ RSpec.describe A3::CLI do
 
   it "prints persisted blocked diagnosis and evidence summary through sqlite repositories" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       FileUtils.mkdir_p(preset_dir)
-      File.write(manifest_path, "presets: []\n")
+      File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
       run_repository = A3::Infra::SqliteRunRepository.new(File.join(dir, "a3.sqlite3"))
       task_repository.save(

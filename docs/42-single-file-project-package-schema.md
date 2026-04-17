@@ -3,13 +3,13 @@
 対象読者: A2O 設計者 / project package author / reviewer
 文書種別: schema proposal
 
-Status: owner-approved direction for `A2O#272` implementation.
+Status: implemented by `A2O#272`.
 
 ## Decision
 
 The canonical project package config file should be `project.yaml`.
 
-`manifest.yml` should be deprecated as a separate author-facing file. Its current responsibilities should move into `project.yaml` under explicit runtime sections. This keeps the existing public package command shape, avoids introducing a second new name such as `a2o.yaml`, and removes the confusing split between "project config" and "manifest" for package authors.
+`manifest.yml` is deprecated as a separate author-facing file. Its former responsibilities moved into `project.yaml` under explicit runtime sections. This keeps the existing public package command shape, avoids introducing a second new name such as `a2o.yaml`, and removes the confusing split between "project config" and "manifest" for package authors.
 
 The owner decisions for implementation are:
 
@@ -18,14 +18,14 @@ The owner decisions for implementation are:
 - User-facing schema and diagnostics should use A2O names. A3 names may remain only as internal compatibility details.
 - Internal follow-up labels such as `a3:follow-up-child` should not be exposed in normal user-authored schema.
 
-## Current Split
+## Former Split
 
-Today package authors must understand two files:
+Before `A2O#272`, package authors had to understand two files:
 
 - `project.yaml`: package metadata, kanban board, repo slots, agent prerequisites, runtime loop defaults.
 - `manifest.yml`: runtime presets, merge behavior, project surface commands and skills through presets.
 
-That split is unclear because both files describe the same runtime package. `manifest.yml` also repeats the kanban project already present in `project.yaml`.
+That split was unclear because both files described the same runtime package. `manifest.yml` also repeated the kanban project already present in `project.yaml`.
 
 ## Proposed Shape
 
@@ -94,7 +94,7 @@ scenarios:
 
 `agent` owns host-side workspace and toolchain requirements. `required_bins` remains declarative because the agent can validate prerequisites before work starts.
 
-`runtime` owns execution defaults and the project surface that the Ruby runtime currently reads from `manifest.yml` plus presets.
+`runtime` owns execution defaults and the project surface that the Ruby runtime formerly read from `manifest.yml` plus presets.
 
 `runtime.presets` keeps the current preset model. Presets are still useful for common A2O behavior, but package-local overrides live beside the rest of the package config.
 
@@ -262,17 +262,17 @@ runtime:
       default: refs/heads/main
 ```
 
-## Migration Plan
+## Migration Status
 
-1. Add a single loader that reads `project.yaml` schema version `1`.
-2. Teach the runtime bridge to derive the internal runtime package payload from `runtime.presets`, `runtime.surface`, and `runtime.merge`.
-3. Remove `manifest.yml` from the reference product packages.
-4. Convert the four reference packages to single-file `project.yaml`.
-5. Update user docs and reference package docs to remove author-facing `manifest.yml`.
-6. Add validation errors when package authors provide old split files or misplaced fields.
-7. Map any remaining internal A3 names, environment variables, or labels behind A2O-facing schema and diagnostics.
+`A2O#272` implements the migration:
 
-`A2O#272` should implement these steps. If step 7 uncovers broader diagnostics wording outside package loading, keep the package schema A2O-facing and track remaining diagnostic cleanup under `A2O#270`.
+1. A single loader reads `project.yaml` schema version `1`.
+2. The runtime bridge derives internal runtime package data from `runtime.presets`, `runtime.surface`, and `runtime.merge`.
+3. Reference product packages no longer contain `manifest.yml`.
+4. The four reference packages use single-file `project.yaml`.
+5. User docs and reference package docs no longer ask authors to create `manifest.yml`.
+6. Package loading rejects old split files.
+7. Package schema and docs use A2O-facing names; broader diagnostics wording remains tracked by `A2O#270`.
 
 ## Implementation Notes
 

@@ -1,8 +1,12 @@
-project: a2o-reference-python-service
+schema_version: 1
+package:
+  name: a2o-reference-python-service
 kanban:
   provider: soloboard
   project: A2OReferencePython
   bootstrap: kanban/bootstrap.json
+  selection:
+    status: To do
 repos:
   app:
     path: ..
@@ -13,7 +17,21 @@ agent:
     - git
     - python3
 runtime:
-  kanban_status: To do
   live_ref: refs/heads/main
   max_steps: 20
   agent_attempts: 200
+  presets:
+    - base
+  surface:
+    implementation_skill: skills/implementation/base.md
+    review_skill:
+      default: skills/review/default.md
+    verification_commands:
+      - app/project-package/commands/verify.sh
+    remediation_commands:
+      - app/project-package/commands/format.sh
+    workspace_hook: app/project-package/commands/bootstrap.sh
+  merge:
+    target: merge_to_live
+    policy: ff_only
+    target_ref: refs/heads/main

@@ -213,7 +213,9 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 		t.Fatal(err)
 	}
 	projectYaml := strings.Join([]string{
-		"project: reference",
+		"schema_version: 1",
+		"package:",
+		"  name: reference",
 		"kanban:",
 		"  provider: soloboard",
 		"  project: A2OReference",
@@ -478,6 +480,87 @@ func TestRuntimeRunOnceFailsWithoutProjectYaml(t *testing.T) {
 
 	if !strings.Contains(stderr.String(), "project package config not found") {
 		t.Fatalf("stderr should mention missing project.yaml, got %q", stderr.String())
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
+	}
+}
+
+func TestRuntimeRunOnceRejectsLegacyManifestSplit(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	if err := os.WriteFile(filepath.Join(packageDir, "manifest.yml"), []byte("presets: [base]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail when manifest.yml is present")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "manifest.yml is no longer supported") {
+		t.Fatalf("stderr should reject legacy manifest split, got %q", stderr.String())
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
+	}
+}
+
+func TestRuntimeRunOnceRejectsProjectYamlWithoutSchemaVersion(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail without schema_version")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "missing schema_version") {
+		t.Fatalf("stderr should mention missing schema_version, got %q", stderr.String())
 	}
 	if len(runner.calls) != 0 {
 		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
@@ -973,10 +1056,14 @@ func TestRuntimeRunOnceReadsProjectYaml(t *testing.T) {
 	if err := os.MkdirAll(repoDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	projectYaml := `project: a2o-reference-typescript-api-web
+	projectYaml := `schema_version: 1
+package:
+  name: a2o-reference-typescript-api-web
 kanban:
   provider: soloboard
   project: A2OReferenceTypeScript
+  selection:
+    status: To do
 repos:
   app:
     path: ..
@@ -988,7 +1075,6 @@ agent:
     - node
     - npm
 runtime:
-  kanban_status: To do
   live_ref: refs/heads/main
   max_steps: 7
   agent_attempts: 9
@@ -1415,10 +1501,14 @@ func writeTestInstanceConfig(t *testing.T, dir string, config runtimeInstanceCon
 
 func writeMultiRepoProjectYaml(t *testing.T, packageDir string) {
 	t.Helper()
-	body := `project: a2o-reference-multi-repo
+	body := `schema_version: 1
+package:
+  name: a2o-reference-multi-repo
 kanban:
   provider: soloboard
   project: A2OReferenceMultiRepo
+  selection:
+    status: To do
 repos:
   repo_alpha:
     path: ../repos/catalog-service
@@ -1434,7 +1524,6 @@ agent:
     - git
     - node
 runtime:
-  kanban_status: To do
   live_ref: refs/heads/main
   max_steps: 40
   agent_attempts: 300

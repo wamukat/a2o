@@ -22,10 +22,9 @@ Each product keeps its package at `project-package/`.
 
 ## Package Contract
 
-Until `A2O#272` is implemented, each package includes:
+Each package includes:
 
 - `README.md`
-- `manifest.yml`
 - `project.yaml`
 - `kanban/bootstrap.json`
 - `commands/`
@@ -34,7 +33,7 @@ Until `A2O#272` is implemented, each package includes:
 
 The package must define a deterministic test or build command, agent prerequisites, editable source boundaries, and at least one scenario task that can be placed on the kanban board.
 
-The target package schema is a single `project.yaml` file proposed in [42-single-file-project-package-schema.md](42-single-file-project-package-schema.md). Reference products should be migrated after owner approval.
+`project.yaml` is the single author-facing package config file. It owns package identity, kanban selection, repo slots, agent prerequisites, runtime presets, project surface commands, and merge defaults.
 
 ## Validation Boundary
 

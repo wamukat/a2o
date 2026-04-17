@@ -1,8 +1,0 @@
-presets:
-  - base
-core:
-  merge_target: merge_to_live
-  merge_policy: ff_only
-  merge_target_ref: refs/heads/main
-project:
-  kanban_project: A2OReferenceTypeScript

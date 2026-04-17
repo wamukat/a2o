@@ -15,7 +15,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
 
   let(:loader) { described_class.new(preset_dir: @preset_dir) }
 
-  it "loads a manifest from preset chain and project overrides" do
+  it "loads a project config from preset chain and project overrides" do
     write_yaml(
       "base.yml",
       {
@@ -27,16 +27,18 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
       }
     )
 
-    manifest_path = write_manifest(
+    project_config_path = write_project_config(
       {
-        "presets" => ["base"],
-        "project" => {
-          "review_skill" => "skills/review/project.md"
+        "runtime" => {
+          "presets" => ["base"],
+          "surface" => {
+            "review_skill" => "skills/review/project.md"
+          }
         }
       }
     )
 
-    surface = loader.load(manifest_path)
+    surface = loader.load(project_config_path)
 
     expect(surface.implementation_skill).to eq("skills/implementation/base.md")
     expect(surface.review_skill).to eq("skills/review/project.md")
@@ -59,13 +61,9 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
       }
     )
 
-    manifest_path = write_manifest(
-      {
-        "presets" => ["base", "java-child"]
-      }
-    )
+    project_config_path = write_project_config({ "runtime" => { "presets" => ["base", "java-child"] } })
 
-    expect { loader.load(manifest_path) }.to raise_error(A3::Domain::ConfigurationConflictError)
+    expect { loader.load(project_config_path) }.to raise_error(A3::Domain::ConfigurationConflictError)
   end
 
   it "resolves variants in task_kind -> repo_scope -> phase order" do
@@ -75,15 +73,15 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
         "review_skill" => {
           "default" => "skills/review/default.md",
           "variants" => {
-                "task_kind" => {
-                  "parent" => {
-                    "repo_scope" => {
-                      "repo_alpha" => {
-                        "phase" => {
-                          "review" => "skills/review/repo-alpha-parent.md"
-                        }
-                      }
+            "task_kind" => {
+              "parent" => {
+                "repo_scope" => {
+                  "repo_alpha" => {
+                    "phase" => {
+                      "review" => "skills/review/repo-alpha-parent.md"
                     }
+                  }
+                }
               }
             }
           }
@@ -91,8 +89,8 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
       }
     )
 
-    manifest_path = write_manifest({ "presets" => ["base"] })
-    surface = loader.load(manifest_path)
+    project_config_path = write_project_config({ "runtime" => { "presets" => ["base"] } })
+    surface = loader.load(project_config_path)
 
     expect(surface.resolve(:review_skill, task_kind: :parent, repo_scope: :repo_alpha, phase: :review))
       .to eq("skills/review/repo-alpha-parent.md")
@@ -107,15 +105,15 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
         "review_skill" => {
           "default" => "skills/review/default.md",
           "variants" => {
-                "task_kind" => {
-                  "parent" => {
-                    "repo_scope" => {
-                      "repo_alpha" => {
-                        "phase" => {
-                          "review" => "skills/review/repo-alpha-parent.md"
-                        }
-                      }
+            "task_kind" => {
+              "parent" => {
+                "repo_scope" => {
+                  "repo_alpha" => {
+                    "phase" => {
+                      "review" => "skills/review/repo-alpha-parent.md"
                     }
+                  }
+                }
               }
             }
           }
@@ -128,15 +126,15 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
         "review_skill" => {
           "default" => "skills/review/default.md",
           "variants" => {
-                "task_kind" => {
-                  "parent" => {
-                    "repo_scope" => {
-                      "repo_beta" => {
-                        "phase" => {
-                          "review" => "skills/review/repo-beta-parent.md"
-                        }
-                      }
+            "task_kind" => {
+              "parent" => {
+                "repo_scope" => {
+                  "repo_beta" => {
+                    "phase" => {
+                      "review" => "skills/review/repo-beta-parent.md"
                     }
+                  }
+                }
               }
             }
           }
@@ -144,8 +142,8 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
       }
     )
 
-    manifest_path = write_manifest({ "presets" => ["base", "frontend-child"] })
-    surface = loader.load(manifest_path)
+    project_config_path = write_project_config({ "runtime" => { "presets" => ["base", "frontend-child"] } })
+    surface = loader.load(project_config_path)
 
     expect(surface.resolve(:review_skill, task_kind: :parent, repo_scope: :repo_alpha, phase: :review))
       .to eq("skills/review/repo-alpha-parent.md")
@@ -160,15 +158,15 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
         "review_skill" => {
           "default" => "skills/review/default.md",
           "variants" => {
-                "task_kind" => {
-                  "parent" => {
-                    "repo_scope" => {
-                      "repo_alpha" => {
-                        "phase" => {
-                          "review" => "skills/review/repo-alpha-parent.md"
-                        }
-                      }
+            "task_kind" => {
+              "parent" => {
+                "repo_scope" => {
+                  "repo_alpha" => {
+                    "phase" => {
+                      "review" => "skills/review/repo-alpha-parent.md"
                     }
+                  }
+                }
               }
             }
           }
@@ -176,8 +174,8 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
       }
     )
 
-    manifest_path = write_manifest({ "presets" => ["base"] })
-    surface = loader.load(manifest_path)
+    project_config_path = write_project_config({ "runtime" => { "presets" => ["base"] } })
+    surface = loader.load(project_config_path)
 
     expect(surface.review_skill).to be_frozen
     expect(surface.review_skill.fetch("variants")).to be_frozen
@@ -189,9 +187,9 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
 
   private
 
-  def write_manifest(payload)
-    path = File.join(@tmpdir, "manifest.yml")
-    File.write(path, YAML.dump(payload))
+  def write_project_config(payload)
+    path = File.join(@tmpdir, "project.yaml")
+    File.write(path, YAML.dump({ "schema_version" => 1 }.merge(payload)))
     path
   end
 

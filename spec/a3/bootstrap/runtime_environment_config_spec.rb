@@ -5,7 +5,7 @@ require "tmpdir"
 RSpec.describe A3::Bootstrap do
   it "builds an immutable runtime environment config around the runtime package descriptor" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       FileUtils.mkdir_p(preset_dir)
       File.write(
@@ -21,7 +21,7 @@ RSpec.describe A3::Bootstrap do
           }
         )
       )
-      File.write(manifest_path, YAML.dump({ "schema_version" => "1", "presets" => ["base"], "core" => { "merge_target" => "merge_to_parent", "merge_policy" => "ff_only", "merge_target_ref" => "refs/heads/live" } }))
+      File.write(manifest_path, YAML.dump({ "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/live" } } }))
 
       runtime_environment = described_class.runtime_environment_config(
         manifest_path: manifest_path,
@@ -100,10 +100,10 @@ RSpec.describe A3::Bootstrap do
 
   it "builds a runtime-only doctor config without project bootstrap dependencies" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       FileUtils.mkdir_p(preset_dir)
-      File.write(manifest_path, "schema_version: 1\npresets: []\n")
+      File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
 
       runtime_environment = described_class.doctor_runtime_environment_config(
         manifest_path: manifest_path,

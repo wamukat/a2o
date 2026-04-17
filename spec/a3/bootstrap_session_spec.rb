@@ -3,37 +3,10 @@
 require "tmpdir"
 
 RSpec.describe A3::Bootstrap do
-  it "assembles a manifest-only session without storage dependencies" do
+  it "assembles a project config session without storage dependencies" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
-      preset_dir = File.join(dir, "presets")
-      FileUtils.mkdir_p(preset_dir)
-      File.write(
-        File.join(preset_dir, "base.yml"),
-        YAML.dump(
-          {
-            "schema_version" => "1",
-            "implementation_skill" => "skills/implementation/base.md",
-            "review_skill" => "skills/review/default.md",
-            "verification_commands" => ["commands/verify-all"],
-            "remediation_commands" => ["commands/apply-remediation"],
-            "workspace_hook" => "hooks/prepare-runtime.sh"
-          }
-        )
-      )
-      File.write(
-        manifest_path,
-        YAML.dump(
-          {
-            "presets" => ["base"],
-            "core" => {
-              "merge_target" => "merge_to_parent",
-              "merge_policy" => "ff_only",
-              "merge_target_ref" => "refs/heads/live"
-            }
-          }
-        )
-      )
+      manifest_path = File.join(dir, "project.yaml")
+      preset_dir = write_runtime_package(dir, manifest_path)
 
       session = described_class.manifest_session(
         manifest_path: manifest_path,
@@ -47,37 +20,10 @@ RSpec.describe A3::Bootstrap do
     end
   end
 
-  it "assembles a manifest-driven session with project context and storage container" do
+  it "assembles a project config driven session with project context and storage container" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
-      preset_dir = File.join(dir, "presets")
-      FileUtils.mkdir_p(preset_dir)
-      File.write(
-        File.join(preset_dir, "base.yml"),
-        YAML.dump(
-          {
-            "schema_version" => "1",
-            "implementation_skill" => "skills/implementation/base.md",
-            "review_skill" => "skills/review/default.md",
-            "verification_commands" => ["commands/verify-all"],
-            "remediation_commands" => ["commands/apply-remediation"],
-            "workspace_hook" => "hooks/prepare-runtime.sh"
-          }
-        )
-      )
-      File.write(
-        manifest_path,
-        YAML.dump(
-          {
-            "presets" => ["base"],
-            "core" => {
-              "merge_target" => "merge_to_parent",
-              "merge_policy" => "ff_only",
-              "merge_target_ref" => "refs/heads/live"
-            }
-          }
-        )
-      )
+      manifest_path = File.join(dir, "project.yaml")
+      preset_dir = write_runtime_package(dir, manifest_path)
 
       session = described_class.session(
         manifest_path: manifest_path,
@@ -120,37 +66,10 @@ RSpec.describe A3::Bootstrap do
     end
   end
 
-  it "assembles a manifest-driven sqlite session through the shared session assembly path" do
+  it "assembles a project config driven sqlite session through the shared session assembly path" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
-      preset_dir = File.join(dir, "presets")
-      FileUtils.mkdir_p(preset_dir)
-      File.write(
-        File.join(preset_dir, "base.yml"),
-        YAML.dump(
-          {
-            "schema_version" => "1",
-            "implementation_skill" => "skills/implementation/base.md",
-            "review_skill" => "skills/review/default.md",
-            "verification_commands" => ["commands/verify-all"],
-            "remediation_commands" => ["commands/apply-remediation"],
-            "workspace_hook" => "hooks/prepare-runtime.sh"
-          }
-        )
-      )
-      File.write(
-        manifest_path,
-        YAML.dump(
-          {
-            "presets" => ["base"],
-            "core" => {
-              "merge_target" => "merge_to_parent",
-              "merge_policy" => "ff_only",
-              "merge_target_ref" => "refs/heads/live"
-            }
-          }
-        )
-      )
+      manifest_path = File.join(dir, "project.yaml")
+      preset_dir = write_runtime_package(dir, manifest_path)
 
       session = A3::Bootstrap::Session.build(
         manifest_path: manifest_path,
@@ -175,23 +94,10 @@ RSpec.describe A3::Bootstrap do
 
 
 
-  it "exposes a runtime package descriptor on manifest-driven sessions" do
+  it "exposes a runtime package descriptor on project config driven sessions" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
-      preset_dir = File.join(dir, "presets")
-      FileUtils.mkdir_p(preset_dir)
-      File.write(File.join(preset_dir, "base.yml"), YAML.dump({
-        "schema_version" => "1",
-        "implementation_skill" => "skills/implementation/base.md",
-        "review_skill" => "skills/review/default.md",
-        "verification_commands" => ["commands/verify-all"],
-        "remediation_commands" => ["commands/apply-remediation"],
-        "workspace_hook" => "hooks/prepare-runtime.sh"
-      }))
-      File.write(manifest_path, YAML.dump({
-        "presets" => ["base"],
-        "core" => {"merge_target" => "merge_to_parent", "merge_policy" => "ff_only", "merge_target_ref" => "refs/heads/live"}
-      }))
+      manifest_path = File.join(dir, "project.yaml")
+      preset_dir = write_runtime_package(dir, manifest_path)
 
       session = described_class.session(
         manifest_path: manifest_path,
@@ -216,7 +122,7 @@ RSpec.describe A3::Bootstrap do
   it "raises for unsupported storage backends" do
     expect do
       described_class.session(
-        manifest_path: "manifest.yml",
+        manifest_path: "project.yaml",
         preset_dir: "presets",
         storage_backend: :unknown,
         storage_dir: "/tmp",
@@ -224,5 +130,40 @@ RSpec.describe A3::Bootstrap do
         run_id_generator: -> { "run-1" }
       )
     end.to raise_error(ArgumentError, /unsupported storage backend/)
+  end
+
+  def write_runtime_package(dir, manifest_path)
+    preset_dir = File.join(dir, "presets")
+    FileUtils.mkdir_p(preset_dir)
+    File.write(
+      File.join(preset_dir, "base.yml"),
+      YAML.dump(
+        {
+          "schema_version" => "1",
+          "implementation_skill" => "skills/implementation/base.md",
+          "review_skill" => "skills/review/default.md",
+          "verification_commands" => ["commands/verify-all"],
+          "remediation_commands" => ["commands/apply-remediation"],
+          "workspace_hook" => "hooks/prepare-runtime.sh"
+        }
+      )
+    )
+    File.write(
+      manifest_path,
+      YAML.dump(
+        {
+          "schema_version" => 1,
+          "runtime" => {
+            "presets" => ["base"],
+            "merge" => {
+              "target" => "merge_to_parent",
+              "policy" => "ff_only",
+              "target_ref" => "refs/heads/live"
+            }
+          }
+        }
+      )
+    )
+    preset_dir
   end
 end

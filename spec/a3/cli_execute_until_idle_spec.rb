@@ -18,16 +18,9 @@ RSpec.describe A3::CLI do
       repo_sources = create_repo_sources(dir)
       seed_context(dir)
       File.write(
-        File.join(dir, "manifest.yml"),
+        File.join(dir, "project.yaml"),
         YAML.dump(
-          {
-            "presets" => ["base"],
-            "core" => {
-              "merge_target" => "merge_to_live",
-              "merge_policy" => "ff_only",
-              "merge_target_ref" => "refs/heads/main"
-            }
-          }
+          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_live", "policy" => "ff_only", "target_ref" => "refs/heads/main" } } }
         )
       )
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
@@ -64,7 +57,7 @@ RSpec.describe A3::CLI do
       described_class.start(
         [
           "execute-until-idle",
-          File.join(dir, "manifest.yml"),
+          File.join(dir, "project.yaml"),
           "--storage-backend", "sqlite",
           "--storage-dir", dir,
           *repo_source_args(repo_sources),
@@ -95,16 +88,9 @@ RSpec.describe A3::CLI do
       }
       seed_context(dir)
       File.write(
-        File.join(dir, "manifest.yml"),
+        File.join(dir, "project.yaml"),
         YAML.dump(
-          {
-            "presets" => ["base"],
-            "core" => {
-              "merge_target" => "merge_to_live",
-              "merge_policy" => "ff_only",
-              "merge_target_ref" => "refs/heads/main"
-            }
-          }
+          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_live", "policy" => "ff_only", "target_ref" => "refs/heads/main" } } }
         )
       )
       repo_sources.each_value do |repo_path|
@@ -159,7 +145,7 @@ RSpec.describe A3::CLI do
       described_class.start(
         [
           "execute-until-idle",
-          File.join(dir, "manifest.yml"),
+          File.join(dir, "project.yaml"),
           "--storage-backend", "sqlite",
           "--storage-dir", dir,
           *repo_source_args(repo_sources),
@@ -184,16 +170,9 @@ RSpec.describe A3::CLI do
       repo_sources = create_repo_sources(dir)
       seed_context(dir)
       File.write(
-        File.join(dir, "manifest.yml"),
+        File.join(dir, "project.yaml"),
         YAML.dump(
-          {
-            "presets" => ["base"],
-            "core" => {
-              "merge_target" => "merge_to_live",
-              "merge_policy" => "ff_only",
-              "merge_target_ref" => "refs/heads/main"
-            }
-          }
+          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_live", "policy" => "ff_only", "target_ref" => "refs/heads/main" } } }
         )
       )
       fake_cli = create_fake_kanban_cli(
@@ -254,7 +233,7 @@ RSpec.describe A3::CLI do
         described_class.start(
           [
             "execute-until-idle",
-            File.join(dir, "manifest.yml"),
+            File.join(dir, "project.yaml"),
             "--storage-backend", "sqlite",
             "--storage-dir", dir,
             *repo_source_args(repo_sources),
@@ -359,7 +338,7 @@ RSpec.describe A3::CLI do
         described_class.start(
           [
             "execute-until-idle",
-            File.join(dir, "manifest.yml"),
+            File.join(dir, "project.yaml"),
             "--storage-backend", "sqlite",
             "--storage-dir", dir,
             *repo_source_args(repo_sources),
@@ -419,16 +398,9 @@ RSpec.describe A3::CLI do
       )
     )
     File.write(
-      File.join(dir, "manifest.yml"),
+      File.join(dir, "project.yaml"),
       YAML.dump(
-          {
-            "presets" => ["base"],
-            "core" => {
-              "merge_target" => "merge_to_parent",
-              "merge_policy" => "ff_only",
-              "merge_target_ref" => "refs/heads/main"
-            }
-          }
+          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/main" } } }
         )
       )
   end

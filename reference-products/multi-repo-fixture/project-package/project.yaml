@@ -1,8 +1,12 @@
-project: a2o-reference-multi-repo
+schema_version: 1
+package:
+  name: a2o-reference-multi-repo
 kanban:
   provider: soloboard
   project: A2OReferenceMultiRepo
   bootstrap: kanban/bootstrap.json
+  selection:
+    status: To do
 repos:
   repo_alpha:
     path: ../repos/catalog-service
@@ -18,7 +22,36 @@ agent:
     - git
     - node
 runtime:
-  kanban_status: To do
   live_ref: refs/heads/main
   max_steps: 40
   agent_attempts: 300
+  presets:
+    - base
+  surface:
+    implementation_skill: skills/implementation/base.md
+    review_skill:
+      default: skills/review/default.md
+      variants:
+        task_kind:
+          parent:
+            repo_scope:
+              both:
+                phase:
+                  review: skills/review/parent.md
+    verification_commands:
+      - "$A2O_ROOT_DIR/reference-products/multi-repo-fixture/project-package/commands/verify-all.sh"
+    remediation_commands:
+      - "$A2O_ROOT_DIR/reference-products/multi-repo-fixture/project-package/commands/format.sh"
+    workspace_hook: reference-products/multi-repo-fixture
+  merge:
+    target:
+      default: merge_to_live
+      variants:
+        task_kind:
+          child:
+            default: merge_to_parent
+          parent:
+            default: merge_to_live
+    policy: ff_only
+    target_ref:
+      default: refs/heads/main

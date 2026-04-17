@@ -71,7 +71,7 @@ RSpec.describe A3::CLI do
         described_class.start(
           [
             "execute-next-runnable-task",
-            File.join(dir, "manifest.yml"),
+            File.join(dir, "project.yaml"),
             "--storage-backend", "sqlite",
             "--storage-dir", dir,
             *repo_source_args(repo_sources),
@@ -104,7 +104,7 @@ RSpec.describe A3::CLI do
         described_class.start(
           [
             "execute-next-runnable-task",
-            File.join(dir, "manifest.yml"),
+            File.join(dir, "project.yaml"),
             "--storage-backend", "sqlite",
             "--storage-dir", dir,
             *repo_source_args(repo_sources),
@@ -154,7 +154,7 @@ RSpec.describe A3::CLI do
         described_class.start(
           [
             "execute-next-runnable-task",
-            File.join(dir, "manifest.yml"),
+            File.join(dir, "project.yaml"),
             "--storage-backend", "sqlite",
             "--storage-dir", dir,
             *repo_source_args(repo_sources),
@@ -236,7 +236,7 @@ RSpec.describe A3::CLI do
         described_class.start(
           [
             "execute-next-runnable-task",
-            File.join(dir, "manifest.yml"),
+            File.join(dir, "project.yaml"),
             "--storage-backend", "sqlite",
             "--storage-dir", dir,
             *repo_source_args(repo_sources),
@@ -317,7 +317,7 @@ RSpec.describe A3::CLI do
         described_class.start(
           [
             "execute-next-runnable-task",
-            File.join(dir, "manifest.yml"),
+            File.join(dir, "project.yaml"),
             "--storage-backend", "sqlite",
             "--storage-dir", dir,
             *repo_source_args(repo_sources),
@@ -354,7 +354,7 @@ RSpec.describe A3::CLI do
         described_class.start(
           [
             "execute-next-runnable-task",
-            File.join(dir, "manifest.yml"),
+            File.join(dir, "project.yaml"),
             "--storage-backend", "sqlite",
             "--storage-dir", dir,
             *repo_source_args(repo_sources),
@@ -388,16 +388,9 @@ RSpec.describe A3::CLI do
       )
     )
     File.write(
-      File.join(dir, "manifest.yml"),
+      File.join(dir, "project.yaml"),
       YAML.dump(
-        {
-          "presets" => ["base"],
-          "core" => {
-            "merge_target" => "merge_to_live",
-            "merge_policy" => "ff_only",
-            "merge_target_ref" => "refs/heads/feature/prototype"
-          }
-        }
+        { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_live", "policy" => "ff_only", "target_ref" => "refs/heads/feature/prototype" } } }
       )
     )
   end

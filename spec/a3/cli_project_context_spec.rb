@@ -21,16 +21,19 @@ RSpec.describe A3::CLI do
           }
         )
       )
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       File.write(
         manifest_path,
         YAML.dump(
           {
-            "presets" => ["base"],
-            "core" => {
-              "merge_target" => "merge_to_live",
-              "merge_policy" => "no_ff",
-              "merge_target_ref" => "refs/heads/live"
+            "schema_version" => 1,
+            "runtime" => {
+              "presets" => ["base"],
+              "merge" => {
+                "target" => "merge_to_live",
+                "policy" => "no_ff",
+                "target_ref" => "refs/heads/live"
+              }
             }
           }
         )

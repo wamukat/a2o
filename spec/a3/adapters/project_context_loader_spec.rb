@@ -32,18 +32,20 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
   end
 
   it "loads project surface and core merge config together" do
-    manifest_path = write_manifest(
+    project_config_path = write_project_config(
       {
-        "presets" => ["base"],
-        "core" => {
-          "merge_target" => "merge_to_parent",
-          "merge_policy" => "ff_only",
-          "merge_target_ref" => "refs/heads/feature/prototype"
+        "runtime" => {
+          "presets" => ["base"],
+          "merge" => {
+            "target" => "merge_to_parent",
+            "policy" => "ff_only",
+            "target_ref" => "refs/heads/feature/prototype"
+          }
         }
       }
     )
 
-    context = loader.load(manifest_path)
+    context = loader.load(project_config_path)
 
     expect(context.surface.implementation_skill).to eq("skills/implementation/base.md")
     expect(context.merge_config.target).to eq(:merge_to_parent)
@@ -52,90 +54,100 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
   end
 
   it "rejects unknown merge target" do
-    manifest_path = write_manifest(
+    project_config_path = write_project_config(
       {
-        "presets" => ["base"],
-        "core" => {
-          "merge_target" => "invented_target",
-          "merge_policy" => "ff_only",
-          "merge_target_ref" => "refs/heads/feature/prototype"
+        "runtime" => {
+          "presets" => ["base"],
+          "merge" => {
+            "target" => "invented_target",
+            "policy" => "ff_only",
+            "target_ref" => "refs/heads/feature/prototype"
+          }
         }
       }
     )
 
-    expect { loader.load(manifest_path) }.to raise_error(A3::Domain::ConfigurationError)
+    expect { loader.load(project_config_path) }.to raise_error(A3::Domain::ConfigurationError)
   end
 
   it "rejects missing core merge config" do
-    manifest_path = write_manifest(
+    project_config_path = write_project_config(
       {
-        "presets" => ["base"]
+        "runtime" => {
+          "presets" => ["base"]
+        }
       }
     )
 
-    expect { loader.load(manifest_path) }
-      .to raise_error(A3::Domain::ConfigurationError, "manifest core.merge_target and core.merge_policy must be provided")
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.merge.target and runtime.merge.policy must be provided")
   end
 
   it "rejects missing core merge target ref" do
-    manifest_path = write_manifest(
+    project_config_path = write_project_config(
       {
-        "presets" => ["base"],
-        "core" => {
-          "merge_target" => "merge_to_parent",
-          "merge_policy" => "ff_only"
+        "runtime" => {
+          "presets" => ["base"],
+          "merge" => {
+            "target" => "merge_to_parent",
+            "policy" => "ff_only"
+          }
         }
       }
     )
 
-    expect { loader.load(manifest_path) }
-      .to raise_error(A3::Domain::ConfigurationError, "manifest core.merge_target_ref must be provided")
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.merge.target_ref must be provided")
   end
 
   it "rejects blank core merge target ref" do
-    manifest_path = write_manifest(
+    project_config_path = write_project_config(
       {
-        "presets" => ["base"],
-        "core" => {
-          "merge_target" => "merge_to_parent",
-          "merge_policy" => "ff_only",
-          "merge_target_ref" => "   "
+        "runtime" => {
+          "presets" => ["base"],
+          "merge" => {
+            "target" => "merge_to_parent",
+            "policy" => "ff_only",
+            "target_ref" => "   "
+          }
         }
       }
     )
 
-    expect { loader.load(manifest_path) }
-      .to raise_error(A3::Domain::ConfigurationError, "manifest core.merge_target_ref must not be blank")
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.merge.target_ref must not be blank")
   end
 
   it "loads task-kind-specific merge config variants" do
-    manifest_path = write_manifest(
+    project_config_path = write_project_config(
       {
-        "presets" => ["base"],
-        "core" => {
-          "merge_target" => {
-            "default" => "merge_to_live",
-            "variants" => {
-              "task_kind" => {
-                "child" => {"default" => "merge_to_parent"},
-                "parent" => {"default" => "merge_to_live"}
+        "runtime" => {
+          "presets" => ["base"],
+          "merge" => {
+            "target" => {
+              "default" => "merge_to_live",
+              "variants" => {
+                "task_kind" => {
+                  "child" => {"default" => "merge_to_parent"},
+                  "parent" => {"default" => "merge_to_live"}
+                }
               }
-            }
-          },
-          "merge_target_ref" => {
-            "default" => "refs/heads/live",
-            "variants" => {
-              "task_kind" => {
-                "parent" => {"default" => "refs/heads/feature/prototype"}
+            },
+            "target_ref" => {
+              "default" => "refs/heads/live",
+              "variants" => {
+                "task_kind" => {
+                  "parent" => {"default" => "refs/heads/feature/prototype"}
+                }
               }
-            }
-          },
-          "merge_policy" => "ff_only"
+            },
+            "policy" => "ff_only"
+          }
         }
       }
     )
 
-    context = loader.load(manifest_path)
+    context = loader.load(project_config_path)
     child_task = A3::Domain::Task.new(
       ref: "A3-v2#3037",
       kind: :child,
@@ -159,9 +171,9 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
 
   private
 
-  def write_manifest(payload)
-    path = File.join(@tmpdir, "manifest.yml")
-    File.write(path, YAML.dump(payload))
+  def write_project_config(payload)
+    path = File.join(@tmpdir, "project.yaml")
+    File.write(path, YAML.dump({ "schema_version" => 1 }.merge(payload)))
     path
   end
 end

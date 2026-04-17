@@ -36,18 +36,11 @@ RSpec.describe A3::CLI do
           }
         )
       )
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       File.write(
         manifest_path,
         YAML.dump(
-          {
-            "presets" => ["base"],
-            "core" => {
-              "merge_target" => "merge_to_parent",
-              "merge_policy" => "ff_only",
-              "merge_target_ref" => "refs/heads/a3/parent/A3-v2-3022"
-            }
-          }
+          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/a3/parent/A3-v2-3022" } } }
         )
       )
 
@@ -88,18 +81,11 @@ RSpec.describe A3::CLI do
           }
         )
       )
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       File.write(
         manifest_path,
         YAML.dump(
-          {
-            "presets" => ["base"],
-            "core" => {
-              "merge_target" => "merge_to_parent",
-              "merge_policy" => "ff_only",
-              "merge_target_ref" => "refs/heads/a3/parent/A3-v2-3022"
-            }
-          }
+          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/a3/parent/A3-v2-3022" } } }
         )
       )
 

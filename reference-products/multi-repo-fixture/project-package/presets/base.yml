@@ -10,7 +10,7 @@ review_skill:
             phase:
               review: skills/review/parent.md
 verification_commands:
-  - "$A3_ROOT_DIR/reference-products/multi-repo-fixture/project-package/commands/verify-all.sh"
+  - "$A2O_ROOT_DIR/reference-products/multi-repo-fixture/project-package/commands/verify-all.sh"
 remediation_commands:
-  - "$A3_ROOT_DIR/reference-products/multi-repo-fixture/project-package/commands/format.sh"
+  - "$A2O_ROOT_DIR/reference-products/multi-repo-fixture/project-package/commands/format.sh"
 workspace_hook: reference-products/multi-repo-fixture

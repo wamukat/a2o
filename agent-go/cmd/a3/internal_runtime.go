@@ -568,11 +568,12 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		RuntimePIDFile:       envDefault("A3_RUNTIME_RUN_ONCE_PID_FILE", envDefault("A3_RUNTIME_SCHEDULER_PID_FILE", "/tmp/a3-runtime-run-once.pid")),
 		ServerPIDFile:        envDefault("A3_RUNTIME_RUN_ONCE_SERVER_PID_FILE", envDefault("A3_RUNTIME_SCHEDULER_SERVER_PID_FILE", "/tmp/a3-runtime-run-once-agent-server.pid")),
 		PresetDir:            envDefault("A3_RUNTIME_RUN_ONCE_PRESET_DIR", envDefault("A3_RUNTIME_SCHEDULER_PRESET_DIR", "/tmp/a3-engine/config/presets")),
-		ManifestPath:         envDefault("A3_RUNTIME_RUN_ONCE_MANIFEST", envDefault("A3_RUNTIME_SCHEDULER_MANIFEST", filepath.Join(referencePackagePath, "manifest.yml"))),
+		ManifestPath:         envDefault("A3_RUNTIME_RUN_ONCE_PROJECT_CONFIG", envDefault("A3_RUNTIME_SCHEDULER_PROJECT_CONFIG", filepath.Join(referencePackagePath, "project.yaml"))),
 		SoloBoardInternalURL: envDefault("A3_SOLOBOARD_INTERNAL_URL", "http://soloboard:3000"),
 		LiveRef:              envDefault("A3_RUNTIME_RUN_ONCE_LIVE_REF", envDefault("A3_RUNTIME_SCHEDULER_LIVE_REF", defaultLiveRef)),
 		AgentEnv: []string{
 			"A3_ROOT_DIR=" + hostRootDir,
+			"A2O_ROOT_DIR=" + hostRootDir,
 			"A3_MAVEN_WORKSPACE_BOOTSTRAP_MODE=" + envDefault("A3_RUNTIME_RUN_ONCE_MAVEN_WORKSPACE_BOOTSTRAP_MODE", envDefault("A3_RUNTIME_SCHEDULER_MAVEN_WORKSPACE_BOOTSTRAP_MODE", "empty")),
 		},
 		AgentSourcePaths:   envDefaultList("A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS", agentSourcePaths),
@@ -844,6 +845,7 @@ func startRuntimeExecuteUntilIdle(config runtimeInstanceConfig, plan runtimeRunO
 		Env: map[string]string{
 			"A3_BRANCH_NAMESPACE": plan.BranchNamespace,
 			"A3_ROOT_DIR":         "/workspace",
+			"A2O_ROOT_DIR":        "/workspace",
 			"KANBAN_BACKEND":      "soloboard",
 		},
 		EnvShell: map[string]string{

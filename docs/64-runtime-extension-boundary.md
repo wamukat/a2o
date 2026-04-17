@@ -36,12 +36,11 @@ A2O Engine core must stay project-neutral. Project-specific behavior enters thro
 
 ## Current Package Layout
 
-Until `A2O#272` is implemented, reference packages use this shape:
+Reference packages use this shape:
 
 ```text
 project-package/
   README.md
-  manifest.yml
   project.yaml
   kanban/bootstrap.json
   commands/
@@ -49,9 +48,7 @@ project-package/
   scenarios/
 ```
 
-`project.yaml` is the runtime-facing package config. `manifest.yml` is release and review metadata. `commands/` contains project-owned scripts when declarative commands are not enough. `scenarios/` contains kanban task templates used for validation.
-
-The target single-file schema is proposed in [42-single-file-project-package-schema.md](42-single-file-project-package-schema.md). After owner approval and implementation, `project.yaml` should become the only author-facing package config file.
+`project.yaml` is the only author-facing package config. It owns package metadata, kanban bootstrap and selection, repo slots, agent prerequisites, runtime presets, project surface commands, and merge defaults. `commands/` contains project-owned scripts when declarative commands are not enough. `scenarios/` contains kanban task templates used for validation.
 
 ## Review Checklist
 

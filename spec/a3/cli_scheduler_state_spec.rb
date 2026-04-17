@@ -22,16 +22,9 @@ RSpec.describe A3::CLI do
         )
       )
       File.write(
-        File.join(dir, "manifest.yml"),
+        File.join(dir, "project.yaml"),
         YAML.dump(
-          {
-            "presets" => ["base"],
-            "core" => {
-              "merge_target" => "merge_to_parent",
-              "merge_policy" => "ff_only",
-              "merge_target_ref" => "refs/heads/live"
-            }
-          }
+          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/live" } } }
         )
       )
       out = StringIO.new
@@ -50,7 +43,7 @@ RSpec.describe A3::CLI do
       described_class.start(
         [
           "execute-until-idle",
-          File.join(dir, "manifest.yml"),
+          File.join(dir, "project.yaml"),
           "--storage-backend", "sqlite",
           "--storage-dir", dir,
           "--preset-dir", preset_dir,

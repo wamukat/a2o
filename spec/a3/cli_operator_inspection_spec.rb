@@ -18,10 +18,10 @@ RSpec.describe A3::CLI do
 
   it "shows task and run inspection views through sqlite backend" do
     Dir.mktmpdir do |dir|
-      manifest_path = File.join(dir, "manifest.yml")
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       FileUtils.mkdir_p(preset_dir)
-      File.write(manifest_path, "presets: []\n")
+      File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
       run_repository = A3::Infra::SqliteRunRepository.new(File.join(dir, "a3.sqlite3"))
       task_repository.save(
@@ -171,12 +171,12 @@ RSpec.describe A3::CLI do
       "A3_SCHEDULER_STORE_MIGRATION" => "pending"
     ) do
       Dir.mktmpdir do |dir|
-        manifest_path = File.join(dir, "manifest.yml")
+        manifest_path = File.join(dir, "project.yaml")
         preset_dir = File.join(dir, "presets")
         repo_source_dir = File.join(dir, "repos", "repo-alpha")
         FileUtils.mkdir_p(preset_dir)
         FileUtils.mkdir_p(repo_source_dir)
-        File.write(manifest_path, "schema_version: 1\npresets: []\n")
+        File.write(manifest_path, "schema_version: 1\nruntime:\n  presets: []\n")
 
         task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
         run_repository = A3::Infra::SqliteRunRepository.new(File.join(dir, "a3.sqlite3"))
