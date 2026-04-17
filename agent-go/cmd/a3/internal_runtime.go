@@ -427,6 +427,7 @@ type runtimeRunOncePlan struct {
 	RuntimeExitFile      string
 	RuntimePIDFile       string
 	ServerPIDFile        string
+	PresetDir            string
 	ManifestPath         string
 	SoloBoardInternalURL string
 	LiveRef              string
@@ -563,6 +564,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		RuntimeExitFile:      envDefault("A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefault("A3_RUNTIME_SCHEDULER_EXIT_FILE", "/tmp/a3-runtime-run-once.exit")),
 		RuntimePIDFile:       envDefault("A3_RUNTIME_RUN_ONCE_PID_FILE", envDefault("A3_RUNTIME_SCHEDULER_PID_FILE", "/tmp/a3-runtime-run-once.pid")),
 		ServerPIDFile:        envDefault("A3_RUNTIME_RUN_ONCE_SERVER_PID_FILE", envDefault("A3_RUNTIME_SCHEDULER_SERVER_PID_FILE", "/tmp/a3-runtime-run-once-agent-server.pid")),
+		PresetDir:            envDefault("A3_RUNTIME_RUN_ONCE_PRESET_DIR", envDefault("A3_RUNTIME_SCHEDULER_PRESET_DIR", "/tmp/a3-engine/config/presets")),
 		ManifestPath:         envDefault("A3_RUNTIME_RUN_ONCE_MANIFEST", envDefault("A3_RUNTIME_SCHEDULER_MANIFEST", filepath.Join(referencePackagePath, "manifest.yml"))),
 		SoloBoardInternalURL: envDefault("A3_SOLOBOARD_INTERNAL_URL", "http://soloboard:3000"),
 		LiveRef:              envDefault("A3_RUNTIME_RUN_ONCE_LIVE_REF", envDefault("A3_RUNTIME_SCHEDULER_LIVE_REF", defaultLiveRef)),
@@ -856,7 +858,7 @@ func startRuntimeExecuteUntilIdle(config runtimeInstanceConfig, plan runtimeRunO
 func executeUntilIdleArgs(plan runtimeRunOncePlan) []string {
 	args := []string{
 		"a3", "execute-until-idle",
-		"--preset-dir", "a3-engine/config/presets",
+		"--preset-dir", plan.PresetDir,
 		"--storage-backend", "json",
 		"--storage-dir", plan.StorageDir,
 		"--worker-gateway", "agent-http",

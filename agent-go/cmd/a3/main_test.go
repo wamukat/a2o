@@ -376,6 +376,7 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 		"'--agent-source-path' 'repo_beta=",
 		"'--kanban-repo-label' 'repo:catalog=repo_alpha'",
 		"'--repo-source' 'repo_alpha=/workspace/repos/catalog-service'",
+		"'--preset-dir' '/tmp/a3-engine/config/presets'",
 	} {
 		if !strings.Contains(joinedText, want) {
 			t.Fatalf("run-once missing %q in:\n%s", want, joinedText)
