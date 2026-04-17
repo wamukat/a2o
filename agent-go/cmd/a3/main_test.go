@@ -208,6 +208,9 @@ func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
 			if strings.Contains(stderr.String(), "Usage of a3 ") {
 				t.Fatalf("stderr should not expose internal usage name, got %q", stderr.String())
 			}
+			if strings.Contains(stderr.String(), "a3-agent binary") {
+				t.Fatalf("stderr should use public agent binary name, got %q", stderr.String())
+			}
 		})
 	}
 }

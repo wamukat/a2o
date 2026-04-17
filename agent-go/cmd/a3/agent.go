@@ -45,7 +45,7 @@ func runAgentInstall(args []string, runner commandRunner, stdout io.Writer, stde
 	flags.SetOutput(stderr)
 
 	target := flags.String("target", "auto", "agent package target, or auto")
-	output := flags.String("output", "", "host output path for the exported a3-agent binary")
+	output := flags.String("output", "", "host output path for the exported a2o-agent binary")
 	composeProject := flags.String("compose-project", "", "docker compose project name")
 	composeFile := flags.String("compose-file", "", "docker compose file")
 	runtimeService := flags.String("runtime-service", "", "docker compose runtime service name")
