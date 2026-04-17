@@ -441,10 +441,10 @@ The first operator-facing bridge is explicit CLI configuration, not implicit inf
 - Freshness defaults to `reuse_if_clean_and_ref_matches`.
 - Cleanup defaults to `retain_until_a3_cleanup`; `cleanup_after_job` is available for validation/dev.
 
-The runtime package surface exposes two separate command shapes:
+The runtime package contract separates A3-side job construction from agent-side fallback / diagnostic operation:
 
 - A3-side worker gateway options: `--worker-gateway agent-http --agent-shared-workspace-mode agent-materialized --agent-source-alias SLOT=ALIAS --agent-workspace-root PATH --agent-source-path ALIAS=PATH ...`
-- Agent-side worker command: `a2o-agent --engine <control-plane-url> --agent-token-file <path> --loop ...`
+- Agent-side fallback / diagnostic command: `a2o-agent --engine <control-plane-url> --agent-token-file <path> --loop ...`
 
 The first part, `slot -> alias`, is A3 job construction data. The second part, `alias -> local path`, is host/dev-env environment data but is still configured in Engine-side project config and transmitted per job as `agent_environment`. A3 doctor validates schema, alias coverage, and policy values; Engine-issued agent doctor jobs validate local filesystem accessibility from the agent runtime.
 
