@@ -254,7 +254,11 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 	if strings.TrimSpace(hostRootDir) == "" {
 		hostRootDir = "."
 	}
-	packageConfig, err := loadProjectPackageConfig(config.PackagePath)
+	referencePackagePath := envDefault("A3_RUNTIME_RUN_ONCE_REFERENCE_PACKAGE", envDefault("A3_RUNTIME_SCHEDULER_REFERENCE_PACKAGE", config.PackagePath))
+	if strings.TrimSpace(referencePackagePath) == "" {
+		return runtimeRunOncePlan{}, errors.New("runtime package path is empty; run `a2o project bootstrap --package ./a2o-project` first")
+	}
+	packageConfig, err := loadProjectPackageConfig(referencePackagePath)
 	if err != nil {
 		return runtimeRunOncePlan{}, err
 	}
@@ -291,10 +295,6 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		workerCommand = "ruby"
 		workerArgs = []string{effectiveWorker}
 	}
-	referencePackagePath := envDefault("A3_RUNTIME_RUN_ONCE_REFERENCE_PACKAGE", envDefault("A3_RUNTIME_SCHEDULER_REFERENCE_PACKAGE", config.PackagePath))
-	if strings.TrimSpace(referencePackagePath) == "" {
-		referencePackagePath = filepath.Join(hostRootDir, "reference-products", "multi-repo-fixture", "project-package")
-	}
 	agentSourcePaths, agentSourceAliases, localSourceAliases, repoSources, repoLabels := packageRuntimeRepoArgs(hostRootDir, referencePackagePath, packageConfig)
 	requiredBins := packageConfig.AgentRequiredBins
 	if len(requiredBins) == 0 {
@@ -302,7 +302,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 	}
 	defaultMaxSteps := envDefaultValue(packageConfig.MaxSteps, "16")
 	defaultLiveRef := envDefaultValue(packageConfig.LiveRef, "refs/heads/feature/prototype")
-	defaultKanbanProject := envDefaultValue(packageConfig.KanbanProject, "A2OReferenceMultiRepo")
+	defaultKanbanProject := packageConfig.KanbanProject
 	defaultKanbanStatus := envDefaultValue(packageConfig.KanbanStatus, "To do")
 	return runtimeRunOncePlan{
 		ComposePrefix:        composeArgs(config),
@@ -345,33 +345,6 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 }
 
 func packageRuntimeRepoArgs(hostRootDir string, packagePath string, config projectPackageConfig) ([]string, []string, []string, []string, []string) {
-	if len(config.Repos) == 0 {
-		referenceRoot := filepath.Clean(filepath.Join(packagePath, ".."))
-		catalogPath := filepath.Join(referenceRoot, "repos", "catalog-service")
-		storefrontPath := filepath.Join(referenceRoot, "repos", "storefront")
-		return []string{
-				"catalog-service=" + catalogPath,
-				"storefront=" + storefrontPath,
-			},
-			[]string{
-				"repo_alpha=catalog-service",
-				"repo_beta=storefront",
-			},
-			[]string{
-				"catalog-service=" + catalogPath,
-				"storefront=" + storefrontPath,
-			},
-			[]string{
-				"repo_alpha=/workspace/reference-products/multi-repo-fixture/repos/catalog-service",
-				"repo_beta=/workspace/reference-products/multi-repo-fixture/repos/storefront",
-			},
-			[]string{
-				"repo:catalog=repo_alpha",
-				"repo:storefront=repo_beta",
-				"repo:both=repo_alpha,repo_beta",
-			}
-	}
-
 	agentSourcePaths := []string{}
 	agentSourceAliases := []string{}
 	localSourceAliases := []string{}

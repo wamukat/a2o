@@ -202,4 +202,4 @@ task は repo label を使って対象 slot を指定する。parent-child flow 
 - project package schema は `manifest.yml` と `project.yaml` の責務をさらに明確化する余地がある。
 - published image での release smoke は、公開前の独立した gate として実行する。
 
-これらは A2O の設計ギャップとして `A2O#267`、`A2O#268`、`A2O#269`、`A2O#270` で追跡する。
+これらは A2O の設計ギャップとして `A2O#268`、`A2O#269`、`A2O#270` と、常駐 scheduler ON/OFF 用の `A2O#271` で追跡する。

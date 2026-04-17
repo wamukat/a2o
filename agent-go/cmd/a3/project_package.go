@@ -32,7 +32,7 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	file, err := os.Open(projectFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return config, nil
+			return config, fmt.Errorf("project package config not found: %s", projectFile)
 		}
 		return config, fmt.Errorf("read project package config: %w", err)
 	}
@@ -130,6 +130,12 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	}
 	if err := scanner.Err(); err != nil {
 		return config, fmt.Errorf("scan project package config: %w", err)
+	}
+	if strings.TrimSpace(config.KanbanProject) == "" {
+		return config, fmt.Errorf("project package config %s is missing kanban.project", projectFile)
+	}
+	if len(config.Repos) == 0 {
+		return config, fmt.Errorf("project package config %s is missing repos", projectFile)
 	}
 	return config, nil
 }

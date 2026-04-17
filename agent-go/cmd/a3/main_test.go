@@ -309,6 +309,7 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	writeMultiRepoProjectYaml(t, packageDir)
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
 		SchemaVersion:  1,
 		PackagePath:    packageDir,
@@ -360,10 +361,10 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	joinedText := strings.Join(joined, "\n")
 	for _, want := range []string{
 		"'--kanban-project' 'A2OReferenceMultiRepo'",
-		"'--agent-source-path' 'catalog-service=",
-		"'--agent-source-path' 'storefront=",
+		"'--agent-source-path' 'repo_alpha=",
+		"'--agent-source-path' 'repo_beta=",
 		"'--kanban-repo-label' 'repo:catalog=repo_alpha'",
-		"'--repo-source' 'repo_alpha=/workspace/reference-products/multi-repo-fixture/repos/catalog-service'",
+		"'--repo-source' 'repo_alpha=/workspace/repos/catalog-service'",
 	} {
 		if !strings.Contains(joinedText, want) {
 			t.Fatalf("run-once missing %q in:\n%s", want, joinedText)
@@ -386,12 +387,46 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	}
 }
 
+func TestRuntimeRunOnceFailsWithoutProjectYaml(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail without project.yaml")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "project package config not found") {
+		t.Fatalf("stderr should mention missing project.yaml, got %q", stderr.String())
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
+	}
+}
+
 func TestRuntimeRunOncePrefersPublicA2OAgentPath(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	writeMultiRepoProjectYaml(t, packageDir)
 	publicAgentPath := filepath.Join(tempDir, ".work", "a2o-agent", "bin", "a2o-agent")
 	if err := os.MkdirAll(filepath.Dir(publicAgentPath), 0o755); err != nil {
 		t.Fatal(err)
@@ -511,6 +546,7 @@ func TestRuntimeRunOnceAllowsEnvToOverrideStaleInstanceRuntimeValues(t *testing.
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	writeMultiRepoProjectYaml(t, packageDir)
 	t.Setenv("A3_COMPOSE_PROJECT", "env-project")
 	t.Setenv("A3_COMPOSE_FILE", "env-compose.yml")
 	t.Setenv("A3_BUNDLE_AGENT_PORT", "7555")
@@ -554,6 +590,7 @@ func TestRuntimeLoopRunsConfiguredCycles(t *testing.T) {
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	writeMultiRepoProjectYaml(t, packageDir)
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
 		SchemaVersion:  1,
 		PackagePath:    packageDir,
@@ -827,6 +864,37 @@ func writeTestInstanceConfig(t *testing.T, dir string, config runtimeInstanceCon
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeMultiRepoProjectYaml(t *testing.T, packageDir string) {
+	t.Helper()
+	body := `project: a2o-reference-multi-repo
+kanban:
+  provider: soloboard
+  project: A2OReferenceMultiRepo
+repos:
+  repo_alpha:
+    path: ../repos/catalog-service
+    role: product
+    label: repo:catalog
+  repo_beta:
+    path: ../repos/storefront
+    role: product
+    label: repo:storefront
+agent:
+  workspace_root: .work/a2o-agent/workspaces
+  required_bins:
+    - git
+    - node
+runtime:
+  kanban_status: To do
+  live_ref: refs/heads/main
+  max_steps: 40
+  agent_attempts: 300
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
