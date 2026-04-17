@@ -306,7 +306,7 @@ docker run --rm \
    - retired Portal runtime task (up)
    - retired Portal runtime task (bootstrap)
    - retired Portal runtime task (doctor)
-   - `doctor` が SoloBoard `/api/boards`、runtime container の `ruby` / `python3` / `task` を確認する
+   - `doctor` が SoloBoard `/api/boards`、runtime container の `ruby` / transitional `python3` / `task` を確認する。`python3` は `tools/kanban/cli.py` subprocess adapter が runtime default である間だけ必要な依存である
 2. SoloBoard 初期化
    - bootstrap は `Portal` / `OIDC` / `A3Engine` board、lane、tag を seed する
    - `task kanban:doctor` と `task kanban:validation` で generic operator surface を確認する
@@ -1385,7 +1385,7 @@ SoloBoard を current generic default に寄せた時点で、Docker/runtime pac
   - repeated scheduler-loop 観測で追加 hardening 要否が判断できる
   - local compose bundle (`task a3:portal:bundle:up/bootstrap/doctor/validation`) が通る
 
-2026-04-11 時点では、workspace root に `docker-compose.a3-portal-soloboard.yml` と `docker/a3-runtime/Dockerfile` を置き、`task a3:portal:bundle:up`, `:doctor`, `:bootstrap`, `:validation`, `:down`, `:logs` を追加した。2026-04-13 の配布整理で compose 正本は `a3-engine/docker/compose/a3-portal-soloboard.yml`、runtime Dockerfile 正本は `a3-engine/docker/a3-runtime/Dockerfile` へ移動した。local bundle は `a3-runtime` container と `soloboard` container を同一 compose project で起動し、`doctor` で `ruby`, `python3`, `task`, SoloBoard `/api/boards` を確認し、`bootstrap` で `Portal` / `OIDC` / `A3Engine` board/lane/tag surface を seed し、`validation` で relation/comment/transition を含む compatibility surface を実機確認できる。
+2026-04-11 時点では、workspace root に `docker-compose.a3-portal-soloboard.yml` と `docker/a3-runtime/Dockerfile` を置き、`task a3:portal:bundle:up`, `:doctor`, `:bootstrap`, `:validation`, `:down`, `:logs` を追加した。2026-04-13 の配布整理で compose 正本は `a3-engine/docker/compose/a3-portal-soloboard.yml`、runtime Dockerfile 正本は `a3-engine/docker/a3-runtime/Dockerfile` へ移動した。local bundle は `a3-runtime` container と `soloboard` container を同一 compose project で起動し、`doctor` で `ruby`, transitional `python3`, `task`, SoloBoard `/api/boards` を確認し、`bootstrap` で `Portal` / `OIDC` / `A3Engine` board/lane/tag surface を seed し、`validation` で relation/comment/transition を含む compatibility surface を実機確認できる。`python3` は runtime kanban adapter が `tools/kanban/cli.py` を subprocess 実行する間だけ残す。
 
 ただし、この spike では Portal verification を A3 runtime container 内で直接実行するために Temurin 25 JDK を A3 image へ入れており、これは完成形ではない。完成形では A3 container は汎用 orchestration/control plane とし、project 固有 toolchain は host または project dev-env container に配置した `a3-agent` が引き受ける。したがって次の slice は「A3 image から project runtime を剥がす」「A3 job protocol と `a3-agent` MVP を設計する」「SoloBoard 固定 compose bundle に manual loop agent を接続する」に寄せる。
 
