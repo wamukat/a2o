@@ -141,6 +141,10 @@ func TestResolveAgentTokenPrefersDirectToken(t *testing.T) {
 
 func TestRunWorkerStdinBundleExecutesConfiguredCommand(t *testing.T) {
 	tmp := t.TempDir()
+	workspace := filepath.Join(tmp, "workspace")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	requestPath := filepath.Join(tmp, "request.json")
 	resultPath := filepath.Join(tmp, "result.json")
 	promptPath := filepath.Join(tmp, "prompt.json")
@@ -193,8 +197,8 @@ JSON
 
 	t.Setenv("A3_WORKER_REQUEST_PATH", requestPath)
 	t.Setenv("A3_WORKER_RESULT_PATH", resultPath)
-	t.Setenv("A3_WORKER_LAUNCHER_CONFIG_PATH", launcherPath)
-	t.Setenv("A3_WORKSPACE_ROOT", tmp)
+	t.Setenv("A3_ROOT_DIR", tmp)
+	t.Setenv("A3_WORKSPACE_ROOT", workspace)
 
 	if code := run([]string{"worker", "stdin-bundle"}); code != 0 {
 		t.Fatalf("worker exit code = %d", code)
@@ -218,6 +222,72 @@ JSON
 	if !strings.Contains(string(promptBody), "You are the A2O worker") || !strings.Contains(string(promptBody), "A2O#2") {
 		t.Fatalf("prompt should contain A2O worker bundle, got %s", promptBody)
 	}
+}
+
+func TestWorkerResponseSchemaIncludesPhaseSpecificProperties(t *testing.T) {
+	tests := []struct {
+		name       string
+		request    map[string]any
+		properties []string
+	}{
+		{
+			name: "implementation",
+			request: map[string]any{
+				"phase": "implementation",
+			},
+			properties: []string{"changed_files", "review_disposition"},
+		},
+		{
+			name: "parent review",
+			request: map[string]any{
+				"phase": "review",
+				"phase_runtime": map[string]any{
+					"task_kind": "parent",
+				},
+			},
+			properties: []string{"review_disposition"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			path, cleanup, err := writeWorkerResponseSchema(tc.request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer cleanup()
+			body, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var schema map[string]any
+			if err := json.Unmarshal(body, &schema); err != nil {
+				t.Fatal(err)
+			}
+			properties, ok := schema["properties"].(map[string]any)
+			if !ok {
+				t.Fatalf("schema properties missing: %s", body)
+			}
+			required := stringSet(schema["required"].([]any))
+			for _, property := range tc.properties {
+				if _, ok := properties[property]; !ok {
+					t.Fatalf("schema missing property %q: %s", property, body)
+				}
+				if !required[property] {
+					t.Fatalf("schema should require %q: %s", property, body)
+				}
+			}
+		})
+	}
+}
+
+func stringSet(values []any) map[string]bool {
+	result := map[string]bool{}
+	for _, value := range values {
+		if text, ok := value.(string); ok {
+			result[text] = true
+		}
+	}
+	return result
 }
 
 func createDoctorGitSource(t *testing.T, root string) string {

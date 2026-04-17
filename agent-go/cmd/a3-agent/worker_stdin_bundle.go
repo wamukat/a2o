@@ -150,20 +150,34 @@ func writeWorkerResponseSchema(request map[string]any) (string, func(), error) {
 	if err != nil {
 		return "", func() {}, err
 	}
+	properties := map[string]any{
+		"task_ref":        map[string]any{"type": "string"},
+		"run_ref":         map[string]any{"type": "string"},
+		"phase":           map[string]any{"type": "string"},
+		"success":         map[string]any{"type": "boolean"},
+		"summary":         map[string]any{"type": "string"},
+		"failing_command": map[string]any{"type": []string{"string", "null"}},
+		"observed_state":  map[string]any{"type": []string{"string", "null"}},
+		"rework_required": map[string]any{"type": "boolean"},
+	}
+	if stringValue(request["phase"]) == "implementation" {
+		properties["changed_files"] = map[string]any{
+			"type": []string{"object", "null"},
+			"additionalProperties": map[string]any{
+				"type":  "array",
+				"items": map[string]any{"type": "string"},
+			},
+		}
+		properties["review_disposition"] = reviewDispositionSchema([]string{"object", "null"})
+	}
+	if stringValue(request["phase"]) == "review" && nestedString(request, "phase_runtime", "task_kind") == "parent" {
+		properties["review_disposition"] = reviewDispositionSchema("object")
+	}
 	schema := map[string]any{
 		"type":                 "object",
 		"additionalProperties": false,
 		"required":             workerRequiredFields(request),
-		"properties": map[string]any{
-			"task_ref":        map[string]any{"type": "string"},
-			"run_ref":         map[string]any{"type": "string"},
-			"phase":           map[string]any{"type": "string"},
-			"success":         map[string]any{"type": "boolean"},
-			"summary":         map[string]any{"type": "string"},
-			"failing_command": map[string]any{"type": []string{"string", "null"}},
-			"observed_state":  map[string]any{"type": []string{"string", "null"}},
-			"rework_required": map[string]any{"type": "boolean"},
-		},
+		"properties":           properties,
 	}
 	body, err := json.MarshalIndent(schema, "", "  ")
 	if err != nil {
@@ -181,6 +195,21 @@ func writeWorkerResponseSchema(request map[string]any) (string, func(), error) {
 		return "", func() {}, err
 	}
 	return file.Name(), func() { _ = os.Remove(file.Name()) }, nil
+}
+
+func reviewDispositionSchema(schemaType any) map[string]any {
+	return map[string]any{
+		"type": schemaType,
+		"properties": map[string]any{
+			"kind":        map[string]any{"type": "string"},
+			"repo_scope":  map[string]any{"type": "string"},
+			"summary":     map[string]any{"type": "string"},
+			"description": map[string]any{"type": "string"},
+			"finding_key": map[string]any{"type": "string"},
+		},
+		"required":             []string{"kind", "repo_scope", "summary", "description", "finding_key"},
+		"additionalProperties": false,
+	}
 }
 
 func workerRequiredFields(request map[string]any) []string {
@@ -223,7 +252,19 @@ func workerLauncherConfigPath() string {
 	if path := strings.TrimSpace(os.Getenv("A3_WORKER_LAUNCHER_CONFIG_PATH")); path != "" {
 		return path
 	}
-	return filepath.Join(workerWorkspaceRoot(), "launcher.json")
+	candidates := []string{}
+	for _, envKey := range []string{"A2O_ROOT_DIR", "A3_ROOT_DIR"} {
+		if root := strings.TrimSpace(os.Getenv(envKey)); root != "" {
+			candidates = append(candidates, filepath.Join(root, "launcher.json"))
+		}
+	}
+	candidates = append(candidates, filepath.Join(workerWorkspaceRoot(), "launcher.json"))
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	return candidates[0]
 }
 
 func resolveWorkerExecutorProfile(request map[string]any, executor map[string]any) (executorProfile, error) {
