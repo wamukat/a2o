@@ -201,6 +201,7 @@ JSON
 	t.Setenv("A3_ROOT_DIR", tmp)
 	t.Setenv("A2O_ROOT_DIR", tmp)
 	t.Setenv("A3_WORKSPACE_ROOT", workspace)
+	t.Setenv("A3_WORKER_LAUNCHER_CONFIG_PATH", launcherPath)
 
 	if code := run([]string{"worker", "stdin-bundle"}); code != 0 {
 		t.Fatalf("worker exit code = %d", code)
@@ -223,6 +224,53 @@ JSON
 	}
 	if !strings.Contains(string(promptBody), "You are the A2O worker") || !strings.Contains(string(promptBody), "A2O#2") {
 		t.Fatalf("prompt should contain A2O worker bundle, got %s", promptBody)
+	}
+}
+
+func TestRunWorkerStdinBundleRejectsMissingLauncherConfigEnv(t *testing.T) {
+	tmp := t.TempDir()
+	requestPath := filepath.Join(tmp, "request.json")
+	resultPath := filepath.Join(tmp, "result.json")
+	workspace := filepath.Join(tmp, "workspace")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(requestPath, []byte(`{
+  "task_ref": "A2O#5",
+  "run_ref": "run-1",
+  "phase": "implementation",
+  "phase_runtime": {},
+  "task_packet": {"title": "implement"}
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "launcher.json"), []byte(`{"executor": {}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("A3_WORKER_REQUEST_PATH", requestPath)
+	t.Setenv("A3_WORKER_RESULT_PATH", resultPath)
+	t.Setenv("A3_ROOT_DIR", tmp)
+	t.Setenv("A2O_ROOT_DIR", tmp)
+	t.Setenv("A3_WORKSPACE_ROOT", workspace)
+
+	if code := run([]string{"worker", "stdin-bundle"}); code != 0 {
+		t.Fatalf("worker should return protocol failure payload with exit 0, got %d", code)
+	}
+	resultBody, err := os.ReadFile(resultPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(resultBody, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result["success"] != false || result["observed_state"] != "invalid_executor_config" {
+		t.Fatalf("unexpected result: %s", resultBody)
+	}
+	diagnostics, _ := result["diagnostics"].(map[string]any)
+	if !strings.Contains(stringValue(diagnostics["error"]), "A3_WORKER_LAUNCHER_CONFIG_PATH is required") {
+		t.Fatalf("result should explain missing launcher env, got %s", resultBody)
 	}
 }
 

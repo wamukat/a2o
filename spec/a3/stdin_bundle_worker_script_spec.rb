@@ -139,6 +139,34 @@ RSpec.describe "worker:stdin-bundle" do
     end
   end
 
+  it "does not fall back to root launcher.json when launcher config env is missing" do
+    Dir.mktmpdir("a3-stdin-worker-missing-launcher-env-") do |temp_dir_text|
+      temp_dir = Pathname(temp_dir_text)
+      request_path = temp_dir.join("request.json")
+      result_path = temp_dir.join("result.json")
+      workspace_root = temp_dir.join("workspace")
+      workspace_root.mkpath
+      request_path.write(JSON.generate(base_request))
+      temp_dir.join("launcher.json").write(JSON.generate("executor" => {}))
+
+      stdout, stderr, status = run_worker_process(
+        {
+          "A3_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A3_WORKER_RESULT_PATH" => result_path.to_s,
+          "A3_ROOT_DIR" => temp_dir.to_s,
+          "A3_WORKSPACE_ROOT" => workspace_root.to_s
+        }
+      )
+
+      expect(status.success?).to eq(true), "#{stdout}\n#{stderr}"
+      payload = JSON.parse(result_path.read)
+      expect(payload.fetch("success")).to eq(false)
+      expect(payload.fetch("summary")).to eq("stdin worker executor config invalid")
+      expect(payload.fetch("observed_state")).to eq("invalid_executor_config")
+      expect(payload.fetch("diagnostics").fetch("error")).to include("A3_WORKER_LAUNCHER_CONFIG_PATH is required")
+    end
+  end
+
   it "rewrites invalid payload as schema failure" do
     Dir.mktmpdir("a3-stdin-worker-invalid-") do |temp_dir_text|
       temp_dir = Pathname(temp_dir_text)

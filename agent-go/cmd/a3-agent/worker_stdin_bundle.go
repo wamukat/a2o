@@ -226,7 +226,11 @@ func workerRequiredFields(request map[string]any) []string {
 
 func workerExecutorCommand(request map[string]any, resultPath string, schemaPath string) ([]string, map[string]string, error) {
 	config := map[string]any{}
-	if err := readJSONFile(workerLauncherConfigPath(), &config); err != nil {
+	launcherConfigPath := workerLauncherConfigPath()
+	if launcherConfigPath == "" {
+		return nil, nil, fmt.Errorf("A3_WORKER_LAUNCHER_CONFIG_PATH is required for a2o-agent worker stdin-bundle")
+	}
+	if err := readJSONFile(launcherConfigPath, &config); err != nil {
 		return nil, nil, err
 	}
 	rawExecutor, ok := config["executor"].(map[string]any)
@@ -252,19 +256,7 @@ func workerLauncherConfigPath() string {
 	if path := strings.TrimSpace(os.Getenv("A3_WORKER_LAUNCHER_CONFIG_PATH")); path != "" {
 		return path
 	}
-	candidates := []string{}
-	for _, envKey := range []string{"A2O_ROOT_DIR", "A3_ROOT_DIR"} {
-		if root := strings.TrimSpace(os.Getenv(envKey)); root != "" {
-			candidates = append(candidates, filepath.Join(root, "launcher.json"))
-		}
-	}
-	candidates = append(candidates, filepath.Join(workerWorkspaceRoot(), "launcher.json"))
-	for _, candidate := range candidates {
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
-	}
-	return candidates[0]
+	return ""
 }
 
 func resolveWorkerExecutorProfile(request map[string]any, executor map[string]any) (executorProfile, error) {

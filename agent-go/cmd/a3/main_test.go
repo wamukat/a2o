@@ -692,6 +692,57 @@ runtime:
 	}
 }
 
+func TestRuntimeRunOnceRejectsMissingProjectExecutorBeforeDocker(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: portal
+kanban:
+  project: Portal
+repos:
+  repo_alpha:
+    path: ..
+runtime:
+  live_ref: refs/heads/main
+  max_steps: 20
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail without runtime.executor")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "project.yaml runtime.executor is required") {
+		t.Fatalf("stderr should mention missing runtime.executor, got %q", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "launcher.json") {
+		t.Fatalf("stderr should not ask users for launcher.json, got %q", stderr.String())
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
+	}
+}
+
 func TestRuntimeStartLaunchesForegroundLoopInBackground(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

@@ -6,7 +6,7 @@ require "tempfile"
 require "open3"
 
 ROOT_DIR = Pathname(ENV.fetch("A3_ROOT_DIR", Dir.pwd)).expand_path.freeze
-LAUNCHER_CONFIG_PATH = Pathname(ENV.fetch("A3_WORKER_LAUNCHER_CONFIG_PATH", "launcher.json")).expand_path.freeze
+LAUNCHER_CONFIG_PATH = ENV["A3_WORKER_LAUNCHER_CONFIG_PATH"]
 KNOWN_EXECUTOR_PHASES = %w[implementation review parent_review].freeze
 ALLOWED_EXECUTOR_PLACEHOLDERS = {
   "result_path" => :result_path,
@@ -177,6 +177,8 @@ def response_schema(request)
 end
 
 def load_executor_config
+  raise ArgumentError, "A3_WORKER_LAUNCHER_CONFIG_PATH is required for a2o-agent worker stdin-bundle" if LAUNCHER_CONFIG_PATH.to_s.strip.empty?
+
   load_json(LAUNCHER_CONFIG_PATH).fetch("executor", {})
 end
 
