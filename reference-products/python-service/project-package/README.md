@@ -4,6 +4,7 @@ Use this package from the product root:
 
 ```sh
 a2o project bootstrap --package ./project-package
+a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 ```
 
 The package targets the single Python repository in `..`.

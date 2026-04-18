@@ -22,8 +22,8 @@ bootstrap は project package から runtime instance config を作成する。�
 
 ```sh
 a2o project bootstrap
+a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 a2o kanban up
-a2o agent install
 a2o runtime run-once
 ```
 

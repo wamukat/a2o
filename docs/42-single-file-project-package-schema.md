@@ -99,6 +99,8 @@ scenarios:
   - path: scenarios/001-add-work-order-filter.md
 ```
 
+Host agent binary は canonical path `.work/a2o/agent/bin/a2o-agent` に置く。導入時は `a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent` を使う。
+
 ## Section Responsibilities
 
 `schema_version` is required. Version `1` is the first single-file schema. The implementation should reject unsupported versions with a clear error.

@@ -284,6 +284,9 @@ func TestProjectTemplatePrintsValidMinimalProjectYaml(t *testing.T) {
 	if config.KanbanProject != "SampleProduct" {
 		t.Fatalf("KanbanProject=%q", config.KanbanProject)
 	}
+	if !strings.Contains(stdout.String(), "a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent") {
+		t.Fatalf("template should document canonical agent install path, got:\n%s", stdout.String())
+	}
 	if config.Repos["app"].Label != "repo:app" {
 		t.Fatalf("repo label=%q", config.Repos["app"].Label)
 	}
@@ -749,6 +752,65 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("doctor output missing %q in:\n%s", want, stdout.String())
 		}
+	}
+}
+
+func TestDoctorAgentInstallFailureShowsExactOutputPath(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	repoDir := filepath.Join(tempDir, "repo")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(repoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectYaml := strings.Join([]string{
+		"schema_version: 1",
+		"package:",
+		"  name: sample",
+		"kanban:",
+		"  project: Sample",
+		"repos:",
+		"  app:",
+		"    path: ../repo",
+		"agent:",
+		"  required_bins: [\"sh\"]",
+		"runtime:",
+		"  executor:",
+		"    command: [\"sh\", \"-c\", \"echo ok\"]",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-sample",
+		RuntimeService: "a3-runtime",
+		SoloBoardPort:  "3480",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"doctor"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("doctor should fail when canonical agent is missing, stdout=%s", stdout.String())
+		}
+	})
+
+	wantPath := filepath.Join(tempDir, hostAgentBinRelativePath)
+	wantAction := "action=run a2o agent install --target auto --output " + shellQuote(wantPath)
+	if !strings.Contains(stdout.String(), "doctor_check name=agent_install status=blocked") {
+		t.Fatalf("doctor should report blocked agent install, got:\n%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), wantAction) {
+		t.Fatalf("doctor should include exact install command %q in:\n%s", wantAction, stdout.String())
 	}
 }
 
@@ -1952,6 +2014,48 @@ func TestRuntimeRunOncePrefersPublicA2OAgentPath(t *testing.T) {
 
 	if runner.lastEnv["A3_HOST_AGENT_BIN"] != publicAgentPath {
 		t.Fatalf("agent bin env=%q, want %q", runner.lastEnv["A3_HOST_AGENT_BIN"], publicAgentPath)
+	}
+}
+
+func TestRuntimeRunOnceIgnoresLegacyA2OAgentPath(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	legacyAgentPath := filepath.Join(tempDir, ".work", "a2o-agent", "bin", "a2o-agent")
+	if err := os.MkdirAll(filepath.Dir(legacyAgentPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacyAgentPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	publicAgentPath := filepath.Join(tempDir, ".work", "a2o", "agent", "bin", "a2o-agent")
+	if runner.lastEnv["A3_HOST_AGENT_BIN"] != publicAgentPath {
+		t.Fatalf("agent bin env=%q, want canonical %q", runner.lastEnv["A3_HOST_AGENT_BIN"], publicAgentPath)
 	}
 }
 

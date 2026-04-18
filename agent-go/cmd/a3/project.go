@@ -163,6 +163,8 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	}
 
 	var builder strings.Builder
+	builder.WriteString("# Install the host agent at the canonical path before runtime execution:\n")
+	builder.WriteString("# a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent\n")
 	builder.WriteString("schema_version: 1\n")
 	builder.WriteString("package:\n")
 	writeYAMLScalar(&builder, 1, "name", options.PackageName)

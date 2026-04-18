@@ -77,6 +77,8 @@ runtime:
   agent_attempts: 200
 ```
 
+Host agent binary は `.work/a2o/agent/bin/a2o-agent` に統一する。旧 package や Taskfile が `.work/a2o-agent/bin/a2o-agent` を使っている場合は、`a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent` に更新する。
+
 旧 `manifest.yml`:
 
 ```yaml

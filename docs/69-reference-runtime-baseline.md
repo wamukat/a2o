@@ -11,7 +11,7 @@ The implementation and parent-review decisions in this baseline are deterministi
 - SoloBoard: isolated board on `http://127.0.0.1:3481`
 - Engine entrypoint: `ruby -Ilib bin/a3 execute-until-idle`
 - Agent control plane: `ruby -Ilib bin/a3 agent-server`
-- Agent runner: `.work/bin/a2o-agent`
+- Agent runner: `.work/a2o/agent/bin/a2o-agent`
 - Worker gateway: `agent-http`
 - Verification runner: `agent-http`
 - Merge runner: `agent-http`

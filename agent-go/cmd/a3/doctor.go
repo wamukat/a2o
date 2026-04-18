@@ -51,10 +51,11 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 	}
 
 	agentPath := filepath.Join(config.WorkspaceRoot, hostAgentBinRelativePath)
+	agentInstallAction := "run " + agentInstallCommand(agentPath)
 	if info, err := os.Stat(agentPath); err != nil {
-		report("agent_install", false, agentPath+" not found", "run a2o agent install")
+		report("agent_install", false, agentPath+" not found", agentInstallAction)
 	} else if info.Mode().Perm()&0o111 == 0 {
-		report("agent_install", false, agentPath+" is not executable", "rerun a2o agent install")
+		report("agent_install", false, agentPath+" is not executable", agentInstallAction)
 	} else {
 		report("agent_install", true, agentPath, "none")
 	}

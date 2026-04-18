@@ -98,11 +98,11 @@ func resolveDefaultHostAgentBin(config runtimeInstanceConfig, hostRootDir string
 			return publicWorkspaceAgentPath
 		}
 	}
-	legacyAgentPath := filepath.Join(hostRootDir, ".work", "a2o-agent", "bin", "a2o-agent")
-	if _, err := os.Stat(legacyAgentPath); err == nil {
-		return legacyAgentPath
-	}
 	return publicAgentPath
+}
+
+func agentInstallCommand(outputPath string) string {
+	return "a2o agent install --target auto --output " + shellQuote(outputPath)
 }
 
 func shellQuote(value string) string {
