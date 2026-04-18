@@ -157,6 +157,8 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("runtime remediation_commands=commands/apply-remediation")
       expect(out.string).to include("runtime merge_target=merge_to_parent merge_policy=ff_only")
       expect(out.string).to include("latest_blocked phase=verification summary=review launch could not resolve runtime workspace")
+      expect(out.string).to include("blocked_error_category=executor_failed")
+      expect(out.string).to include("blocked_remediation=executor command が agent 環境で実行可能か、必要な binary と認証、出力 JSON を確認してください。")
       expect(out.string).to include("blocked_expected=runtime workspace available")
       expect(out.string).to include("blocked_observed=repo-beta missing")
       expect(out.string).to include("blocked_diagnostic.missing_path=/tmp/repo-beta")

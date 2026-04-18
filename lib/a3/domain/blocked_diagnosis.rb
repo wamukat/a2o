@@ -71,7 +71,7 @@ module A3
         return "configuration_error" if text.match?(/configuration|config|schema|manifest|project\.yaml|executor config|invalid_executor_config|launcher/)
         return "workspace_dirty" if text.match?(/dirty|has changes|changed files do not match|untracked|working tree/)
         return "merge_conflict" if text.match?(/merge conflict|conflict marker|would be overwritten|unmerged/)
-        return "verification_failed" if phase == :verification || text.match?(/verification|remediation/)
+        return "verification_failed" if phase == :verification || text.match?(/verification/)
         return "merge_failed" if phase == :merge
         return "executor_failed" if %i[implementation review parent_review worker].include?(phase) || text.match?(/worker|executor/)
 

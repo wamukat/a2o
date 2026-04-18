@@ -7,9 +7,9 @@ module A3
     class OperatorInspectionReadModel
       class RunView
         class BlockedDiagnosisSnapshot
-          attr_reader :task_ref, :run_ref, :phase, :outcome, :summary, :expected_state, :observed_state, :failing_command, :infra_diagnostics, :worker_response_bundle
+          attr_reader :task_ref, :run_ref, :phase, :outcome, :summary, :expected_state, :observed_state, :failing_command, :infra_diagnostics, :worker_response_bundle, :error_category, :remediation_summary
 
-          def initialize(task_ref:, run_ref:, phase:, outcome:, summary:, expected_state:, observed_state:, failing_command:, infra_diagnostics:, worker_response_bundle:)
+          def initialize(task_ref:, run_ref:, phase:, outcome:, summary:, expected_state:, observed_state:, failing_command:, infra_diagnostics:, worker_response_bundle:, error_category:, remediation_summary:)
             @task_ref = task_ref
             @run_ref = run_ref
             @phase = phase.to_sym
@@ -20,6 +20,8 @@ module A3
             @failing_command = failing_command
             @infra_diagnostics = infra_diagnostics
             @worker_response_bundle = worker_response_bundle
+            @error_category = error_category
+            @remediation_summary = remediation_summary
             freeze
           end
 
@@ -40,7 +42,9 @@ module A3
               observed_state: diagnosis.observed_state,
               failing_command: diagnosis.failing_command,
               infra_diagnostics: diagnosis.infra_diagnostics,
-              worker_response_bundle: worker_response_bundle
+              worker_response_bundle: worker_response_bundle,
+              error_category: diagnosis.error_category,
+              remediation_summary: diagnosis.remediation_summary
             )
           end
 

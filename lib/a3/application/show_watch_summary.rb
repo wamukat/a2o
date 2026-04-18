@@ -152,7 +152,11 @@ module A3
         if run
           phase_record = run.phase_records.reverse_each.find { |item| !item.blocked_diagnosis.nil? }
           diagnosis = phase_record&.blocked_diagnosis
-          lines.concat([diagnosis&.diagnostic_summary || diagnosis&.observed_state].compact.map(&:to_s).reject(&:empty?)) if diagnosis
+          if diagnosis
+            lines << "error_category=#{diagnosis.error_category}"
+            lines << "remediation=#{diagnosis.remediation_summary}"
+            lines.concat([diagnosis.diagnostic_summary || diagnosis.observed_state].compact.map(&:to_s).reject(&:empty?))
+          end
         end
         lines.freeze
       end

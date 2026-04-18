@@ -125,6 +125,8 @@ module A3
           return unless diagnosis
 
           result << "latest_blocked phase=#{diagnosis.phase} summary=#{diagnosis.summary}"
+          result << "blocked_error_category=#{diagnosis.error_category}"
+          result << "blocked_remediation=#{diagnosis.remediation_summary}"
           result << "blocked_expected=#{diagnosis.expected_state}"
           result << "blocked_observed=#{diagnosis.observed_state}"
           result << "blocked_failing_command=#{diagnosis.failing_command}" if diagnosis.failing_command

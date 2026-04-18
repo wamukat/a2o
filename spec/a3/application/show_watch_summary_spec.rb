@@ -143,7 +143,11 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(result.running_entries.first.detail).to eq("refs/heads/a3/work/Sample-1")
     expect(result.tasks.map(&:ref)).to eq(["Sample#3", "Sample#1", "Sample#2"])
     expect(result.tasks.find { |item| item.ref == "Sample#1" }.phase_counts).to eq("implementation" => 1)
-    expect(result.tasks.find { |item| item.ref == "Sample#2" }.blocked_lines).to eq(["publish failed"])
+    expect(result.tasks.find { |item| item.ref == "Sample#2" }.blocked_lines).to eq([
+      "error_category=executor_failed",
+      "remediation=executor command が agent 環境で実行可能か、必要な binary と認証、出力 JSON を確認してください。",
+      "publish failed"
+    ])
     expect(result.tasks.find { |item| item.ref == "Sample#2" }.title).to include("[kanban=To do internal=Blocked]")
   end
 
@@ -255,7 +259,11 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(task_entry.title).to include("Imported task")
     expect(task_entry.title).to include("[kanban=To do internal=Blocked]")
     expect(task_entry.latest_phase).to eq("inspection")
-    expect(task_entry.blocked_lines).to eq(["review blocked"])
+      expect(task_entry.blocked_lines).to eq([
+        "error_category=executor_failed",
+        "remediation=executor command が agent 環境で実行可能か、必要な binary と認証、出力 JSON を確認してください。",
+        "review blocked"
+      ])
     expect(task_entry.phase_counts).to eq("implementation" => 1, "inspection" => 1)
   end
 

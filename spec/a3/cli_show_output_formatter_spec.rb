@@ -265,6 +265,8 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     result = described_class.blocked_diagnosis_lines(result)
 
     expect(result).to include("blocked diagnosis blocked for run-1 on A3-v2#child")
+    expect(result).to include("error_category=executor_failed")
+    expect(result).to include("remediation=executor command が agent 環境で実行可能か、必要な binary と認証、出力 JSON を確認してください。")
     expect(result).to include("worker_response_bundle={\"success\"=>false, \"summary\"=>\"review blocked\", \"failing_command\"=>\"codex exec --json -\", \"observed_state\"=>\"repo-beta missing\"}")
     expect(result).to include("recovery decision=requires_operator_action next_action=diagnose_blocked operator_action_required=true")
     expect(result).to include("runtime_package_action=inspect_runtime_package")
@@ -414,6 +416,8 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     lines = described_class.blocked_diagnosis_lines(result)
 
     expect(lines).to include("blocked diagnosis blocked for run-1 on A3-v2#child")
+    expect(lines).to include("error_category=executor_failed")
+    expect(lines).to include("remediation=executor command が agent 環境で実行可能か、必要な binary と認証、出力 JSON を確認してください。")
     expect(lines).to include("worker_response_bundle={\"success\"=>false, \"summary\"=>\"review blocked\", \"failing_command\"=>\"codex exec --json -\", \"observed_state\"=>\"repo-beta missing\"}")
     expect(lines).to include("recovery decision=requires_operator_action next_action=diagnose_blocked operator_action_required=true")
   end

@@ -20,6 +20,8 @@ module A3
             output << "expected=#{diagnosis.expected_state}"
             output << "failing_command=#{diagnosis.failing_command}"
             output << "summary=#{diagnosis.diagnostic_summary}"
+            output << "error_category=#{diagnosis.error_category}"
+            output << "remediation=#{diagnosis.remediation_summary}"
             output << "worker_response_bundle=#{FormattingHelpers.diagnostic_value(worker_response_bundle)}" if worker_response_bundle
             output << "recovery decision=#{recovery.decision} next_action=#{recovery.next_action} operator_action_required=#{recovery.operator_action_required}"
             output << "runtime_package_action=#{recovery.package_expectation}"

@@ -142,4 +142,31 @@ RSpec.describe A3::Domain::BlockedDiagnosis do
     expect(diagnosis.error_category).to eq("workspace_dirty")
     expect(diagnosis.remediation_summary).to include("commit")
   end
+
+  it "does not classify review worker remediation diagnostics as verification failures" do
+    diagnosis = described_class.new(
+      task_ref: "A2O#12",
+      run_ref: "run-1",
+      phase: :review,
+      outcome: :blocked,
+      review_target: A3::Domain::ReviewTarget.new(base_commit: "base", head_commit: "head", task_ref: "A2O#12", phase_ref: :review),
+      source_descriptor: A3::Domain::SourceDescriptor.new(workspace_kind: :runtime_workspace, source_type: :detached_commit, ref: "head", task_ref: "A2O#12"),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: [:app], verification_scope: [:app], ownership_scope: :task),
+      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: "A2O#12", owner_scope: :task, snapshot_version: "head"),
+      expected_state: "review passes",
+      observed_state: "worker blocked",
+      failing_command: "review_worker",
+      diagnostic_summary: "worker result JSON invalid",
+      infra_diagnostics: {
+        "worker_response_bundle" => {
+          "diagnostics" => {
+            "remediation" => "Check the worker result JSON."
+          }
+        }
+      }
+    )
+
+    expect(diagnosis.error_category).to eq("executor_failed")
+    expect(diagnosis.remediation_summary).to include("executor command")
+  end
 end
