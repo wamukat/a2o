@@ -734,11 +734,13 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 
 	for _, want := range []string{
 		"doctor_check name=project_package status=ok",
+		"doctor_check name=executor_config status=ok detail=commands=sh",
 		"doctor_check name=agent_required_command.sh status=ok",
 		"doctor_check name=repo_clean.app status=ok detail=" + repoDir,
 		"doctor_check name=agent_install status=ok",
 		"doctor_check name=kanban_volume status=ok detail=reuse_existing a2o-sample_soloboard-data",
 		"doctor_check name=kanban_service status=ok detail=http://localhost:3480/",
+		"doctor_check name=runtime_container status=ok detail=service=a3-runtime container=runtime-container",
 		"doctor_check name=runtime_image_digest status=ok detail=ghcr.io/wamukat/a2o-engine@sha256:test",
 		"doctor_status=ok",
 	} {
@@ -2250,6 +2252,8 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		return []byte("image-123\n"), nil
 	case strings.Contains(joined, " compose ") && strings.Contains(joined, " ps --status running -q soloboard"):
 		return []byte("soloboard-container\n"), nil
+	case strings.Contains(joined, " compose ") && strings.Contains(joined, " ps --status running -q a3-runtime"):
+		return []byte("runtime-container\n"), nil
 	case name == "docker" && len(args) >= 4 && args[0] == "image" && args[1] == "inspect":
 		return []byte("ghcr.io/wamukat/a2o-engine@sha256:test\n"), nil
 	case strings.Contains(joined, " compose ") && strings.Contains(joined, " ps -q "):

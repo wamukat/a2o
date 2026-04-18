@@ -45,6 +45,7 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 		report("project_package", false, err.Error(), "fix project.yaml or rerun a2o project template")
 	} else {
 		report("project_package", true, "project.yaml schema_version="+packageConfig.SchemaVersion+" package="+packageConfig.PackageName, "none")
+		checkExecutorConfig(packageConfig, report)
 		checkRequiredCommands(packageConfig, runner, report)
 		checkRepoClean(config.PackagePath, packageConfig, runner, report)
 	}
@@ -74,6 +75,14 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 		report("kanban_service", true, kanbanPublicURL(*config), "none")
 	}
 
+	if output, err := runExternal(runner, "docker", append(composeArgs(*config), "ps", "--status", "running", "-q", config.RuntimeService)...); err != nil {
+		report("runtime_container", false, err.Error(), "run a2o runtime up")
+	} else if strings.TrimSpace(string(output)) == "" {
+		report("runtime_container", false, config.RuntimeService+" is not running", "run a2o runtime up")
+	} else {
+		report("runtime_container", true, "service="+config.RuntimeService+" container="+strings.TrimSpace(string(output)), "none")
+	}
+
 	if digest := runtimeImageDigest(config, runner); digest != "" {
 		report("runtime_image_digest", true, digest, "pin this digest for release smoke")
 	} else {
@@ -85,6 +94,15 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 		return 1
 	}
 	return 0
+}
+
+func checkExecutorConfig(config projectPackageConfig, report func(string, bool, string, string)) {
+	bins := executorCommandBins(config.Executor)
+	if len(bins) == 0 {
+		report("executor_config", false, "runtime.executor command is missing", "set runtime.executor.command in project.yaml or regenerate with a2o project template")
+		return
+	}
+	report("executor_config", true, "commands="+strings.Join(bins, ","), "none")
 }
 
 func checkRequiredCommands(config projectPackageConfig, runner commandRunner, report func(string, bool, string, string)) {

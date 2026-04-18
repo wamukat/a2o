@@ -275,6 +275,8 @@ a2o runtime doctor
 a2o runtime describe-task <task-ref>
 ```
 
+`a2o doctor` は primary diagnostic である。project package、executor config、required command、repo clean 状態、agent install、kanban volume / service、runtime container、runtime image digest をまとめて確認し、失敗時は `action=` に次の操作を出す。`a2o kanban doctor` と `a2o runtime doctor` は focused inspection 用に使う。
+
 User-facing diagnostics は A2O/project.yaml の語彙に寄せる。内部互換名が必要な場合も、通常の導入手順では編集対象として扱わない。
 
 ## Advanced Examples
