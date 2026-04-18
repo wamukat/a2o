@@ -11,6 +11,7 @@ Date: 2026-04-17
 - Project bootstrap: `a2o project bootstrap`, optional `--package DIR`
 - Kanban service lifecycle: `a2o kanban up`, `doctor`, `url`
 - Agent binary export: `a2o agent install`
+- Runtime container lifecycle: `a2o runtime up`, `down`
 - Foreground runtime execution: `a2o runtime run-once`, `a2o runtime loop`
 - Resident scheduler lifecycle: `a2o runtime start`, `stop`, `status`
 - Runtime diagnosis: `a2o runtime doctor`, `a2o runtime describe-task <task-ref>`

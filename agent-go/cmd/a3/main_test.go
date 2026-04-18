@@ -441,8 +441,6 @@ runtime:
 
 func TestUnsupportedRuntimeCommandsAreNotPublicEntrypoints(t *testing.T) {
 	for _, command := range [][]string{
-		{"runtime", "up"},
-		{"runtime", "down"},
 		{"runtime", "command-plan"},
 	} {
 		var stdout bytes.Buffer
@@ -476,8 +474,10 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o kanban up [--build]",
 		"a2o kanban doctor",
 		"a2o kanban url",
-		"a2o runtime start [--interval DURATION]",
-		"a2o runtime stop",
+		"a2o runtime up [--build]",
+		"a2o runtime down",
+		"a2o runtime start [--interval DURATION]  # start scheduler",
+		"a2o runtime stop                         # stop scheduler",
 		"a2o runtime status",
 		"a2o runtime doctor",
 		"a2o runtime describe-task TASK_REF",
@@ -531,6 +531,8 @@ func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
 		{name: "kanban up", args: []string{"kanban", "up", "-bad"}, want: "Usage of a2o kanban up:"},
 		{name: "kanban doctor", args: []string{"kanban", "doctor", "-bad"}, want: "Usage of a2o kanban doctor:"},
 		{name: "kanban url", args: []string{"kanban", "url", "-bad"}, want: "Usage of a2o kanban url:"},
+		{name: "runtime up", args: []string{"runtime", "up", "-bad"}, want: "Usage of a2o runtime up:"},
+		{name: "runtime down", args: []string{"runtime", "down", "-bad"}, want: "Usage of a2o runtime down:"},
 		{name: "runtime start", args: []string{"runtime", "start", "-bad"}, want: "Usage of a2o runtime start:"},
 		{name: "runtime stop", args: []string{"runtime", "stop", "-bad"}, want: "Usage of a2o runtime stop:"},
 		{name: "runtime status", args: []string{"runtime", "status", "-bad"}, want: "Usage of a2o runtime status:"},
@@ -1172,6 +1174,69 @@ runtime:
 	}
 	if len(runner.calls) != 0 {
 		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
+	}
+}
+
+func TestRuntimeUpStartsContainersWithoutScheduler(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    filepath.Join(tempDir, "package"),
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "up", "--build"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := runner.joinedCalls()
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml build a3-runtime")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a3-runtime soloboard")
+	if strings.Contains(strings.Join(joined, "\n"), "start-background") {
+		t.Fatalf("runtime up must not launch scheduler, got:\n%s", strings.Join(joined, "\n"))
+	}
+	if !strings.Contains(stdout.String(), "runtime_up compose_project=a3-test") {
+		t.Fatalf("stdout should report runtime up, got %q", stdout.String())
+	}
+}
+
+func TestRuntimeDownStopsContainersWithoutSchedulerMutation(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    filepath.Join(tempDir, "package"),
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "down"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := runner.joinedCalls()
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml down")
+	if strings.Contains(strings.Join(joined, "\n"), "terminate-process-group") || strings.Contains(strings.Join(joined, "\n"), "start-background") {
+		t.Fatalf("runtime down must only affect containers, got:\n%s", strings.Join(joined, "\n"))
+	}
+	if !strings.Contains(stdout.String(), "runtime_down compose_project=a3-test") {
+		t.Fatalf("stdout should report runtime down, got %q", stdout.String())
 	}
 }
 

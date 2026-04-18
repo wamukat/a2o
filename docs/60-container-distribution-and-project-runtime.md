@@ -29,6 +29,8 @@ a2o runtime run-once
 
 `./project-package` または `./a2o-project` 以外に package を置く場合は `a2o project bootstrap --package DIR` を使う。
 
+`a2o runtime up` / `down` は runtime container lifecycle だけを扱い、scheduler を開始しない。task processing を常駐実行する場合だけ `a2o runtime start` を使う。
+
 複数 product を同時に動かす場合は、package ごとに workspace、storage dir、compose project name、port を分ける。
 
 ## Responsibility Boundary
@@ -63,7 +65,7 @@ Project package が持たないもの:
 
 The current baseline exercises the reference product suite through SoloBoard, agent-materialized workspaces, agent-http worker gateway, verification, merge, and evidence persistence. The recorded baseline is [69-reference-runtime-baseline.md](69-reference-runtime-baseline.md).
 
-The public launcher covers host install, project bootstrap, kanban service lifecycle, kanban diagnosis, URL discovery, agent install, one-shot runtime execution, foreground runtime loop, resident scheduler start/stop/status, runtime diagnosis, and task/run observability.
+The public launcher covers host install, project bootstrap, kanban service lifecycle, kanban diagnosis, URL discovery, agent install, runtime container up/down, one-shot runtime execution, foreground runtime loop, resident scheduler start/stop/status, runtime diagnosis, and task/run observability.
 
 ## Operator Notes
 

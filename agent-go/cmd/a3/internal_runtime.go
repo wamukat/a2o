@@ -29,6 +29,18 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 	}
 
 	switch args[0] {
+	case "up":
+		if err := runRuntimeUp(args[1:], runner, stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
+	case "down":
+		if err := runRuntimeDown(args[1:], runner, stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
 	case "start":
 		if err := runRuntimeStart(args[1:], runner, stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)
