@@ -127,6 +127,18 @@ func shellJoin(args []string) string {
 	return strings.Join(quoted, " ")
 }
 
+func nonEmptyLines(output []byte) []string {
+	lines := strings.Split(string(output), "\n")
+	values := make([]string, 0, len(lines))
+	for _, line := range lines {
+		value := strings.TrimSpace(line)
+		if value != "" {
+			values = append(values, value)
+		}
+	}
+	return values
+}
+
 func appendFile(path string, body []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err

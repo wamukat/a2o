@@ -85,6 +85,9 @@ func runKanbanUp(args []string, runner commandRunner, stdout io.Writer, stderr i
 				return err
 			}
 		}
+		if err := cleanupLegacyRuntimeServiceOrphans(effectiveConfig, runner, stdout); err != nil {
+			return err
+		}
 		if _, err := runExternal(runner, "docker", append(composePrefix, "up", "-d", effectiveConfig.RuntimeService, "soloboard")...); err != nil {
 			return err
 		}

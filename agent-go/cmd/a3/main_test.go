@@ -1340,6 +1340,72 @@ func TestRuntimeUpCanPullConfiguredImageBeforeStarting(t *testing.T) {
 	}
 }
 
+func TestRuntimeUpRemovesLegacyRuntimeServiceOrphanBeforeStarting(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    filepath.Join(tempDir, "package"),
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-upgrade",
+		RuntimeService: "a2o-runtime",
+	})
+	runner := &fakeRunner{legacyRuntimeOrphans: []string{"old-runtime-1"}}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "up", "--pull"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := runner.joinedCalls()
+	assertCallContains(t, joined, "docker ps -a --filter label=com.docker.compose.project=a2o-upgrade --filter label=com.docker.compose.service=a3-runtime --format {{.ID}}")
+	assertCallContains(t, joined, "docker rm -f old-runtime-1")
+	assertCallContains(t, joined, "docker compose -p a2o-upgrade -f compose.yml up -d a2o-runtime soloboard")
+	if strings.Contains(strings.Join(joined, "\n"), " soloboard-data") {
+		t.Fatalf("orphan cleanup must not touch kanban volumes, got:\n%s", strings.Join(joined, "\n"))
+	}
+	if !strings.Contains(stdout.String(), "runtime_orphan_cleanup compose_project=a2o-upgrade service=legacy-runtime containers=old-runtime-1 action=removed") {
+		t.Fatalf("stdout should report orphan cleanup, got %q", stdout.String())
+	}
+}
+
+func TestRuntimeUpReportsSafeRemediationWhenLegacyOrphanRemovalFails(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    filepath.Join(tempDir, "package"),
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-upgrade",
+		RuntimeService: "a2o-runtime",
+	})
+	runner := &fakeRunner{
+		legacyRuntimeOrphans: []string{"old-runtime-1", "old-runtime-2"},
+		failLegacyRuntimeRM:  true,
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "up", "--pull"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run unexpectedly succeeded, stdout=%s", stdout.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if strings.Contains(joined, "docker compose -p a2o-upgrade -f compose.yml up -d a2o-runtime soloboard") {
+		t.Fatalf("runtime up must stop before compose up when orphan removal fails, got:\n%s", joined)
+	}
+	if !strings.Contains(stderr.String(), "safe_remediation='docker' 'rm' '-f' 'old-runtime-1' 'old-runtime-2'") {
+		t.Fatalf("stderr should include exact safe remediation, got %q", stderr.String())
+	}
+}
+
 func TestRuntimeDownStopsContainersWithoutSchedulerMutation(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
@@ -2445,6 +2511,8 @@ type fakeRunner struct {
 	emptyContainer        bool
 	failShowTask          bool
 	taskWithoutCurrentRun bool
+	legacyRuntimeOrphans  []string
+	failLegacyRuntimeRM   bool
 	err                   error
 	lastEnv               map[string]string
 	nextPID               int
@@ -2479,6 +2547,16 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	}
 	joined := strings.Join(call, " ")
 	switch {
+	case name == "docker" && len(args) >= 8 && args[0] == "ps" && containsArg(args, "label=com.docker.compose.service=a3-runtime"):
+		if len(r.legacyRuntimeOrphans) == 0 {
+			return []byte{}, nil
+		}
+		return []byte(strings.Join(r.legacyRuntimeOrphans, "\n") + "\n"), nil
+	case name == "docker" && len(args) >= 3 && args[0] == "rm" && args[1] == "-f":
+		if r.failLegacyRuntimeRM {
+			return []byte("remove failed\n"), errors.New("remove failed")
+		}
+		return []byte{}, nil
 	case name == "docker" && len(args) >= 3 && args[0] == "volume" && args[1] == "inspect":
 		return []byte(`[{"Name":"` + args[2] + `"}]`), nil
 	case strings.Contains(joined, " compose ") && strings.Contains(joined, " images --quiet "):
@@ -2528,6 +2606,15 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	default:
 		return []byte{}, nil
 	}
+}
+
+func containsArg(args []string, want string) bool {
+	for _, arg := range args {
+		if arg == want {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *fakeRunner) StartBackground(name string, args []string, logPath string) (int, error) {

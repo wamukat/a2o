@@ -430,12 +430,50 @@ func runRuntimeUp(args []string, runner commandRunner, stdout io.Writer, stderr 
 				return err
 			}
 		}
+		if err := cleanupLegacyRuntimeServiceOrphans(effectiveConfig, runner, stdout); err != nil {
+			return err
+		}
 		if _, err := runExternal(runner, "docker", append(composePrefix, "up", "-d", effectiveConfig.RuntimeService, "soloboard")...); err != nil {
 			return err
 		}
 		fmt.Fprintf(stdout, "runtime_up compose_project=%s package=%s\n", effectiveConfig.ComposeProject, effectiveConfig.PackagePath)
 		return nil
 	})
+}
+
+func cleanupLegacyRuntimeServiceOrphans(config runtimeInstanceConfig, runner commandRunner, stdout io.Writer) error {
+	if strings.TrimSpace(config.RuntimeService) != "a2o-runtime" {
+		return nil
+	}
+	composeProject := strings.TrimSpace(config.ComposeProject)
+	if composeProject == "" {
+		return nil
+	}
+	output, err := runExternal(
+		runner,
+		"docker",
+		"ps",
+		"-a",
+		"--filter",
+		"label=com.docker.compose.project="+composeProject,
+		"--filter",
+		"label=com.docker.compose.service=a3-runtime",
+		"--format",
+		"{{.ID}}",
+	)
+	if err != nil {
+		return fmt.Errorf("detect obsolete runtime service containers for compose_project=%s: %w", composeProject, err)
+	}
+	containerIDs := nonEmptyLines(output)
+	if len(containerIDs) == 0 {
+		return nil
+	}
+	if _, err := runExternal(runner, "docker", append([]string{"rm", "-f"}, containerIDs...)...); err != nil {
+		remediation := shellJoin(append([]string{"docker", "rm", "-f"}, containerIDs...))
+		return fmt.Errorf("remove obsolete runtime service containers for compose_project=%s: %w\nsafe_remediation=%s", composeProject, err, remediation)
+	}
+	fmt.Fprintf(stdout, "runtime_orphan_cleanup compose_project=%s service=legacy-runtime containers=%s action=removed\n", composeProject, strings.Join(containerIDs, ","))
+	return nil
 }
 
 func runRuntimeDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
