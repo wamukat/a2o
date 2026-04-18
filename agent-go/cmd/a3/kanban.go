@@ -24,19 +24,19 @@ func runKanban(args []string, runner commandRunner, stdout io.Writer, stderr io.
 	switch args[0] {
 	case "up":
 		if err := runKanbanUp(args[1:], runner, stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
+			printUserFacingError(stderr, err)
 			return 1
 		}
 		return 0
 	case "doctor":
 		if err := runKanbanDoctor(args[1:], runner, stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
+			printUserFacingError(stderr, err)
 			return 1
 		}
 		return 0
 	case "url":
 		if err := runKanbanURL(args[1:], stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
+			printUserFacingError(stderr, err)
 			return 1
 		}
 		return 0

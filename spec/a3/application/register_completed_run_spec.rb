@@ -162,7 +162,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
-      body: a_string_matching(/A2O 実行完了: review.*ブロック要約: review found runner-layout gap in repo-alpha.*失敗コマンド: review_worker.*観測状態: findings remain/m)
+      body: a_string_matching(/A2O 実行完了: review.*エラー分類: executor_failed.*ブロック要約: review found runner-layout gap in repo-alpha.*次の対応: executor command.*失敗コマンド: review_worker.*観測状態: findings remain/m)
     )
     result = use_case.call(task_ref: task.ref, run_ref: review_run.ref, outcome: :blocked)
 

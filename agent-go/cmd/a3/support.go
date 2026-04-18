@@ -21,6 +21,31 @@ func runExternal(runner commandRunner, name string, args ...string) ([]byte, err
 	return nil, fmt.Errorf("%s failed: %w\n%s", command, err, message)
 }
 
+func printUserFacingError(w interface{ Write([]byte) (int, error) }, err error) {
+	fmt.Fprintln(w, err)
+	category, remediation := classifyUserFacingError(err.Error())
+	fmt.Fprintf(w, "error_category=%s\n", category)
+	fmt.Fprintf(w, "remediation=%s\n", remediation)
+}
+
+func classifyUserFacingError(message string) (string, string) {
+	text := strings.ToLower(message)
+	switch {
+	case strings.Contains(text, "project.yaml"), strings.Contains(text, "schema"), strings.Contains(text, "config"), strings.Contains(text, "executor"), strings.Contains(text, "manifest"):
+		return "configuration_error", "Review project.yaml and package settings, then rerun the A2O command."
+	case strings.Contains(text, "dirty"), strings.Contains(text, "has changes"), strings.Contains(text, "changed files"), strings.Contains(text, "working tree"):
+		return "workspace_dirty", "Clean, commit, or stash the reported repo files before rerunning A2O."
+	case strings.Contains(text, "merge conflict"), strings.Contains(text, "unmerged"), strings.Contains(text, "conflict marker"):
+		return "merge_conflict", "Resolve the merge conflict or update the base branch before rerunning A2O."
+	case strings.Contains(text, "verification"):
+		return "verification_failed", "Inspect verification output and fix product tests, lint, or dependencies."
+	case strings.Contains(text, "docker"):
+		return "runtime_failed", "Check Docker runtime status, compose project settings, and the printed command output."
+	default:
+		return "runtime_failed", "Inspect the error above, fix the reported cause, and rerun the A2O command."
+	}
+}
+
 func envDefault(name string, fallback string) string {
 	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
 		return value

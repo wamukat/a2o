@@ -26,14 +26,14 @@ func runAgent(args []string, runner commandRunner, stdout io.Writer, stderr io.W
 	case "target":
 		target, err := detectHostTarget()
 		if err != nil {
-			fmt.Fprintln(stderr, err)
+			printUserFacingError(stderr, err)
 			return 2
 		}
 		fmt.Fprintln(stdout, target)
 		return 0
 	case "install":
 		if err := runAgentInstall(args[1:], runner, stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
+			printUserFacingError(stderr, err)
 			return 1
 		}
 		return 0

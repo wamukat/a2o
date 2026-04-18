@@ -26,6 +26,47 @@ func TestAgentTargetPrintsSupportedTarget(t *testing.T) {
 	}
 }
 
+func TestClassifyUserFacingError(t *testing.T) {
+	tests := []struct {
+		name     string
+		message  string
+		category string
+	}{
+		{
+			name:     "project config",
+			message:  "project.yaml schema is invalid",
+			category: "configuration_error",
+		},
+		{
+			name:     "dirty workspace",
+			message:  "repo app has changes: README.md",
+			category: "workspace_dirty",
+		},
+		{
+			name:     "merge conflict",
+			message:  "merge conflict detected in src/main.go",
+			category: "merge_conflict",
+		},
+		{
+			name:     "verification",
+			message:  "verification command failed",
+			category: "verification_failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			category, remediation := classifyUserFacingError(tt.message)
+			if category != tt.category {
+				t.Fatalf("category=%q, want %q", category, tt.category)
+			}
+			if strings.TrimSpace(remediation) == "" {
+				t.Fatalf("remediation should be present")
+			}
+		})
+	}
+}
+
 func TestAgentInstallExportsAgentFromRuntimeImage(t *testing.T) {
 	tempDir := t.TempDir()
 	outputPath := filepath.Join(tempDir, "bin", "a3-agent")

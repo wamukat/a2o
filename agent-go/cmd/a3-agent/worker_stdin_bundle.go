@@ -111,6 +111,13 @@ func writeWorkerFailureResult(resultPath string, request map[string]any, payload
 }
 
 func workerFailure(request map[string]any, summary string, command []string, observedState string, diagnostics map[string]any) map[string]any {
+	category := workerErrorCategory(summary, observedState, stringValue(request["phase"]))
+	enrichedDiagnostics := map[string]any{}
+	for key, value := range diagnostics {
+		enrichedDiagnostics[key] = value
+	}
+	enrichedDiagnostics["error_category"] = category
+	enrichedDiagnostics["remediation"] = workerRemediation(category)
 	payload := map[string]any{
 		"task_ref":        stringValue(request["task_ref"]),
 		"run_ref":         stringValue(request["run_ref"]),
@@ -120,7 +127,7 @@ func workerFailure(request map[string]any, summary string, command []string, obs
 		"failing_command": strings.Join(command, " "),
 		"observed_state":  observedState,
 		"rework_required": false,
-		"diagnostics":     diagnostics,
+		"diagnostics":     enrichedDiagnostics,
 	}
 	if stringValue(request["phase"]) == "review" && nestedString(request, "phase_runtime", "task_kind") == "parent" {
 		payload["review_disposition"] = map[string]any{
@@ -132,6 +139,41 @@ func workerFailure(request map[string]any, summary string, command []string, obs
 		}
 	}
 	return payload
+}
+
+func workerErrorCategory(summary string, observedState string, phase string) string {
+	text := strings.ToLower(strings.Join([]string{summary, observedState, phase}, " "))
+	switch {
+	case strings.Contains(text, "config"), strings.Contains(text, "schema"), strings.Contains(text, "project.yaml"), strings.Contains(text, "invalid_executor_config"), strings.Contains(text, "launcher"):
+		return "configuration_error"
+	case strings.Contains(text, "dirty"), strings.Contains(text, "has changes"), strings.Contains(text, "changed files"), strings.Contains(text, "untracked"), strings.Contains(text, "working tree"):
+		return "workspace_dirty"
+	case strings.Contains(text, "merge conflict"), strings.Contains(text, "conflict marker"), strings.Contains(text, "unmerged"):
+		return "merge_conflict"
+	case phase == "verification":
+		return "verification_failed"
+	case phase == "merge":
+		return "merge_failed"
+	default:
+		return "executor_failed"
+	}
+}
+
+func workerRemediation(category string) string {
+	switch category {
+	case "configuration_error":
+		return "Review project.yaml and executor settings. Do not edit generated launcher.json files."
+	case "workspace_dirty":
+		return "Clean, commit, or stash the reported repo files before rerunning A2O."
+	case "merge_conflict":
+		return "Resolve the merge conflict or update the base branch before rerunning A2O."
+	case "verification_failed":
+		return "Inspect the verification command output and fix product tests, lint, or dependencies."
+	case "merge_failed":
+		return "Check the merge target ref and branch policy before rerunning A2O."
+	default:
+		return "Check that the executor binary, credentials, and worker result JSON are valid."
+	}
 }
 
 func workerWorkspaceRoot() string {

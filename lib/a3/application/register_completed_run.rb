@@ -207,7 +207,9 @@ module A3
         append_merge_recovery_comment_lines(lines, execution_record&.diagnostics || execution&.diagnostics)
 
         if blocked_diagnosis
+          lines << "エラー分類: #{single_line(blocked_diagnosis.error_category)}"
           lines << "ブロック要約: #{single_line(blocked_diagnosis.diagnostic_summary)}"
+          lines << "次の対応: #{single_line(blocked_diagnosis.remediation_summary)}"
           lines << "失敗コマンド: #{single_line(blocked_diagnosis.failing_command)}" if present?(blocked_diagnosis.failing_command)
           lines << "観測状態: #{single_line(blocked_diagnosis.observed_state)}" if present?(blocked_diagnosis.observed_state)
         elsif execution_record&.failing_command

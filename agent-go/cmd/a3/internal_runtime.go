@@ -31,37 +31,37 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 	switch args[0] {
 	case "start":
 		if err := runRuntimeStart(args[1:], runner, stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
+			printUserFacingError(stderr, err)
 			return 1
 		}
 		return 0
 	case "stop":
 		if err := runRuntimeStop(args[1:], runner, stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
+			printUserFacingError(stderr, err)
 			return 1
 		}
 		return 0
 	case "status":
 		if err := runRuntimeStatus(args[1:], runner, stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
+			printUserFacingError(stderr, err)
 			return 1
 		}
 		return 0
 	case "doctor":
 		if err := runRuntimeDoctor(args[1:], runner, stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
+			printUserFacingError(stderr, err)
 			return 1
 		}
 		return 0
 	case "run-once":
 		if err := runRuntimeRunOnce(args[1:], runner, stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
+			printUserFacingError(stderr, err)
 			return 1
 		}
 		return 0
 	case "loop":
 		if err := runRuntimeLoop(args[1:], runner, stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
+			printUserFacingError(stderr, err)
 			return 1
 		}
 		return 0

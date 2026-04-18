@@ -268,4 +268,18 @@ task は repo label を使って対象 slot を指定する。parent-child flow 
 - project package の公開 config は `project.yaml` に一本化されている。`manifest.yml` はサポート対象外である。
 - published image での release smoke は、公開前の独立した gate として digest 固定で実行する。
 
+## Troubleshooting
+
+A2O の CLI stderr と kanban comment は、失敗時に `error_category` / `エラー分類` と remediation を出す。最初に分類を見て、次に `失敗コマンド`、`観測状態`、evidence を確認する。
+
+| Category | What to fix |
+|---|---|
+| `configuration_error` | `project.yaml`、executor、package path、schema を直す。generated `launcher.json` は編集しない。 |
+| `workspace_dirty` | 表示された repo / file の未コミット変更を commit、stash、または削除する。 |
+| `executor_failed` | executor binary、認証、必要 toolchain、worker result JSON を確認する。 |
+| `verification_failed` | verification / remediation command の出力を見て product test、lint、依存関係を直す。 |
+| `merge_conflict` | merge conflict または base branch を整理する。 |
+| `merge_failed` | merge target ref と branch policy を確認する。 |
+| `runtime_failed` | Docker / compose / runtime process の状態と出力を確認する。 |
+
 User-facing diagnostics は A2O/project.yaml の語彙に寄せる。内部互換名が必要な場合も、通常の導入手順では編集対象として扱わない。

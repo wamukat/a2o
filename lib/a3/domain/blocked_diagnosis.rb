@@ -66,6 +66,37 @@ module A3
         }
       end
 
+      def error_category
+        text = [phase, diagnostic_summary, observed_state, failing_command, infra_diagnostics.values].join(" ").downcase
+        return "configuration_error" if text.match?(/configuration|config|schema|manifest|project\.yaml|executor config|invalid_executor_config|launcher/)
+        return "workspace_dirty" if text.match?(/dirty|has changes|changed files do not match|untracked|working tree/)
+        return "merge_conflict" if text.match?(/merge conflict|conflict marker|would be overwritten|unmerged/)
+        return "verification_failed" if phase == :verification || text.match?(/verification|remediation/)
+        return "merge_failed" if phase == :merge
+        return "executor_failed" if %i[implementation review parent_review worker].include?(phase) || text.match?(/worker|executor/)
+
+        "runtime_failed"
+      end
+
+      def remediation_summary
+        case error_category
+        when "configuration_error"
+          "project.yaml と executor 設定を確認し、A2O の公開設定だけを修正してください。内部生成物や launcher.json は編集しません。"
+        when "workspace_dirty"
+          "表示された repo / file の未コミット変更を commit、stash、または削除してから再実行してください。"
+        when "merge_conflict"
+          "対象 branch の merge conflict を解消するか、base branch を更新してから再実行してください。"
+        when "verification_failed"
+          "失敗した verification / remediation command の出力を確認し、product 側のテスト・lint・依存関係を修正してください。"
+        when "merge_failed"
+          "merge 対象 ref と branch policy を確認し、必要なら手動で branch を整えてから再実行してください。"
+        when "executor_failed"
+          "executor command が agent 環境で実行可能か、必要な binary と認証、出力 JSON を確認してください。"
+        else
+          "blocked diagnosis の failing_command、observed_state、evidence を確認して原因を取り除いてください。"
+        end
+      end
+
       def ==(other)
         other.is_a?(self.class) &&
           other.task_ref == task_ref &&

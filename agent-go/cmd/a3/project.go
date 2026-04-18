@@ -25,13 +25,13 @@ func runProject(args []string, stdout io.Writer, stderr io.Writer) int {
 	switch args[0] {
 	case "bootstrap":
 		if err := runProjectBootstrap(args[1:], stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
+			printUserFacingError(stderr, err)
 			return 1
 		}
 		return 0
 	case "template":
 		if err := runProjectTemplate(args[1:], stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
+			printUserFacingError(stderr, err)
 			return 1
 		}
 		return 0
