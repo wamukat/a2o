@@ -179,7 +179,7 @@ a2o agent install
 a2o doctor
 ```
 
-`a2o agent install` は runtime image から host 用 `a2o-agent` を取り出す。`a2o doctor` は release-readiness の一括診断で、project package、required command、repo clean 状態、agent install、kanban volume / service、runtime image digest を確認する。問題がある check は `status=blocked` と `action=...` を出す。
+`a2o agent install` は runtime image から host 用 `a2o-agent` を取り出す。`a2o doctor` は release-readiness の一括診断で、project package、executor config、required command、repo clean 状態、agent install、kanban volume / service、runtime container、runtime image digest を確認する。問題がある check は `status=blocked` と `action=...` を出す。
 
 ### Task
 
