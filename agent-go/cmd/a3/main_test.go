@@ -1054,6 +1054,42 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	}
 }
 
+func TestRuntimeRunOnceRemovesLegacyRuntimeServiceOrphanBeforeStarting(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-upgrade",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{legacyRuntimeOrphans: []string{"old-runtime-1"}}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once", "--max-steps", "1"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := runner.joinedCalls()
+	assertCallContains(t, joined, "docker ps -a --filter label=com.docker.compose.project=a2o-upgrade --filter label=com.docker.compose.service=a3-runtime --format {{.ID}}")
+	assertCallContains(t, joined, "docker rm -f old-runtime-1")
+	assertCallContains(t, joined, "docker compose -p a2o-upgrade -f compose.yml up -d a2o-runtime soloboard")
+	if !strings.Contains(stdout.String(), "runtime_orphan_cleanup compose_project=a2o-upgrade service=legacy-runtime containers=old-runtime-1 action=removed") {
+		t.Fatalf("stdout should report orphan cleanup, got %q", stdout.String())
+	}
+}
+
 func TestRuntimeRunOnceFailsWithoutProjectYaml(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

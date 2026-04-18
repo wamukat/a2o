@@ -702,6 +702,9 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, age
 	}
 	return withComposeEnv(config, func() error {
 		fmt.Fprintf(stdout, "kanban_run_once=generic\n")
+		if err := cleanupLegacyRuntimeServiceOrphans(config, runner, stdout); err != nil {
+			return err
+		}
 		if _, err := runExternal(runner, "docker", append(plan.ComposePrefix, "up", "-d", config.RuntimeService, "soloboard")...); err != nil {
 			return err
 		}
