@@ -158,6 +158,24 @@ func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
 	}
 }
 
+func TestDefaultComposeProjectNameUsesA2OPrefix(t *testing.T) {
+	if got := defaultComposeProjectName("/tmp/project-package"); got != "a2o-project-package" {
+		t.Fatalf("defaultComposeProjectName=%q", got)
+	}
+	if got := defaultComposeProjectName("/tmp/a3-project-package"); got != "a2o-project-package" {
+		t.Fatalf("defaultComposeProjectName should strip legacy a3 prefix, got %q", got)
+	}
+}
+
+func TestDefaultBranchNamespaceStripsLegacyA3Prefix(t *testing.T) {
+	if got := defaultBranchNamespace("a3-test"); got != "test" {
+		t.Fatalf("defaultBranchNamespace=%q", got)
+	}
+	if got := defaultBranchNamespace("a2o-reference"); got != "a2o-reference" {
+		t.Fatalf("defaultBranchNamespace=%q", got)
+	}
+}
+
 func TestRuntimeCommandsReadLegacyInstanceConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -783,8 +801,8 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"] != "1" {
 		t.Fatalf("max steps env=%q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"])
 	}
-	if runner.lastEnv["A3_BRANCH_NAMESPACE"] != "a3-test" {
-		t.Fatalf("branch namespace env=%q", runner.lastEnv["A3_BRANCH_NAMESPACE"])
+	if runner.lastEnv["A2O_BRANCH_NAMESPACE"] != "test" {
+		t.Fatalf("branch namespace env=%q", runner.lastEnv["A2O_BRANCH_NAMESPACE"])
 	}
 	if runner.lastEnv["A3_HOST_AGENT_BIN"] != filepath.Join(tempDir, ".work", "a2o", "agent", "bin", "a2o-agent") {
 		t.Fatalf("agent bin env=%q", runner.lastEnv["A3_HOST_AGENT_BIN"])
@@ -1705,8 +1723,8 @@ func TestRuntimeContainerProcessBuildsQuotedBackgroundScript(t *testing.T) {
 	script := runtimeContainerProcess{
 		WorkingDir: "/workspace",
 		Env: map[string]string{
-			"A3_BRANCH_NAMESPACE": "branch with space",
-			"A3_ROOT_DIR":         "/workspace",
+			"A2O_BRANCH_NAMESPACE": "branch with space",
+			"A3_ROOT_DIR":          "/workspace",
 		},
 		EnvShell: map[string]string{
 			"A3_SECRET": "${A3_SECRET:-a2o-runtime-secret}",
@@ -1720,7 +1738,7 @@ func TestRuntimeContainerProcessBuildsQuotedBackgroundScript(t *testing.T) {
 
 	for _, want := range []string{
 		"cd '/workspace' &&",
-		"export A3_BRANCH_NAMESPACE='branch with space' A3_ROOT_DIR='/workspace' A3_SECRET=${A3_SECRET:-a2o-runtime-secret}",
+		"export A2O_BRANCH_NAMESPACE='branch with space' A3_ROOT_DIR='/workspace' A3_SECRET=${A3_SECRET:-a2o-runtime-secret}",
 		"'--storage-dir' '/var/lib/a3/test runtime'",
 		"> '/tmp/a3 runtime.log' 2>&1",
 		"echo $? > '/tmp/a3 runtime.exit'",
@@ -1828,7 +1846,7 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		"A3_BUNDLE_PROJECT":                  os.Getenv("A3_BUNDLE_PROJECT"),
 		"A3_RUNTIME_RUN_ONCE_MAX_STEPS":      os.Getenv("A3_RUNTIME_RUN_ONCE_MAX_STEPS"),
 		"A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS": os.Getenv("A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"),
-		"A3_BRANCH_NAMESPACE":                os.Getenv("A3_BRANCH_NAMESPACE"),
+		"A2O_BRANCH_NAMESPACE":               os.Getenv("A2O_BRANCH_NAMESPACE"),
 		"A3_HOST_AGENT_BIN":                  os.Getenv("A3_HOST_AGENT_BIN"),
 	}
 	if r.err != nil {

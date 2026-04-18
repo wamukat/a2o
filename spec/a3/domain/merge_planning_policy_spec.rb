@@ -113,7 +113,7 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a2o/runtime/a3-test/work/A3-v2-3025",
+        ref: "refs/heads/a2o/runtime/test/work/A3-v2-3025",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -137,7 +137,7 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
 
     plan = described_class.new(branch_namespace: "runtime/a3-test").build(task: task, run: run, merge_config: merge_config)
 
-    expect(plan.integration_target.target_ref).to eq("refs/heads/a2o/runtime/a3-test/parent/A3-v2-3022")
+    expect(plan.integration_target.target_ref).to eq("refs/heads/a2o/runtime/test/parent/A3-v2-3022")
   end
 
   it "builds a merge-to-live plan for parent tasks" do

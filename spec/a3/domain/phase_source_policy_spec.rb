@@ -77,8 +77,8 @@ RSpec.describe A3::Domain::PhaseSourcePolicy do
     implementation_descriptor = namespaced.source_descriptor_for(task: child_task, phase: :implementation)
     parent_descriptor = namespaced.source_descriptor_for(task: parent_task, phase: :verification)
 
-    expect(implementation_descriptor.ref).to eq("refs/heads/a2o/runtime/a3-user-runtime-check/work/A3-v2-3030")
-    expect(parent_descriptor.ref).to eq("refs/heads/a2o/runtime/a3-user-runtime-check/parent/A3-v2-3022")
+    expect(implementation_descriptor.ref).to eq("refs/heads/a2o/runtime/user-runtime-check/work/A3-v2-3030")
+    expect(parent_descriptor.ref).to eq("refs/heads/a2o/runtime/user-runtime-check/parent/A3-v2-3022")
   end
 
   it "builds canonical review targets from the source ref" do

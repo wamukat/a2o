@@ -146,7 +146,11 @@ func defaultComposeProjectName(packagePath string) string {
 	if normalized == "" {
 		normalized = "project"
 	}
-	return "a3-" + normalized
+	normalized = strings.TrimPrefix(normalized, "a3-")
+	if normalized == "" {
+		normalized = "project"
+	}
+	return "a2o-" + normalized
 }
 
 func applyAgentInstallOverrides(config runtimeInstanceConfig, composeProject string, composeFile string, runtimeService string) runtimeInstanceConfig {
@@ -220,7 +224,7 @@ func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttem
 		overrides["A3_HOST_AGENT_BIN"] = filepath.Join(config.WorkspaceRoot, hostAgentBinRelativePath)
 	}
 	if strings.TrimSpace(config.ComposeProject) != "" {
-		overrides["A3_BRANCH_NAMESPACE"] = config.ComposeProject
+		overrides["A2O_BRANCH_NAMESPACE"] = defaultBranchNamespace(config.ComposeProject)
 	}
 	if strings.TrimSpace(maxSteps) != "" {
 		overrides["A3_RUNTIME_RUN_ONCE_MAX_STEPS"] = strings.TrimSpace(maxSteps)

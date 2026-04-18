@@ -182,7 +182,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       root_path: "/tmp/a3-parent-runtime-workspace",
       source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(
         task_ref: "Sample#173",
-        ref: "refs/heads/a2o/runtime/a3-user-runtime-check/parent/Sample-173"
+        ref: "refs/heads/a2o/runtime/user-runtime-check/parent/Sample-173"
       ),
       slot_paths: {}
     )
@@ -199,7 +199,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       workspace_kind: parent_workspace.workspace_kind,
       source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(
         task_ref: parent_task.ref,
-        ref: "refs/heads/a2o/runtime/a3-user-runtime-check/parent/Sample-173"
+        ref: "refs/heads/a2o/runtime/user-runtime-check/parent/Sample-173"
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
         edit_scope: parent_task.edit_scope,
@@ -209,7 +209,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: parent_task.ref,
         owner_scope: :task,
-        snapshot_version: "refs/heads/a2o/runtime/a3-user-runtime-check/parent/Sample-173"
+        snapshot_version: "refs/heads/a2o/runtime/user-runtime-check/parent/Sample-173"
       )
     )
 
@@ -222,8 +222,8 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       branch_namespace: "runtime/a3-user-runtime-check"
     ).call(workspace: parent_workspace, task: parent_task, run: parent_run)
 
-    expect(request.slots.fetch("repo_alpha")).to include("ref" => "refs/heads/a2o/runtime/a3-user-runtime-check/parent/Sample-173")
-    expect(request.slots.fetch("repo_beta")).to include("ref" => "refs/heads/a2o/runtime/a3-user-runtime-check/parent/Sample-173")
+    expect(request.slots.fetch("repo_alpha")).to include("ref" => "refs/heads/a2o/runtime/user-runtime-check/parent/Sample-173")
+    expect(request.slots.fetch("repo_beta")).to include("ref" => "refs/heads/a2o/runtime/user-runtime-check/parent/Sample-173")
   end
 
   it "uses slot-specific support refs when multiple support repositories are configured" do

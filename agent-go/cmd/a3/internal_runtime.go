@@ -623,8 +623,17 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		WorkerCommand:      workerCommand,
 		WorkerArgs:         workerArgs,
 		JobTimeoutSeconds:  envDefault("A3_RUNTIME_RUN_ONCE_AGENT_JOB_TIMEOUT_SECONDS", envDefault("A3_RUNTIME_SCHEDULER_AGENT_JOB_TIMEOUT_SECONDS", "7200")),
-		BranchNamespace:    config.ComposeProject,
+		BranchNamespace:    defaultBranchNamespace(config.ComposeProject),
 	}, nil
+}
+
+func defaultBranchNamespace(composeProject string) string {
+	namespace := strings.Trim(strings.ToLower(strings.TrimSpace(composeProject)), "-")
+	namespace = strings.TrimPrefix(namespace, "a3-")
+	if namespace == "" {
+		return "runtime"
+	}
+	return namespace
 }
 
 func packageRuntimeRepoArgs(hostRootDir string, packagePath string, config projectPackageConfig) ([]string, []string, []string, []string, []string) {
@@ -879,10 +888,10 @@ func startRuntimeExecuteUntilIdle(config runtimeInstanceConfig, plan runtimeRunO
 	return dockerComposeExecShell(config, plan, runner, runtimeContainerProcess{
 		WorkingDir: "/workspace",
 		Env: map[string]string{
-			"A3_BRANCH_NAMESPACE": plan.BranchNamespace,
-			"A3_ROOT_DIR":         "/workspace",
-			"A2O_ROOT_DIR":        "/workspace",
-			"KANBAN_BACKEND":      "soloboard",
+			"A2O_BRANCH_NAMESPACE": plan.BranchNamespace,
+			"A3_ROOT_DIR":          "/workspace",
+			"A2O_ROOT_DIR":         "/workspace",
+			"KANBAN_BACKEND":       "soloboard",
 		},
 		EnvShell: map[string]string{
 			"A3_SECRET":           "${A3_SECRET:-a2o-runtime-secret}",
