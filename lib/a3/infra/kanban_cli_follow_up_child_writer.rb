@@ -176,7 +176,7 @@ module A3
         return false unless @follow_up_label == "a2o:follow-up-child"
 
         legacy_expected = expected_labels.map { |label| label == "a2o:follow-up-child" ? "a3:follow-up-child" : label }.sort
-        actual_labels == legacy_expected
+        actual_labels == legacy_expected || (actual_labels - ["a3:follow-up-child"]).sort == expected_labels
       end
 
       def ensure_relation(parent_task_id, child_task_id)
