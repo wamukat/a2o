@@ -111,7 +111,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage:")
 	fmt.Fprintln(w, "  a2o version")
 	fmt.Fprintln(w, "  a2o doctor")
-	fmt.Fprintln(w, "  a2o project bootstrap --package DIR")
+	fmt.Fprintln(w, "  a2o project bootstrap [--package DIR]")
 	fmt.Fprintln(w, "  a2o project template [--language node|go|python|ruby] [--output project.yaml]")
 	fmt.Fprintln(w, "  a2o kanban up [--build]")
 	fmt.Fprintln(w, "  a2o kanban doctor")
@@ -124,5 +124,5 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o runtime run-once [--max-steps N] [--agent-attempts N]")
 	fmt.Fprintln(w, "  a2o runtime loop [--interval DURATION] [--max-cycles N]")
 	fmt.Fprintln(w, "  a2o agent target")
-	fmt.Fprintln(w, "  a2o agent install --target auto --output PATH [--build]")
+	fmt.Fprintln(w, "  a2o agent install [--target auto] [--output PATH] [--build]")
 }

@@ -106,7 +106,7 @@ func findInstanceConfig(start string) (string, error) {
 		}
 		parent := filepath.Dir(current)
 		if parent == current {
-			return "", fmt.Errorf("A2O runtime instance config not found; run `a2o project bootstrap --package ./a2o-project` first")
+			return "", fmt.Errorf("A2O runtime instance config not found; run `a2o project bootstrap` from a workspace with ./a2o-project or ./project-package first")
 		}
 		current = parent
 	}

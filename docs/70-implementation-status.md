@@ -8,7 +8,7 @@ Date: 2026-04-17
 ## Ready
 
 - Host launcher install: `a2o host install`
-- Project bootstrap: `a2o project bootstrap --package DIR`
+- Project bootstrap: `a2o project bootstrap`, optional `--package DIR`
 - Kanban service lifecycle: `a2o kanban up`, `doctor`, `url`
 - Agent binary export: `a2o agent install`
 - Foreground runtime execution: `a2o runtime run-once`, `a2o runtime loop`

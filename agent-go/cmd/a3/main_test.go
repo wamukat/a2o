@@ -158,6 +158,39 @@ func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
 	}
 }
 
+func TestProjectBootstrapDefaultsToProjectPackageDirectory(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "project-package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"project",
+		"bootstrap",
+		"--workspace",
+		tempDir,
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+
+	configPath := filepath.Join(tempDir, ".work", "a2o", "runtime-instance.json")
+	body, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("instance config missing: %v", err)
+	}
+	var config runtimeInstanceConfig
+	if err := json.Unmarshal(body, &config); err != nil {
+		t.Fatalf("invalid instance config: %v", err)
+	}
+	if config.PackagePath != packageDir {
+		t.Fatalf("PackagePath=%q, want %q", config.PackagePath, packageDir)
+	}
+}
+
 func TestDefaultComposeProjectNameUsesA2OPrefix(t *testing.T) {
 	if got := defaultComposeProjectName("/tmp/project-package"); got != "a2o-project-package" {
 		t.Fatalf("defaultComposeProjectName=%q", got)
@@ -439,6 +472,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 
 	output := stdout.String()
 	for _, want := range []string{
+		"a2o project bootstrap [--package DIR]",
 		"a2o kanban up [--build]",
 		"a2o kanban doctor",
 		"a2o kanban url",
@@ -449,6 +483,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime describe-task TASK_REF",
 		"a2o runtime run-once [--max-steps N] [--agent-attempts N]",
 		"a2o runtime loop [--interval DURATION] [--max-cycles N]",
+		"a2o agent install [--target auto] [--output PATH] [--build]",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("usage missing %q in %q", want, output)
@@ -781,7 +816,6 @@ func TestKanbanExecutionCommandsAreNotPublicEntrypoints(t *testing.T) {
 
 func TestAgentInstallUsesBootstrappedInstanceConfig(t *testing.T) {
 	tempDir := t.TempDir()
-	outputPath := filepath.Join(tempDir, "bin", "a3-agent")
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
 		SchemaVersion:  1,
 		PackagePath:    filepath.Join(tempDir, "package"),
@@ -795,7 +829,7 @@ func TestAgentInstallUsesBootstrappedInstanceConfig(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"agent", "install", "--target", "linux-amd64", "--output", outputPath}, runner, &stdout, &stderr)
+		code := run([]string{"agent", "install", "--target", "linux-amd64"}, runner, &stdout, &stderr)
 		if code != 0 {
 			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
@@ -805,6 +839,7 @@ func TestAgentInstallUsesBootstrappedInstanceConfig(t *testing.T) {
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d --no-deps a3-runtime")
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml ps -q a3-runtime")
 	assertCallContains(t, joined, "docker exec container-123 a3 agent package verify --target linux-amd64")
+	assertCallContains(t, joined, "docker cp container-123:/tmp/a2o-agent-export "+filepath.Join(tempDir, hostAgentBinRelativePath))
 }
 
 func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
@@ -2035,15 +2070,44 @@ func TestArchiveRuntimeStateUsesStructuredDockerCommands(t *testing.T) {
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime mkdir -p /var/lib/a3/test-runtime")
 }
 
-func TestAgentInstallRequiresOutput(t *testing.T) {
+func TestAgentInstallDefaultsOutputFromInstanceConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    filepath.Join(tempDir, "package"),
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+	})
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := run([]string{"agent", "install"}, &fakeRunner{}, &stdout, &stderr)
-	if code == 0 {
-		t.Fatalf("run should fail without --output")
+	withChdir(t, tempDir, func() {
+		code := run([]string{"agent", "install", "--target", "linux-amd64"}, &fakeRunner{}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	outputPath := filepath.Join(tempDir, hostAgentBinRelativePath)
+	if _, err := os.Stat(outputPath); err != nil {
+		t.Fatalf("default agent output missing: %v", err)
 	}
-	if !strings.Contains(stderr.String(), "--output is required") {
+	if !strings.Contains(stdout.String(), "output="+outputPath) {
+		t.Fatalf("stdout should include default output path, got %q", stdout.String())
+	}
+}
+
+func TestAgentInstallRequiresOutputWithoutInstanceConfig(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"agent", "install", "--compose-project", "a3-test", "--compose-file", "compose.yml"}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("run should fail without --output and instance config")
+	}
+	if !strings.Contains(stderr.String(), "--output is required when no runtime instance config is available") {
 		t.Fatalf("stderr should mention missing output, got %q", stderr.String())
 	}
 }

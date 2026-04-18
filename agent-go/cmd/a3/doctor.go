@@ -32,7 +32,7 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 
 	config, configPath, err := loadInstanceConfigFromWorkingTree()
 	if err != nil {
-		report("runtime_instance_config", false, err.Error(), "run a2o project bootstrap --package DIR")
+		report("runtime_instance_config", false, err.Error(), "run a2o project bootstrap")
 		fmt.Fprintf(stdout, "doctor_status=%s\n", status)
 		return 1
 	}
@@ -51,7 +51,7 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 
 	agentPath := filepath.Join(config.WorkspaceRoot, hostAgentBinRelativePath)
 	if info, err := os.Stat(agentPath); err != nil {
-		report("agent_install", false, agentPath+" not found", "run a2o agent install --target auto --output ./"+filepath.ToSlash(hostAgentBinRelativePath))
+		report("agent_install", false, agentPath+" not found", "run a2o agent install")
 	} else if info.Mode().Perm()&0o111 == 0 {
 		report("agent_install", false, agentPath+" is not executable", "rerun a2o agent install")
 	} else {

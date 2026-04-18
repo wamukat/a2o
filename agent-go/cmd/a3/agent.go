@@ -62,10 +62,6 @@ func runAgentInstall(args []string, runner commandRunner, stdout io.Writer, stde
 	if flags.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
-	if strings.TrimSpace(*output) == "" {
-		return errors.New("--output is required")
-	}
-
 	resolvedTarget := strings.TrimSpace(*target)
 	if resolvedTarget == "" || resolvedTarget == "auto" {
 		detected, err := detectHostTarget()
@@ -73,14 +69,6 @@ func runAgentInstall(args []string, runner commandRunner, stdout io.Writer, stde
 			return err
 		}
 		resolvedTarget = detected
-	}
-
-	outputPath, err := filepath.Abs(*output)
-	if err != nil {
-		return fmt.Errorf("resolve output path: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
-		return fmt.Errorf("create output directory: %w", err)
 	}
 
 	instanceConfig, _, instanceConfigErr := loadInstanceConfigFromWorkingTree()
@@ -92,6 +80,21 @@ func runAgentInstall(args []string, runner commandRunner, stdout io.Writer, stde
 		config = *instanceConfig
 	}
 	config = applyAgentInstallOverrides(config, *composeProject, *composeFile, *runtimeService)
+
+	outputValue := strings.TrimSpace(*output)
+	if outputValue == "" {
+		if strings.TrimSpace(config.WorkspaceRoot) == "" {
+			return errors.New("--output is required when no runtime instance config is available")
+		}
+		outputValue = filepath.Join(config.WorkspaceRoot, hostAgentBinRelativePath)
+	}
+	outputPath, err := filepath.Abs(outputValue)
+	if err != nil {
+		return fmt.Errorf("resolve output path: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		return fmt.Errorf("create output directory: %w", err)
+	}
 
 	composePrefix := composeArgs(config)
 	if *build {

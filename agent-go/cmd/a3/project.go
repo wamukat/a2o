@@ -285,15 +285,15 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 	if flags.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
-	if strings.TrimSpace(*packagePath) == "" {
-		return errors.New("--package is required")
-	}
-
 	absWorkspaceRoot, err := filepath.Abs(*workspaceRoot)
 	if err != nil {
 		return fmt.Errorf("resolve workspace root: %w", err)
 	}
-	absPackagePath, err := filepath.Abs(*packagePath)
+	resolvedPackagePath, err := resolveBootstrapPackagePath(*packagePath, absWorkspaceRoot)
+	if err != nil {
+		return err
+	}
+	absPackagePath, err := filepath.Abs(resolvedPackagePath)
 	if err != nil {
 		return fmt.Errorf("resolve package path: %w", err)
 	}
@@ -334,4 +334,28 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 
 	fmt.Fprintf(stdout, "project_bootstrapped package=%s instance_config=%s\n", config.PackagePath, filepath.Join(absWorkspaceRoot, instanceConfigRelativePath))
 	return nil
+}
+
+func resolveBootstrapPackagePath(packagePath string, workspaceRoot string) (string, error) {
+	if strings.TrimSpace(packagePath) != "" {
+		return strings.TrimSpace(packagePath), nil
+	}
+	candidates := []string{
+		filepath.Join(workspaceRoot, "a2o-project"),
+		filepath.Join(workspaceRoot, "project-package"),
+	}
+	matches := []string{}
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			matches = append(matches, candidate)
+		}
+	}
+	switch len(matches) {
+	case 1:
+		return matches[0], nil
+	case 0:
+		return "", errors.New("--package is required unless ./a2o-project or ./project-package exists")
+	default:
+		return "", errors.New("--package is required when both ./a2o-project and ./project-package exist")
+	}
 }

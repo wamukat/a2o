@@ -395,7 +395,7 @@ func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) er
 	fmt.Fprintln(stdout, "kanban_doctor=a2o kanban doctor")
 	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(*config))
 	fmt.Fprintf(stdout, "internal_runtime_up=docker compose -p %s -f %s up -d %s soloboard\n", config.ComposeProject, config.ComposeFile, config.RuntimeService)
-	fmt.Fprintf(stdout, "agent_install=a2o agent install --target auto --output ./%s\n", filepath.ToSlash(hostAgentBinRelativePath))
+	fmt.Fprintln(stdout, "agent_install=a2o agent install")
 	return nil
 }
 
@@ -614,7 +614,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 	}
 	referencePackagePath := envDefault("A3_RUNTIME_RUN_ONCE_REFERENCE_PACKAGE", envDefault("A3_RUNTIME_SCHEDULER_REFERENCE_PACKAGE", config.PackagePath))
 	if strings.TrimSpace(referencePackagePath) == "" {
-		return runtimeRunOncePlan{}, errors.New("runtime package path is empty; run `a2o project bootstrap --package ./a2o-project` first")
+		return runtimeRunOncePlan{}, errors.New("runtime package path is empty; run `a2o project bootstrap` from a workspace with ./a2o-project or ./project-package first")
 	}
 	packageConfig, err := loadProjectPackageConfig(referencePackagePath)
 	if err != nil {
@@ -719,7 +719,7 @@ func buildRuntimeDescribeTaskPlan(config runtimeInstanceConfig) (runtimeRunOnceP
 	}
 	referencePackagePath := envDefault("A3_RUNTIME_RUN_ONCE_REFERENCE_PACKAGE", envDefault("A3_RUNTIME_SCHEDULER_REFERENCE_PACKAGE", config.PackagePath))
 	if strings.TrimSpace(referencePackagePath) == "" {
-		return runtimeRunOncePlan{}, errors.New("runtime package path is empty; run `a2o project bootstrap --package ./a2o-project` first")
+		return runtimeRunOncePlan{}, errors.New("runtime package path is empty; run `a2o project bootstrap` from a workspace with ./a2o-project or ./project-package first")
 	}
 	packageConfig, err := loadProjectPackageConfig(referencePackagePath)
 	if err != nil {

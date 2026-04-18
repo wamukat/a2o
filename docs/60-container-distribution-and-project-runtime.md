@@ -21,15 +21,13 @@ A2O は「1 project package = 1 runtime instance」として扱う。
 bootstrap は project package から runtime instance config を作成する。以後の `a2o kanban ...` と `a2o agent install` はカレントディレクトリから instance config を探索し、対象 package、storage、compose project、runtime image を解決する。
 
 ```sh
-a2o project bootstrap --package ./reference-products/typescript-api-web/project-package
+a2o project bootstrap
 a2o kanban up
-a2o kanban doctor
-a2o kanban url
-a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
+a2o agent install
 a2o runtime run-once
-a2o runtime describe-task <task-ref>
-a2o runtime start
 ```
+
+`./project-package` または `./a2o-project` 以外に package を置く場合は `a2o project bootstrap --package DIR` を使う。
 
 複数 product を同時に動かす場合は、package ごとに workspace、storage dir、compose project name、port を分ける。
 

@@ -52,7 +52,7 @@ project-package/
 
 ## Review Checklist
 
-- The package can be bootstrapped with `a2o project bootstrap --package DIR`.
+- The package can be bootstrapped with `a2o project bootstrap`; use `--package DIR` when it is not in `./a2o-project` or `./project-package`.
 - Repo aliases are stable and do not encode local machine paths.
 - Required binaries are listed under `agent.required_bins`.
 - Build and verification commands can run from an agent-materialized workspace.
