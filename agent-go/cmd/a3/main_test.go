@@ -1596,6 +1596,7 @@ func TestRuntimeStartRejectsAlreadyRunningScheduler(t *testing.T) {
 }
 
 func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
+	t.Setenv("A3_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -1641,7 +1642,7 @@ func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
 		"runtime_status_check name=runtime_container status=running container=runtime-container",
 		"runtime_status_check name=kanban_service status=running container=soloboard-container",
 		"runtime_image_digest=ghcr.io/wamukat/a2o-engine@sha256:test",
-		"runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation status=blocked outcome=blocked",
+		"runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation state=terminal outcome=blocked",
 	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("stdout should include %q in:\n%s", want, stdout.String())
@@ -1649,6 +1650,9 @@ func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
 	}
 	assertCallContains(t, runner.joinedCalls(), "process-running 12345")
 	assertCallContains(t, runner.joinedCalls(), "process-command 12345")
+	if runner.lastEnv["A3_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine@sha256:pinned" {
+		t.Fatalf("runtime status should evaluate compose with runtime image env, got %#v", runner.lastEnv)
+	}
 }
 
 func TestRuntimeStatusReportsStaleForUnrelatedReusedPID(t *testing.T) {
@@ -2253,6 +2257,7 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		"A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS": os.Getenv("A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"),
 		"A2O_BRANCH_NAMESPACE":               os.Getenv("A2O_BRANCH_NAMESPACE"),
 		"A3_HOST_AGENT_BIN":                  os.Getenv("A3_HOST_AGENT_BIN"),
+		"A3_RUNTIME_IMAGE":                   os.Getenv("A3_RUNTIME_IMAGE"),
 	}
 	if r.err != nil {
 		output := r.errorOutput
@@ -2287,7 +2292,7 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		}
 		return []byte("task A2O#16 kind=single status=blocked current_run=run-16\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n"), nil
 	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "runtime_latest_run"):
-		return []byte("runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation status=blocked outcome=blocked\n"), nil
+		return []byte("runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation state=terminal outcome=blocked\n"), nil
 	case strings.Contains(joined, " ruby -rjson -e "):
 		return []byte("run-16\n"), nil
 	case strings.Contains(joined, " a3 show-run "):

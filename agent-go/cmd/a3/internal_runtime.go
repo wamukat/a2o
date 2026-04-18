@@ -254,10 +254,12 @@ func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, std
 	} else {
 		fmt.Fprintf(stdout, "runtime_scheduler_status=stale pid=%d pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
 	}
-	printRuntimeServiceStatus(effectiveConfig, runner, stdout)
-	printRuntimeImageStatus(&effectiveConfig, runner, stdout)
-	printLatestRuntimeSummary(effectiveConfig, runner, stdout)
-	return nil
+	return withComposeEnv(effectiveConfig, func() error {
+		printRuntimeServiceStatus(effectiveConfig, runner, stdout)
+		printRuntimeImageStatus(&effectiveConfig, runner, stdout)
+		printLatestRuntimeSummary(effectiveConfig, runner, stdout)
+		return nil
+	})
 }
 
 func printRuntimeServiceStatus(config runtimeInstanceConfig, runner commandRunner, stdout io.Writer) {
@@ -296,7 +298,7 @@ func printLatestRuntimeSummary(config runtimeInstanceConfig, runner commandRunne
 		fmt.Fprintf(stdout, "runtime_latest_run status=unavailable reason=%s\n", singleLine(err.Error()))
 		return
 	}
-	script := "records = JSON.parse(File.read(ARGV.fetch(0))); run = records.values.last; if run then puts \"runtime_latest_run run_ref=#{run['ref']} task_ref=#{run['task_ref']} phase=#{run['phase'] || '-'} status=#{run['status'] || '-'} outcome=#{run['outcome'] || '-'}\" end"
+	script := "records = JSON.parse(File.read(ARGV.fetch(0))); run = records.values.last; if run then outcome = run['terminal_outcome']; state = outcome ? 'terminal' : 'active'; puts \"runtime_latest_run run_ref=#{run['ref']} task_ref=#{run['task_ref']} phase=#{run['phase'] || '-'} state=#{state} outcome=#{outcome || '-'}\" end"
 	output, err := dockerComposeExecOutput(config, plan, runner, "ruby", "-rjson", "-e", script, path.Join(plan.StorageDir, "runs.json"))
 	if err != nil {
 		fmt.Fprintf(stdout, "runtime_latest_run status=unavailable reason=%s\n", singleLine(err.Error()))
