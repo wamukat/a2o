@@ -797,7 +797,7 @@ module A3
 
     def parse_agent_package_options(argv)
       options = {
-        package_dir: ENV.fetch("A3_AGENT_PACKAGE_DIR", A3::Infra::AgentPackageStore::DEFAULT_PACKAGE_DIR)
+        package_dir: ENV.fetch("A2O_AGENT_PACKAGE_DIR", ENV.fetch("A3_AGENT_PACKAGE_DIR", A3::Infra::AgentPackageStore::DEFAULT_PACKAGE_DIR))
       }
       parser = OptionParser.new
       parser.on("--package-dir DIR") { |value| options[:package_dir] = File.expand_path(value) }
@@ -809,7 +809,7 @@ module A3
 
     def parse_host_install_options(argv)
       options = {
-        package_dir: ENV.fetch("A3_AGENT_PACKAGE_DIR", A3::Infra::AgentPackageStore::DEFAULT_PACKAGE_DIR)
+        package_dir: ENV.fetch("A2O_AGENT_PACKAGE_DIR", ENV.fetch("A3_AGENT_PACKAGE_DIR", A3::Infra::AgentPackageStore::DEFAULT_PACKAGE_DIR))
       }
       parser = OptionParser.new
       parser.on("--package-dir DIR") { |value| options[:package_dir] = File.expand_path(value) }
@@ -818,7 +818,7 @@ module A3
       parser.on("--runtime-image IMAGE") { |value| options[:runtime_image] = value.to_s.strip }
       parser.parse!(argv)
       options.fetch(:output_dir) { raise ArgumentError, "--output-dir is required for host install" }
-      options[:share_dir] ||= File.expand_path(File.join(options.fetch(:output_dir), "..", "share", "a3"))
+      options[:share_dir] ||= File.expand_path(File.join(options.fetch(:output_dir), "..", "share", "a2o"))
       options
     end
 
@@ -839,7 +839,7 @@ module A3
     end
 
     def install_host_share_assets(share_dir:)
-      source_dir = ENV.fetch("A3_SHARE_DIR", "/opt/a3/share")
+      source_dir = ENV.fetch("A2O_SHARE_DIR", ENV.fetch("A3_SHARE_DIR", "/opt/a2o/share"))
       return nil unless Dir.exist?(source_dir)
 
       FileUtils.mkdir_p(File.dirname(share_dir))

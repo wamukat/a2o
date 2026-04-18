@@ -24,6 +24,30 @@ func TestPreScanConfigPath(t *testing.T) {
 	}
 }
 
+func TestPublicAgentEnvironmentAliasesTakePrecedence(t *testing.T) {
+	t.Setenv("A2O_AGENT_CONFIG", "/tmp/public-profile.json")
+	t.Setenv("A3_AGENT_CONFIG", "/tmp/legacy-profile.json")
+	t.Setenv("A2O_AGENT_NAME", "public-agent")
+	t.Setenv("A3_AGENT_NAME", "legacy-agent")
+	t.Setenv("A2O_AGENT_POLL_INTERVAL", "3s")
+	t.Setenv("A3_AGENT_POLL_INTERVAL", "9s")
+	t.Setenv("A2O_AGENT_MAX_ITERATIONS", "4")
+	t.Setenv("A3_AGENT_MAX_ITERATIONS", "8")
+
+	if got := preScanConfigPath(nil); got != "/tmp/public-profile.json" {
+		t.Fatalf("preScanConfigPath env = %q", got)
+	}
+	if got := defaultStringCompat("A2O_AGENT_NAME", "A3_AGENT_NAME", "", "local-agent"); got != "public-agent" {
+		t.Fatalf("agent name alias = %q", got)
+	}
+	if got := envDurationCompat("A2O_AGENT_POLL_INTERVAL", "A3_AGENT_POLL_INTERVAL", 0); got.String() != "3s" {
+		t.Fatalf("poll interval alias = %s", got)
+	}
+	if got := envIntCompat("A2O_AGENT_MAX_ITERATIONS", "A3_AGENT_MAX_ITERATIONS", 0); got != 4 {
+		t.Fatalf("max iterations alias = %d", got)
+	}
+}
+
 func TestMergeSourceAliases(t *testing.T) {
 	got := mergeSourceAliases(
 		map[string]string{"repo-a": "/config/a", "repo-b": "/config/b"},

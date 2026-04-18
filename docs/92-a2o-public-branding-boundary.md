@@ -14,14 +14,14 @@
 - Public runtime branch namespace: `refs/heads/a2o/...`
 - Public runtime commit messages: `A2O ...`
 - Internal engine name: `A3`
-- Internal command / module / env / legacy state: `a3`, `A3_*`, `.a3`, `a3-runtime`
+- Internal command / module / env / legacy state: `a3`, `A3_*`, `.a3`
 
 ## Rename しないもの
 
 現行 release では、次は rename しない。
 
 - legacy `.a3/runtime-instance.json` reader fallback
-- `A3_*` environment variables
+- `A3_*` environment variables as compatibility fallbacks behind public `A2O_*` variables
 - Ruby module / Go package / internal class / internal file path
 - runtime storage schema / artifact schema / job schema
 - 過去の internal evidence に含まれる legacy `a3-agent` identifier
@@ -37,7 +37,7 @@
 | Branch refs generated for work / parent integration | `refs/heads/a2o/...` | Existing `refs/heads/a3/...` refs are legacy data and may still be read from persisted evidence. |
 | Runtime publication commit messages | `A2O implementation update ...`, `A2O remediation update ...`, `A2O merge recovery ...` | Existing commits keep their historical messages. |
 | Runtime generated files | `.work/a2o/...` for current user-facing host artifacts | `.a3/...` is read only as legacy state or used as internal workspace metadata. |
-| Compose service name | Hidden from normal CLI output | The current compose file still uses the legacy internal service identity. Renaming it changes Docker networking and existing compose state, so it remains compatibility surface until a migration ticket handles it. |
+| Compose service name | `a2o-runtime` in generated/default compose files | Existing runtime instance configs may still name `a3-runtime`; CLI commands continue to honor that stored compatibility value. |
 
 ## Public Alias
 
@@ -53,5 +53,4 @@ agent install は public path では `a2o-agent` を使う。binary の中身は
 
 ## Follow-up
 
-- compose service name / internal env name の rename は、state migration と Docker volume / network impact を別チケットで扱う。
 - 将来 `.a3` / `A3_*` を rename する場合は、別 release の state migration として扱う。

@@ -7,7 +7,7 @@ WORKSPACE_ROOT="$(cd "${ENGINE_ROOT}/.." && pwd)"
 
 COMPOSE_PROJECT="${COMPOSE_PROJECT:-a2o-runtime}"
 COMPOSE_FILE="${COMPOSE_FILE:-${ENGINE_ROOT}/docker/compose/a2o-soloboard.yml}"
-RUNTIME_SERVICE="${RUNTIME_SERVICE:-a3-runtime}"
+RUNTIME_SERVICE="${RUNTIME_SERVICE:-a2o-runtime}"
 
 detect_host_target() {
   local os
@@ -39,11 +39,11 @@ source_root="${work_dir}/source/catalog-service"
 workspace_root="${work_dir}/workspaces"
 
 SOLOBOARD_IMAGE="${SOLOBOARD_IMAGE:-ghcr.io/wamukat/soloboard:latest}" \
-A3_BUNDLE_SOLOBOARD_PORT="${A3_BUNDLE_SOLOBOARD_PORT:-3470}" \
+A2O_BUNDLE_SOLOBOARD_PORT="${A2O_BUNDLE_SOLOBOARD_PORT:-3470}" \
 docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" build "${RUNTIME_SERVICE}"
 
 SOLOBOARD_IMAGE="${SOLOBOARD_IMAGE:-ghcr.io/wamukat/soloboard:latest}" \
-A3_BUNDLE_SOLOBOARD_PORT="${A3_BUNDLE_SOLOBOARD_PORT:-3470}" \
+A2O_BUNDLE_SOLOBOARD_PORT="${A2O_BUNDLE_SOLOBOARD_PORT:-3470}" \
 docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" up -d --no-deps --force-recreate "${RUNTIME_SERVICE}"
 
 runtime_container="$(docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" ps -q "${RUNTIME_SERVICE}")"
@@ -54,8 +54,8 @@ chmod +x "${exported_agent}"
 
 mkdir -p "${source_root}"
 git -C "${source_root}" init -q
-git -C "${source_root}" config user.name "A3 Runtime Image Validation"
-git -C "${source_root}" config user.email "a3-runtime-image-validation@example.com"
+git -C "${source_root}" config user.name "A2O Runtime Image Validation"
+git -C "${source_root}" config user.email "a2o-runtime-image-validation@example.com"
 printf 'runtime image validation\n' > "${source_root}/README.md"
 git -C "${source_root}" add README.md
 git -C "${source_root}" commit -q -m "initial runtime image validation source"

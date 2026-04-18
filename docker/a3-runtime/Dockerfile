@@ -12,7 +12,7 @@ COPY agent-go/cmd ./cmd
 COPY agent-go/internal ./internal
 COPY agent-go/scripts ./scripts
 
-RUN DIST_DIR=/opt/a3/agents VERSION="${A3_AGENT_VERSION}" ./scripts/build-release.sh
+RUN DIST_DIR=/opt/a2o/agents VERSION="${A3_AGENT_VERSION}" ./scripts/build-release.sh
 
 FROM ruby:3.1-slim
 
@@ -60,21 +60,23 @@ COPY config /tmp/a3-engine/config
 COPY lib /tmp/a3-engine/lib
 COPY bin /tmp/a3-engine/bin
 COPY tools /tmp/a3-engine/tools
-COPY tools /opt/a3/share/tools
-COPY docker/compose /opt/a3/share/docker/compose
-RUN cp /opt/a3/share/docker/compose/a2o-soloboard.release.yml /opt/a3/share/docker/compose/a2o-soloboard.yml
+COPY tools /opt/a2o/share/tools
+COPY docker/compose /opt/a2o/share/docker/compose
+RUN cp /opt/a2o/share/docker/compose/a2o-soloboard.release.yml /opt/a2o/share/docker/compose/a2o-soloboard.yml
 
 RUN cd /tmp/a3-engine \
     && bundle _${BUNDLER_VERSION}_ install \
     && rm -rf /usr/local/bundle/cache/*.gem
 
-COPY --from=agent-builder /opt/a3/agents /opt/a3/agents
+COPY --from=agent-builder /opt/a2o/agents /opt/a2o/agents
 
 RUN ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a3 \
     && ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a2o
 
 ENV A3_ROOT_DIR=/workspace
-ENV A3_AGENT_PACKAGE_DIR=/opt/a3/agents
+ENV A2O_ROOT_DIR=/workspace
+ENV A2O_AGENT_PACKAGE_DIR=/opt/a2o/agents
+ENV A3_AGENT_PACKAGE_DIR=/opt/a2o/agents
 ENV RUBYLIB=/tmp/a3-engine/lib
 
 CMD ["sleep", "infinity"]

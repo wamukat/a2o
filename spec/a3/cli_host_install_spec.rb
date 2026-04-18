@@ -21,15 +21,15 @@ RSpec.describe "A3 host install CLI" do
     share_dir = File.join(@tmp_dir, "share-out")
     out = StringIO.new
 
-    with_env("A3_SHARE_DIR" => share_source_dir) do
-      A3::CLI.start(["host", "install", "--package-dir", package_dir, "--output-dir", output_dir, "--share-dir", share_dir, "--runtime-image", "example/a3-engine:latest"], out: out)
+    with_env("A2O_SHARE_DIR" => share_source_dir) do
+      A3::CLI.start(["host", "install", "--package-dir", package_dir, "--output-dir", output_dir, "--share-dir", share_dir, "--runtime-image", "example/a2o-engine:latest"], out: out)
     end
 
     expect(out.string).to include("host_launcher_installed output=#{File.join(output_dir, 'a2o')}")
     expect(out.string).to include("host_launcher_alias output=#{File.join(output_dir, 'a3')}")
     expect(out.string).to include("targets=darwin-amd64,linux-arm64")
     expect(out.string).to include("host_share_installed output=#{share_dir}")
-    expect(out.string).to include("host_runtime_image=example/a3-engine:latest")
+    expect(out.string).to include("host_runtime_image=example/a2o-engine:latest")
     expect(File.read(File.join(output_dir, "a3-darwin-amd64"))).to eq("darwin launcher\n")
     expect(File.executable?(File.join(output_dir, "a3-darwin-amd64"))).to be(true)
     expect(File.read(File.join(output_dir, "a2o-darwin-amd64"))).to eq("darwin launcher\n")
@@ -43,7 +43,7 @@ RSpec.describe "A3 host install CLI" do
     expect(File.read(File.join(output_dir, "a3"))).to include("exec \"$binary\" \"$@\"")
     expect(File.executable?(File.join(output_dir, "a3"))).to be(true)
     expect(File.read(File.join(share_dir, "docker/compose/a2o-soloboard.yml"))).to eq("services: {}\n")
-    expect(File.read(File.join(share_dir, "runtime-image"))).to eq("example/a3-engine:latest\n")
+    expect(File.read(File.join(share_dir, "runtime-image"))).to eq("example/a2o-engine:latest\n")
   end
 
   it "fails when no host launcher binaries exist" do

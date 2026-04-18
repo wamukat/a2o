@@ -158,21 +158,21 @@ func defaultComposeProjectName(packagePath string) string {
 
 func applyAgentInstallOverrides(config runtimeInstanceConfig, composeProject string, composeFile string, runtimeService string) runtimeInstanceConfig {
 	if strings.TrimSpace(config.ComposeProject) == "" {
-		config.ComposeProject = envDefault("A3_COMPOSE_PROJECT", "a2o-runtime")
+		config.ComposeProject = envDefaultCompat("A2O_COMPOSE_PROJECT", "A3_COMPOSE_PROJECT", "a2o-runtime")
 	}
 	if strings.TrimSpace(config.ComposeFile) == "" {
-		config.ComposeFile = envDefault("A3_COMPOSE_FILE", defaultComposeFile())
+		config.ComposeFile = envDefaultCompat("A2O_COMPOSE_FILE", "A3_COMPOSE_FILE", defaultComposeFile())
 	}
 	if strings.TrimSpace(config.RuntimeService) == "" {
-		config.RuntimeService = envDefault("A3_RUNTIME_SERVICE", "a3-runtime")
+		config.RuntimeService = envDefaultCompat("A2O_RUNTIME_SERVICE", "A3_RUNTIME_SERVICE", "a2o-runtime")
 	}
-	if envComposeProject := strings.TrimSpace(os.Getenv("A3_COMPOSE_PROJECT")); envComposeProject != "" {
+	if envComposeProject := envDefaultCompat("A2O_COMPOSE_PROJECT", "A3_COMPOSE_PROJECT", ""); envComposeProject != "" {
 		config.ComposeProject = envComposeProject
 	}
-	if envComposeFile := strings.TrimSpace(os.Getenv("A3_COMPOSE_FILE")); envComposeFile != "" {
+	if envComposeFile := envDefaultCompat("A2O_COMPOSE_FILE", "A3_COMPOSE_FILE", ""); envComposeFile != "" {
 		config.ComposeFile = envComposeFile
 	}
-	if envRuntimeService := strings.TrimSpace(os.Getenv("A3_RUNTIME_SERVICE")); envRuntimeService != "" {
+	if envRuntimeService := envDefaultCompat("A2O_RUNTIME_SERVICE", "A3_RUNTIME_SERVICE", ""); envRuntimeService != "" {
 		config.RuntimeService = envRuntimeService
 	}
 	if strings.TrimSpace(composeProject) != "" {
@@ -198,17 +198,22 @@ func withComposeEnv(config runtimeInstanceConfig, fn func() error) error {
 
 func composeEnv(config runtimeInstanceConfig) map[string]string {
 	overrides := map[string]string{}
-	if soloboardPort := envDefault("A3_BUNDLE_SOLOBOARD_PORT", config.SoloBoardPort); strings.TrimSpace(soloboardPort) != "" {
+	if soloboardPort := envDefaultCompat("A2O_BUNDLE_SOLOBOARD_PORT", "A3_BUNDLE_SOLOBOARD_PORT", config.SoloBoardPort); strings.TrimSpace(soloboardPort) != "" {
+		overrides["A2O_BUNDLE_SOLOBOARD_PORT"] = soloboardPort
 		overrides["A3_BUNDLE_SOLOBOARD_PORT"] = soloboardPort
 	}
-	if agentPort := envDefault("A3_BUNDLE_AGENT_PORT", config.AgentPort); strings.TrimSpace(agentPort) != "" {
+	if agentPort := envDefaultCompat("A2O_BUNDLE_AGENT_PORT", "A3_BUNDLE_AGENT_PORT", config.AgentPort); strings.TrimSpace(agentPort) != "" {
+		overrides["A2O_BUNDLE_AGENT_PORT"] = agentPort
 		overrides["A3_BUNDLE_AGENT_PORT"] = agentPort
 	}
 	if strings.TrimSpace(config.WorkspaceRoot) != "" {
+		overrides["A2O_WORKSPACE_ROOT"] = config.WorkspaceRoot
+		overrides["A2O_HOST_WORKSPACE_ROOT"] = config.WorkspaceRoot
 		overrides["A3_WORKSPACE_ROOT"] = config.WorkspaceRoot
 		overrides["A3_HOST_WORKSPACE_ROOT"] = config.WorkspaceRoot
 	}
 	if runtimeImage := defaultRuntimeImage(); runtimeImage != "" {
+		overrides["A2O_RUNTIME_IMAGE"] = runtimeImage
 		overrides["A3_RUNTIME_IMAGE"] = runtimeImage
 	}
 	return overrides
@@ -216,12 +221,18 @@ func composeEnv(config runtimeInstanceConfig) map[string]string {
 
 func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttempts string) map[string]string {
 	overrides := composeEnv(config)
+	overrides["A2O_BUNDLE_COMPOSE_FILE"] = config.ComposeFile
+	overrides["A2O_BUNDLE_PROJECT"] = config.ComposeProject
 	overrides["A3_BUNDLE_COMPOSE_FILE"] = config.ComposeFile
 	overrides["A3_BUNDLE_PROJECT"] = config.ComposeProject
-	if storageDir := envDefault("A3_BUNDLE_STORAGE_DIR", config.StorageDir); strings.TrimSpace(storageDir) != "" {
+	if storageDir := envDefaultCompat("A2O_BUNDLE_STORAGE_DIR", "A3_BUNDLE_STORAGE_DIR", config.StorageDir); strings.TrimSpace(storageDir) != "" {
+		overrides["A2O_BUNDLE_STORAGE_DIR"] = storageDir
 		overrides["A3_BUNDLE_STORAGE_DIR"] = storageDir
 	}
 	if strings.TrimSpace(config.WorkspaceRoot) != "" {
+		overrides["A2O_RUNTIME_RUN_ONCE_HOST_ROOT_DIR"] = config.WorkspaceRoot
+		overrides["A2O_RUNTIME_RUN_ONCE_HOST_ROOT"] = filepath.Join(config.WorkspaceRoot, runtimeHostAgentRelativePath)
+		overrides["A2O_HOST_AGENT_BIN"] = filepath.Join(config.WorkspaceRoot, hostAgentBinRelativePath)
 		overrides["A3_RUNTIME_RUN_ONCE_HOST_ROOT_DIR"] = config.WorkspaceRoot
 		overrides["A3_RUNTIME_RUN_ONCE_HOST_ROOT"] = filepath.Join(config.WorkspaceRoot, runtimeHostAgentRelativePath)
 		overrides["A3_HOST_AGENT_BIN"] = filepath.Join(config.WorkspaceRoot, hostAgentBinRelativePath)
@@ -230,9 +241,11 @@ func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttem
 		overrides["A2O_BRANCH_NAMESPACE"] = defaultBranchNamespace(config.ComposeProject)
 	}
 	if strings.TrimSpace(maxSteps) != "" {
+		overrides["A2O_RUNTIME_RUN_ONCE_MAX_STEPS"] = strings.TrimSpace(maxSteps)
 		overrides["A3_RUNTIME_RUN_ONCE_MAX_STEPS"] = strings.TrimSpace(maxSteps)
 	}
 	if strings.TrimSpace(agentAttempts) != "" {
+		overrides["A2O_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] = strings.TrimSpace(agentAttempts)
 		overrides["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] = strings.TrimSpace(agentAttempts)
 	}
 	return overrides

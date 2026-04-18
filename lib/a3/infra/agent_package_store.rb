@@ -9,7 +9,7 @@ require "zlib"
 module A3
   module Infra
     class AgentPackageStore
-      DEFAULT_PACKAGE_DIR = "/opt/a3/agents"
+      DEFAULT_PACKAGE_DIR = "/opt/a2o/agents"
 
       Package = Struct.new(:target, :version, :goos, :goarch, :archive, :sha256, keyword_init: true) do
         def archive_path(package_dir)
@@ -17,7 +17,7 @@ module A3
         end
       end
 
-      def initialize(package_dir: ENV.fetch("A3_AGENT_PACKAGE_DIR", DEFAULT_PACKAGE_DIR))
+      def initialize(package_dir: ENV.fetch("A2O_AGENT_PACKAGE_DIR", ENV.fetch("A3_AGENT_PACKAGE_DIR", DEFAULT_PACKAGE_DIR)))
         @package_dir = File.expand_path(package_dir)
       end
 

@@ -1,17 +1,18 @@
 services:
-  a3-runtime:
+  a2o-runtime:
     build:
       context: ../..
       dockerfile: docker/a3-runtime/Dockerfile
     working_dir: /workspace
     environment:
       A3_ROOT_DIR: /workspace
+      A2O_ROOT_DIR: /workspace
     volumes:
-      - ${A3_WORKSPACE_ROOT:-../../..}:/workspace
-      - ${A3_HOST_WORKSPACE_ROOT:-../../..}:${A3_HOST_WORKSPACE_ROOT:-/workspace-host}
-      - a3-runtime-state:/var/lib/a3
+      - ${A2O_WORKSPACE_ROOT:-../../..}:/workspace
+      - ${A2O_HOST_WORKSPACE_ROOT:-../../..}:${A2O_HOST_WORKSPACE_ROOT:-/workspace-host}
+      - a2o-runtime-state:/var/lib/a2o
     ports:
-      - "${A3_BUNDLE_AGENT_PORT:-7393}:7393"
+      - "${A2O_BUNDLE_AGENT_PORT:-7393}:7393"
     command: ["sleep", "infinity"]
     restart: unless-stopped
 
@@ -22,11 +23,11 @@ services:
       PORT: 3000
       SOLOBOARD_DB_FILE: /app/data/soloboard.sqlite
     ports:
-      - "${A3_BUNDLE_SOLOBOARD_PORT:-3470}:3000"
+      - "${A2O_BUNDLE_SOLOBOARD_PORT:-3470}:3000"
     volumes:
       - soloboard-data:/app/data
     restart: unless-stopped
 
 volumes:
-  a3-runtime-state:
+  a2o-runtime-state:
   soloboard-data:

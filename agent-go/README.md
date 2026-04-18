@@ -140,7 +140,7 @@ Supported shapes:
 - Dev-env container agent
   - Copy or install the release archive into the project dev-env image.
   - Point `workspace_root` and `source_aliases` at paths inside that container.
-  - Use the compose service name for the internal A2O control plane, for example `http://a3-runtime:7393`.
+  - Use the compose service name for the internal A2O control plane, for example `http://a2o-runtime:7393`.
 - CI runner agent
   - Install from release archive during the job setup step.
   - Use a job-local `workspace_root` and token files mounted from CI secrets.
@@ -208,9 +208,9 @@ The current command runs a single poll cycle:
 
 The runtime profile file is a compatibility fallback for the host/dev-env side `alias -> local path` contract. The standard path should use Engine-managed agent environment config rendered into doctor flags and job payloads.
 
-`agent_token` is optional for local-only development. When the internal A2O control plane is started with `--agent-token` / `--agent-token-file` or `A3_AGENT_TOKEN` / `A3_AGENT_TOKEN_FILE`, the Go agent must provide the same agent token through `A3_AGENT_TOKEN`, `-agent-token`, `agent_token_file`, `A3_AGENT_TOKEN_FILE`, `-agent-token-file`, or the inline profile `agent_token`. Engine-side enqueue/fetch clients may use a separate control token (`--agent-control-token-file` or `A3_AGENT_CONTROL_TOKEN_FILE`) while the Go agent continues to use only the agent token. Prefer token files for service manager / container operation so tokens are not exposed through process arguments.
+`agent_token` is optional for local-only development. When the internal A2O control plane is started with `--agent-token` / `--agent-token-file`, the Go agent must provide the same agent token through `A2O_AGENT_TOKEN`, `-agent-token`, `agent_token_file`, `A2O_AGENT_TOKEN_FILE`, `-agent-token-file`, or the inline profile `agent_token`. The legacy `A3_AGENT_TOKEN` / `A3_AGENT_TOKEN_FILE` names remain compatibility fallbacks for existing service definitions. Engine-side enqueue/fetch clients may use a separate control token (`--agent-control-token-file` or compatibility `A3_AGENT_CONTROL_TOKEN_FILE`) while the Go agent continues to use only the agent token. Prefer token files for service manager / container operation so tokens are not exposed through process arguments.
 
-The runtime profile rejects remote `http://` control-plane URLs by default. Loopback URLs (`127.0.0.1` / `localhost`) and single-label Docker service names such as `http://a3-runtime:7393` are treated as local topology. Remote deployment is out of scope for the current runtime; `allow_insecure_remote` is only a diagnostic escape hatch and should not appear in the standard runbook.
+The runtime profile rejects remote `http://` control-plane URLs by default. Loopback URLs (`127.0.0.1` / `localhost`) and single-label Docker service names such as `http://a2o-runtime:7393` are treated as local topology. Remote deployment is out of scope for the current runtime; `allow_insecure_remote` is only a diagnostic escape hatch and should not appear in the standard runbook.
 
 ## Compatibility Manual Loop Mode
 
@@ -225,7 +225,9 @@ a2o-agent --engine http://127.0.0.1:7393 --loop --poll-interval 2s
 Useful flags and environment overrides:
 
 - `--loop`: keep polling until the process is interrupted or fails.
-- `--poll-interval` / `A3_AGENT_POLL_INTERVAL`: idle sleep duration, for example `2s`.
-- `--max-iterations` / `A3_AGENT_MAX_ITERATIONS`: bounded loop count for manual verification; `0` means unlimited.
+- `--poll-interval` / `A2O_AGENT_POLL_INTERVAL`: idle sleep duration, for example `2s`.
+- `--max-iterations` / `A2O_AGENT_MAX_ITERATIONS`: bounded loop count for manual verification; `0` means unlimited.
+
+Legacy `A3_AGENT_*` environment variables are accepted only as compatibility fallbacks; prefer the `A2O_AGENT_*` names in new configuration.
 
 Loop mode exits non-zero on control-plane or job execution errors. If an operator wants OS-managed restart later, they can wrap this command outside A2O. The current A2O distribution intentionally does not own systemd, launchd, or Windows service registration. Windows users run A2O through WSL2 Ubuntu and should still start from the standard `a2o ...` lifecycle commands.

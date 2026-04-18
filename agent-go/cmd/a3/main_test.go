@@ -156,6 +156,12 @@ func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
 	if config.SoloBoardPort != "3479" {
 		t.Fatalf("SoloBoardPort=%q", config.SoloBoardPort)
 	}
+	if config.RuntimeService != "a2o-runtime" {
+		t.Fatalf("RuntimeService=%q", config.RuntimeService)
+	}
+	if config.StorageDir != "/var/lib/a2o/a2o-runtime" {
+		t.Fatalf("StorageDir=%q", config.StorageDir)
+	}
 }
 
 func TestProjectBootstrapDefaultsToProjectPackageDirectory(t *testing.T) {
@@ -675,7 +681,7 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 
 	joined := runner.joinedCalls()
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a3-runtime soloboard")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime python3 /opt/a3/share/tools/kanban/bootstrap_soloboard.py --config /workspace/reference/project-package/kanban/bootstrap.json --base-url http://soloboard:3000 --board A2OReference")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime python3 /opt/a2o/share/tools/kanban/bootstrap_soloboard.py --config /workspace/reference/project-package/kanban/bootstrap.json --base-url http://soloboard:3000 --board A2OReference")
 	if !strings.Contains(stdout.String(), "kanban_bootstrapped project=A2OReference") {
 		t.Fatalf("stdout should describe kanban bootstrap, got %q", stdout.String())
 	}
@@ -996,7 +1002,7 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 		"'--kanban-repo-label' 'repo:catalog=repo_alpha'",
 		"'--repo-source' 'repo_alpha=/workspace/repos/catalog-service'",
 		"'--preset-dir' '/tmp/a3-engine/config/presets'",
-		"'--kanban-command-arg' '/opt/a3/share/tools/kanban/cli.py'",
+		"'--kanban-command-arg' '/opt/a2o/share/tools/kanban/cli.py'",
 	} {
 		if !strings.Contains(joinedText, want) {
 			t.Fatalf("run-once missing %q in:\n%s", want, joinedText)
@@ -1005,11 +1011,20 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	if runner.lastEnv["A3_BUNDLE_COMPOSE_FILE"] != "compose.yml" {
 		t.Fatalf("compose env=%q", runner.lastEnv["A3_BUNDLE_COMPOSE_FILE"])
 	}
+	if runner.lastEnv["A2O_BUNDLE_COMPOSE_FILE"] != "compose.yml" {
+		t.Fatalf("public compose env=%q", runner.lastEnv["A2O_BUNDLE_COMPOSE_FILE"])
+	}
 	if runner.lastEnv["A3_BUNDLE_PROJECT"] != "a3-test" {
 		t.Fatalf("project env=%q", runner.lastEnv["A3_BUNDLE_PROJECT"])
 	}
+	if runner.lastEnv["A2O_BUNDLE_PROJECT"] != "a3-test" {
+		t.Fatalf("public project env=%q", runner.lastEnv["A2O_BUNDLE_PROJECT"])
+	}
 	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"] != "1" {
 		t.Fatalf("max steps env=%q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"])
+	}
+	if runner.lastEnv["A2O_RUNTIME_RUN_ONCE_MAX_STEPS"] != "1" {
+		t.Fatalf("public max steps env=%q", runner.lastEnv["A2O_RUNTIME_RUN_ONCE_MAX_STEPS"])
 	}
 	if runner.lastEnv["A2O_BRANCH_NAMESPACE"] != "test" {
 		t.Fatalf("branch namespace env=%q", runner.lastEnv["A2O_BRANCH_NAMESPACE"])
@@ -1300,7 +1315,7 @@ func TestRuntimeUpCanPullConfiguredImageBeforeStarting(t *testing.T) {
 	joined := runner.joinedCalls()
 	assertCallContains(t, joined, "docker compose -p a2o-pull -f compose.yml pull a3-runtime")
 	assertCallContains(t, joined, "docker compose -p a2o-pull -f compose.yml up -d a3-runtime soloboard")
-	if runner.lastEnv["A3_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine:latest" {
+	if runner.lastEnv["A2O_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine:latest" {
 		t.Fatalf("runtime up should map public A2O_RUNTIME_IMAGE into compose env, got %#v", runner.lastEnv)
 	}
 }
@@ -1446,7 +1461,7 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 	for _, want := range []string{
 		"docker compose -p a3-test -f compose.yml exec -T a3-runtime a3 show-task --storage-backend json --storage-dir /var/lib/a3/test-runtime A2O#16",
 		"docker compose -p a3-test -f compose.yml exec -T a3-runtime a3 show-run --storage-backend json --storage-dir /var/lib/a3/test-runtime --preset-dir /tmp/a3-engine/config/presets run-16 " + filepath.Join(packageDir, "project.yaml"),
-		"docker compose -p a3-test -f compose.yml exec -T a3-runtime python3 /opt/a3/share/tools/kanban/cli.py --backend soloboard --base-url http://soloboard:3000 task-comment-list --project A2OReferenceMultiRepo --task A2O#16",
+		"docker compose -p a3-test -f compose.yml exec -T a3-runtime python3 /opt/a2o/share/tools/kanban/cli.py --backend soloboard --base-url http://soloboard:3000 task-comment-list --project A2OReferenceMultiRepo --task A2O#16",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("describe-task missing call %q in:\n%s", want, joined)
@@ -2173,10 +2188,10 @@ func TestRuntimeRunOnceAllowsEnvToOverrideStaleInstanceRuntimeValues(t *testing.
 		t.Fatal(err)
 	}
 	writeMultiRepoProjectYaml(t, packageDir)
-	t.Setenv("A3_COMPOSE_PROJECT", "env-project")
-	t.Setenv("A3_COMPOSE_FILE", "env-compose.yml")
-	t.Setenv("A3_BUNDLE_AGENT_PORT", "7555")
-	t.Setenv("A3_BUNDLE_STORAGE_DIR", "/var/lib/a3/env-runtime")
+	t.Setenv("A2O_COMPOSE_PROJECT", "env-project")
+	t.Setenv("A2O_COMPOSE_FILE", "env-compose.yml")
+	t.Setenv("A2O_BUNDLE_AGENT_PORT", "7555")
+	t.Setenv("A2O_BUNDLE_STORAGE_DIR", "/var/lib/a2o/env-runtime")
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
 		SchemaVersion:  1,
 		PackagePath:    packageDir,
@@ -2205,7 +2220,7 @@ func TestRuntimeRunOnceAllowsEnvToOverrideStaleInstanceRuntimeValues(t *testing.
 	if !strings.Contains(joined, "http://127.0.0.1:7555") {
 		t.Fatalf("run-once should use env agent port override, calls:\n%s", joined)
 	}
-	if !strings.Contains(joined, "/var/lib/a3/env-runtime") {
+	if !strings.Contains(joined, "/var/lib/a2o/env-runtime") {
 		t.Fatalf("run-once should use env storage override, calls:\n%s", joined)
 	}
 }
@@ -2317,9 +2332,9 @@ func TestArchiveRuntimeStateUsesStructuredDockerCommands(t *testing.T) {
 			t.Fatalf("archive should use structured docker commands, found %q in:\n%s", forbidden, strings.Join(joined, "\n"))
 		}
 	}
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime mkdir -p /var/lib/a3/archive")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime mkdir -p /var/lib/a2o/archive")
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime test -e /var/lib/a3/test-runtime")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime mv /var/lib/a3/test-runtime /var/lib/a3/archive/test-runtime-20260417T000000Z")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime mv /var/lib/a3/test-runtime /var/lib/a2o/archive/test-runtime-20260417T000000Z")
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime mkdir -p /var/lib/a3/test-runtime")
 }
 
@@ -2421,13 +2436,19 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	call := append([]string{name}, args...)
 	r.calls = append(r.calls, call)
 	r.lastEnv = map[string]string{
-		"A3_BUNDLE_COMPOSE_FILE":             os.Getenv("A3_BUNDLE_COMPOSE_FILE"),
-		"A3_BUNDLE_PROJECT":                  os.Getenv("A3_BUNDLE_PROJECT"),
-		"A3_RUNTIME_RUN_ONCE_MAX_STEPS":      os.Getenv("A3_RUNTIME_RUN_ONCE_MAX_STEPS"),
-		"A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS": os.Getenv("A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"),
-		"A2O_BRANCH_NAMESPACE":               os.Getenv("A2O_BRANCH_NAMESPACE"),
-		"A3_HOST_AGENT_BIN":                  os.Getenv("A3_HOST_AGENT_BIN"),
-		"A3_RUNTIME_IMAGE":                   os.Getenv("A3_RUNTIME_IMAGE"),
+		"A2O_BUNDLE_COMPOSE_FILE":             os.Getenv("A2O_BUNDLE_COMPOSE_FILE"),
+		"A2O_BUNDLE_PROJECT":                  os.Getenv("A2O_BUNDLE_PROJECT"),
+		"A2O_RUNTIME_RUN_ONCE_MAX_STEPS":      os.Getenv("A2O_RUNTIME_RUN_ONCE_MAX_STEPS"),
+		"A2O_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS": os.Getenv("A2O_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"),
+		"A2O_HOST_AGENT_BIN":                  os.Getenv("A2O_HOST_AGENT_BIN"),
+		"A2O_RUNTIME_IMAGE":                   os.Getenv("A2O_RUNTIME_IMAGE"),
+		"A3_BUNDLE_COMPOSE_FILE":              os.Getenv("A3_BUNDLE_COMPOSE_FILE"),
+		"A3_BUNDLE_PROJECT":                   os.Getenv("A3_BUNDLE_PROJECT"),
+		"A3_RUNTIME_RUN_ONCE_MAX_STEPS":       os.Getenv("A3_RUNTIME_RUN_ONCE_MAX_STEPS"),
+		"A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS":  os.Getenv("A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"),
+		"A2O_BRANCH_NAMESPACE":                os.Getenv("A2O_BRANCH_NAMESPACE"),
+		"A3_HOST_AGENT_BIN":                   os.Getenv("A3_HOST_AGENT_BIN"),
+		"A3_RUNTIME_IMAGE":                    os.Getenv("A3_RUNTIME_IMAGE"),
 	}
 	if r.err != nil {
 		output := r.errorOutput
@@ -2444,7 +2465,7 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		return []byte("image-123\n"), nil
 	case strings.Contains(joined, " compose ") && strings.Contains(joined, " ps --status running -q soloboard"):
 		return []byte("soloboard-container\n"), nil
-	case strings.Contains(joined, " compose ") && strings.Contains(joined, " ps --status running -q a3-runtime"):
+	case strings.Contains(joined, " compose ") && (strings.Contains(joined, " ps --status running -q a3-runtime") || strings.Contains(joined, " ps --status running -q a2o-runtime")):
 		return []byte("runtime-container\n"), nil
 	case name == "docker" && len(args) >= 4 && args[0] == "image" && args[1] == "inspect":
 		return []byte("ghcr.io/wamukat/a2o-engine@sha256:test\n"), nil
