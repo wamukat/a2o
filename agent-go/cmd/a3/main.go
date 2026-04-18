@@ -83,6 +83,8 @@ func run(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer
 	case "version":
 		fmt.Fprintf(stdout, "a2o version=%s\n", version)
 		return 0
+	case "doctor":
+		return runDoctor(args[1:], runner, stdout, stderr)
 	case "project":
 		return runProject(args[1:], stdout, stderr)
 	case "kanban":
@@ -108,6 +110,7 @@ func isHelpArg(arg string) bool {
 func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage:")
 	fmt.Fprintln(w, "  a2o version")
+	fmt.Fprintln(w, "  a2o doctor")
 	fmt.Fprintln(w, "  a2o project bootstrap --package DIR")
 	fmt.Fprintln(w, "  a2o project template [--language node|go|python|ruby] [--output project.yaml]")
 	fmt.Fprintln(w, "  a2o kanban up [--build]")

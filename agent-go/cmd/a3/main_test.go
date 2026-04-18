@@ -638,6 +638,78 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 	}
 }
 
+func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	repoDir := filepath.Join(tempDir, "repo")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(repoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectYaml := strings.Join([]string{
+		"schema_version: 1",
+		"package:",
+		"  name: sample",
+		"kanban:",
+		"  project: Sample",
+		"repos:",
+		"  app:",
+		"    path: ../repo",
+		"agent:",
+		"  required_bins: [\"sh\"]",
+		"runtime:",
+		"  executor:",
+		"    command: [\"sh\", \"-c\", \"echo ok\"]",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-sample",
+		RuntimeService: "a3-runtime",
+		SoloBoardPort:  "3480",
+	})
+	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
+	if err := os.MkdirAll(filepath.Dir(agentPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(agentPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"doctor"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s stdout=%s", code, stderr.String(), stdout.String())
+		}
+	})
+
+	for _, want := range []string{
+		"doctor_check name=project_package status=ok",
+		"doctor_check name=required_command.sh status=ok",
+		"doctor_check name=repo_clean.app status=ok detail=" + repoDir,
+		"doctor_check name=agent_install status=ok",
+		"doctor_check name=kanban_volume status=ok detail=reuse_existing a2o-sample_soloboard-data",
+		"doctor_check name=kanban_service status=ok detail=http://localhost:3480/",
+		"doctor_check name=runtime_image_digest status=ok detail=ghcr.io/wamukat/a2o-engine@sha256:test",
+		"doctor_status=ok",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("doctor output missing %q in:\n%s", want, stdout.String())
+		}
+	}
+}
+
 func TestKanbanURLUsesBootstrappedInstanceConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
@@ -1885,6 +1957,10 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	}
 	joined := strings.Join(call, " ")
 	switch {
+	case strings.Contains(joined, " compose ") && strings.Contains(joined, " images --quiet "):
+		return []byte("image-123\n"), nil
+	case name == "docker" && len(args) >= 4 && args[0] == "image" && args[1] == "inspect":
+		return []byte("ghcr.io/wamukat/a2o-engine@sha256:test\n"), nil
 	case strings.Contains(joined, " compose ") && strings.Contains(joined, " ps -q "):
 		if r.emptyContainer {
 			return []byte("\n"), nil
