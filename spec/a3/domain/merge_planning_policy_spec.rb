@@ -18,7 +18,7 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/work/3025",
+        ref: "refs/heads/a2o/work/3025",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -44,8 +44,8 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
 
     expect(plan.task_ref).to eq(task.ref)
     expect(plan.run_ref).to eq(run.ref)
-    expect(plan.merge_source.source_ref).to eq("refs/heads/a3/work/3025")
-    expect(plan.integration_target.target_ref).to eq("refs/heads/a3/parent/A3-v2-3022")
+    expect(plan.merge_source.source_ref).to eq("refs/heads/a2o/work/3025")
+    expect(plan.integration_target.target_ref).to eq("refs/heads/a2o/parent/A3-v2-3022")
     expect(plan.integration_target.bootstrap_ref).to eq("refs/heads/live")
     expect(plan.merge_policy).to eq(:ff_only)
     expect(plan.merge_slots).to eq([:repo_alpha])
@@ -66,7 +66,7 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/work/3025",
+        ref: "refs/heads/a2o/work/3025",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -94,7 +94,7 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
 
     plan = policy.build(task: task, run: run, merge_config: merge_config)
 
-    expect(plan.integration_target.target_ref).to eq("refs/heads/a3/parent/A3-v2-3022")
+    expect(plan.integration_target.target_ref).to eq("refs/heads/a2o/parent/A3-v2-3022")
     expect(plan.integration_target.bootstrap_ref).to eq("refs/heads/feature/prototype")
   end
 
@@ -113,7 +113,7 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/runtime/a3-test/work/A3-v2-3025",
+        ref: "refs/heads/a2o/runtime/a3-test/work/A3-v2-3025",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -137,7 +137,7 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
 
     plan = described_class.new(branch_namespace: "runtime/a3-test").build(task: task, run: run, merge_config: merge_config)
 
-    expect(plan.integration_target.target_ref).to eq("refs/heads/a3/runtime/a3-test/parent/A3-v2-3022")
+    expect(plan.integration_target.target_ref).to eq("refs/heads/a2o/runtime/a3-test/parent/A3-v2-3022")
   end
 
   it "builds a merge-to-live plan for parent tasks" do
@@ -154,7 +154,7 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/A3-v2#3022",
+        ref: "refs/heads/a2o/parent/A3-v2#3022",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -179,7 +179,7 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
     plan = policy.build(task: task, run: run, merge_config: merge_config)
 
     expect(plan.integration_target.target_ref).to eq("refs/heads/feature/prototype")
-    expect(plan.merge_source.source_ref).to eq("refs/heads/a3/parent/A3-v2#3022")
+    expect(plan.merge_source.source_ref).to eq("refs/heads/a2o/parent/A3-v2#3022")
     expect(plan.merge_policy).to eq(:no_ff)
     expect(plan.merge_slots).to eq(%i[repo_alpha repo_beta])
   end
@@ -198,7 +198,7 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/work/3025",
+        ref: "refs/heads/a2o/work/3025",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -239,7 +239,7 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/work/3025",
+        ref: "refs/heads/a2o/work/3025",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -279,7 +279,7 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/A3-v2#3022",
+        ref: "refs/heads/a2o/parent/A3-v2#3022",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -319,7 +319,7 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/A3-v2#3022",
+        ref: "refs/heads/a2o/parent/A3-v2#3022",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(

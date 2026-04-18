@@ -22,12 +22,12 @@ RSpec.describe A3::Application::ReconcileManualMergeRecovery do
       task_ref: "Sample#245",
       phase: :merge,
       workspace_kind: :runtime_workspace,
-      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#245", ref: "refs/heads/a3/work/Sample-245"),
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#245", ref: "refs/heads/a2o/work/Sample-245"),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: %i[repo_alpha], verification_scope: %i[repo_alpha], ownership_scope: :task),
       artifact_owner: artifact_owner
     ).append_phase_evidence(
       phase: :merge,
-      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#245", ref: "refs/heads/a3/work/Sample-245"),
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#245", ref: "refs/heads/a2o/work/Sample-245"),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: %i[repo_alpha], verification_scope: %i[repo_alpha], ownership_scope: :task),
       execution_record: A3::Domain::PhaseExecutionRecord.new(
         summary: "merge conflict requires recovery",
@@ -35,7 +35,7 @@ RSpec.describe A3::Application::ReconcileManualMergeRecovery do
         diagnostics: {
           "merge_recovery" => {
             "status" => "candidate",
-            "source_ref" => "refs/heads/a3/work/Sample-245",
+            "source_ref" => "refs/heads/a2o/work/Sample-245",
             "merge_before_head" => "before123"
           },
           "merge_recovery_required" => true
@@ -77,7 +77,7 @@ RSpec.describe A3::Application::ReconcileManualMergeRecovery do
     expect(result.run.phase_records.last.execution_record.diagnostics.fetch("merge_recovery")).to include(
       "status" => "manual_reconciled",
       "mode" => "manual",
-      "source_ref" => "refs/heads/a3/work/Sample-245",
+      "source_ref" => "refs/heads/a2o/work/Sample-245",
       "publish_before_head" => "before123",
       "publish_after_head" => "after456",
       "previous_status" => "candidate"
@@ -131,7 +131,7 @@ RSpec.describe A3::Application::ReconcileManualMergeRecovery do
         task_ref: "Sample#245",
         phase: :merge,
         workspace_kind: :runtime_workspace,
-        source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#245", ref: "refs/heads/a3/work/Sample-245"),
+        source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#245", ref: "refs/heads/a2o/work/Sample-245"),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: %i[repo_alpha], verification_scope: %i[repo_alpha], ownership_scope: :task),
         artifact_owner: artifact_owner
       ).complete(outcome: :blocked)
@@ -150,7 +150,7 @@ RSpec.describe A3::Application::ReconcileManualMergeRecovery do
         task_ref: "Sample#245",
         phase: :verification,
         workspace_kind: :runtime_workspace,
-        source_descriptor: A3::Domain::SourceDescriptor.runtime(task_ref: "Sample#245", ref: "refs/heads/a3/work/Sample-245", source_type: :branch_head),
+        source_descriptor: A3::Domain::SourceDescriptor.runtime(task_ref: "Sample#245", ref: "refs/heads/a2o/work/Sample-245", source_type: :branch_head),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: %i[repo_alpha], verification_scope: %i[repo_alpha], ownership_scope: :task),
         artifact_owner: artifact_owner
       )

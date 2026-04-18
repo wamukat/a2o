@@ -29,7 +29,7 @@ RSpec.describe A3::Application::RunVerification do
   let(:integration_ref_readiness_checker) do
     instance_double(
       A3::Infra::IntegrationRefReadinessChecker,
-      check: A3::Infra::IntegrationRefReadinessChecker::Result.new(ready: true, missing_slots: [], ref: "refs/heads/a3/parent/A3-v2-3022")
+      check: A3::Infra::IntegrationRefReadinessChecker::Result.new(ready: true, missing_slots: [], ref: "refs/heads/a2o/parent/A3-v2-3022")
     )
   end
   let(:register_completed_run) do
@@ -63,7 +63,7 @@ RSpec.describe A3::Application::RunVerification do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/work/3025",
+        ref: "refs/heads/a2o/work/3025",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -289,7 +289,7 @@ RSpec.describe A3::Application::RunVerification do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/A3-v2-3022",
+        ref: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: parent_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -298,15 +298,15 @@ RSpec.describe A3::Application::RunVerification do
         ownership_scope: :parent
       ),
       review_target: A3::Domain::ReviewTarget.new(
-        base_commit: "refs/heads/a3/parent/A3-v2-3022",
-        head_commit: "refs/heads/a3/parent/A3-v2-3022",
+        base_commit: "refs/heads/a2o/parent/A3-v2-3022",
+        head_commit: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: parent_task.ref,
         phase_ref: :verification
       ),
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: parent_task.ref,
         owner_scope: :parent,
-        snapshot_version: "refs/heads/a3/parent/A3-v2-3022"
+        snapshot_version: "refs/heads/a2o/parent/A3-v2-3022"
       )
     )
     task_repository.save(parent_task)

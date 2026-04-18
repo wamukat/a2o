@@ -51,7 +51,7 @@ Verification commands are project package responsibility. Engine only interprets
 ## Materialized Workspace Rules
 
 - Repo slot names are stable package aliases, such as `app`, `repo_alpha`, or `repo_beta`.
-- Internal branch refs may use `refs/heads/a3/...` for compatibility.
+- User-visible branch refs created by the current runtime use `refs/heads/a2o/...`. Existing `refs/heads/a3/...` refs are legacy compatibility data.
 - Agent workspace paths are disposable and should not be used as durable project configuration.
 - Generated runtime metadata may live under `.a3/` inside the materialized workspace for compatibility, but user-facing docs should not require users to edit it.
 

@@ -5,13 +5,13 @@ RSpec.describe A3::Domain::ArtifactOwner do
     owner = described_class.new(
       owner_ref: "A3-v2#3022",
       owner_scope: :task,
-      snapshot_version: "refs/heads/a3/work/3022"
+      snapshot_version: "refs/heads/a2o/work/3022"
     )
 
     expect(owner.persisted_form).to eq(
       "owner_ref" => "A3-v2#3022",
       "owner_scope" => "task",
-      "snapshot_version" => "refs/heads/a3/work/3022"
+      "snapshot_version" => "refs/heads/a2o/work/3022"
     )
     expect(described_class.from_persisted_form(owner.persisted_form)).to eq(owner)
   end

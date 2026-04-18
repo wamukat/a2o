@@ -19,7 +19,7 @@ RSpec.describe A3::Infra::IntegrationRefReadinessChecker do
       system("git", "-C", path, "add", "README.md", exception: true, out: File::NULL, err: File::NULL)
       system("git", "-C", path, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "init", exception: true, out: File::NULL, err: File::NULL)
     end
-    system("git", "-C", repo_beta, "update-ref", "refs/heads/a3/parent/Sample-5200", "HEAD", exception: true, out: File::NULL, err: File::NULL)
+    system("git", "-C", repo_beta, "update-ref", "refs/heads/a2o/parent/Sample-5200", "HEAD", exception: true, out: File::NULL, err: File::NULL)
 
     checker = described_class.new(
       repo_sources: {
@@ -29,7 +29,7 @@ RSpec.describe A3::Infra::IntegrationRefReadinessChecker do
     )
 
     result = checker.check(
-      ref: "refs/heads/a3/parent/Sample-5200",
+      ref: "refs/heads/a2o/parent/Sample-5200",
       repo_slots: %i[repo_alpha repo_beta]
     )
 

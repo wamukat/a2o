@@ -12,7 +12,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/sample",
+        ref: "refs/heads/a2o/work/sample",
         task_ref: "A3-v2#3028"
       ),
       slot_paths: {
@@ -119,7 +119,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       expect(request.fetch("source_descriptor")).to include(
         "workspace_kind" => "runtime_workspace",
         "source_type" => "branch_head",
-        "ref" => "refs/heads/a3/work/sample"
+        "ref" => "refs/heads/a2o/work/sample"
       )
       expect(request.fetch("slot_paths")).to include(
         "repo_beta" => workspace.slot_paths.fetch(:repo_beta).to_s
@@ -380,7 +380,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/sample",
+        ref: "refs/heads/a2o/work/sample",
         task_ref: task.ref
       ),
       scope_snapshot: run.scope_snapshot,

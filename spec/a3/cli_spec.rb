@@ -62,8 +62,8 @@ RSpec.describe A3::CLI do
           A3::Application::BuildMergePlan,
           call: Struct.new(:merge_plan).new(
             Struct.new(:merge_source, :integration_target, :merge_policy, :merge_slots).new(
-              Struct.new(:source_ref).new("refs/heads/a3/work/A3-v2-3025"),
-              Struct.new(:target_ref).new("refs/heads/a3/parent/A3-v2#3022"),
+              Struct.new(:source_ref).new("refs/heads/a2o/work/A3-v2-3025"),
+              Struct.new(:target_ref).new("refs/heads/a2o/parent/A3-v2#3022"),
               :ff_only,
               [:repo_alpha]
             )
@@ -81,7 +81,7 @@ RSpec.describe A3::CLI do
     )
 
     expect(described_class).to have_received(:with_runtime_session)
-    expect(out.string).to include("merge_source=refs/heads/a3/work/A3-v2-3025")
+    expect(out.string).to include("merge_source=refs/heads/a2o/work/A3-v2-3025")
   end
 
   it "uses a shared default storage dir for start-run parsing" do
@@ -479,7 +479,7 @@ RSpec.describe A3::CLI do
           "--storage-dir", dir,
           *repo_source_args(repo_sources),
           "--source-type", "branch_head",
-          "--source-ref", "refs/heads/a3/work/A3-v2-3025",
+          "--source-ref", "refs/heads/a2o/work/A3-v2-3025",
           "--bootstrap-marker", "workspace-hook:v1",
           "--review-base", "base123",
           "--review-head", "head456"
@@ -524,7 +524,7 @@ RSpec.describe A3::CLI do
           source_descriptor: A3::Domain::SourceDescriptor.new(
             workspace_kind: :ticket_workspace,
             source_type: :branch_head,
-            ref: "refs/heads/a3/work/A3-v2-3025",
+            ref: "refs/heads/a2o/work/A3-v2-3025",
             task_ref: "A3-v2#3025"
           ),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -596,7 +596,7 @@ RSpec.describe A3::CLI do
           "--storage-dir", dir,
           *repo_source_args(repo_sources),
           "--source-type", "branch_head",
-          "--source-ref", "refs/heads/a3/work/A3-v2-3025",
+          "--source-ref", "refs/heads/a2o/work/A3-v2-3025",
           "--bootstrap-marker", "workspace-hook:v1",
           "--review-base", "base123",
           "--review-head", "head456"
@@ -635,7 +635,7 @@ RSpec.describe A3::CLI do
             "--storage-dir", dir,
             *repo_source_args(repo_sources),
             "--source-type", "branch_head",
-            "--source-ref", "refs/heads/a3/work/A3-v2-3025",
+            "--source-ref", "refs/heads/a2o/work/A3-v2-3025",
             "--review-base", "base123",
             "--review-head", "head456"
           ],
@@ -1048,12 +1048,12 @@ RSpec.describe A3::CLI do
           task_ref: "Sample#245",
           phase: :merge,
           workspace_kind: :runtime_workspace,
-          source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#245", ref: "refs/heads/a3/work/Sample-245"),
+          source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#245", ref: "refs/heads/a2o/work/Sample-245"),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: %i[repo_alpha], verification_scope: %i[repo_alpha], ownership_scope: :task),
           artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: "Sample#245", owner_scope: :task, snapshot_version: "merge-head")
         ).append_phase_evidence(
           phase: :merge,
-          source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#245", ref: "refs/heads/a3/work/Sample-245"),
+          source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#245", ref: "refs/heads/a2o/work/Sample-245"),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: %i[repo_alpha], verification_scope: %i[repo_alpha], ownership_scope: :task),
           execution_record: A3::Domain::PhaseExecutionRecord.new(
             summary: "merge conflict requires recovery",
@@ -1062,7 +1062,7 @@ RSpec.describe A3::CLI do
               "merge_recovery" => {
                 "status" => "failed",
                 "target_ref" => "refs/heads/main",
-                "source_ref" => "refs/heads/a3/work/Sample-245"
+                "source_ref" => "refs/heads/a2o/work/Sample-245"
               }
             }
           )
@@ -1077,7 +1077,7 @@ RSpec.describe A3::CLI do
           "run-merge-245",
           "--storage-dir", dir,
           "--target-ref", "refs/heads/main",
-          "--source-ref", "refs/heads/a3/work/Sample-245",
+          "--source-ref", "refs/heads/a2o/work/Sample-245",
           "--publish-before-head", "before123",
           "--publish-after-head", "after456"
         ],
@@ -1096,7 +1096,7 @@ RSpec.describe A3::CLI do
       expect(persisted_run.phase_records.last.execution_record.diagnostics.fetch("merge_recovery")).to include(
         "status" => "manual_reconciled",
         "target_ref" => "refs/heads/main",
-        "source_ref" => "refs/heads/a3/work/Sample-245",
+        "source_ref" => "refs/heads/a2o/work/Sample-245",
         "publish_before_head" => "before123",
         "publish_after_head" => "after456"
       )

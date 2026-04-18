@@ -11,7 +11,7 @@ RSpec.describe A3::Infra::LocalCommandRunner do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/sample",
+        ref: "refs/heads/a2o/work/sample",
         task_ref: "A3-v2#3028"
       ),
       slot_paths: {}

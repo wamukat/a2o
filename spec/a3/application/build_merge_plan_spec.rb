@@ -26,7 +26,7 @@ RSpec.describe A3::Application::BuildMergePlan do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/work/3025",
+        ref: "refs/heads/a2o/work/3025",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -65,7 +65,7 @@ RSpec.describe A3::Application::BuildMergePlan do
 
     result = use_case.call(task_ref: task.ref, run_ref: run.ref, project_context: context)
 
-    expect(result.merge_plan.integration_target.target_ref).to eq("refs/heads/a3/parent/A3-v2-3022")
+    expect(result.merge_plan.integration_target.target_ref).to eq("refs/heads/a2o/parent/A3-v2-3022")
     expect(result.merge_plan.integration_target.bootstrap_ref).to eq("refs/heads/live")
     expect(result.merge_plan.merge_policy).to eq(:ff_only)
     expect(result.merge_plan.merge_slots).to eq([:repo_alpha])

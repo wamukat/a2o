@@ -35,7 +35,7 @@ RSpec.describe A3::Application::StartRun do
     A3::Domain::SourceDescriptor.new(
       workspace_kind: :ticket_workspace,
       source_type: :branch_head,
-      ref: "refs/heads/a3/work/A3-v2-3025",
+      ref: "refs/heads/a2o/work/A3-v2-3025",
       task_ref: "A3-v2#3025"
     )
   end
@@ -101,7 +101,7 @@ RSpec.describe A3::Application::StartRun do
     runtime_source_descriptor = A3::Domain::SourceDescriptor.new(
       workspace_kind: :runtime_workspace,
       source_type: :integration_record,
-      ref: "refs/heads/a3/parent/A3-v2-3022",
+      ref: "refs/heads/a2o/parent/A3-v2-3022",
       task_ref: task.ref
     )
     task_repository.save(task)
@@ -154,7 +154,7 @@ RSpec.describe A3::Application::StartRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/A3-v2-3022",
+        ref: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(

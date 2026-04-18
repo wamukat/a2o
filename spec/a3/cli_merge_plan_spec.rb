@@ -47,7 +47,7 @@ RSpec.describe A3::CLI do
           source_descriptor: A3::Domain::SourceDescriptor.new(
             workspace_kind: :runtime_workspace,
             source_type: :integration_record,
-            ref: "refs/heads/a3/work/3025",
+            ref: "refs/heads/a2o/work/3025",
             task_ref: "A3-v2#3025"
           ),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -84,8 +84,8 @@ RSpec.describe A3::CLI do
         out: out
       )
 
-      expect(out.string).to include("merge_source=refs/heads/a3/work/3025")
-      expect(out.string).to include("merge_target=refs/heads/a3/parent/A3-v2-3022")
+      expect(out.string).to include("merge_source=refs/heads/a2o/work/3025")
+      expect(out.string).to include("merge_target=refs/heads/a2o/parent/A3-v2-3022")
       expect(out.string).to include("merge_policy=ff_only")
       expect(out.string).to include("merge_slots=repo_alpha")
     end

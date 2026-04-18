@@ -56,7 +56,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
       "review",
       "running_command",
       nil,
-      "refs/heads/a3/work/Sample-3141"
+      "refs/heads/a2o/work/Sample-3141"
     )
     summary = Struct.new(:scheduler_paused, :scheduler_paused_at, :tasks, :next_candidates, :running_entries).new(
       false,

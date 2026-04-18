@@ -80,7 +80,7 @@ RSpec.describe A3::Domain::EvidenceRecord do
       review_target: nil,
       source_descriptor: A3::Domain::SourceDescriptor.implementation(
         task_ref: "A3-v2#3025",
-        ref: "refs/heads/a3/work/3025"
+        ref: "refs/heads/a2o/work/3025"
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
         edit_scope: [:repo_alpha],
@@ -97,7 +97,7 @@ RSpec.describe A3::Domain::EvidenceRecord do
           phase: :implementation,
           source_descriptor: A3::Domain::SourceDescriptor.implementation(
             task_ref: "A3-v2#3025",
-            ref: "refs/heads/a3/work/3025"
+            ref: "refs/heads/a2o/work/3025"
           ),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(
             edit_scope: [:repo_alpha],
@@ -120,7 +120,7 @@ RSpec.describe A3::Domain::EvidenceRecord do
       phase: :implementation,
       source_descriptor: A3::Domain::SourceDescriptor.implementation(
         task_ref: "A3-v2#3025",
-        ref: "refs/heads/a3/work/3025"
+        ref: "refs/heads/a2o/work/3025"
       ),
       scope_snapshot: scope_snapshot,
       review_target: review_target,

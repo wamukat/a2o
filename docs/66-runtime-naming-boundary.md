@@ -14,6 +14,7 @@ Use these names in user-facing docs and commands:
 - `a2o-agent`
 - `share/a2o`
 - `.work/a2o/agent`
+- `refs/heads/a2o/...`
 - `reference-products`
 
 ## Internal Compatibility Names
@@ -25,7 +26,7 @@ These names may remain in implementation details:
 - `bin/a3`
 - `.a3`
 - `A3_*` environment variables
-- `refs/heads/a3/...`
+- legacy `refs/heads/a3/...`
 
 Do not require users to author these names in normal setup docs. If they appear in diagnostics or baseline reproduction notes, describe them as internal compatibility surfaces.
 

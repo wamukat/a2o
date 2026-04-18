@@ -45,9 +45,9 @@ RSpec.describe A3::Application::RepairRuns do
           task_ref: "Sample#3179",
           phase: :review,
           workspace_kind: :runtime_workspace,
-          source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#3179", ref: "refs/heads/a3/parent/Sample-3179"),
+          source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#3179", ref: "refs/heads/a2o/parent/Sample-3179"),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: %i[repo_alpha repo_beta], verification_scope: %i[repo_alpha repo_beta], ownership_scope: :parent),
-          artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: "Sample#3179", owner_scope: :parent, snapshot_version: "refs/heads/a3/parent/Sample-3179")
+          artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: "Sample#3179", owner_scope: :parent, snapshot_version: "refs/heads/a2o/parent/Sample-3179")
         )
       )
       task_repository.save(
@@ -89,9 +89,9 @@ RSpec.describe A3::Application::RepairRuns do
           task_ref: "Sample#3153",
           phase: :implementation,
           workspace_kind: :ticket_workspace,
-          source_descriptor: A3::Domain::SourceDescriptor.ticket_branch_head(task_ref: "Sample#3153", ref: "refs/heads/a3/work/Sample-3153"),
+          source_descriptor: A3::Domain::SourceDescriptor.ticket_branch_head(task_ref: "Sample#3153", ref: "refs/heads/a2o/work/Sample-3153"),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], ownership_scope: :task),
-          artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: "Sample#3153", owner_scope: :task, snapshot_version: "refs/heads/a3/work/Sample-3153")
+          artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: "Sample#3153", owner_scope: :task, snapshot_version: "refs/heads/a2o/work/Sample-3153")
         )
       )
       task_repository.save(
@@ -134,9 +134,9 @@ RSpec.describe A3::Application::RepairRuns do
           task_ref: "Sample#2",
           phase: :verification,
           workspace_kind: :runtime_workspace,
-          source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#2", ref: "refs/heads/a3/work/Sample-2"),
+          source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#2", ref: "refs/heads/a2o/work/Sample-2"),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_beta], verification_scope: [:repo_beta], ownership_scope: :task),
-          artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: "Sample#2", owner_scope: :task, snapshot_version: "refs/heads/a3/work/Sample-2")
+          artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: "Sample#2", owner_scope: :task, snapshot_version: "refs/heads/a2o/work/Sample-2")
         )
       )
       task_repository.save(

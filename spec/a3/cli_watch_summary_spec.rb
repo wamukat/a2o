@@ -38,7 +38,7 @@ RSpec.describe A3::CLI do
           source_descriptor: A3::Domain::SourceDescriptor.new(
             workspace_kind: :ticket_workspace,
             source_type: :branch_head,
-            ref: "refs/heads/a3/work/Sample-3138",
+            ref: "refs/heads/a2o/work/Sample-3138",
             task_ref: "Sample#3138"
           ),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -49,7 +49,7 @@ RSpec.describe A3::CLI do
           artifact_owner: A3::Domain::ArtifactOwner.new(
             owner_ref: "Sample#3140",
             owner_scope: :task,
-            snapshot_version: "refs/heads/a3/work/Sample-3138"
+            snapshot_version: "refs/heads/a2o/work/Sample-3138"
           )
         )
       )

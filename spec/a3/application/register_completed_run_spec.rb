@@ -24,7 +24,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     A3::Infra::IntegrationRefReadinessChecker::Result.new(
       ready: true,
       missing_slots: [],
-      ref: "refs/heads/a3/parent/A3-v2-3022"
+      ref: "refs/heads/a2o/parent/A3-v2-3022"
     )
   end
 
@@ -45,7 +45,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/3025",
+        ref: "refs/heads/a2o/work/3025",
         task_ref: "A3-v2#3025"
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -189,7 +189,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/3022",
+        ref: "refs/heads/a2o/parent/3022",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -233,7 +233,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/3022",
+        ref: "refs/heads/a2o/parent/3022",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -250,14 +250,14 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       diagnostics: {
         "merge_recovery" => {
           "status" => "recovered",
-          "target_ref" => "refs/heads/a3/parent/3022",
+          "target_ref" => "refs/heads/a2o/parent/3022",
           "publish_before_head" => "abc123",
           "publish_after_head" => "def456"
         }
       },
       response_bundle: {
         "merge_recovery_verification_required" => true,
-        "merge_recovery_verification_source_ref" => "refs/heads/a3/parent/3022"
+        "merge_recovery_verification_source_ref" => "refs/heads/a2o/parent/3022"
       }
     )
 
@@ -265,12 +265,12 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
-      body: a_string_matching(/merge_recovery: recovered.*merge_recovery_target: refs\/heads\/a3\/parent\/3022.*merge_recovery_publish: abc123\.\.def456/m)
+      body: a_string_matching(/merge_recovery: recovered.*merge_recovery_target: refs\/heads\/a2o\/parent\/3022.*merge_recovery_publish: abc123\.\.def456/m)
     )
     result = use_case.call(task_ref: task.ref, run_ref: merge_run.ref, outcome: :verification_required, execution: execution)
 
     expect(result.task.status).to eq(:verifying)
-    expect(result.task.verification_source_ref).to eq("refs/heads/a3/parent/3022")
+    expect(result.task.verification_source_ref).to eq("refs/heads/a2o/parent/3022")
     expect(result.run.terminal_outcome).to eq(:verification_required)
   end
 
@@ -293,7 +293,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/work/3025",
+        ref: "refs/heads/a2o/work/3025",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -314,7 +314,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       A3::Infra::IntegrationRefReadinessChecker::Result.new(
         ready: false,
         missing_slots: [:repo_alpha],
-        ref: "refs/heads/a3/parent/A3-v2-3022"
+        ref: "refs/heads/a2o/parent/A3-v2-3022"
       )
     )
 
@@ -322,7 +322,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
-      body: a_string_matching(/ブロック要約: missing integration ref refs\/heads\/a3\/parent\/A3-v2-3022 for slots repo_alpha/)
+      body: a_string_matching(/ブロック要約: missing integration ref refs\/heads\/a2o\/parent\/A3-v2-3022 for slots repo_alpha/)
     )
 
     result = use_case.call(task_ref: task.ref, run_ref: merge_run.ref, outcome: :completed)
@@ -360,7 +360,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       status: :verifying,
       current_run_ref: "run-verification-1",
       external_task_id: 3025,
-      verification_source_ref: "refs/heads/a3/parent/3022"
+      verification_source_ref: "refs/heads/a2o/parent/3022"
     )
     verification_run = A3::Domain::Run.new(
       ref: "run-verification-1",
@@ -380,7 +380,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
 
     expect(result.task.status).to eq(:verifying)
     expect(result.task.current_run_ref).to be_nil
-    expect(result.task.verification_source_ref).to eq("refs/heads/a3/parent/3022")
+    expect(result.task.verification_source_ref).to eq("refs/heads/a2o/parent/3022")
     expect(result.run.terminal_outcome).to eq(:retryable)
   end
 
@@ -402,7 +402,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/Sample-3140",
+        ref: "refs/heads/a2o/parent/Sample-3140",
         task_ref: parent_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -519,7 +519,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/Sample-3140",
+        ref: "refs/heads/a2o/parent/Sample-3140",
         task_ref: parent_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -570,7 +570,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/Sample-3140",
+        ref: "refs/heads/a2o/parent/Sample-3140",
         task_ref: parent_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -589,7 +589,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/Sample-3140",
+        ref: "refs/heads/a2o/parent/Sample-3140",
         task_ref: parent_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(

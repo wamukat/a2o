@@ -30,7 +30,7 @@ RSpec.describe A3::Application::RunMerge do
   let(:integration_ref_readiness_checker) do
     instance_double(
       A3::Infra::IntegrationRefReadinessChecker,
-      check: A3::Infra::IntegrationRefReadinessChecker::Result.new(ready: true, missing_slots: [], ref: "refs/heads/a3/parent/A3-v2-3022")
+      check: A3::Infra::IntegrationRefReadinessChecker::Result.new(ready: true, missing_slots: [], ref: "refs/heads/a2o/parent/A3-v2-3022")
     )
   end
   let(:register_completed_run) do
@@ -69,7 +69,7 @@ RSpec.describe A3::Application::RunMerge do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/work/3025",
+        ref: "refs/heads/a2o/work/3025",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -134,15 +134,15 @@ RSpec.describe A3::Application::RunMerge do
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: true,
-        summary: "merged refs/heads/a3/work/3025 into refs/heads/a3/parent/A3-v2#3022"
+        summary: "merged refs/heads/a2o/work/3025 into refs/heads/a2o/parent/A3-v2#3022"
       )
     )
 
     result = use_case.call(task_ref: task.ref, run_ref: run.ref, project_context: project_context)
 
     expect(result.task.status).to eq(:done)
-    expect(result.run.phase_records.last.verification_summary).to include("merged refs/heads/a3/work/3025")
-    expect(result.run.phase_records.last.execution_record&.summary).to include("merged refs/heads/a3/work/3025")
+    expect(result.run.phase_records.last.verification_summary).to include("merged refs/heads/a2o/work/3025")
+    expect(result.run.phase_records.last.execution_record&.summary).to include("merged refs/heads/a2o/work/3025")
     expect(result.run.phase_records.last.execution_record.runtime_snapshot).to have_attributes(
       phase: :merge,
       merge_target: :merge_to_parent,
@@ -162,7 +162,7 @@ RSpec.describe A3::Application::RunMerge do
       A3::Application::ExecutionResult.new(
         success: false,
         summary: "merge failed",
-        failing_command: "git merge --ff-only refs/heads/a3/work/3025",
+        failing_command: "git merge --ff-only refs/heads/a2o/work/3025",
         observed_state: "non-fast-forward",
         diagnostics: { "stderr" => "fatal: not possible" }
       )
@@ -173,7 +173,7 @@ RSpec.describe A3::Application::RunMerge do
     expect(result.task.status).to eq(:blocked)
     expect(result.run.phase_records.last.execution_record).to have_attributes(
       summary: "merge failed",
-      failing_command: "git merge --ff-only refs/heads/a3/work/3025",
+      failing_command: "git merge --ff-only refs/heads/a2o/work/3025",
       observed_state: "non-fast-forward",
       diagnostics: { "stderr" => "fatal: not possible" }
     )
@@ -237,9 +237,9 @@ RSpec.describe A3::Application::RunMerge do
       task_ref: single_task.ref,
       phase: :merge,
       workspace_kind: :runtime_workspace,
-      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: single_task.ref, ref: "refs/heads/a3/work/Sample-245"),
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: single_task.ref, ref: "refs/heads/a2o/work/Sample-245"),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], ownership_scope: :task),
-      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: single_task.ref, owner_scope: :task, snapshot_version: "refs/heads/a3/work/Sample-245")
+      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: single_task.ref, owner_scope: :task, snapshot_version: "refs/heads/a2o/work/Sample-245")
     )
     task_repository.save(single_task)
     run_repository.save(single_run)
@@ -281,7 +281,7 @@ RSpec.describe A3::Application::RunMerge do
     result = use_case.call(task_ref: single_task.ref, run_ref: single_run.ref, project_context: live_project_context)
 
     expect(captured_single_merge_plan.integration_target.target_ref).to eq("refs/heads/main")
-    expect(captured_single_merge_plan.merge_source.source_ref).to eq("refs/heads/a3/work/Sample-245")
+    expect(captured_single_merge_plan.merge_source.source_ref).to eq("refs/heads/a2o/work/Sample-245")
     expect(result.task.status).to eq(:verifying)
     expect(result.task.verification_source_ref).to eq("refs/heads/main")
     expect(result.run.terminal_outcome).to eq(:verification_required)
@@ -306,9 +306,9 @@ RSpec.describe A3::Application::RunMerge do
       task_ref: parent_task.ref,
       phase: :merge,
       workspace_kind: :runtime_workspace,
-      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: parent_task.ref, ref: "refs/heads/a3/parent/Sample-201"),
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: parent_task.ref, ref: "refs/heads/a2o/parent/Sample-201"),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: %i[repo_alpha repo_beta], verification_scope: %i[repo_alpha repo_beta], ownership_scope: :parent),
-      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: parent_task.ref, owner_scope: :parent, snapshot_version: "refs/heads/a3/parent/Sample-201")
+      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: parent_task.ref, owner_scope: :parent, snapshot_version: "refs/heads/a2o/parent/Sample-201")
     )
     task_repository.save(parent_task)
     run_repository.save(parent_run)
@@ -353,7 +353,7 @@ RSpec.describe A3::Application::RunMerge do
     result = use_case.call(task_ref: parent_task.ref, run_ref: parent_run.ref, project_context: live_project_context)
 
     expect(captured_parent_merge_plan.integration_target.target_ref).to eq("refs/heads/main")
-    expect(captured_parent_merge_plan.merge_source.source_ref).to eq("refs/heads/a3/parent/Sample-201")
+    expect(captured_parent_merge_plan.merge_source.source_ref).to eq("refs/heads/a2o/parent/Sample-201")
     expect(result.task.status).to eq(:verifying)
     expect(result.task.verification_source_ref).to eq("refs/heads/main")
     expect(result.run.terminal_outcome).to eq(:verification_required)
@@ -381,7 +381,7 @@ RSpec.describe A3::Application::RunMerge do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/A3-v2-3022",
+        ref: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: parent_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -390,15 +390,15 @@ RSpec.describe A3::Application::RunMerge do
         ownership_scope: :parent
       ),
       review_target: A3::Domain::ReviewTarget.new(
-        base_commit: "refs/heads/a3/parent/A3-v2-3022",
-        head_commit: "refs/heads/a3/parent/A3-v2-3022",
+        base_commit: "refs/heads/a2o/parent/A3-v2-3022",
+        head_commit: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: parent_task.ref,
         phase_ref: :merge
       ),
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: parent_task.ref,
         owner_scope: :parent,
-        snapshot_version: "refs/heads/a3/parent/A3-v2-3022"
+        snapshot_version: "refs/heads/a2o/parent/A3-v2-3022"
       )
     )
     task_repository.save(parent_task)
@@ -430,7 +430,7 @@ RSpec.describe A3::Application::RunMerge do
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: true,
-        summary: "merged refs/heads/a3/parent/A3-v2-3022 into refs/heads/live/main"
+        summary: "merged refs/heads/a2o/parent/A3-v2-3022 into refs/heads/live/main"
       )
     )
 

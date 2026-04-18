@@ -40,7 +40,7 @@ RSpec.describe A3::CLI do
       File.write(
         manifest_path,
         YAML.dump(
-          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/a3/parent/A3-v2-3022" } } }
+          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/a2o/parent/A3-v2-3022" } } }
         )
       )
 
@@ -85,7 +85,7 @@ RSpec.describe A3::CLI do
       File.write(
         manifest_path,
         YAML.dump(
-          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/a3/parent/A3-v2-3022" } } }
+          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/a2o/parent/A3-v2-3022" } } }
         )
       )
 

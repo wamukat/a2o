@@ -177,10 +177,12 @@ module A3
       def archive_branch_ref!(root, ref, commit_sha)
         branch_name = branch_name_for(ref)
         archive_branch =
-          if branch_name.start_with?("a3/")
-            "a3/archive/#{branch_name.delete_prefix('a3/')}/#{commit_sha[0, 12]}"
+          if branch_name.start_with?("a2o/")
+            "a2o/archive/#{branch_name.delete_prefix('a2o/')}/#{commit_sha[0, 12]}"
+          elsif branch_name.start_with?("a3/")
+            "a2o/archive/#{branch_name.delete_prefix('a3/')}/#{commit_sha[0, 12]}"
           else
-            "a3/archive/#{branch_name}/#{commit_sha[0, 12]}"
+            "a2o/archive/#{branch_name}/#{commit_sha[0, 12]}"
           end
         run_git!(root, "branch", "--force", archive_branch, commit_sha)
       end

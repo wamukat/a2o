@@ -3,7 +3,7 @@
 require "spec_helper"
 
 RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
-  let(:source_descriptor) { A3::Domain::SourceDescriptor.implementation(task_ref: "Sample#42", ref: "refs/heads/a3/work/Sample-42") }
+  let(:source_descriptor) { A3::Domain::SourceDescriptor.implementation(task_ref: "Sample#42", ref: "refs/heads/a2o/work/Sample-42") }
   let(:task) do
     A3::Domain::Task.new(
       ref: "Sample#42",
@@ -28,11 +28,11 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     expect(request.workspace_id).to eq("Sample-42-implementation-run-implementation")
     expect(request.publish_policy).to eq(
       "mode" => "commit_all_edit_target_changes_on_worker_success",
-      "commit_message" => "A3 implementation update for Sample#42"
+      "commit_message" => "A2O implementation update for Sample#42"
     )
     expect(request.slots.keys).to eq(%w[repo_alpha repo_beta])
     expect(request.slots.fetch("repo_alpha")).to include(
-      "ref" => "refs/heads/a3/work/Sample-42",
+      "ref" => "refs/heads/a2o/work/Sample-42",
       "checkout" => "worktree_branch",
       "access" => "read_write",
       "sync_class" => "eager",
@@ -67,7 +67,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       workspace_kind: workspace.workspace_kind,
       source_descriptor: A3::Domain::SourceDescriptor.implementation(
         task_ref: parented_task.ref,
-        ref: "refs/heads/a3/work/Sample-135"
+        ref: "refs/heads/a2o/work/Sample-135"
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
         edit_scope: parented_task.edit_scope,
@@ -77,7 +77,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: parented_task.parent_ref,
         owner_scope: :task,
-        snapshot_version: "refs/heads/a3/work/Sample-135"
+        snapshot_version: "refs/heads/a2o/work/Sample-135"
       )
     )
 
@@ -92,13 +92,13 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       "relative_path" => "children/Sample-135/ticket_workspace"
     )
     expect(request.slots.fetch("repo_alpha")).to include(
-      "ref" => "refs/heads/a3/work/Sample-135",
-      "bootstrap_ref" => "refs/heads/a3/parent/Sample-134",
+      "ref" => "refs/heads/a2o/work/Sample-135",
+      "bootstrap_ref" => "refs/heads/a2o/parent/Sample-134",
       "bootstrap_base_ref" => "refs/heads/feature/prototype",
       "ownership" => "edit_target"
     )
     expect(request.slots.fetch("repo_beta")).to include(
-      "ref" => "refs/heads/a3/parent/Sample-134",
+      "ref" => "refs/heads/a2o/parent/Sample-134",
       "bootstrap_ref" => "refs/heads/feature/prototype",
       "ownership" => "support"
     )
@@ -116,7 +116,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     request = builder.call(workspace: workspace, task: task, run: run(:implementation))
 
     expect(request.slots.fetch("repo_alpha")).to include(
-      "ref" => "refs/heads/a3/work/Sample-42",
+      "ref" => "refs/heads/a2o/work/Sample-42",
       "ownership" => "edit_target"
     )
     expect(request.slots.fetch("repo_beta")).to include(
@@ -140,7 +140,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       workspace_kind: workspace.workspace_kind,
       source_descriptor: A3::Domain::SourceDescriptor.implementation(
         task_ref: parent_task.ref,
-        ref: "refs/heads/a3/parent/Sample-173"
+        ref: "refs/heads/a2o/parent/Sample-173"
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
         edit_scope: parent_task.edit_scope,
@@ -150,7 +150,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: parent_task.ref,
         owner_scope: :task,
-        snapshot_version: "refs/heads/a3/parent/Sample-173"
+        snapshot_version: "refs/heads/a2o/parent/Sample-173"
       )
     )
 
@@ -164,12 +164,12 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
 
     expect(request.workspace_id).to eq("Sample-173-parent")
     expect(request.slots.fetch("repo_alpha")).to include(
-      "ref" => "refs/heads/a3/parent/Sample-173",
+      "ref" => "refs/heads/a2o/parent/Sample-173",
       "bootstrap_ref" => "refs/heads/feature/prototype",
       "ownership" => "edit_target"
     )
     expect(request.slots.fetch("repo_beta")).to include(
-      "ref" => "refs/heads/a3/parent/Sample-173",
+      "ref" => "refs/heads/a2o/parent/Sample-173",
       "bootstrap_ref" => "refs/heads/feature/prototype",
       "ownership" => "support"
     )
@@ -182,7 +182,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       root_path: "/tmp/a3-parent-runtime-workspace",
       source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(
         task_ref: "Sample#173",
-        ref: "refs/heads/a3/runtime/a3-user-runtime-check/parent/Sample-173"
+        ref: "refs/heads/a2o/runtime/a3-user-runtime-check/parent/Sample-173"
       ),
       slot_paths: {}
     )
@@ -199,7 +199,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       workspace_kind: parent_workspace.workspace_kind,
       source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(
         task_ref: parent_task.ref,
-        ref: "refs/heads/a3/runtime/a3-user-runtime-check/parent/Sample-173"
+        ref: "refs/heads/a2o/runtime/a3-user-runtime-check/parent/Sample-173"
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
         edit_scope: parent_task.edit_scope,
@@ -209,7 +209,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: parent_task.ref,
         owner_scope: :task,
-        snapshot_version: "refs/heads/a3/runtime/a3-user-runtime-check/parent/Sample-173"
+        snapshot_version: "refs/heads/a2o/runtime/a3-user-runtime-check/parent/Sample-173"
       )
     )
 
@@ -222,8 +222,8 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       branch_namespace: "runtime/a3-user-runtime-check"
     ).call(workspace: parent_workspace, task: parent_task, run: parent_run)
 
-    expect(request.slots.fetch("repo_alpha")).to include("ref" => "refs/heads/a3/runtime/a3-user-runtime-check/parent/Sample-173")
-    expect(request.slots.fetch("repo_beta")).to include("ref" => "refs/heads/a3/runtime/a3-user-runtime-check/parent/Sample-173")
+    expect(request.slots.fetch("repo_alpha")).to include("ref" => "refs/heads/a2o/runtime/a3-user-runtime-check/parent/Sample-173")
+    expect(request.slots.fetch("repo_beta")).to include("ref" => "refs/heads/a2o/runtime/a3-user-runtime-check/parent/Sample-173")
   end
 
   it "uses slot-specific support refs when multiple support repositories are configured" do
@@ -241,7 +241,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
 
     request = multi_support_builder.call(workspace: workspace, task: task, run: run(:implementation))
 
-    expect(request.slots.fetch("repo_alpha")).to include("ref" => "refs/heads/a3/work/Sample-42")
+    expect(request.slots.fetch("repo_alpha")).to include("ref" => "refs/heads/a2o/work/Sample-42")
     expect(request.slots.fetch("repo_beta")).to include("ref" => "refs/heads/support/beta")
     expect(request.slots.fetch("repo_gamma")).to include("ref" => "refs/heads/support/gamma")
   end
@@ -257,7 +257,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
 
     expect(request.publish_policy).to eq(
       "mode" => "commit_all_edit_target_changes_on_success",
-      "commit_message" => "A3 remediation update for Sample#42"
+      "commit_message" => "A2O remediation update for Sample#42"
     )
     expect(request.slots.fetch("repo_alpha")).to include("access" => "read_write", "ownership" => "edit_target")
     expect(request.slots.fetch("repo_beta")).to include("access" => "read_only", "ownership" => "support")

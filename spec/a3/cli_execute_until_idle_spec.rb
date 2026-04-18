@@ -95,7 +95,7 @@ RSpec.describe A3::CLI do
       )
       repo_sources.each_value do |repo_path|
         head = `git -C #{Shellwords.escape(repo_path)} rev-parse HEAD`.strip
-        system("git", "-C", repo_path, "update-ref", "refs/heads/a3/parent/A3-v2-3022", head, exception: true, out: File::NULL, err: File::NULL)
+        system("git", "-C", repo_path, "update-ref", "refs/heads/a2o/parent/A3-v2-3022", head, exception: true, out: File::NULL, err: File::NULL)
       end
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
       task_repository.save(
@@ -288,7 +288,7 @@ RSpec.describe A3::CLI do
       seed_context(dir)
       repo_sources.each_value do |repo_path|
         head = `git -C #{Shellwords.escape(repo_path)} rev-parse HEAD`.strip
-        system("git", "-C", repo_path, "update-ref", "refs/heads/a3/parent/Sample-5100", head, exception: true, out: File::NULL, err: File::NULL)
+        system("git", "-C", repo_path, "update-ref", "refs/heads/a2o/parent/Sample-5100", head, exception: true, out: File::NULL, err: File::NULL)
       end
       fake_cli = create_fake_kanban_cli(
         dir,

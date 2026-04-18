@@ -3,7 +3,7 @@
 module A3
   module Infra
     class AgentWorkspaceRequestBuilder
-      def initialize(source_aliases:, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, support_ref: nil, support_refs: {}, branch_namespace: ENV.fetch("A3_BRANCH_NAMESPACE", nil))
+      def initialize(source_aliases:, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, support_ref: nil, support_refs: {}, branch_namespace: ENV.fetch("A2O_BRANCH_NAMESPACE", ENV.fetch("A3_BRANCH_NAMESPACE", nil)))
         @source_aliases = source_aliases.transform_keys(&:to_sym).transform_values(&:to_s).freeze
         @branch_namespace = normalize_branch_namespace(branch_namespace)
         @repo_slots = @source_aliases.keys.sort.freeze
@@ -105,7 +105,7 @@ module A3
 
       def parent_integration_ref_for(task)
         owner_ref = task.parent_ref || task.ref
-        parts = ["refs/heads/a3"]
+        parts = ["refs/heads/a2o"]
         parts << @branch_namespace if @branch_namespace
         parts << "parent"
         parts << owner_ref.tr("#", "-")
@@ -139,14 +139,14 @@ module A3
         if command_intent == :remediation && run.phase.to_sym == :verification
           return {
             mode: "commit_all_edit_target_changes_on_success",
-            commit_message: "A3 remediation update for #{task.ref}"
+            commit_message: "A2O remediation update for #{task.ref}"
           }
         end
         return nil unless run.phase.to_sym == :implementation
 
         {
           mode: "commit_all_edit_target_changes_on_worker_success",
-          commit_message: "A3 implementation update for #{task.ref}"
+          commit_message: "A2O implementation update for #{task.ref}"
         }
       end
 

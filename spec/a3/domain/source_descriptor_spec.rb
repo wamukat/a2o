@@ -24,14 +24,14 @@ RSpec.describe A3::Domain::SourceDescriptor do
     descriptor = described_class.new(
       workspace_kind: :runtime_workspace,
       source_type: :integration_record,
-      ref: "refs/heads/a3/work/3026",
+      ref: "refs/heads/a2o/work/3026",
       task_ref: "A3-v2#3026"
     )
 
     expect(descriptor.persisted_form).to eq(
       "workspace_kind" => "runtime_workspace",
       "source_type" => "integration_record",
-      "ref" => "refs/heads/a3/work/3026",
+      "ref" => "refs/heads/a2o/work/3026",
       "task_ref" => "A3-v2#3026"
     )
     expect(described_class.from_persisted_form(descriptor.persisted_form)).to eq(descriptor)
@@ -40,7 +40,7 @@ RSpec.describe A3::Domain::SourceDescriptor do
   it "builds implementation descriptors through a semantic constructor" do
     descriptor = described_class.implementation(
       task_ref: child_task.ref,
-      ref: "refs/heads/a3/work/3030"
+      ref: "refs/heads/a2o/work/3030"
     )
 
     expect(descriptor.workspace_kind).to eq(:ticket_workspace)
@@ -52,7 +52,7 @@ RSpec.describe A3::Domain::SourceDescriptor do
   it "builds runtime descriptors through a semantic constructor" do
     descriptor = described_class.runtime(
       task_ref: parent_task.ref,
-      ref: "refs/heads/a3/parent/3022",
+      ref: "refs/heads/a2o/parent/3022",
       source_type: :integration_record
     )
 
@@ -66,19 +66,19 @@ RSpec.describe A3::Domain::SourceDescriptor do
     implementation_descriptor = described_class.for_phase(
       task: child_task,
       phase: :implementation,
-      ref: "refs/heads/a3/work/3030"
+      ref: "refs/heads/a2o/work/3030"
     )
     review_descriptor = described_class.for_phase(
       task: parent_task,
       phase: :review,
-      ref: "refs/heads/a3/parent/3022"
+      ref: "refs/heads/a2o/parent/3022"
     )
 
     expect(implementation_descriptor).to eq(
       described_class.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/3030",
+        ref: "refs/heads/a2o/work/3030",
         task_ref: child_task.ref
       )
     )
@@ -86,7 +86,7 @@ RSpec.describe A3::Domain::SourceDescriptor do
       described_class.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/3022",
+        ref: "refs/heads/a2o/parent/3022",
         task_ref: parent_task.ref
       )
     )
@@ -97,7 +97,7 @@ RSpec.describe A3::Domain::SourceDescriptor do
       described_class.new(
         workspace_kind: :runtime_workspace,
         source_type: :legacy_snapshot,
-        ref: "refs/heads/a3/work/3026",
+        ref: "refs/heads/a2o/work/3026",
         task_ref: "A3-v2#3026"
       )
     end.to raise_error(A3::Domain::ConfigurationError, /unsupported source_type/)
@@ -108,7 +108,7 @@ RSpec.describe A3::Domain::SourceDescriptor do
       described_class.new(
         workspace_kind: :support_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/work/3026",
+        ref: "refs/heads/a2o/work/3026",
         task_ref: "A3-v2#3026"
       )
     end.to raise_error(A3::Domain::ConfigurationError, /unsupported workspace_kind/)
@@ -119,7 +119,7 @@ RSpec.describe A3::Domain::SourceDescriptor do
       described_class.for_phase(
         task: child_task,
         phase: :planning,
-        ref: "refs/heads/a3/work/3030"
+        ref: "refs/heads/a2o/work/3030"
       )
     end.to raise_error(A3::Domain::InvalidPhaseError, /unsupported phase/)
   end

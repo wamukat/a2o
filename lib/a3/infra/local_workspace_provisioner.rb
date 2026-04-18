@@ -10,7 +10,7 @@ module A3
     class LocalWorkspaceProvisioner
       IGNORED_REPO_SOURCE_ENTRIES = %w[.git .a3 .work target node_modules].freeze
 
-      def initialize(base_dir:, repo_sources: {}, git_workspace_backend: A3::Infra::LocalGitWorkspaceBackend.new, branch_namespace: ENV.fetch("A3_BRANCH_NAMESPACE", nil))
+      def initialize(base_dir:, repo_sources: {}, git_workspace_backend: A3::Infra::LocalGitWorkspaceBackend.new, branch_namespace: ENV.fetch("A2O_BRANCH_NAMESPACE", ENV.fetch("A3_BRANCH_NAMESPACE", nil)))
         @base_dir = Pathname(base_dir)
         @repo_sources = repo_sources.transform_keys(&:to_sym).transform_values { |value| Pathname(value) }.freeze
         @git_workspace_backend = git_workspace_backend
@@ -370,7 +370,7 @@ module A3
       end
 
       def parent_integration_ref(parent_ref)
-        parts = ["refs/heads/a3"]
+        parts = ["refs/heads/a2o"]
         parts << @branch_namespace if @branch_namespace
         parts << "parent"
         parts << slugify(parent_ref)

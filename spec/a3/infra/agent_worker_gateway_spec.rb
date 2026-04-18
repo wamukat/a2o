@@ -257,7 +257,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
           },
           workspace_descriptor: workspace_descriptor(
             "repo_beta" => materialized_slot_descriptor_without_changed_files.merge(
-              "branch_ref" => "refs/heads/a3/work/wrong"
+              "branch_ref" => "refs/heads/a2o/work/wrong"
             )
           )
         )
@@ -736,7 +736,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       cleanup_policy: :retain_until_a3_cleanup,
       publish_policy: publish ? {
         mode: "commit_all_edit_target_changes_on_worker_success",
-        commit_message: "A3 implementation update for #{task.ref}"
+        commit_message: "A2O implementation update for #{task.ref}"
       } : nil,
       slots: {
         repo_beta: {
@@ -744,7 +744,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
             kind: "local_git",
             alias: "sample-catalog-service"
           },
-          ref: "refs/heads/a3/work/Sample-42",
+          ref: "refs/heads/a2o/work/Sample-42",
           checkout: "worktree_branch",
           access: "read_write",
           sync_class: "eager",
@@ -764,7 +764,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       cleanup_policy: :retain_until_a3_cleanup,
       publish_policy: {
         mode: "commit_all_edit_target_changes_on_worker_success",
-        commit_message: "A3 implementation update for #{task.ref}"
+        commit_message: "A2O implementation update for #{task.ref}"
       },
       slots: {
         repo_alpha: {
@@ -772,7 +772,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
             kind: "local_git",
             alias: "sample-storefront"
           },
-          ref: "refs/heads/a3/work/Sample-42",
+          ref: "refs/heads/a2o/work/Sample-42",
           checkout: "worktree_branch",
           access: "read_only",
           sync_class: "lazy_but_guaranteed",
@@ -784,7 +784,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
             kind: "local_git",
             alias: "sample-catalog-service"
           },
-          ref: "refs/heads/a3/work/Sample-42",
+          ref: "refs/heads/a2o/work/Sample-42",
           checkout: "worktree_branch",
           access: "read_write",
           sync_class: "eager",
@@ -859,7 +859,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
   end
 
   def source_descriptor
-    A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: task.ref, ref: "refs/heads/a3/work/Sample-42")
+    A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: task.ref, ref: "refs/heads/a2o/work/Sample-42")
   end
 
   def workspace_descriptor(slot_descriptors = {})
@@ -913,8 +913,8 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       "source_kind" => "local_git",
       "source_alias" => "sample-catalog-service",
       "checkout" => "worktree_branch",
-      "requested_ref" => "refs/heads/a3/work/Sample-42",
-      "branch_ref" => "refs/heads/a3/work/Sample-42",
+      "requested_ref" => "refs/heads/a2o/work/Sample-42",
+      "branch_ref" => "refs/heads/a2o/work/Sample-42",
       "resolved_head" => "abc123",
       "dirty_before" => false,
       "dirty_after" => true,

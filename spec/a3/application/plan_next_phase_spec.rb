@@ -26,7 +26,7 @@ RSpec.describe A3::Application::PlanNextPhase do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/3025",
+        ref: "refs/heads/a2o/work/3025",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -63,7 +63,7 @@ RSpec.describe A3::Application::PlanNextPhase do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/3022",
+        ref: "refs/heads/a2o/parent/3022",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -105,7 +105,7 @@ RSpec.describe A3::Application::PlanNextPhase do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/3022",
+        ref: "refs/heads/a2o/parent/3022",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -146,7 +146,7 @@ RSpec.describe A3::Application::PlanNextPhase do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/3022",
+        ref: "refs/heads/a2o/parent/3022",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -285,7 +285,7 @@ RSpec.describe A3::Application::PlanNextPhase do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/3025",
+        ref: "refs/heads/a2o/work/3025",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -324,7 +324,7 @@ RSpec.describe A3::Application::PlanNextPhase do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/3022",
+        ref: "refs/heads/a2o/parent/3022",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(

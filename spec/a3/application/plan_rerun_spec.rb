@@ -105,7 +105,7 @@ RSpec.describe A3::Application::PlanRerun do
       current_source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/3025",
+        ref: "refs/heads/a2o/work/3025",
         task_ref: "A3-v2#3025"
       ),
       current_review_target: review_target,

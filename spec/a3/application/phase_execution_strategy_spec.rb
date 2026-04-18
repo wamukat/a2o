@@ -22,7 +22,7 @@ RSpec.describe "phase execution strategies" do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/3025",
+        ref: "refs/heads/a2o/work/3025",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -33,7 +33,7 @@ RSpec.describe "phase execution strategies" do
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: "A3-v2#3022",
         owner_scope: :task,
-        snapshot_version: "refs/heads/a3/work/3025"
+        snapshot_version: "refs/heads/a2o/work/3025"
       )
     )
   end
@@ -321,8 +321,8 @@ RSpec.describe "phase execution strategies" do
     merge_plan = A3::Domain::MergePlan.new(
       task_ref: task.ref,
       run_ref: implementation_run.ref,
-      merge_source: A3::Domain::MergeSource.new(source_ref: "refs/heads/a3/work/3025"),
-      integration_target: A3::Domain::IntegrationTarget.new(target_ref: "refs/heads/a3/parent/A3-v2-3022"),
+      merge_source: A3::Domain::MergeSource.new(source_ref: "refs/heads/a2o/work/3025"),
+      integration_target: A3::Domain::IntegrationTarget.new(target_ref: "refs/heads/a2o/parent/A3-v2-3022"),
       merge_slots: [:repo_alpha],
       merge_policy: :ff_only
     )

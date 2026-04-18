@@ -53,9 +53,9 @@ RSpec.describe A3::CLI do
           task_ref: "Sample#3179",
           phase: :review,
           workspace_kind: :runtime_workspace,
-          source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#3179", ref: "refs/heads/a3/parent/Sample-3179"),
+          source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#3179", ref: "refs/heads/a2o/parent/Sample-3179"),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: %i[repo_alpha repo_beta], verification_scope: %i[repo_alpha repo_beta], ownership_scope: :parent),
-          artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: "Sample#3179", owner_scope: :parent, snapshot_version: "refs/heads/a3/parent/Sample-3179")
+          artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: "Sample#3179", owner_scope: :parent, snapshot_version: "refs/heads/a2o/parent/Sample-3179")
         )
       )
       task_repository.save(

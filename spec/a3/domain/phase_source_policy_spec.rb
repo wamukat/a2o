@@ -29,7 +29,7 @@ RSpec.describe A3::Domain::PhaseSourcePolicy do
       A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/A3-v2-3030",
+        ref: "refs/heads/a2o/work/A3-v2-3030",
         task_ref: child_task.ref
       )
     )
@@ -42,7 +42,7 @@ RSpec.describe A3::Domain::PhaseSourcePolicy do
       A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/A3-v2-3022",
+        ref: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: parent_task.ref
       )
     )
@@ -56,7 +56,7 @@ RSpec.describe A3::Domain::PhaseSourcePolicy do
       A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/A3-v2-3022",
+        ref: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: parent_task.ref
       )
     )
@@ -64,7 +64,7 @@ RSpec.describe A3::Domain::PhaseSourcePolicy do
       A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/A3-v2-3022",
+        ref: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: parent_task.ref
       )
     )
@@ -77,21 +77,21 @@ RSpec.describe A3::Domain::PhaseSourcePolicy do
     implementation_descriptor = namespaced.source_descriptor_for(task: child_task, phase: :implementation)
     parent_descriptor = namespaced.source_descriptor_for(task: parent_task, phase: :verification)
 
-    expect(implementation_descriptor.ref).to eq("refs/heads/a3/runtime/a3-user-runtime-check/work/A3-v2-3030")
-    expect(parent_descriptor.ref).to eq("refs/heads/a3/runtime/a3-user-runtime-check/parent/A3-v2-3022")
+    expect(implementation_descriptor.ref).to eq("refs/heads/a2o/runtime/a3-user-runtime-check/work/A3-v2-3030")
+    expect(parent_descriptor.ref).to eq("refs/heads/a2o/runtime/a3-user-runtime-check/parent/A3-v2-3022")
   end
 
   it "builds canonical review targets from the source ref" do
     review_target = policy.review_target_for(
       task: child_task,
       phase: :review,
-      source_ref: "refs/heads/a3/work/A3-v2-3030"
+      source_ref: "refs/heads/a2o/work/A3-v2-3030"
     )
 
     expect(review_target).to eq(
       A3::Domain::ReviewTarget.new(
-        base_commit: "refs/heads/a3/work/A3-v2-3030",
-        head_commit: "refs/heads/a3/work/A3-v2-3030",
+        base_commit: "refs/heads/a2o/work/A3-v2-3030",
+        head_commit: "refs/heads/a2o/work/A3-v2-3030",
         task_ref: child_task.ref,
         phase_ref: :review
       )

@@ -34,7 +34,7 @@ RSpec.describe A3::CLI do
           source_descriptor: A3::Domain::SourceDescriptor.new(
             workspace_kind: :runtime_workspace,
             source_type: :integration_record,
-            ref: "refs/heads/a3/work/3025",
+            ref: "refs/heads/a2o/work/3025",
             task_ref: "A3-v2#3025"
           ),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -104,8 +104,8 @@ RSpec.describe A3::CLI do
       seed_merge_child_context(dir)
       repo_sources.each_value do |repo_path|
         head = `git -C #{Shellwords.escape(repo_path)} rev-parse HEAD`.strip
-        system("git", "-C", repo_path, "update-ref", "refs/heads/a3/parent/A3-v2-3022", head, exception: true, out: File::NULL, err: File::NULL)
-        system("git", "-C", repo_path, "update-ref", "refs/heads/a3/work/3025", head, exception: true, out: File::NULL, err: File::NULL)
+        system("git", "-C", repo_path, "update-ref", "refs/heads/a2o/parent/A3-v2-3022", head, exception: true, out: File::NULL, err: File::NULL)
+        system("git", "-C", repo_path, "update-ref", "refs/heads/a2o/work/3025", head, exception: true, out: File::NULL, err: File::NULL)
       end
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
       run_repository = A3::Infra::SqliteRunRepository.new(File.join(dir, "a3.sqlite3"))
@@ -128,7 +128,7 @@ RSpec.describe A3::CLI do
           source_descriptor: A3::Domain::SourceDescriptor.new(
             workspace_kind: :runtime_workspace,
             source_type: :integration_record,
-            ref: "refs/heads/a3/work/3025",
+            ref: "refs/heads/a2o/work/3025",
             task_ref: "A3-v2#3025"
           ),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -155,7 +155,7 @@ RSpec.describe A3::CLI do
       ).and_return(
         A3::Application::ExecutionResult.new(
           success: true,
-          summary: "merged refs/heads/a3/work/3025 into refs/heads/a3/parent/A3-v2#3022"
+          summary: "merged refs/heads/a2o/work/3025 into refs/heads/a2o/parent/A3-v2#3022"
         )
       )
 
@@ -189,8 +189,8 @@ RSpec.describe A3::CLI do
       }
       seed_merge_child_context(dir)
       head = `git -C #{Shellwords.escape(repo_sources.fetch(:repo_alpha))} rev-parse HEAD`.strip
-      system("git", "-C", repo_sources.fetch(:repo_alpha), "update-ref", "refs/heads/a3/parent/A3-v2-3022", head, exception: true, out: File::NULL, err: File::NULL)
-      system("git", "-C", repo_sources.fetch(:repo_alpha), "update-ref", "refs/heads/a3/work/3028", head, exception: true, out: File::NULL, err: File::NULL)
+      system("git", "-C", repo_sources.fetch(:repo_alpha), "update-ref", "refs/heads/a2o/parent/A3-v2-3022", head, exception: true, out: File::NULL, err: File::NULL)
+      system("git", "-C", repo_sources.fetch(:repo_alpha), "update-ref", "refs/heads/a2o/work/3028", head, exception: true, out: File::NULL, err: File::NULL)
       kanban_stub = File.join(dir, "kanban_stub.py")
       File.write(
         kanban_stub,
@@ -240,7 +240,7 @@ RSpec.describe A3::CLI do
           source_descriptor: A3::Domain::SourceDescriptor.new(
             workspace_kind: :runtime_workspace,
             source_type: :integration_record,
-            ref: "refs/heads/a3/work/3028",
+            ref: "refs/heads/a2o/work/3028",
             task_ref: "A3-v2#3028"
           ),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -264,7 +264,7 @@ RSpec.describe A3::CLI do
       allow(merge_runner).to receive(:run).and_return(
         A3::Application::ExecutionResult.new(
           success: true,
-          summary: "merged refs/heads/a3/work/3028 into refs/heads/a3/parent/A3-v2-3022"
+          summary: "merged refs/heads/a2o/work/3028 into refs/heads/a2o/parent/A3-v2-3022"
         )
       )
 
@@ -315,7 +315,7 @@ RSpec.describe A3::CLI do
     File.write(
       File.join(dir, "project.yaml"),
       YAML.dump(
-        { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/a3/parent/A3-v2-3022" } } }
+        { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/a2o/parent/A3-v2-3022" } } }
       )
     )
   end

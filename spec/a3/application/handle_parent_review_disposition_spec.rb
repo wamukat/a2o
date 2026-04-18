@@ -25,7 +25,7 @@ RSpec.describe A3::Application::HandleParentReviewDisposition do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/Sample-3140",
+        ref: "refs/heads/a2o/parent/Sample-3140",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(

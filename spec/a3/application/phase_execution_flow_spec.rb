@@ -6,7 +6,7 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
   let(:integration_ref_readiness_checker) do
     instance_double(
       A3::Infra::IntegrationRefReadinessChecker,
-      check: A3::Infra::IntegrationRefReadinessChecker::Result.new(ready: true, missing_slots: [], ref: "refs/heads/a3/parent/A3-v2-3022")
+      check: A3::Infra::IntegrationRefReadinessChecker::Result.new(ready: true, missing_slots: [], ref: "refs/heads/a2o/parent/A3-v2-3022")
     )
   end
   let(:register_completed_run) do
@@ -50,7 +50,7 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/3025",
+        ref: "refs/heads/a2o/work/3025",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -59,15 +59,15 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
         ownership_scope: :task
       ),
       review_target: A3::Domain::ReviewTarget.new(
-        base_commit: "refs/heads/a3/work/3025",
-        head_commit: "refs/heads/a3/work/3025",
+        base_commit: "refs/heads/a2o/work/3025",
+        head_commit: "refs/heads/a2o/work/3025",
         task_ref: task.ref,
         phase_ref: :implementation
       ),
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: "A3-v2#3022",
         owner_scope: :task,
-        snapshot_version: "refs/heads/a3/work/3025"
+        snapshot_version: "refs/heads/a2o/work/3025"
       )
     )
   end

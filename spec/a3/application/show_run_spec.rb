@@ -234,7 +234,7 @@ RSpec.describe A3::Application::ShowRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/child",
+        ref: "refs/heads/a2o/work/child",
         task_ref: "A3-v2#child"
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -259,7 +259,7 @@ RSpec.describe A3::Application::ShowRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/child",
+        ref: "refs/heads/a2o/work/child",
         task_ref: "A3-v2#child"
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(

@@ -12,7 +12,7 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       cleanup_policy: :retain_until_a3_cleanup,
       publish_policy: {
         mode: "commit_declared_changes_on_success",
-        commit_message: "A3 implementation update for Sample#42"
+        commit_message: "A2O implementation update for Sample#42"
       },
       slots: {
         repo_alpha: {
@@ -20,7 +20,7 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
             kind: "local_git",
             alias: "sample-catalog-service"
           },
-          ref: "refs/heads/a3/work/Sample-42",
+          ref: "refs/heads/a2o/work/Sample-42",
           checkout: "worktree_branch",
           access: "read_write",
           sync_class: "eager",
@@ -38,7 +38,7 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       "cleanup_policy" => "retain_until_a3_cleanup",
       "publish_policy" => {
         "mode" => "commit_declared_changes_on_success",
-        "commit_message" => "A3 implementation update for Sample#42"
+        "commit_message" => "A2O implementation update for Sample#42"
       },
       "slots" => {
         "repo_alpha" => {
@@ -46,7 +46,7 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
             "kind" => "local_git",
             "alias" => "sample-catalog-service"
           },
-          "ref" => "refs/heads/a3/work/Sample-42",
+          "ref" => "refs/heads/a2o/work/Sample-42",
           "checkout" => "worktree_branch",
           "access" => "read_write",
           "sync_class" => "eager",
@@ -75,7 +75,7 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       slots: {
         repo_alpha: {
           source: { kind: "local_git", alias: "sample-catalog-service" },
-          ref: "refs/heads/a3/work/Sample-135",
+          ref: "refs/heads/a2o/work/Sample-135",
           checkout: "worktree_branch",
           access: "read_write",
           sync_class: "eager",
@@ -106,7 +106,7 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
         slots: {
           repo_alpha: {
             source: { kind: "remote_git", alias: "sample-catalog-service" },
-            ref: "refs/heads/a3/work/Sample-42",
+            ref: "refs/heads/a2o/work/Sample-42",
             checkout: "clone",
             access: "read_write",
             sync_class: "eager",
@@ -129,7 +129,7 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
         slots: {
           repo_alpha: {
             source: { kind: "local_git", alias: "sample-catalog-service" },
-            ref: "refs/heads/a3/work/Sample-42",
+            ref: "refs/heads/a2o/work/Sample-42",
             checkout: "worktree_branch",
             access: "read_write",
             required: true
@@ -177,7 +177,7 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
         slots: {
           repo_alpha: {
             source: { kind: "local_git", alias: "sample-catalog-service" },
-            ref: "refs/heads/a3/work/Sample-42",
+            ref: "refs/heads/a2o/work/Sample-42",
             checkout: "worktree_branch",
             access: "read_write",
             sync_class: "eager",

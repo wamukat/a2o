@@ -3,7 +3,7 @@
 module A3
   module Domain
     class MergePlanningPolicy
-      def initialize(branch_namespace: ENV.fetch("A3_BRANCH_NAMESPACE", nil))
+      def initialize(branch_namespace: ENV.fetch("A2O_BRANCH_NAMESPACE", ENV.fetch("A3_BRANCH_NAMESPACE", nil)))
         @branch_namespace = normalize_branch_namespace(branch_namespace)
       end
 
@@ -60,7 +60,7 @@ module A3
       end
 
       def parent_integration_ref(parent_ref)
-        parts = ["refs/heads/a3"]
+        parts = ["refs/heads/a2o"]
         parts << @branch_namespace if @branch_namespace
         parts << "parent"
         parts << parent_ref.tr("#", "-")

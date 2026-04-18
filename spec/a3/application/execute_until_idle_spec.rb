@@ -165,7 +165,7 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
         plan_next_phase: A3::Application::PlanNextPhase.new,
         integration_ref_readiness_checker: instance_double(
           A3::Infra::IntegrationRefReadinessChecker,
-          check: A3::Infra::IntegrationRefReadinessChecker::Result.new(ready: true, missing_slots: [], ref: "refs/heads/a3/parent/A3-v2-3022")
+          check: A3::Infra::IntegrationRefReadinessChecker::Result.new(ready: true, missing_slots: [], ref: "refs/heads/a2o/parent/A3-v2-3022")
         )
       )
       build_scope_snapshot = A3::Application::BuildScopeSnapshot.new
@@ -182,7 +182,7 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
         build_artifact_owner: build_artifact_owner,
         integration_ref_readiness_checker: instance_double(
           A3::Infra::IntegrationRefReadinessChecker,
-          check: A3::Infra::IntegrationRefReadinessChecker::Result.new(ready: true, missing_slots: [], ref: "refs/heads/a3/parent/A3-v2-3022")
+          check: A3::Infra::IntegrationRefReadinessChecker::Result.new(ready: true, missing_slots: [], ref: "refs/heads/a2o/parent/A3-v2-3022")
         )
       )
       run_worker_phase = A3::Application::RunWorkerPhase.new(

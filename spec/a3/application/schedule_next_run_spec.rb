@@ -11,7 +11,7 @@ RSpec.describe A3::Application::ScheduleNextRun do
     A3::Infra::IntegrationRefReadinessChecker::Result.new(
       ready: true,
       missing_slots: [],
-      ref: "refs/heads/a3/parent/A3-v2-3022"
+      ref: "refs/heads/a2o/parent/A3-v2-3022"
     )
   end
 
@@ -61,7 +61,7 @@ RSpec.describe A3::Application::ScheduleNextRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/A3-v2-3030",
+        ref: "refs/heads/a2o/work/A3-v2-3030",
         task_ref: task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -70,15 +70,15 @@ RSpec.describe A3::Application::ScheduleNextRun do
         ownership_scope: :task
       ),
       review_target: A3::Domain::ReviewTarget.new(
-        base_commit: "refs/heads/a3/work/A3-v2-3030",
-        head_commit: "refs/heads/a3/work/A3-v2-3030",
+        base_commit: "refs/heads/a2o/work/A3-v2-3030",
+        head_commit: "refs/heads/a2o/work/A3-v2-3030",
         task_ref: task.ref,
         phase_ref: :implementation
       ),
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: task.parent_ref,
         owner_scope: :task,
-        snapshot_version: "refs/heads/a3/work/A3-v2-3030"
+        snapshot_version: "refs/heads/a2o/work/A3-v2-3030"
       ),
       bootstrap_marker: "hooks/prepare-runtime.sh"
     ).and_return(
@@ -97,7 +97,7 @@ RSpec.describe A3::Application::ScheduleNextRun do
       edit_scope: task.edit_scope,
       status: :verifying,
       parent_ref: task.parent_ref,
-      verification_source_ref: "refs/heads/a3/parent/A3-v2-3022"
+      verification_source_ref: "refs/heads/a2o/parent/A3-v2-3022"
     )
     task_repository.save(recovered_task)
 
@@ -107,7 +107,7 @@ RSpec.describe A3::Application::ScheduleNextRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/parent/A3-v2-3022",
+        ref: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: recovered_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -116,15 +116,15 @@ RSpec.describe A3::Application::ScheduleNextRun do
         ownership_scope: :task
       ),
       review_target: A3::Domain::ReviewTarget.new(
-        base_commit: "refs/heads/a3/parent/A3-v2-3022",
-        head_commit: "refs/heads/a3/parent/A3-v2-3022",
+        base_commit: "refs/heads/a2o/parent/A3-v2-3022",
+        head_commit: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: recovered_task.ref,
         phase_ref: :verification
       ),
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: recovered_task.parent_ref,
         owner_scope: :task,
-        snapshot_version: "refs/heads/a3/parent/A3-v2-3022"
+        snapshot_version: "refs/heads/a2o/parent/A3-v2-3022"
       ),
       bootstrap_marker: "hooks/prepare-runtime.sh"
     ).and_return(
@@ -192,7 +192,7 @@ RSpec.describe A3::Application::ScheduleNextRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/A3-v2-3022",
+        ref: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: parent_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -201,15 +201,15 @@ RSpec.describe A3::Application::ScheduleNextRun do
         ownership_scope: :parent
       ),
       review_target: A3::Domain::ReviewTarget.new(
-        base_commit: "refs/heads/a3/parent/A3-v2-3022",
-        head_commit: "refs/heads/a3/parent/A3-v2-3022",
+        base_commit: "refs/heads/a2o/parent/A3-v2-3022",
+        head_commit: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: parent_task.ref,
         phase_ref: :review
       ),
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: parent_task.ref,
         owner_scope: :parent,
-        snapshot_version: "refs/heads/a3/parent/A3-v2-3022"
+        snapshot_version: "refs/heads/a2o/parent/A3-v2-3022"
       ),
       bootstrap_marker: "hooks/prepare-runtime.sh"
     ).and_return(
@@ -249,14 +249,14 @@ RSpec.describe A3::Application::ScheduleNextRun do
       A3::Infra::IntegrationRefReadinessChecker::Result.new(
         ready: false,
         missing_slots: [:repo_alpha],
-        ref: "refs/heads/a3/parent/A3-v2-3022"
+        ref: "refs/heads/a2o/parent/A3-v2-3022"
       )
     )
 
     expect(start_run).not_to receive(:call)
 
     expect { use_case.call(project_context: project_context) }
-      .to raise_error(A3::Domain::ConfigurationError, /missing integration ref refs\/heads\/a3\/parent\/A3-v2-3022 for slots repo_alpha/)
+      .to raise_error(A3::Domain::ConfigurationError, /missing integration ref refs\/heads\/a2o\/parent\/A3-v2-3022 for slots repo_alpha/)
   end
 
   it "starts the next runnable parent verification run against the parent integration branch" do
@@ -289,7 +289,7 @@ RSpec.describe A3::Application::ScheduleNextRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/A3-v2-3022",
+        ref: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: parent_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -298,15 +298,15 @@ RSpec.describe A3::Application::ScheduleNextRun do
         ownership_scope: :parent
       ),
       review_target: A3::Domain::ReviewTarget.new(
-        base_commit: "refs/heads/a3/parent/A3-v2-3022",
-        head_commit: "refs/heads/a3/parent/A3-v2-3022",
+        base_commit: "refs/heads/a2o/parent/A3-v2-3022",
+        head_commit: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: parent_task.ref,
         phase_ref: :verification
       ),
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: parent_task.ref,
         owner_scope: :parent,
-        snapshot_version: "refs/heads/a3/parent/A3-v2-3022"
+        snapshot_version: "refs/heads/a2o/parent/A3-v2-3022"
       ),
       bootstrap_marker: "hooks/prepare-runtime.sh"
     ).and_return(
@@ -349,7 +349,7 @@ RSpec.describe A3::Application::ScheduleNextRun do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
         source_type: :integration_record,
-        ref: "refs/heads/a3/parent/A3-v2-3022",
+        ref: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: parent_task.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -358,15 +358,15 @@ RSpec.describe A3::Application::ScheduleNextRun do
         ownership_scope: :parent
       ),
       review_target: A3::Domain::ReviewTarget.new(
-        base_commit: "refs/heads/a3/parent/A3-v2-3022",
-        head_commit: "refs/heads/a3/parent/A3-v2-3022",
+        base_commit: "refs/heads/a2o/parent/A3-v2-3022",
+        head_commit: "refs/heads/a2o/parent/A3-v2-3022",
         task_ref: parent_task.ref,
         phase_ref: :merge
       ),
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: parent_task.ref,
         owner_scope: :parent,
-        snapshot_version: "refs/heads/a3/parent/A3-v2-3022"
+        snapshot_version: "refs/heads/a2o/parent/A3-v2-3022"
       ),
       bootstrap_marker: "hooks/prepare-runtime.sh"
     ).and_return(

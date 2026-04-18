@@ -62,7 +62,7 @@ RSpec.describe A3::Domain::AgentJobRequest do
       slots: {
         repo_alpha: {
           source: { kind: "local_git", alias: "sample-catalog-service" },
-          ref: "refs/heads/a3/work/Sample-42",
+          ref: "refs/heads/a2o/work/Sample-42",
           checkout: "worktree_branch",
           access: "read_write",
           sync_class: "eager",
@@ -130,7 +130,7 @@ RSpec.describe A3::Domain::AgentJobRequest do
             "kind" => "local_git",
             "alias" => "sample-catalog-service"
           },
-          "source_ref" => "refs/heads/a3/work/Sample-42",
+          "source_ref" => "refs/heads/a2o/work/Sample-42",
           "target_ref" => "refs/heads/main"
         }
       }
@@ -161,7 +161,7 @@ it "round-trips merge recovery requests" do
       "repo_alpha" => {
         "runtime_path" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo-alpha",
         "target_ref" => "refs/heads/main",
-        "source_ref" => "refs/heads/a3/work/Sample-42",
+        "source_ref" => "refs/heads/a2o/work/Sample-42",
         "merge_before_head" => "abc123",
         "source_head_commit" => "def456",
         "conflict_files" => ["docs/conflict.md"],

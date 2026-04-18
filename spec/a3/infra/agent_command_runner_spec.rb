@@ -21,7 +21,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
   end
 
   let(:client) { FakeAgentCommandClient.new(records: {}, base_url: "http://127.0.0.1:7393") }
-  let(:source_descriptor) { A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Sample#42", ref: "refs/heads/a3/work/Sample-42") }
+  let(:source_descriptor) { A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Sample#42", ref: "refs/heads/a2o/work/Sample-42") }
   let(:workspace) do
     A3::Domain::PreparedWorkspace.new(
       workspace_kind: :runtime_workspace,
@@ -39,7 +39,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
       workspace_kind: :runtime_workspace,
       source_descriptor: source_descriptor,
       scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], ownership_scope: :task),
-      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: task.ref, owner_scope: :task, snapshot_version: "refs/heads/a3/work/Sample-42")
+      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: task.ref, owner_scope: :task, snapshot_version: "refs/heads/a2o/work/Sample-42")
     )
   end
 
@@ -129,7 +129,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(result.success?).to eq(true)
     expect(request.workspace_request.publish_policy).to eq(
       "mode" => "commit_all_edit_target_changes_on_success",
-      "commit_message" => "A3 remediation update for Sample#42"
+      "commit_message" => "A2O remediation update for Sample#42"
     )
     expect(request.workspace_request.slots.fetch("repo_alpha")).to include("access" => "read_write")
   end

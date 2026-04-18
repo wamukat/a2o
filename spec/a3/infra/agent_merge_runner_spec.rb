@@ -35,7 +35,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     A3::Domain::MergePlan.new(
       task_ref: "Sample#42",
       run_ref: "run-merge-1",
-      merge_source: A3::Domain::MergeSource.new(source_ref: "refs/heads/a3/work/Sample-42"),
+      merge_source: A3::Domain::MergeSource.new(source_ref: "refs/heads/a2o/work/Sample-42"),
       integration_target: A3::Domain::IntegrationTarget.new(target_ref: "refs/heads/main", bootstrap_ref: nil),
       merge_policy: :ff_only,
       merge_slots: [:repo_alpha]
@@ -57,7 +57,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
           "runtime_path" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo-alpha",
           "source_kind" => "local_git",
           "source_alias" => "sample-catalog-service",
-          "merge_source_ref" => "refs/heads/a3/work/Sample-42",
+          "merge_source_ref" => "refs/heads/a2o/work/Sample-42",
           "merge_target_ref" => "refs/heads/main",
           "merge_policy" => "ff_only",
           "merge_before_head" => "abc123",
@@ -79,7 +79,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
       "policy" => "ff_only"
     )
     expect(request.merge_request.fetch("slots").fetch("repo_alpha")).to include(
-      "source_ref" => "refs/heads/a3/work/Sample-42",
+      "source_ref" => "refs/heads/a2o/work/Sample-42",
       "target_ref" => "refs/heads/main"
     )
     expect(execution).to have_attributes(success?: true)
@@ -99,7 +99,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     client.on_fetch = lambda do |job_id|
       client.complete(job_id, agent_result(job_id, workspace_descriptor(
         "repo_alpha" => {
-          "merge_source_ref" => "refs/heads/a3/work/Sample-42",
+          "merge_source_ref" => "refs/heads/a2o/work/Sample-42",
           "merge_target_ref" => "refs/heads/main",
           "merge_status" => "prepared"
         }
@@ -124,7 +124,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
           "repo_alpha" => {
             "runtime_path" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo-alpha",
             "source_alias" => "sample-catalog-service",
-            "merge_source_ref" => "refs/heads/a3/work/Sample-42",
+            "merge_source_ref" => "refs/heads/a2o/work/Sample-42",
             "merge_target_ref" => "refs/heads/main",
             "merge_policy" => "ff_or_merge",
             "merge_before_head" => "abc123",
@@ -155,7 +155,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
       "recovery_id" => "merge-recovery-merge-run-merge-1-job-1",
       "merge_run_ref" => "run-merge-1",
       "target_ref" => "refs/heads/main",
-      "source_ref" => "refs/heads/a3/work/Sample-42",
+      "source_ref" => "refs/heads/a2o/work/Sample-42",
       "merge_before_head" => "abc123",
       "source_head_commit" => "def456",
       "conflict_files" => ["docs/conflict.md"],
@@ -173,7 +173,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
         "slot" => "repo_alpha",
         "runtime_path" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo-alpha",
         "target_ref" => "refs/heads/main",
-        "source_ref" => "refs/heads/a3/work/Sample-42",
+        "source_ref" => "refs/heads/a2o/work/Sample-42",
         "merge_before_head" => "abc123",
         "source_head_commit" => "def456",
         "conflict_files" => ["docs/conflict.md"],
@@ -211,7 +211,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
             "repo_alpha" => {
               "runtime_path" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo-alpha",
               "source_alias" => "sample-catalog-service",
-              "merge_source_ref" => "refs/heads/a3/work/Sample-42",
+              "merge_source_ref" => "refs/heads/a2o/work/Sample-42",
               "merge_target_ref" => "refs/heads/main",
               "merge_policy" => "ff_or_merge",
               "merge_before_head" => "abc123",
@@ -243,11 +243,11 @@ RSpec.describe A3::Infra::AgentMergeRunner do
             "repo_alpha" => {
               "runtime_path" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo-alpha",
               "target_ref" => "refs/heads/main",
-              "source_ref" => "refs/heads/a3/work/Sample-42",
+              "source_ref" => "refs/heads/a2o/work/Sample-42",
               "merge_before_head" => "abc123",
               "source_head_commit" => "def456",
               "conflict_files" => ["docs/conflict.md"],
-              "commit_message" => "A3 merge recovery Sample#42 run-merge-1"
+              "commit_message" => "A2O merge recovery Sample#42 run-merge-1"
             }
           }
         )
@@ -295,7 +295,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     sample_merge_plan = A3::Domain::MergePlan.new(
       task_ref: "Sample#245",
       run_ref: "run-merge-245",
-      merge_source: A3::Domain::MergeSource.new(source_ref: "refs/heads/a3/work/Sample-245"),
+      merge_source: A3::Domain::MergeSource.new(source_ref: "refs/heads/a2o/work/Sample-245"),
       integration_target: A3::Domain::IntegrationTarget.new(target_ref: "refs/heads/main", bootstrap_ref: nil),
       merge_policy: :ff_or_merge,
       merge_slots: [:repo_alpha]
@@ -330,7 +330,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
               "repo_alpha" => {
                 "runtime_path" => "/agent/workspaces/merge-Sample-245-run-merge-245/repo-alpha",
                 "source_alias" => "sample-catalog-service",
-                "merge_source_ref" => "refs/heads/a3/work/Sample-245",
+                "merge_source_ref" => "refs/heads/a2o/work/Sample-245",
                 "merge_target_ref" => "refs/heads/main",
                 "merge_policy" => "ff_or_merge",
                 "merge_before_head" => "base245",
@@ -351,7 +351,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
       when "a3-merge-recovery-worker"
         expect(JSON.parse(request.env.fetch("A3_MERGE_RECOVERY"))).to include(
           "target_ref" => "refs/heads/main",
-          "source_ref" => "refs/heads/a3/work/Sample-245",
+          "source_ref" => "refs/heads/a2o/work/Sample-245",
           "conflict_files" => ["docs/10-ops/validation.md"]
         )
         client.complete(job_id, agent_result(job_id, workspace_descriptor({}, workspace_id: "merge-Sample-245-run-merge-245", task_ref: "Sample#245"), summary: "resolved Sample#245 validation docs conflict"))
@@ -388,7 +388,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     expect(recovery).to include(
       "status" => "recovered",
       "target_ref" => "refs/heads/main",
-      "source_ref" => "refs/heads/a3/work/Sample-245",
+      "source_ref" => "refs/heads/a2o/work/Sample-245",
       "conflict_files" => ["docs/10-ops/validation.md"],
       "changed_files" => ["docs/10-ops/validation.md"],
       "publish_before_head" => "base245",
@@ -422,7 +422,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
         workspace_descriptor(
           "repo_alpha" => {
             "runtime_path" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo-alpha",
-            "merge_source_ref" => "refs/heads/a3/work/Sample-42",
+            "merge_source_ref" => "refs/heads/a2o/work/Sample-42",
             "merge_target_ref" => "refs/heads/main",
             "merge_before_head" => "abc123",
             "source_head_commit" => "def456",
@@ -455,7 +455,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
           "slot" => "repo_alpha",
           "runtime_path" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo-alpha",
           "target_ref" => "refs/heads/main",
-          "source_ref" => "refs/heads/a3/work/Sample-42",
+          "source_ref" => "refs/heads/a2o/work/Sample-42",
           "merge_before_head" => "abc123",
           "source_head_commit" => "def456",
           "conflict_files" => ["docs/conflict.md"],
@@ -494,7 +494,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     client.on_fetch = lambda do |job_id|
       client.complete(job_id, agent_result(job_id, workspace_descriptor(
         "repo_alpha" => {
-          "merge_source_ref" => "refs/heads/a3/work/Sample-42",
+          "merge_source_ref" => "refs/heads/a2o/work/Sample-42",
           "merge_target_ref" => "refs/heads/main",
           "merge_policy" => "ff_only",
           "merge_before_head" => "abc123",
@@ -524,7 +524,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
         "repo_alpha" => {
           "runtime_path" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo-alpha",
           "source_alias" => "wrong-repo",
-          "merge_source_ref" => "refs/heads/a3/work/Sample-42",
+          "merge_source_ref" => "refs/heads/a2o/work/Sample-42",
           "merge_target_ref" => "refs/heads/main",
           "merge_policy" => "ff_only",
           "merge_before_head" => "abc123",

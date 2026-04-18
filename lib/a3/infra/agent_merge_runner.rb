@@ -260,7 +260,7 @@ module A3
               "merge_before_head" => slot.fetch("merge_before_head"),
               "source_head_commit" => slot.fetch("source_head_commit"),
               "conflict_files" => Array(slot.fetch("conflict_files")),
-              "commit_message" => "A3 merge recovery #{merge_plan.task_ref} #{merge_plan.run_ref}"
+              "commit_message" => "A2O merge recovery #{merge_plan.task_ref} #{merge_plan.run_ref}"
             }
           end
         }

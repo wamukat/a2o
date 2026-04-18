@@ -116,7 +116,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
         source_descriptor: A3::Domain::SourceDescriptor.new(
           workspace_kind: :ticket_workspace,
           source_type: :branch_head,
-          ref: "refs/heads/a3/work/child",
+          ref: "refs/heads/a2o/work/child",
           task_ref: "A3-v2#child"
         ),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -127,7 +127,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
         artifact_owner: A3::Domain::ArtifactOwner.new(
           owner_ref: "A3-v2#child",
           owner_scope: :task,
-          snapshot_version: "refs/heads/a3/work/child"
+          snapshot_version: "refs/heads/a2o/work/child"
         )
       )
 
@@ -340,7 +340,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
         source_descriptor: A3::Domain::SourceDescriptor.new(
           workspace_kind: :ticket_workspace,
           source_type: :branch_head,
-          ref: "refs/heads/a3/work/child",
+          ref: "refs/heads/a2o/work/child",
           task_ref: "A3-v2#child"
         ),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -365,7 +365,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
         source_descriptor: A3::Domain::SourceDescriptor.new(
           workspace_kind: :ticket_workspace,
           source_type: :branch_head,
-          ref: "refs/heads/a3/work/child",
+          ref: "refs/heads/a2o/work/child",
           task_ref: "A3-v2#child"
         ),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -508,7 +508,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
         source_descriptor: A3::Domain::SourceDescriptor.new(
           workspace_kind: :runtime_workspace,
           source_type: :integration_record,
-          ref: "refs/heads/a3/work/child",
+          ref: "refs/heads/a2o/work/child",
           task_ref: "A3-v2#child"
         ),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(

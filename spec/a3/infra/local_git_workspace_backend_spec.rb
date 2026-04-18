@@ -30,12 +30,12 @@ RSpec.describe A3::Infra::LocalGitWorkspaceBackend do
       backend.materialize(
         source_root: source_root,
         destination: destination,
-        ref: "refs/heads/a3/work/Sample-3046",
+        ref: "refs/heads/a2o/work/Sample-3046",
         create_branch_if_missing: true
       )
 
       expect(destination).to exist
-      branch_ref = `git -C #{source_root} rev-parse refs/heads/a3/work/Sample-3046`.strip
+      branch_ref = `git -C #{source_root} rev-parse refs/heads/a2o/work/Sample-3046`.strip
       head_ref = `git -C #{source_root} rev-parse HEAD`.strip
       expect(branch_ref).to eq(head_ref)
     end
@@ -73,7 +73,7 @@ RSpec.describe A3::Infra::LocalGitWorkspaceBackend do
       system("git", "-C", source_root.to_s, "add", "NEXT.md", exception: true)
       system("git", "-C", source_root.to_s, "commit", "-m", "advance head", exception: true)
 
-      branch_name = "refs/heads/a3/work/Sample-3046"
+      branch_name = "refs/heads/a2o/work/Sample-3046"
       previous_head = `git -C #{source_root} rev-parse HEAD~1`.strip
       system("git", "-C", source_root.to_s, "branch", "--force", branch_name.delete_prefix("refs/heads/"), previous_head, exception: true)
 
@@ -103,7 +103,7 @@ RSpec.describe A3::Infra::LocalGitWorkspaceBackend do
       system("git", "-C", source_root.to_s, "add", "NEXT.md", exception: true)
       system("git", "-C", source_root.to_s, "commit", "-m", "advance head", exception: true)
 
-      branch_name = "refs/heads/a3/work/Sample-3046"
+      branch_name = "refs/heads/a2o/work/Sample-3046"
       system("git", "-C", source_root.to_s, "branch", "--force", branch_name.delete_prefix("refs/heads/"), previous_head, exception: true)
 
       backend.materialize(
@@ -114,7 +114,7 @@ RSpec.describe A3::Infra::LocalGitWorkspaceBackend do
         reset_branch_to: "HEAD"
       )
 
-      archive_ref = "refs/heads/a3/archive/work/Sample-3046/#{previous_head[0, 12]}"
+      archive_ref = "refs/heads/a2o/archive/work/Sample-3046/#{previous_head[0, 12]}"
       expect(`git -C #{source_root} rev-parse #{archive_ref}`.strip).to eq(previous_head)
     end
   end

@@ -52,7 +52,7 @@ RSpec.describe A3::CLI do
           source_descriptor: A3::Domain::SourceDescriptor.new(
             workspace_kind: :ticket_workspace,
             source_type: :branch_head,
-            ref: "refs/heads/a3/work/3025",
+            ref: "refs/heads/a2o/work/3025",
             task_ref: "A3-v2#3025"
           ),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -145,7 +145,7 @@ RSpec.describe A3::CLI do
           source_descriptor: A3::Domain::SourceDescriptor.new(
             workspace_kind: :runtime_workspace,
             source_type: :integration_record,
-            ref: "refs/heads/a3/work/3026",
+            ref: "refs/heads/a2o/work/3026",
             task_ref: "A3-v2#3026"
           ),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -238,7 +238,7 @@ RSpec.describe A3::CLI do
           source_descriptor: A3::Domain::SourceDescriptor.new(
             workspace_kind: :ticket_workspace,
             source_type: :branch_head,
-            ref: "refs/heads/a3/work/3027",
+            ref: "refs/heads/a2o/work/3027",
             task_ref: "A3-v2#3027"
           ),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -329,7 +329,7 @@ RSpec.describe A3::CLI do
     File.write(
       File.join(dir, "project.yaml"),
       YAML.dump(
-        { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/a3/parent/default" } } }
+        { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/a2o/parent/default" } } }
       )
     )
   end

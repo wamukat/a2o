@@ -5,7 +5,7 @@ module A3
     class RegisterCompletedRun
       Result = Struct.new(:task, :run, keyword_init: true)
 
-      def initialize(task_repository:, run_repository:, plan_next_phase:, publish_external_task_status: nil, publish_external_task_activity: nil, integration_ref_readiness_checker:, handle_parent_review_disposition: nil, branch_namespace: ENV.fetch("A3_BRANCH_NAMESPACE", nil))
+      def initialize(task_repository:, run_repository:, plan_next_phase:, publish_external_task_status: nil, publish_external_task_activity: nil, integration_ref_readiness_checker:, handle_parent_review_disposition: nil, branch_namespace: ENV.fetch("A2O_BRANCH_NAMESPACE", ENV.fetch("A3_BRANCH_NAMESPACE", nil)))
         @task_repository = task_repository
         @run_repository = run_repository
         @plan_next_phase = plan_next_phase
@@ -181,7 +181,7 @@ module A3
       end
 
       def parent_integration_ref_for(task)
-        parts = ["refs/heads/a3"]
+        parts = ["refs/heads/a2o"]
         parts << @branch_namespace if @branch_namespace
         parts << "parent"
         parts << task.parent_ref.tr("#", "-")

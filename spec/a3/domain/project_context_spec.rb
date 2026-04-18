@@ -99,7 +99,7 @@ RSpec.describe A3::Domain::ProjectContext do
         "default" => "refs/heads/live",
         "variants" => {
           "task_kind" => {
-            "child" => {"default" => "refs/heads/a3/parent/A3-v2-3022"}
+            "child" => {"default" => "refs/heads/a2o/parent/A3-v2-3022"}
           }
         }
       }
@@ -120,7 +120,7 @@ RSpec.describe A3::Domain::ProjectContext do
     runtime = context.resolve_phase_runtime(task: task, phase: :merge)
 
     expect(runtime.merge_target).to eq(:merge_to_parent)
-    expect(runtime.merge_target_ref).to eq("refs/heads/a3/parent/A3-v2-3022")
+    expect(runtime.merge_target_ref).to eq("refs/heads/a2o/parent/A3-v2-3022")
     expect(context.merge_config.target).to eq(:merge_to_live)
   end
 end

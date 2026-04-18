@@ -58,7 +58,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
         source_descriptor: A3::Domain::SourceDescriptor.new(
           workspace_kind: :ticket_workspace,
           source_type: :branch_head,
-          ref: "refs/heads/a3/work/Sample-1",
+          ref: "refs/heads/a2o/work/Sample-1",
           task_ref: "Sample#1"
         ),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -69,7 +69,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
         artifact_owner: A3::Domain::ArtifactOwner.new(
           owner_ref: "Sample#10",
           owner_scope: :task,
-          snapshot_version: "refs/heads/a3/work/Sample-1"
+          snapshot_version: "refs/heads/a2o/work/Sample-1"
         )
       )
     )
@@ -81,7 +81,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/Sample-2",
+        ref: "refs/heads/a2o/work/Sample-2",
         task_ref: "Sample#2"
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -92,7 +92,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: "Sample#10",
         owner_scope: :task,
-        snapshot_version: "refs/heads/a3/work/Sample-2"
+        snapshot_version: "refs/heads/a2o/work/Sample-2"
       ),
       terminal_outcome: :blocked
     ).append_blocked_diagnosis(
@@ -110,7 +110,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
         source_descriptor: A3::Domain::SourceDescriptor.new(
           workspace_kind: :ticket_workspace,
           source_type: :branch_head,
-          ref: "refs/heads/a3/work/Sample-2",
+          ref: "refs/heads/a2o/work/Sample-2",
           task_ref: "Sample#2"
         ),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -121,7 +121,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
         artifact_owner: A3::Domain::ArtifactOwner.new(
           owner_ref: "Sample#10",
           owner_scope: :task,
-          snapshot_version: "refs/heads/a3/work/Sample-2"
+          snapshot_version: "refs/heads/a2o/work/Sample-2"
         ),
         expected_state: "worker phase succeeds",
         observed_state: "git add failed",
@@ -140,7 +140,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(result.running_entries.first.phase).to eq("implementation")
     expect(result.running_entries.first.internal_phase).to eq("implementation")
     expect(result.running_entries.first.state).to eq("running_command")
-    expect(result.running_entries.first.detail).to eq("refs/heads/a3/work/Sample-1")
+    expect(result.running_entries.first.detail).to eq("refs/heads/a2o/work/Sample-1")
     expect(result.tasks.map(&:ref)).to eq(["Sample#3", "Sample#1", "Sample#2"])
     expect(result.tasks.find { |item| item.ref == "Sample#1" }.phase_counts).to eq("implementation" => 1)
     expect(result.tasks.find { |item| item.ref == "Sample#2" }.blocked_lines).to eq([
@@ -170,7 +170,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/Sample-imported-7",
+        ref: "refs/heads/a2o/work/Sample-imported-7",
         task_ref: "Sample#imported-7"
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -181,7 +181,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: "Sample#imported-7",
         owner_scope: :task,
-        snapshot_version: "refs/heads/a3/work/Sample-imported-7"
+        snapshot_version: "refs/heads/a2o/work/Sample-imported-7"
       )
     )
     latest_run = A3::Domain::Run.new(
@@ -192,7 +192,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :ticket_workspace,
         source_type: :branch_head,
-        ref: "refs/heads/a3/work/Sample-imported-7",
+        ref: "refs/heads/a2o/work/Sample-imported-7",
         task_ref: "Sample#imported-7"
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -203,7 +203,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
       artifact_owner: A3::Domain::ArtifactOwner.new(
         owner_ref: "Sample#imported-7",
         owner_scope: :task,
-        snapshot_version: "refs/heads/a3/work/Sample-imported-7"
+        snapshot_version: "refs/heads/a2o/work/Sample-imported-7"
       )
     ).append_blocked_diagnosis(
       A3::Domain::BlockedDiagnosis.new(
@@ -220,7 +220,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
         source_descriptor: A3::Domain::SourceDescriptor.new(
           workspace_kind: :ticket_workspace,
           source_type: :branch_head,
-          ref: "refs/heads/a3/work/Sample-imported-7",
+          ref: "refs/heads/a2o/work/Sample-imported-7",
           task_ref: "Sample#imported-7"
         ),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -231,7 +231,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
         artifact_owner: A3::Domain::ArtifactOwner.new(
           owner_ref: "Sample#imported-7",
           owner_scope: :task,
-          snapshot_version: "refs/heads/a3/work/Sample-imported-7"
+          snapshot_version: "refs/heads/a2o/work/Sample-imported-7"
         ),
         expected_state: "review succeeds",
         observed_state: "review failed",
@@ -292,7 +292,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
       verification_scope: [:repo_alpha],
       status: :verifying,
       parent_ref: "Sample#201",
-      verification_source_ref: "refs/heads/a3/parent/Sample-201"
+      verification_source_ref: "refs/heads/a2o/parent/Sample-201"
     )
     task_repository.save(task)
 
@@ -300,7 +300,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
 
     task_entry = result.tasks.find { |item| item.ref == "Sample#245" }
     expect(task_entry.latest_phase).to eq("inspection")
-    expect(task_entry.blocked_lines).to include("merge_recovery verification_source_ref=refs/heads/a3/parent/Sample-201")
+    expect(task_entry.blocked_lines).to include("merge_recovery verification_source_ref=refs/heads/a2o/parent/Sample-201")
   end
 
   it "treats in-review tasks with a current run as running review work" do
@@ -324,7 +324,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
         source_descriptor: A3::Domain::SourceDescriptor.new(
           workspace_kind: :runtime_workspace,
           source_type: :branch_head,
-          ref: "refs/heads/a3/work/Sample-3141",
+          ref: "refs/heads/a2o/work/Sample-3141",
           task_ref: "Sample#3141"
         ),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -335,7 +335,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
         artifact_owner: A3::Domain::ArtifactOwner.new(
           owner_ref: "Sample#3140",
           owner_scope: :task,
-          snapshot_version: "refs/heads/a3/work/Sample-3141"
+          snapshot_version: "refs/heads/a2o/work/Sample-3141"
         )
       )
     )
