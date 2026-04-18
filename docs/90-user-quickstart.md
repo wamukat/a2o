@@ -327,7 +327,7 @@ task は repo label を使って対象 slot を指定する。parent-child flow 
 
 ## Runtime Image Updates
 
-A2O の runtime image は、導入検証では `ghcr.io/wamukat/a2o-engine:latest` を使ってよい。実 product package、release smoke、Portal のように複数人が同じ board / package を使う環境では digest pinning を使う。tag は動く参照であり、digest は同じ image を再現する参照である。
+A2O の runtime image は、導入検証では `ghcr.io/wamukat/a2o-engine:latest` を使ってよい。実 product package、release smoke、複数人が同じ board / package を使う環境では digest pinning を使う。tag は動く参照であり、digest は同じ image を再現する参照である。
 
 推奨手順:
 
@@ -346,7 +346,7 @@ a2o runtime status
 a2o doctor
 ```
 
-package 側では runtime image 値を 1 箇所に寄せる。Taskfile を使う場合は `A2O_RUNTIME_IMAGE` に digest を置く。A2O launcher は `A2O_RUNTIME_IMAGE` を読み取り、compose 実行時の runtime image として使う。test expectation に digest を直接複数箇所へ書かない。Portal など既存 package を更新する場合も、`a2o runtime image-digest` の出力を source of truth として Taskfile と smoke test expectation を同時に更新する。
+package 側では runtime image 値を 1 箇所に寄せる。Taskfile を使う場合は `A2O_RUNTIME_IMAGE` に digest を置く。A2O launcher は `A2O_RUNTIME_IMAGE` を読み取り、compose 実行時の runtime image として使う。test expectation に digest を直接複数箇所へ書かない。既存 product package を更新する場合も、`a2o runtime image-digest` の出力を source of truth として Taskfile と smoke test expectation を同時に更新する。
 
 `latest` を使ってよい場面:
 
