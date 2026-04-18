@@ -432,23 +432,31 @@ func runRuntimeDescribeTask(args []string, runner commandRunner, stdout io.Write
 		fmt.Fprintf(stdout, "runtime_logs runtime=%s server=%s host_agent=%s exit_file=%s\n", plan.RuntimeLog, plan.ServerLog, plan.HostAgentLog, plan.RuntimeExitFile)
 		fmt.Fprintf(stdout, "operator_next=a2o runtime describe-task %s\n", taskRef)
 
+		runRef := ""
 		taskOutput, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "task", "a3", "show-task", "--storage-backend", "json", "--storage-dir", plan.StorageDir, taskRef)
 		if err != nil {
 			fmt.Fprintf(stdout, "describe_section name=task status=blocked action=run a2o runtime run-once or verify task ref detail=%s\n", singleLine(err.Error()))
-			fmt.Fprintln(stdout, "describe_section name=run status=skipped reason=task_state_unavailable")
 		} else {
 			printDescribeSection(stdout, "task", taskOutput)
-
-			runRef := parseOutputValue(taskOutput, "current_run")
-			if runRef == "" {
-				fmt.Fprintln(stdout, "describe_section name=run status=skipped reason=no_current_run")
+			runRef = parseOutputValue(taskOutput, "current_run")
+		}
+		if runRef == "" {
+			latestRunRef, latestErr := latestRuntimeRunRef(effectiveConfig, plan, runner, taskRef)
+			if latestErr != nil {
+				fmt.Fprintf(stdout, "describe_section name=run_ref status=blocked action=inspect runs store detail=%s\n", singleLine(latestErr.Error()))
+			} else if latestRunRef != "" {
+				runRef = latestRunRef
+				fmt.Fprintf(stdout, "describe_section name=run_ref status=resolved source=latest_run_store run_ref=%s\n", runRef)
+			}
+		}
+		if runRef == "" {
+			fmt.Fprintln(stdout, "describe_section name=run status=skipped reason=no_run_for_task")
+		} else {
+			runOutput, runErr := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "run", "a3", "show-run", "--storage-backend", "json", "--storage-dir", plan.StorageDir, "--preset-dir", plan.PresetDir, runRef, plan.ManifestPath)
+			if runErr != nil {
+				fmt.Fprintf(stdout, "describe_section name=run status=blocked run_ref=%s action=inspect runtime log detail=%s\n", runRef, singleLine(runErr.Error()))
 			} else {
-				runOutput, runErr := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "run", "a3", "show-run", "--storage-backend", "json", "--storage-dir", plan.StorageDir, "--preset-dir", plan.PresetDir, runRef, plan.ManifestPath)
-				if runErr != nil {
-					fmt.Fprintf(stdout, "describe_section name=run status=blocked run_ref=%s action=inspect runtime log detail=%s\n", runRef, singleLine(runErr.Error()))
-				} else {
-					printDescribeSection(stdout, "run", runOutput)
-				}
+				printDescribeSection(stdout, "run", runOutput)
 			}
 		}
 
@@ -738,6 +746,15 @@ func runtimeDescribeSectionOutput(config runtimeInstanceConfig, plan runtimeRunO
 		return "", fmt.Errorf("%s command failed: %w", section, err)
 	}
 	return strings.TrimRight(string(output), "\n"), nil
+}
+
+func latestRuntimeRunRef(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, taskRef string) (string, error) {
+	script := "records = JSON.parse(File.read(ARGV.fetch(0))); run = records.values.select { |record| record['task_ref'] == ARGV.fetch(1) }.last; puts(run['ref']) if run"
+	output, err := dockerComposeExecOutput(config, plan, runner, "ruby", "-rjson", "-e", script, path.Join(plan.StorageDir, "runs.json"), taskRef)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
 }
 
 func printDescribeSection(stdout io.Writer, name string, output string) {

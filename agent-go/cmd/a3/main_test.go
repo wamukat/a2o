@@ -1290,7 +1290,8 @@ func TestRuntimeDescribeTaskContinuesWhenRuntimeTaskStateIsUnavailable(t *testin
 	output := stdout.String()
 	for _, want := range []string{
 		"describe_section name=task status=blocked",
-		"describe_section name=run status=skipped reason=task_state_unavailable",
+		"describe_section name=run_ref status=resolved source=latest_run_store run_ref=run-16",
+		"run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked",
 		"--- kanban_task ---",
 		"comment_count=1",
 		"operator_logs runtime_tail=docker compose -p a3-test -f compose.yml exec -T a3-runtime tail -n 220 /tmp/a3-runtime-run-once.log",
@@ -1298,6 +1299,51 @@ func TestRuntimeDescribeTaskContinuesWhenRuntimeTaskStateIsUnavailable(t *testin
 		if !strings.Contains(output, want) {
 			t.Fatalf("describe-task missing %q in:\n%s", want, output)
 		}
+	}
+}
+
+func TestRuntimeDescribeTaskFindsLatestRunWhenTaskHasNoCurrentRun(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{taskWithoutCurrentRun: true}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "describe-task", "A2O#16"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	for _, want := range []string{
+		"task A2O#16 kind=single status=blocked current_run=",
+		"describe_section name=run_ref status=resolved source=latest_run_store run_ref=run-16",
+		"run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked",
+		"evidence workspace=runtime_workspace source=detached_commit:abc",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("describe-task missing %q in:\n%s", want, output)
+		}
+	}
+	if !strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "docker compose -p a3-test -f compose.yml exec -T a3-runtime ruby -rjson -e") {
+		t.Fatalf("describe-task should inspect runs.json, calls:\n%s", strings.Join(runner.joinedCalls(), "\n"))
 	}
 }
 
@@ -2043,13 +2089,14 @@ func TestAgentInstallRequiresInstanceConfigOrExplicitCompose(t *testing.T) {
 }
 
 type fakeRunner struct {
-	calls           [][]string
-	emptyContainer  bool
-	failShowTask    bool
-	err             error
-	lastEnv         map[string]string
-	nextPID         int
-	processCommands map[int]string
+	calls                 [][]string
+	emptyContainer        bool
+	failShowTask          bool
+	taskWithoutCurrentRun bool
+	err                   error
+	lastEnv               map[string]string
+	nextPID               int
+	processCommands       map[int]string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -2085,7 +2132,12 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		if r.failShowTask {
 			return []byte("task not found\n"), errors.New("task not found")
 		}
+		if r.taskWithoutCurrentRun {
+			return []byte("task A2O#16 kind=single status=blocked current_run=\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n"), nil
+		}
 		return []byte("task A2O#16 kind=single status=blocked current_run=run-16\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n"), nil
+	case strings.Contains(joined, " ruby -rjson -e "):
+		return []byte("run-16\n"), nil
 	case strings.Contains(joined, " a3 show-run "):
 		return []byte("run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked\nevidence workspace=runtime_workspace source=detached_commit:abc\nlatest_blocked phase=implementation summary=executor failed\nblocked_error_category=executor_failed\n"), nil
 	case strings.Contains(joined, " task-get "):
