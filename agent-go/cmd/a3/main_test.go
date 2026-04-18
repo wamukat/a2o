@@ -1635,6 +1635,18 @@ func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
 	if !strings.Contains(stdout.String(), "runtime_scheduler_status=running pid=12345") {
 		t.Fatalf("stdout should report running scheduler, got %q", stdout.String())
 	}
+	for _, want := range []string{
+		"runtime_package=" + packageDir,
+		"kanban_url=http://localhost:3470/",
+		"runtime_status_check name=runtime_container status=running container=runtime-container",
+		"runtime_status_check name=kanban_service status=running container=soloboard-container",
+		"runtime_image_digest=ghcr.io/wamukat/a2o-engine@sha256:test",
+		"runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation status=blocked outcome=blocked",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("stdout should include %q in:\n%s", want, stdout.String())
+		}
+	}
 	assertCallContains(t, runner.joinedCalls(), "process-running 12345")
 	assertCallContains(t, runner.joinedCalls(), "process-command 12345")
 }
@@ -2274,6 +2286,8 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 			return []byte("task A2O#16 kind=single status=blocked current_run=\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n"), nil
 		}
 		return []byte("task A2O#16 kind=single status=blocked current_run=run-16\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n"), nil
+	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "runtime_latest_run"):
+		return []byte("runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation status=blocked outcome=blocked\n"), nil
 	case strings.Contains(joined, " ruby -rjson -e "):
 		return []byte("run-16\n"), nil
 	case strings.Contains(joined, " a3 show-run "):

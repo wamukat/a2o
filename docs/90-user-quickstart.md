@@ -231,7 +231,7 @@ a2o runtime status
 a2o runtime stop
 ```
 
-`runtime start/stop/status` は scheduler lifecycle の command である。`runtime start` は task processing を自動開始するため、container refresh だけが目的なら `runtime up` を使う。
+`runtime start/stop/status` は scheduler lifecycle の command である。`runtime start` は task processing を自動開始するため、container refresh だけが目的なら `runtime up` を使う。`runtime status` は scheduler 状態に加えて、runtime container、kanban service、kanban URL、runtime image digest、project package、latest run summary をまとめて表示する。
 
 状態確認:
 

@@ -232,25 +232,82 @@ func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, std
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
 
-	config, _, err := loadInstanceConfigFromWorkingTree()
+	config, configPath, err := loadInstanceConfigFromWorkingTree()
 	if err != nil {
 		return err
 	}
-	paths := schedulerPaths(applyAgentInstallOverrides(*config, "", "", ""))
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	paths := schedulerPaths(effectiveConfig)
+	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
+	fmt.Fprintf(stdout, "runtime_package=%s\n", effectiveConfig.PackagePath)
+	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
+	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(effectiveConfig))
 	pid, err := readSchedulerPID(paths.PIDFile)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			fmt.Fprintf(stdout, "runtime_scheduler_status=stopped pid_file=%s log=%s\n", paths.PIDFile, paths.LogFile)
-			return nil
+		} else {
+			return err
 		}
-		return err
-	}
-	if schedulerProcessRunning(pid, paths.CommandFile, runner) {
+	} else if schedulerProcessRunning(pid, paths.CommandFile, runner) {
 		fmt.Fprintf(stdout, "runtime_scheduler_status=running pid=%d pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
-		return nil
+	} else {
+		fmt.Fprintf(stdout, "runtime_scheduler_status=stale pid=%d pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
 	}
-	fmt.Fprintf(stdout, "runtime_scheduler_status=stale pid=%d pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
+	printRuntimeServiceStatus(effectiveConfig, runner, stdout)
+	printRuntimeImageStatus(&effectiveConfig, runner, stdout)
+	printLatestRuntimeSummary(effectiveConfig, runner, stdout)
 	return nil
+}
+
+func printRuntimeServiceStatus(config runtimeInstanceConfig, runner commandRunner, stdout io.Writer) {
+	for _, check := range []struct {
+		name    string
+		service string
+	}{
+		{name: "runtime_container", service: config.RuntimeService},
+		{name: "kanban_service", service: "soloboard"},
+	} {
+		output, err := runExternal(runner, "docker", append(composeArgs(config), "ps", "--status", "running", "-q", check.service)...)
+		if err != nil {
+			fmt.Fprintf(stdout, "runtime_status_check name=%s status=blocked detail=%s\n", check.name, singleLine(err.Error()))
+			continue
+		}
+		containerID := strings.TrimSpace(string(output))
+		if containerID == "" {
+			fmt.Fprintf(stdout, "runtime_status_check name=%s status=stopped action=run a2o runtime up\n", check.name)
+			continue
+		}
+		fmt.Fprintf(stdout, "runtime_status_check name=%s status=running container=%s\n", check.name, containerID)
+	}
+}
+
+func printRuntimeImageStatus(config *runtimeInstanceConfig, runner commandRunner, stdout io.Writer) {
+	if digest := runtimeImageDigest(config, runner); digest != "" {
+		fmt.Fprintf(stdout, "runtime_image_digest=%s\n", digest)
+		return
+	}
+	fmt.Fprintln(stdout, "runtime_image_digest=unavailable action=pull or build runtime image")
+}
+
+func printLatestRuntimeSummary(config runtimeInstanceConfig, runner commandRunner, stdout io.Writer) {
+	plan, err := buildRuntimeDescribeTaskPlan(config)
+	if err != nil {
+		fmt.Fprintf(stdout, "runtime_latest_run status=unavailable reason=%s\n", singleLine(err.Error()))
+		return
+	}
+	script := "records = JSON.parse(File.read(ARGV.fetch(0))); run = records.values.last; if run then puts \"runtime_latest_run run_ref=#{run['ref']} task_ref=#{run['task_ref']} phase=#{run['phase'] || '-'} status=#{run['status'] || '-'} outcome=#{run['outcome'] || '-'}\" end"
+	output, err := dockerComposeExecOutput(config, plan, runner, "ruby", "-rjson", "-e", script, path.Join(plan.StorageDir, "runs.json"))
+	if err != nil {
+		fmt.Fprintf(stdout, "runtime_latest_run status=unavailable reason=%s\n", singleLine(err.Error()))
+		return
+	}
+	summary := strings.TrimSpace(string(output))
+	if summary == "" {
+		fmt.Fprintln(stdout, "runtime_latest_run status=unavailable reason=no_runs")
+		return
+	}
+	fmt.Fprintln(stdout, sanitizePublicCommand(summary))
 }
 
 func pathsConfig(config *runtimeInstanceConfig) runtimeInstanceConfig {
