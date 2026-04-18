@@ -1332,7 +1332,7 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 	output := stdout.String()
 	for _, want := range []string{
 		"describe_task task_ref=A2O#16",
-		"runtime_storage=/var/lib/a3/test-runtime",
+		"runtime_storage=internal-managed",
 		"runtime_logs runtime=/tmp/a2o-runtime-run-once.log",
 		"task A2O#16 kind=single status=blocked current_run=run-16",
 		"run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked",
@@ -1341,7 +1341,7 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 		"\"task_ref\":\"A2O#16\"",
 		"comment_count=1",
 		"comment[0] id=61 updated=2026-04-18T07:46:17.996Z body=blocked evidence is available",
-		"operator_logs runtime_tail=a2o runtime describe-task A2O#16 server_log=/tmp/a2o-runtime-run-once-agent-server.log",
+		"operator_logs runtime_log=/tmp/a2o-runtime-run-once.log server_log=/tmp/a2o-runtime-run-once-agent-server.log",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("describe-task missing %q in:\n%s", want, output)
@@ -1396,7 +1396,7 @@ func TestRuntimeDescribeTaskContinuesWhenRuntimeTaskStateIsUnavailable(t *testin
 		"run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked",
 		"--- kanban_task ---",
 		"comment_count=1",
-		"operator_logs runtime_tail=a2o runtime describe-task A2O#16 server_log=/tmp/a2o-runtime-run-once-agent-server.log",
+		"operator_logs runtime_log=/tmp/a2o-runtime-run-once.log server_log=/tmp/a2o-runtime-run-once-agent-server.log",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("describe-task missing %q in:\n%s", want, output)
@@ -2390,6 +2390,19 @@ func TestRunExternalIncludesOutputOnFailure(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "forced error") {
 		t.Fatalf("error should include command output, got %q", err.Error())
+	}
+}
+
+func TestRunExternalSanitizesInternalRuntimeNames(t *testing.T) {
+	_, err := runExternal(&fakeRunner{err: errors.New("boom")}, "docker", "compose", "up", "-d", "a3-runtime")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if strings.Contains(err.Error(), "a3-runtime") {
+		t.Fatalf("error should hide internal runtime service, got %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "<runtime-service>") {
+		t.Fatalf("error should keep actionable runtime service placeholder, got %q", err.Error())
 	}
 }
 

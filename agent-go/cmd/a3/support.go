@@ -13,12 +13,24 @@ func runExternal(runner commandRunner, name string, args ...string) ([]byte, err
 	if err == nil {
 		return output, nil
 	}
-	command := strings.TrimSpace(name + " " + strings.Join(args, " "))
+	command := sanitizePublicCommand(strings.TrimSpace(name + " " + strings.Join(args, " ")))
 	message := strings.TrimSpace(string(output))
 	if message == "" {
 		return nil, fmt.Errorf("%s failed: %w", command, err)
 	}
 	return nil, fmt.Errorf("%s failed: %w\n%s", command, err, message)
+}
+
+func sanitizePublicCommand(command string) string {
+	replacer := strings.NewReplacer(
+		"a3-runtime", "<runtime-service>",
+		"/var/lib/a3", "<runtime-storage>",
+		"/tmp/a3-engine", "<runtime-preset-dir>",
+		"/opt/a3", "<runtime-tools>",
+		"/tmp/a3-runtime", "/tmp/a2o-runtime",
+		" a3 ", " <engine-entrypoint> ",
+	)
+	return replacer.Replace(command)
 }
 
 func printUserFacingError(w interface{ Write([]byte) (int, error) }, err error) {
