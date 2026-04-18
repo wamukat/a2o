@@ -743,7 +743,7 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 		"doctor_check name=agent_required_command.sh status=ok",
 		"doctor_check name=repo_clean.app status=ok detail=" + repoDir,
 		"doctor_check name=agent_install status=ok",
-		"doctor_check name=kanban_volume status=ok detail=reuse_existing a2o-sample_soloboard-data",
+		"doctor_check name=kanban_volume status=ok detail=reuse_existing volume=a2o-sample_soloboard-data note=healthy_board_reuse action=none",
 		"doctor_check name=kanban_service status=ok detail=http://localhost:3480/",
 		"doctor_check name=runtime_container status=ok detail=A2O runtime container=runtime-container",
 		"doctor_check name=runtime_image_digest status=ok detail=ghcr.io/wamukat/a2o-engine@sha256:test",

@@ -63,7 +63,7 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 	if exists, err := dockerVolumeExists(runner, kanbanDataVolumeName(config.ComposeProject)); err != nil {
 		report("kanban_volume", false, err.Error(), "check Docker daemon and compose project")
 	} else if exists {
-		report("kanban_volume", true, "reuse_existing "+kanbanDataVolumeName(config.ComposeProject), "backup before reset; use a2o kanban up --fresh-board to guard against reuse")
+		report("kanban_volume", true, "reuse_existing volume="+kanbanDataVolumeName(config.ComposeProject)+" note=healthy_board_reuse", "none")
 	} else {
 		report("kanban_volume", true, "create_new "+kanbanDataVolumeName(config.ComposeProject), "none")
 	}
