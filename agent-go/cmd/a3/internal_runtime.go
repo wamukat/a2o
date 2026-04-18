@@ -53,6 +53,12 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
+	case "describe-task":
+		if err := runRuntimeDescribeTask(args[1:], runner, stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
 	case "run-once":
 		if err := runRuntimeRunOnce(args[1:], runner, stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)
@@ -157,6 +163,7 @@ func runRuntimeStart(args []string, runner commandRunner, stdout io.Writer, stde
 		return fmt.Errorf("write scheduler pid file: %w", err)
 	}
 	fmt.Fprintf(stdout, "runtime_scheduler_started pid_file=%s log=%s\n", paths.PIDFile, paths.LogFile)
+	fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
 	return nil
 }
 
@@ -392,6 +399,74 @@ func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) er
 	return nil
 }
 
+func runRuntimeDescribeTask(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a2o runtime describe-task", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 1 {
+		return fmt.Errorf("usage: a2o runtime describe-task TASK_REF")
+	}
+	taskRef := strings.TrimSpace(flags.Arg(0))
+	if taskRef == "" {
+		return fmt.Errorf("task ref is required")
+	}
+
+	config, configPath, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	return withComposeEnv(effectiveConfig, func() error {
+		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "describe_task task_ref=%s\n", taskRef)
+		fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
+		fmt.Fprintf(stdout, "package=%s\n", effectiveConfig.PackagePath)
+		fmt.Fprintf(stdout, "compose_project=%s runtime_service=%s\n", effectiveConfig.ComposeProject, effectiveConfig.RuntimeService)
+		fmt.Fprintf(stdout, "kanban_project=%s kanban_url=%s\n", plan.KanbanProject, kanbanPublicURL(effectiveConfig))
+		fmt.Fprintf(stdout, "runtime_storage=%s manifest=%s preset_dir=%s\n", plan.StorageDir, plan.ManifestPath, plan.PresetDir)
+		fmt.Fprintf(stdout, "runtime_logs runtime=%s server=%s host_agent=%s exit_file=%s\n", plan.RuntimeLog, plan.ServerLog, plan.HostAgentLog, plan.RuntimeExitFile)
+		fmt.Fprintf(stdout, "operator_next=a2o runtime describe-task %s\n", taskRef)
+
+		taskOutput, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "task", "a3", "show-task", "--storage-backend", "json", "--storage-dir", plan.StorageDir, taskRef)
+		if err != nil {
+			fmt.Fprintf(stdout, "describe_section name=task status=blocked action=run a2o runtime run-once or verify task ref detail=%s\n", singleLine(err.Error()))
+			return err
+		}
+		printDescribeSection(stdout, "task", taskOutput)
+
+		runRef := parseOutputValue(taskOutput, "current_run")
+		if runRef == "" {
+			fmt.Fprintln(stdout, "describe_section name=run status=skipped reason=no_current_run")
+		} else {
+			runOutput, runErr := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "run", "a3", "show-run", "--storage-backend", "json", "--storage-dir", plan.StorageDir, "--preset-dir", plan.PresetDir, runRef, plan.ManifestPath)
+			if runErr != nil {
+				fmt.Fprintf(stdout, "describe_section name=run status=blocked run_ref=%s action=inspect runtime log detail=%s\n", runRef, singleLine(runErr.Error()))
+			} else {
+				printDescribeSection(stdout, "run", runOutput)
+			}
+		}
+
+		printDescribeKanbanSection(effectiveConfig, plan, runner, stdout, taskRef)
+		fmt.Fprintf(stdout, "operator_logs runtime_tail=docker compose -p %s -f %s exec -T %s tail -n 220 %s server_tail=docker compose -p %s -f %s exec -T %s tail -n 120 %s host_agent_log=%s\n",
+			effectiveConfig.ComposeProject,
+			effectiveConfig.ComposeFile,
+			effectiveConfig.RuntimeService,
+			plan.RuntimeLog,
+			effectiveConfig.ComposeProject,
+			effectiveConfig.ComposeFile,
+			effectiveConfig.RuntimeService,
+			plan.ServerLog,
+			plan.HostAgentLog,
+		)
+		return nil
+	})
+}
+
 func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
 	flags := flag.NewFlagSet("a2o runtime run-once", flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -495,6 +570,7 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, age
 			return err
 		}
 		fmt.Fprintf(stdout, "kanban_run_once_finished exit=%s\n", runtimeExit)
+		fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
 		if runtimeExit != "0" {
 			_ = printRuntimeDiagnostics(config, plan, runner, stdout)
 			return fmt.Errorf("runtime run-once failed with exit=%s", runtimeExit)
@@ -625,6 +701,109 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		JobTimeoutSeconds:  envDefault("A3_RUNTIME_RUN_ONCE_AGENT_JOB_TIMEOUT_SECONDS", envDefault("A3_RUNTIME_SCHEDULER_AGENT_JOB_TIMEOUT_SECONDS", "7200")),
 		BranchNamespace:    defaultBranchNamespace(config.ComposeProject),
 	}, nil
+}
+
+func buildRuntimeDescribeTaskPlan(config runtimeInstanceConfig) (runtimeRunOncePlan, error) {
+	hostRootDir := envDefault("A3_RUNTIME_RUN_ONCE_HOST_ROOT_DIR", envDefault("A3_RUNTIME_SCHEDULER_HOST_ROOT_DIR", config.WorkspaceRoot))
+	if strings.TrimSpace(hostRootDir) == "" {
+		hostRootDir = "."
+	}
+	referencePackagePath := envDefault("A3_RUNTIME_RUN_ONCE_REFERENCE_PACKAGE", envDefault("A3_RUNTIME_SCHEDULER_REFERENCE_PACKAGE", config.PackagePath))
+	if strings.TrimSpace(referencePackagePath) == "" {
+		return runtimeRunOncePlan{}, errors.New("runtime package path is empty; run `a2o project bootstrap --package ./a2o-project` first")
+	}
+	packageConfig, err := loadProjectPackageConfig(referencePackagePath)
+	if err != nil {
+		return runtimeRunOncePlan{}, err
+	}
+	hostRoot := envDefault("A3_RUNTIME_RUN_ONCE_HOST_ROOT", envDefault("A3_RUNTIME_SCHEDULER_HOST_ROOT", filepath.Join(hostRootDir, runtimeHostAgentRelativePath)))
+	return runtimeRunOncePlan{
+		ComposePrefix:        composeArgs(config),
+		StorageDir:           envDefault("A3_BUNDLE_STORAGE_DIR", envDefaultValue(config.StorageDir, "/var/lib/a3/a2o-runtime")),
+		HostAgentLog:         envDefault("A3_RUNTIME_RUN_ONCE_HOST_AGENT_LOG", envDefault("A3_RUNTIME_SCHEDULER_HOST_AGENT_LOG", filepath.Join(hostRoot, "agent.log"))),
+		ServerLog:            envDefault("A3_RUNTIME_RUN_ONCE_SERVER_LOG", envDefault("A3_RUNTIME_SCHEDULER_SERVER_LOG", "/tmp/a3-runtime-run-once-agent-server.log")),
+		RuntimeLog:           envDefault("A3_RUNTIME_RUN_ONCE_LOG", envDefault("A3_RUNTIME_SCHEDULER_LOG", "/tmp/a3-runtime-run-once.log")),
+		RuntimeExitFile:      envDefault("A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefault("A3_RUNTIME_SCHEDULER_EXIT_FILE", "/tmp/a3-runtime-run-once.exit")),
+		PresetDir:            envDefault("A3_RUNTIME_RUN_ONCE_PRESET_DIR", envDefault("A3_RUNTIME_SCHEDULER_PRESET_DIR", "/tmp/a3-engine/config/presets")),
+		ManifestPath:         envDefault("A3_RUNTIME_RUN_ONCE_PROJECT_CONFIG", envDefault("A3_RUNTIME_SCHEDULER_PROJECT_CONFIG", filepath.Join(referencePackagePath, "project.yaml"))),
+		SoloBoardInternalURL: envDefault("A3_SOLOBOARD_INTERNAL_URL", "http://soloboard:3000"),
+		KanbanProject:        envDefault("A3_RUNTIME_RUN_ONCE_KANBAN_PROJECT", envDefault("A3_RUNTIME_SCHEDULER_KANBAN_PROJECT", packageConfig.KanbanProject)),
+	}, nil
+}
+
+func runtimeDescribeSectionOutput(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, section string, argv ...string) (string, error) {
+	output, err := dockerComposeExecOutput(config, plan, runner, argv...)
+	if err != nil {
+		return "", fmt.Errorf("%s command failed: %w", section, err)
+	}
+	return strings.TrimRight(string(output), "\n"), nil
+}
+
+func printDescribeSection(stdout io.Writer, name string, output string) {
+	fmt.Fprintf(stdout, "--- %s ---\n", name)
+	if strings.TrimSpace(output) == "" {
+		fmt.Fprintln(stdout, "(empty)")
+		return
+	}
+	fmt.Fprintln(stdout, output)
+}
+
+func printDescribeKanbanSection(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, taskRef string) {
+	taskOutput, taskErr := runtimeDescribeSectionOutput(config, plan, runner, "kanban_task", "python3", packagedKanbanCLIPath, "--backend", "soloboard", "--base-url", plan.SoloBoardInternalURL, "task-get", "--project", plan.KanbanProject, "--task", taskRef)
+	if taskErr != nil {
+		fmt.Fprintf(stdout, "describe_section name=kanban_task status=blocked action=check kanban service detail=%s\n", singleLine(taskErr.Error()))
+	} else {
+		printDescribeSection(stdout, "kanban_task", taskOutput)
+	}
+
+	commentOutput, commentErr := runtimeDescribeSectionOutput(config, plan, runner, "kanban_comments", "python3", packagedKanbanCLIPath, "--backend", "soloboard", "--base-url", plan.SoloBoardInternalURL, "task-comment-list", "--project", plan.KanbanProject, "--task", taskRef)
+	if commentErr != nil {
+		fmt.Fprintf(stdout, "describe_section name=kanban_comments status=blocked action=check kanban service detail=%s\n", singleLine(commentErr.Error()))
+		return
+	}
+	printDescribeComments(stdout, commentOutput)
+}
+
+func printDescribeComments(stdout io.Writer, output string) {
+	fmt.Fprintln(stdout, "--- kanban_comments ---")
+	var comments []struct {
+		ID      int    `json:"id"`
+		Comment string `json:"comment"`
+		Updated string `json:"updated"`
+		Created string `json:"created"`
+	}
+	if err := json.Unmarshal([]byte(output), &comments); err != nil {
+		if strings.TrimSpace(output) == "" {
+			fmt.Fprintln(stdout, "(empty)")
+			return
+		}
+		fmt.Fprintln(stdout, output)
+		return
+	}
+	fmt.Fprintf(stdout, "comment_count=%d\n", len(comments))
+	for index, comment := range comments {
+		when := firstNonEmpty(comment.Updated, comment.Created)
+		fmt.Fprintf(stdout, "comment[%d] id=%d updated=%s body=%s\n", index, comment.ID, when, singleLine(comment.Comment))
+	}
+}
+
+func parseOutputValue(output string, key string) string {
+	prefix := key + "="
+	for _, field := range strings.Fields(output) {
+		if strings.HasPrefix(field, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(field, prefix))
+		}
+	}
+	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func defaultBranchNamespace(composeProject string) string {

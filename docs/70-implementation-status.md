@@ -13,7 +13,7 @@ Date: 2026-04-17
 - Agent binary export: `a2o agent install`
 - Foreground runtime execution: `a2o runtime run-once`, `a2o runtime loop`
 - Resident scheduler lifecycle: `a2o runtime start`, `stop`, `status`
-- Runtime diagnosis: `a2o runtime doctor`
+- Runtime diagnosis: `a2o runtime doctor`, `a2o runtime describe-task <task-ref>`
 - Single-file project package config: `project.yaml`
 - SoloBoard adapter and bootstrap tooling
 - Agent HTTP worker gateway

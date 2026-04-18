@@ -446,6 +446,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime stop",
 		"a2o runtime status",
 		"a2o runtime doctor",
+		"a2o runtime describe-task TASK_REF",
 		"a2o runtime run-once [--max-steps N] [--agent-attempts N]",
 		"a2o runtime loop [--interval DURATION] [--max-cycles N]",
 	} {
@@ -843,6 +844,9 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	if !strings.Contains(stdout.String(), "kanban_run_once=generic") {
 		t.Fatalf("stdout should describe generic run-once, got %q", stdout.String())
 	}
+	if !strings.Contains(stdout.String(), "describe_task=a2o runtime describe-task <task-ref>") {
+		t.Fatalf("run-once should guide operator to describe-task, got %q", stdout.String())
+	}
 	if !strings.Contains(strings.Join(joined, "\n"), "a3 execute-until-idle") {
 		t.Fatalf("run-once should start execute-until-idle directly, calls:\n%s", strings.Join(joined, "\n"))
 	}
@@ -1188,6 +1192,69 @@ func TestRuntimeStartLaunchesForegroundLoopInBackground(t *testing.T) {
 	}
 	if got := strings.TrimSpace(string(commandBody)); got != runner.processCommands[12345] {
 		t.Fatalf("scheduler command file should contain launched command, got %q want %q", got, runner.processCommands[12345])
+	}
+	if !strings.Contains(stdout.String(), "describe_task=a2o runtime describe-task <task-ref>") {
+		t.Fatalf("runtime start should guide operator to describe-task, got %q", stdout.String())
+	}
+}
+
+func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "describe-task", "A2O#16"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	for _, want := range []string{
+		"describe_task task_ref=A2O#16",
+		"runtime_storage=/var/lib/a3/test-runtime",
+		"runtime_logs runtime=/tmp/a3-runtime-run-once.log",
+		"task A2O#16 kind=single status=blocked current_run=run-16",
+		"run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked",
+		"evidence workspace=runtime_workspace source=detached_commit:abc",
+		"--- kanban_task ---",
+		"\"task_ref\":\"A2O#16\"",
+		"comment_count=1",
+		"comment[0] id=61 updated=2026-04-18T07:46:17.996Z body=blocked evidence is available",
+		"operator_logs runtime_tail=docker compose -p a3-test -f compose.yml exec -T a3-runtime tail -n 220 /tmp/a3-runtime-run-once.log",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("describe-task missing %q in:\n%s", want, output)
+		}
+	}
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"docker compose -p a3-test -f compose.yml exec -T a3-runtime a3 show-task --storage-backend json --storage-dir /var/lib/a3/test-runtime A2O#16",
+		"docker compose -p a3-test -f compose.yml exec -T a3-runtime a3 show-run --storage-backend json --storage-dir /var/lib/a3/test-runtime --preset-dir /tmp/a3-engine/config/presets run-16 " + filepath.Join(packageDir, "project.yaml"),
+		"docker compose -p a3-test -f compose.yml exec -T a3-runtime python3 /opt/a3/share/tools/kanban/cli.py --backend soloboard --base-url http://soloboard:3000 task-comment-list --project A2OReferenceMultiRepo --task A2O#16",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("describe-task missing call %q in:\n%s", want, joined)
+		}
 	}
 }
 
@@ -1970,6 +2037,14 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 			return []byte("\n"), nil
 		}
 		return []byte("container-123\n"), nil
+	case strings.Contains(joined, " a3 show-task "):
+		return []byte("task A2O#16 kind=single status=blocked current_run=run-16\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n"), nil
+	case strings.Contains(joined, " a3 show-run "):
+		return []byte("run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked\nevidence workspace=runtime_workspace source=detached_commit:abc\nlatest_blocked phase=implementation summary=executor failed\nblocked_error_category=executor_failed\n"), nil
+	case strings.Contains(joined, " task-get "):
+		return []byte(`{"task_ref":"A2O#16","status":"Blocked"}` + "\n"), nil
+	case strings.Contains(joined, " task-comment-list "):
+		return []byte(`[{"id":61,"comment":"blocked evidence is available","updated":"2026-04-18T07:46:17.996Z"}]` + "\n"), nil
 	case strings.Contains(joined, " date -u +%Y%m%dT%H%M%SZ"):
 		return []byte("20260417T000000Z\n"), nil
 	case strings.Contains(joined, " cat /tmp/a3-runtime-run-once.exit"):

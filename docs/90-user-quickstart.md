@@ -135,6 +135,7 @@ a2o kanban url
 a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 a2o doctor
 a2o runtime run-once
+a2o runtime describe-task <task-ref>
 a2o runtime start
 ```
 
@@ -237,7 +238,10 @@ a2o runtime stop
 
 ```sh
 a2o runtime doctor
+a2o runtime describe-task <task-ref>
 ```
+
+`describe-task` は runtime state、task/run の phase、workspace/ref/evidence、kanban comment、operator が次に見る log をまとめて表示する。`run-once` や `runtime start` の後、task が `Blocked` になった場合はこの command から確認する。
 
 標準操作は次の流れである。
 

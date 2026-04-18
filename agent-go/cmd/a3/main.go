@@ -120,6 +120,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o runtime stop")
 	fmt.Fprintln(w, "  a2o runtime status")
 	fmt.Fprintln(w, "  a2o runtime doctor")
+	fmt.Fprintln(w, "  a2o runtime describe-task TASK_REF")
 	fmt.Fprintln(w, "  a2o runtime run-once [--max-steps N] [--agent-attempts N]")
 	fmt.Fprintln(w, "  a2o runtime loop [--interval DURATION] [--max-cycles N]")
 	fmt.Fprintln(w, "  a2o agent target")
