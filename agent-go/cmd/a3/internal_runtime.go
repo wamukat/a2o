@@ -59,6 +59,12 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
+	case "image-digest":
+		if err := runRuntimeImageDigest(args[1:], runner, stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
 	case "doctor":
 		if err := runRuntimeDoctor(args[1:], runner, stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)
@@ -258,6 +264,30 @@ func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, std
 		printRuntimeServiceStatus(effectiveConfig, runner, stdout)
 		printRuntimeImageStatus(&effectiveConfig, runner, stdout)
 		printLatestRuntimeSummary(effectiveConfig, runner, stdout)
+		return nil
+	})
+}
+
+func runRuntimeImageDigest(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a2o runtime image-digest", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+	config, _, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	return withComposeEnv(effectiveConfig, func() error {
+		digest := runtimeImageDigest(&effectiveConfig, runner)
+		if digest == "" {
+			return errors.New("runtime image digest unavailable; run a2o runtime up, then retry")
+		}
+		fmt.Fprintf(stdout, "runtime_image_digest=%s\n", digest)
 		return nil
 	})
 }

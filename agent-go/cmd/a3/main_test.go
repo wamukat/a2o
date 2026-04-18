@@ -479,6 +479,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime start [--interval DURATION]  # start scheduler",
 		"a2o runtime stop                         # stop scheduler",
 		"a2o runtime status",
+		"a2o runtime image-digest",
 		"a2o runtime doctor",
 		"a2o runtime describe-task TASK_REF",
 		"a2o runtime run-once [--max-steps N] [--agent-attempts N]",
@@ -536,6 +537,7 @@ func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
 		{name: "runtime start", args: []string{"runtime", "start", "-bad"}, want: "Usage of a2o runtime start:"},
 		{name: "runtime stop", args: []string{"runtime", "stop", "-bad"}, want: "Usage of a2o runtime stop:"},
 		{name: "runtime status", args: []string{"runtime", "status", "-bad"}, want: "Usage of a2o runtime status:"},
+		{name: "runtime image-digest", args: []string{"runtime", "image-digest", "-bad"}, want: "Usage of a2o runtime image-digest:"},
 		{name: "runtime doctor", args: []string{"runtime", "doctor", "-bad"}, want: "Usage of a2o runtime doctor:"},
 		{name: "runtime run-once", args: []string{"runtime", "run-once", "-bad"}, want: "Usage of a2o runtime run-once:"},
 		{name: "runtime loop", args: []string{"runtime", "loop", "-bad"}, want: "Usage of a2o runtime loop:"},
@@ -1696,6 +1698,40 @@ func TestRuntimeStatusReportsStaleForUnrelatedReusedPID(t *testing.T) {
 	}
 	assertCallContains(t, runner.joinedCalls(), "process-running 12345")
 	assertCallContains(t, runner.joinedCalls(), "process-command 12345")
+}
+
+func TestRuntimeImageDigestPrintsPinnedRuntimeDigest(t *testing.T) {
+	t.Setenv("A3_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-digest",
+		RuntimeService: "a3-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "image-digest"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "runtime_image_digest=ghcr.io/wamukat/a2o-engine@sha256:test") {
+		t.Fatalf("stdout should print digest, got %q", stdout.String())
+	}
+	if runner.lastEnv["A3_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine@sha256:pinned" {
+		t.Fatalf("image-digest should evaluate compose with runtime image env, got %#v", runner.lastEnv)
+	}
 }
 
 func TestRuntimeStatusRejectsInvalidPIDFile(t *testing.T) {

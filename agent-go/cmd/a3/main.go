@@ -121,6 +121,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o runtime start [--interval DURATION]  # start scheduler")
 	fmt.Fprintln(w, "  a2o runtime stop                         # stop scheduler")
 	fmt.Fprintln(w, "  a2o runtime status")
+	fmt.Fprintln(w, "  a2o runtime image-digest")
 	fmt.Fprintln(w, "  a2o runtime doctor")
 	fmt.Fprintln(w, "  a2o runtime describe-task TASK_REF")
 	fmt.Fprintln(w, "  a2o runtime run-once [--max-steps N] [--agent-attempts N]")

@@ -325,8 +325,43 @@ repos:
 
 task は repo label を使って対象 slot を指定する。parent-child flow では child が各 repo の作業を進め、parent が統合 review、verification、merge を担当する。
 
+## Runtime Image Updates
+
+A2O の runtime image は、導入検証では `ghcr.io/wamukat/a2o-engine:latest` を使ってよい。実 product package、release smoke、Portal のように複数人が同じ board / package を使う環境では digest pinning を使う。tag は動く参照であり、digest は同じ image を再現する参照である。
+
+推奨手順:
+
+```sh
+a2o runtime up
+a2o runtime image-digest
+a2o doctor
+```
+
+`a2o runtime image-digest` が出した `runtime_image_digest=...` を project package の Taskfile / env file / deployment note の runtime image 値に反映する。更新後は次を確認する。
+
+```sh
+a2o runtime down
+a2o runtime up
+a2o runtime status
+a2o doctor
+```
+
+package 側では runtime image 値を 1 箇所に寄せる。Taskfile を使う場合は `A2O_RUNTIME_IMAGE` のような project-local 変数を置き、A2O 起動時だけ runtime image env に渡す。test expectation に digest を直接複数箇所へ書かない。Portal など既存 package を更新する場合も、`a2o runtime image-digest` の出力を source of truth として Taskfile と smoke test expectation を同時に更新する。
+
+`latest` を使ってよい場面:
+
+- local trial
+- reference project の短い動作確認
+- digest を採取する前の一時起動
+
+digest pinning が必要な場面:
+
+- release smoke
+- 実 product package の共有運用
+- CI / regression validation
+- 利用者へ再現手順を案内する場合
+
 ## Known Gaps
 
 - `project.yaml` のさらに短い guided bootstrap は未実装である。導入時の候補生成は backlog の feature として扱う。
 - runtime state には内部互換名が残る場合がある。通常の manual では編集対象にしない。
-- published image での release smoke は、公開前の独立した gate として digest 固定で実行する。
