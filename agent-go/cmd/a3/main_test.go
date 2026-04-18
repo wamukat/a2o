@@ -2228,6 +2228,7 @@ type fakeRunner struct {
 	lastEnv               map[string]string
 	nextPID               int
 	processCommands       map[int]string
+	errorOutput           string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -2242,7 +2243,11 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		"A3_HOST_AGENT_BIN":                  os.Getenv("A3_HOST_AGENT_BIN"),
 	}
 	if r.err != nil {
-		return []byte("forced error"), r.err
+		output := r.errorOutput
+		if output == "" {
+			output = "forced error"
+		}
+		return []byte(output), r.err
 	}
 	joined := strings.Join(call, " ")
 	switch {
@@ -2394,12 +2399,18 @@ func TestRunExternalIncludesOutputOnFailure(t *testing.T) {
 }
 
 func TestRunExternalSanitizesInternalRuntimeNames(t *testing.T) {
-	_, err := runExternal(&fakeRunner{err: errors.New("boom")}, "docker", "compose", "up", "-d", "a3-runtime")
+	runner := &fakeRunner{
+		err:         errors.New("boom"),
+		errorOutput: "service a3-runtime failed in /var/lib/a3 with 'a3' A3_ROOT_DIR /opt/a3 .a3",
+	}
+	_, err := runExternal(runner, "docker", "compose", "exec", "-T", "a3-runtime", "sh", "-lc", "A3_ROOT_DIR=/workspace 'a3' execute-until-idle")
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if strings.Contains(err.Error(), "a3-runtime") {
-		t.Fatalf("error should hide internal runtime service, got %q", err.Error())
+	for _, forbidden := range []string{"a3-runtime", "/var/lib/a3", "/opt/a3", ".a3", "A3_ROOT_DIR", "'a3'"} {
+		if strings.Contains(err.Error(), forbidden) {
+			t.Fatalf("error should hide %q, got %q", forbidden, err.Error())
+		}
 	}
 	if !strings.Contains(err.Error(), "<runtime-service>") {
 		t.Fatalf("error should keep actionable runtime service placeholder, got %q", err.Error())

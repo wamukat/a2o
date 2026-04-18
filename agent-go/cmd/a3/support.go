@@ -14,7 +14,7 @@ func runExternal(runner commandRunner, name string, args ...string) ([]byte, err
 		return output, nil
 	}
 	command := sanitizePublicCommand(strings.TrimSpace(name + " " + strings.Join(args, " ")))
-	message := strings.TrimSpace(string(output))
+	message := sanitizePublicCommand(strings.TrimSpace(string(output)))
 	if message == "" {
 		return nil, fmt.Errorf("%s failed: %w", command, err)
 	}
@@ -28,6 +28,10 @@ func sanitizePublicCommand(command string) string {
 		"/tmp/a3-engine", "<runtime-preset-dir>",
 		"/opt/a3", "<runtime-tools>",
 		"/tmp/a3-runtime", "/tmp/a2o-runtime",
+		".a3", "<agent-metadata>",
+		"A3_", "A2O_INTERNAL_",
+		"'a3'", "'<engine-entrypoint>'",
+		"\"a3\"", "\"<engine-entrypoint>\"",
 		" a3 ", " <engine-entrypoint> ",
 	)
 	return replacer.Replace(command)
