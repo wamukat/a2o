@@ -51,6 +51,7 @@ func runKanbanUp(args []string, runner commandRunner, stdout io.Writer, stderr i
 	flags := flag.NewFlagSet("a2o kanban up", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	build := flags.Bool("build", false, "build the runtime image before starting services")
+	freshBoard := flags.Bool("fresh-board", false, "fail if the configured SoloBoard data volume already exists")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -64,6 +65,20 @@ func runKanbanUp(args []string, runner commandRunner, stdout io.Writer, stderr i
 	}
 	composePrefix := composeArgs(*config)
 	return withComposeEnv(*config, func() error {
+		volumeName := kanbanDataVolumeName(config.ComposeProject)
+		volumeExists, err := dockerVolumeExists(runner, volumeName)
+		if err != nil {
+			return err
+		}
+		if *freshBoard && volumeExists {
+			return fmt.Errorf("fresh board requested but kanban volume already exists: %s; use the existing board without --fresh-board, choose a different compose project with a2o project bootstrap, or back up and remove the volume explicitly", volumeName)
+		}
+		mode := "create_new"
+		if volumeExists {
+			mode = "reuse_existing"
+		}
+		fmt.Fprintf(stdout, "kanban_data compose_project=%s volume=%s mode=%s\n", config.ComposeProject, volumeName, mode)
+		fmt.Fprintf(stdout, "kanban_backup_hint=docker run --rm -v %s:/data -v \"$PWD\":/backup alpine sh -c 'cp /data/soloboard.sqlite /backup/soloboard-%s.sqlite'\n", volumeName, sanitizeBackupName(config.ComposeProject))
 		if *build {
 			if _, err := runExternal(runner, "docker", append(composePrefix, "build", config.RuntimeService)...); err != nil {
 				return err
@@ -75,9 +90,36 @@ func runKanbanUp(args []string, runner commandRunner, stdout io.Writer, stderr i
 		if err := runKanbanBootstrap(*config, runner, stdout); err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "kanban_up compose_project=%s url=%s\n", config.ComposeProject, kanbanPublicURL(*config))
+		fmt.Fprintf(stdout, "kanban_up compose_project=%s volume=%s url=%s\n", config.ComposeProject, volumeName, kanbanPublicURL(*config))
 		return nil
 	})
+}
+
+func kanbanDataVolumeName(composeProject string) string {
+	project := strings.TrimSpace(composeProject)
+	if project == "" {
+		project = "a2o-runtime"
+	}
+	return project + "_soloboard-data"
+}
+
+func dockerVolumeExists(runner commandRunner, volumeName string) (bool, error) {
+	if strings.TrimSpace(volumeName) == "" {
+		return false, fmt.Errorf("kanban volume name is required")
+	}
+	if _, err := runner.Run("docker", "volume", "inspect", volumeName); err != nil {
+		return false, nil
+	}
+	return true, nil
+}
+
+func sanitizeBackupName(value string) string {
+	name := strings.TrimSpace(value)
+	if name == "" {
+		return "a2o-runtime"
+	}
+	replacer := strings.NewReplacer("/", "-", "\\", "-", " ", "-")
+	return replacer.Replace(name)
 }
 
 func runKanbanBootstrap(config runtimeInstanceConfig, runner commandRunner, stdout io.Writer) error {

@@ -168,6 +168,12 @@ a2o kanban doctor
 a2o kanban url
 ```
 
+`a2o kanban up` は、利用する `compose_project`、SoloBoard data volume、reuse / create mode、backup hint を表示する。同じ compose project で起動すると既存 board を再利用する。compose project が変わると Docker volume 名も変わるため、board が空に見える。
+
+fresh board を意図する場合は、bootstrap 時に別の compose project を指定するか、既存 volume を backup して明示的に削除してから起動する。誤って既存 board を使いたくない場合は `a2o kanban up --fresh-board` を使う。既存 volume がある場合、この command は停止する。
+
+backup は `a2o kanban up` の `kanban_backup_hint` を使う。手動で確認する場合の volume 名は `<compose_project>_soloboard-data` である。
+
 `doctor` は kanban service と runtime config の接続確認に使う。`url` は browser で開く board URL を表示する。
 
 ## Agent Operation

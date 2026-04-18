@@ -547,10 +547,41 @@ func TestKanbanUpUsesBootstrappedInstanceConfig(t *testing.T) {
 	})
 
 	joined := runner.joinedCalls()
+	assertCallContains(t, joined, "docker volume inspect a3-test_soloboard-data")
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml build a3-runtime")
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a3-runtime soloboard")
-	if !strings.Contains(stdout.String(), "kanban_up compose_project=a3-test url=http://localhost:3480/") {
+	if !strings.Contains(stdout.String(), "kanban_data compose_project=a3-test volume=a3-test_soloboard-data mode=reuse_existing") {
+		t.Fatalf("stdout should describe kanban data volume, got %q", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "kanban_up compose_project=a3-test volume=a3-test_soloboard-data url=http://localhost:3480/") {
 		t.Fatalf("stdout should describe kanban up, got %q", stdout.String())
+	}
+}
+
+func TestKanbanUpFreshBoardFailsWhenVolumeExists(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    filepath.Join(tempDir, "package"),
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a3-runtime",
+		SoloBoardPort:  "3480",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"kanban", "up", "--fresh-board"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail when fresh board volume exists")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "fresh board requested but kanban volume already exists: a3-test_soloboard-data") {
+		t.Fatalf("stderr should describe existing volume, got %q", stderr.String())
 	}
 }
 
