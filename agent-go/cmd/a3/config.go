@@ -46,6 +46,9 @@ func defaultComposeFile() string {
 }
 
 func defaultRuntimeImage() string {
+	if value := strings.TrimSpace(os.Getenv("A2O_RUNTIME_IMAGE")); value != "" {
+		return value
+	}
 	if value := strings.TrimSpace(os.Getenv("A3_RUNTIME_IMAGE")); value != "" {
 		return value
 	}

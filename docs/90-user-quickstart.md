@@ -332,7 +332,7 @@ A2O の runtime image は、導入検証では `ghcr.io/wamukat/a2o-engine:lates
 推奨手順:
 
 ```sh
-a2o runtime up
+a2o runtime up --pull
 a2o runtime image-digest
 a2o doctor
 ```
@@ -346,7 +346,7 @@ a2o runtime status
 a2o doctor
 ```
 
-package 側では runtime image 値を 1 箇所に寄せる。Taskfile を使う場合は `A2O_RUNTIME_IMAGE` のような project-local 変数を置き、A2O 起動時だけ runtime image env に渡す。test expectation に digest を直接複数箇所へ書かない。Portal など既存 package を更新する場合も、`a2o runtime image-digest` の出力を source of truth として Taskfile と smoke test expectation を同時に更新する。
+package 側では runtime image 値を 1 箇所に寄せる。Taskfile を使う場合は `A2O_RUNTIME_IMAGE` に digest を置く。A2O launcher は `A2O_RUNTIME_IMAGE` を読み取り、compose 実行時の runtime image として使う。test expectation に digest を直接複数箇所へ書かない。Portal など既存 package を更新する場合も、`a2o runtime image-digest` の出力を source of truth として Taskfile と smoke test expectation を同時に更新する。
 
 `latest` を使ってよい場面:
 

@@ -405,6 +405,7 @@ func runRuntimeUp(args []string, runner commandRunner, stdout io.Writer, stderr 
 	flags := flag.NewFlagSet("a2o runtime up", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	build := flags.Bool("build", false, "build the runtime image before starting services")
+	pull := flags.Bool("pull", false, "pull the configured runtime image before starting services")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -418,6 +419,11 @@ func runRuntimeUp(args []string, runner commandRunner, stdout io.Writer, stderr 
 	}
 	composePrefix := composeArgs(*config)
 	return withComposeEnv(*config, func() error {
+		if *pull && !*build {
+			if _, err := runExternal(runner, "docker", append(composePrefix, "pull", config.RuntimeService)...); err != nil {
+				return err
+			}
+		}
 		if *build {
 			if _, err := runExternal(runner, "docker", append(composePrefix, "build", config.RuntimeService)...); err != nil {
 				return err

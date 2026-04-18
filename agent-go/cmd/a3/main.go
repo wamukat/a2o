@@ -116,7 +116,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o kanban up [--build]")
 	fmt.Fprintln(w, "  a2o kanban doctor")
 	fmt.Fprintln(w, "  a2o kanban url")
-	fmt.Fprintln(w, "  a2o runtime up [--build]")
+	fmt.Fprintln(w, "  a2o runtime up [--build] [--pull]")
 	fmt.Fprintln(w, "  a2o runtime down")
 	fmt.Fprintln(w, "  a2o runtime start [--interval DURATION]  # start scheduler")
 	fmt.Fprintln(w, "  a2o runtime stop                         # stop scheduler")
