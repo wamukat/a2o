@@ -108,6 +108,8 @@ a2o project template \
   --output ./a2o-project/project.yaml
 ```
 
+The generated file uses the compact `runtime.executor.command` form. A2O expands it to the default stdin-bundle executor internally, so existing full executor objects remain compatible.
+
 After `a2o project bootstrap --package ./a2o-project`, runtime commands discover `.a3/runtime-instance.json` from the current directory upward:
 
 ```sh

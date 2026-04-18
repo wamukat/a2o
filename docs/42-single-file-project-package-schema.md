@@ -117,6 +117,22 @@ scenarios:
 
 The executor command receives the worker bundle on stdin and must write worker result JSON to `{{result_path}}`. Supported command placeholders are `{{result_path}}`, `{{schema_path}}`, `{{workspace_root}}`, `{{a2o_root_dir}}`, and `{{root_dir}}`.
 
+For normal packages, use the compact form:
+
+```yaml
+runtime:
+  executor:
+    command:
+      - your-ai-worker
+      - "--schema"
+      - "{{schema_path}}"
+      - "--result"
+      - "{{result_path}}"
+    phase_profiles: {}
+```
+
+This expands to the default command executor with `prompt_transport: stdin-bundle`, file result mode, and file schema mode. Existing full executor objects remain supported for advanced cases.
+
 New packages should start from the generated template instead of hand-writing the executor block:
 
 ```sh
@@ -128,7 +144,7 @@ a2o project template \
   --output ./project-package/project.yaml
 ```
 
-The template keeps the public schema unchanged, but it makes the default executor contract explicit. `--language` controls `agent.required_bins`; `--executor-bin` and repeated `--executor-arg` flags generate `runtime.executor.default_profile.command`.
+The template uses the compact executor form. `--language` controls `agent.required_bins`; `--executor-bin` and repeated `--executor-arg` flags generate `runtime.executor.command`.
 
 `runtime.presets` keeps the current preset model. Presets are still useful for common A2O behavior, but package-local overrides live beside the rest of the package config.
 

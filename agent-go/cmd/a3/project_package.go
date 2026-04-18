@@ -61,7 +61,7 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	config.AgentAttempts = scalarString(payload.Runtime.AgentAttempts)
 	config.AgentWorkspaceRoot = payload.Agent.WorkspaceRoot
 	config.AgentRequiredBins = payload.Agent.RequiredBins
-	config.Executor = normalizeYAMLValue(payload.Runtime.Executor)
+	config.Executor = expandProjectExecutorConfig(normalizeYAMLValue(payload.Runtime.Executor))
 	for alias, repo := range payload.Repos {
 		config.Repos[alias] = projectPackageRepo{Path: repo.Path, Label: repo.Label}
 	}
@@ -86,6 +86,38 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 		}
 	}
 	return config, nil
+}
+
+func expandProjectExecutorConfig(executor map[string]any) map[string]any {
+	if len(executor) == 0 {
+		return executor
+	}
+	if _, hasDefaultProfile := executor["default_profile"]; hasDefaultProfile {
+		return executor
+	}
+	command, hasCommand := executor["command"]
+	if !hasCommand {
+		return executor
+	}
+	expanded := map[string]any{
+		"kind":             "command",
+		"prompt_transport": "stdin-bundle",
+		"result":           map[string]any{"mode": "file"},
+		"schema":           map[string]any{"mode": "file"},
+		"default_profile": map[string]any{
+			"command": command,
+		},
+		"phase_profiles": map[string]any{},
+	}
+	if env, ok := executor["env"]; ok {
+		expanded["default_profile"].(map[string]any)["env"] = env
+	} else {
+		expanded["default_profile"].(map[string]any)["env"] = map[string]any{}
+	}
+	if phaseProfiles, ok := executor["phase_profiles"]; ok {
+		expanded["phase_profiles"] = phaseProfiles
+	}
+	return expanded
 }
 
 type projectPackageYAML struct {

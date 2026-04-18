@@ -147,6 +147,9 @@ func TestProjectTemplatePrintsValidMinimalProjectYaml(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), stdout.Bytes(), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if strings.Contains(stdout.String(), "prompt_transport") || strings.Contains(stdout.String(), "default_profile") {
+		t.Fatalf("template should use compact executor syntax, got:\n%s", stdout.String())
+	}
 	config, err := loadProjectPackageConfig(packageDir)
 	if err != nil {
 		t.Fatalf("generated project.yaml should load: %v\n%s", err, stdout.String())
@@ -217,6 +220,54 @@ func TestProjectTemplateWritesOutputFileWithCustomExecutorArgs(t *testing.T) {
 	}
 	if !containsString(config.AgentRequiredBins, "python3") {
 		t.Fatalf("python template should include python3 in %#v", config.AgentRequiredBins)
+	}
+}
+
+func TestProjectPackageLoaderExpandsCompactExecutorCommand(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "project-package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: compact-executor
+kanban:
+  project: CompactExecutor
+repos:
+  app:
+    path: ..
+runtime:
+  executor:
+    command:
+      - worker
+      - --result
+      - "{{result_path}}"
+  presets:
+    - base
+  merge:
+    target: merge_to_live
+    policy: ff_only
+    target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	config, err := loadProjectPackageConfig(packageDir)
+	if err != nil {
+		t.Fatalf("compact executor should load: %v", err)
+	}
+	if config.Executor["kind"] != "command" {
+		t.Fatalf("compact executor should expand kind, got %#v", config.Executor)
+	}
+	if config.Executor["prompt_transport"] != "stdin-bundle" {
+		t.Fatalf("compact executor should expand transport, got %#v", config.Executor)
+	}
+	profile := config.Executor["default_profile"].(map[string]any)
+	command := profile["command"].([]any)
+	if command[0].(string) != "worker" || command[2].(string) != "{{result_path}}" {
+		t.Fatalf("unexpected expanded command: %#v", command)
 	}
 }
 

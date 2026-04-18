@@ -25,7 +25,7 @@ project-package/
 
 `manifest.yml` は削除する。残っている場合、A2O は package config を拒否する。
 
-新規 package は `a2o project template` で最小構成を生成してから編集する。既存 package の移行時も、生成された `runtime.executor` と `agent.required_bins` を比較対象にすると、手書きで不足しやすい項目を確認しやすい。
+新規 package は `a2o project template` で最小構成を生成してから編集する。既存 package の移行時も、生成された短縮形の `runtime.executor.command` と `agent.required_bins` を比較対象にすると、手書きで不足しやすい項目を確認しやすい。
 
 ```sh
 a2o project template \
@@ -34,6 +34,19 @@ a2o project template \
   --language node \
   --executor-bin your-ai-worker \
   --output ./project-package/project.yaml
+```
+
+既存の full executor object はそのまま利用できる。新規または単純な package では、次の短縮形を使える。
+
+```yaml
+runtime:
+  executor:
+    command:
+      - your-ai-worker
+      - "--schema"
+      - "{{schema_path}}"
+      - "--result"
+      - "{{result_path}}"
 ```
 
 ## 移行前
