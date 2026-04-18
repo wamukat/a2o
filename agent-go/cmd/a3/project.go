@@ -274,7 +274,7 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 	workspaceRoot := flags.String("workspace", ".", "workspace root where .work/a2o/runtime-instance.json is written")
 	composeProject := flags.String("compose-project", "", "docker compose project name for this runtime instance")
 	composeFile := flags.String("compose-file", "", "A2O distribution compose file")
-	runtimeService := flags.String("runtime-service", "a3-runtime", "docker compose runtime service name")
+	runtimeService := flags.String("runtime-service", "a3-runtime", "internal compatibility docker compose runtime service name")
 	soloBoardPort := flags.String("soloboard-port", "3470", "host kanban service port")
 	agentPort := flags.String("agent-port", "7393", "host A2O agent control-plane port")
 	storageDir := flags.String("storage-dir", "/var/lib/a3/a2o-runtime", "runtime storage dir inside the A2O runtime container")

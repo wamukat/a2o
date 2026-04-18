@@ -37,7 +37,7 @@
 | Branch refs generated for work / parent integration | `refs/heads/a2o/...` | Existing `refs/heads/a3/...` refs are legacy data and may still be read from persisted evidence. |
 | Runtime publication commit messages | `A2O implementation update ...`, `A2O remediation update ...`, `A2O merge recovery ...` | Existing commits keep their historical messages. |
 | Runtime generated files | `.work/a2o/...` for current user-facing host artifacts | `.a3/...` is read only as legacy state or used as internal workspace metadata. |
-| Compose service name | `a3-runtime` for current release | Renaming service identity changes Docker networking and existing compose state, so it remains compatibility surface until a migration ticket handles it. |
+| Compose service name | Hidden from normal CLI output | The current compose file still uses the legacy internal service identity. Renaming it changes Docker networking and existing compose state, so it remains compatibility surface until a migration ticket handles it. |
 
 ## Public Alias
 

@@ -113,7 +113,7 @@ func runAgentInstall(args []string, runner commandRunner, stdout io.Writer, stde
 		}
 		containerID = strings.TrimSpace(string(containerBytes))
 		if containerID == "" {
-			return fmt.Errorf("runtime container not found for service %q", config.RuntimeService)
+			return fmt.Errorf("A2O runtime container not found; run a2o runtime up")
 		}
 		return nil
 	})

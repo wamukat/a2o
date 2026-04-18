@@ -78,9 +78,9 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 	if output, err := runExternal(runner, "docker", append(composeArgs(*config), "ps", "--status", "running", "-q", config.RuntimeService)...); err != nil {
 		report("runtime_container", false, err.Error(), "run a2o runtime up")
 	} else if strings.TrimSpace(string(output)) == "" {
-		report("runtime_container", false, config.RuntimeService+" is not running", "run a2o runtime up")
+		report("runtime_container", false, "A2O runtime container is not running", "run a2o runtime up")
 	} else {
-		report("runtime_container", true, "service="+config.RuntimeService+" container="+strings.TrimSpace(string(output)), "none")
+		report("runtime_container", true, "A2O runtime container="+strings.TrimSpace(string(output)), "none")
 	}
 
 	if digest := runtimeImageDigest(config, runner); digest != "" {

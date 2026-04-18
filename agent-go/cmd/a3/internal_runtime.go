@@ -359,11 +359,24 @@ func runRuntimeDoctor(args []string, runner commandRunner, stdout io.Writer, std
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
 	fmt.Fprintf(stdout, "package=%s\n", config.PackagePath)
 	fmt.Fprintf(stdout, "compose_project=%s\n", config.ComposeProject)
-	output, err := runExternal(runner, "docker", append(composeArgs(*config), "ps")...)
-	if err != nil {
-		return err
+	for _, check := range []struct {
+		name    string
+		service string
+	}{
+		{name: "runtime_container", service: config.RuntimeService},
+		{name: "kanban_service", service: "soloboard"},
+	} {
+		output, err := runExternal(runner, "docker", append(composeArgs(*config), "ps", "--status", "running", "-q", check.service)...)
+		if err != nil {
+			return err
+		}
+		containerID := strings.TrimSpace(string(output))
+		if containerID == "" {
+			fmt.Fprintf(stdout, "runtime_doctor_check name=%s status=blocked action=run a2o runtime up\n", check.name)
+			continue
+		}
+		fmt.Fprintf(stdout, "runtime_doctor_check name=%s status=ok container=%s\n", check.name, containerID)
 	}
-	fmt.Fprint(stdout, string(output))
 	return nil
 }
 
@@ -406,7 +419,7 @@ func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) er
 	fmt.Fprintln(stdout, "kanban_up=a2o kanban up")
 	fmt.Fprintln(stdout, "kanban_doctor=a2o kanban doctor")
 	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(*config))
-	fmt.Fprintf(stdout, "internal_runtime_up=docker compose -p %s -f %s up -d %s soloboard\n", config.ComposeProject, config.ComposeFile, config.RuntimeService)
+	fmt.Fprintln(stdout, "runtime_up=a2o runtime up")
 	fmt.Fprintln(stdout, "agent_install=a2o agent install")
 	return nil
 }
@@ -438,7 +451,7 @@ func runRuntimeDescribeTask(args []string, runner commandRunner, stdout io.Write
 		fmt.Fprintf(stdout, "describe_task task_ref=%s\n", taskRef)
 		fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
 		fmt.Fprintf(stdout, "package=%s\n", effectiveConfig.PackagePath)
-		fmt.Fprintf(stdout, "compose_project=%s runtime_service=%s\n", effectiveConfig.ComposeProject, effectiveConfig.RuntimeService)
+		fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
 		fmt.Fprintf(stdout, "kanban_project=%s kanban_url=%s\n", plan.KanbanProject, kanbanPublicURL(effectiveConfig))
 		fmt.Fprintf(stdout, "runtime_storage=%s manifest=%s preset_dir=%s\n", plan.StorageDir, plan.ManifestPath, plan.PresetDir)
 		fmt.Fprintf(stdout, "runtime_logs runtime=%s server=%s host_agent=%s exit_file=%s\n", plan.RuntimeLog, plan.ServerLog, plan.HostAgentLog, plan.RuntimeExitFile)
@@ -473,14 +486,8 @@ func runRuntimeDescribeTask(args []string, runner commandRunner, stdout io.Write
 		}
 
 		printDescribeKanbanSection(effectiveConfig, plan, runner, stdout, taskRef)
-		fmt.Fprintf(stdout, "operator_logs runtime_tail=docker compose -p %s -f %s exec -T %s tail -n 220 %s server_tail=docker compose -p %s -f %s exec -T %s tail -n 120 %s host_agent_log=%s\n",
-			effectiveConfig.ComposeProject,
-			effectiveConfig.ComposeFile,
-			effectiveConfig.RuntimeService,
-			plan.RuntimeLog,
-			effectiveConfig.ComposeProject,
-			effectiveConfig.ComposeFile,
-			effectiveConfig.RuntimeService,
+		fmt.Fprintf(stdout, "operator_logs runtime_tail=a2o runtime describe-task %s server_log=%s host_agent_log=%s\n",
+			taskRef,
 			plan.ServerLog,
 			plan.HostAgentLog,
 		)
@@ -694,11 +701,11 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		HostAgentLog:         envDefault("A3_RUNTIME_RUN_ONCE_HOST_AGENT_LOG", envDefault("A3_RUNTIME_SCHEDULER_HOST_AGENT_LOG", filepath.Join(hostRoot, "agent.log"))),
 		LauncherConfigPath:   launcherConfigPath,
 		LauncherConfig:       packageConfig.Executor,
-		ServerLog:            envDefault("A3_RUNTIME_RUN_ONCE_SERVER_LOG", envDefault("A3_RUNTIME_SCHEDULER_SERVER_LOG", "/tmp/a3-runtime-run-once-agent-server.log")),
-		RuntimeLog:           envDefault("A3_RUNTIME_RUN_ONCE_LOG", envDefault("A3_RUNTIME_SCHEDULER_LOG", "/tmp/a3-runtime-run-once.log")),
-		RuntimeExitFile:      envDefault("A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefault("A3_RUNTIME_SCHEDULER_EXIT_FILE", "/tmp/a3-runtime-run-once.exit")),
-		RuntimePIDFile:       envDefault("A3_RUNTIME_RUN_ONCE_PID_FILE", envDefault("A3_RUNTIME_SCHEDULER_PID_FILE", "/tmp/a3-runtime-run-once.pid")),
-		ServerPIDFile:        envDefault("A3_RUNTIME_RUN_ONCE_SERVER_PID_FILE", envDefault("A3_RUNTIME_SCHEDULER_SERVER_PID_FILE", "/tmp/a3-runtime-run-once-agent-server.pid")),
+		ServerLog:            envDefault("A3_RUNTIME_RUN_ONCE_SERVER_LOG", envDefault("A3_RUNTIME_SCHEDULER_SERVER_LOG", "/tmp/a2o-runtime-run-once-agent-server.log")),
+		RuntimeLog:           envDefault("A3_RUNTIME_RUN_ONCE_LOG", envDefault("A3_RUNTIME_SCHEDULER_LOG", "/tmp/a2o-runtime-run-once.log")),
+		RuntimeExitFile:      envDefault("A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefault("A3_RUNTIME_SCHEDULER_EXIT_FILE", "/tmp/a2o-runtime-run-once.exit")),
+		RuntimePIDFile:       envDefault("A3_RUNTIME_RUN_ONCE_PID_FILE", envDefault("A3_RUNTIME_SCHEDULER_PID_FILE", "/tmp/a2o-runtime-run-once.pid")),
+		ServerPIDFile:        envDefault("A3_RUNTIME_RUN_ONCE_SERVER_PID_FILE", envDefault("A3_RUNTIME_SCHEDULER_SERVER_PID_FILE", "/tmp/a2o-runtime-run-once-agent-server.pid")),
 		PresetDir:            envDefault("A3_RUNTIME_RUN_ONCE_PRESET_DIR", envDefault("A3_RUNTIME_SCHEDULER_PRESET_DIR", "/tmp/a3-engine/config/presets")),
 		ManifestPath:         envDefault("A3_RUNTIME_RUN_ONCE_PROJECT_CONFIG", envDefault("A3_RUNTIME_SCHEDULER_PROJECT_CONFIG", filepath.Join(referencePackagePath, "project.yaml"))),
 		SoloBoardInternalURL: envDefault("A3_SOLOBOARD_INTERNAL_URL", "http://soloboard:3000"),
@@ -742,9 +749,9 @@ func buildRuntimeDescribeTaskPlan(config runtimeInstanceConfig) (runtimeRunOnceP
 		ComposePrefix:        composeArgs(config),
 		StorageDir:           envDefault("A3_BUNDLE_STORAGE_DIR", envDefaultValue(config.StorageDir, "/var/lib/a3/a2o-runtime")),
 		HostAgentLog:         envDefault("A3_RUNTIME_RUN_ONCE_HOST_AGENT_LOG", envDefault("A3_RUNTIME_SCHEDULER_HOST_AGENT_LOG", filepath.Join(hostRoot, "agent.log"))),
-		ServerLog:            envDefault("A3_RUNTIME_RUN_ONCE_SERVER_LOG", envDefault("A3_RUNTIME_SCHEDULER_SERVER_LOG", "/tmp/a3-runtime-run-once-agent-server.log")),
-		RuntimeLog:           envDefault("A3_RUNTIME_RUN_ONCE_LOG", envDefault("A3_RUNTIME_SCHEDULER_LOG", "/tmp/a3-runtime-run-once.log")),
-		RuntimeExitFile:      envDefault("A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefault("A3_RUNTIME_SCHEDULER_EXIT_FILE", "/tmp/a3-runtime-run-once.exit")),
+		ServerLog:            envDefault("A3_RUNTIME_RUN_ONCE_SERVER_LOG", envDefault("A3_RUNTIME_SCHEDULER_SERVER_LOG", "/tmp/a2o-runtime-run-once-agent-server.log")),
+		RuntimeLog:           envDefault("A3_RUNTIME_RUN_ONCE_LOG", envDefault("A3_RUNTIME_SCHEDULER_LOG", "/tmp/a2o-runtime-run-once.log")),
+		RuntimeExitFile:      envDefault("A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefault("A3_RUNTIME_SCHEDULER_EXIT_FILE", "/tmp/a2o-runtime-run-once.exit")),
 		PresetDir:            envDefault("A3_RUNTIME_RUN_ONCE_PRESET_DIR", envDefault("A3_RUNTIME_SCHEDULER_PRESET_DIR", "/tmp/a3-engine/config/presets")),
 		ManifestPath:         envDefault("A3_RUNTIME_RUN_ONCE_PROJECT_CONFIG", envDefault("A3_RUNTIME_SCHEDULER_PROJECT_CONFIG", filepath.Join(referencePackagePath, "project.yaml"))),
 		SoloBoardInternalURL: envDefault("A3_SOLOBOARD_INTERNAL_URL", "http://soloboard:3000"),
@@ -930,10 +937,10 @@ func ensureRuntimeHostAgent(config runtimeInstanceConfig, plan runtimeRunOncePla
 		if _, err := runExternal(runner, "docker", "exec", containerID, "a3", "agent", "package", "verify", "--target", plan.HostAgentTarget); err != nil {
 			return err
 		}
-		if _, err := runExternal(runner, "docker", "exec", containerID, "a3", "agent", "package", "export", "--target", plan.HostAgentTarget, "--output", "/tmp/a3-runtime-run-once-agent"); err != nil {
+		if _, err := runExternal(runner, "docker", "exec", containerID, "a3", "agent", "package", "export", "--target", plan.HostAgentTarget, "--output", "/tmp/a2o-runtime-run-once-agent"); err != nil {
 			return err
 		}
-		if _, err := runExternal(runner, "docker", "cp", containerID+":/tmp/a3-runtime-run-once-agent", plan.HostAgentBin); err != nil {
+		if _, err := runExternal(runner, "docker", "cp", containerID+":/tmp/a2o-runtime-run-once-agent", plan.HostAgentBin); err != nil {
 			return err
 		}
 		return os.Chmod(plan.HostAgentBin, 0o755)
@@ -954,7 +961,7 @@ func runtimeContainerID(config runtimeInstanceConfig, plan runtimeRunOncePlan, r
 	}
 	containerID := strings.TrimSpace(string(output))
 	if containerID == "" {
-		return "", fmt.Errorf("runtime container not found for service %q", config.RuntimeService)
+		return "", fmt.Errorf("A2O runtime container not found; run a2o runtime up")
 	}
 	return containerID, nil
 }

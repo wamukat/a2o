@@ -156,7 +156,7 @@ runtime:
 
 `.work/a2o/` は A2O が再生成できる runtime output であり、通常は version control に入れない。利用者が管理するのは project package、product source、Taskfile などである。
 
-既存 workspace に `.a3/runtime-instance.json` がある場合、A2O は互換のため読み取る。ただし新規 bootstrap は `.a3/` に instance config を書かない。materialized workspace 内の `.a3/` は agent metadata であり、利用者が編集する設定ではない。
+旧バージョンの runtime instance config は互換のため読み取る。ただし新規 bootstrap は旧ディレクトリに instance config を書かない。materialized workspace 内の agent metadata は利用者が編集する設定ではない。
 
 ## Operations
 

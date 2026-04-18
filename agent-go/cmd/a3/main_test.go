@@ -740,7 +740,7 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 		"doctor_check name=agent_install status=ok",
 		"doctor_check name=kanban_volume status=ok detail=reuse_existing a2o-sample_soloboard-data",
 		"doctor_check name=kanban_service status=ok detail=http://localhost:3480/",
-		"doctor_check name=runtime_container status=ok detail=service=a3-runtime container=runtime-container",
+		"doctor_check name=runtime_container status=ok detail=A2O runtime container=runtime-container",
 		"doctor_check name=runtime_image_digest status=ok detail=ghcr.io/wamukat/a2o-engine@sha256:test",
 		"doctor_status=ok",
 	} {
@@ -901,8 +901,8 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 		}
 	}
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime pgrep -f a3 execute-until-idle")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime cat /tmp/a3-runtime-run-once.exit")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime tail -n 160 /tmp/a3-runtime-run-once.log")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime cat /tmp/a2o-runtime-run-once.exit")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime tail -n 160 /tmp/a2o-runtime-run-once.log")
 	joinedText := strings.Join(joined, "\n")
 	if !strings.Contains(joinedText, "'a3' 'agent-server' '--storage-dir' '/var/lib/a3/test-runtime' '--host' '0.0.0.0' '--port' '7393'") {
 		t.Fatalf("agent-server should listen on container-internal port 7393, calls:\n%s", joinedText)
@@ -1333,7 +1333,7 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 	for _, want := range []string{
 		"describe_task task_ref=A2O#16",
 		"runtime_storage=/var/lib/a3/test-runtime",
-		"runtime_logs runtime=/tmp/a3-runtime-run-once.log",
+		"runtime_logs runtime=/tmp/a2o-runtime-run-once.log",
 		"task A2O#16 kind=single status=blocked current_run=run-16",
 		"run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked",
 		"evidence workspace=runtime_workspace source=detached_commit:abc",
@@ -1341,7 +1341,7 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 		"\"task_ref\":\"A2O#16\"",
 		"comment_count=1",
 		"comment[0] id=61 updated=2026-04-18T07:46:17.996Z body=blocked evidence is available",
-		"operator_logs runtime_tail=docker compose -p a3-test -f compose.yml exec -T a3-runtime tail -n 220 /tmp/a3-runtime-run-once.log",
+		"operator_logs runtime_tail=a2o runtime describe-task A2O#16 server_log=/tmp/a2o-runtime-run-once-agent-server.log",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("describe-task missing %q in:\n%s", want, output)
@@ -1396,7 +1396,7 @@ func TestRuntimeDescribeTaskContinuesWhenRuntimeTaskStateIsUnavailable(t *testin
 		"run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked",
 		"--- kanban_task ---",
 		"comment_count=1",
-		"operator_logs runtime_tail=docker compose -p a3-test -f compose.yml exec -T a3-runtime tail -n 220 /tmp/a3-runtime-run-once.log",
+		"operator_logs runtime_tail=a2o runtime describe-task A2O#16 server_log=/tmp/a2o-runtime-run-once-agent-server.log",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("describe-task missing %q in:\n%s", want, output)
@@ -2199,7 +2199,7 @@ func TestAgentInstallFailsWhenRuntimeContainerIsMissing(t *testing.T) {
 	if code == 0 {
 		t.Fatalf("run should fail when compose ps returns no container")
 	}
-	if !strings.Contains(stderr.String(), "runtime container not found") {
+	if !strings.Contains(stderr.String(), "A2O runtime container not found") {
 		t.Fatalf("stderr should mention missing runtime container, got %q", stderr.String())
 	}
 }
@@ -2279,7 +2279,7 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		return []byte(`[{"id":61,"comment":"blocked evidence is available","updated":"2026-04-18T07:46:17.996Z"}]` + "\n"), nil
 	case strings.Contains(joined, " date -u +%Y%m%dT%H%M%SZ"):
 		return []byte("20260417T000000Z\n"), nil
-	case strings.Contains(joined, " cat /tmp/a3-runtime-run-once.exit"):
+	case strings.Contains(joined, " cat /tmp/a2o-runtime-run-once.exit"):
 		return []byte("0\n"), nil
 	case name == "docker" && len(args) >= 1 && args[0] == "cp":
 		destination := args[len(args)-1]
