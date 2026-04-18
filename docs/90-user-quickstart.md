@@ -54,6 +54,8 @@ a2o project template \
 
 `--output` を使うと、A2O は `project.yaml` と同時に `kanban/bootstrap.json` も生成する。既存ファイルは `--force` なしでは上書きしない。
 
+`your-ai-worker` は placeholder である。bootstrap や runtime 実行の前に、agent 環境で実行できる executor binary 名へ置き換える。A2O はこの値を `agent.required_bins` と `runtime.executor.command` に書くため、未置換のままだと `a2o doctor` や runtime execution で missing command として止まる。
+
 ### 3. 最小 4 コマンドで起動する
 
 project package を置いた後の最小手順:
@@ -67,7 +69,14 @@ a2o runtime run-once
 
 `a2o project bootstrap` は `.work/a2o/runtime-instance.json` を作り、後続の `kanban`、`agent`、`runtime` command が同じ runtime instance を使えるようにする。`a2o agent install` は既定で `.work/a2o/agent/bin/a2o-agent` に agent を配置する。
 
-board を開く場合は次を実行する。
+`run-once` の前に、board 上に runnable task を 1 つ用意する。`kanban/bootstrap.json` は lane と tag を作るが、作業 task は自動投入しない。
+
+1. `a2o kanban url` で board を開く。
+2. `project-package/scenarios/` の内容をもとに task を作成する。
+3. task を `project.yaml` の `kanban.selection.status` に置く。既定は `To do`。
+4. task に trigger label と、必要なら repo label を付ける。
+
+board URL は次で確認する。
 
 ```sh
 a2o kanban url
