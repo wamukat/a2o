@@ -435,19 +435,20 @@ func runRuntimeDescribeTask(args []string, runner commandRunner, stdout io.Write
 		taskOutput, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "task", "a3", "show-task", "--storage-backend", "json", "--storage-dir", plan.StorageDir, taskRef)
 		if err != nil {
 			fmt.Fprintf(stdout, "describe_section name=task status=blocked action=run a2o runtime run-once or verify task ref detail=%s\n", singleLine(err.Error()))
-			return err
-		}
-		printDescribeSection(stdout, "task", taskOutput)
-
-		runRef := parseOutputValue(taskOutput, "current_run")
-		if runRef == "" {
-			fmt.Fprintln(stdout, "describe_section name=run status=skipped reason=no_current_run")
+			fmt.Fprintln(stdout, "describe_section name=run status=skipped reason=task_state_unavailable")
 		} else {
-			runOutput, runErr := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "run", "a3", "show-run", "--storage-backend", "json", "--storage-dir", plan.StorageDir, "--preset-dir", plan.PresetDir, runRef, plan.ManifestPath)
-			if runErr != nil {
-				fmt.Fprintf(stdout, "describe_section name=run status=blocked run_ref=%s action=inspect runtime log detail=%s\n", runRef, singleLine(runErr.Error()))
+			printDescribeSection(stdout, "task", taskOutput)
+
+			runRef := parseOutputValue(taskOutput, "current_run")
+			if runRef == "" {
+				fmt.Fprintln(stdout, "describe_section name=run status=skipped reason=no_current_run")
 			} else {
-				printDescribeSection(stdout, "run", runOutput)
+				runOutput, runErr := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "run", "a3", "show-run", "--storage-backend", "json", "--storage-dir", plan.StorageDir, "--preset-dir", plan.PresetDir, runRef, plan.ManifestPath)
+				if runErr != nil {
+					fmt.Fprintf(stdout, "describe_section name=run status=blocked run_ref=%s action=inspect runtime log detail=%s\n", runRef, singleLine(runErr.Error()))
+				} else {
+					printDescribeSection(stdout, "run", runOutput)
+				}
 			}
 		}
 
@@ -486,6 +487,7 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
 
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
+	fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
 	return withEnv(runtimeRunOnceEnv(effectiveConfig, *maxSteps, *agentAttempts), func() error {
 		return runGenericRuntimeRunOnce(effectiveConfig, *maxSteps, *agentAttempts, runner, stdout)
 	})
@@ -570,7 +572,6 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, age
 			return err
 		}
 		fmt.Fprintf(stdout, "kanban_run_once_finished exit=%s\n", runtimeExit)
-		fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
 		if runtimeExit != "0" {
 			_ = printRuntimeDiagnostics(config, plan, runner, stdout)
 			return fmt.Errorf("runtime run-once failed with exit=%s", runtimeExit)
