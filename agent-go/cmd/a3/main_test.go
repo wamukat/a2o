@@ -225,13 +225,13 @@ func TestApplyAgentInstallOverridesMapsLegacyRuntimeServiceToA2O(t *testing.T) {
 		t.Fatalf("RuntimeService=%q", config.RuntimeService)
 	}
 
+	t.Setenv("A3_RUNTIME_SERVICE", "a3-runtime")
 	config = applyAgentInstallOverrides(runtimeInstanceConfig{
 		ComposeProject: "custom",
 		ComposeFile:    "compose.yml",
-		RuntimeService: "a3-runtime",
 	}, "", "", "a3-runtime")
-	if config.RuntimeService != "a3-runtime" {
-		t.Fatalf("explicit RuntimeService=%q", config.RuntimeService)
+	if config.RuntimeService != "a2o-runtime" {
+		t.Fatalf("legacy override RuntimeService=%q", config.RuntimeService)
 	}
 }
 
