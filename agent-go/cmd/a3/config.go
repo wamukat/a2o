@@ -166,6 +166,9 @@ func applyAgentInstallOverrides(config runtimeInstanceConfig, composeProject str
 	if strings.TrimSpace(config.RuntimeService) == "" {
 		config.RuntimeService = envDefaultCompat("A2O_RUNTIME_SERVICE", "A3_RUNTIME_SERVICE", "a2o-runtime")
 	}
+	if strings.TrimSpace(config.RuntimeService) == "a3-runtime" {
+		config.RuntimeService = "a2o-runtime"
+	}
 	if envComposeProject := envDefaultCompat("A2O_COMPOSE_PROJECT", "A3_COMPOSE_PROJECT", ""); envComposeProject != "" {
 		config.ComposeProject = envComposeProject
 	}
@@ -190,6 +193,10 @@ func applyAgentInstallOverrides(config runtimeInstanceConfig, composeProject str
 func composeArgs(config runtimeInstanceConfig) []string {
 	config = applyAgentInstallOverrides(config, "", "", "")
 	return []string{"compose", "-p", config.ComposeProject, "-f", config.ComposeFile}
+}
+
+func runtimeServiceName(config runtimeInstanceConfig) string {
+	return applyAgentInstallOverrides(config, "", "", "").RuntimeService
 }
 
 func withComposeEnv(config runtimeInstanceConfig, fn func() error) error {

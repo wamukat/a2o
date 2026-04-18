@@ -417,22 +417,23 @@ func runRuntimeUp(args []string, runner commandRunner, stdout io.Writer, stderr 
 	if err != nil {
 		return err
 	}
-	composePrefix := composeArgs(*config)
-	return withComposeEnv(*config, func() error {
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	composePrefix := composeArgs(effectiveConfig)
+	return withComposeEnv(effectiveConfig, func() error {
 		if *pull && !*build {
-			if _, err := runExternal(runner, "docker", append(composePrefix, "pull", config.RuntimeService)...); err != nil {
+			if _, err := runExternal(runner, "docker", append(composePrefix, "pull", effectiveConfig.RuntimeService)...); err != nil {
 				return err
 			}
 		}
 		if *build {
-			if _, err := runExternal(runner, "docker", append(composePrefix, "build", config.RuntimeService)...); err != nil {
+			if _, err := runExternal(runner, "docker", append(composePrefix, "build", effectiveConfig.RuntimeService)...); err != nil {
 				return err
 			}
 		}
-		if _, err := runExternal(runner, "docker", append(composePrefix, "up", "-d", config.RuntimeService, "soloboard")...); err != nil {
+		if _, err := runExternal(runner, "docker", append(composePrefix, "up", "-d", effectiveConfig.RuntimeService, "soloboard")...); err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "runtime_up compose_project=%s package=%s\n", config.ComposeProject, config.PackagePath)
+		fmt.Fprintf(stdout, "runtime_up compose_project=%s package=%s\n", effectiveConfig.ComposeProject, effectiveConfig.PackagePath)
 		return nil
 	})
 }
@@ -451,17 +452,18 @@ func runRuntimeDoctor(args []string, runner commandRunner, stdout io.Writer, std
 	if err != nil {
 		return err
 	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
-	fmt.Fprintf(stdout, "package=%s\n", config.PackagePath)
-	fmt.Fprintf(stdout, "compose_project=%s\n", config.ComposeProject)
+	fmt.Fprintf(stdout, "package=%s\n", effectiveConfig.PackagePath)
+	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
 	for _, check := range []struct {
 		name    string
 		service string
 	}{
-		{name: "runtime_container", service: config.RuntimeService},
+		{name: "runtime_container", service: effectiveConfig.RuntimeService},
 		{name: "kanban_service", service: "soloboard"},
 	} {
-		output, err := runExternal(runner, "docker", append(composeArgs(*config), "ps", "--status", "running", "-q", check.service)...)
+		output, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "ps", "--status", "running", "-q", check.service)...)
 		if err != nil {
 			return err
 		}
@@ -1060,7 +1062,7 @@ func ensureRuntimeHostAgent(config runtimeInstanceConfig, plan runtimeRunOncePla
 		_, err := runExternal(runner, "bash", "-lc", "cd "+shellQuote(buildDir)+" && go build -trimpath -o "+shellQuote(plan.HostAgentBin)+" ./cmd/a3-agent")
 		return err
 	default:
-		return fmt.Errorf("unsupported A3_RUNTIME_RUN_ONCE_AGENT_SOURCE: %s", plan.HostAgentSource)
+		return fmt.Errorf("unsupported A2O_RUNTIME_RUN_ONCE_AGENT_SOURCE: %s", plan.HostAgentSource)
 	}
 }
 
@@ -1275,7 +1277,7 @@ func executeUntilIdleArgs(plan runtimeRunOncePlan) []string {
 		"--kanban-project", plan.KanbanProject,
 		"--kanban-status", plan.KanbanStatus,
 		"--kanban-working-dir", "/workspace",
-		"--kanban-follow-up-label", "a3:follow-up-child",
+		"--kanban-follow-up-label", "a2o:follow-up-child",
 		"--kanban-trigger-label", "trigger:auto-implement",
 		"--kanban-trigger-label", "trigger:auto-parent",
 	)

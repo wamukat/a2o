@@ -36,9 +36,10 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 		fmt.Fprintf(stdout, "doctor_status=%s\n", status)
 		return 1
 	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
-	fmt.Fprintf(stdout, "compose_project=%s\n", config.ComposeProject)
-	fmt.Fprintf(stdout, "kanban_volume=%s\n", kanbanDataVolumeName(config.ComposeProject))
+	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
+	fmt.Fprintf(stdout, "kanban_volume=%s\n", kanbanDataVolumeName(effectiveConfig.ComposeProject))
 
 	packageConfig, err := loadProjectPackageConfig(config.PackagePath)
 	if err != nil {
@@ -60,23 +61,23 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 		report("agent_install", true, agentPath, "none")
 	}
 
-	if exists, err := dockerVolumeExists(runner, kanbanDataVolumeName(config.ComposeProject)); err != nil {
+	if exists, err := dockerVolumeExists(runner, kanbanDataVolumeName(effectiveConfig.ComposeProject)); err != nil {
 		report("kanban_volume", false, err.Error(), "check Docker daemon and compose project")
 	} else if exists {
-		report("kanban_volume", true, "reuse_existing volume="+kanbanDataVolumeName(config.ComposeProject)+" note=healthy_board_reuse", "none")
+		report("kanban_volume", true, "reuse_existing volume="+kanbanDataVolumeName(effectiveConfig.ComposeProject)+" note=healthy_board_reuse", "none")
 	} else {
-		report("kanban_volume", true, "create_new "+kanbanDataVolumeName(config.ComposeProject), "none")
+		report("kanban_volume", true, "create_new "+kanbanDataVolumeName(effectiveConfig.ComposeProject), "none")
 	}
 
-	if output, err := runExternal(runner, "docker", append(composeArgs(*config), "ps", "--status", "running", "-q", "soloboard")...); err != nil {
+	if output, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "ps", "--status", "running", "-q", "soloboard")...); err != nil {
 		report("kanban_service", false, err.Error(), "run a2o kanban up")
 	} else if strings.TrimSpace(string(output)) == "" {
 		report("kanban_service", false, "soloboard is not running", "run a2o kanban up")
 	} else {
-		report("kanban_service", true, kanbanPublicURL(*config), "none")
+		report("kanban_service", true, kanbanPublicURL(effectiveConfig), "none")
 	}
 
-	if output, err := runExternal(runner, "docker", append(composeArgs(*config), "ps", "--status", "running", "-q", config.RuntimeService)...); err != nil {
+	if output, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "ps", "--status", "running", "-q", effectiveConfig.RuntimeService)...); err != nil {
 		report("runtime_container", false, err.Error(), "run a2o runtime up")
 	} else if strings.TrimSpace(string(output)) == "" {
 		report("runtime_container", false, "A2O runtime container is not running", "run a2o runtime up")
@@ -169,7 +170,8 @@ func checkRepoClean(packagePath string, config projectPackageConfig, runner comm
 }
 
 func runtimeImageDigest(config *runtimeInstanceConfig, runner commandRunner) string {
-	imageID, err := runExternal(runner, "docker", append(composeArgs(*config), "images", "--quiet", config.RuntimeService)...)
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	imageID, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "images", "--quiet", effectiveConfig.RuntimeService)...)
 	if err != nil {
 		return ""
 	}

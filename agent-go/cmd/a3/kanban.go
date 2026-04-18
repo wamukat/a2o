@@ -63,9 +63,10 @@ func runKanbanUp(args []string, runner commandRunner, stdout io.Writer, stderr i
 	if err != nil {
 		return err
 	}
-	composePrefix := composeArgs(*config)
-	return withComposeEnv(*config, func() error {
-		volumeName := kanbanDataVolumeName(config.ComposeProject)
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	composePrefix := composeArgs(effectiveConfig)
+	return withComposeEnv(effectiveConfig, func() error {
+		volumeName := kanbanDataVolumeName(effectiveConfig.ComposeProject)
 		volumeExists, err := dockerVolumeExists(runner, volumeName)
 		if err != nil {
 			return err
@@ -77,20 +78,20 @@ func runKanbanUp(args []string, runner commandRunner, stdout io.Writer, stderr i
 		if volumeExists {
 			mode = "reuse_existing"
 		}
-		fmt.Fprintf(stdout, "kanban_data compose_project=%s volume=%s mode=%s\n", config.ComposeProject, volumeName, mode)
-		fmt.Fprintf(stdout, "kanban_backup_hint=docker run --rm -v %s:/data -v \"$PWD\":/backup alpine sh -c 'cp /data/soloboard.sqlite /backup/soloboard-%s.sqlite'\n", volumeName, sanitizeBackupName(config.ComposeProject))
+		fmt.Fprintf(stdout, "kanban_data compose_project=%s volume=%s mode=%s\n", effectiveConfig.ComposeProject, volumeName, mode)
+		fmt.Fprintf(stdout, "kanban_backup_hint=docker run --rm -v %s:/data -v \"$PWD\":/backup alpine sh -c 'cp /data/soloboard.sqlite /backup/soloboard-%s.sqlite'\n", volumeName, sanitizeBackupName(effectiveConfig.ComposeProject))
 		if *build {
-			if _, err := runExternal(runner, "docker", append(composePrefix, "build", config.RuntimeService)...); err != nil {
+			if _, err := runExternal(runner, "docker", append(composePrefix, "build", effectiveConfig.RuntimeService)...); err != nil {
 				return err
 			}
 		}
-		if _, err := runExternal(runner, "docker", append(composePrefix, "up", "-d", config.RuntimeService, "soloboard")...); err != nil {
+		if _, err := runExternal(runner, "docker", append(composePrefix, "up", "-d", effectiveConfig.RuntimeService, "soloboard")...); err != nil {
 			return err
 		}
-		if err := runKanbanBootstrap(*config, runner, stdout); err != nil {
+		if err := runKanbanBootstrap(effectiveConfig, runner, stdout); err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "kanban_up compose_project=%s volume=%s url=%s\n", config.ComposeProject, volumeName, kanbanPublicURL(*config))
+		fmt.Fprintf(stdout, "kanban_up compose_project=%s volume=%s url=%s\n", effectiveConfig.ComposeProject, volumeName, kanbanPublicURL(effectiveConfig))
 		return nil
 	})
 }
@@ -186,10 +187,11 @@ func runKanbanDoctor(args []string, runner commandRunner, stdout io.Writer, stde
 	if err != nil {
 		return err
 	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
-	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(*config))
-	fmt.Fprintf(stdout, "compose_project=%s\n", config.ComposeProject)
-	output, err := runExternal(runner, "docker", append(composeArgs(*config), "ps", "soloboard")...)
+	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(effectiveConfig))
+	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
+	output, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "ps", "soloboard")...)
 	if err != nil {
 		return err
 	}

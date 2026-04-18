@@ -86,7 +86,7 @@ func TestAgentInstallExportsAgentFromRuntimeImage(t *testing.T) {
 		"--compose-file",
 		"compose.yml",
 		"--runtime-service",
-		"a3-runtime",
+		"a2o-runtime",
 		"--build",
 	}, runner, &stdout, &stderr)
 	if code != 0 {
@@ -105,9 +105,9 @@ func TestAgentInstallExportsAgentFromRuntimeImage(t *testing.T) {
 	}
 
 	joined := runner.joinedCalls()
-	assertCallContains(t, joined, "docker compose -p test-project -f compose.yml build a3-runtime")
-	assertCallContains(t, joined, "docker compose -p test-project -f compose.yml up -d --no-deps a3-runtime")
-	assertCallContains(t, joined, "docker compose -p test-project -f compose.yml ps -q a3-runtime")
+	assertCallContains(t, joined, "docker compose -p test-project -f compose.yml build a2o-runtime")
+	assertCallContains(t, joined, "docker compose -p test-project -f compose.yml up -d --no-deps a2o-runtime")
+	assertCallContains(t, joined, "docker compose -p test-project -f compose.yml ps -q a2o-runtime")
 	assertCallContains(t, joined, "docker exec container-123 a3 agent package verify --target darwin-amd64")
 	assertCallContains(t, joined, "docker exec container-123 a3 agent package export --target darwin-amd64 --output /tmp/a2o-agent-export")
 	assertCallContains(t, joined, "docker cp container-123:/tmp/a2o-agent-export "+outputPath)
@@ -215,6 +215,26 @@ func TestDefaultBranchNamespaceStripsLegacyA3Prefix(t *testing.T) {
 	}
 }
 
+func TestApplyAgentInstallOverridesMapsLegacyRuntimeServiceToA2O(t *testing.T) {
+	config := applyAgentInstallOverrides(runtimeInstanceConfig{
+		ComposeProject: "a2o-upgraded",
+		ComposeFile:    "compose.yml",
+		RuntimeService: "a3-runtime",
+	}, "", "", "")
+	if config.RuntimeService != "a2o-runtime" {
+		t.Fatalf("RuntimeService=%q", config.RuntimeService)
+	}
+
+	config = applyAgentInstallOverrides(runtimeInstanceConfig{
+		ComposeProject: "custom",
+		ComposeFile:    "compose.yml",
+		RuntimeService: "a3-runtime",
+	}, "", "", "a3-runtime")
+	if config.RuntimeService != "a3-runtime" {
+		t.Fatalf("explicit RuntimeService=%q", config.RuntimeService)
+	}
+}
+
 func TestRuntimeCommandsReadLegacyInstanceConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -227,7 +247,7 @@ func TestRuntimeCommandsReadLegacyInstanceConfig(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "legacy-project",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		SoloBoardPort:  "3479",
 		AgentPort:      "7393",
 		StorageDir:     "/var/lib/a3/a2o-runtime",
@@ -581,7 +601,7 @@ func TestKanbanUpUsesBootstrappedInstanceConfig(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		SoloBoardPort:  "3480",
 	})
 	runner := &fakeRunner{}
@@ -597,8 +617,8 @@ func TestKanbanUpUsesBootstrappedInstanceConfig(t *testing.T) {
 
 	joined := runner.joinedCalls()
 	assertCallContains(t, joined, "docker volume inspect a3-test_soloboard-data")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml build a3-runtime")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a3-runtime soloboard")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml build a2o-runtime")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime soloboard")
 	if !strings.Contains(stdout.String(), "kanban_data compose_project=a3-test volume=a3-test_soloboard-data mode=reuse_existing") {
 		t.Fatalf("stdout should describe kanban data volume, got %q", stdout.String())
 	}
@@ -615,7 +635,7 @@ func TestKanbanUpFreshBoardFailsWhenVolumeExists(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		SoloBoardPort:  "3480",
 	})
 	runner := &fakeRunner{}
@@ -665,7 +685,7 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		SoloBoardPort:  "3480",
 	})
 	runner := &fakeRunner{}
@@ -680,8 +700,8 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 	})
 
 	joined := runner.joinedCalls()
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a3-runtime soloboard")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime python3 /opt/a2o/share/tools/kanban/bootstrap_soloboard.py --config /workspace/reference/project-package/kanban/bootstrap.json --base-url http://soloboard:3000 --board A2OReference")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime soloboard")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a2o-runtime python3 /opt/a2o/share/tools/kanban/bootstrap_soloboard.py --config /workspace/reference/project-package/kanban/bootstrap.json --base-url http://soloboard:3000 --board A2OReference")
 	if !strings.Contains(stdout.String(), "kanban_bootstrapped project=A2OReference") {
 		t.Fatalf("stdout should describe kanban bootstrap, got %q", stdout.String())
 	}
@@ -722,7 +742,7 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a2o-sample",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		SoloBoardPort:  "3480",
 	})
 	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
@@ -796,7 +816,7 @@ func TestDoctorAgentInstallFailureShowsExactOutputPath(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a2o-sample",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		SoloBoardPort:  "3480",
 	})
 	runner := &fakeRunner{}
@@ -896,7 +916,7 @@ func TestAgentInstallUsesBootstrappedInstanceConfig(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -910,8 +930,8 @@ func TestAgentInstallUsesBootstrappedInstanceConfig(t *testing.T) {
 	})
 
 	joined := runner.joinedCalls()
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d --no-deps a3-runtime")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml ps -q a3-runtime")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d --no-deps a2o-runtime")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml ps -q a2o-runtime")
 	assertCallContains(t, joined, "docker exec container-123 a3 agent package verify --target linux-amd64")
 	assertCallContains(t, joined, "docker cp container-123:/tmp/a2o-agent-export "+filepath.Join(tempDir, hostAgentBinRelativePath))
 }
@@ -929,7 +949,7 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		SoloBoardPort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
@@ -946,7 +966,7 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	})
 
 	joined := runner.joinedCalls()
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a3-runtime soloboard")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime soloboard")
 	if hasCallPrefix(joined, "bash "+packageDir) {
 		t.Fatalf("run-once should not call project runtime script:\n%s", strings.Join(joined, "\n"))
 	}
@@ -970,9 +990,9 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 			t.Fatalf("run-once should use structured cleanup/read/log commands, found %q in:\n%s", forbidden, strings.Join(joined, "\n"))
 		}
 	}
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime pgrep -f a3 execute-until-idle")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime cat /tmp/a2o-runtime-run-once.exit")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime tail -n 160 /tmp/a2o-runtime-run-once.log")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a2o-runtime pgrep -f a3 execute-until-idle")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a2o-runtime cat /tmp/a2o-runtime-run-once.exit")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a2o-runtime tail -n 160 /tmp/a2o-runtime-run-once.log")
 	joinedText := strings.Join(joined, "\n")
 	if !strings.Contains(joinedText, "'a3' 'agent-server' '--storage-dir' '/var/lib/a3/test-runtime' '--host' '0.0.0.0' '--port' '7393'") {
 		t.Fatalf("agent-server should listen on container-internal port 7393, calls:\n%s", joinedText)
@@ -1046,7 +1066,7 @@ func TestRuntimeRunOnceFailsWithoutProjectYaml(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1083,7 +1103,7 @@ func TestRuntimeRunOnceRejectsLegacyManifestSplit(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1127,7 +1147,7 @@ repos:
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1185,7 +1205,7 @@ runtime:
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1233,7 +1253,7 @@ runtime:
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1266,7 +1286,7 @@ func TestRuntimeUpStartsContainersWithoutScheduler(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1280,8 +1300,8 @@ func TestRuntimeUpStartsContainersWithoutScheduler(t *testing.T) {
 	})
 
 	joined := runner.joinedCalls()
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml build a3-runtime")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a3-runtime soloboard")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml build a2o-runtime")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime soloboard")
 	if strings.Contains(strings.Join(joined, "\n"), "start-background") {
 		t.Fatalf("runtime up must not launch scheduler, got:\n%s", strings.Join(joined, "\n"))
 	}
@@ -1299,7 +1319,7 @@ func TestRuntimeUpCanPullConfiguredImageBeforeStarting(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a2o-pull",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1313,8 +1333,8 @@ func TestRuntimeUpCanPullConfiguredImageBeforeStarting(t *testing.T) {
 	})
 
 	joined := runner.joinedCalls()
-	assertCallContains(t, joined, "docker compose -p a2o-pull -f compose.yml pull a3-runtime")
-	assertCallContains(t, joined, "docker compose -p a2o-pull -f compose.yml up -d a3-runtime soloboard")
+	assertCallContains(t, joined, "docker compose -p a2o-pull -f compose.yml pull a2o-runtime")
+	assertCallContains(t, joined, "docker compose -p a2o-pull -f compose.yml up -d a2o-runtime soloboard")
 	if runner.lastEnv["A2O_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine:latest" {
 		t.Fatalf("runtime up should map public A2O_RUNTIME_IMAGE into compose env, got %#v", runner.lastEnv)
 	}
@@ -1328,7 +1348,7 @@ func TestRuntimeDownStopsContainersWithoutSchedulerMutation(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1364,7 +1384,7 @@ func TestRuntimeStartLaunchesForegroundLoopInBackground(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1422,7 +1442,7 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		SoloBoardPort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
@@ -1459,9 +1479,9 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 
 	joined := strings.Join(runner.joinedCalls(), "\n")
 	for _, want := range []string{
-		"docker compose -p a3-test -f compose.yml exec -T a3-runtime a3 show-task --storage-backend json --storage-dir /var/lib/a3/test-runtime A2O#16",
-		"docker compose -p a3-test -f compose.yml exec -T a3-runtime a3 show-run --storage-backend json --storage-dir /var/lib/a3/test-runtime --preset-dir /tmp/a3-engine/config/presets run-16 " + filepath.Join(packageDir, "project.yaml"),
-		"docker compose -p a3-test -f compose.yml exec -T a3-runtime python3 /opt/a2o/share/tools/kanban/cli.py --backend soloboard --base-url http://soloboard:3000 task-comment-list --project A2OReferenceMultiRepo --task A2O#16",
+		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 show-task --storage-backend json --storage-dir /var/lib/a3/test-runtime A2O#16",
+		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 show-run --storage-backend json --storage-dir /var/lib/a3/test-runtime --preset-dir /tmp/a3-engine/config/presets run-16 " + filepath.Join(packageDir, "project.yaml"),
+		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime python3 /opt/a2o/share/tools/kanban/cli.py --backend soloboard --base-url http://soloboard:3000 task-comment-list --project A2OReferenceMultiRepo --task A2O#16",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("describe-task missing call %q in:\n%s", want, joined)
@@ -1482,7 +1502,7 @@ func TestRuntimeDescribeTaskContinuesWhenRuntimeTaskStateIsUnavailable(t *testin
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		SoloBoardPort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
@@ -1526,7 +1546,7 @@ func TestRuntimeDescribeTaskFindsLatestRunWhenTaskHasNoCurrentRun(t *testing.T) 
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		SoloBoardPort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
@@ -1553,7 +1573,7 @@ func TestRuntimeDescribeTaskFindsLatestRunWhenTaskHasNoCurrentRun(t *testing.T) 
 			t.Fatalf("describe-task missing %q in:\n%s", want, output)
 		}
 	}
-	if !strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "docker compose -p a3-test -f compose.yml exec -T a3-runtime ruby -rjson -e") {
+	if !strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "docker compose -p a3-test -f compose.yml exec -T a2o-runtime ruby -rjson -e") {
 		t.Fatalf("describe-task should inspect runs.json, calls:\n%s", strings.Join(runner.joinedCalls(), "\n"))
 	}
 }
@@ -1571,7 +1591,7 @@ func TestRuntimeStartRejectsInvalidOptionsBeforeBackgroundLaunch(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1605,7 +1625,7 @@ func TestRuntimeStartRejectsNegativeIntervalBeforeBackgroundLaunch(t *testing.T)
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1638,7 +1658,7 @@ func TestRuntimeStartRequiresProjectConfigBeforeBackgroundLaunch(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1672,7 +1692,7 @@ func TestRuntimeStartRejectsAlreadyRunningScheduler(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
 	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
@@ -1718,7 +1738,7 @@ func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
 	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
@@ -1776,7 +1796,7 @@ func TestRuntimeStatusReportsStaleForUnrelatedReusedPID(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
 	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
@@ -1820,7 +1840,7 @@ func TestRuntimeImageDigestPrintsPinnedRuntimeDigest(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a2o-digest",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1853,7 +1873,7 @@ func TestRuntimeStatusRejectsInvalidPIDFile(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
 	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
@@ -1894,7 +1914,7 @@ func TestRuntimeStopKillsSchedulerAndRemovesPID(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
 	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
@@ -1945,7 +1965,7 @@ func TestRuntimeStopDoesNotTerminateUnrelatedReusedPID(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
 	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
@@ -1972,8 +1992,8 @@ func TestRuntimeStopDoesNotTerminateUnrelatedReusedPID(t *testing.T) {
 	if runner.callCount("terminate-process-group 12345") != 0 {
 		t.Fatalf("runtime stop must not terminate unrelated process, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
 	}
-	assertCallContains(t, runner.joinedCalls(), "docker compose -p a3-test -f compose.yml exec -T a3-runtime pgrep -f a3 execute-until-idle")
-	assertCallContains(t, runner.joinedCalls(), "docker compose -p a3-test -f compose.yml exec -T a3-runtime pgrep -f a3 agent-server")
+	assertCallContains(t, runner.joinedCalls(), "docker compose -p a3-test -f compose.yml exec -T a2o-runtime pgrep -f a3 execute-until-idle")
+	assertCallContains(t, runner.joinedCalls(), "docker compose -p a3-test -f compose.yml exec -T a2o-runtime pgrep -f a3 agent-server")
 	if _, err := os.Stat(paths.PIDFile); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("pid file should be removed after stale stop, stat err=%v", err)
 	}
@@ -2011,7 +2031,7 @@ func TestRuntimeRunOncePrefersPublicA2OAgentPath(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		SoloBoardPort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
@@ -2052,7 +2072,7 @@ func TestRuntimeRunOnceIgnoresLegacyA2OAgentPath(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		SoloBoardPort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
@@ -2130,7 +2150,7 @@ runtime:
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		SoloBoardPort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
@@ -2198,7 +2218,7 @@ func TestRuntimeRunOnceAllowsEnvToOverrideStaleInstanceRuntimeValues(t *testing.
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "stale-compose.yml",
 		ComposeProject: "stale-project",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/stale-runtime",
 	})
@@ -2214,7 +2234,7 @@ func TestRuntimeRunOnceAllowsEnvToOverrideStaleInstanceRuntimeValues(t *testing.
 	})
 
 	joined := strings.Join(runner.joinedCalls(), "\n")
-	if !strings.Contains(joined, "docker compose -p env-project -f env-compose.yml up -d a3-runtime soloboard") {
+	if !strings.Contains(joined, "docker compose -p env-project -f env-compose.yml up -d a2o-runtime soloboard") {
 		t.Fatalf("run-once should use env compose override, calls:\n%s", joined)
 	}
 	if !strings.Contains(joined, "http://127.0.0.1:7555") {
@@ -2238,7 +2258,7 @@ func TestRuntimeLoopRunsConfiguredCycles(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 		SoloBoardPort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
@@ -2314,7 +2334,7 @@ func TestRuntimeContainerProcessBuildsQuotedBackgroundScript(t *testing.T) {
 
 func TestArchiveRuntimeStateUsesStructuredDockerCommands(t *testing.T) {
 	t.Setenv("A3_RUNTIME_RUN_ONCE_ARCHIVE_STATE", "1")
-	config := runtimeInstanceConfig{RuntimeService: "a3-runtime"}
+	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
 	plan := runtimeRunOncePlan{
 		ComposePrefix: []string{"compose", "-p", "a3-test", "-f", "compose.yml"},
 		StorageDir:    "/var/lib/a3/test-runtime",
@@ -2332,10 +2352,10 @@ func TestArchiveRuntimeStateUsesStructuredDockerCommands(t *testing.T) {
 			t.Fatalf("archive should use structured docker commands, found %q in:\n%s", forbidden, strings.Join(joined, "\n"))
 		}
 	}
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime mkdir -p /var/lib/a2o/archive")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime test -e /var/lib/a3/test-runtime")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime mv /var/lib/a3/test-runtime /var/lib/a2o/archive/test-runtime-20260417T000000Z")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a3-runtime mkdir -p /var/lib/a3/test-runtime")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a2o-runtime mkdir -p /var/lib/a2o/archive")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a2o-runtime test -e /var/lib/a3/test-runtime")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a2o-runtime mv /var/lib/a3/test-runtime /var/lib/a2o/archive/test-runtime-20260417T000000Z")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a2o-runtime mkdir -p /var/lib/a3/test-runtime")
 }
 
 func TestAgentInstallDefaultsOutputFromInstanceConfig(t *testing.T) {
@@ -2346,7 +2366,7 @@ func TestAgentInstallDefaultsOutputFromInstanceConfig(t *testing.T) {
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
-		RuntimeService: "a3-runtime",
+		RuntimeService: "a2o-runtime",
 	})
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -2465,7 +2485,7 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		return []byte("image-123\n"), nil
 	case strings.Contains(joined, " compose ") && strings.Contains(joined, " ps --status running -q soloboard"):
 		return []byte("soloboard-container\n"), nil
-	case strings.Contains(joined, " compose ") && (strings.Contains(joined, " ps --status running -q a3-runtime") || strings.Contains(joined, " ps --status running -q a2o-runtime")):
+	case strings.Contains(joined, " compose ") && (strings.Contains(joined, " ps --status running -q a2o-runtime") || strings.Contains(joined, " ps --status running -q a2o-runtime")):
 		return []byte("runtime-container\n"), nil
 	case name == "docker" && len(args) >= 4 && args[0] == "image" && args[1] == "inspect":
 		return []byte("ghcr.io/wamukat/a2o-engine@sha256:test\n"), nil

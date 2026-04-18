@@ -16,7 +16,7 @@ The owner decisions for implementation are:
 - `project.yaml` is the canonical file name.
 - `manifest.yml` compatibility is not required for the new schema.
 - User-facing schema and diagnostics should use A2O names. A3 names may remain only as internal compatibility details.
-- Internal follow-up labels such as `a3:follow-up-child` should not be exposed in normal user-authored schema.
+- Internal follow-up labels such as `a2o:follow-up-child` should not be exposed in normal user-authored schema.
 
 ## Former Split
 
