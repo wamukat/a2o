@@ -219,6 +219,8 @@ func TestWorkspaceMaterializerFailsBeforeCommandForDirtySource(t *testing.T) {
 
 	if _, err := materializer.Prepare(testWorkspaceRequest("sample-catalog-service")); err == nil {
 		t.Fatal("expected dirty source failure")
+	} else if !strings.Contains(err.Error(), "dirty.txt") {
+		t.Fatalf("expected dirty source failure to include changed file, got %v", err)
 	}
 }
 

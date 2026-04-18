@@ -242,12 +242,12 @@ func (m WorkspaceMaterializer) prepareMergePlans(request MergeRequest, descripto
 			rollbackMergePlans(plans)
 			return nil, err
 		}
-		if dirty, err := gitDirty(sourceRoot); err != nil {
+		if dirtyFiles, err := gitDirtyFiles(sourceRoot); err != nil {
 			rollbackMergePlans(plans)
 			return nil, err
-		} else if dirty {
+		} else if len(dirtyFiles) > 0 {
 			rollbackMergePlans(plans)
-			return nil, fmt.Errorf("source alias %s is dirty before merge", slot.Source.Alias)
+			return nil, fmt.Errorf("source alias %s is dirty before merge: changed_files=%v", slot.Source.Alias, dirtyFiles)
 		}
 		beforeHead, createdRef, err := ensureMergeTargetRef(sourceRoot, slot.TargetRef, slot.BootstrapRef)
 		if err != nil {
@@ -1129,10 +1129,10 @@ func (m WorkspaceMaterializer) sourceRoot(alias string) (string, error) {
 }
 
 func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot WorkspaceSlotRequest) (map[string]any, error) {
-	if dirty, err := gitDirty(sourceRoot); err != nil {
+	if dirtyFiles, err := gitDirtyFiles(sourceRoot); err != nil {
 		return nil, err
-	} else if dirty {
-		return nil, fmt.Errorf("source alias %s is dirty before materialization", slot.Source.Alias)
+	} else if len(dirtyFiles) > 0 {
+		return nil, fmt.Errorf("source alias %s is dirty before materialization: changed_files=%v", slot.Source.Alias, dirtyFiles)
 	}
 	if err := os.RemoveAll(slotPath); err != nil {
 		return nil, err
@@ -1269,11 +1269,30 @@ func gitPatch(root string) (string, error) {
 }
 
 func gitDirty(root string) (bool, error) {
-	out, err := gitOutput(root, "status", "--porcelain", "--untracked-files=all")
+	files, err := gitDirtyFiles(root)
 	if err != nil {
 		return false, err
 	}
-	return out != "", nil
+	return len(files) > 0, nil
+}
+
+func gitDirtyFiles(root string) ([]string, error) {
+	out, err := gitOutput(root, "status", "--porcelain", "--untracked-files=all")
+	if err != nil {
+		return nil, err
+	}
+	if out == "" {
+		return nil, nil
+	}
+	files := []string{}
+	for _, line := range strings.Split(out, "\n") {
+		if len(line) <= 3 {
+			continue
+		}
+		files = append(files, strings.TrimSpace(line[3:]))
+	}
+	sort.Strings(files)
+	return files, nil
 }
 
 func gitDirtyIgnoringMetadata(root string) (bool, error) {
