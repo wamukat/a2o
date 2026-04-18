@@ -33,8 +33,10 @@ a2o project template \
   --kanban-project MyProduct \
   --language node \
   --executor-bin your-ai-worker \
-  --output ./project-package/project.yaml
+  --output ./tmp-a2o-template/project.yaml
 ```
+
+`--output` は `project.yaml` と `kanban/bootstrap.json` を生成する。既存ファイルは `--force` なしでは上書きしない。移行作業では既存 package に直接出力せず、別ディレクトリに生成して差分を比較する。
 
 既存の full executor object はそのまま利用できる。新規または単純な package では、次の短縮形を使える。
 

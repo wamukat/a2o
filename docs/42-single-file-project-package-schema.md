@@ -146,6 +146,8 @@ a2o project template \
 
 The template uses the compact executor form. `--language` controls `agent.required_bins`; `--executor-bin` and repeated `--executor-arg` flags generate `runtime.executor.command`.
 
+When `--output` points to a file, the generator also writes `kanban/bootstrap.json` beside the package config. Existing files are not overwritten unless `--force` is provided.
+
 `runtime.presets` keeps the current preset model. Presets are still useful for common A2O behavior, but package-local overrides live beside the rest of the package config.
 
 `runtime.surface` owns skills, verification commands, remediation commands, and workspace hook. Values may be scalar or variant maps, matching the current project surface resolver behavior.

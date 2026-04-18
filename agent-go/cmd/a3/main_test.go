@@ -210,9 +210,20 @@ func TestProjectTemplateWritesOutputFileWithCustomExecutorArgs(t *testing.T) {
 	if !strings.Contains(stdout.String(), "project_template_written path="+outputPath) {
 		t.Fatalf("stdout should describe output path, got %q", stdout.String())
 	}
+	bootstrapPath := filepath.Join(filepath.Dir(outputPath), "kanban", "bootstrap.json")
+	if !strings.Contains(stdout.String(), "kanban_bootstrap_template_written path="+bootstrapPath) {
+		t.Fatalf("stdout should describe bootstrap path, got %q", stdout.String())
+	}
 	config, err := loadProjectPackageConfig(filepath.Dir(outputPath))
 	if err != nil {
 		t.Fatalf("generated project.yaml should load: %v", err)
+	}
+	bootstrapBody, err := os.ReadFile(bootstrapPath)
+	if err != nil {
+		t.Fatalf("kanban bootstrap template missing: %v", err)
+	}
+	if !strings.Contains(string(bootstrapBody), `"name": "PythonProduct"`) || !strings.Contains(string(bootstrapBody), `"name": "repo:app"`) {
+		t.Fatalf("unexpected kanban bootstrap template:\n%s", string(bootstrapBody))
 	}
 	command := config.Executor["default_profile"].(map[string]any)["command"].([]any)
 	if got := command[0].(string) + " " + command[1].(string) + " " + command[2].(string); got != "custom-worker run --out={{result_path}}" {
@@ -220,6 +231,39 @@ func TestProjectTemplateWritesOutputFileWithCustomExecutorArgs(t *testing.T) {
 	}
 	if !containsString(config.AgentRequiredBins, "python3") {
 		t.Fatalf("python template should include python3 in %#v", config.AgentRequiredBins)
+	}
+}
+
+func TestProjectTemplateRefusesToOverwriteWithoutForce(t *testing.T) {
+	tempDir := t.TempDir()
+	outputPath := filepath.Join(tempDir, "project-package", "project.yaml")
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(outputPath, []byte("existing\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"project",
+		"template",
+		"--output",
+		outputPath,
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("run should fail when output exists")
+	}
+	if !strings.Contains(stderr.String(), "pass --force to overwrite") {
+		t.Fatalf("stderr should explain force, got %q", stderr.String())
+	}
+	body, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != "existing\n" {
+		t.Fatalf("existing file should not be overwritten, got %q", string(body))
 	}
 }
 

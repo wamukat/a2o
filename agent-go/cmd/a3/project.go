@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -63,6 +64,7 @@ func runProjectTemplate(args []string, stdout io.Writer, stderr io.Writer) error
 	language := flags.String("language", "generic", "toolchain preset: generic, node, go, python, ruby")
 	executorBin := flags.String("executor-bin", "your-ai-worker", "agent-side executor binary")
 	outputPath := flags.String("output", "-", "output project.yaml path, or - for stdout")
+	force := flags.Bool("force", false, "overwrite existing generated files")
 	var executorArgs stringListFlag
 	flags.Var(&executorArgs, "executor-arg", "executor argument; repeat to override the default --schema/--result arguments")
 
@@ -88,13 +90,39 @@ func runProjectTemplate(args []string, stdout io.Writer, stderr io.Writer) error
 		_, err := io.WriteString(stdout, template)
 		return err
 	}
+	if !*force {
+		if _, err := os.Stat(*outputPath); err == nil {
+			return fmt.Errorf("output file already exists: %s; pass --force to overwrite", *outputPath)
+		} else if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("inspect output file: %w", err)
+		}
+	}
+	bootstrapPath := filepath.Join(filepath.Dir(*outputPath), "kanban", "bootstrap.json")
+	if !*force {
+		if _, err := os.Stat(bootstrapPath); err == nil {
+			return fmt.Errorf("kanban bootstrap file already exists: %s; pass --force to overwrite", bootstrapPath)
+		} else if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("inspect kanban bootstrap file: %w", err)
+		}
+	}
+	bootstrapTemplate, err := buildKanbanBootstrapTemplate(strings.TrimSpace(*kanbanProject), strings.TrimSpace(*repoLabel))
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(*outputPath), 0o755); err != nil {
 		return fmt.Errorf("create output directory: %w", err)
 	}
 	if err := os.WriteFile(*outputPath, []byte(template), 0o644); err != nil {
 		return fmt.Errorf("write project template: %w", err)
 	}
+	if err := os.MkdirAll(filepath.Dir(bootstrapPath), 0o755); err != nil {
+		return fmt.Errorf("create kanban bootstrap directory: %w", err)
+	}
+	if err := os.WriteFile(bootstrapPath, []byte(bootstrapTemplate), 0o644); err != nil {
+		return fmt.Errorf("write kanban bootstrap template: %w", err)
+	}
 	fmt.Fprintf(stdout, "project_template_written path=%s\n", *outputPath)
+	fmt.Fprintf(stdout, "kanban_bootstrap_template_written path=%s\n", bootstrapPath)
 	return nil
 }
 
@@ -121,6 +149,10 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	if options.ExecutorBin == "" {
 		return "", errors.New("--executor-bin must not be blank")
 	}
+	repoLabel := options.RepoLabel
+	if repoLabel == "" {
+		repoLabel = "repo:app"
+	}
 	requiredBins, err := templateRequiredBins(options.Language, options.ExecutorBin)
 	if err != nil {
 		return "", err
@@ -144,9 +176,7 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	builder.WriteString("  app:\n")
 	writeYAMLScalar(&builder, 2, "path", options.RepoPath)
 	writeYAMLScalar(&builder, 2, "role", "product")
-	if options.RepoLabel != "" {
-		writeYAMLScalar(&builder, 2, "label", options.RepoLabel)
-	}
+	writeYAMLScalar(&builder, 2, "label", repoLabel)
 	builder.WriteString("agent:\n")
 	writeYAMLScalar(&builder, 1, "workspace_root", ".work/a2o-agent/workspaces")
 	builder.WriteString("  required_bins:\n")
@@ -169,6 +199,33 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	writeYAMLScalar(&builder, 2, "policy", "ff_only")
 	writeYAMLScalar(&builder, 2, "target_ref", "refs/heads/main")
 	return builder.String(), nil
+}
+
+func buildKanbanBootstrapTemplate(kanbanProject string, repoLabel string) (string, error) {
+	if kanbanProject == "" {
+		return "", errors.New("--kanban-project must not be blank")
+	}
+	if strings.TrimSpace(repoLabel) == "" {
+		repoLabel = "repo:app"
+	}
+	payload := map[string]any{
+		"boards": []any{
+			map[string]any{
+				"name":  kanbanProject,
+				"lanes": []string{"Backlog", "To do", "In progress", "In review", "Inspection", "Merging", "Done"},
+				"tags": []any{
+					map[string]any{"name": "trigger:auto-implement"},
+					map[string]any{"name": repoLabel},
+					map[string]any{"name": "blocked"},
+				},
+			},
+		},
+	}
+	body, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("build kanban bootstrap template: %w", err)
+	}
+	return string(body) + "\n", nil
 }
 
 func templateRequiredBins(language string, executorBin string) ([]string, error) {

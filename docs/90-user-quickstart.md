@@ -45,6 +45,8 @@ a2o project template \
 
 `--language` は `generic`、`node`、`go`、`python`、`ruby` を選べる。A2O は選択した toolchain と `--executor-bin` を `agent.required_bins` に入れる。
 
+`--output` を使うと、A2O は `project.yaml` と同時に `kanban/bootstrap.json` も生成する。既存ファイルは `--force` なしでは上書きしない。既存 package の移行で比較用に出す場合は、別ディレクトリか stdout 出力を使う。
+
 生成される `runtime.executor.command` は、A2O が agent に渡す stdin bundle を executor command へ接続する短縮記法である。通常は `--executor-bin` を自分の worker CLI に変えるところから始める。worker CLI が標準の `--schema {{schema_path}} --result {{result_path}}` 以外の引数を使う場合は、`--executor-arg` を繰り返して command array を生成する。
 
 ```yaml
