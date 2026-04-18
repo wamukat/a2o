@@ -103,7 +103,7 @@ runtime:
 
 `repos.*.path` と `agent.workspace_root` は agent が見える path として扱う。project 固有の build、test、verification は `commands/` と `scenarios/` に置く。
 
-Portal のように複数 repo、support repo、Maven local repo、parent/child flow を持つ package は advanced example として扱う。最初の package では single repo、single merge target、one executor から始める。
+複数 repo、support repo、local dependency cache、parent/child flow を持つ package は advanced example として扱う。最初の package では single repo、single merge target、one executor から始める。
 
 ## 初回セットアップ
 
