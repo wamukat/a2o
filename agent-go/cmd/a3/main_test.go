@@ -117,6 +117,109 @@ func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
 	}
 }
 
+func TestProjectTemplatePrintsValidMinimalProjectYaml(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"project",
+		"template",
+		"--package-name",
+		"sample-product",
+		"--kanban-project",
+		"SampleProduct",
+		"--language",
+		"node",
+		"--executor-bin",
+		"a2o-worker",
+		"--repo-label",
+		"repo:app",
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "project-package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), stdout.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	config, err := loadProjectPackageConfig(packageDir)
+	if err != nil {
+		t.Fatalf("generated project.yaml should load: %v\n%s", err, stdout.String())
+	}
+	if config.PackageName != "sample-product" {
+		t.Fatalf("PackageName=%q", config.PackageName)
+	}
+	if config.KanbanProject != "SampleProduct" {
+		t.Fatalf("KanbanProject=%q", config.KanbanProject)
+	}
+	if config.Repos["app"].Label != "repo:app" {
+		t.Fatalf("repo label=%q", config.Repos["app"].Label)
+	}
+	for _, want := range []string{"git", "node", "npm", "a2o-worker"} {
+		if !containsString(config.AgentRequiredBins, want) {
+			t.Fatalf("required_bins missing %q in %#v", want, config.AgentRequiredBins)
+		}
+	}
+	command := config.Executor["default_profile"].(map[string]any)["command"].([]any)
+	if strings.Join([]string{
+		command[0].(string),
+		command[1].(string),
+		command[2].(string),
+		command[3].(string),
+		command[4].(string),
+	}, " ") != "a2o-worker --schema {{schema_path}} --result {{result_path}}" {
+		t.Fatalf("unexpected executor command: %#v", command)
+	}
+}
+
+func TestProjectTemplateWritesOutputFileWithCustomExecutorArgs(t *testing.T) {
+	tempDir := t.TempDir()
+	outputPath := filepath.Join(tempDir, "project-package", "project.yaml")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"project",
+		"template",
+		"--package-name",
+		"python-product",
+		"--kanban-project",
+		"PythonProduct",
+		"--language",
+		"python",
+		"--executor-bin",
+		"custom-worker",
+		"--executor-arg",
+		"run",
+		"--executor-arg",
+		"--out={{result_path}}",
+		"--output",
+		outputPath,
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "project_template_written path="+outputPath) {
+		t.Fatalf("stdout should describe output path, got %q", stdout.String())
+	}
+	config, err := loadProjectPackageConfig(filepath.Dir(outputPath))
+	if err != nil {
+		t.Fatalf("generated project.yaml should load: %v", err)
+	}
+	command := config.Executor["default_profile"].(map[string]any)["command"].([]any)
+	if got := command[0].(string) + " " + command[1].(string) + " " + command[2].(string); got != "custom-worker run --out={{result_path}}" {
+		t.Fatalf("unexpected executor command: %s", got)
+	}
+	if !containsString(config.AgentRequiredBins, "python3") {
+		t.Fatalf("python template should include python3 in %#v", config.AgentRequiredBins)
+	}
+}
+
 func TestUnsupportedRuntimeCommandsAreNotPublicEntrypoints(t *testing.T) {
 	for _, command := range [][]string{
 		{"runtime", "up"},

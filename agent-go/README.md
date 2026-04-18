@@ -97,6 +97,17 @@ This command starts the runtime service if needed, verifies the matching agent p
 
 The standard compose file is an A2O distribution asset. Project packages provide bootstrap/config values; they do not provide the A2O runtime compose file. `--compose-file`, `--compose-project`, and `--runtime-service` remain available as development/diagnostic overrides, but they are not part of the normal user path.
 
+Start a new package from the template generator so the executor contract is not hand-written:
+
+```sh
+a2o project template \
+  --package-name my-product \
+  --kanban-project MyProduct \
+  --language node \
+  --executor-bin your-ai-worker \
+  --output ./a2o-project/project.yaml
+```
+
 After `a2o project bootstrap --package ./a2o-project`, runtime commands discover `.a3/runtime-instance.json` from the current directory upward:
 
 ```sh

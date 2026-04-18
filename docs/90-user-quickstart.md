@@ -32,6 +32,21 @@ project-package/
 
 `project.yaml` は project package の唯一の公開 config である。
 
+新規 package は手書きから始めず、まず template を生成する。
+
+```sh
+a2o project template \
+  --package-name my-product \
+  --kanban-project MyProduct \
+  --language node \
+  --executor-bin your-ai-worker \
+  --output ./project-package/project.yaml
+```
+
+`--language` は `generic`、`node`、`go`、`python`、`ruby` を選べる。A2O は選択した toolchain と `--executor-bin` を `agent.required_bins` に入れる。
+
+生成される `runtime.executor` は、A2O が agent に渡す stdin bundle を executor command へ接続する設定である。通常は `--executor-bin` を自分の worker CLI に変えるところから始める。worker CLI が標準の `--schema {{schema_path}} --result {{result_path}}` 以外の引数を使う場合は、`--executor-arg` を繰り返して command array を生成する。
+
 ```yaml
 schema_version: 1
 package:
@@ -93,6 +108,8 @@ runtime:
 `runtime.executor` は implementation / review を実行する agent 側 command である。A2O は worker request を stdin bundle として渡し、executor は `{{result_path}}` に worker result JSON を書く。`{{schema_path}}`、`{{result_path}}`、`{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` を command placeholder として使える。
 
 `repos.*.path` と `agent.workspace_root` は agent が見える path として扱う。project 固有の build、test、verification は `commands/` と `scenarios/` に置く。
+
+Portal のように複数 repo、support repo、Maven local repo、parent/child flow を持つ package は advanced example として扱う。最初の package では single repo、single merge target、one executor から始める。
 
 ## 初回セットアップ
 

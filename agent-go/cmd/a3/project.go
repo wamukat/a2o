@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -27,10 +28,192 @@ func runProject(args []string, stdout io.Writer, stderr io.Writer) int {
 			return 1
 		}
 		return 0
+	case "template":
+		if err := runProjectTemplate(args[1:], stdout, stderr); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
 	default:
 		fmt.Fprintf(stderr, "unknown project subcommand: %s\n", args[0])
 		printUsage(stderr)
 		return 2
+	}
+}
+
+type stringListFlag []string
+
+func (values *stringListFlag) String() string {
+	return strings.Join(*values, " ")
+}
+
+func (values *stringListFlag) Set(value string) error {
+	*values = append(*values, value)
+	return nil
+}
+
+func runProjectTemplate(args []string, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a2o project template", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+
+	packageName := flags.String("package-name", "my-a2o-project", "package.name value")
+	kanbanProject := flags.String("kanban-project", "MyA2OProject", "kanban.project value")
+	repoPath := flags.String("repo-path", "..", "product repo path relative to the package directory")
+	repoLabel := flags.String("repo-label", "", "optional kanban label for the app repo slot")
+	language := flags.String("language", "generic", "toolchain preset: generic, node, go, python, ruby")
+	executorBin := flags.String("executor-bin", "your-ai-worker", "agent-side executor binary")
+	outputPath := flags.String("output", "-", "output project.yaml path, or - for stdout")
+	var executorArgs stringListFlag
+	flags.Var(&executorArgs, "executor-arg", "executor argument; repeat to override the default --schema/--result arguments")
+
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+	template, err := buildProjectTemplate(projectTemplateOptions{
+		PackageName:   strings.TrimSpace(*packageName),
+		KanbanProject: strings.TrimSpace(*kanbanProject),
+		RepoPath:      strings.TrimSpace(*repoPath),
+		RepoLabel:     strings.TrimSpace(*repoLabel),
+		Language:      strings.TrimSpace(*language),
+		ExecutorBin:   strings.TrimSpace(*executorBin),
+		ExecutorArgs:  executorArgs,
+	})
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(*outputPath) == "" || *outputPath == "-" {
+		_, err := io.WriteString(stdout, template)
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(*outputPath), 0o755); err != nil {
+		return fmt.Errorf("create output directory: %w", err)
+	}
+	if err := os.WriteFile(*outputPath, []byte(template), 0o644); err != nil {
+		return fmt.Errorf("write project template: %w", err)
+	}
+	fmt.Fprintf(stdout, "project_template_written path=%s\n", *outputPath)
+	return nil
+}
+
+type projectTemplateOptions struct {
+	PackageName   string
+	KanbanProject string
+	RepoPath      string
+	RepoLabel     string
+	Language      string
+	ExecutorBin   string
+	ExecutorArgs  []string
+}
+
+func buildProjectTemplate(options projectTemplateOptions) (string, error) {
+	if options.PackageName == "" {
+		return "", errors.New("--package-name must not be blank")
+	}
+	if options.KanbanProject == "" {
+		return "", errors.New("--kanban-project must not be blank")
+	}
+	if options.RepoPath == "" {
+		return "", errors.New("--repo-path must not be blank")
+	}
+	if options.ExecutorBin == "" {
+		return "", errors.New("--executor-bin must not be blank")
+	}
+	requiredBins, err := templateRequiredBins(options.Language, options.ExecutorBin)
+	if err != nil {
+		return "", err
+	}
+	executorCommand := append([]string{options.ExecutorBin}, options.ExecutorArgs...)
+	if len(options.ExecutorArgs) == 0 {
+		executorCommand = []string{options.ExecutorBin, "--schema", "{{schema_path}}", "--result", "{{result_path}}"}
+	}
+
+	var builder strings.Builder
+	builder.WriteString("schema_version: 1\n")
+	builder.WriteString("package:\n")
+	writeYAMLScalar(&builder, 1, "name", options.PackageName)
+	builder.WriteString("kanban:\n")
+	writeYAMLScalar(&builder, 1, "provider", "soloboard")
+	writeYAMLScalar(&builder, 1, "project", options.KanbanProject)
+	writeYAMLScalar(&builder, 1, "bootstrap", "kanban/bootstrap.json")
+	builder.WriteString("  selection:\n")
+	writeYAMLScalar(&builder, 2, "status", "To do")
+	builder.WriteString("repos:\n")
+	builder.WriteString("  app:\n")
+	writeYAMLScalar(&builder, 2, "path", options.RepoPath)
+	writeYAMLScalar(&builder, 2, "role", "product")
+	if options.RepoLabel != "" {
+		writeYAMLScalar(&builder, 2, "label", options.RepoLabel)
+	}
+	builder.WriteString("agent:\n")
+	writeYAMLScalar(&builder, 1, "workspace_root", ".work/a2o-agent/workspaces")
+	builder.WriteString("  required_bins:\n")
+	writeYAMLList(&builder, 2, requiredBins)
+	builder.WriteString("runtime:\n")
+	writeYAMLScalar(&builder, 1, "live_ref", "refs/heads/main")
+	builder.WriteString("  max_steps: 20\n")
+	builder.WriteString("  agent_attempts: 200\n")
+	builder.WriteString("  executor:\n")
+	writeYAMLScalar(&builder, 2, "kind", "command")
+	writeYAMLScalar(&builder, 2, "prompt_transport", "stdin-bundle")
+	builder.WriteString("    result:\n")
+	writeYAMLScalar(&builder, 3, "mode", "file")
+	builder.WriteString("    schema:\n")
+	writeYAMLScalar(&builder, 3, "mode", "file")
+	builder.WriteString("    default_profile:\n")
+	builder.WriteString("      command:\n")
+	writeYAMLList(&builder, 4, executorCommand)
+	builder.WriteString("      env: {}\n")
+	builder.WriteString("    phase_profiles: {}\n")
+	builder.WriteString("  presets:\n")
+	writeYAMLList(&builder, 2, []string{"base"})
+	builder.WriteString("  surface:\n")
+	builder.WriteString("    verification_commands: []\n")
+	builder.WriteString("    remediation_commands: []\n")
+	builder.WriteString("  merge:\n")
+	writeYAMLScalar(&builder, 2, "target", "merge_to_live")
+	writeYAMLScalar(&builder, 2, "policy", "ff_only")
+	writeYAMLScalar(&builder, 2, "target_ref", "refs/heads/main")
+	return builder.String(), nil
+}
+
+func templateRequiredBins(language string, executorBin string) ([]string, error) {
+	bins := []string{"git"}
+	switch strings.ToLower(language) {
+	case "", "generic":
+	case "node", "typescript", "javascript":
+		bins = append(bins, "node", "npm")
+	case "go", "golang":
+		bins = append(bins, "go")
+	case "python", "python3":
+		bins = append(bins, "python3")
+	case "ruby":
+		bins = append(bins, "ruby")
+	default:
+		return nil, fmt.Errorf("--language must be one of generic, node, go, python, ruby")
+	}
+	if !containsString(bins, executorBin) {
+		bins = append(bins, executorBin)
+	}
+	return bins, nil
+}
+
+func writeYAMLScalar(builder *strings.Builder, indent int, key string, value string) {
+	builder.WriteString(strings.Repeat("  ", indent))
+	builder.WriteString(key)
+	builder.WriteString(": ")
+	builder.WriteString(strconv.Quote(value))
+	builder.WriteString("\n")
+}
+
+func writeYAMLList(builder *strings.Builder, indent int, values []string) {
+	for _, value := range values {
+		builder.WriteString(strings.Repeat("  ", indent))
+		builder.WriteString("- ")
+		builder.WriteString(strconv.Quote(value))
+		builder.WriteString("\n")
 	}
 }
 
