@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -46,7 +45,7 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 		report("project_package", false, err.Error(), "fix project.yaml or rerun a2o project template")
 	} else {
 		report("project_package", true, "project.yaml schema_version="+packageConfig.SchemaVersion+" package="+packageConfig.PackageName, "none")
-		checkRequiredCommands(packageConfig, report)
+		checkRequiredCommands(packageConfig, runner, report)
 		checkRepoClean(config.PackagePath, packageConfig, runner, report)
 	}
 
@@ -67,8 +66,10 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 		report("kanban_volume", true, "create_new "+kanbanDataVolumeName(config.ComposeProject), "none")
 	}
 
-	if _, err := runExternal(runner, "docker", append(composeArgs(*config), "ps", "soloboard")...); err != nil {
+	if output, err := runExternal(runner, "docker", append(composeArgs(*config), "ps", "--status", "running", "-q", "soloboard")...); err != nil {
 		report("kanban_service", false, err.Error(), "run a2o kanban up")
+	} else if strings.TrimSpace(string(output)) == "" {
+		report("kanban_service", false, "soloboard is not running", "run a2o kanban up")
 	} else {
 		report("kanban_service", true, kanbanPublicURL(*config), "none")
 	}
@@ -86,7 +87,7 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 	return 0
 }
 
-func checkRequiredCommands(config projectPackageConfig, report func(string, bool, string, string)) {
+func checkRequiredCommands(config projectPackageConfig, runner commandRunner, report func(string, bool, string, string)) {
 	required := append([]string{}, config.AgentRequiredBins...)
 	required = append(required, executorCommandBins(config.Executor)...)
 	sort.Strings(required)
@@ -97,10 +98,10 @@ func checkRequiredCommands(config projectPackageConfig, report func(string, bool
 			continue
 		}
 		seen[bin] = true
-		if _, err := exec.LookPath(bin); err != nil {
-			report("required_command."+bin, false, bin+" not found on PATH", "install "+bin+" or update project.yaml agent.required_bins/runtime.executor")
+		if _, err := runner.Run("sh", "-lc", "command -v "+shellQuote(bin)); err != nil {
+			report("agent_required_command."+bin, false, bin+" not found on host agent PATH", "install "+bin+" where a2o-agent runs or update project.yaml agent.required_bins/runtime.executor")
 		} else {
-			report("required_command."+bin, true, bin+" found", "none")
+			report("agent_required_command."+bin, true, bin+" found on host agent PATH", "none")
 		}
 	}
 }

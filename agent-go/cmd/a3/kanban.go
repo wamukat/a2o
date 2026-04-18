@@ -107,7 +107,15 @@ func dockerVolumeExists(runner commandRunner, volumeName string) (bool, error) {
 	if strings.TrimSpace(volumeName) == "" {
 		return false, fmt.Errorf("kanban volume name is required")
 	}
-	if _, err := runner.Run("docker", "volume", "inspect", volumeName); err != nil {
+	output, err := runner.Run("docker", "volume", "inspect", volumeName)
+	if err != nil {
+		message := strings.ToLower(string(output) + " " + err.Error())
+		if strings.Contains(message, "no such volume") || strings.Contains(message, "not found") {
+			return false, nil
+		}
+		return false, fmt.Errorf("inspect kanban volume %s: %w", volumeName, err)
+	}
+	if strings.TrimSpace(string(output)) == "" {
 		return false, nil
 	}
 	return true, nil

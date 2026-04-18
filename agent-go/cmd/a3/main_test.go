@@ -696,7 +696,7 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 
 	for _, want := range []string{
 		"doctor_check name=project_package status=ok",
-		"doctor_check name=required_command.sh status=ok",
+		"doctor_check name=agent_required_command.sh status=ok",
 		"doctor_check name=repo_clean.app status=ok detail=" + repoDir,
 		"doctor_check name=agent_install status=ok",
 		"doctor_check name=kanban_volume status=ok detail=reuse_existing a2o-sample_soloboard-data",
@@ -1957,8 +1957,12 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	}
 	joined := strings.Join(call, " ")
 	switch {
+	case name == "docker" && len(args) >= 3 && args[0] == "volume" && args[1] == "inspect":
+		return []byte(`[{"Name":"` + args[2] + `"}]`), nil
 	case strings.Contains(joined, " compose ") && strings.Contains(joined, " images --quiet "):
 		return []byte("image-123\n"), nil
+	case strings.Contains(joined, " compose ") && strings.Contains(joined, " ps --status running -q soloboard"):
+		return []byte("soloboard-container\n"), nil
 	case name == "docker" && len(args) >= 4 && args[0] == "image" && args[1] == "inspect":
 		return []byte("ghcr.io/wamukat/a2o-engine@sha256:test\n"), nil
 	case strings.Contains(joined, " compose ") && strings.Contains(joined, " ps -q "):
