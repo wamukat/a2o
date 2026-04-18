@@ -724,6 +724,7 @@ runtime:
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
+	t.Setenv("A3_WORKER_LAUNCHER_CONFIG_PATH", filepath.Join(tempDir, "legacy-launcher.json"))
 
 	withChdir(t, tempDir, func() {
 		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)

@@ -578,7 +578,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 	defaultKanbanProject := packageConfig.KanbanProject
 	defaultKanbanStatus := envDefaultValue(packageConfig.KanbanStatus, "To do")
 	launcherConfigPath := envDefault("A3_WORKER_LAUNCHER_CONFIG_PATH", filepath.Join(hostRootDir, "launcher.json"))
-	if len(packageConfig.Executor) == 0 && strings.TrimSpace(envDefault("A3_WORKER_LAUNCHER_CONFIG_PATH", "")) == "" {
+	if len(packageConfig.Executor) == 0 {
 		return runtimeRunOncePlan{}, fmt.Errorf("project.yaml runtime.executor is required for packaged a2o-agent worker execution")
 	}
 	return runtimeRunOncePlan{
