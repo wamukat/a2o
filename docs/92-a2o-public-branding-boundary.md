@@ -12,13 +12,13 @@
 - Public image: `ghcr.io/wamukat/a2o-engine:latest`
 - Public agent binary: `a2o-agent`
 - Internal engine name: `A3`
-- Internal command / module / env / state: `a3`, `A3_*`, `.a3`, `a3-runtime`
+- Internal command / module / env / legacy state: `a3`, `A3_*`, `.a3`, `a3-runtime`
 
 ## Rename しないもの
 
 現行 release では、次は rename しない。
 
-- `.a3/runtime-instance.json`
+- legacy `.a3/runtime-instance.json` reader fallback
 - `A3_*` environment variables
 - Ruby module / Go package / internal class / internal file path
 - runtime storage schema / artifact schema / job schema

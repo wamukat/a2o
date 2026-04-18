@@ -178,7 +178,7 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	writeYAMLScalar(&builder, 2, "role", "product")
 	writeYAMLScalar(&builder, 2, "label", repoLabel)
 	builder.WriteString("agent:\n")
-	writeYAMLScalar(&builder, 1, "workspace_root", ".work/a2o-agent/workspaces")
+	writeYAMLScalar(&builder, 1, "workspace_root", ".work/a2o/agent/workspaces")
 	builder.WriteString("  required_bins:\n")
 	writeYAMLList(&builder, 2, requiredBins)
 	builder.WriteString("runtime:\n")
@@ -271,7 +271,7 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 	flags.SetOutput(stderr)
 
 	packagePath := flags.String("package", "", "project package directory")
-	workspaceRoot := flags.String("workspace", ".", "workspace root where .a3/runtime-instance.json is written")
+	workspaceRoot := flags.String("workspace", ".", "workspace root where .work/a2o/runtime-instance.json is written")
 	composeProject := flags.String("compose-project", "", "docker compose project name for this runtime instance")
 	composeFile := flags.String("compose-file", "", "A2O distribution compose file")
 	runtimeService := flags.String("runtime-service", "a3-runtime", "docker compose runtime service name")

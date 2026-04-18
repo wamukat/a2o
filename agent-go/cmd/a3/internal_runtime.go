@@ -388,7 +388,7 @@ func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) er
 	fmt.Fprintln(stdout, "kanban_doctor=a2o kanban doctor")
 	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(*config))
 	fmt.Fprintf(stdout, "internal_runtime_up=docker compose -p %s -f %s up -d %s soloboard\n", config.ComposeProject, config.ComposeFile, config.RuntimeService)
-	fmt.Fprintf(stdout, "agent_install=a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent\n")
+	fmt.Fprintf(stdout, "agent_install=a2o agent install --target auto --output ./%s\n", filepath.ToSlash(hostAgentBinRelativePath))
 	return nil
 }
 
@@ -535,7 +535,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 	if err != nil {
 		return runtimeRunOncePlan{}, err
 	}
-	hostRoot := envDefault("A3_RUNTIME_RUN_ONCE_HOST_ROOT", envDefault("A3_RUNTIME_SCHEDULER_HOST_ROOT", filepath.Join(hostRootDir, ".work", "a3", "runtime-host-agent")))
+	hostRoot := envDefault("A3_RUNTIME_RUN_ONCE_HOST_ROOT", envDefault("A3_RUNTIME_SCHEDULER_HOST_ROOT", filepath.Join(hostRootDir, runtimeHostAgentRelativePath)))
 	defaultWorkspaceRoot := filepath.Join(hostRoot, "workspaces")
 	if strings.TrimSpace(packageConfig.AgentWorkspaceRoot) != "" {
 		defaultWorkspaceRoot = resolvePackagePath(hostRootDir, packageConfig.AgentWorkspaceRoot)
@@ -577,7 +577,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 	defaultLiveRef := envDefaultValue(packageConfig.LiveRef, "refs/heads/feature/prototype")
 	defaultKanbanProject := packageConfig.KanbanProject
 	defaultKanbanStatus := envDefaultValue(packageConfig.KanbanStatus, "To do")
-	launcherConfigPath := envDefault("A3_WORKER_LAUNCHER_CONFIG_PATH", filepath.Join(hostRootDir, "launcher.json"))
+	launcherConfigPath := envDefault("A3_WORKER_LAUNCHER_CONFIG_PATH", filepath.Join(hostRoot, "launcher.json"))
 	if len(packageConfig.Executor) == 0 {
 		return runtimeRunOncePlan{}, fmt.Errorf("project.yaml runtime.executor is required for packaged a2o-agent worker execution")
 	}

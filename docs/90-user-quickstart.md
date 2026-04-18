@@ -64,7 +64,7 @@ repos:
     path: ..
     role: product
 agent:
-  workspace_root: .work/a2o-agent/workspaces
+  workspace_root: .work/a2o/agent/workspaces
   required_bins:
     - git
     - node
@@ -132,12 +132,20 @@ a2o project bootstrap --package ./reference-products/typescript-api-web/project-
 a2o kanban up
 a2o kanban doctor
 a2o kanban url
-a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
+a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 a2o runtime run-once
 a2o runtime start
 ```
 
 bootstrap 後は、カレント workspace の runtime instance config を `a2o` が探索する。通常操作で `--package` を毎回指定しない。
+
+## Generated Files
+
+新規 `a2o project bootstrap` は runtime instance config を `.work/a2o/runtime-instance.json` に書く。`a2o agent install` と runtime execution で生成される host agent、launcher config、agent workspace も原則 `.work/a2o/` 配下に置く。
+
+`.work/a2o/` は A2O が再生成できる runtime output であり、通常は version control に入れない。利用者が管理するのは project package、product source、Taskfile などである。
+
+既存 workspace に `.a3/runtime-instance.json` がある場合、A2O は互換のため読み取る。ただし新規 bootstrap は `.a3/` に instance config を書かない。materialized workspace 内の `.a3/` は agent metadata であり、利用者が編集する設定ではない。
 
 ## Reference Products
 
@@ -167,7 +175,7 @@ a2o kanban url
 通常は `a2o agent install` で `a2o-agent` を project dev-env または host に置く。
 
 ```sh
-a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
+a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 ```
 
 agent は project toolchain と `runtime.executor` command がある場所で動かす。たとえば Node product なら `node` と `npm`、Go product なら `go`、Python product なら `python3` が agent 側に必要である。executor が使う AI CLI や helper binary も含め、必要な binary は `project.yaml` の `agent.required_bins` に書く。

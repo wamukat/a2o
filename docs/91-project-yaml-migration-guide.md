@@ -66,7 +66,7 @@ repos:
     path: ..
     role: product
 agent:
-  workspace_root: .work/a2o-agent/workspaces
+  workspace_root: .work/a2o/agent/workspaces
   required_bins:
     - git
     - go
@@ -111,7 +111,7 @@ repos:
     path: ..
     role: product
 agent:
-  workspace_root: .work/a2o-agent/workspaces
+  workspace_root: .work/a2o/agent/workspaces
   required_bins:
     - git
     - go

@@ -97,7 +97,7 @@ func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
 		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 	}
 
-	configPath := filepath.Join(tempDir, ".a3", "runtime-instance.json")
+	configPath := filepath.Join(tempDir, ".work", "a2o", "runtime-instance.json")
 	body, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("instance config missing: %v", err)
@@ -114,6 +114,38 @@ func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
 	}
 	if config.SoloBoardPort != "3479" {
 		t.Fatalf("SoloBoardPort=%q", config.SoloBoardPort)
+	}
+}
+
+func TestRuntimeCommandsReadLegacyInstanceConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeLegacyTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "legacy-project",
+		RuntimeService: "a3-runtime",
+		SoloBoardPort:  "3479",
+		AgentPort:      "7393",
+		StorageDir:     "/var/lib/a3/a2o-runtime",
+	})
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"kanban", "url"}, &fakeRunner{}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "http://localhost:3479") {
+		t.Fatalf("legacy instance config should be discovered, got %q", stdout.String())
 	}
 }
 
@@ -679,7 +711,7 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	if !strings.Contains(joinedText, " -agent host-local -control-plane-url http://127.0.0.1:7394") {
 		t.Fatalf("host agent should use configured host agent port, calls:\n%s", joinedText)
 	}
-	if !strings.Contains(joinedText, "'--worker-command' '"+filepath.Join(tempDir, ".work", "a2o-agent", "bin", "a2o-agent")+"'") {
+	if !strings.Contains(joinedText, "'--worker-command' '"+filepath.Join(tempDir, ".work", "a2o", "agent", "bin", "a2o-agent")+"'") {
 		t.Fatalf("run-once should use packaged a2o-agent as worker command, calls:\n%s", joinedText)
 	}
 	if !strings.Contains(joinedText, "'--worker-command-arg' 'worker'") || !strings.Contains(joinedText, "'--worker-command-arg' 'stdin-bundle'") {
@@ -713,7 +745,7 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	if runner.lastEnv["A3_BRANCH_NAMESPACE"] != "a3-test" {
 		t.Fatalf("branch namespace env=%q", runner.lastEnv["A3_BRANCH_NAMESPACE"])
 	}
-	if runner.lastEnv["A3_HOST_AGENT_BIN"] != filepath.Join(tempDir, ".work", "a2o-agent", "bin", "a2o-agent") {
+	if runner.lastEnv["A3_HOST_AGENT_BIN"] != filepath.Join(tempDir, ".work", "a2o", "agent", "bin", "a2o-agent") {
 		t.Fatalf("agent bin env=%q", runner.lastEnv["A3_HOST_AGENT_BIN"])
 	}
 }
@@ -1387,7 +1419,7 @@ func TestRuntimeRunOncePrefersPublicA2OAgentPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeMultiRepoProjectYaml(t, packageDir)
-	publicAgentPath := filepath.Join(tempDir, ".work", "a2o-agent", "bin", "a2o-agent")
+	publicAgentPath := filepath.Join(tempDir, ".work", "a2o", "agent", "bin", "a2o-agent")
 	if err := os.MkdirAll(filepath.Dir(publicAgentPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -1444,7 +1476,7 @@ repos:
     path: ..
     role: product
 agent:
-  workspace_root: .work/a2o-agent/workspaces
+  workspace_root: .work/a2o/agent/workspaces
   required_bins:
     - git
     - node
@@ -1509,7 +1541,7 @@ runtime:
 			t.Fatalf("run-once missing %q in:\n%s", want, joined)
 		}
 	}
-	launcherPath := filepath.Join(tempDir, "launcher.json")
+	launcherPath := filepath.Join(tempDir, ".work", "a2o", "runtime-host-agent", "launcher.json")
 	launcherBody, err := os.ReadFile(launcherPath)
 	if err != nil {
 		t.Fatalf("launcher config should be written: %v", err)
@@ -1886,6 +1918,21 @@ func TestRunExternalIncludesOutputOnFailure(t *testing.T) {
 
 func writeTestInstanceConfig(t *testing.T, dir string, config runtimeInstanceConfig) {
 	t.Helper()
+	path := filepath.Join(dir, ".work", "a2o", "runtime-instance.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeLegacyTestInstanceConfig(t *testing.T, dir string, config runtimeInstanceConfig) {
+	t.Helper()
 	path := filepath.Join(dir, ".a3", "runtime-instance.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
@@ -1919,7 +1966,7 @@ repos:
     role: product
     label: repo:storefront
 agent:
-  workspace_root: .work/a2o-agent/workspaces
+  workspace_root: .work/a2o/agent/workspaces
   required_bins:
     - git
     - node

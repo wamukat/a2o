@@ -11,7 +11,10 @@ import (
 )
 
 const version = "dev"
-const instanceConfigRelativePath = ".a3/runtime-instance.json"
+const instanceConfigRelativePath = ".work/a2o/runtime-instance.json"
+const legacyInstanceConfigRelativePath = ".a3/runtime-instance.json"
+const runtimeHostAgentRelativePath = ".work/a2o/runtime-host-agent"
+const hostAgentBinRelativePath = ".work/a2o/agent/bin/a2o-agent"
 
 type commandRunner interface {
 	Run(name string, args ...string) ([]byte, error)

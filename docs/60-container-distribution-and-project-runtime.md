@@ -25,7 +25,7 @@ a2o project bootstrap --package ./reference-products/typescript-api-web/project-
 a2o kanban up
 a2o kanban doctor
 a2o kanban url
-a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
+a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 a2o runtime run-once
 a2o runtime start
 ```
@@ -70,5 +70,7 @@ The public launcher covers host install, project bootstrap, kanban service lifec
 
 - Keep project toolchains out of the runtime image. Install them in the host or dev-env where `a2o-agent` runs.
 - Keep branch namespaces instance-specific so isolated boards can reuse small task numbers without colliding with existing refs.
-- Treat `.work/` as disposable runtime output and `.a3/` as internal runtime state.
+- Treat `.work/a2o/` as disposable runtime output. New bootstrap state, host-agent binaries, generated launcher config, and agent workspaces should live there.
+- Existing `.a3/runtime-instance.json` is read as a compatibility fallback only. New bootstrap does not write it.
+- `.a3/` directories inside materialized repo workspaces are internal agent metadata and are not user-managed package files.
 - Prefer project package declarations over new Engine hardcoded defaults.

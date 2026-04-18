@@ -47,15 +47,19 @@ func parsePositiveInt(value string, label string) (int, error) {
 }
 
 func resolveDefaultHostAgentBin(config runtimeInstanceConfig, hostRootDir string) string {
-	publicAgentPath := filepath.Join(hostRootDir, ".work", "a2o-agent", "bin", "a2o-agent")
+	publicAgentPath := filepath.Join(hostRootDir, hostAgentBinRelativePath)
 	if _, err := os.Stat(publicAgentPath); err == nil {
 		return publicAgentPath
 	}
 	if strings.TrimSpace(config.WorkspaceRoot) != "" && config.WorkspaceRoot != hostRootDir {
-		publicWorkspaceAgentPath := filepath.Join(config.WorkspaceRoot, ".work", "a2o-agent", "bin", "a2o-agent")
+		publicWorkspaceAgentPath := filepath.Join(config.WorkspaceRoot, hostAgentBinRelativePath)
 		if _, err := os.Stat(publicWorkspaceAgentPath); err == nil {
 			return publicWorkspaceAgentPath
 		}
+	}
+	legacyAgentPath := filepath.Join(hostRootDir, ".work", "a2o-agent", "bin", "a2o-agent")
+	if _, err := os.Stat(legacyAgentPath); err == nil {
+		return legacyAgentPath
 	}
 	return publicAgentPath
 }

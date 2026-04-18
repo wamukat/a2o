@@ -31,7 +31,7 @@ a2o project bootstrap --package ./reference-products/typescript-api-web/project-
 a2o kanban up
 a2o kanban doctor
 a2o kanban url
-a2o agent install --target auto --output ./.work/a2o-agent/bin/a2o-agent
+a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 a2o runtime run-once
 a2o runtime start
 a2o runtime status

@@ -89,7 +89,7 @@ Export `a2o-agent` from the A2O Engine runtime image:
 ```sh
 a2o agent install \
   --target auto \
-  --output ./.work/a2o-agent/bin/a2o-agent \
+  --output ./.work/a2o/agent/bin/a2o-agent \
   --build
 ```
 
@@ -111,7 +111,7 @@ a2o project template \
 The generated file uses the compact `runtime.executor.command` form. A2O expands it to the default stdin-bundle executor internally, so existing full executor objects remain compatible.
 When `--output` points to a file, the generator also creates `kanban/bootstrap.json`. Existing files are not overwritten unless `--force` is passed.
 
-After `a2o project bootstrap --package ./a2o-project`, runtime commands discover `.a3/runtime-instance.json` from the current directory upward:
+After `a2o project bootstrap --package ./a2o-project`, runtime commands discover `.work/a2o/runtime-instance.json` from the current directory upward:
 
 ```sh
 a2o kanban up

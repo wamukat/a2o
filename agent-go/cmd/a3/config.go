@@ -98,9 +98,11 @@ func findInstanceConfig(start string) (string, error) {
 		return "", err
 	}
 	for {
-		candidate := filepath.Join(current, instanceConfigRelativePath)
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate, nil
+		for _, relativePath := range []string{instanceConfigRelativePath, legacyInstanceConfigRelativePath} {
+			candidate := filepath.Join(current, relativePath)
+			if _, err := os.Stat(candidate); err == nil {
+				return candidate, nil
+			}
 		}
 		parent := filepath.Dir(current)
 		if parent == current {
@@ -214,13 +216,8 @@ func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttem
 	}
 	if strings.TrimSpace(config.WorkspaceRoot) != "" {
 		overrides["A3_RUNTIME_RUN_ONCE_HOST_ROOT_DIR"] = config.WorkspaceRoot
-		overrides["A3_RUNTIME_RUN_ONCE_HOST_ROOT"] = filepath.Join(config.WorkspaceRoot, ".work", "a3", "runtime-host-agent")
-		publicAgentPath := filepath.Join(config.WorkspaceRoot, ".work", "a2o-agent", "bin", "a2o-agent")
-		if _, err := os.Stat(publicAgentPath); err == nil {
-			overrides["A3_HOST_AGENT_BIN"] = publicAgentPath
-		} else {
-			overrides["A3_HOST_AGENT_BIN"] = publicAgentPath
-		}
+		overrides["A3_RUNTIME_RUN_ONCE_HOST_ROOT"] = filepath.Join(config.WorkspaceRoot, runtimeHostAgentRelativePath)
+		overrides["A3_HOST_AGENT_BIN"] = filepath.Join(config.WorkspaceRoot, hostAgentBinRelativePath)
 	}
 	if strings.TrimSpace(config.ComposeProject) != "" {
 		overrides["A3_BRANCH_NAMESPACE"] = config.ComposeProject

@@ -13,7 +13,7 @@ Use these names in user-facing docs and commands:
 - `a2o`
 - `a2o-agent`
 - `share/a2o`
-- `.work/a2o-agent`
+- `.work/a2o/agent`
 - `reference-products`
 
 ## Internal Compatibility Names

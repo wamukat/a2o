@@ -17,7 +17,7 @@ repos:
     role: product
     label: repo:storefront
 agent:
-  workspace_root: .work/a2o-agent/workspaces
+  workspace_root: .work/a2o/agent/workspaces
   required_bins:
     - git
     - node
