@@ -104,6 +104,9 @@ func runAgentInstall(args []string, runner commandRunner, stdout io.Writer, stde
 	}
 	var containerID string
 	err = withComposeEnv(config, func() error {
+		if err := cleanupLegacyRuntimeServiceOrphans(config, runner, stdout); err != nil {
+			return err
+		}
 		if _, err := runExternal(runner, "docker", append(composePrefix, "up", "-d", "--no-deps", config.RuntimeService)...); err != nil {
 			return err
 		}
