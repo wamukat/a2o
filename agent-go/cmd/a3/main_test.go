@@ -2045,7 +2045,11 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 	joined := strings.Join(runner.joinedCalls(), "\n")
 	for _, want := range []string{
 		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 show-task --storage-backend json --storage-dir /var/lib/a3/test-runtime A2O#16",
-		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 show-run --storage-backend json --storage-dir /var/lib/a3/test-runtime --preset-dir /tmp/a3-engine/config/presets run-16 " + filepath.Join(packageDir, "project.yaml"),
+		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime bash -lc",
+		"export A3_SECRET_REFERENCE=\"${A3_SECRET_REFERENCE:-A3_SECRET}\"",
+		"export A2O_INTERNAL_SECRET_REFERENCE=\"${A2O_INTERNAL_SECRET_REFERENCE:-a2o-runtime-secret}\"",
+		"show-run",
+		filepath.Join(packageDir, "project.yaml"),
 		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime python3 /opt/a2o/share/tools/kanban/cli.py --backend soloboard --base-url http://soloboard:3000 task-comment-list --project A2OReferenceMultiRepo --task A2O#16",
 	} {
 		if !strings.Contains(joined, want) {
@@ -2919,6 +2923,50 @@ func TestRuntimeRunOnceAllowsEnvToOverrideStaleInstanceRuntimeValues(t *testing.
 	}
 }
 
+func TestRuntimeRunOnceRepairsStaleRunsOnStartupAndAttemptBudgetExhaustion(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{runtimeExitMissing: true}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once", "--max-steps", "1", "--agent-attempts", "2"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail when runtime exit file is never written")
+		}
+	})
+
+	output := stdout.String()
+	if !strings.Contains(output, "runtime_repair_runs reason=startup") {
+		t.Fatalf("run-once should repair stale runs before starting, got:\n%s", output)
+	}
+	if !strings.Contains(output, "runtime_repair_runs reason=agent_attempt_budget_exhausted") {
+		t.Fatalf("run-once should repair active runs after agent attempt exhaustion, got:\n%s", output)
+	}
+	if count := runner.callCountContains("a3 repair-runs --storage-backend json --storage-dir /var/lib/a3/test-runtime --apply"); count != 2 {
+		t.Fatalf("repair-runs call count=%d, want 2\ncalls:\n%s", count, strings.Join(runner.joinedCalls(), "\n"))
+	}
+	if !strings.Contains(stderr.String(), "runtime run-once did not finish within 2 agent attempts") {
+		t.Fatalf("stderr should report attempt exhaustion, got %q", stderr.String())
+	}
+}
+
 func TestRuntimeLoopRunsConfiguredCycles(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -3119,6 +3167,7 @@ type fakeRunner struct {
 	emptyContainer        bool
 	failShowTask          bool
 	taskWithoutCurrentRun bool
+	runtimeExitMissing    bool
 	legacyRuntimeOrphans  []string
 	failLegacyRuntimeRM   bool
 	missingRunHistory     bool
@@ -3181,6 +3230,11 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 			return []byte("\n"), nil
 		}
 		return []byte("container-123\n"), nil
+	case strings.Contains(joined, " exec -T ") && strings.Contains(joined, " test -f /tmp/a2o-runtime-run-once.exit"):
+		if r.runtimeExitMissing {
+			return []byte("missing\n"), errors.New("missing")
+		}
+		return []byte{}, nil
 	case strings.Contains(joined, " sh -c ") && strings.Contains(joined, "test -f"):
 		if r.missingRunHistory {
 			return []byte("missing\n"), nil
@@ -3198,7 +3252,7 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		return []byte("runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation state=terminal outcome=blocked\n"), nil
 	case strings.Contains(joined, " ruby -rjson -e "):
 		return []byte("run-16\n"), nil
-	case strings.Contains(joined, " a3 show-run "):
+	case strings.Contains(joined, "show-run"):
 		return []byte("run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked\nevidence workspace=runtime_workspace source=detached_commit:abc\nlatest_blocked phase=implementation summary=executor failed\nblocked_error_category=executor_failed\n"), nil
 	case strings.Contains(joined, " a3 watch-summary "):
 		return []byte("Scheduler: running\nTask Tree\nNext\nRunning\n"), nil

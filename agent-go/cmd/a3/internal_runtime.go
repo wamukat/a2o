@@ -628,7 +628,7 @@ func runRuntimeDescribeTask(args []string, runner commandRunner, stdout io.Write
 		if runRef == "" {
 			fmt.Fprintln(stdout, "describe_section name=run status=skipped reason=no_run_for_task")
 		} else {
-			runOutput, runErr := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "run", "a3", "show-run", "--storage-backend", "json", "--storage-dir", plan.StorageDir, "--preset-dir", plan.PresetDir, runRef, plan.ManifestPath)
+			runOutput, runErr := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "run", runtimeInspectionArgs("a3", "show-run", "--storage-backend", "json", "--storage-dir", plan.StorageDir, "--preset-dir", plan.PresetDir, runRef, plan.ManifestPath)...)
 			if runErr != nil {
 				fmt.Fprintf(stdout, "describe_section name=run status=blocked run_ref=%s action=inspect runtime log detail=%s\n", runRef, singleLine(runErr.Error()))
 			} else {
@@ -762,6 +762,9 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, age
 		if err := cleanupRuntimeProcesses(config, plan, runner); err != nil {
 			return err
 		}
+		if err := repairRuntimeRuns(config, plan, runner, stdout, "startup"); err != nil {
+			return err
+		}
 		if err := ensureRuntimeLauncherConfig(plan, stdout); err != nil {
 			return err
 		}
@@ -778,6 +781,8 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, age
 			return err
 		}
 		if err := runHostAgentLoop(config, plan, runner, stdout); err != nil {
+			_ = cleanupRuntimeProcesses(config, plan, runner)
+			_ = repairRuntimeRuns(config, plan, runner, stdout, "agent_attempt_budget_exhausted")
 			return err
 		}
 		runtimeExit, err := readRuntimeExit(config, plan, runner)
@@ -954,6 +959,16 @@ func runtimeDescribeSectionOutput(config runtimeInstanceConfig, plan runtimeRunO
 		return "", fmt.Errorf("%s command failed: %w", section, err)
 	}
 	return strings.TrimRight(string(output), "\n"), nil
+}
+
+func runtimeInspectionArgs(argv ...string) []string {
+	script := strings.Join([]string{
+		`export A3_SECRET="${A3_SECRET:-a2o-runtime-secret}"`,
+		`export A3_SECRET_REFERENCE="${A3_SECRET_REFERENCE:-A3_SECRET}"`,
+		`export A2O_INTERNAL_SECRET_REFERENCE="${A2O_INTERNAL_SECRET_REFERENCE:-a2o-runtime-secret}"`,
+		"exec " + shellJoin(argv),
+	}, "; ")
+	return []string{"bash", "-lc", script}
 }
 
 func runtimeWatchSummaryArgs(plan runtimeRunOncePlan) []string {
@@ -1144,6 +1159,21 @@ func cleanupRuntimeProcesses(config runtimeInstanceConfig, plan runtimeRunOncePl
 	killRuntimePIDFile(config, plan, runner, plan.RuntimePIDFile)
 	killRuntimePIDFile(config, plan, runner, plan.ServerPIDFile)
 	return dockerComposeExec(config, plan, runner, "rm", "-f", plan.RuntimeExitFile, plan.ServerLog, plan.RuntimeLog)
+}
+
+func repairRuntimeRuns(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, reason string) error {
+	fmt.Fprintf(stdout, "runtime_repair_runs reason=%s\n", reason)
+	output, err := dockerComposeExecOutput(config, plan, runner, "a3", "repair-runs", "--storage-backend", "json", "--storage-dir", plan.StorageDir, "--apply")
+	if strings.TrimSpace(string(output)) != "" {
+		fmt.Fprint(stdout, string(output))
+		if !strings.HasSuffix(string(output), "\n") {
+			fmt.Fprintln(stdout)
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("repair runtime runs: %w", err)
+	}
+	return nil
 }
 
 func ensureRuntimeHostAgent(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
