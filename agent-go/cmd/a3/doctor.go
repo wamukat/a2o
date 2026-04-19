@@ -180,8 +180,8 @@ func isProjectScriptContractScanTarget(packagePath string, path string, mode os.
 		return false
 	}
 	parts := strings.Split(filepath.ToSlash(rel), "/")
-	if len(parts) == 1 && isPackageAutomationFile(parts[0]) {
-		return true
+	if len(parts) == 1 {
+		return isPackageRootContractScanTarget(parts[0])
 	}
 	if len(parts) > 1 {
 		switch parts[0] {
@@ -200,12 +200,16 @@ func isProjectScriptContractScanTarget(packagePath string, path string, mode os.
 	}
 }
 
-func isPackageAutomationFile(name string) bool {
-	switch name {
-	case "project.yaml", "project.yml", "Taskfile", "Taskfile.yml", "Taskfile.yaml", "Makefile", "Justfile", "Rakefile", "Brewfile", "Dockerfile", ".env", "package.json":
-		return true
-	default:
+func isPackageRootContractScanTarget(name string) bool {
+	lower := strings.ToLower(name)
+	if lower == "readme" || strings.HasPrefix(lower, "readme.") || lower == "license" || strings.HasPrefix(lower, "license.") || strings.HasPrefix(lower, "changelog.") {
 		return false
+	}
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".md", ".markdown", ".txt", ".rst", ".adoc":
+		return false
+	default:
+		return true
 	}
 }
 

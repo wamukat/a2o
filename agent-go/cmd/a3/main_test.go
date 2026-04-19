@@ -899,6 +899,14 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(packageDir, "Justfile"), []byte(justfile), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	procfile := "worker: echo $A3_BUNDLE_PROJECT\n"
+	if err := os.WriteFile(filepath.Join(packageDir, "Procfile"), []byte(procfile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	envExample := "A3_RUNTIME_IMAGE=example\n"
+	if err := os.WriteFile(filepath.Join(packageDir, ".env.example"), []byte(envExample), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	privateScript := "echo $A3_WORKER_REQUEST_PATH && ruby -e 'puts File.join(\".a3\", \"workspace.json\")'\n"
 	if err := os.WriteFile(filepath.Join(packageDir, "commands", "worker.sh"), []byte(privateScript), 0o644); err != nil {
 		t.Fatal(err)
@@ -934,7 +942,9 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 		"doctor_check name=project_script_contract status=blocked",
 		"Dockerfile:A3_*",
 		"Justfile:A3_*",
+		"Procfile:A3_*",
 		"Taskfile.yml:A3_*",
+		".env.example:A3_*",
 		"commands/worker.sh:.a3/workspace.json",
 		"commands/worker.sh:A3_*",
 		"action=use A2O_* worker env and worker request fields instead of internal runtime files",
