@@ -1,4 +1,4 @@
-# A2O 0.5.1 Release Status
+# A2O 0.5.2 Release Status
 
 ## Ready
 
@@ -15,7 +15,7 @@
 - Agent HTTP worker gateway
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates
-- GHCR image publication with `latest`, `0.5.1`, and `sha-*` tags on main
+- GHCR image publication with `latest`, `0.5.2`, and `sha-*` tags on main
 - Full RSpec release gate passing locally
 
 ## Validation Scope

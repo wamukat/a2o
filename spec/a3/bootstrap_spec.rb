@@ -86,7 +86,7 @@ RSpec.describe A3::Bootstrap do
         FileUtils.mkdir_p(preset_dir)
         File.write(manifest_path, YAML.dump({ "schema_version" => 1, "runtime" => { "presets" => [] } }))
 
-        with_env("A2O_IMAGE_VERSION" => "0.5.1", "A3_IMAGE_VERSION" => "legacy") do
+        with_env("A2O_IMAGE_VERSION" => "0.5.2", "A3_IMAGE_VERSION" => "legacy") do
           descriptor = described_class.runtime_package_descriptor(
             manifest_path: manifest_path,
             preset_dir: preset_dir,
@@ -95,8 +95,8 @@ RSpec.describe A3::Bootstrap do
             repo_sources: {}
           )
 
-          expect(descriptor.image_version).to eq("0.5.1")
-          expect(descriptor.operator_summary.fetch("distribution")).to include("image_ref=a3-engine:0.5.1")
+          expect(descriptor.image_version).to eq("0.5.2")
+          expect(descriptor.operator_summary.fetch("distribution")).to include("image_ref=a3-engine:0.5.2")
         end
       end
     end

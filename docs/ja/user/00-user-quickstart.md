@@ -11,11 +11,11 @@ mkdir -p "$HOME/.local/bin" "$HOME/.local/share"
 
 docker run --rm \
   -v "$HOME/.local:/install" \
-  ghcr.io/wamukat/a2o-engine:0.5.1 \
+  ghcr.io/wamukat/a2o-engine:0.5.2 \
   a2o host install \
     --output-dir /install/bin \
     --share-dir /install/share/a2o \
-    --runtime-image ghcr.io/wamukat/a2o-engine:0.5.1
+    --runtime-image ghcr.io/wamukat/a2o-engine:0.5.2
 
 export PATH="$HOME/.local/bin:$PATH"
 ```
@@ -370,7 +370,7 @@ task は repo label を使って対象 slot を指定する。parent-child flow 
 
 ## Runtime Image Updates
 
-A2O 0.5.1 の runtime image は `ghcr.io/wamukat/a2o-engine:0.5.1` で取得する。実 product package、release smoke、複数人が同じ board / package を使う環境では digest pinning を使う。tag は動く参照であり、digest は同じ image を再現する参照である。
+A2O 0.5.2 の runtime image は `ghcr.io/wamukat/a2o-engine:0.5.2` で取得する。実 product package、release smoke、複数人が同じ board / package を使う環境では digest pinning を使う。tag は動く参照であり、digest は同じ image を再現する参照である。
 
 推奨手順:
 

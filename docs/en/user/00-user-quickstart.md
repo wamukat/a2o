@@ -11,11 +11,11 @@ mkdir -p "$HOME/.local/bin" "$HOME/.local/share"
 
 docker run --rm \
   -v "$HOME/.local:/install" \
-  ghcr.io/wamukat/a2o-engine:0.5.1 \
+  ghcr.io/wamukat/a2o-engine:0.5.2 \
   a2o host install \
     --output-dir /install/bin \
     --share-dir /install/share/a2o \
-    --runtime-image ghcr.io/wamukat/a2o-engine:0.5.1
+    --runtime-image ghcr.io/wamukat/a2o-engine:0.5.2
 
 export PATH="$HOME/.local/bin:$PATH"
 ```
@@ -289,10 +289,10 @@ a2o runtime describe-task <task-ref>
 
 ## Runtime Image Updates
 
-A2O 0.5.1 uses:
+A2O 0.5.2 uses:
 
 ```text
-ghcr.io/wamukat/a2o-engine:0.5.1
+ghcr.io/wamukat/a2o-engine:0.5.2
 ```
 
 For shared product packages, release smoke, or multi-user boards, pin by digest after validation.
