@@ -1,8 +1,5 @@
 # A2O 0.5.0 Release Status（release 状態）
 
-対象読者: A2O 利用者 / 実装者 / reviewer
-文書種別: current status
-
 ## Ready（利用可能）
 
 - Host launcher install（host launcher の install）: `a2o host install`

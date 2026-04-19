@@ -1,8 +1,5 @@
 # Container Distribution And Project Runtime（container 配布と project runtime）
 
-対象読者: A2O 利用者 / runtime 実装者 / operator
-文書種別: 配布設計 / runtime 境界
-
 A2O の配布単位は Docker runtime image、host launcher、project package、`a2o-agent` である。利用者は Engine 内部の長い command line や runtime shell script を作らない。
 
 ## 配布物

@@ -1,9 +1,6 @@
 # Runtime Naming Boundary
 
-Audience: A2O users, runtime implementers, operators
-Document type: naming policy
-
-A2O is the public product name. A3 remains an internal compatibility name in code paths, state paths, and Engine CLI surfaces that have not been renamed.
+A2O stands for Agent-to-Operations and is the public product name. A3 remains an internal compatibility name in code paths, state paths, and Engine CLI surfaces that have not been renamed.
 
 ## Public Names
 

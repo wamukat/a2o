@@ -1,8 +1,5 @@
 # Agent Worker Gateway Design（agent worker gateway 設計）
 
-対象読者: A2O runtime 実装者 / agent 実装者 / reviewer
-文書種別: protocol design
-
 Agent worker gateway は、A2O Engine が project-local な作業を host または project dev-env で動く `a2o-agent` process へ委譲するための境界である。これにより、project toolchain を runtime image の外へ置いたまま、Engine-owned orchestration を維持できる。
 
 ## 目的

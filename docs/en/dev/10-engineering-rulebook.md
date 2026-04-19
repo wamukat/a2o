@@ -1,8 +1,5 @@
 # A2O Engineering Rulebook
 
-Audience: A2O implementers, reviewers
-Document type: engineering discipline
-
 This document fixes the day-to-day engineering rules for A2O. Design documents define what to build; this document defines how to build it.
 
 ## Core Rules

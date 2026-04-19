@@ -1,8 +1,5 @@
 # A2O Core Domain Model
 
-対象読者: A2O 設計者 / 実装者
-文書種別: 設計メモ
-
 この文書は、A2O の core domain model を固定するためのもの。
 目的は、task / run / phase / evidence / workspace に関する知識を domain に集約し、
 V1 のように executor や materializer の条件分岐へ意味が漏れないようにすることである。

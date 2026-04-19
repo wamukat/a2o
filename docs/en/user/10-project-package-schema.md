@@ -1,8 +1,5 @@
 # Single-File Project Package Schema
 
-Audience: A2O designers, project package authors, reviewers
-Document type: schema reference
-
 The canonical project package config file is `project.yaml`.
 
 `manifest.yml` is not part of the public 0.5.0 package format. Runtime responsibilities live in `project.yaml` under explicit runtime sections. This keeps the package surface small and avoids a split between "project config" and "manifest".

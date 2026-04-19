@@ -1,8 +1,5 @@
 # A2O 0.5.0 Release Status
 
-Audience: A2O users, implementers, reviewers
-Document type: current status
-
 ## Ready
 
 - Host launcher install: `a2o host install`

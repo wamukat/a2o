@@ -1,8 +1,5 @@
 # A2O Core Domain Model
 
-Audience: A2O designers, implementers
-Document type: domain model
-
 This document defines the core domain objects and their responsibility boundaries.
 
 ## Model Principles

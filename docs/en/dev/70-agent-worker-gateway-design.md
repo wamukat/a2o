@@ -1,8 +1,5 @@
 # Agent Worker Gateway Design
 
-Audience: A2O runtime implementers, operators
-Document type: runtime design
-
 The agent worker gateway lets A2O delegate project-local work to an `a2o-agent` process running on the host or in a project dev environment. This keeps project toolchains out of the runtime image while preserving Engine-owned orchestration.
 
 ## Goals

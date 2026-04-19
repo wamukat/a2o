@@ -1,8 +1,5 @@
 # Runtime Extension Boundary
 
-Audience: A2O designers, project package authors, runtime implementers
-Document type: extension boundary
-
 This document defines what a project package may extend and what remains Engine-owned.
 
 ## Extension Principles

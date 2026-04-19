@@ -1,8 +1,5 @@
 # Evidence And Rerun Diagnosis
 
-Audience: A2O designers, implementers, operators
-Document type: evidence model
-
 This document defines how A2O records evidence, diagnoses blocked runs, and supports rerun decisions.
 
 ## Goals

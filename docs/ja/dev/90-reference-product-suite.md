@@ -1,8 +1,5 @@
 # A2O Reference Product Suite（reference product suite の構成）
 
-対象読者: A2O runtime 実装者 / validation 設計者 / operator
-文書種別: validation 方針
-
 この文書は、A2O core validation で使う owned sample products を定義する。
 
 ## 目的

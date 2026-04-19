@@ -1,8 +1,5 @@
 # Kanban Adapter Boundary
 
-Audience: A2O runtime implementers, operators
-Document type: adapter boundary
-
 ## Current Contract
 
 The A2O engine talks to kanban through a command contract compatible with `tools/kanban/cli.py`. Runtime operations include:

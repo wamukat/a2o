@@ -1,8 +1,5 @@
 # A2O Design Map
 
-Audience: A2O designers, implementers, reviewers
-Document type: design navigation
-
 This document explains what each design document covers and the recommended reading order.
 
 ## Goals

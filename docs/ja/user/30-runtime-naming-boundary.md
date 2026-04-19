@@ -1,9 +1,6 @@
 # Runtime Naming Boundary（runtime 命名境界）
 
-対象読者: A2O 利用者 / runtime 実装者 / operator
-文書種別: naming policy
-
-A2O は公開 product 名である。A3 は、まだ rename していない code path、state path、Engine CLI surface に残る内部互換名として扱う。
+A2O の正式名称は Agent-to-Operations であり、公開 product 名である。A3 は、まだ rename していない code path、state path、Engine CLI surface に残る内部互換名として扱う。
 
 ## 公開名
 

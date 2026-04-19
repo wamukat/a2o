@@ -1,8 +1,5 @@
 # A2O Reference Product Suite
 
-Audience: A2O runtime implementers, validation designers, operators
-Document type: validation policy
-
 This document defines the owned sample products used for A2O core validation.
 
 ## Purpose

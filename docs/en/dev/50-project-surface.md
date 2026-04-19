@@ -1,8 +1,5 @@
 # A2O Project Surface
 
-Audience: A2O designers, project package authors, implementers
-Document type: project surface design
-
 This document defines the small project-owned configuration surface. The project package should express product-specific knowledge without turning `project.yaml` into an unrestricted Engine configuration file.
 
 ## Goals

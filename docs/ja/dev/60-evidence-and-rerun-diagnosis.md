@@ -1,8 +1,5 @@
 # A2O Evidence and Rerun Diagnosis
 
-対象読者: A2O 設計者 / 実装者 / 運用者
-文書種別: 設計メモ
-
 この文書は、review / verification / merge / rerun / blocked 調査の再現性を支える evidence model を固定するためのもの。
 V1 のように phase ごとの場当たり的 JSON 断片へ依存せず、phase が読む内部証跡を先に定義する。
 

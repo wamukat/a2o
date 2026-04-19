@@ -1,8 +1,5 @@
 # A2O Bounded Context and Ubiquitous Language
 
-対象読者: A2O 設計者 / 実装者 / reviewer
-文書種別: 設計メモ
-
 この文書は、A2O の用語と bounded context を先に固定するためのもの。
 後続の core domain model、workspace model、evidence model、Ruby 実装は、この文書の語彙と境界を前提にする。
 

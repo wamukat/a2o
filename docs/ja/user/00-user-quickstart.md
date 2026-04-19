@@ -1,8 +1,5 @@
 # A2O User Manual
 
-対象読者: A2O 利用者 / project maintainer
-文書種別: 利用手順
-
 A2O は kanban task を起点に、workspace 作成、agent 実行、検証、merge、evidence 記録を進める automation engine である。利用者は project package を用意し、A2O の公開コマンドで runtime を起動する。
 
 ## Getting Started

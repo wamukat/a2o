@@ -1,8 +1,5 @@
 # A2O Project Surface
 
-対象読者: A2O 設計者 / project package 作成者 / 実装者
-文書種別: project surface 設計
-
 この文書は、project が所有する設定面を小さく保つためのもの。
 project package は product 固有知識を表現するが、`project.yaml` を無制限な Engine 設定ファイルにしてはならない。
 

@@ -1,8 +1,5 @@
 # A2O User Manual
 
-Audience: A2O users, project maintainers
-Document type: operating guide
-
 A2O starts from kanban tasks and manages workspace creation, agent execution, verification, merge, and evidence recording. Users prepare a project package and operate the runtime through public A2O commands.
 
 ## Getting Started

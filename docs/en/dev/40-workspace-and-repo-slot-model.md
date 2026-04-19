@@ -1,8 +1,5 @@
 # A2O Workspace And Repo Slot Model
 
-Audience: A2O designers, implementers
-Document type: workspace model
-
 This document defines workspace topology, repo slots, source synchronization, freshness, retention, and merge behavior.
 
 ## Goals

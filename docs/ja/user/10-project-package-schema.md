@@ -1,8 +1,5 @@
 # Single-File Project Package Schema（単一ファイル project package schema）
 
-対象読者: A2O 設計者 / project package 作成者 / reviewer
-文書種別: schema reference
-
 ## 方針
 
 Project package config の正規ファイル名は `project.yaml` とする。

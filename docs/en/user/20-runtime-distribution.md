@@ -1,8 +1,5 @@
 # Container Distribution And Project Runtime
 
-Audience: A2O users, runtime implementers, operators
-Document type: distribution design / runtime boundary
-
 A2O is distributed as a Docker runtime image, host launcher, project package, and `a2o-agent`. Users should not assemble long internal Engine command lines or runtime shell scripts.
 
 ## Artifacts

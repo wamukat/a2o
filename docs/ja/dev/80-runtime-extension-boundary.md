@@ -1,8 +1,5 @@
 # Runtime Extension Boundary（runtime extension の境界）
 
-対象読者: A2O 設計者 / project package 作成者 / reviewer
-文書種別: extension boundary
-
 A2O Engine core は project-neutral に保つ。Project-specific behavior は project packages、command profiles、hook scripts、task templates、agent-side toolchains を通じて注入する。
 
 ## Core が知ってよいもの

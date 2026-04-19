@@ -1,8 +1,5 @@
 # A2O Bounded Contexts And Language
 
-Audience: A2O designers, implementers, reviewers
-Document type: design reference
-
 This document fixes the vocabulary and bounded contexts used by A2O. Later domain, workspace, evidence, and implementation documents use these terms.
 
 ## Design Stance
