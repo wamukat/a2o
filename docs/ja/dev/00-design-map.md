@@ -14,43 +14,39 @@
 ```mermaid
 flowchart TB
   subgraph User["利用者"]
-    Task["kanban task を書く\n変更内容 / 制約 / 優先度"]
-    Package["project package を管理する\nproject.yaml / skills / commands"]
-    Command["a2o command を実行する\nbootstrap / kanban up / runtime start / run-once / status"]
+    Task["kanban task を作る\n依頼内容 / 制約 / 優先度"]
+    Package["project package を用意する\nproject.yaml / skills / commands"]
     Observe["結果を確認する\nkanban status / comments / workspace evidence"]
   end
 
   subgraph CLI["a2o CLI"]
-    Bootstrap["runtime setup を作成・検証する\nproject template / project bootstrap / project lint"]
-    KanbanOps["kanban を起動・表示する\nboard / lane / required tags"]
-    RuntimeOps["実行を制御する\nrun-once は 1 cycle / start は scheduler / status は確認"]
+    Runtime["常駐 runtime を動かす\nscheduler / status commands"]
   end
 
   subgraph Engine["A2O Engine"]
-    Config["project.yaml を読む\nrepos / phases / commands / scheduler settings"]
-    SkillUse["phase skill を読む\nimplementation / review / remediation / merge"]
-    Scheduler["scheduler\n実行可能な kanban task を選び phase を進める"]
-    Execute["phase command を実行する\na2o-agent と project commands 経由"]
+    Scheduler["scheduler\n実行可能な kanban task を選ぶ"]
+    Plan["phase instruction を組み立てる\nproject.yaml と skills から生成"]
+    Execute["phase を実行する\nimplementation / review / remediation / merge"]
     Report["結果を記録する\nevidence / summaries / kanban comments / status changes"]
   end
 
+  AI["生成AI\ntask を解釈し作業を進める"]
   Kanban["kanban\nwork queue / visible state"]
+  ProjectYaml["project.yaml\nrepos / phases / commands / scheduler settings"]
+  Skills["skills\nAI 作業の phase guidance"]
   Workspace["product workspace\nrepo slots / branches / evidence files"]
 
   Task --> Kanban
-  Package --> Bootstrap
-  Command --> Bootstrap
-  Command --> KanbanOps
-  Command --> RuntimeOps
-  Bootstrap --> Config
-  KanbanOps --> Kanban
-  RuntimeOps --> Scheduler
+  Package --> ProjectYaml
+  Package --> Skills
+  Runtime --> Scheduler
   Kanban --> Scheduler
-  Config --> Scheduler
-  SkillUse --> Scheduler
-  Package --> Config
-  Package --> SkillUse
-  Scheduler --> Execute
+  Scheduler --> Plan
+  ProjectYaml --> Plan
+  Skills --> Plan
+  Plan --> AI
+  AI --> Execute
+  Execute --> AI
   Execute --> Workspace
   Execute --> Report
   Report --> Workspace
@@ -59,7 +55,7 @@ flowchart TB
   Workspace --> Observe
 ```
 
-利用者が A2O に与える主な入力は、kanban task、project package、CLI command の 3 つである。`project.yaml` は project の構造、phase command、repo slot、scheduler settings を定義する。skills は各 phase をどう扱うかを定義する。CLI は runtime と kanban surface を準備し、run-once または常駐 scheduler を開始する。Engine は kanban の work、`project.yaml`、skills を組み合わせ、設定された phase を実行し、結果を workspace evidence と kanban 上の status として戻す。
+通常利用では、利用者は kanban task を作り、project package を最新に保つ。常駐 scheduler は kanban から実行可能な task を選ぶ。Engine は `project.yaml` から project 構造と実行可能な phase command を読み、skills から phase guidance を読み、生成AIに作業を進めさせる。結果は workspace evidence と kanban 上の status として記録される。
 
 ## 設計資料一覧
 

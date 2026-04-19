@@ -14,43 +14,39 @@ This document explains what each design document covers and the recommended read
 ```mermaid
 flowchart TB
   subgraph User["User"]
-    Task["Writes kanban tasks\nwhat to change, constraints, priority"]
-    Package["Maintains project package\nproject.yaml, skills, commands"]
-    Command["Runs a2o commands\nbootstrap, kanban up, runtime start/run-once/status"]
-    Observe["Checks results\nkanban status, comments, workspace evidence"]
+    Task["Creates a kanban task\nrequest, constraints, priority"]
+    Package["Provides project package\nproject.yaml, skills, commands"]
+    Observe["Checks the outcome\nkanban status, comments, workspace evidence"]
   end
 
   subgraph CLI["a2o CLI"]
-    Bootstrap["Creates and validates runtime setup\nproject template, project bootstrap, project lint"]
-    KanbanOps["Starts and opens kanban\nboard, lanes, required tags"]
-    RuntimeOps["Controls execution\nrun-once for one cycle, start for scheduler, status for inspection"]
+    Runtime["Runs the resident runtime\nscheduler and status commands"]
   end
 
   subgraph Engine["A2O Engine"]
-    Config["Loads project.yaml\nrepos, phases, commands, scheduler settings"]
-    SkillUse["Loads phase skills\nimplementation, review, remediation, merge"]
-    Scheduler["Scheduler\nselects runnable kanban work and advances phases"]
-    Execute["Executes phase commands\nthrough a2o-agent and project commands"]
-    Report["Records results\nevidence, summaries, kanban comments, status changes"]
+    Scheduler["Scheduler\nselects runnable kanban tasks"]
+    Plan["Builds phase instructions\nfrom project.yaml and skills"]
+    Execute["Executes phases\nimplementation, review, remediation, merge"]
+    Report["Records the result\nevidence, summaries, kanban comments, status changes"]
   end
 
+  AI["Generative AI\ninterprets task and produces work"]
   Kanban["Kanban\nwork queue and visible state"]
+  ProjectYaml["project.yaml\nrepos, phases, commands, scheduler settings"]
+  Skills["Skills\nphase guidance for AI work"]
   Workspace["Product workspace\nrepo slots, branches, evidence files"]
 
   Task --> Kanban
-  Package --> Bootstrap
-  Command --> Bootstrap
-  Command --> KanbanOps
-  Command --> RuntimeOps
-  Bootstrap --> Config
-  KanbanOps --> Kanban
-  RuntimeOps --> Scheduler
+  Package --> ProjectYaml
+  Package --> Skills
+  Runtime --> Scheduler
   Kanban --> Scheduler
-  Config --> Scheduler
-  SkillUse --> Scheduler
-  Package --> Config
-  Package --> SkillUse
-  Scheduler --> Execute
+  Scheduler --> Plan
+  ProjectYaml --> Plan
+  Skills --> Plan
+  Plan --> AI
+  AI --> Execute
+  Execute --> AI
   Execute --> Workspace
   Execute --> Report
   Report --> Workspace
@@ -59,7 +55,7 @@ flowchart TB
   Workspace --> Observe
 ```
 
-The user gives A2O three main inputs: kanban tasks, a project package, and CLI commands. `project.yaml` defines the project shape, phase commands, repository slots, and scheduler settings. Skills define how each phase should be handled. The CLI prepares the runtime and kanban surface, then starts either one-shot execution or the resident scheduler. The Engine combines kanban work, `project.yaml`, and skills, executes the configured phases, and writes the outcome back as workspace evidence and kanban-visible status.
+In normal use, the user creates a kanban task and keeps the project package up to date. The resident scheduler picks runnable tasks from kanban. The Engine reads `project.yaml` for the project structure and executable phase commands, reads skills for phase guidance, asks Generative AI to perform the work, and records the outcome as workspace evidence and kanban-visible status.
 
 ## Documents
 
