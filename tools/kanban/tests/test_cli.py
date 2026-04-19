@@ -213,6 +213,41 @@ class SoloBoardCliTest(unittest.TestCase):
         self.assertEqual(description, payload["description"])
         self.assertEqual(("POST", "/api/boards/42/tickets"), calls[-1][:2])
 
+    def test_update_task_backfills_description_when_backend_omits_body_markdown(self) -> None:
+        description = "## Updated\n\n- line 1\n- line 2\n"
+        board_shell = {
+            "board": {"id": 42, "name": "Sample"},
+            "lanes": [{"id": 7, "name": "To do", "position": 0}],
+        }
+
+        def fake_rest_request(_base_url, _token, method, path, *, payload=None):
+            if method == "PATCH" and path == "/api/tickets/101":
+                self.assertEqual(description, payload["bodyMarkdown"])
+                return {
+                    "id": 101,
+                    "boardId": 42,
+                    "laneId": 7,
+                    "title": "Task",
+                    "isResolved": False,
+                    "ref": "Sample#101",
+                    "shortRef": "#101",
+                }
+            if method == "GET" and path == "/api/boards":
+                return {"boards": [{"id": 42, "name": "Sample"}]}
+            if method == "GET" and path == "/api/boards/42":
+                return board_shell
+            raise AssertionError(f"unexpected request: {method} {path}")
+
+        with patch.object(kanban_cli, "rest_request", side_effect=fake_rest_request):
+            updated = kanban_cli.update_task(
+                "http://localhost:3460",
+                "",
+                101,
+                {"description": description},
+            )
+
+        self.assertEqual(description, updated["description"])
+
     def test_task_update_description_file_and_append_description_file_preserve_multiline_text(self) -> None:
         existing = "Existing body"
         replacement = "## Replacement\n\n- one\n- two\n"
@@ -338,7 +373,7 @@ class SoloBoardCliTest(unittest.TestCase):
                     "identifier": "#101",
                     "index": 101,
                     "title": "Snapshot task",
-                    "description": "",
+                    "description": "stale list payload",
                     "status": "To do",
                 },
                 project_title="Sample",

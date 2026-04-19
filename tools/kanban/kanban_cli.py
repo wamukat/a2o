@@ -351,7 +351,7 @@ def normalize_task_snapshot(
     # Snapshot normalization already needs the detail endpoint for tags; reuse it
     # as the source of truth for bodyMarkdown instead of trusting list payloads.
     detailed_task = get_task(base_url, token, task_id)
-    description = str(detailed_task.get("description") or detailed_task.get("bodyMarkdown") or task.get("description") or "")
+    description = str(detailed_task.get("description") or detailed_task.get("bodyMarkdown") or "")
     tags = detailed_task.get("tags") if isinstance(detailed_task, dict) else None
     if not isinstance(tags, list):
         raise RuntimeError("Unexpected SoloBoard task tags response.")
@@ -886,6 +886,8 @@ def update_task(base_url: str, token: str, task_id: int, changes: dict[str, Any]
     updated = rest_request(base_url, token, "PATCH", f"/api/tickets/{task_id}", payload=payload)
     if not isinstance(updated, dict):
         raise RuntimeError(f"Task update failed: {task_id}")
+    if "description" in changes and not updated.get("bodyMarkdown"):
+        updated = {**updated, "bodyMarkdown": changes["description"]}
     board_title = resolve_project_title(base_url, token, project_id=int(updated.get("boardId") or 0))
     board_shell = rest_request(base_url, token, "GET", f"/api/boards/{int(updated.get('boardId') or 0)}")
     return soloboard_normalize_ticket(updated, board_title=board_title, board_shell=board_shell)
