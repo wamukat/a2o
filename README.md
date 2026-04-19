@@ -4,6 +4,8 @@
 
 A2O stands for Agentic AI Orchestrator. A2O is an automation engine that starts from kanban tasks and manages workspaces, agent execution, verification, merge, and evidence recording.
 
+![A2O system overview](docs/assets/a2o-system-overview.svg)
+
 This repository contains the A2O Engine, Go host launcher, Go agent, Docker runtime image, reference product packages, and design documentation. The normal public entrypoints are `a2o`, `a2o-agent`, project packages, and the bundled kanban service.
 
 ## Principles
