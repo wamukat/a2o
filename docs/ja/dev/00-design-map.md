@@ -23,16 +23,14 @@ flowchart LR
     SkillFiles[/AI 用スキル群\nimplementation / review guidance/]
   end
 
-  subgraph Product["プロダクト状態"]
-    Kanban[(kanban\nwork queue / visible state)]
-    Repository[(Git repository\ncode changes / merge result)]
-  end
-
   subgraph Engine["A2O Engine"]
+    Kanban[(kanban\nwork queue / visible state)]
     Scheduler(scheduler\n実行可能な kanban task を選ぶ)
     Prepare(AI 実行 job を用意する\ntask / config / skills から生成)
     Report(結果を記録する\nkanban comments / status / evidence)
   end
+
+  Repository[(Git repository\ncode changes / merge result)]
 
   User -->|"task を作る"| Kanban
   User -->|"管理する"| ProjectConfig
@@ -47,13 +45,10 @@ flowchart LR
   AI -->|"assistant output"| Agent
   Agent -->|"変更を反映する"| Repository
   Agent --> Report
-  Report --> Repository
   Report --> Kanban
-  Kanban -->|"status / comments"| User
-  Repository -->|"merged code"| User
 ```
 
-通常利用では、利用者は kanban task を作り、プロジェクト設定ファイルと AI 用スキル群を管理する。常駐 scheduler は kanban から実行可能な task を選ぶ。Engine は task、設定、skills を組み合わせて AI 実行 job を用意する。`a2o-agent` は host または project dev-env で job を実行し、設定された command が必要とする場合に生成AIを呼び出し、結果を Git repository に反映する。Engine は結果を kanban に記録する。
+通常利用では、利用者は kanban task を作り、プロジェクト設定ファイルと AI 用スキル群を管理する。常駐 scheduler は Engine が管理する kanban state から実行可能な task を選ぶ。Engine は task、設定、skills を組み合わせて AI 実行 job を用意する。`a2o-agent` は host または project dev-env で job を実行し、設定された command が必要とする場合に生成AIを呼び出し、結果を Git repository に反映する。Engine は task status、comments、evidence を kanban に記録する。
 
 ## 設計資料一覧
 
