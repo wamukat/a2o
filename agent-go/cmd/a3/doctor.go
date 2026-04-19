@@ -7,9 +7,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
+
+var projectScriptContractA3EnvPattern = regexp.MustCompile(`A3_[A-Z0-9_]+`)
 
 func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) int {
 	flags := flag.NewFlagSet("a2o doctor", flag.ContinueOnError)
@@ -177,7 +180,7 @@ func isProjectScriptContractScanTarget(packagePath string, path string, mode os.
 		return false
 	}
 	parts := strings.Split(filepath.ToSlash(rel), "/")
-	if len(parts) == 1 && parts[0] == "project.yaml" {
+	if len(parts) == 1 && isPackageAutomationFile(parts[0]) {
 		return true
 	}
 	if len(parts) > 1 {
@@ -190,7 +193,16 @@ func isProjectScriptContractScanTarget(packagePath string, path string, mode os.
 		return true
 	}
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".sh", ".bash", ".zsh", ".rb", ".py", ".js", ".mjs", ".cjs", ".ts", ".go":
+	case ".sh", ".bash", ".zsh", ".rb", ".py", ".js", ".mjs", ".cjs", ".ts", ".go", ".env", ".json", ".yml", ".yaml":
+		return true
+	default:
+		return false
+	}
+}
+
+func isPackageAutomationFile(name string) bool {
+	switch name {
+	case "project.yaml", "project.yml", "Taskfile.yml", "Taskfile.yaml", "Makefile", ".env", "package.json":
 		return true
 	default:
 		return false
@@ -203,17 +215,8 @@ func projectScriptContractViolations(text string) []string {
 		label string
 		match func(string) bool
 	}{
-		{"A3_WORKER_REQUEST_PATH", func(value string) bool {
-			return strings.Contains(value, "A3_WORKER_REQUEST_PATH") || (strings.Contains(value, "A3") && strings.Contains(value, "WORKER_REQUEST_PATH"))
-		}},
-		{"A3_WORKER_RESULT_PATH", func(value string) bool {
-			return strings.Contains(value, "A3_WORKER_RESULT_PATH") || (strings.Contains(value, "A3") && strings.Contains(value, "WORKER_RESULT_PATH"))
-		}},
-		{"A3_WORKSPACE_ROOT", func(value string) bool {
-			return strings.Contains(value, "A3_WORKSPACE_ROOT") || (strings.Contains(value, "A3") && strings.Contains(value, "WORKSPACE_ROOT"))
-		}},
-		{"A3_WORKER_LAUNCHER_CONFIG_PATH", func(value string) bool {
-			return strings.Contains(value, "A3_WORKER_LAUNCHER_CONFIG_PATH") || (strings.Contains(value, "A3") && strings.Contains(value, "WORKER_LAUNCHER_CONFIG_PATH"))
+		{"A3_*", func(value string) bool {
+			return projectScriptContractA3EnvPattern.MatchString(value) || strings.Contains(value, "A3_")
 		}},
 		{".a3/workspace.json", func(value string) bool {
 			return strings.Contains(value, ".a3/workspace.json") || (strings.Contains(value, ".a3") && strings.Contains(value, "workspace.json"))

@@ -883,6 +883,14 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	readme := "Historical note: A3_WORKER_REQUEST_PATH and .a3/workspace.json are not public.\n"
+	if err := os.WriteFile(filepath.Join(packageDir, "README.md"), []byte(readme), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	taskfile := "version: '3'\ntasks:\n  verify:\n    cmds: ['echo $A3_RUNTIME_IMAGE']\n"
+	if err := os.WriteFile(filepath.Join(packageDir, "Taskfile.yml"), []byte(taskfile), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	privateScript := "echo $A3_WORKER_REQUEST_PATH && ruby -e 'puts File.join(\".a3\", \"workspace.json\")'\n"
 	if err := os.WriteFile(filepath.Join(packageDir, "commands", "worker.sh"), []byte(privateScript), 0o644); err != nil {
 		t.Fatal(err)
@@ -916,8 +924,9 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 
 	for _, want := range []string{
 		"doctor_check name=project_script_contract status=blocked",
+		"Taskfile.yml:A3_*",
 		"commands/worker.sh:.a3/workspace.json",
-		"commands/worker.sh:A3_WORKER_REQUEST_PATH",
+		"commands/worker.sh:A3_*",
 		"action=use A2O_* worker env and worker request fields instead of internal runtime files",
 	} {
 		if !strings.Contains(stdout.String(), want) {
@@ -994,7 +1003,7 @@ func TestDoctorFlagsPrivateContractUsageInProjectYaml(t *testing.T) {
 	for _, want := range []string{
 		"doctor_check name=project_script_contract status=blocked",
 		"project.yaml:.a3/slot.json",
-		"project.yaml:A3_WORKER_RESULT_PATH",
+		"project.yaml:A3_*",
 	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("doctor output missing %q in:\n%s", want, stdout.String())
