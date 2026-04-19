@@ -7,7 +7,7 @@ module A3
 
       attr_reader :manifest_path, :preset_dir, :storage_dir, :storage_backend, :project_surface, :project_context, :container, :runtime_package, :runtime_environment_config
 
-      def self.build(manifest_path:, preset_dir:, storage_backend:, storage_dir:, run_id_generator:, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::DisabledMergeRunner.new, worker_gateway: nil, repo_sources: {}, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil, image_version: ENV.fetch("A3_IMAGE_VERSION", "dev"))
+      def self.build(manifest_path:, preset_dir:, storage_backend:, storage_dir:, run_id_generator:, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::DisabledMergeRunner.new, worker_gateway: nil, repo_sources: {}, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil, image_version: ENV.fetch("A2O_IMAGE_VERSION", ENV.fetch("A3_IMAGE_VERSION", "dev")))
         build_session(
           manifest_path: manifest_path,
           preset_dir: preset_dir,
@@ -26,7 +26,7 @@ module A3
         )
       end
 
-      def self.json(manifest_path:, preset_dir:, storage_dir:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:, repo_sources:, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil, image_version: ENV.fetch("A3_IMAGE_VERSION", "dev"))
+      def self.json(manifest_path:, preset_dir:, storage_dir:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:, repo_sources:, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil, image_version: ENV.fetch("A2O_IMAGE_VERSION", ENV.fetch("A3_IMAGE_VERSION", "dev")))
         build(
           manifest_path: manifest_path,
           preset_dir: preset_dir,
@@ -45,7 +45,7 @@ module A3
         )
       end
 
-      def self.sqlite(manifest_path:, preset_dir:, storage_dir:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:, repo_sources:, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil, image_version: ENV.fetch("A3_IMAGE_VERSION", "dev"))
+      def self.sqlite(manifest_path:, preset_dir:, storage_dir:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:, repo_sources:, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil, image_version: ENV.fetch("A2O_IMAGE_VERSION", ENV.fetch("A3_IMAGE_VERSION", "dev")))
         build(
           manifest_path: manifest_path,
           preset_dir: preset_dir,

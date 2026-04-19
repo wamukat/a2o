@@ -81,7 +81,7 @@ module A3
       )
     end
 
-    def runtime_package_descriptor(manifest_path:, preset_dir:, storage_backend:, storage_dir:, repo_sources: {}, image_version: ENV.fetch("A3_IMAGE_VERSION", "dev"))
+    def runtime_package_descriptor(manifest_path:, preset_dir:, storage_backend:, storage_dir:, repo_sources: {}, image_version: ENV.fetch("A2O_IMAGE_VERSION", ENV.fetch("A3_IMAGE_VERSION", "dev")))
       A3::Domain::RuntimePackageDescriptor.build(
         image_version: image_version,
         manifest_path: manifest_path,

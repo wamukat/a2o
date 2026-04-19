@@ -16,6 +16,7 @@ RUN DIST_DIR=/opt/a2o/agents VERSION="${A3_AGENT_VERSION}" ./scripts/build-relea
 
 FROM ruby:3.1-slim
 
+ARG A3_IMAGE_VERSION=0.5.0
 ARG GO_TASK_VERSION=3.41.0
 ARG BUNDLER_VERSION=2.5.22
 
@@ -75,6 +76,8 @@ RUN ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a3 \
 
 ENV A3_ROOT_DIR=/workspace
 ENV A2O_ROOT_DIR=/workspace
+ENV A3_IMAGE_VERSION=${A3_IMAGE_VERSION}
+ENV A2O_IMAGE_VERSION=${A3_IMAGE_VERSION}
 ENV A2O_AGENT_PACKAGE_DIR=/opt/a2o/agents
 ENV A3_AGENT_PACKAGE_DIR=/opt/a2o/agents
 ENV RUBYLIB=/tmp/a3-engine/lib

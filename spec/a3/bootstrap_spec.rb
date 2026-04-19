@@ -79,6 +79,28 @@ RSpec.describe A3::Bootstrap do
       end
     end
 
+    it "prefers the public A2O image version environment for runtime package descriptors" do
+      Dir.mktmpdir do |dir|
+        manifest_path = File.join(dir, "project.yaml")
+        preset_dir = File.join(dir, "presets")
+        FileUtils.mkdir_p(preset_dir)
+        File.write(manifest_path, YAML.dump({ "schema_version" => 1, "runtime" => { "presets" => [] } }))
+
+        with_env("A2O_IMAGE_VERSION" => "0.5.0", "A3_IMAGE_VERSION" => "legacy") do
+          descriptor = described_class.runtime_package_descriptor(
+            manifest_path: manifest_path,
+            preset_dir: preset_dir,
+            storage_backend: :sqlite,
+            storage_dir: dir,
+            repo_sources: {}
+          )
+
+          expect(descriptor.image_version).to eq("0.5.0")
+          expect(descriptor.operator_summary.fetch("distribution")).to include("image_ref=a3-engine:0.5.0")
+        end
+      end
+    end
+
     it "rejects legacy manifest.yml runtime package paths" do
       Dir.mktmpdir do |dir|
         manifest_path = File.join(dir, "manifest.yml")
