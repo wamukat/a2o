@@ -191,8 +191,6 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	builder.WriteString("    command:\n")
 	writeYAMLList(&builder, 3, executorCommand)
 	builder.WriteString("    phase_profiles: {}\n")
-	builder.WriteString("  presets:\n")
-	writeYAMLList(&builder, 2, []string{"base"})
 	builder.WriteString("  surface:\n")
 	builder.WriteString("    verification_commands: []\n")
 	builder.WriteString("    remediation_commands: []\n")

@@ -23,7 +23,7 @@ The owner decisions for implementation are:
 Before `A2O#272`, package authors had to understand two files:
 
 - `project.yaml`: package metadata, kanban board, repo slots, agent prerequisites, runtime loop defaults.
-- `manifest.yml`: runtime presets, merge behavior, project surface commands and skills through presets.
+- `manifest.yml`: runtime presets, merge behavior, project surface commands and skills.
 
 That split was unclear because both files described the same runtime package. `manifest.yml` also repeated the kanban project already present in `project.yaml`.
 
@@ -76,8 +76,6 @@ runtime:
         - "{{result_path}}"
       env: {}
     phase_profiles: {}
-  presets:
-    - base
   surface:
     implementation_skill: skills/implementation/base.md
     review_skill:
@@ -110,7 +108,7 @@ Host agent binary は canonical path `.work/a2o/agent/bin/a2o-agent` に置く�
 
 `agent` owns host-side workspace, product toolchain requirements, and executor command requirements. `required_bins` remains declarative because the agent can validate prerequisites before work starts.
 
-`runtime` owns execution defaults and the project surface that the Ruby runtime formerly read from `manifest.yml` plus presets.
+`runtime` owns execution defaults and the project surface.
 
 `runtime.executor` owns the agent-side implementation/review command. It is required for packaged `a2o runtime run-once`, `runtime loop`, and `runtime start` when using the default `a2o-agent worker stdin-bundle` worker. A2O renders this public `project.yaml` section into an internal compatibility launcher config; users should not create a separate `launcher.json`.
 
@@ -147,9 +145,7 @@ The template uses the compact executor form. `--language` controls `agent.requir
 
 When `--output` points to a file, the generator also writes `kanban/bootstrap.json` beside the package config. Existing files are not overwritten unless `--force` is provided. The generated bootstrap file contains project-owned labels such as repo labels; A2O-owned lanes and internal coordination labels are provisioned by the provider bootstrap.
 
-`runtime.presets` keeps the current preset model. Presets are still useful for common A2O behavior, but package-local overrides live beside the rest of the package config.
-
-`runtime.surface` owns skills, verification commands, remediation commands, and workspace hook. Values may be scalar or variant maps, matching the current project surface resolver behavior.
+`runtime.surface` owns skills, verification commands, remediation commands, and workspace hook. Values may be scalar or variant maps, matching the current project surface resolver behavior. It is the single user-facing place for project runtime surface configuration.
 
 `runtime.merge` owns merge target, policy, and target ref. Values may be scalar or variant maps, matching the current merge resolver behavior.
 
@@ -188,7 +184,6 @@ runtime:
       command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
       env: {}
     phase_profiles: {}
-  presets: [base]
   surface:
     verification_commands:
       - app/project-package/commands/verify.sh
@@ -231,7 +226,6 @@ runtime:
       command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
       env: {}
     phase_profiles: {}
-  presets: [base]
   surface:
     verification_commands:
       - app/project-package/commands/verify.sh
@@ -272,7 +266,6 @@ runtime:
       command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
       env: {}
     phase_profiles: {}
-  presets: [base]
   surface:
     verification_commands:
       - app/project-package/commands/verify.sh
@@ -319,7 +312,6 @@ runtime:
       command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
       env: {}
     phase_profiles: {}
-  presets: [base]
   surface:
     review_skill:
       default: skills/review/default.md
@@ -354,7 +346,7 @@ runtime:
 `A2O#272` implements the migration:
 
 1. A single loader reads `project.yaml` schema version `1`.
-2. The runtime bridge derives internal runtime package data from `runtime.presets`, `runtime.surface`, and `runtime.merge`.
+2. The runtime bridge derives internal runtime package data from `runtime.surface` and `runtime.merge`.
 3. Reference product packages no longer contain `manifest.yml`.
 4. The four reference packages use single-file `project.yaml`.
 5. User docs and reference package docs no longer ask authors to create `manifest.yml`.

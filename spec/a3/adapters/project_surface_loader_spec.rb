@@ -15,6 +15,30 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
 
   let(:loader) { described_class.new(preset_dir: @preset_dir) }
 
+  it "loads a project config from runtime.surface without presets" do
+    project_config_path = write_project_config(
+      {
+        "runtime" => {
+          "surface" => {
+            "implementation_skill" => "skills/implementation/base.md",
+            "review_skill" => "skills/review/project.md",
+            "verification_commands" => ["commands/verify-all"],
+            "remediation_commands" => ["commands/apply-remediation"],
+            "workspace_hook" => "hooks/prepare-runtime.sh"
+          }
+        }
+      }
+    )
+
+    surface = loader.load(project_config_path)
+
+    expect(surface.implementation_skill).to eq("skills/implementation/base.md")
+    expect(surface.review_skill).to eq("skills/review/project.md")
+    expect(surface.verification_commands).to eq(["commands/verify-all"])
+    expect(surface.remediation_commands).to eq(["commands/apply-remediation"])
+    expect(surface.workspace_hook).to eq("hooks/prepare-runtime.sh")
+  end
+
   it "loads a project config from preset chain and project overrides" do
     write_yaml(
       "base.yml",
@@ -45,6 +69,25 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     expect(surface.verification_commands).to eq(["commands/verify-all"])
     expect(surface.remediation_commands).to eq(["commands/apply-remediation"])
     expect(surface.workspace_hook).to eq("hooks/prepare-runtime.sh")
+  end
+
+  it "loads yaml presets before legacy yml presets for compatibility" do
+    write_yaml(
+      "base.yml",
+      {
+        "implementation_skill" => "skills/implementation/legacy.md"
+      }
+    )
+    write_yaml(
+      "base.yaml",
+      {
+        "implementation_skill" => "skills/implementation/public.md"
+      }
+    )
+
+    project_config_path = write_project_config({ "runtime" => { "presets" => ["base"] } })
+
+    expect(loader.load(project_config_path).implementation_skill).to eq("skills/implementation/public.md")
   end
 
   it "fails fast when two presets define incompatible values for the same key" do

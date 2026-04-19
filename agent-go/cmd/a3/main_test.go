@@ -461,8 +461,6 @@ runtime:
       - worker
       - --result
       - "{{result_path}}"
-  presets:
-    - base
   merge:
     target: merge_to_live
     policy: ff_only

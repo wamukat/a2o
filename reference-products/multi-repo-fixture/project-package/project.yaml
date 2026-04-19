@@ -39,8 +39,6 @@ runtime:
         - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
       env: {}
     phase_profiles: {}
-  presets:
-    - base
   surface:
     implementation_skill: skills/implementation/base.md
     review_skill:

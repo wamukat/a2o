@@ -53,6 +53,30 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
     expect(context.merge_config.target_ref).to eq("refs/heads/feature/prototype")
   end
 
+  it "loads project surface directly without runtime presets" do
+    project_config_path = write_project_config(
+      {
+        "runtime" => {
+          "surface" => {
+            "implementation_skill" => "skills/implementation/project.md",
+            "verification_commands" => ["commands/verify-project"]
+          },
+          "merge" => {
+            "target" => "merge_to_parent",
+            "policy" => "ff_only",
+            "target_ref" => "refs/heads/feature/prototype"
+          }
+        }
+      }
+    )
+
+    context = loader.load(project_config_path)
+
+    expect(context.surface.implementation_skill).to eq("skills/implementation/project.md")
+    expect(context.surface.verification_commands).to eq(["commands/verify-project"])
+    expect(context.merge_config.target).to eq(:merge_to_parent)
+  end
+
   it "rejects unknown merge target" do
     project_config_path = write_project_config(
       {

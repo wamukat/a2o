@@ -33,7 +33,7 @@ Each package includes:
 
 The package must define a deterministic test or build command, agent prerequisites, editable source boundaries, and at least one scenario task that can be placed on the kanban board.
 
-`project.yaml` is the single author-facing package config file. It owns package identity, kanban selection, repo slots, agent prerequisites, runtime presets, project surface commands, and merge defaults.
+`project.yaml` is the single author-facing package config file. It owns package identity, kanban selection, repo slots, agent prerequisites, runtime surface commands, and merge defaults.
 
 ## Validation Boundary
 

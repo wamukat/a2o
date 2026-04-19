@@ -180,9 +180,10 @@ module A3
     def preset_chain(manifest_path)
       document = manifest_document(manifest_path)
       runtime = document.is_a?(Hash) ? document["runtime"] : nil
-      unless runtime.is_a?(Hash) && runtime.key?("presets")
-        raise A3::Domain::ConfigurationError, "project.yaml runtime.presets must be provided"
+      unless runtime.is_a?(Hash)
+        raise A3::Domain::ConfigurationError, "project.yaml runtime must be provided"
       end
+      return [] unless runtime.key?("presets")
       unless runtime["presets"].is_a?(Array)
         raise A3::Domain::ConfigurationError, "project.yaml runtime.presets must be an array"
       end
@@ -193,7 +194,7 @@ module A3
 
     def preset_schema_versions(manifest_path, preset_dir)
       preset_chain(manifest_path).each_with_object({}) do |preset_name, versions|
-        preset_path = Pathname(preset_dir).join("#{preset_name}.yml")
+        preset_path = preset_file_path(preset_dir, preset_name)
         versions[preset_name] =
           if preset_path.file?
             document = YAML.safe_load(preset_path.read, permitted_classes: [], aliases: false)
@@ -205,6 +206,14 @@ module A3
       end.freeze
     end
     private_class_method :preset_schema_versions
+
+    def preset_file_path(preset_dir, preset_name)
+      yaml_path = Pathname(preset_dir).join("#{preset_name}.yaml")
+      return yaml_path if yaml_path.file?
+
+      Pathname(preset_dir).join("#{preset_name}.yml")
+    end
+    private_class_method :preset_file_path
 
     def required_manifest_schema_version
       ENV.fetch("A3_REQUIRED_MANIFEST_SCHEMA_VERSION", "1")

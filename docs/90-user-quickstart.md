@@ -90,7 +90,7 @@ a2o runtime describe-task <task-ref>
 
 ### project.yaml
 
-`project.yaml` は project package の唯一の公開 config である。A2O は package metadata、kanban bootstrap、repo slot、agent prerequisites、runtime preset、project surface command、merge default をここから読む。
+`project.yaml` は project package の唯一の公開 config である。A2O は package metadata、kanban bootstrap、repo slot、agent prerequisites、runtime surface command、merge default をここから読む。
 
 最小構成では single repo、single merge target、one executor から始める。
 
@@ -127,8 +127,6 @@ runtime:
       - "--result"
       - "{{result_path}}"
     phase_profiles: {}
-  presets:
-    - base
   surface:
     implementation_skill: skills/implementation/base.md
     review_skill:

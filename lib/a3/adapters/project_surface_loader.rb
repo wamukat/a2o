@@ -15,7 +15,7 @@ module A3
         runtime = project_config.fetch("runtime") do
           raise A3::Domain::ConfigurationError, "project.yaml runtime must be provided"
         end
-        presets = runtime.fetch("presets")
+        presets = runtime.fetch("presets", [])
         unless presets.is_a?(Array)
           raise A3::Domain::ConfigurationError, "project.yaml runtime.presets must be an array"
         end
@@ -56,13 +56,20 @@ module A3
       end
 
       def load_preset(name)
-        payload = YAML.safe_load(File.read(File.join(@preset_dir, "#{name}.yml")), permitted_classes: [], aliases: false)
+        payload = YAML.safe_load(File.read(preset_path(name)), permitted_classes: [], aliases: false)
         schema_version = payload["schema_version"].to_s
         if schema_version.empty? || schema_version != @required_preset_schema_version
           raise A3::Domain::ConfigurationError, "preset #{name} schema_version must be #{@required_preset_schema_version}"
         end
 
         payload.reject { |key, _| key == "schema_version" }
+      end
+
+      def preset_path(name)
+        yaml_path = File.join(@preset_dir, "#{name}.yaml")
+        return yaml_path if File.file?(yaml_path)
+
+        File.join(@preset_dir, "#{name}.yml")
       end
 
       def merge_preset(merged, incoming)
