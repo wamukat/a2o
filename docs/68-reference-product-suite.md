@@ -28,15 +28,15 @@ Each package includes:
 - `project.yaml`
 - `commands/`
 - `skills/`
-- `scenarios/`
+- `task-templates/`
 
-The package must define a deterministic test or build command, agent prerequisites, editable source boundaries, and at least one scenario task that can be placed on the kanban board.
+The package must define a deterministic test or build command, agent prerequisites, editable source boundaries, and at least one task template that can be placed on the kanban board.
 
 `project.yaml` is the single author-facing package config file. It owns package identity, kanban selection, repo slots, agent prerequisites, runtime surface commands, and merge defaults.
 
 ## Validation Boundary
 
-Core validation starts with the reference suite. If a runtime, workspace, worker gateway, verification, merge, or package preset change cannot be validated against at least one reference product, create a ticket to add or improve a reference scenario before relying on external product evidence.
+Core validation starts with the reference suite. If a runtime, workspace, worker gateway, verification, merge, or package preset change cannot be validated against at least one reference product, create a ticket to add or improve a reference task template before relying on external product evidence.
 
 External behavior changes found while improving the suite require owner discussion before implementation.
 

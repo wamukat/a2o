@@ -17,7 +17,6 @@ agent:
     - python3
     - ruby
 runtime:
-  live_ref: refs/heads/main
   max_steps: 20
   agent_attempts: 200
   phases:
@@ -27,7 +26,6 @@ runtime:
         command:
           - ruby
           - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
-      workspace_hook: app/project-package/commands/bootstrap.sh
     review:
       skill: skills/review/default.md
       executor:

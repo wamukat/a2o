@@ -5,7 +5,7 @@ This fixture provides two small repositories for A2O parent-child validation.
 - `repos/catalog-service`: publishes catalog data and validates a JSON contract.
 - `repos/storefront`: consumes the catalog contract and renders a storefront summary.
 
-The A2O package under `project-package/` includes repo-scope labels and scenarios for:
+The A2O package under `project-package/` includes repo-scope labels and task templates for:
 
 - A single-repo task against `repo_alpha`.
 - A single-repo task against `repo_beta`.

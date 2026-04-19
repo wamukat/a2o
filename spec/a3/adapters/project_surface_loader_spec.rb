@@ -20,8 +20,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
       "runtime" => {
         "phases" => {
           "implementation" => {
-            "skill" => "skills/implementation/base.md",
-            "workspace_hook" => "hooks/prepare-runtime.sh"
+            "skill" => "skills/implementation/base.md"
           },
           "review" => {
             "skill" => "skills/review/project.md"
@@ -42,7 +41,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     expect(surface.review_skill).to eq("skills/review/project.md")
     expect(surface.verification_commands).to eq(["commands/verify-all"])
     expect(surface.remediation_commands).to eq(["commands/apply-remediation"])
-    expect(surface.workspace_hook).to eq("hooks/prepare-runtime.sh")
+    expect(surface.workspace_hook).to be_nil
   end
 
   it "maps parent_review phase skill to the parent review runtime variant" do
@@ -138,6 +137,38 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
 
     expect { loader.load(project_config_path) }
       .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.merge is no longer supported; use runtime.phases.merge")
+  end
+
+  it "rejects legacy runtime.live_ref" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "phases" => {
+          "implementation" => { "skill" => "skills/implementation/base.md" },
+          "review" => { "skill" => "skills/review/default.md" }
+        },
+        "live_ref" => "refs/heads/main"
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.live_ref is no longer supported; use runtime.phases.merge.target_ref")
+  end
+
+  it "rejects legacy phase workspace_hook" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md",
+            "workspace_hook" => "hooks/prepare-runtime.sh"
+          },
+          "review" => { "skill" => "skills/review/default.md" }
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.phases.implementation.workspace_hook is no longer supported; use phase commands or project package commands")
   end
 
   it "rejects legacy runtime.presets" do

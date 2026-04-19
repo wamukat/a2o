@@ -1362,6 +1362,130 @@ runtime:
 	}
 }
 
+func TestRuntimeRunOnceRejectsLegacyRuntimeLiveRef(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  live_ref: refs/heads/main
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - worker
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail with legacy runtime.live_ref")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "invalid runtime.live_ref") || !strings.Contains(stderr.String(), "runtime.live_ref is no longer supported") {
+		t.Fatalf("stderr should reject legacy runtime.live_ref, got %q", stderr.String())
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
+	}
+}
+
+func TestRuntimeRunOnceRejectsLegacyWorkspaceHook(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      workspace_hook: hooks/prepare-runtime.sh
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - worker
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail with legacy workspace_hook")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "invalid runtime.phases") || !strings.Contains(stderr.String(), "implementation.workspace_hook is no longer supported") {
+		t.Fatalf("stderr should reject legacy workspace_hook, got %q", stderr.String())
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
+	}
+}
+
 func TestRuntimeRunOnceRejectsMalformedProjectExecutor(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -1606,7 +1730,6 @@ repos:
   repo_alpha:
     path: ..
 runtime:
-  live_ref: refs/heads/main
   max_steps: 20
 `
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
@@ -2611,7 +2734,6 @@ agent:
     - npm
     - ruby
 runtime:
-  live_ref: refs/heads/main
   max_steps: 7
   agent_attempts: 9
   phases:
@@ -3220,7 +3342,6 @@ agent:
     - node
     - ruby
 runtime:
-  live_ref: refs/heads/main
   max_steps: 40
   agent_attempts: 300
   phases:

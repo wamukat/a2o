@@ -17,8 +17,7 @@ RSpec.describe A3::CLI do
             "runtime" => {
               "phases" => {
                 "implementation" => {
-                  "skill" => "skills/implementation/base.md",
-                  "workspace_hook" => "hooks/prepare-runtime.sh"
+                  "skill" => "skills/implementation/base.md"
                 },
                 "review" => {
                   "skill" => "skills/review/default.md"

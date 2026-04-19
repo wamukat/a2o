@@ -4,4 +4,3 @@ review_skill:
   default: skills/review/default.md
 verification_commands: []
 remediation_commands: []
-workspace_hook:

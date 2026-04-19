@@ -24,6 +24,9 @@ module A3
         if runtime.key?("merge")
           raise A3::Domain::ConfigurationError, "project.yaml runtime.merge is no longer supported; use runtime.phases.merge"
         end
+        if runtime.key?("live_ref")
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.live_ref is no longer supported; use runtime.phases.merge.target_ref"
+        end
         phases = runtime.fetch("phases") do
           raise A3::Domain::ConfigurationError, "project.yaml runtime.phases must be provided"
         end

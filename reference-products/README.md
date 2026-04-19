@@ -15,10 +15,10 @@ Each product keeps its A2O package under `project-package/`. Bootstrap a package
 a2o project bootstrap --package ./reference-products/<product>/project-package
 ```
 
-Run runtime-flow validation only as an explicit test step after the product code, package manifest, and scenario tasks have been reviewed.
+Run runtime-flow validation only as an explicit test step after the product code, package manifest, and task templates have been reviewed.
 
 ## Scope
 
-These fixtures should stay small enough for an agent to understand quickly, while still including real source code, tests, build or compile commands, and realistic task scenarios.
+These fixtures should stay small enough for an agent to understand quickly, while still including real source code, tests, build or compile commands, and realistic task templates.
 
 External A2O behavior changes found while improving these fixtures require owner discussion before implementation.

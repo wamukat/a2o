@@ -22,7 +22,6 @@ PJ が自由に差し替える surface は次を基本とする。
 - review skill
 - verification commands
 - remediation commands
-- workspace hook
 
 これ以上の注入点は、既存 surface や variant/preset で吸収できない場合に限って検討する。
 
@@ -106,18 +105,6 @@ verification failure に対する自動補正・再実行前処理。
 - lightweight recovery
 
 ただし、意味判断を伴う修正は remediation に入れない。
-
-### 3.5 workspace hook
-
-workspace 作成直後または repo slot 準備後の補助処理。
-
-役割:
-
-- bootstrap
-- local dependency setup
-- knowledge/build cache の初期化
-
-workspace hook は repo の存在そのものを変えるためには使わない。
 
 ## 4. Variant Resolution
 

@@ -4,7 +4,7 @@ Date: 2026-04-17
 
 This baseline proves A2O core runtime flows against the dedicated reference product suite.
 
-The implementation and parent-review decisions in this baseline are deterministic on purpose. `tools/reference_validation/deterministic_worker.rb` applies known scenario changes and returns known review dispositions so the baseline isolates A2O runtime behavior from model variability. The exercised runtime surfaces are still real: SoloBoard pickup and transitions, branch namespace creation, agent-materialized workspace preparation, worker gateway transport, agent-side publication, verification command execution, child-to-parent merge, parent review handoff, parent verification, live merge, and evidence persistence.
+The implementation and parent-review decisions in this baseline are deterministic on purpose. `tools/reference_validation/deterministic_worker.rb` applies known task-template changes and returns known review dispositions so the baseline isolates A2O runtime behavior from model variability. The exercised runtime surfaces are still real: SoloBoard pickup and transitions, branch namespace creation, agent-materialized workspace preparation, worker gateway transport, agent-side publication, verification command execution, child-to-parent merge, parent review handoff, parent verification, live merge, and evidence persistence.
 
 ## Runtime Shape
 
@@ -29,7 +29,7 @@ The public host launcher now covers project bootstrap, kanban service operations
 | Python service | `A2OReferencePython#11` | implementation, verification, merge | Done |
 | Multi-repo fixture | `A2OReferenceMultiRepo#1/#2/#3` | child implementation, child verification, child-to-parent merge, parent review, parent verification, parent merge | Done |
 
-Evidence state was retained under `.work/reference-baseline/`. These files are runtime evidence for the engine/agent/kanban/verification/merge path, not evidence that an AI model independently solved the scenarios:
+Evidence state was retained under `.work/reference-baseline/`. These files are runtime evidence for the engine/agent/kanban/verification/merge path, not evidence that an AI model independently solved the task-template requests:
 
 - `.work/reference-baseline/typescript-flow9/state/runs.json`
 - `.work/reference-baseline/go-flow1/state/runs.json`
@@ -51,7 +51,7 @@ Evidence state was retained under `.work/reference-baseline/`. These files are r
 For each product:
 
 1. Bootstrap the package board with `a2o kanban up`.
-2. Create scenario tasks from `project-package/scenarios`.
+2. Create kanban tasks from `project-package/task-templates`.
 3. Add trigger and repo labels from `project.yaml`.
 4. Start `agent-server` and `a2o-agent`.
 5. Run `execute-until-idle` with:

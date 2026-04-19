@@ -19,7 +19,7 @@ Date: 2026-04-17
 - SoloBoard adapter and bootstrap tooling
 - Agent HTTP worker gateway
 - Agent-materialized workspace mode
-- Reference product packages for TypeScript, Go, Python, and multi-repo scenarios
+- Reference product packages for TypeScript, Go, Python, and multi-repo task templates
 - Published GHCR image smoke for the reference product packages
 - Full RSpec release gate passing locally
 

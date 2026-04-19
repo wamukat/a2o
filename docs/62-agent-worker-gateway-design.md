@@ -9,7 +9,7 @@ The agent worker gateway lets A2O Engine delegate project-local work to an `a2o-
 
 - Engine owns task selection, phase transitions, workspace metadata, evidence, and merge decisions.
 - Agent owns project-local command execution in a materialized workspace.
-- Project package supplies repo aliases, command profiles, required binaries, and scenario expectations.
+- Project package supplies repo aliases, command profiles, required binaries, and task template expectations.
 - Gateway payloads are explicit JSON contracts, not ad hoc shell argument bundles.
 
 ## Flow

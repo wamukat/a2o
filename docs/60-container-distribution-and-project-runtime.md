@@ -10,7 +10,7 @@ A2O の配布単位は Docker runtime image、host launcher、project package、
 - Runtime image: Engine CLI、compose asset、host install asset、agent release binary を含む。
 - Host launcher: `a2o`。host から runtime image を操作する薄い Go binary である。
 - Agent: `a2o-agent`。host または project dev-env で job を pull し、project command を実行する。
-- Project package: project 名、kanban bootstrap、repo slot、runtime parameter、agent requirement、scenario を宣言する。
+- Project package: project 名、kanban bootstrap、repo slot、runtime parameter、agent requirement、task template を宣言する。
 
 内部互換のため、runtime image 内には `a3` CLI と `.a3` state path が残る。利用者向け surface では `a2o` と `a2o-agent` を使う。
 
@@ -48,7 +48,7 @@ Project package が持つもの:
 
 - project name and kanban board name
 - repo slot aliases and source paths
-- trigger labels and scenario task templates
+- trigger labels and task templates
 - verification/build/test commands
 - required toolchain names for agent-side execution
 - project-specific hook scripts when a declarative command is insufficient

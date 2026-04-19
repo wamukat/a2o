@@ -162,7 +162,6 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	builder.WriteString("  required_bins:\n")
 	writeYAMLList(&builder, 2, requiredBins)
 	builder.WriteString("runtime:\n")
-	writeYAMLScalar(&builder, 1, "live_ref", "refs/heads/main")
 	builder.WriteString("  max_steps: 20\n")
 	builder.WriteString("  agent_attempts: 200\n")
 	builder.WriteString("  phases:\n")

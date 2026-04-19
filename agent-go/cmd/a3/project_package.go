@@ -62,7 +62,6 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	config.KanbanProject = payload.Kanban.Project
 	config.KanbanLabels = payload.Kanban.Labels
 	config.KanbanStatus = payload.Kanban.Selection.Status
-	config.LiveRef = scalarString(payload.Runtime.LiveRef)
 	config.MaxSteps = scalarString(payload.Runtime.MaxSteps)
 	config.AgentAttempts = scalarString(payload.Runtime.AgentAttempts)
 	config.AgentWorkspaceRoot = payload.Agent.WorkspaceRoot
@@ -76,6 +75,9 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	if _, ok := kanbanPayload["bootstrap"]; ok {
 		return config, fmt.Errorf("project package config %s has invalid kanban.bootstrap: kanban.bootstrap is no longer supported; define project labels in kanban.labels or repos.<slot>.label", projectFile)
 	}
+	if _, ok := runtimePayload["live_ref"]; ok {
+		return config, fmt.Errorf("project package config %s has invalid runtime.live_ref: runtime.live_ref is no longer supported; use runtime.phases.merge.target_ref", projectFile)
+	}
 	if _, ok := runtimePayload["executor"]; ok {
 		return config, fmt.Errorf("project package config %s has invalid runtime.executor: runtime.executor is no longer supported; use runtime.phases.implementation.executor", projectFile)
 	}
@@ -85,11 +87,19 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	if _, ok := runtimePayload["merge"]; ok {
 		return config, fmt.Errorf("project package config %s has invalid runtime.merge: runtime.merge is no longer supported; use runtime.phases.merge", projectFile)
 	}
+	if err := rejectLegacyPhaseWorkspaceHook(runtimePayload); err != nil {
+		return config, fmt.Errorf("project package config %s has invalid runtime.phases: %w", projectFile, err)
+	}
 	executor, err := buildProjectExecutorConfig(payload.Runtime.Phases)
 	if err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.phases: %w", projectFile, err)
 	}
 	config.Executor = executor
+	liveRef, err := projectLiveRefFromMergePhase(payload.Runtime.Phases)
+	if err != nil {
+		return config, fmt.Errorf("project package config %s has invalid runtime.phases.merge: %w", projectFile, err)
+	}
+	config.LiveRef = liveRef
 	for alias, repo := range payload.Repos {
 		config.Repos[alias] = projectPackageRepo{Path: repo.Path, Label: repo.Label}
 	}
@@ -182,7 +192,6 @@ type projectPackageYAML struct {
 		RequiredBins  []string `yaml:"required_bins"`
 	} `yaml:"agent"`
 	Runtime struct {
-		LiveRef       any                                `yaml:"live_ref"`
 		MaxSteps      any                                `yaml:"max_steps"`
 		AgentAttempts any                                `yaml:"agent_attempts"`
 		Phases        map[string]projectPackagePhaseYAML `yaml:"phases"`
@@ -190,10 +199,50 @@ type projectPackageYAML struct {
 }
 
 type projectPackagePhaseYAML struct {
-	Skill         any            `yaml:"skill"`
-	Executor      map[string]any `yaml:"executor"`
-	Commands      []string       `yaml:"commands"`
-	WorkspaceHook string         `yaml:"workspace_hook"`
+	Skill     any            `yaml:"skill"`
+	Executor  map[string]any `yaml:"executor"`
+	Commands  []string       `yaml:"commands"`
+	TargetRef any            `yaml:"target_ref"`
+}
+
+func rejectLegacyPhaseWorkspaceHook(runtimePayload map[string]any) error {
+	phases, ok := normalizeYAMLValue(runtimePayload["phases"]).(map[string]any)
+	if !ok {
+		return nil
+	}
+	for phaseName, phaseValue := range phases {
+		phase, ok := normalizeYAMLValue(phaseValue).(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, ok := phase["workspace_hook"]; ok {
+			return fmt.Errorf("%s.workspace_hook is no longer supported; use phase commands or project package commands", phaseName)
+		}
+	}
+	return nil
+}
+
+func projectLiveRefFromMergePhase(phases map[string]projectPackagePhaseYAML) (string, error) {
+	mergePhase, ok := phases["merge"]
+	if !ok {
+		return "", fmt.Errorf("target_ref must be provided")
+	}
+	ref := targetRefDefaultValue(mergePhase.TargetRef)
+	if strings.TrimSpace(ref) == "" {
+		return "", fmt.Errorf("target_ref must be provided")
+	}
+	return ref, nil
+}
+
+func targetRefDefaultValue(value any) string {
+	switch typed := value.(type) {
+	case map[string]any:
+		return targetRefDefaultValue(typed["default"])
+	case map[any]any:
+		return targetRefDefaultValue(typed["default"])
+	default:
+		return scalarString(value)
+	}
 }
 
 func scalarString(value any) string {

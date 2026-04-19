@@ -130,6 +130,24 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
       .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.merge is no longer supported; use runtime.phases.merge")
   end
 
+  it "rejects legacy runtime.live_ref" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "phases" => base_phases.merge(
+          "merge" => {
+            "target" => "merge_to_parent",
+            "policy" => "ff_only",
+            "target_ref" => "refs/heads/feature/prototype"
+          }
+        ),
+        "live_ref" => "refs/heads/main"
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.live_ref is no longer supported; use runtime.phases.merge.target_ref")
+  end
+
   it "loads task-kind-specific merge config variants" do
     project_config_path = write_project_config(
       "runtime" => {
@@ -193,8 +211,7 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
   def base_phases
     {
       "implementation" => {
-        "skill" => "skills/implementation/base.md",
-        "workspace_hook" => "hooks/prepare-runtime.sh"
+        "skill" => "skills/implementation/base.md"
       },
       "review" => {
         "skill" => "skills/review/default.md"

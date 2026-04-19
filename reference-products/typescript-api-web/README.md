@@ -27,4 +27,4 @@ npm run dev:web
 a2o project bootstrap --package ./project-package
 ```
 
-The package contains small implementation and review skills plus scenario tasks. It is ready for a later runtime-flow validation, but this repository creation step does not start that flow.
+The package contains small implementation and review skills plus task templates. It is ready for a later runtime-flow validation, but this repository creation step does not start that flow.

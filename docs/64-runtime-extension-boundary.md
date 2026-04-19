@@ -3,7 +3,7 @@
 対象読者: A2O 設計者 / project package author / reviewer
 文書種別: extension boundary
 
-A2O Engine core must stay project-neutral. Project-specific behavior enters through project packages, command profiles, hook scripts, scenario tasks, and agent-side toolchains.
+A2O Engine core must stay project-neutral. Project-specific behavior enters through project packages, command profiles, hook scripts, task templates, and agent-side toolchains.
 
 ## Core May Know
 
@@ -23,7 +23,7 @@ A2O Engine core must stay project-neutral. Project-specific behavior enters thro
 - repo slot aliases and source paths
 - build/test/format commands
 - environment prerequisites for `a2o-agent`
-- scenario tasks for validation
+- task templates for validation
 - project-specific bootstrap, remediation, or verification hooks
 
 ## Injection Rules
@@ -44,10 +44,10 @@ project-package/
   project.yaml
   commands/
   skills/
-  scenarios/
+  task-templates/
 ```
 
-`project.yaml` is the only author-facing package config. It owns package metadata, kanban bootstrap and selection, repo slots, agent prerequisites, runtime surface commands, and merge defaults. A2O-owned lanes and internal coordination labels are provider/runtime defaults, not package responsibilities. `commands/` contains project-owned scripts when declarative commands are not enough. `scenarios/` contains kanban task templates used for validation.
+`project.yaml` is the only author-facing package config. It owns package metadata, kanban bootstrap and selection, repo slots, agent prerequisites, runtime surface commands, and merge defaults. A2O-owned lanes and internal coordination labels are provider/runtime defaults, not package responsibilities. `commands/` contains project-owned scripts when declarative commands are not enough. `task-templates/` contains kanban task templates used for validation.
 
 ## Review Checklist
 

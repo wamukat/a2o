@@ -26,12 +26,16 @@ module A3
         if runtime.key?("merge")
           raise A3::Domain::ConfigurationError, "project.yaml runtime.merge is no longer supported; use runtime.phases.merge"
         end
+        if runtime.key?("live_ref")
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.live_ref is no longer supported; use runtime.phases.merge.target_ref"
+        end
         phases = runtime.fetch("phases") do
           raise A3::Domain::ConfigurationError, "project.yaml runtime.phases must be provided"
         end
         unless phases.is_a?(Hash)
           raise A3::Domain::ConfigurationError, "project.yaml runtime.phases must be a mapping"
         end
+        reject_legacy_workspace_hook(phases)
         payload = surface_payload_from_phases(phases)
 
         A3::Domain::ProjectSurface.new(
@@ -39,7 +43,7 @@ module A3
           review_skill: payload["review_skill"],
           verification_commands: payload.fetch("verification_commands", []),
           remediation_commands: payload.fetch("remediation_commands", []),
-          workspace_hook: payload["workspace_hook"]
+          workspace_hook: nil
         )
       end
 
@@ -78,8 +82,7 @@ module A3
             raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.review.skill must be provided"
           end,
           "verification_commands" => verification.fetch("commands", []),
-          "remediation_commands" => remediation.fetch("commands", []),
-          "workspace_hook" => implementation["workspace_hook"]
+          "remediation_commands" => remediation.fetch("commands", [])
         }
         parent_review = optional_phase_mapping(phases, "parent_review")
         if parent_review.key?("skill")
@@ -119,6 +122,15 @@ module A3
           raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.#{name} must be a mapping"
         end
         phase
+      end
+
+      def reject_legacy_workspace_hook(phases)
+        phases.each do |name, phase|
+          next unless phase.is_a?(Hash) && phase.key?("workspace_hook")
+
+          raise A3::Domain::ConfigurationError,
+                "project.yaml runtime.phases.#{name}.workspace_hook is no longer supported; use phase commands or project package commands"
+        end
       end
 
     end
