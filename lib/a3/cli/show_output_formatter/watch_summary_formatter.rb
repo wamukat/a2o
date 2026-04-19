@@ -120,7 +120,7 @@ module A3
           task_legend_rows = [
             " #{TASK_SYMBOLS.fetch(:idle)} idle     #{TASK_SYMBOLS.fetch(:waiting)} waiting   │  #{PHASE_SYMBOLS.fetch(:pending)} none      │",
             " #{TASK_SYMBOLS.fetch(:next)} next     #{TASK_SYMBOLS.fetch(:running)} running   │  #{PHASE_SYMBOLS.fetch(:running)} running   │",
-            " #{TASK_SYMBOLS.fetch(:done)} done                 │  #{PHASE_SYMBOLS.fetch(:done)} done      │",
+            " #{TASK_SYMBOLS.fetch(:done)} automation done      │  #{PHASE_SYMBOLS.fetch(:done)} phase done│",
             " #{TASK_SYMBOLS.fetch(:blocked)} blocked              │  #{PHASE_SYMBOLS.fetch(:blocked)} blocked   │"
           ]
           lines = ["Task Tree"]

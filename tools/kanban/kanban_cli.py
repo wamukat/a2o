@@ -1835,8 +1835,9 @@ def build_parser() -> argparse.ArgumentParser:
         dest="sync_done_state",
         action="store_true",
         help=(
-            "Also synchronize Kanban's resolved flag. "
-            "Use this when moving to Done if you also want the task resolved."
+            "Also synchronize Kanban's human-resolved flag. "
+            "A2O normally moves tasks to the Done lane without resolving them; "
+            "use this only when a human confirmation should also mark the task resolved."
         ),
     )
     task_transition.set_defaults(func=cmd_task_transition)

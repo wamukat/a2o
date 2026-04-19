@@ -10,6 +10,17 @@ The A2O engine talks to kanban through a command contract compatible with `tools
 
 The command contract remains the external compatibility surface for existing tooling. The internal improvement target is to stop making the Ruby engine depend on a Python subprocess for every kanban operation.
 
+## Done And Resolved
+
+A2O distinguishes automation completion from human confirmation.
+
+- `status=Done` means A2O completed the automation flow for the task, including implementation, verification, and merge when those phases apply.
+- SoloBoard `done=true` / `isResolved=true` means a human has confirmed the task as resolved in the board.
+- A2O runtime status publishing moves tasks to the `Done` lane but does not set the SoloBoard resolved flag.
+- `task-transition --sync-done-state` is reserved for operator actions that intentionally synchronize the human-resolved flag.
+
+Therefore a SoloBoard snapshot with `status=Done` and `done=false` is valid. Runtime task selection, watch summary, and reporting must use the lane/status as the A2O automation state and must not treat `done=false` as a failed merge or incomplete automation.
+
 ## Direction
 
 Use a Ruby operation client boundary first, then move provider implementations behind that boundary.

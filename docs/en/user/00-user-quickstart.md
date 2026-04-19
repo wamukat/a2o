@@ -251,6 +251,8 @@ a2o runtime watch-summary
 a2o runtime describe-task <task-ref>
 ```
 
+`Done` in the board is A2O's automation-complete state. SoloBoard's `Resolved` flag is a separate human-confirmation state. It is normal for API snapshots to show `status=Done` with `done=false` until a human marks the task resolved.
+
 ## Runtime Image Updates
 
 A2O 0.5.0 uses:

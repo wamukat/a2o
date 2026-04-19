@@ -256,6 +256,8 @@ a2o runtime describe-task <task-ref>
 6. A2O が kanban comment、phase transition、evidence、branch publication を記録する。
 7. task が `Done` または `Blocked` になったことを board と evidence で確認する。
 
+Board 上の `Done` は、A2O の automation が完了した状態である。SoloBoard の `Resolved` / `done=true` は、人間が最終確認したことを示す別の状態である。そのため API snapshot で `status=Done` かつ `done=false` と表示されても正常である。
+
 利用者は `execute-until-idle` の引数、agent control plane、workspace materializer、merge runner を直接組み立てない。
 
 ## Troubleshooting

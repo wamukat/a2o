@@ -42,7 +42,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
     expect(lines[0]).to include("\e[36mScheduler: idle\e[0m")
     expect(lines).to include(a_string_matching(/○ idle\s+… waiting\s+│\s+· none\s+│\s+Merging ─+┐$/))
     expect(lines).to include(a_string_matching(/▷ next\s+▶ running\s+│\s+▶ running\s+│\s+Inspecting ─+┐\s+│$/))
-    expect(lines).to include(a_string_matching(/✔ done\s+│\s+✔ done\s+│\s+Review ─+┐\s+│\s+│$/))
+    expect(lines).to include(a_string_matching(/✔ automation done\s+│\s+✔ phase done\s*│\s+Review ─+┐\s+│\s+│$/))
     expect(lines).to include(a_string_matching(/✖ blocked\s+│\s+✖ blocked\s+│\s+Implementation ─+┐\s+│\s+│\s+│$/))
     expect(lines).to include("\e[36mTask Tree\e[0m")
     expect(lines).to include(a_string_including("\e[36m▷ #1"))
