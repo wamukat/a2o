@@ -12,33 +12,54 @@ This document explains what each design document covers and the recommended read
 ## Architecture Overview
 
 ```mermaid
-flowchart LR
-  User["Operator"]
-  CLI["a2o CLI"]
-  Kanban["Bundled kanban service"]
-  Runtime["A2O runtime container"]
-  Engine["A2O Engine\norchestration and state"]
-  Agent["a2o-agent\nhost gateway"]
-  Package["Project package\nproject.yaml, skills, commands"]
-  Workspace["Product workspace\nrepo slots and branches"]
-  Evidence["Evidence and status\nlogs, summaries, kanban comments"]
+flowchart TB
+  subgraph User["User"]
+    Task["Writes kanban tasks\nwhat to change, constraints, priority"]
+    Package["Maintains project package\nproject.yaml, skills, commands"]
+    Command["Runs a2o commands\nbootstrap, kanban up, runtime start/run-once/status"]
+    Observe["Checks results\nkanban status, comments, workspace evidence"]
+  end
 
-  User --> CLI
-  CLI --> Kanban
-  CLI --> Runtime
-  Kanban --> Engine
-  Runtime --> Engine
-  Engine --> Package
-  Engine --> Agent
-  Agent --> Workspace
-  Package --> Agent
-  Workspace --> Evidence
-  Engine --> Evidence
-  Evidence --> Kanban
-  Evidence --> User
+  subgraph CLI["a2o CLI"]
+    Bootstrap["Creates and validates runtime setup\nproject template, project bootstrap, project lint"]
+    KanbanOps["Starts and opens kanban\nboard, lanes, required tags"]
+    RuntimeOps["Controls execution\nrun-once for one cycle, start for scheduler, status for inspection"]
+  end
+
+  subgraph Engine["A2O Engine"]
+    Config["Loads project.yaml\nrepos, phases, commands, scheduler settings"]
+    SkillUse["Loads phase skills\nimplementation, review, remediation, merge"]
+    Scheduler["Scheduler\nselects runnable kanban work and advances phases"]
+    Execute["Executes phase commands\nthrough a2o-agent and project commands"]
+    Report["Records results\nevidence, summaries, kanban comments, status changes"]
+  end
+
+  Kanban["Kanban\nwork queue and visible state"]
+  Workspace["Product workspace\nrepo slots, branches, evidence files"]
+
+  Task --> Kanban
+  Package --> Bootstrap
+  Command --> Bootstrap
+  Command --> KanbanOps
+  Command --> RuntimeOps
+  Bootstrap --> Config
+  KanbanOps --> Kanban
+  RuntimeOps --> Scheduler
+  Kanban --> Scheduler
+  Config --> Scheduler
+  SkillUse --> Scheduler
+  Package --> Config
+  Package --> SkillUse
+  Scheduler --> Execute
+  Execute --> Workspace
+  Execute --> Report
+  Report --> Workspace
+  Report --> Kanban
+  Kanban --> Observe
+  Workspace --> Observe
 ```
 
-A2O reads work from the bundled kanban service, runs the Engine inside the runtime container, delegates product-specific commands through `a2o-agent`, and records evidence back to the workspace and kanban task. Product-specific knowledge belongs in the project package and product workspace. The Engine owns orchestration, phase state, kanban integration, and evidence flow.
+The user gives A2O three main inputs: kanban tasks, a project package, and CLI commands. `project.yaml` defines the project shape, phase commands, repository slots, and scheduler settings. Skills define how each phase should be handled. The CLI prepares the runtime and kanban surface, then starts either one-shot execution or the resident scheduler. The Engine combines kanban work, `project.yaml`, and skills, executes the configured phases, and writes the outcome back as workspace evidence and kanban-visible status.
 
 ## Documents
 
