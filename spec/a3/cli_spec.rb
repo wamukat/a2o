@@ -25,8 +25,11 @@ RSpec.describe A3::CLI do
 
     described_class.start(["--help"], out: out)
 
+    expect(out.string).to include("A2O runtime container CLI")
+    expect(out.string).to include("This help is for the runtime container entrypoint")
     expect(out.string).to include("usage:")
     expect(out.string).to include("a2o host install")
+    expect(out.string).to include(".work/a2o/bin/a2o project template --help")
     expect(out.string).not_to include("A3 CLI placeholder")
   end
 

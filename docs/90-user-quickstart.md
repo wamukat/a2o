@@ -25,6 +25,8 @@ export PATH="$HOME/.local/bin:$PATH"
 
 `a2o host install` は runtime image から host launcher と shared runtime asset を取り出す。host に Ruby runtime は要求しない。
 
+`docker run ... a2o --help` は runtime container entrypoint の help であり、host launcher の全コマンド一覧ではない。`a2o project template` などの setup command は、host install 後の `a2o` を使う。
+
 ### 2. Project package を置く
 
 workspace root に `project-package/` または `a2o-project/` を置く。

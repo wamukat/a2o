@@ -14,6 +14,8 @@ A2O の配布単位は Docker runtime image、host launcher、project package、
 
 内部互換のため、runtime image 内には `a3` CLI と `.a3` state path が残る。利用者向け surface では `a2o` と `a2o-agent` を使う。
 
+runtime image 内の `a2o --help` は container entrypoint の help であり、host launcher の完全な help ではない。`a2o project template`、`a2o project bootstrap`、`a2o kanban ...`、`a2o runtime ...` などの通常操作は、`a2o host install` で取り出した host launcher の `a2o` から実行する。
+
 ## Runtime Shape
 
 A2O は「1 project package = 1 runtime instance」として扱う。

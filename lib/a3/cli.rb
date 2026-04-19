@@ -37,11 +37,19 @@ module A3
     end
 
     def print_public_usage(out)
+      out.puts("A2O runtime container CLI")
+      out.puts("")
+      out.puts("This help is for the runtime container entrypoint. Install and use the host launcher for setup commands such as `a2o project template`.")
+      out.puts("")
       out.puts("usage:")
       out.puts("  a2o host install --output-dir DIR --share-dir DIR [--runtime-image IMAGE]")
       out.puts("  a2o agent package list|verify|export")
       out.puts("  a2o execute-until-idle [options] project.yaml")
       out.puts("  a2o worker:stdin-bundle")
+      out.puts("")
+      out.puts("host launcher:")
+      out.puts("  docker run --rm -v \"$PWD/.work/a2o:/out\" ghcr.io/wamukat/a2o-engine:latest a2o host install --output-dir /out/bin --share-dir /out/share")
+      out.puts("  .work/a2o/bin/a2o project template --help")
     end
 
     def handle_start_run(argv, out:, run_id_generator:, command_runner:, merge_runner:)
