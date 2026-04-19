@@ -1612,7 +1612,7 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 	output := stdout.String()
 	for _, want := range []string{
 		"describe_task task_ref=A2O#16",
-		"runtime_storage=internal-managed",
+		"runtime_storage=internal-managed project_config=" + filepath.Join(packageDir, "project.yaml") + " surface_source=project-package",
 		"runtime_logs runtime=/tmp/a2o-runtime-run-once.log",
 		"task A2O#16 kind=single status=blocked current_run=run-16",
 		"run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked",
@@ -1625,6 +1625,15 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("describe-task missing %q in:\n%s", want, output)
+		}
+	}
+	for _, forbidden := range []string{
+		"manifest=",
+		"preset_source=",
+		"runtime.presets",
+	} {
+		if strings.Contains(output, forbidden) {
+			t.Fatalf("describe-task exposed legacy runtime surface term %q in:\n%s", forbidden, output)
 		}
 	}
 

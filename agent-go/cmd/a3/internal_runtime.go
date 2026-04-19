@@ -598,7 +598,7 @@ func runRuntimeDescribeTask(args []string, runner commandRunner, stdout io.Write
 		fmt.Fprintf(stdout, "package=%s\n", effectiveConfig.PackagePath)
 		fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
 		fmt.Fprintf(stdout, "kanban_project=%s kanban_url=%s\n", plan.KanbanProject, kanbanPublicURL(effectiveConfig))
-		fmt.Fprintf(stdout, "runtime_storage=internal-managed manifest=%s preset_source=runtime-image\n", plan.ManifestPath)
+		fmt.Fprintf(stdout, "runtime_storage=internal-managed project_config=%s surface_source=project-package\n", plan.ManifestPath)
 		fmt.Fprintf(stdout, "runtime_logs runtime=%s server=%s host_agent=%s exit_file=%s\n", plan.RuntimeLog, plan.ServerLog, plan.HostAgentLog, plan.RuntimeExitFile)
 		fmt.Fprintf(stdout, "operator_next=a2o runtime describe-task %s\n", taskRef)
 
