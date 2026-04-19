@@ -19,46 +19,41 @@ flowchart LR
   AI([生成AI])
 
   subgraph Inputs["利用者が管理する入力"]
-    ProjectYaml[/project.yaml\nrepos / phases / commands / scheduler settings/]
-    Skills[/skills/*.md\nAI 作業の phase guidance/]
-    Commands[/project commands\nimplementation / review / verification / merge/]
+    ProjectConfig[/プロジェクト設定ファイル\nproject.yaml/]
+    SkillFiles[/AI 用スキル群\nimplementation / review guidance/]
   end
 
-  subgraph Work["作業状態"]
+  subgraph Product["プロダクト状態"]
     Kanban[(kanban\nwork queue / visible state)]
-    Workspace[(product workspace\nrepo slots / branches / evidence files)]
+    Repository[(Git repository\ncode changes / merge result)]
   end
 
   subgraph Engine["A2O Engine"]
     Scheduler(scheduler\n実行可能な kanban task を選ぶ)
-    Plan(phase instruction を組み立てる\nproject.yaml と skills から生成)
-    Publish(phase job を発行する\nimplementation / review / remediation / merge)
-    Report(結果を記録する\nevidence / summaries / kanban comments / status changes)
+    Prepare(AI 実行 job を用意する\ntask / config / skills から生成)
+    Report(結果を記録する\nkanban comments / status / evidence)
   end
 
   User -->|"task を作る"| Kanban
-  User -->|"管理する"| ProjectYaml
-  User -->|"管理する"| Skills
-  User -->|"管理する"| Commands
+  User -->|"管理する"| ProjectConfig
+  User -->|"管理する"| SkillFiles
   CLI -->|"常駐 runtime を動かす"| Scheduler
   Kanban --> Scheduler
-  Scheduler --> Plan
-  ProjectYaml --> Plan
-  Skills --> Plan
-  Plan --> Publish
-  Publish --> Agent
-  Commands --> Agent
+  Scheduler --> Prepare
+  ProjectConfig --> Prepare
+  SkillFiles --> Prepare
+  Prepare --> Agent
   Agent -->|"AI が必要な command で呼び出す"| AI
   AI -->|"assistant output"| Agent
-  Agent -->|"edits / artifacts"| Workspace
+  Agent -->|"変更を反映する"| Repository
   Agent --> Report
-  Report --> Workspace
+  Report --> Repository
   Report --> Kanban
   Kanban -->|"status / comments"| User
-  Workspace -->|"evidence"| User
+  Repository -->|"merged code"| User
 ```
 
-通常利用では、利用者は kanban task を作り、project package を最新に保つ。常駐 scheduler は kanban から実行可能な task を選ぶ。Engine は `project.yaml` から project 構造と実行可能な phase command を読み、skills から phase guidance を読み、phase job を発行する。`a2o-agent` は host または project dev-env で project command を実行し、その command が生成AIを呼び出す。Engine は返却された結果を workspace evidence と kanban 上の status として記録する。
+通常利用では、利用者は kanban task を作り、プロジェクト設定ファイルと AI 用スキル群を管理する。常駐 scheduler は kanban から実行可能な task を選ぶ。Engine は task、設定、skills を組み合わせて AI 実行 job を用意する。`a2o-agent` は host または project dev-env で job を実行し、設定された command が必要とする場合に生成AIを呼び出し、結果を Git repository に反映する。Engine は結果を kanban に記録する。
 
 ## 設計資料一覧
 

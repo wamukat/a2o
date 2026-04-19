@@ -19,46 +19,41 @@ flowchart LR
   AI([Generative AI])
 
   subgraph Inputs["User-maintained inputs"]
-    ProjectYaml[/project.yaml\nrepos, phases, commands, scheduler settings/]
-    Skills[/skills/*.md\nphase guidance for AI work/]
-    Commands[/project commands\nimplementation, review, verification, merge/]
+    ProjectConfig[/Project config file\nproject.yaml/]
+    SkillFiles[/AI skill files\nimplementation and review guidance/]
   end
 
-  subgraph Work["Work state"]
+  subgraph Product["Product state"]
     Kanban[(Kanban\nwork queue and visible state)]
-    Workspace[(Product workspace\nrepo slots, branches, evidence files)]
+    Repository[(Git repository\ncode changes and merge result)]
   end
 
   subgraph Engine["A2O Engine"]
     Scheduler(Scheduler\nselects runnable kanban tasks)
-    Plan(Builds phase instructions\nfrom project.yaml and skills)
-    Publish(Publishes phase jobs\nimplementation, review, remediation, merge)
-    Report(Records the result\nevidence, summaries, kanban comments, status changes)
+    Prepare(Prepares AI execution jobs\nfrom task, config, and skills)
+    Report(Records the result\nkanban comments, status, and evidence)
   end
 
   User -->|"creates task"| Kanban
-  User -->|"maintains"| ProjectYaml
-  User -->|"maintains"| Skills
-  User -->|"maintains"| Commands
+  User -->|"maintains"| ProjectConfig
+  User -->|"maintains"| SkillFiles
   CLI -->|"runs resident runtime"| Scheduler
   Kanban --> Scheduler
-  Scheduler --> Plan
-  ProjectYaml --> Plan
-  Skills --> Plan
-  Plan --> Publish
-  Publish --> Agent
-  Commands --> Agent
+  Scheduler --> Prepare
+  ProjectConfig --> Prepare
+  SkillFiles --> Prepare
+  Prepare --> Agent
   Agent -->|"invokes when command needs AI"| AI
   AI -->|"assistant output"| Agent
-  Agent -->|"edits and artifacts"| Workspace
+  Agent -->|"applies changes"| Repository
   Agent --> Report
-  Report --> Workspace
+  Report --> Repository
   Report --> Kanban
   Kanban -->|"status and comments"| User
-  Workspace -->|"evidence"| User
+  Repository -->|"merged code"| User
 ```
 
-In normal use, the user creates a kanban task and keeps the project package up to date. The resident scheduler picks runnable tasks from kanban. The Engine reads `project.yaml` for the project structure and executable phase commands, reads skills for phase guidance, and publishes phase jobs. `a2o-agent` runs those project commands on the host or project dev environment, including commands that call Generative AI. The Engine records the returned outcome as workspace evidence and kanban-visible status.
+In normal use, the user creates a kanban task and maintains two product inputs: a project config file and AI skill files. The resident scheduler picks runnable tasks from kanban. The Engine combines the task, config, and skills into AI execution jobs. `a2o-agent` runs those jobs on the host or project dev environment, calls Generative AI when the configured command requires it, and applies the result to the Git repository. The Engine records the outcome back to kanban.
 
 ## Documents
 
