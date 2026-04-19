@@ -189,7 +189,6 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	builder.WriteString("  executor:\n")
 	builder.WriteString("    command:\n")
 	writeYAMLList(&builder, 3, executorCommand)
-	builder.WriteString("    phase_profiles: {}\n")
 	builder.WriteString("  surface:\n")
 	builder.WriteString("    verification_commands: []\n")
 	builder.WriteString("    remediation_commands: []\n")

@@ -61,7 +61,13 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	config.AgentAttempts = scalarString(payload.Runtime.AgentAttempts)
 	config.AgentWorkspaceRoot = payload.Agent.WorkspaceRoot
 	config.AgentRequiredBins = payload.Agent.RequiredBins
-	config.Executor = expandProjectExecutorConfig(normalizeYAMLValue(payload.Runtime.Executor))
+	authorExecutor := normalizeYAMLValue(payload.Runtime.Executor)
+	if len(authorExecutor) > 0 {
+		if err := validateProjectAuthorExecutorConfig(authorExecutor); err != nil {
+			return config, fmt.Errorf("project package config %s has invalid runtime.executor: %w", projectFile, err)
+		}
+	}
+	config.Executor = expandProjectExecutorConfig(authorExecutor)
 	for alias, repo := range payload.Repos {
 		config.Repos[alias] = projectPackageRepo{Path: repo.Path, Label: repo.Label}
 	}
@@ -80,19 +86,11 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	if len(config.Repos) == 0 {
 		return config, fmt.Errorf("project package config %s is missing repos", projectFile)
 	}
-	if len(config.Executor) > 0 {
-		if err := validateProjectExecutorConfig(config.Executor); err != nil {
-			return config, fmt.Errorf("project package config %s has invalid runtime.executor: %w", projectFile, err)
-		}
-	}
 	return config, nil
 }
 
 func expandProjectExecutorConfig(executor map[string]any) map[string]any {
 	if len(executor) == 0 {
-		return executor
-	}
-	if _, hasDefaultProfile := executor["default_profile"]; hasDefaultProfile {
 		return executor
 	}
 	command, hasCommand := executor["command"]
@@ -184,22 +182,13 @@ func normalizeYAMLValue[T any](value T) T {
 	return normalized
 }
 
-func validateProjectExecutorConfig(executor map[string]any) error {
-	if projectConfigString(executor["kind"]) != "command" {
-		return fmt.Errorf("kind must be command")
+func validateProjectAuthorExecutorConfig(executor map[string]any) error {
+	for _, key := range []string{"kind", "prompt_transport", "result", "schema", "default_profile"} {
+		if _, ok := executor[key]; ok {
+			return fmt.Errorf("%s is internal; use runtime.executor.command in project.yaml", key)
+		}
 	}
-	if projectConfigString(executor["prompt_transport"]) != "stdin-bundle" {
-		return fmt.Errorf("prompt_transport must be stdin-bundle")
-	}
-	result, ok := executor["result"].(map[string]any)
-	if !ok || projectConfigString(result["mode"]) != "file" {
-		return fmt.Errorf("result.mode must be file")
-	}
-	schema, ok := executor["schema"].(map[string]any)
-	if !ok || !containsString([]string{"file", "none"}, projectConfigString(schema["mode"])) {
-		return fmt.Errorf("schema.mode must be file or none")
-	}
-	if err := validateProjectExecutorProfile(executor["default_profile"], "default_profile"); err != nil {
+	if err := validateProjectExecutorProfile(executor, "executor"); err != nil {
 		return err
 	}
 	phaseProfiles := map[string]any{}

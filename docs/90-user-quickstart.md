@@ -125,7 +125,6 @@ runtime:
       - "{{schema_path}}"
       - "--result"
       - "{{result_path}}"
-    phase_profiles: {}
   surface:
     implementation_skill: skills/implementation/base.md
     review_skill:

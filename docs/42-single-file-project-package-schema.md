@@ -60,21 +60,12 @@ runtime:
   max_steps: 20
   agent_attempts: 200
   executor:
-    kind: command
-    prompt_transport: stdin-bundle
-    result:
-      mode: file
-    schema:
-      mode: file
-    default_profile:
-      command:
-        - your-ai-worker
-        - "--schema"
-        - "{{schema_path}}"
-        - "--result"
-        - "{{result_path}}"
-      env: {}
-    phase_profiles: {}
+    command:
+      - your-ai-worker
+      - "--schema"
+      - "{{schema_path}}"
+      - "--result"
+      - "{{result_path}}"
   surface:
     implementation_skill: skills/implementation/base.md
     review_skill:
@@ -124,10 +115,9 @@ runtime:
       - "{{schema_path}}"
       - "--result"
       - "{{result_path}}"
-    phase_profiles: {}
 ```
 
-This expands to the default command executor with `prompt_transport: stdin-bundle`, file result mode, and file schema mode. Existing full executor objects remain supported for advanced cases.
+This expands internally to the fixed stdin-bundle command executor. `prompt_transport`, `result`, `schema`, and `default_profile` are A2O implementation details and are not valid `project.yaml` fields.
 
 New packages should start from the generated template instead of hand-writing the executor block:
 
@@ -174,14 +164,7 @@ runtime:
   max_steps: 20
   agent_attempts: 200
   executor:
-    kind: command
-    prompt_transport: stdin-bundle
-    result: {mode: file}
-    schema: {mode: file}
-    default_profile:
-      command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
-      env: {}
-    phase_profiles: {}
+    command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
   surface:
     verification_commands:
       - app/project-package/commands/verify.sh
@@ -215,14 +198,7 @@ runtime:
   max_steps: 20
   agent_attempts: 200
   executor:
-    kind: command
-    prompt_transport: stdin-bundle
-    result: {mode: file}
-    schema: {mode: file}
-    default_profile:
-      command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
-      env: {}
-    phase_profiles: {}
+    command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
   surface:
     verification_commands:
       - app/project-package/commands/verify.sh
@@ -254,14 +230,7 @@ runtime:
   max_steps: 20
   agent_attempts: 200
   executor:
-    kind: command
-    prompt_transport: stdin-bundle
-    result: {mode: file}
-    schema: {mode: file}
-    default_profile:
-      command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
-      env: {}
-    phase_profiles: {}
+    command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
   surface:
     verification_commands:
       - app/project-package/commands/verify.sh
@@ -299,14 +268,7 @@ runtime:
   max_steps: 40
   agent_attempts: 300
   executor:
-    kind: command
-    prompt_transport: stdin-bundle
-    result: {mode: file}
-    schema: {mode: file}
-    default_profile:
-      command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
-      env: {}
-    phase_profiles: {}
+    command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
   surface:
     review_skill:
       default: skills/review/default.md

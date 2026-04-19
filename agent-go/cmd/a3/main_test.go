@@ -313,7 +313,7 @@ func TestProjectTemplatePrintsValidMinimalProjectYaml(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), stdout.Bytes(), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(stdout.String(), "prompt_transport") || strings.Contains(stdout.String(), "default_profile") {
+	if strings.Contains(stdout.String(), "prompt_transport") || strings.Contains(stdout.String(), "default_profile") || strings.Contains(stdout.String(), "phase_profiles") {
 		t.Fatalf("template should use compact executor syntax, got:\n%s", stdout.String())
 	}
 	if strings.Contains(stdout.String(), "provider: soloboard") {
@@ -1280,17 +1280,8 @@ repos:
     path: ..
 runtime:
   executor:
-    kind: command
-    prompt_transport: stdin-bundle
-    result:
-      mode: file
-    schema:
-      mode: file
-    default_profile:
-      command:
-        - 123
-      env: {}
-    phase_profiles: {}
+    command:
+      - 123
 `
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
@@ -1314,8 +1305,65 @@ runtime:
 		}
 	})
 
-	if !strings.Contains(stderr.String(), "invalid runtime.executor") || !strings.Contains(stderr.String(), "default_profile.command") {
+	if !strings.Contains(stderr.String(), "invalid runtime.executor") || !strings.Contains(stderr.String(), "executor.command") {
 		t.Fatalf("stderr should mention malformed executor command, got %q", stderr.String())
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
+	}
+}
+
+func TestRuntimeRunOnceRejectsInternalProjectExecutorShape(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  executor:
+    kind: command
+    prompt_transport: stdin-bundle
+    result:
+      mode: file
+    schema:
+      mode: file
+    default_profile:
+      command:
+        - worker
+      env: {}
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail with internal runtime.executor shape")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "invalid runtime.executor") || !strings.Contains(stderr.String(), "kind is internal; use runtime.executor.command") {
+		t.Fatalf("stderr should reject internal executor shape, got %q", stderr.String())
 	}
 	if len(runner.calls) != 0 {
 		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
@@ -2346,18 +2394,9 @@ runtime:
   max_steps: 7
   agent_attempts: 9
   executor:
-    kind: command
-    prompt_transport: stdin-bundle
-    result:
-      mode: file
-    schema:
-      mode: file
-    default_profile:
-      command:
-        - ruby
-        - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
-      env: {}
-    phase_profiles: {}
+    command:
+      - ruby
+      - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
 `
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
 		t.Fatal(err)
@@ -2951,18 +2990,9 @@ runtime:
   max_steps: 40
   agent_attempts: 300
   executor:
-    kind: command
-    prompt_transport: stdin-bundle
-    result:
-      mode: file
-    schema:
-      mode: file
-    default_profile:
-      command:
-        - ruby
-        - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
-      env: {}
-    phase_profiles: {}
+    command:
+      - ruby
+      - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
 `
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)

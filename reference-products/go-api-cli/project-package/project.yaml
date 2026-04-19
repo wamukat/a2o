@@ -21,18 +21,9 @@ runtime:
   max_steps: 20
   agent_attempts: 200
   executor:
-    kind: command
-    prompt_transport: stdin-bundle
-    result:
-      mode: file
-    schema:
-      mode: file
-    default_profile:
-      command:
-        - ruby
-        - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
-      env: {}
-    phase_profiles: {}
+    command:
+      - ruby
+      - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
   surface:
     implementation_skill: skills/implementation/base.md
     review_skill:
