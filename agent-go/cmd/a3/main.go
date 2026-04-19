@@ -11,6 +11,7 @@ import (
 )
 
 var version = "dev"
+
 const instanceConfigRelativePath = ".work/a2o/runtime-instance.json"
 const legacyInstanceConfigRelativePath = ".a3/runtime-instance.json"
 const runtimeHostAgentRelativePath = ".work/a2o/runtime-host-agent"
@@ -112,6 +113,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o version")
 	fmt.Fprintln(w, "  a2o doctor")
 	fmt.Fprintln(w, "  a2o project bootstrap [--package DIR]")
+	fmt.Fprintln(w, "  a2o project lint [--package DIR]")
 	fmt.Fprintln(w, "  a2o project template [--language node|go|python|ruby] [--output project.yaml]")
 	fmt.Fprintln(w, "  a2o kanban up [--build]")
 	fmt.Fprintln(w, "  a2o kanban doctor")

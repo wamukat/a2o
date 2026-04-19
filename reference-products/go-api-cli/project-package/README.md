@@ -11,6 +11,7 @@ The package targets the single Go repository in `..`.
 
 Validation commands:
 
+- `commands/bootstrap.sh`: lightweight package readiness check.
 - `commands/verify.sh`: `go test ./...`.
 - `commands/build.sh`: `go build ./...`.
 - `commands/format.sh`: `gofmt`.

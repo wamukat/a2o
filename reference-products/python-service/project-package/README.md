@@ -11,6 +11,7 @@ The package targets the single Python repository in `..`.
 
 Validation commands:
 
+- `commands/bootstrap.sh`: lightweight package readiness check.
 - `commands/verify.sh`: unittest discovery and compile check.
 - `commands/build.sh`: compile check.
 - `commands/format.sh`: placeholder remediation hook until a formatter policy is chosen.

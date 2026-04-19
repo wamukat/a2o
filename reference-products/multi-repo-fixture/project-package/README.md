@@ -14,6 +14,7 @@ The package targets two repositories:
 
 Validation commands:
 
+- `commands/bootstrap.sh`: lightweight fixture readiness check.
 - `commands/verify-repo-alpha.sh`: catalog-service tests.
 - `commands/verify-repo-beta.sh`: storefront tests.
 - `commands/verify-all.sh`: both repository tests.

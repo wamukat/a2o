@@ -54,6 +54,14 @@ a2o project template \
 
 Package 設計上の判断は [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md) を参照する。
 
+Bootstrap の前に次を実行する。
+
+```sh
+a2o project lint --package ./project-package
+```
+
+`a2o project lint` は `project.yaml`、旧 split file、通常 config から test fixture への参照、利用者向けに漏れた A3/internal runtime 名、package docs や config から参照されない command file を確認する。Blocked finding は runtime 実行前に修正する。Warning finding は確認し、不要なら削除し、必要なら docs に明記する。
+
 ### 3. 最小 4 コマンドで起動する
 
 project package を置いた後の最小手順:

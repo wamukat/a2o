@@ -42,6 +42,7 @@ A2O の正式名称は Agentic AI Orchestrator である。A2O は kanban 上の
 ```sh
 a2o host install
 a2o project bootstrap --package ./reference-products/typescript-api-web/project-package
+a2o project lint --package ./reference-products/typescript-api-web/project-package
 a2o kanban up
 a2o kanban doctor
 a2o kanban url

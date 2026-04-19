@@ -136,6 +136,7 @@ Catalog result は補助情報として扱う。Source code、docs、tests、ver
 実 task に使う前に確認する。
 
 - `project.yaml` が唯一の公開 config file である。
+- `a2o project lint --package ./project-package` に blocked finding がない。
 - A2O-owned lane と internal label を package config に手書きしていない。
 - `agent.required_bins` に product toolchain と worker executable が含まれている。
 - Production phase が `tests/fixtures/` を呼んでいない。

@@ -54,6 +54,14 @@ a2o project template \
 
 For package design decisions, see [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md).
 
+Before bootstrapping a package, run:
+
+```sh
+a2o project lint --package ./project-package
+```
+
+`a2o project lint` checks `project.yaml`, legacy split files, production config references to test fixtures, user-facing A3/internal runtime leaks, and command files that are not referenced by package docs or config. Blocked findings should be fixed before runtime execution. Warning findings should be reviewed and either removed or documented.
+
 ### 3. Start With Four Commands
 
 ```sh

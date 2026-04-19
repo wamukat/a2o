@@ -11,6 +11,7 @@ The package targets the single repository in `..`.
 
 Validation commands:
 
+- `commands/bootstrap.sh`: lightweight package readiness check.
 - `commands/verify.sh`: typecheck and unit tests.
 - `commands/build.sh`: production build.
 - `commands/format.sh`: placeholder remediation hook until a formatter policy is chosen.

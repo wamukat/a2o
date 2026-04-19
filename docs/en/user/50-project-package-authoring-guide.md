@@ -136,6 +136,7 @@ Use knowledge results as supporting context. Source code, docs, tests, and verif
 Before using a package for real tasks, check:
 
 - `project.yaml` is the only public config file.
+- `a2o project lint --package ./project-package` has no blocked findings.
 - A2O-owned lanes and internal labels are not hand-authored in package config.
 - `agent.required_bins` includes the product toolchain and worker executable.
 - Production phases do not call `tests/fixtures/`.

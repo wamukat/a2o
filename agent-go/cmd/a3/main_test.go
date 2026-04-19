@@ -527,6 +527,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 	output := stdout.String()
 	for _, want := range []string{
 		"a2o project bootstrap [--package DIR]",
+		"a2o project lint [--package DIR]",
 		"a2o kanban up [--build]",
 		"a2o kanban doctor",
 		"a2o kanban url",
@@ -586,6 +587,7 @@ func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
 		want string
 	}{
 		{name: "project bootstrap", args: []string{"project", "bootstrap", "-bad"}, want: "Usage of a2o project bootstrap:"},
+		{name: "project lint", args: []string{"project", "lint", "-bad"}, want: "Usage of a2o project lint:"},
 		{name: "kanban up", args: []string{"kanban", "up", "-bad"}, want: "Usage of a2o kanban up:"},
 		{name: "kanban doctor", args: []string{"kanban", "doctor", "-bad"}, want: "Usage of a2o kanban doctor:"},
 		{name: "kanban url", args: []string{"kanban", "url", "-bad"}, want: "Usage of a2o kanban url:"},
@@ -1036,6 +1038,155 @@ func TestDoctorFlagsPrivateContractUsageInProjectYaml(t *testing.T) {
 	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("doctor output missing %q in:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestProjectLintFlagsFixtureAndLegacyLeaks(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(filepath.Join(packageDir, "commands"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectYaml := strings.Join([]string{
+		"schema_version: 1",
+		"package:",
+		"  name: sample",
+		"kanban:",
+		"  project: Sample",
+		"repos:",
+		"  app:",
+		"    path: ..",
+		"agent:",
+		"  required_bins: [\"sh\"]",
+		"runtime:",
+		"  phases:",
+		"    implementation:",
+		"      skill: skills/implementation/base.md",
+		"      executor:",
+		"        command: [\"tests/fixtures/dummy-worker.sh\", \"--schema\", \"{{schema_path}}\", \"--result\", \"{{result_path}}\"]",
+		"    review:",
+		"      skill: skills/review/default.md",
+		"    merge:",
+		"      target: merge_to_live",
+		"      policy: ff_only",
+		"      target_ref: refs/heads/main",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "commands", "dummy-worker.sh"), []byte("echo $A3_WORKER_REQUEST_PATH\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "lint", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project lint should fail for fixture and legacy leaks, stdout=%s", stdout.String())
+	}
+	for _, want := range []string{
+		"lint_check name=project_package status=ok",
+		"lint_check name=project_script_contract status=blocked",
+		"commands/dummy-worker.sh:A3_*",
+		"lint_check name=fixture_reference status=blocked",
+		"project.yaml:tests/fixtures",
+		"commands/dummy-worker.sh:fixture-like command name",
+		"lint_status=blocked",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("project lint output missing %q in:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestProjectLintReportsUnusedCommandsAsWarning(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(filepath.Join(packageDir, "commands"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectYaml := strings.Join([]string{
+		"schema_version: 1",
+		"package:",
+		"  name: sample",
+		"kanban:",
+		"  project: Sample",
+		"repos:",
+		"  app:",
+		"    path: ..",
+		"agent:",
+		"  required_bins: [\"sh\"]",
+		"runtime:",
+		"  phases:",
+		"    implementation:",
+		"      skill: skills/implementation/base.md",
+		"      executor:",
+		"        command: [\"sh\", \"-c\", \"echo ok\"]",
+		"    review:",
+		"      skill: skills/review/default.md",
+		"    verification:",
+		"      commands:",
+		"        - app/project-package/commands/verify.sh",
+		"    merge:",
+		"      target: merge_to_live",
+		"      policy: ff_only",
+		"      target_ref: refs/heads/main",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "commands", "verify.sh"), []byte("echo ok\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "commands", "unused.sh"), []byte("echo unused\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "lint", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project lint warnings should not fail, code=%d stderr=%s stdout=%s", code, stderr.String(), stdout.String())
+	}
+	for _, want := range []string{
+		"lint_check name=project_package status=ok",
+		"lint_check name=project_script_contract status=ok",
+		"lint_check name=fixture_reference status=ok",
+		"lint_check name=unused_commands status=warning detail=commands/unused.sh",
+		"lint_status=warning",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("project lint output missing %q in:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestProjectLintRejectsLegacyManifest(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "manifest.yml"), []byte("schema_version: 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "lint", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project lint should fail for legacy manifest, stdout=%s", stdout.String())
+	}
+	for _, want := range []string{
+		"lint_check name=project_package status=blocked",
+		"manifest.yml is no longer supported",
+		"lint_status=blocked",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("project lint output missing %q in:\n%s", want, stdout.String())
 		}
 	}
 }
