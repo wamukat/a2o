@@ -106,4 +106,6 @@ Task-local cache and artifact paths are A2O-managed workspace concerns. Project 
 - executor commands that do not use public placeholders
 - verification/remediation commands that require undeclared binaries
 
+Lint output should include the next remediation step. For example, `A3_*` names should point to the matching `A2O_*` variables, `.a3` metadata reads should point to `A2O_WORKER_REQUEST_PATH` fields such as `slot_paths`, `scope_snapshot`, and `phase_runtime`, and `launcher.json` references should point back to `project.yaml` phase executor settings.
+
 The goal is to keep project-specific automation possible while making the boundary stable across A2O releases.

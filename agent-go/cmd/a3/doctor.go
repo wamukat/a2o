@@ -171,7 +171,7 @@ func checkProjectScriptContract(packagePath string, report func(string, bool, st
 	}
 	if len(findings) > 0 {
 		sort.Strings(findings)
-		report("project_script_contract", false, strings.Join(findings, ","), "use A2O_* worker env and worker request fields instead of internal runtime files")
+		report("project_script_contract", false, strings.Join(findings, ","), projectScriptContractAction(findings))
 		return
 	}
 	report("project_script_contract", true, "public A2O script contract only", "none")
@@ -236,6 +236,33 @@ func projectScriptContractViolations(text string) []string {
 		}
 	}
 	return violations
+}
+
+func projectScriptContractAction(findings []string) string {
+	actions := []string{}
+	if findingsContain(findings, "A3_*") {
+		actions = append(actions, "replace A3_* names with A2O_* public env such as A2O_WORKER_REQUEST_PATH, A2O_WORKER_RESULT_PATH, A2O_WORKSPACE_ROOT, and A2O_ROOT_DIR")
+	}
+	if findingsContain(findings, ".a3/workspace.json") || findingsContain(findings, ".a3/slot.json") {
+		actions = append(actions, "replace private .a3 metadata reads with the JSON at A2O_WORKER_REQUEST_PATH; use slot_paths for repo paths, scope_snapshot.verification_scope for target slots, and phase_runtime for task_kind/repo_scope/phase policy")
+	}
+	if findingsContain(findings, "launcher.json") {
+		actions = append(actions, "remove launcher.json dependencies; configure runtime.phases.*.executor.command in project.yaml and let A2O generate launcher config")
+	}
+	if len(actions) == 0 {
+		return "use the public worker request contract documented in docs/en/dev/55-project-script-contract.md"
+	}
+	actions = append(actions, "see docs/en/dev/55-project-script-contract.md")
+	return strings.Join(actions, "; ")
+}
+
+func findingsContain(findings []string, marker string) bool {
+	for _, finding := range findings {
+		if strings.Contains(finding, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func executorCommandBins(executor map[string]any) []string {

@@ -106,4 +106,6 @@ Task-local cache と artifact paths は A2O-managed workspace の責務である
 - public placeholders を使っていない executor commands
 - undeclared binaries を必要とする verification/remediation commands
 
+Lint output には次の修正手順を含める。例えば `A3_*` names は対応する `A2O_*` variables、`.a3` metadata reads は `A2O_WORKER_REQUEST_PATH` の `slot_paths`、`scope_snapshot`、`phase_runtime`、`launcher.json` references は `project.yaml` の phase executor settings へ誘導する。
+
 目的は、project-specific automation を可能にしたまま、A2O release 間で安定した境界を維持することである。

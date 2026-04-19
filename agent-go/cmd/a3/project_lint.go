@@ -154,7 +154,7 @@ func checkProjectUserFacingContract(packagePath string, report func(string, lint
 	}
 	if len(findings) > 0 {
 		sort.Strings(findings)
-		report("user_facing_contract", lintBlocked, strings.Join(findings, ","), "use A2O names and keep fixture/internal runtime paths out of user-facing package docs")
+		report("user_facing_contract", lintBlocked, strings.Join(findings, ","), projectUserFacingContractAction(findings))
 		return
 	}
 	report("user_facing_contract", lintOK, "user-facing package docs avoid internal runtime leaks", "none")
@@ -233,6 +233,27 @@ func fixtureReferenceFindings(label string, text string) []string {
 		}
 	}
 	return findings
+}
+
+func projectUserFacingContractAction(findings []string) string {
+	actions := []string{}
+	if findingsContain(findings, "A3_*") {
+		actions = append(actions, "document A2O_* public env names instead of A3_* compatibility aliases")
+	}
+	if findingsContain(findings, ".a3/workspace.json") || findingsContain(findings, ".a3/slot.json") {
+		actions = append(actions, "document A2O_WORKER_REQUEST_PATH fields such as slot_paths, scope_snapshot, and phase_runtime instead of private .a3 metadata")
+	}
+	if findingsContain(findings, "launcher.json") {
+		actions = append(actions, "document project.yaml runtime.phases.*.executor.command instead of generated launcher.json")
+	}
+	if findingsContain(findings, "tests/fixtures") || findingsContain(findings, "test/fixtures") {
+		actions = append(actions, "keep fixture references in test-only docs or alternate test config, not user-facing package docs")
+	}
+	if len(actions) == 0 {
+		return "use public A2O names and keep fixture/internal runtime paths out of user-facing package docs"
+	}
+	actions = append(actions, "see docs/en/user/10-project-package-schema.md and docs/en/dev/55-project-script-contract.md")
+	return strings.Join(actions, "; ")
 }
 
 func checkProjectUnusedCommands(packagePath string, report func(string, lintSeverity, string, string)) {

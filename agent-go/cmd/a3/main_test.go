@@ -1602,7 +1602,8 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 		".env.example:A3_*",
 		"commands/worker.sh:.a3/workspace.json",
 		"commands/worker.sh:A3_*",
-		"action=use A2O_* worker env and worker request fields instead of internal runtime files",
+		"action=replace A3_* names with A2O_* public env such as A2O_WORKER_REQUEST_PATH",
+		"replace private .a3 metadata reads with the JSON at A2O_WORKER_REQUEST_PATH; use slot_paths for repo paths",
 	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("doctor output missing %q in:\n%s", want, stdout.String())
@@ -1737,11 +1738,14 @@ func TestProjectLintFlagsFixtureAndLegacyLeaks(t *testing.T) {
 		"lint_check name=project_package status=ok",
 		"lint_check name=project_script_contract status=blocked",
 		"commands/dummy-worker.sh:A3_*",
+		"action=replace A3_* names with A2O_* public env such as A2O_WORKER_REQUEST_PATH",
 		"lint_check name=user_facing_contract status=blocked",
 		"README.md:.a3/workspace.json",
 		"README.md:A3_*",
 		"README.md:launcher.json",
 		"README.md:tests/fixtures",
+		"document A2O_WORKER_REQUEST_PATH fields such as slot_paths, scope_snapshot, and phase_runtime instead of private .a3 metadata",
+		"document project.yaml runtime.phases.*.executor.command instead of generated launcher.json",
 		"lint_check name=fixture_reference status=blocked",
 		"project.yaml:tests/fixtures",
 		"commands/dummy-worker.sh:fixture-like command name",
