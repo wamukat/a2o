@@ -3724,6 +3724,57 @@ func TestRuntimeImageDigestShowsLatestAndRunningMismatches(t *testing.T) {
 	}
 }
 
+func TestRuntimeImageDigestReportsUnavailableWithoutFailing(t *testing.T) {
+	t.Setenv("A2O_RUNTIME_IMAGE", "registry.example.com/team/a2o-runtime@sha256:pinned")
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-digest",
+		RuntimeService: "a2o-runtime",
+	})
+	runner := &fakeRunner{
+		containerImageIDs: map[string]string{
+			"runtime-container": "running-image-123",
+		},
+		imageInspectDigests: map[string]string{
+			"image-123": "",
+			"registry.example.com/team/a2o-runtime:latest": "",
+			"running-image-123":                            "",
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "image-digest"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run should report unavailable digest without failing, code=%d stderr=%s stdout=%s", code, stderr.String(), stdout.String())
+		}
+	})
+
+	for _, want := range []string{
+		"runtime_image_digest=unavailable",
+		"runtime_image_pinned_ref=registry.example.com/team/a2o-runtime@sha256:pinned",
+		"runtime_image_pinned_digest=unavailable",
+		"runtime_image_local_latest_ref=registry.example.com/team/a2o-runtime:latest",
+		"runtime_image_local_latest_digest=unavailable",
+		"runtime_image_running_container=runtime-container image_id=running-image-123 digest=unavailable",
+		"runtime_image_latest_status=unknown action=pull registry.example.com/team/a2o-runtime:latest or inspect the configured runtime image, then rerun a2o runtime image-digest",
+		"runtime_image_running_status=unknown action=run a2o runtime up, then rerun a2o runtime status",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("stdout should include %q in:\n%s", want, stdout.String())
+		}
+	}
+}
+
 func TestRuntimeStatusRejectsInvalidPIDFile(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

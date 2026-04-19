@@ -290,9 +290,6 @@ func runRuntimeImageDigest(args []string, runner commandRunner, stdout io.Writer
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
 	return withComposeEnv(effectiveConfig, func() error {
 		report := runtimeImageDigestReport(&effectiveConfig, runner)
-		if report.ConfiguredDigest == "" {
-			return errors.New("runtime image digest unavailable; run a2o runtime up, then retry")
-		}
 		printRuntimeImageDigestReport(report, stdout)
 		return nil
 	})
@@ -365,7 +362,7 @@ func printRuntimeImageDigestReport(report runtimeImageReport, stdout io.Writer) 
 	} else {
 		fmt.Fprintf(stdout, "runtime_image_running_container=%s image_id=%s digest=%s\n", report.RunningContainer, valueOrUnavailable(report.RunningImageID), valueOrUnavailable(report.RunningDigest))
 	}
-	fmt.Fprintf(stdout, "runtime_image_latest_status=%s action=%s\n", runtimeImageComparisonStatus(report.ConfiguredDigest, report.LocalLatestDigest), runtimeImageLatestAction(report.ConfiguredDigest, report.LocalLatestDigest))
+	fmt.Fprintf(stdout, "runtime_image_latest_status=%s action=%s\n", runtimeImageComparisonStatus(report.ConfiguredDigest, report.LocalLatestDigest), runtimeImageLatestAction(report.ConfiguredDigest, report.LocalLatestDigest, report.LocalLatestRef))
 	fmt.Fprintf(stdout, "runtime_image_running_status=%s action=%s\n", runtimeImageComparisonStatus(report.ConfiguredDigest, report.RunningDigest), runtimeImageRunningAction(report.ConfiguredDigest, report.RunningDigest))
 }
 
@@ -381,14 +378,17 @@ func runtimeImageComparisonStatus(expected string, actual string) string {
 	return "mismatch"
 }
 
-func runtimeImageLatestAction(configuredDigest string, latestDigest string) string {
+func runtimeImageLatestAction(configuredDigest string, latestDigest string, latestRef string) string {
 	switch runtimeImageComparisonStatus(configuredDigest, latestDigest) {
 	case "current":
 		return "none"
 	case "mismatch":
 		return "validate local latest, then update the package runtime image pin if you want this version"
 	default:
-		return "pull ghcr.io/wamukat/a2o-engine:latest or inspect the configured runtime image, then rerun a2o runtime image-digest"
+		if latestRef == "" {
+			return "configure A2O_RUNTIME_IMAGE, pull or inspect the configured runtime image, then rerun a2o runtime image-digest"
+		}
+		return "pull " + latestRef + " or inspect the configured runtime image, then rerun a2o runtime image-digest"
 	}
 }
 
