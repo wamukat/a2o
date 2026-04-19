@@ -18,8 +18,7 @@ flowchart LR
   AI([生成AI])
 
   subgraph Inputs["利用者が管理する入力"]
-    ProjectConfig[/プロジェクト設定ファイル\nproject.yaml/]
-    SkillFiles[/AI 用スキル群\nimplementation / review guidance/]
+    ProjectInputs[/プロジェクト設定 / AI 用スキル群/]
   end
 
   subgraph Engine["A2O Engine"]
@@ -32,12 +31,10 @@ flowchart LR
   Repository[(Git repository)]
 
   User -->|"task を作る"| Kanban
-  User -.->|"作成する"| ProjectConfig
-  User -.->|"作成する"| SkillFiles
+  User -.->|"作成する"| ProjectInputs
   Kanban --> Scheduler
   Scheduler --> Prepare
-  ProjectConfig --> Prepare
-  SkillFiles --> Prepare
+  ProjectInputs --> Prepare
   Prepare --> Agent
   Agent -->|"job の実行を指示"| AI
   AI -->|"job result"| Agent
@@ -46,7 +43,7 @@ flowchart LR
   Report --> Kanban
 ```
 
-通常利用では、利用者は kanban task、プロジェクト設定ファイル、AI 用スキル群を作成する。常駐 scheduler は Engine が管理する kanban state から実行可能な task を選ぶ。Engine は task、設定、skills を組み合わせて AI 実行 job を用意する。`a2o-agent` は host または project dev-env で job を実行し、生成AIに job の実行を指示し、結果を Git repository に反映する。Engine は task status、comments、evidence を kanban に記録する。
+通常利用では、利用者は kanban task とプロジェクト入力を作成する。常駐 scheduler は Engine が管理する kanban state から実行可能な task を選ぶ。Engine は task、プロジェクト設定、AI 用スキル群を組み合わせて AI 実行 job を用意する。`a2o-agent` は host または project dev-env で job を実行し、生成AIに job の実行を指示し、結果を Git repository に反映する。Engine は task status、comments、evidence を kanban に記録する。
 
 ## 設計資料一覧
 

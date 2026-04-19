@@ -18,8 +18,7 @@ flowchart LR
   AI([Generative AI])
 
   subgraph Inputs["User-maintained inputs"]
-    ProjectConfig[/Project config file\nproject.yaml/]
-    SkillFiles[/AI skill files\nimplementation and review guidance/]
+    ProjectInputs[/Project config / AI skill files/]
   end
 
   subgraph Engine["A2O Engine"]
@@ -32,12 +31,10 @@ flowchart LR
   Repository[(Git repository)]
 
   User -->|"creates task"| Kanban
-  User -.->|"creates"| ProjectConfig
-  User -.->|"creates"| SkillFiles
+  User -.->|"creates"| ProjectInputs
   Kanban --> Scheduler
   Scheduler --> Prepare
-  ProjectConfig --> Prepare
-  SkillFiles --> Prepare
+  ProjectInputs --> Prepare
   Prepare --> Agent
   Agent -->|"requests job execution"| AI
   AI -->|"job result"| Agent
@@ -46,7 +43,7 @@ flowchart LR
   Report --> Kanban
 ```
 
-In normal use, the user creates a kanban task and two product inputs: a project config file and AI skill files. The resident scheduler picks runnable tasks from the Engine-managed kanban state. The Engine combines the task, config, and skills into AI execution jobs. `a2o-agent` runs those jobs on the host or project dev environment, requests Generative AI execution, and applies the result to the Git repository. The Engine records task status, comments, and evidence back to kanban.
+In normal use, the user creates a kanban task and project inputs. The resident scheduler picks runnable tasks from the Engine-managed kanban state. The Engine combines the task, project config, and AI skills into AI execution jobs. `a2o-agent` runs those jobs on the host or project dev environment, requests Generative AI execution, and applies the result to the Git repository. The Engine records task status, comments, and evidence back to kanban.
 
 ## Documents
 
