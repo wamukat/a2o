@@ -13,22 +13,22 @@
 
 ```mermaid
 flowchart LR
-  User([利用者])
-  Agent([a2o-agent])
-  AI([生成AI])
+  User@{ shape: stadium, label: "利用者" }
+  Agent@{ shape: stadium, label: "a2o-agent" }
+  AI@{ shape: cloud, label: "生成AI" }
 
   subgraph Inputs["利用者が管理する入力"]
     ProjectInputs@{ shape: docs, label: "プロジェクト設定 / AI 用スキル群" }
   end
 
   subgraph Engine["A2O Engine"]
-    Kanban[(カンバン\ntask queue)]
-    Scheduler(scheduler\n実行可能な task を選択)
-    Prepare(Job を準備して指示する\ntask / config / skills から生成)
-    Report(結果を記録\nkanban comments / status)
+    Kanban@{ shape: cyl, label: "カンバン\ntask queue" }
+    Scheduler@{ shape: rounded, label: "scheduler\n実行可能な task を選択" }
+    Prepare@{ shape: rounded, label: "Job を準備して指示する\ntask / config / skills から生成" }
+    Report@{ shape: rounded, label: "結果を記録\nkanban comments / status" }
   end
 
-  Repository[(Git repository)]
+  Repository@{ shape: cyl, label: "Git repository" }
 
   User -->|"task を作る"| Kanban
   User -.->|"作成する"| ProjectInputs

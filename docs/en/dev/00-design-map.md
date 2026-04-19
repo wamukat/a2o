@@ -13,22 +13,22 @@ This document explains what each design document covers and the recommended read
 
 ```mermaid
 flowchart LR
-  User([User])
-  Agent([a2o-agent])
-  AI([Generative AI])
+  User@{ shape: stadium, label: "User" }
+  Agent@{ shape: stadium, label: "a2o-agent" }
+  AI@{ shape: cloud, label: "Generative AI" }
 
   subgraph Inputs["User-maintained inputs"]
     ProjectInputs@{ shape: docs, label: "Project config / AI skill files" }
   end
 
   subgraph Engine["A2O Engine"]
-    Kanban[(Kanban\nwork queue and visible state)]
-    Scheduler(Scheduler\nselects runnable kanban tasks)
-    Prepare(Prepares AI execution jobs\nfrom task, config, and skills)
-    Report(Records the result\nkanban comments, status, and evidence)
+    Kanban@{ shape: cyl, label: "Kanban\nwork queue and visible state" }
+    Scheduler@{ shape: rounded, label: "Scheduler\nselects runnable kanban tasks" }
+    Prepare@{ shape: rounded, label: "Prepares AI execution jobs\nfrom task, config, and skills" }
+    Report@{ shape: rounded, label: "Records the result\nkanban comments, status, and evidence" }
   end
 
-  Repository[(Git repository)]
+  Repository@{ shape: cyl, label: "Git repository" }
 
   User -->|"creates task"| Kanban
   User -.->|"creates"| ProjectInputs
