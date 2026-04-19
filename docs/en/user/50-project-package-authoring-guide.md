@@ -101,7 +101,7 @@ When developing a custom worker, save one worker request and result pair and val
 a2o worker validate-result --request request.json --result result.json
 ```
 
-The validator reports concrete missing keys, type errors, and `task_ref` / `run_ref` / `phase` mismatches before runtime execution.
+The validator reports concrete missing keys, type errors, and `task_ref` / `run_ref` / `phase` mismatches before runtime execution. If your executor uses configured review scopes or repo-scope aliases, pass the same public values with repeated `--review-scope SCOPE` and `--repo-scope-alias FROM=TO`.
 
 ## Verification And Remediation
 

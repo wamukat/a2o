@@ -869,6 +869,94 @@ func TestWorkerValidateResultAllowsNullableImplementationEvidence(t *testing.T) 
 	}
 }
 
+func TestWorkerValidateResultMatchesRuntimeEmptyStringSemantics(t *testing.T) {
+	tempDir := t.TempDir()
+	requestPath := filepath.Join(tempDir, "request.json")
+	resultPath := filepath.Join(tempDir, "result.json")
+	request := map[string]any{
+		"task_ref": "A2O#62",
+		"run_ref":  "run-1",
+		"phase":    "review",
+	}
+	result := map[string]any{
+		"task_ref":        "",
+		"run_ref":         "run-1",
+		"phase":           "review",
+		"success":         false,
+		"summary":         "review finding",
+		"failing_command": "",
+		"observed_state":  "",
+		"rework_required": false,
+	}
+	writeJSONFileForTest(t, requestPath, request)
+	writeJSONFileForTest(t, resultPath, result)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"worker", "validate-result", "--request", requestPath, "--result", resultPath}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("validate-result should fail because task_ref does not match")
+	}
+	if !strings.Contains(stdout.String(), "worker_protocol_error=task_ref must match the worker request") {
+		t.Fatalf("validate-result should report task_ref mismatch, got:\n%s", stdout.String())
+	}
+	if strings.Contains(stdout.String(), "failing_command must be a string") || strings.Contains(stdout.String(), "observed_state must be a string") {
+		t.Fatalf("empty failing_command/observed_state strings should match runtime semantics, got:\n%s", stdout.String())
+	}
+}
+
+func TestWorkerValidateResultHonorsConfiguredReviewScopesAndAliases(t *testing.T) {
+	tempDir := t.TempDir()
+	requestPath := filepath.Join(tempDir, "request.json")
+	resultPath := filepath.Join(tempDir, "result.json")
+	request := map[string]any{
+		"task_ref": "A2O#62",
+		"run_ref":  "run-1",
+		"phase":    "implementation",
+	}
+	result := map[string]any{
+		"task_ref":        "A2O#62",
+		"run_ref":         "run-1",
+		"phase":           "implementation",
+		"success":         true,
+		"summary":         "configured scope",
+		"failing_command": nil,
+		"observed_state":  nil,
+		"rework_required": false,
+		"changed_files":   map[string]any{},
+		"review_disposition": map[string]any{
+			"kind":        "completed",
+			"repo_scope":  "pkg",
+			"summary":     "configured scope",
+			"description": "configured scope",
+			"finding_key": "",
+		},
+	}
+	writeJSONFileForTest(t, requestPath, request)
+	writeJSONFileForTest(t, resultPath, result)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{
+		"worker",
+		"validate-result",
+		"--request",
+		requestPath,
+		"--result",
+		resultPath,
+		"--review-scope",
+		"package",
+		"--repo-scope-alias",
+		"pkg=package",
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("validate-result returned %d, stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "worker_protocol_status=ok") {
+		t.Fatalf("validate-result should report ok, got %q", stdout.String())
+	}
+}
+
 func readFileString(t *testing.T, path string) string {
 	t.Helper()
 	body, err := os.ReadFile(path)

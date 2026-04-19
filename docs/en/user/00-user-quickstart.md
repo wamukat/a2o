@@ -162,6 +162,8 @@ To check a custom worker result outside runtime execution:
 a2o worker validate-result --request request.json --result result.json
 ```
 
+When the worker uses configured review scopes or repo-scope aliases, add repeated `--review-scope SCOPE` and `--repo-scope-alias FROM=TO`.
+
 Executor placeholders:
 
 - `{{schema_path}}`

@@ -85,6 +85,10 @@ func runWorkerValidateResult(args []string, stdout io.Writer, stderr io.Writer) 
 
 	requestPath := flags.String("request", "", "worker request JSON path")
 	resultPath := flags.String("result", "", "worker result JSON path")
+	var reviewScopes stringListFlag
+	var repoScopeAliases stringListFlag
+	flags.Var(&reviewScopes, "review-scope", "valid review_disposition repo_scope; repeat to match executor configuration")
+	flags.Var(&repoScopeAliases, "repo-scope-alias", "review_disposition repo_scope alias in from=to form; repeat to match executor configuration")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -105,7 +109,14 @@ func runWorkerValidateResult(args []string, stdout io.Writer, stderr io.Writer) 
 	if err := readWorkerJSONFile(*resultPath, &result); err != nil {
 		return fmt.Errorf("read worker result: %w", err)
 	}
-	errors := validatePublicWorkerPayload(result, request)
+	aliases, err := parseWorkerRepoScopeAliases(repoScopeAliases)
+	if err != nil {
+		return err
+	}
+	errors := validatePublicWorkerPayload(result, request, workerValidationOptions{
+		ReviewScopes:     reviewScopes,
+		RepoScopeAliases: aliases,
+	})
 	if len(errors) == 0 {
 		fmt.Fprintln(stdout, "worker_protocol_check name=result_schema status=ok")
 		fmt.Fprintln(stdout, "worker_protocol_status=ok")
@@ -128,6 +139,11 @@ func readWorkerJSONFile(path string, target any) error {
 		return err
 	}
 	return nil
+}
+
+type workerValidationOptions struct {
+	ReviewScopes     []string
+	RepoScopeAliases map[string]string
 }
 
 func workerScaffoldTemplate(language string) (string, os.FileMode, error) {
@@ -165,20 +181,20 @@ func normalizeWorkerLanguage(language string) string {
 	}
 }
 
-func validatePublicWorkerPayload(payload map[string]any, request map[string]any) []string {
+func validatePublicWorkerPayload(payload map[string]any, request map[string]any, options workerValidationOptions) []string {
 	errors := []string{}
 	for _, key := range publicWorkerRequiredFields(request) {
 		if _, ok := payload[key]; !ok {
 			errors = append(errors, key+" must be present")
 		}
 	}
-	if workerStringValue(payload["task_ref"]) != "" && workerStringValue(payload["task_ref"]) != workerStringValue(request["task_ref"]) {
+	if value, ok := payload["task_ref"]; ok && value != request["task_ref"] {
 		errors = append(errors, "task_ref must match the worker request")
 	}
-	if workerStringValue(payload["run_ref"]) != "" && workerStringValue(payload["run_ref"]) != workerStringValue(request["run_ref"]) {
+	if value, ok := payload["run_ref"]; ok && value != request["run_ref"] {
 		errors = append(errors, "run_ref must match the worker request")
 	}
-	if workerStringValue(payload["phase"]) != "" && workerStringValue(payload["phase"]) != workerStringValue(request["phase"]) {
+	if value, ok := payload["phase"]; ok && value != request["phase"] {
 		errors = append(errors, "phase must match the worker request")
 	}
 	if _, ok := payload["success"].(bool); !ok {
@@ -192,10 +208,12 @@ func validatePublicWorkerPayload(payload map[string]any, request map[string]any)
 	}
 	success, _ := payload["success"].(bool)
 	if !success {
-		if rework, _ := payload["rework_required"].(bool); !rework && workerStringValue(payload["failing_command"]) == "" {
-			errors = append(errors, "failing_command must be a string when success is false unless rework_required is true")
+		if rework, _ := payload["rework_required"].(bool); !rework {
+			if _, ok := payload["failing_command"].(string); !ok {
+				errors = append(errors, "failing_command must be a string when success is false unless rework_required is true")
+			}
 		}
-		if workerStringValue(payload["observed_state"]) == "" {
+		if _, ok := payload["observed_state"].(string); !ok {
 			errors = append(errors, "observed_state must be a string when success is false")
 		}
 	} else {
@@ -248,14 +266,28 @@ func validatePublicWorkerPayload(payload map[string]any, request map[string]any)
 				return errors
 			}
 			for _, key := range []string{"kind", "repo_scope", "summary", "description", "finding_key"} {
-				if workerStringValue(disposition[key]) == "" {
+				if _, ok := disposition[key].(string); !ok {
 					errors = append(errors, "review_disposition."+key+" must be a string")
 				}
 			}
-			errors = append(errors, validateReviewDisposition(disposition, request)...)
+			errors = append(errors, validateReviewDisposition(disposition, request, options)...)
 		}
 	}
 	return errors
+}
+
+func parseWorkerRepoScopeAliases(values []string) (map[string]string, error) {
+	aliases := map[string]string{}
+	for _, value := range values {
+		left, right, ok := strings.Cut(value, "=")
+		left = strings.TrimSpace(left)
+		right = strings.TrimSpace(right)
+		if !ok || left == "" || right == "" {
+			return nil, fmt.Errorf("--repo-scope-alias must use from=to with non-empty values")
+		}
+		aliases[left] = right
+	}
+	return aliases, nil
 }
 
 func validateChangedFiles(changedFiles map[string]any) []string {
@@ -279,16 +311,20 @@ func validateChangedFiles(changedFiles map[string]any) []string {
 	return errors
 }
 
-func validateReviewDisposition(disposition map[string]any, request map[string]any) []string {
+func validateReviewDisposition(disposition map[string]any, request map[string]any, options workerValidationOptions) []string {
 	phase := workerStringValue(request["phase"])
 	parentReview := phase == "review" && workerNestedString(request, "phase_runtime", "task_kind") == "parent"
-	validScopes := validReviewDispositionRepoScopes(request, parentReview)
+	validScopes := validReviewDispositionRepoScopes(request, parentReview, options)
+	repoScope := workerStringValue(disposition["repo_scope"])
+	if replacement := options.RepoScopeAliases[repoScope]; replacement != "" {
+		repoScope = replacement
+	}
 	errors := []string{}
 	if parentReview {
 		if !containsString([]string{"completed", "follow_up_child", "blocked"}, workerStringValue(disposition["kind"])) {
 			errors = append(errors, "review_disposition.kind must be one of completed, follow_up_child, blocked")
 		}
-		if !containsString(validScopes, workerStringValue(disposition["repo_scope"])) {
+		if !containsString(validScopes, repoScope) {
 			errors = append(errors, "review_disposition.repo_scope must be one of "+strings.Join(validScopes, ", "))
 		}
 		return errors
@@ -297,16 +333,22 @@ func validateReviewDisposition(disposition map[string]any, request map[string]an
 		if workerStringValue(disposition["kind"]) != "completed" {
 			errors = append(errors, "review_disposition.kind must be completed for implementation evidence")
 		}
-		if !containsString(validScopes, workerStringValue(disposition["repo_scope"])) {
+		if !containsString(validScopes, repoScope) {
 			errors = append(errors, "review_disposition.repo_scope must be one of "+strings.Join(validScopes, ", "))
 		}
 	}
 	return errors
 }
 
-func validReviewDispositionRepoScopes(request map[string]any, includeUnresolved bool) []string {
+func validReviewDispositionRepoScopes(request map[string]any, includeUnresolved bool, options workerValidationOptions) []string {
 	scopes := []string{}
-	if slotPaths, ok := request["slot_paths"].(map[string]any); ok {
+	if len(options.ReviewScopes) > 0 {
+		for _, scope := range options.ReviewScopes {
+			if scope != "" && !containsString(scopes, scope) {
+				scopes = append(scopes, scope)
+			}
+		}
+	} else if slotPaths, ok := request["slot_paths"].(map[string]any); ok {
 		for slotName := range slotPaths {
 			if slotName != "" && !containsString(scopes, slotName) {
 				scopes = append(scopes, slotName)
