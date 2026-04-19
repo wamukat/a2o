@@ -9,7 +9,7 @@
 - 利用者向け surface と内部互換名の境界を明確にする。
 - reference product suite を core validation の正本にする。
 
-## アーキテクチャ概要
+## システム概観
 
 ```mermaid
 flowchart LR

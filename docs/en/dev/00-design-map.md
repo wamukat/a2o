@@ -9,7 +9,7 @@ This document explains what each design document covers and the recommended read
 - Make the boundary between public A2O surfaces and internal compatibility names explicit.
 - Treat the reference product suite as the canonical core validation target.
 
-## Architecture Overview
+## System Overview
 
 ```mermaid
 flowchart LR
