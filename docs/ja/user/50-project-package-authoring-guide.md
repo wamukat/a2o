@@ -129,6 +129,13 @@ A2O は knowledge catalog を必須にしない。また、特定 catalog 実装
 
 Project が catalog を持つ場合は、project-owned command または Taskfile entry として公開し、関連 skill に使い方を書く。Open-ended exploration ではなく、task-specific な限定 query を優先する。
 
+Catalog は workflow stage ごとに使い分ける。
+
+- Planning と task 分解では、比較的広い catalog query を使ってよい。関連する結果は kanban task に要約し、runtime worker が同じ context を再発見しなくてよい状態にする。
+- Implementation worker には task-specific な query だけを渡す、または実行させる。Command 名、期待する query shape、使う理由を明示する。
+- Review / parent review worker は、diff に関係する API/SPI surface、repository boundary、product rule、integration assumption の確認に catalog query を使う。
+- MCP は必須にしない。Project-owned CLI、script、Taskfile query であっても、deterministic で package に文書化されていればよい。
+
 Catalog result は補助情報として扱う。Source code、docs、tests、verification result が authoritative である。
 
 ## Review Checklist（レビュー観点）

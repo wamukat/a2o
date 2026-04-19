@@ -129,6 +129,13 @@ A2O does not require a knowledge catalog and does not depend on a specific catal
 
 If a project has one, expose it as project-owned commands or Taskfile entries and describe them in the relevant skills. Prefer narrow, task-specific queries over open-ended exploration.
 
+Use the catalog differently by workflow stage:
+
+- Planning and task decomposition may use broader catalog queries. Summarize relevant findings in the kanban task so runtime workers do not need to rediscover the same context.
+- Implementation workers should receive or run only task-specific queries. Give them the command name, expected query shape, and the reason to use it.
+- Review and parent review workers should use catalog queries to check changed API/SPI surfaces, repository boundaries, product rules, and integration assumptions related to the diff.
+- Do not require MCP. A project-owned CLI, script, or Taskfile query is enough when it is deterministic and documented in the package.
+
 Use knowledge results as supporting context. Source code, docs, tests, and verification results remain authoritative.
 
 ## Review Checklist
