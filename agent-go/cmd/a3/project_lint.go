@@ -71,7 +71,13 @@ func runProjectLintCommand(commandName string, args []string, stdout io.Writer, 
 		if !filepath.IsAbs(effectiveConfigPath) {
 			effectiveConfigPath = filepath.Join(absPackagePath, effectiveConfigPath)
 		}
-		allowFixtureConfigReferences = filepath.Base(effectiveConfigPath) != "project.yaml"
+		absConfigPath, err := filepath.Abs(effectiveConfigPath)
+		if err != nil {
+			printUserFacingError(stderr, fmt.Errorf("resolve project config path: %w", err))
+			return 1
+		}
+		effectiveConfigPath = absConfigPath
+		allowFixtureConfigReferences = filepath.Clean(effectiveConfigPath) != filepath.Clean(filepath.Join(absPackagePath, "project.yaml"))
 	}
 	config, err := loadProjectPackageConfigFile(effectiveConfigPath)
 	if err != nil {

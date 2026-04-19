@@ -1792,6 +1792,34 @@ func TestProjectLintAllowsFixtureReferencesOnlyForExplicitAlternateConfig(t *tes
 	}
 }
 
+func TestProjectLintTreatsExplicitConfigOutsidePackageAsAlternateEvenWhenNamedProjectYaml(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	alternateDir := filepath.Join(tempDir, "test-profile")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(alternateDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	testConfig := strings.ReplaceAll(readFileString(t, filepath.Join(packageDir, "project.yaml")), "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb", "tests/fixtures/deterministic-worker.rb")
+	alternateConfigPath := filepath.Join(alternateDir, "project.yaml")
+	if err := os.WriteFile(alternateConfigPath, []byte(testConfig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir, "--config", alternateConfigPath}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("explicit alternate config named project.yaml should pass, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+	if strings.Contains(stdout.String(), "tests/fixtures") {
+		t.Fatalf("explicit alternate config should not report fixture reference, got:\n%s", stdout.String())
+	}
+}
+
 func TestProjectLintReportsUnusedCommandsAsWarning(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
