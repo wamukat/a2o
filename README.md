@@ -1,6 +1,6 @@
 # A2O Engine
 
-[Japanese README](ja.md)
+[Japanese README](README.ja.md)
 
 A2O is an automation engine that starts from kanban tasks and manages workspaces, agent execution, verification, merge, and evidence recording.
 
