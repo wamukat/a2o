@@ -1,7 +1,7 @@
 Gem::Specification.new do |spec|
-  spec.name = "a3"
+  spec.name = "a2o"
   spec.version = "0.5.0"
-  spec.summary = "A3 next-generation orchestration runtime"
+  spec.summary = "A2O orchestration runtime"
   spec.authors = ["Takuma Watanabe"]
   spec.files = Dir[
     "bin/*",
