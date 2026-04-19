@@ -38,6 +38,74 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
     expect(context.merge_config.target_ref).to eq("refs/heads/feature/prototype")
   end
 
+  it "resolves verification and remediation command variants per task" do
+    phases = base_phases.merge(
+      "verification" => {
+        "commands" => {
+          "default" => ["commands/verify-all"],
+          "variants" => {
+            "task_kind" => {
+              "parent" => {
+                "repo_scope" => {
+                  "both" => {
+                    "phase" => {
+                      "verification" => ["commands/verify-parent"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "remediation" => {
+        "commands" => {
+          "default" => ["commands/format-all"],
+          "variants" => {
+            "task_kind" => {
+              "child" => {
+                "repo_scope" => {
+                  "repo_beta" => {
+                    "phase" => {
+                      "verification" => ["commands/format-storefront"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "merge" => {
+        "target" => "merge_to_parent",
+        "policy" => "ff_only",
+        "target_ref" => "refs/heads/feature/prototype"
+      }
+    )
+    project_config_path = write_project_config("runtime" => {"phases" => phases})
+    context = loader.load(project_config_path)
+    child_task = A3::Domain::Task.new(
+      ref: "A3-v2#3037",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      parent_ref: "A3-v2#3036"
+    )
+    parent_task = A3::Domain::Task.new(
+      ref: "A3-v2#3036",
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      child_refs: %w[A3-v2#3037 A3-v2#3038]
+    )
+
+    child_runtime = context.resolve_phase_runtime(task: child_task, phase: :verification)
+    parent_runtime = context.resolve_phase_runtime(task: parent_task, phase: :verification)
+
+    expect(child_runtime.verification_commands).to eq(["commands/verify-all"])
+    expect(child_runtime.remediation_commands).to eq(["commands/format-storefront"])
+    expect(parent_runtime.verification_commands).to eq(["commands/verify-parent"])
+    expect(parent_runtime.remediation_commands).to eq(["commands/format-all"])
+  end
+
   it "rejects unknown merge target" do
     project_config_path = write_project_config(
       "runtime" => {

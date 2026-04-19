@@ -101,6 +101,39 @@ Phase executor commands は worker bundle を stdin で受け取り、worker res
 
 Project commands は worker request JSON と `A2O_*` worker environment variables を stable contract として扱う。Package scripts から private `.a3` metadata files や generated `launcher.json` files を読んではならない。
 
+Verification と remediation commands は、merge settings と同じ `default` / `variants` 形も使える。`task_kind`、`repo_scope`、phase によって command policy が変わる場合だけ使う。
+
+```yaml
+runtime:
+  phases:
+    verification:
+      commands:
+        default:
+          - app/project-package/commands/verify-all.sh
+        variants:
+          task_kind:
+            parent:
+              repo_scope:
+                both:
+                  phase:
+                    verification:
+                      - app/project-package/commands/verify-parent.sh
+    remediation:
+      commands:
+        default:
+          - app/project-package/commands/format-all.sh
+        variants:
+          task_kind:
+            child:
+              repo_scope:
+                repo_beta:
+                  phase:
+                    verification:
+                      - app/project-package/commands/format-repo-beta.sh
+```
+
+単純な list 形式を default とする。Helper code に task-kind や repo-slot policy が隠れてしまう場合だけ variants を使う。
+
 通常の packages では implementation と review phases を定義する。
 
 ```yaml

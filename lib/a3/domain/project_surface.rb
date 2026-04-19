@@ -16,8 +16,8 @@ module A3
       def initialize(implementation_skill:, review_skill:, verification_commands:, remediation_commands:, workspace_hook:)
         @implementation_skill = deep_freeze_value(implementation_skill)
         @review_skill = deep_freeze_value(review_skill)
-        @verification_commands = deep_freeze_value(Array(verification_commands))
-        @remediation_commands = deep_freeze_value(Array(remediation_commands))
+        @verification_commands = deep_freeze_value(verification_commands)
+        @remediation_commands = deep_freeze_value(remediation_commands)
         @workspace_hook = deep_freeze_value(workspace_hook)
         freeze
       end

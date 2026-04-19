@@ -69,6 +69,66 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
       .to eq("skills/review/default.md")
   end
 
+  it "loads verification and remediation command variants" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/default.md"
+          },
+          "verification" => {
+            "commands" => {
+              "default" => ["commands/verify-all"],
+              "variants" => {
+                "task_kind" => {
+                  "parent" => {
+                    "repo_scope" => {
+                      "both" => {
+                        "phase" => {
+                          "verification" => ["commands/verify-parent"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "remediation" => {
+            "commands" => {
+              "default" => ["commands/format-all"],
+              "variants" => {
+                "task_kind" => {
+                  "child" => {
+                    "repo_scope" => {
+                      "repo_beta" => {
+                        "phase" => {
+                          "verification" => ["commands/format-storefront"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    )
+
+    surface = loader.load(project_config_path)
+
+    expect(surface.resolve(:verification_commands, task_kind: :parent, repo_scope: :both, phase: :verification))
+      .to eq(["commands/verify-parent"])
+    expect(surface.resolve(:verification_commands, task_kind: :child, repo_scope: :repo_beta, phase: :verification))
+      .to eq(["commands/verify-all"])
+    expect(surface.resolve(:remediation_commands, task_kind: :child, repo_scope: :repo_beta, phase: :verification))
+      .to eq(["commands/format-storefront"])
+  end
+
   it "deep-freezes resolved phase surface structures" do
     project_config_path = write_project_config(
       "runtime" => {

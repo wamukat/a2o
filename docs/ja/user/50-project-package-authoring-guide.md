@@ -128,6 +128,25 @@ Verification command は task result を証明する。Remediation command は v
 - task が ready でなければ non-zero で終了する。
 - 可能な限り hidden network や global machine dependency を避ける。
 
+Verification が parent/child/single task や repo slot によって変わる場合は、その policy を `project.yaml` の command variants に見える形で置く。小さな default command を基本にし、例外だけ variants に追加する。
+
+```yaml
+runtime:
+  phases:
+    verification:
+      commands:
+        default:
+          - app/project-package/commands/verify-all.sh
+        variants:
+          task_kind:
+            parent:
+              repo_scope:
+                both:
+                  phase:
+                    verification:
+                      - app/project-package/commands/verify-parent.sh
+```
+
 良い remediation command は保守的である。
 
 - format や既知 artifact の再生成に限定する。

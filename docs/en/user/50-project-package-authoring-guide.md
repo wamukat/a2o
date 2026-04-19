@@ -128,6 +128,25 @@ Good verification commands are deterministic and scoped:
 - exit non-zero when the task is not ready
 - avoid hidden network or global machine dependencies when possible
 
+If verification differs by parent/child/single task or by repo slot, keep that policy visible in `project.yaml` with command variants. Prefer a small default command and add only the exceptional cases:
+
+```yaml
+runtime:
+  phases:
+    verification:
+      commands:
+        default:
+          - app/project-package/commands/verify-all.sh
+        variants:
+          task_kind:
+            parent:
+              repo_scope:
+                both:
+                  phase:
+                    verification:
+                      - app/project-package/commands/verify-parent.sh
+```
+
 Good remediation commands are conservative:
 
 - format or regenerate known project artifacts

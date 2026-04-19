@@ -108,6 +108,39 @@ Verification and remediation commands support:
 
 Project commands should treat the worker request JSON and `A2O_*` worker environment variables as the stable contract. Do not read private `.a3` metadata files or generated `launcher.json` files from package scripts.
 
+Verification and remediation commands may also use the same `default` / `variants` shape used by merge settings. Use this only when command policy depends on `task_kind`, `repo_scope`, or phase:
+
+```yaml
+runtime:
+  phases:
+    verification:
+      commands:
+        default:
+          - app/project-package/commands/verify-all.sh
+        variants:
+          task_kind:
+            parent:
+              repo_scope:
+                both:
+                  phase:
+                    verification:
+                      - app/project-package/commands/verify-parent.sh
+    remediation:
+      commands:
+        default:
+          - app/project-package/commands/format-all.sh
+        variants:
+          task_kind:
+            child:
+              repo_scope:
+                repo_beta:
+                  phase:
+                    verification:
+                      - app/project-package/commands/format-repo-beta.sh
+```
+
+The simple list form remains the recommended default. Use variants when the package would otherwise hide task-kind or repo-slot policy in helper code.
+
 ## Template Generator
 
 New packages should start from the generator instead of hand-writing executor blocks.
