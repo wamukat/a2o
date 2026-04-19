@@ -105,7 +105,7 @@ func runProjectTemplate(args []string, stdout io.Writer, stderr io.Writer) error
 			return fmt.Errorf("inspect output file: %w", err)
 		}
 	}
-	var skillTemplates []plannedSkillTemplate
+	var skillTemplates []plannedTemplateFile
 	if *withSkills {
 		var err error
 		skillTemplates, err = planProjectSkillTemplates(filepath.Dir(*outputPath), strings.TrimSpace(*skillLanguage), *force)
@@ -116,16 +116,14 @@ func runProjectTemplate(args []string, stdout io.Writer, stderr io.Writer) error
 	if err := os.MkdirAll(filepath.Dir(*outputPath), 0o755); err != nil {
 		return fmt.Errorf("create output directory: %w", err)
 	}
-	if err := os.WriteFile(*outputPath, []byte(template), 0o644); err != nil {
-		return fmt.Errorf("write project template: %w", err)
+	files := []plannedTemplateFile{{Path: *outputPath, Body: template}}
+	files = append(files, skillTemplates...)
+	if err := writePlannedTemplateFiles(files); err != nil {
+		return err
 	}
 	if *withSkills {
-		written, err := writeProjectSkillTemplates(skillTemplates)
-		if err != nil {
-			return err
-		}
-		for _, path := range written {
-			fmt.Fprintf(stdout, "project_skill_template_written path=%s\n", path)
+		for _, template := range skillTemplates {
+			fmt.Fprintf(stdout, "project_skill_template_written path=%s\n", template.Path)
 		}
 	}
 	fmt.Fprintf(stdout, "project_template_written path=%s\n", *outputPath)
@@ -220,17 +218,17 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	return builder.String(), nil
 }
 
-type plannedSkillTemplate struct {
+type plannedTemplateFile struct {
 	Path string
 	Body string
 }
 
-func planProjectSkillTemplates(packageDir string, language string, force bool) ([]plannedSkillTemplate, error) {
+func planProjectSkillTemplates(packageDir string, language string, force bool) ([]plannedTemplateFile, error) {
 	templates, err := projectSkillTemplates(language)
 	if err != nil {
 		return nil, err
 	}
-	planned := []plannedSkillTemplate{}
+	planned := []plannedTemplateFile{}
 	for relativePath, body := range templates {
 		path := filepath.Join(packageDir, filepath.FromSlash(relativePath))
 		if !force {
@@ -240,7 +238,7 @@ func planProjectSkillTemplates(packageDir string, language string, force bool) (
 				return nil, fmt.Errorf("inspect skill template: %w", err)
 			}
 		}
-		planned = append(planned, plannedSkillTemplate{Path: path, Body: body})
+		planned = append(planned, plannedTemplateFile{Path: path, Body: body})
 	}
 	sort.Slice(planned, func(left int, right int) bool {
 		return planned[left].Path < planned[right].Path
@@ -248,19 +246,56 @@ func planProjectSkillTemplates(packageDir string, language string, force bool) (
 	return planned, nil
 }
 
-func writeProjectSkillTemplates(templates []plannedSkillTemplate) ([]string, error) {
-	written := []string{}
-	for _, template := range templates {
-		path := template.Path
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return nil, fmt.Errorf("create skill template directory: %w", err)
+func writePlannedTemplateFiles(files []plannedTemplateFile) error {
+	tempPaths := []string{}
+	committedPaths := []string{}
+	cleanupTemps := func() {
+		for _, path := range tempPaths {
+			_ = os.Remove(path)
 		}
-		if err := os.WriteFile(path, []byte(template.Body), 0o644); err != nil {
-			return nil, fmt.Errorf("write skill template: %w", err)
-		}
-		written = append(written, path)
 	}
-	return written, nil
+	cleanupCommitted := func() {
+		for _, path := range committedPaths {
+			_ = os.Remove(path)
+		}
+	}
+	for _, file := range files {
+		if err := os.MkdirAll(filepath.Dir(file.Path), 0o755); err != nil {
+			cleanupTemps()
+			return fmt.Errorf("create template directory: %w", err)
+		}
+		tempFile, err := os.CreateTemp(filepath.Dir(file.Path), "."+filepath.Base(file.Path)+".tmp-*")
+		if err != nil {
+			cleanupTemps()
+			return fmt.Errorf("create temporary template file: %w", err)
+		}
+		tempPath := tempFile.Name()
+		tempPaths = append(tempPaths, tempPath)
+		if _, err := tempFile.WriteString(file.Body); err != nil {
+			_ = tempFile.Close()
+			cleanupTemps()
+			return fmt.Errorf("write temporary template file: %w", err)
+		}
+		if err := tempFile.Chmod(0o644); err != nil {
+			_ = tempFile.Close()
+			cleanupTemps()
+			return fmt.Errorf("chmod temporary template file: %w", err)
+		}
+		if err := tempFile.Close(); err != nil {
+			cleanupTemps()
+			return fmt.Errorf("close temporary template file: %w", err)
+		}
+	}
+	for index, file := range files {
+		tempPath := tempPaths[index]
+		if err := os.Rename(tempPath, file.Path); err != nil {
+			cleanupTemps()
+			cleanupCommitted()
+			return fmt.Errorf("write template file: %w", err)
+		}
+		committedPaths = append(committedPaths, file.Path)
+	}
+	return nil
 }
 
 func projectSkillTemplates(language string) (map[string]string, error) {

@@ -533,6 +533,41 @@ func TestProjectTemplateWithSkillsPreflightsBeforeWritingProjectYaml(t *testing.
 	}
 }
 
+func TestProjectTemplateWithSkillsDoesNotLeaveProjectYamlOnSkillWriteFailure(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "project-package")
+	outputPath := filepath.Join(packageDir, "project.yaml")
+	if err := os.MkdirAll(filepath.Join(packageDir, "skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "skills", "review"), []byte("not a directory\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"project",
+		"template",
+		"--with-skills",
+		"--force",
+		"--output",
+		outputPath,
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("run should fail when a skill template parent cannot be created")
+	}
+	if !strings.Contains(stderr.String(), "create template directory") {
+		t.Fatalf("stderr should explain template directory failure, got %q", stderr.String())
+	}
+	if _, err := os.Stat(outputPath); !os.IsNotExist(err) {
+		t.Fatalf("project.yaml should not be written after skill write failure, err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(packageDir, "skills", "implementation", "base.md")); !os.IsNotExist(err) {
+		t.Fatalf("implementation skill should not be partially written, err=%v", err)
+	}
+}
+
 func TestProjectTemplateRefusesToOverwriteWithoutForce(t *testing.T) {
 	tempDir := t.TempDir()
 	outputPath := filepath.Join(tempDir, "project-package", "project.yaml")
