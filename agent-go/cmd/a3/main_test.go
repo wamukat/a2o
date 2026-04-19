@@ -1748,7 +1748,7 @@ runtime:
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	t.Setenv("A3_WORKER_LAUNCHER_CONFIG_PATH", filepath.Join(tempDir, "legacy-launcher.json"))
+	t.Setenv("A2O_WORKER_LAUNCHER_CONFIG_PATH", filepath.Join(tempDir, "legacy-launcher.json"))
 
 	withChdir(t, tempDir, func() {
 		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
@@ -2868,7 +2868,7 @@ runtime:
 	if !strings.Contains(string(launcherBody), "deterministic_worker.rb") {
 		t.Fatalf("launcher config should contain project executor, got %s", launcherBody)
 	}
-	if !strings.Contains(joined, "'--agent-env' 'A3_WORKER_LAUNCHER_CONFIG_PATH="+launcherPath+"'") {
+	if !strings.Contains(joined, "'--agent-env' 'A2O_WORKER_LAUNCHER_CONFIG_PATH="+launcherPath+"'") {
 		t.Fatalf("run-once should pass launcher config path to agent jobs, calls:\n%s", joined)
 	}
 	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] != "" {
@@ -3034,7 +3034,7 @@ func TestRuntimeContainerProcessBuildsQuotedBackgroundScript(t *testing.T) {
 		WorkingDir: "/workspace",
 		Env: map[string]string{
 			"A2O_BRANCH_NAMESPACE": "branch with space",
-			"A3_ROOT_DIR":          "/workspace",
+			"A2O_ROOT_DIR":         "/workspace",
 		},
 		EnvShell: map[string]string{
 			"A3_SECRET": "${A3_SECRET:-a2o-runtime-secret}",
@@ -3048,7 +3048,7 @@ func TestRuntimeContainerProcessBuildsQuotedBackgroundScript(t *testing.T) {
 
 	for _, want := range []string{
 		"cd '/workspace' &&",
-		"export A2O_BRANCH_NAMESPACE='branch with space' A3_ROOT_DIR='/workspace' A3_SECRET=${A3_SECRET:-a2o-runtime-secret}",
+		"export A2O_BRANCH_NAMESPACE='branch with space' A2O_ROOT_DIR='/workspace' A3_SECRET=${A3_SECRET:-a2o-runtime-secret}",
 		"'--storage-dir' '/var/lib/a3/test runtime'",
 		"> '/tmp/a3 runtime.log' 2>&1",
 		"echo $? > '/tmp/a3 runtime.exit'",

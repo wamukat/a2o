@@ -24,9 +24,12 @@ func runExternal(runner commandRunner, name string, args ...string) ([]byte, err
 func sanitizePublicCommand(command string) string {
 	replacer := strings.NewReplacer(
 		"a3-runtime", "<runtime-service>",
+		"/tmp/a3-engine/lib/a3", "<runtime-preset-dir>/lib/a2o-internal",
 		"/var/lib/a3", "<runtime-storage>",
 		"/tmp/a3-engine", "<runtime-preset-dir>",
 		"/opt/a3", "<runtime-tools>",
+		"/usr/local/bin/a3", "<engine-entrypoint>",
+		"lib/a3", "lib/a2o-internal",
 		"/tmp/a3-runtime", "/tmp/a2o-runtime",
 		".a3", "<agent-metadata>",
 		"A3_", "A2O_INTERNAL_",

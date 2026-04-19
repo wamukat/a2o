@@ -45,6 +45,17 @@ Command runner は次を記録する。
 
 Verification commands は project package の責務である。Engine は success、failure、blocked reason、evidence metadata だけを解釈する。
 
+## Worker Protocol Environment（worker protocol の環境変数）
+
+Project package の command は、公開 contract として次の A2O 名を使う。
+
+- `A2O_WORKER_REQUEST_PATH`: current job の JSON request bundle。
+- `A2O_WORKER_RESULT_PATH`: command が final worker result JSON を書き込む path。
+- `A2O_WORKSPACE_ROOT`: job の materialized workspace root。
+- `A2O_WORKER_LAUNCHER_CONFIG_PATH`: bundled stdin worker が使う generated launcher config。
+
+旧 `A3_*` 名は internal compatibility alias に限定する。Project package、template、user-facing diagnostics では使わない。
+
 ## Materialized Workspace Rules（materialized workspace の rules）
 
 - Repo slot names は `app`、`repo_alpha`、`repo_beta` のような stable package aliases とする。

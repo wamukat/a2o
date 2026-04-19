@@ -24,13 +24,13 @@ RSpec.describe A3::Infra::LocalCommandRunner do
 
   it "runs commands with injected environment variables" do
     result = described_class.new.run(
-      ["ruby -e 'print ENV.fetch(\"A3_WORKER_REQUEST_PATH\")'"],
+      ["ruby -e 'print ENV.fetch(\"A2O_WORKER_REQUEST_PATH\")'"],
       workspace: workspace,
-      env: { "A3_WORKER_REQUEST_PATH" => "/tmp/request.json" }
+      env: { "A2O_WORKER_REQUEST_PATH" => "/tmp/request.json" }
     )
 
     expect(result.success?).to be(true)
-    expect(result.summary).to include("ruby -e 'print ENV.fetch(\"A3_WORKER_REQUEST_PATH\")' ok")
+    expect(result.summary).to include("ruby -e 'print ENV.fetch(\"A2O_WORKER_REQUEST_PATH\")' ok")
   end
 
   it "provides A3_ROOT_DIR when the caller does not inject it" do

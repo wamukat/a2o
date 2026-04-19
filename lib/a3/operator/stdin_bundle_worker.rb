@@ -5,8 +5,15 @@ require "pathname"
 require "tempfile"
 require "open3"
 
-ROOT_DIR = Pathname(ENV.fetch("A3_ROOT_DIR", Dir.pwd)).expand_path.freeze
-LAUNCHER_CONFIG_PATH = ENV["A3_WORKER_LAUNCHER_CONFIG_PATH"]
+ROOT_DIR = Pathname(ENV["A2O_ROOT_DIR"] || ENV.fetch("A3_ROOT_DIR", Dir.pwd)).expand_path.freeze
+def env_compat(public_name, legacy_name)
+  value = ENV[public_name]
+  return value unless value.to_s.strip.empty?
+
+  ENV[legacy_name]
+end
+
+LAUNCHER_CONFIG_PATH = env_compat("A2O_WORKER_LAUNCHER_CONFIG_PATH", "A3_WORKER_LAUNCHER_CONFIG_PATH")
 KNOWN_EXECUTOR_PHASES = %w[implementation review parent_review].freeze
 ALLOWED_EXECUTOR_PLACEHOLDERS = {
   "result_path" => :result_path,
@@ -79,10 +86,10 @@ end
 def bundle_for(request)
   phase = request["phase"].to_s
   review_scopes = valid_review_disposition_repo_scopes(request, include_unresolved: phase == "review")
-  instruction = +"You are the A3 worker. Work only under slot_paths. Follow AGENTS.md and repo Taskfile conventions. "
+  instruction = +"You are the A2O worker. Work only under slot_paths. Follow AGENTS.md and repo Taskfile conventions. "
   instruction << "Do not update kanban directly. Treat request.task_packet as the primary source of truth for what to implement or review before inferring from repository context. Return only the final JSON object required by response_contract."
   if phase == "implementation"
-    instruction << " For implementation success, make the required code change, leave git staging/commit publication to the outer A3 runtime, and include changed_files keyed by slot name with relative paths to publish."
+    instruction << " For implementation success, make the required code change, leave git staging/commit publication to the outer A2O runtime, and include changed_files keyed by slot name with relative paths to publish."
     instruction << " After you finish implementation, perform a final self-review before returning. When that self-review is clean, include review_disposition with kind=completed so the outer runtime can preserve review evidence without a separate review phase."
   elsif phase == "review"
     if request.dig("phase_runtime", "task_kind").to_s == "parent"
@@ -93,7 +100,7 @@ def bundle_for(request)
   end
   JSON.pretty_generate(
     {
-      "type" => "a3-worker-stdin-bundle",
+      "type" => "a2o-worker-stdin-bundle",
       "instruction" => instruction,
       "request" => request,
       "response_contract" => {
@@ -121,7 +128,7 @@ def bundle_for(request)
         ]
       },
       "operating_contract" => {
-        "workspace_root" => ENV["A3_WORKSPACE_ROOT"],
+        "workspace_root" => env_compat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT"),
         "slot_paths" => request["slot_paths"] || {},
         "phase_runtime" => request["phase_runtime"] || {},
         "rules" => [
@@ -203,7 +210,7 @@ def response_schema(request)
 end
 
 def load_executor_config
-  raise ArgumentError, "A3_WORKER_LAUNCHER_CONFIG_PATH is required for a2o-agent worker stdin-bundle" if LAUNCHER_CONFIG_PATH.to_s.strip.empty?
+  raise ArgumentError, "A2O_WORKER_LAUNCHER_CONFIG_PATH is required for a2o-agent worker stdin-bundle" if LAUNCHER_CONFIG_PATH.to_s.strip.empty?
 
   load_json(LAUNCHER_CONFIG_PATH).fetch("executor", {})
 end
@@ -283,7 +290,7 @@ def resolve_executor_profile(request, executor:)
 end
 
 def expand_executor_placeholders(command, result_path:, schema_path:)
-  workspace_root = ENV["A3_WORKSPACE_ROOT"] || ROOT_DIR.to_s
+  workspace_root = env_compat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT") || ROOT_DIR.to_s
   root_dir = ENV["A2O_ROOT_DIR"] || ENV["A3_ROOT_DIR"] || workspace_root
   values = {
     "result_path" => result_path.to_s,
@@ -441,13 +448,13 @@ def load_payload(result_path)
 end
 
 def main
-  request_path = Pathname(ENV.fetch("A3_WORKER_REQUEST_PATH"))
-  result_path = Pathname(ENV.fetch("A3_WORKER_RESULT_PATH"))
+  request_path = Pathname(env_compat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH") || raise(KeyError, "A2O_WORKER_REQUEST_PATH is required"))
+  result_path = Pathname(env_compat("A2O_WORKER_RESULT_PATH", "A3_WORKER_RESULT_PATH") || raise(KeyError, "A2O_WORKER_RESULT_PATH is required"))
   request = load_json(request_path)
   result_path.dirname.mkpath
   result_path.delete if result_path.exist?
 
-  Tempfile.create(["a3-worker-schema", ".json"]) do |schema_file|
+  Tempfile.create(["a2o-worker-schema", ".json"]) do |schema_file|
     schema_file.write(JSON.pretty_generate(response_schema(request)))
     schema_file.flush
     begin
@@ -468,10 +475,10 @@ def main
       return 0
     end
     stdout, stderr, status = Open3.capture3(
-      { "PWD" => (ENV["A3_WORKSPACE_ROOT"] || ROOT_DIR.to_s) }.merge(command_env),
+      { "PWD" => (env_compat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT") || ROOT_DIR.to_s) }.merge(command_env),
       *command,
       stdin_data: stdin_bundle,
-      chdir: ENV["A3_WORKSPACE_ROOT"] || ROOT_DIR.to_s
+      chdir: env_compat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT") || ROOT_DIR.to_s
     )
 
     unless status.success? || result_path.exist?

@@ -16,13 +16,20 @@ type executorProfile struct {
 	Env     map[string]string
 }
 
+func envCompat(publicName string, legacyName string) string {
+	if value := strings.TrimSpace(os.Getenv(publicName)); value != "" {
+		return value
+	}
+	return strings.TrimSpace(os.Getenv(legacyName))
+}
+
 func runWorkerStdinBundle(args []string) int {
 	if len(args) != 0 {
 		fmt.Fprintf(os.Stderr, "unexpected arguments: %s\n", strings.Join(args, " "))
 		return 2
 	}
-	requestPath := strings.TrimSpace(os.Getenv("A3_WORKER_REQUEST_PATH"))
-	resultPath := strings.TrimSpace(os.Getenv("A3_WORKER_RESULT_PATH"))
+	requestPath := envCompat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH")
+	resultPath := envCompat("A2O_WORKER_RESULT_PATH", "A3_WORKER_RESULT_PATH")
 	if requestPath == "" || resultPath == "" {
 		fmt.Fprintln(os.Stderr, "worker request and result paths are required")
 		return 1
@@ -177,7 +184,7 @@ func workerRemediation(category string) string {
 }
 
 func workerWorkspaceRoot() string {
-	if root := strings.TrimSpace(os.Getenv("A3_WORKSPACE_ROOT")); root != "" {
+	if root := envCompat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT"); root != "" {
 		return root
 	}
 	wd, err := os.Getwd()
@@ -270,7 +277,7 @@ func workerExecutorCommand(request map[string]any, resultPath string, schemaPath
 	config := map[string]any{}
 	launcherConfigPath := workerLauncherConfigPath()
 	if launcherConfigPath == "" {
-		return nil, nil, fmt.Errorf("A3_WORKER_LAUNCHER_CONFIG_PATH is required for a2o-agent worker stdin-bundle")
+		return nil, nil, fmt.Errorf("A2O_WORKER_LAUNCHER_CONFIG_PATH is required for a2o-agent worker stdin-bundle")
 	}
 	if err := readJSONFile(launcherConfigPath, &config); err != nil {
 		return nil, nil, err
@@ -295,10 +302,7 @@ func workerExecutorCommand(request map[string]any, resultPath string, schemaPath
 }
 
 func workerLauncherConfigPath() string {
-	if path := strings.TrimSpace(os.Getenv("A3_WORKER_LAUNCHER_CONFIG_PATH")); path != "" {
-		return path
-	}
-	return ""
+	return envCompat("A2O_WORKER_LAUNCHER_CONFIG_PATH", "A3_WORKER_LAUNCHER_CONFIG_PATH")
 }
 
 func resolveWorkerExecutorProfile(request map[string]any, executor map[string]any) (executorProfile, error) {
@@ -438,7 +442,7 @@ func runWorkerExecutor(command []string, commandEnv map[string]string, workspace
 
 func workerBundle() string {
 	request := map[string]any{}
-	_ = readJSONFile(os.Getenv("A3_WORKER_REQUEST_PATH"), &request)
+	_ = readJSONFile(envCompat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH"), &request)
 	bundle := map[string]any{
 		"type":        "a2o-worker-stdin-bundle",
 		"instruction": workerInstruction(request),
@@ -457,7 +461,7 @@ func workerBundle() string {
 			},
 		},
 		"operating_contract": map[string]any{
-			"workspace_root": os.Getenv("A3_WORKSPACE_ROOT"),
+			"workspace_root": envCompat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT"),
 			"slot_paths":     mapValue(request["slot_paths"]),
 			"phase_runtime":  mapValue(request["phase_runtime"]),
 			"rules": []string{

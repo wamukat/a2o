@@ -220,12 +220,12 @@ JSON
 		t.Fatal(err)
 	}
 
-	t.Setenv("A3_WORKER_REQUEST_PATH", requestPath)
-	t.Setenv("A3_WORKER_RESULT_PATH", resultPath)
-	t.Setenv("A3_ROOT_DIR", tmp)
+	t.Setenv("A2O_WORKER_REQUEST_PATH", requestPath)
+	t.Setenv("A2O_WORKER_RESULT_PATH", resultPath)
 	t.Setenv("A2O_ROOT_DIR", tmp)
-	t.Setenv("A3_WORKSPACE_ROOT", workspace)
-	t.Setenv("A3_WORKER_LAUNCHER_CONFIG_PATH", launcherPath)
+	t.Setenv("A2O_ROOT_DIR", tmp)
+	t.Setenv("A2O_WORKSPACE_ROOT", workspace)
+	t.Setenv("A2O_WORKER_LAUNCHER_CONFIG_PATH", launcherPath)
 
 	if code := run([]string{"worker", "stdin-bundle"}); code != 0 {
 		t.Fatalf("worker exit code = %d", code)
@@ -272,11 +272,11 @@ func TestRunWorkerStdinBundleRejectsMissingLauncherConfigEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Setenv("A3_WORKER_REQUEST_PATH", requestPath)
-	t.Setenv("A3_WORKER_RESULT_PATH", resultPath)
-	t.Setenv("A3_ROOT_DIR", tmp)
+	t.Setenv("A2O_WORKER_REQUEST_PATH", requestPath)
+	t.Setenv("A2O_WORKER_RESULT_PATH", resultPath)
 	t.Setenv("A2O_ROOT_DIR", tmp)
-	t.Setenv("A3_WORKSPACE_ROOT", workspace)
+	t.Setenv("A2O_ROOT_DIR", tmp)
+	t.Setenv("A2O_WORKSPACE_ROOT", workspace)
 
 	if code := run([]string{"worker", "stdin-bundle"}); code != 0 {
 		t.Fatalf("worker should return protocol failure payload with exit 0, got %d", code)
@@ -293,7 +293,7 @@ func TestRunWorkerStdinBundleRejectsMissingLauncherConfigEnv(t *testing.T) {
 		t.Fatalf("unexpected result: %s", resultBody)
 	}
 	diagnostics, _ := result["diagnostics"].(map[string]any)
-	if !strings.Contains(stringValue(diagnostics["error"]), "A3_WORKER_LAUNCHER_CONFIG_PATH is required") {
+	if !strings.Contains(stringValue(diagnostics["error"]), "A2O_WORKER_LAUNCHER_CONFIG_PATH is required") {
 		t.Fatalf("result should explain missing launcher env, got %s", resultBody)
 	}
 }

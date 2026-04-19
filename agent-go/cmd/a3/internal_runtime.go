@@ -902,9 +902,8 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		SoloBoardInternalURL: envDefaultCompat("A2O_SOLOBOARD_INTERNAL_URL", "A3_SOLOBOARD_INTERNAL_URL", "http://soloboard:3000"),
 		LiveRef:              envDefaultCompat("A2O_RUNTIME_RUN_ONCE_LIVE_REF", "A3_RUNTIME_RUN_ONCE_LIVE_REF", envDefaultCompat("A2O_RUNTIME_SCHEDULER_LIVE_REF", "A3_RUNTIME_SCHEDULER_LIVE_REF", defaultLiveRef)),
 		AgentEnv: []string{
-			"A3_ROOT_DIR=" + hostRootDir,
 			"A2O_ROOT_DIR=" + hostRootDir,
-			"A3_WORKER_LAUNCHER_CONFIG_PATH=" + launcherConfigPath,
+			"A2O_WORKER_LAUNCHER_CONFIG_PATH=" + launcherConfigPath,
 			"A3_MAVEN_WORKSPACE_BOOTSTRAP_MODE=" + envDefaultCompat("A2O_RUNTIME_RUN_ONCE_MAVEN_WORKSPACE_BOOTSTRAP_MODE", "A3_RUNTIME_RUN_ONCE_MAVEN_WORKSPACE_BOOTSTRAP_MODE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_MAVEN_WORKSPACE_BOOTSTRAP_MODE", "A3_RUNTIME_SCHEDULER_MAVEN_WORKSPACE_BOOTSTRAP_MODE", "empty")),
 		},
 		AgentSourcePaths:   envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS", "A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS", "A2O_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS", agentSourcePaths),
@@ -1361,7 +1360,6 @@ func startRuntimeExecuteUntilIdle(config runtimeInstanceConfig, plan runtimeRunO
 		WorkingDir: "/workspace",
 		Env: map[string]string{
 			"A2O_BRANCH_NAMESPACE": plan.BranchNamespace,
-			"A3_ROOT_DIR":          "/workspace",
 			"A2O_ROOT_DIR":         "/workspace",
 			"KANBAN_BACKEND":       "soloboard",
 		},

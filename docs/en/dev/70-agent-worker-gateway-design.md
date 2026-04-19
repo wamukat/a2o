@@ -43,6 +43,17 @@ The agent returns:
 - workspace descriptor
 - publication refs
 
+## Worker Protocol Environment
+
+Project package commands should use the A2O worker environment names:
+
+- `A2O_WORKER_REQUEST_PATH`: JSON request bundle for the current job.
+- `A2O_WORKER_RESULT_PATH`: path where the command writes the final worker result JSON.
+- `A2O_WORKSPACE_ROOT`: materialized workspace root for the job.
+- `A2O_WORKER_LAUNCHER_CONFIG_PATH`: generated launcher config used by the bundled stdin worker.
+
+Older `A3_*` names are internal compatibility aliases only. Do not use them in project packages, templates, or user-facing diagnostics.
+
 ## Workspace Materialization
 
 The agent owns materialized job workspaces under the configured workspace root. A2O provides source aliases and source descriptors. The agent must not invent source refs.

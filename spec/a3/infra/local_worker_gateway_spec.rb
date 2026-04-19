@@ -100,9 +100,9 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       ["task implementation"],
       workspace: workspace,
       env: {
-        "A3_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
-        "A3_WORKER_RESULT_PATH" => workspace.root_path.join(".a3", "worker-result.json").to_s,
-        "A3_WORKSPACE_ROOT" => workspace.root_path.to_s
+        "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
+        "A2O_WORKER_RESULT_PATH" => workspace.root_path.join(".a3", "worker-result.json").to_s,
+        "A2O_WORKSPACE_ROOT" => workspace.root_path.to_s
       }
     ) do
       request_path = workspace.root_path.join(".a3", "worker-request.json")
@@ -172,9 +172,9 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       ["ruby -I a3-engine/lib a3-engine/bin/a3 worker:stdin-bundle"],
       workspace: workspace,
       env: {
-        "A3_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
-        "A3_WORKER_RESULT_PATH" => workspace.root_path.join(".a3", "worker-result.json").to_s,
-        "A3_WORKSPACE_ROOT" => workspace.root_path.to_s
+        "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
+        "A2O_WORKER_RESULT_PATH" => workspace.root_path.join(".a3", "worker-result.json").to_s,
+        "A2O_WORKSPACE_ROOT" => workspace.root_path.to_s
       }
     ) do
       request = JSON.parse(workspace.root_path.join(".a3", "worker-request.json").read)
@@ -207,8 +207,8 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     allow(command_runner).to receive(:run) do |_commands, workspace:, env:|
       expect(workspace.root_path.join(".a3", "worker-request.json")).to exist
       expect(env).to include(
-        "A3_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
-        "A3_WORKSPACE_ROOT" => workspace.root_path.to_s
+        "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
+        "A2O_WORKSPACE_ROOT" => workspace.root_path.to_s
       )
       result
     end
@@ -239,9 +239,9 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
 
     allow(command_runner).to receive(:run) do |_commands, workspace:, env:|
       expect(env).to include(
-        "A3_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
-        "A3_WORKER_RESULT_PATH" => result_path.to_s,
-        "A3_WORKSPACE_ROOT" => workspace.root_path.to_s
+        "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
+        "A2O_WORKER_RESULT_PATH" => result_path.to_s,
+        "A2O_WORKSPACE_ROOT" => workspace.root_path.to_s
       )
       result_path.write(JSON.pretty_generate(bundle))
       A3::Application::ExecutionResult.new(
@@ -421,7 +421,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     gateway = described_class.new(command_runner: command_runner)
 
     allow(command_runner).to receive(:run) do |_commands, workspace:, env:|
-      expect(env["A3_WORKER_RESULT_PATH"]).to eq(result_path.to_s)
+      expect(env["A2O_WORKER_RESULT_PATH"]).to eq(result_path.to_s)
       result_path.dirname.mkpath
       result_path.write(JSON.pretty_generate(bundle))
       A3::Application::ExecutionResult.new(success: true, summary: "command runner succeeded")

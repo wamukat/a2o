@@ -263,9 +263,9 @@ RSpec.describe A3::CLI do
       allow(command_runner).to receive(:run).with(
         ["skills/implementation/base.md"],
         workspace: an_instance_of(A3::Domain::PreparedWorkspace),
-        env: hash_including("A3_WORKER_REQUEST_PATH", "A3_WORKSPACE_ROOT")
+        env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT")
       ) do |_commands, workspace:, env:|
-        request_path = Pathname(env.fetch("A3_WORKER_REQUEST_PATH"))
+        request_path = Pathname(env.fetch("A2O_WORKER_REQUEST_PATH"))
         expect(request_path).to eq(workspace.root_path.join(".a3", "worker-request.json"))
         expect(request_path).to exist
 

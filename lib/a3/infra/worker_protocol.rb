@@ -18,9 +18,9 @@ module A3
 
       def env_for(workspace)
         {
-          "A3_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
-          "A3_WORKER_RESULT_PATH" => result_path(workspace).to_s,
-          "A3_WORKSPACE_ROOT" => workspace.root_path.to_s
+          "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
+          "A2O_WORKER_RESULT_PATH" => result_path(workspace).to_s,
+          "A2O_WORKSPACE_ROOT" => workspace.root_path.to_s
         }
       end
 

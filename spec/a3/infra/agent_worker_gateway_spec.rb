@@ -113,7 +113,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     expect(request.command).to eq("ruby")
     expect(request.args).to eq(["worker.rb"])
     expect(request.env).to include(
-      "A3_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s
+      "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s
     )
     expect(execution).to have_attributes(
       success: true,
@@ -544,14 +544,14 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       job_id_generator: -> { "job-1" },
       sleeper: ->(_seconds) {},
       workspace_request_builder: ->(**) { materialized_workspace_request },
-      env: { A3_ROOT_DIR: "/host/a3" }
+      env: { A2O_ROOT_DIR: "/host/a2o" }
     )
 
     run_gateway(gateway)
 
     request = client.records.values.first.request
-    expect(request.env).to include("A3_ROOT_DIR" => "/host/a3")
-    expect(request.env).to include("A3_WORKER_REQUEST_PATH")
+    expect(request.env).to include("A2O_ROOT_DIR" => "/host/a2o")
+    expect(request.env).to include("A2O_WORKER_REQUEST_PATH")
   end
 
   it "rejects materialized implementation when required changed files evidence is missing" do
@@ -800,9 +800,9 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     script_path.write(<<~RUBY)
       require "json"
       puts "worker script ran"
-      request = JSON.parse(File.read(ENV.fetch("A3_WORKER_REQUEST_PATH")))
+      request = JSON.parse(File.read(ENV.fetch("A2O_WORKER_REQUEST_PATH")))
       File.write(
-        ENV.fetch("A3_WORKER_RESULT_PATH"),
+        ENV.fetch("A2O_WORKER_RESULT_PATH"),
         JSON.generate(
           "success" => true,
           "summary" => "worker completed via http",

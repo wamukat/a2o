@@ -524,10 +524,10 @@ func workerProtocolEnv(base map[string]string, workspaceRoot string, hasWorkerPr
 	for key, value := range base {
 		env[key] = value
 	}
-	env["A3_WORKSPACE_ROOT"] = workspaceRoot
-	env["A3_WORKER_RESULT_PATH"] = workerResultPath(workspaceRoot)
+	env["A2O_WORKSPACE_ROOT"] = workspaceRoot
+	env["A2O_WORKER_RESULT_PATH"] = workerResultPath(workspaceRoot)
 	if hasWorkerProtocolRequest {
-		env["A3_WORKER_REQUEST_PATH"] = workerRequestPath(workspaceRoot)
+		env["A2O_WORKER_REQUEST_PATH"] = workerRequestPath(workspaceRoot)
 	}
 	return env
 }

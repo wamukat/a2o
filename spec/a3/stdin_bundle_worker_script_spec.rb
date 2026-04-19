@@ -124,10 +124,10 @@ RSpec.describe "worker:stdin-bundle" do
 
       stdout, stderr, status = run_worker_process(
         {
-          "A3_WORKER_REQUEST_PATH" => request_path.to_s,
-          "A3_WORKER_RESULT_PATH" => result_path.to_s,
-          "A3_WORKSPACE_ROOT" => workspace_root.to_s,
-          "A3_WORKER_LAUNCHER_CONFIG_PATH" => launcher_config.to_s
+          "A2O_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A2O_WORKER_RESULT_PATH" => result_path.to_s,
+          "A2O_WORKSPACE_ROOT" => workspace_root.to_s,
+          "A2O_WORKER_LAUNCHER_CONFIG_PATH" => launcher_config.to_s
         }
       )
 
@@ -151,10 +151,10 @@ RSpec.describe "worker:stdin-bundle" do
 
       stdout, stderr, status = run_worker_process(
         {
-          "A3_WORKER_REQUEST_PATH" => request_path.to_s,
-          "A3_WORKER_RESULT_PATH" => result_path.to_s,
-          "A3_ROOT_DIR" => temp_dir.to_s,
-          "A3_WORKSPACE_ROOT" => workspace_root.to_s
+          "A2O_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A2O_WORKER_RESULT_PATH" => result_path.to_s,
+          "A2O_ROOT_DIR" => temp_dir.to_s,
+          "A2O_WORKSPACE_ROOT" => workspace_root.to_s
         }
       )
 
@@ -163,7 +163,7 @@ RSpec.describe "worker:stdin-bundle" do
       expect(payload.fetch("success")).to eq(false)
       expect(payload.fetch("summary")).to eq("stdin worker executor config invalid")
       expect(payload.fetch("observed_state")).to eq("invalid_executor_config")
-      expect(payload.fetch("diagnostics").fetch("error")).to include("A3_WORKER_LAUNCHER_CONFIG_PATH is required")
+      expect(payload.fetch("diagnostics").fetch("error")).to include("A2O_WORKER_LAUNCHER_CONFIG_PATH is required")
     end
   end
 
@@ -184,10 +184,10 @@ RSpec.describe "worker:stdin-bundle" do
 
       stdout, stderr, status = run_worker_process(
         {
-          "A3_WORKER_REQUEST_PATH" => request_path.to_s,
-          "A3_WORKER_RESULT_PATH" => result_path.to_s,
-          "A3_WORKSPACE_ROOT" => workspace_root.to_s,
-          "A3_WORKER_LAUNCHER_CONFIG_PATH" => launcher_config.to_s,
+          "A2O_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A2O_WORKER_RESULT_PATH" => result_path.to_s,
+          "A2O_WORKSPACE_ROOT" => workspace_root.to_s,
+          "A2O_WORKER_LAUNCHER_CONFIG_PATH" => launcher_config.to_s,
           "FAKE_WORKER_MODE" => "invalid"
         }
       )
@@ -217,7 +217,7 @@ RSpec.describe "worker:stdin-bundle" do
       )
 
       ruby = <<~RUBY
-        ENV["A3_WORKER_LAUNCHER_CONFIG_PATH"] = #{launcher_config.to_s.inspect}
+        ENV["A2O_WORKER_LAUNCHER_CONFIG_PATH"] = #{launcher_config.to_s.inspect}
         require #{STDIN_WORKER_LIB.to_s.inspect}
         request = load_json(#{request_path.to_s.inspect})
         command = executor_command(result_path: Pathname(#{result_path.to_s.inspect}), schema_path: Pathname("/tmp/schema.json"), request: request)
@@ -227,9 +227,9 @@ RSpec.describe "worker:stdin-bundle" do
       stdout, stderr, status = run_ruby(
         ruby,
         env: {
-          "A3_WORKER_REQUEST_PATH" => request_path.to_s,
-          "A3_WORKER_RESULT_PATH" => result_path.to_s,
-          "A3_WORKSPACE_ROOT" => workspace_root.to_s,
+          "A2O_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A2O_WORKER_RESULT_PATH" => result_path.to_s,
+          "A2O_WORKSPACE_ROOT" => workspace_root.to_s,
           "A2O_ROOT_DIR" => temp_dir.to_s
         }
       )
@@ -260,7 +260,7 @@ RSpec.describe "worker:stdin-bundle" do
       )
 
       ruby = <<~RUBY
-        ENV["A3_WORKER_LAUNCHER_CONFIG_PATH"] = #{launcher_config.to_s.inspect}
+        ENV["A2O_WORKER_LAUNCHER_CONFIG_PATH"] = #{launcher_config.to_s.inspect}
         require #{STDIN_WORKER_LIB.to_s.inspect}
         request = load_json(#{request_path.to_s.inspect})
         command = executor_command(result_path: Pathname(#{result_path.to_s.inspect}), schema_path: Pathname("/tmp/schema.json"), request: request)
@@ -270,9 +270,9 @@ RSpec.describe "worker:stdin-bundle" do
       stdout, stderr, status = run_ruby(
         ruby,
         env: {
-          "A3_WORKER_REQUEST_PATH" => request_path.to_s,
-          "A3_WORKER_RESULT_PATH" => result_path.to_s,
-          "A3_WORKSPACE_ROOT" => workspace_root.to_s
+          "A2O_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A2O_WORKER_RESULT_PATH" => result_path.to_s,
+          "A2O_WORKSPACE_ROOT" => workspace_root.to_s
         }
       )
 
@@ -315,7 +315,7 @@ RSpec.describe "worker:stdin-bundle" do
       )
 
       ruby = <<~RUBY
-        ENV["A3_WORKER_LAUNCHER_CONFIG_PATH"] = #{launcher_config.to_s.inspect}
+        ENV["A2O_WORKER_LAUNCHER_CONFIG_PATH"] = #{launcher_config.to_s.inspect}
         require #{STDIN_WORKER_LIB.to_s.inspect}
         request = load_json(#{request_path.to_s.inspect})
         payload = load_json(#{payload_path.to_s.inspect})
@@ -325,8 +325,8 @@ RSpec.describe "worker:stdin-bundle" do
       stdout, stderr, status = run_ruby(
         ruby,
         env: {
-          "A3_WORKER_REQUEST_PATH" => request_path.to_s,
-          "A3_WORKER_RESULT_PATH" => temp_dir.join("result.json").to_s
+          "A2O_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A2O_WORKER_RESULT_PATH" => temp_dir.join("result.json").to_s
         }
       )
 
@@ -365,7 +365,7 @@ RSpec.describe "worker:stdin-bundle" do
       write_launcher_config(launcher_config, command: ["runner", "{{result_path}}"])
 
       ruby = <<~RUBY
-        ENV["A3_WORKER_LAUNCHER_CONFIG_PATH"] = #{launcher_config.to_s.inspect}
+        ENV["A2O_WORKER_LAUNCHER_CONFIG_PATH"] = #{launcher_config.to_s.inspect}
         require #{STDIN_WORKER_LIB.to_s.inspect}
         request = load_json(#{request_path.to_s.inspect})
         payload = load_json(#{payload_path.to_s.inspect})
@@ -375,8 +375,8 @@ RSpec.describe "worker:stdin-bundle" do
       stdout, stderr, status = run_ruby(
         ruby,
         env: {
-          "A3_WORKER_REQUEST_PATH" => request_path.to_s,
-          "A3_WORKER_RESULT_PATH" => temp_dir.join("result.json").to_s
+          "A2O_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A2O_WORKER_RESULT_PATH" => temp_dir.join("result.json").to_s
         }
       )
 
@@ -403,10 +403,10 @@ RSpec.describe "worker:stdin-bundle" do
 
       stdout, stderr, status = run_worker_process(
         {
-          "A3_WORKER_REQUEST_PATH" => request_path.to_s,
-          "A3_WORKER_RESULT_PATH" => result_path.to_s,
-          "A3_WORKSPACE_ROOT" => workspace_root.to_s,
-          "A3_WORKER_LAUNCHER_CONFIG_PATH" => launcher_config.to_s
+          "A2O_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A2O_WORKER_RESULT_PATH" => result_path.to_s,
+          "A2O_WORKSPACE_ROOT" => workspace_root.to_s,
+          "A2O_WORKER_LAUNCHER_CONFIG_PATH" => launcher_config.to_s
         }
       )
 
@@ -437,10 +437,10 @@ RSpec.describe "worker:stdin-bundle" do
 
       stdout, stderr, status = run_worker_process(
         {
-          "A3_WORKER_REQUEST_PATH" => request_path.to_s,
-          "A3_WORKER_RESULT_PATH" => result_path.to_s,
-          "A3_WORKSPACE_ROOT" => workspace_root.to_s,
-          "A3_WORKER_LAUNCHER_CONFIG_PATH" => launcher_config.to_s
+          "A2O_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A2O_WORKER_RESULT_PATH" => result_path.to_s,
+          "A2O_WORKSPACE_ROOT" => workspace_root.to_s,
+          "A2O_WORKER_LAUNCHER_CONFIG_PATH" => launcher_config.to_s
         }
       )
 
@@ -478,9 +478,9 @@ RSpec.describe "worker:stdin-bundle" do
       stdout, stderr, status = run_ruby(
         ruby,
         env: {
-          "A3_WORKER_REQUEST_PATH" => request_path.to_s,
-          "A3_WORKER_RESULT_PATH" => result_path.to_s,
-          "A3_WORKSPACE_ROOT" => workspace_root.to_s
+          "A2O_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A2O_WORKER_RESULT_PATH" => result_path.to_s,
+          "A2O_WORKSPACE_ROOT" => workspace_root.to_s
         }
       )
 

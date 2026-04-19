@@ -290,7 +290,7 @@ RSpec.describe A3::CLI do
           import os
           from pathlib import Path
 
-          request = json.loads(Path(os.environ["A3_WORKER_REQUEST_PATH"]).read_text())
+          request = json.loads(Path(os.environ["A2O_WORKER_REQUEST_PATH"]).read_text())
           repo_alpha = Path(request["slot_paths"]["repo_alpha"])
           changed = repo_alpha / "src" / "main.rb"
           changed.parent.mkdir(parents=True, exist_ok=True)
@@ -307,7 +307,7 @@ RSpec.describe A3::CLI do
               "changed_files": {"repo_alpha": ["src/main.rb"]},
               "diagnostics": {}
           }
-          Path(os.environ["A3_WORKER_RESULT_PATH"]).write_text(json.dumps(result))
+          Path(os.environ["A2O_WORKER_RESULT_PATH"]).write_text(json.dumps(result))
         PYTHON
       )
       File.chmod(0o755, worker_script)

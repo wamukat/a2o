@@ -357,7 +357,7 @@ func (executor envAwareWorkerProtocolExecutor) Execute(request JobRequest) Execu
 }
 
 func (executor workerProtocolExecutor) Execute(request JobRequest) ExecutionResult {
-	content, err := os.ReadFile(request.Env["A3_WORKER_REQUEST_PATH"])
+	content, err := os.ReadFile(request.Env["A2O_WORKER_REQUEST_PATH"])
 	if err != nil {
 		code := 1
 		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
@@ -389,7 +389,7 @@ func (executor workerProtocolExecutor) Execute(request JobRequest) ExecutionResu
 		code := 1
 		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
 	}
-	if err := os.WriteFile(request.Env["A3_WORKER_RESULT_PATH"], encoded, 0o600); err != nil {
+	if err := os.WriteFile(request.Env["A2O_WORKER_RESULT_PATH"], encoded, 0o600); err != nil {
 		code := 1
 		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
 	}
