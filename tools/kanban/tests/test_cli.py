@@ -213,6 +213,95 @@ class SoloBoardCliTest(unittest.TestCase):
         self.assertEqual(description, payload["description"])
         self.assertEqual(("POST", "/api/boards/42/tickets"), calls[-1][:2])
 
+    def test_task_update_description_file_and_append_description_file_preserve_multiline_text(self) -> None:
+        existing = "Existing body"
+        replacement = "## Replacement\n\n- one\n- two\n"
+        appendix = "## Appendix\n\nextra detail"
+        updates: list[dict[str, object]] = []
+
+        def fake_resolve_task_id(*_args, **_kwargs):
+            return 101
+
+        def fake_get_task(_base_url, _token, task_id):
+            self.assertEqual(101, task_id)
+            return {
+                "id": 101,
+                "project_id": 42,
+                "column_id": 7,
+                "priority": 0,
+                "done": False,
+                "reference": "Sample#101",
+                "identifier": "#101",
+                "index": 101,
+                "title": "Task",
+                "description": existing,
+            }
+
+        def fake_update_task(_base_url, _token, task_id, changes):
+            self.assertEqual(101, task_id)
+            updates.append(changes)
+            return {
+                "id": 101,
+                "project_id": 42,
+                "column_id": 7,
+                "priority": 0,
+                "done": False,
+                "reference": "Sample#101",
+                "identifier": "#101",
+                "index": 101,
+                "title": "Task",
+                "description": changes["description"],
+            }
+
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as replace_file:
+            replace_file.write(replacement)
+            replace_path = replace_file.name
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as append_file:
+            append_file.write(appendix)
+            append_path = append_file.name
+        try:
+            base_args = {
+                "backend": "soloboard",
+                "base_url": "http://localhost:3460",
+                "token": "",
+                "task": "Sample#101",
+                "task_id": None,
+                "project_id": None,
+                "project": "Sample",
+                "title": None,
+                "description": None,
+                "append_description": None,
+                "reference": None,
+                "done": None,
+                "priority": None,
+            }
+            with (
+                patch.object(kanban_cli, "resolve_task_id_from_ref", side_effect=fake_resolve_task_id),
+                patch.object(kanban_cli, "get_task", side_effect=fake_get_task),
+                patch.object(kanban_cli, "update_task", side_effect=fake_update_task),
+                patch.object(kanban_cli, "resolve_project_title", return_value="Sample"),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                replace_args = SimpleNamespace(
+                    **base_args,
+                    description_file=replace_path,
+                    append_description_file=None,
+                )
+                self.assertEqual(0, kanban_cli.cmd_task_update(replace_args))
+
+                append_args = SimpleNamespace(
+                    **base_args,
+                    description_file=None,
+                    append_description_file=append_path,
+                )
+                self.assertEqual(0, kanban_cli.cmd_task_update(append_args))
+        finally:
+            os.unlink(replace_path)
+            os.unlink(append_path)
+
+        self.assertEqual(replacement, updates[0]["description"])
+        self.assertEqual(f"{existing}\n{appendix}", updates[1]["description"])
+
     def test_task_snapshot_uses_full_description_and_summary_from_detail(self) -> None:
         description = "Heading\n\nfirst line\nsecond line"
 

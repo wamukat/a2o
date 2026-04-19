@@ -348,6 +348,8 @@ def normalize_task_snapshot(
         return fallback
 
     related_tasks = relation_tasks_payload(base_url, token, task_id=task_id)
+    # Snapshot normalization already needs the detail endpoint for tags; reuse it
+    # as the source of truth for bodyMarkdown instead of trusting list payloads.
     detailed_task = get_task(base_url, token, task_id)
     description = str(detailed_task.get("description") or detailed_task.get("bodyMarkdown") or task.get("description") or "")
     tags = detailed_task.get("tags") if isinstance(detailed_task, dict) else None
