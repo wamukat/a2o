@@ -110,6 +110,36 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
       .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.surface is no longer supported; use runtime.phases")
   end
 
+  it "rejects legacy runtime.executor" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "phases" => {
+          "implementation" => { "skill" => "skills/implementation/base.md" },
+          "review" => { "skill" => "skills/review/default.md" }
+        },
+        "executor" => {}
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.executor is no longer supported; use runtime.phases.<phase>.executor")
+  end
+
+  it "rejects legacy runtime.merge" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "phases" => {
+          "implementation" => { "skill" => "skills/implementation/base.md" },
+          "review" => { "skill" => "skills/review/default.md" }
+        },
+        "merge" => {}
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.merge is no longer supported; use runtime.phases.merge")
+  end
+
   it "rejects legacy runtime.presets" do
     project_config_path = write_project_config("runtime" => {"presets" => ["base"]})
 

@@ -94,6 +94,42 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
       .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.phases.merge.target_ref must not be blank")
   end
 
+  it "rejects legacy runtime.executor" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "phases" => base_phases.merge(
+          "merge" => {
+            "target" => "merge_to_parent",
+            "policy" => "ff_only",
+            "target_ref" => "refs/heads/feature/prototype"
+          }
+        ),
+        "executor" => {}
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.executor is no longer supported; use runtime.phases.<phase>.executor")
+  end
+
+  it "rejects legacy runtime.merge" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "phases" => base_phases.merge(
+          "merge" => {
+            "target" => "merge_to_parent",
+            "policy" => "ff_only",
+            "target_ref" => "refs/heads/feature/prototype"
+          }
+        ),
+        "merge" => {}
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.merge is no longer supported; use runtime.phases.merge")
+  end
+
   it "loads task-kind-specific merge config variants" do
     project_config_path = write_project_config(
       "runtime" => {

@@ -1412,6 +1412,68 @@ runtime:
 	}
 }
 
+func TestRuntimeRunOnceRejectsEmptyTopLevelProjectExecutor(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  executor: {}
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - worker
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail with empty top-level runtime.executor")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "invalid runtime.executor") || !strings.Contains(stderr.String(), "runtime.executor is no longer supported") {
+		t.Fatalf("stderr should reject empty top-level executor, got %q", stderr.String())
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
+	}
+}
+
 func TestRuntimeRunOnceRejectsInternalProjectExecutorPhaseProfileShape(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

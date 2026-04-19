@@ -15,6 +15,15 @@ module A3
         runtime = project_config.fetch("runtime") do
           raise A3::Domain::ConfigurationError, "project.yaml runtime must be provided"
         end
+        if runtime.key?("executor")
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.executor is no longer supported; use runtime.phases.<phase>.executor"
+        end
+        if runtime.key?("surface")
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.surface is no longer supported; use runtime.phases"
+        end
+        if runtime.key?("merge")
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.merge is no longer supported; use runtime.phases.merge"
+        end
         phases = runtime.fetch("phases") do
           raise A3::Domain::ConfigurationError, "project.yaml runtime.phases must be provided"
         end

@@ -51,6 +51,11 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	if err := yaml.Unmarshal(body, &payload); err != nil {
 		return config, fmt.Errorf("parse project package config %s: %w", projectFile, err)
 	}
+	var rawPayload map[string]any
+	if err := yaml.Unmarshal(body, &rawPayload); err != nil {
+		return config, fmt.Errorf("parse project package config %s: %w", projectFile, err)
+	}
+	runtimePayload, _ := rawPayload["runtime"].(map[string]any)
 	config.SchemaVersion = scalarString(payload.SchemaVersion)
 	config.PackageName = payload.Package.Name
 	config.KanbanProject = payload.Kanban.Project
@@ -67,13 +72,13 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	if config.SchemaVersion != "1" {
 		return config, fmt.Errorf("project package config %s has unsupported schema_version: %s", projectFile, config.SchemaVersion)
 	}
-	if len(payload.Runtime.Executor) > 0 {
+	if _, ok := runtimePayload["executor"]; ok {
 		return config, fmt.Errorf("project package config %s has invalid runtime.executor: runtime.executor is no longer supported; use runtime.phases.implementation.executor", projectFile)
 	}
-	if payload.Runtime.Surface != nil {
+	if _, ok := runtimePayload["surface"]; ok {
 		return config, fmt.Errorf("project package config %s has invalid runtime.surface: runtime.surface is no longer supported; use runtime.phases", projectFile)
 	}
-	if payload.Runtime.Merge != nil {
+	if _, ok := runtimePayload["merge"]; ok {
 		return config, fmt.Errorf("project package config %s has invalid runtime.merge: runtime.merge is no longer supported; use runtime.phases.merge", projectFile)
 	}
 	executor, err := buildProjectExecutorConfig(payload.Runtime.Phases)
@@ -176,9 +181,6 @@ type projectPackageYAML struct {
 		LiveRef       any                                `yaml:"live_ref"`
 		MaxSteps      any                                `yaml:"max_steps"`
 		AgentAttempts any                                `yaml:"agent_attempts"`
-		Executor      map[string]any                     `yaml:"executor"`
-		Surface       any                                `yaml:"surface"`
-		Merge         any                                `yaml:"merge"`
 		Phases        map[string]projectPackagePhaseYAML `yaml:"phases"`
 	} `yaml:"runtime"`
 }
