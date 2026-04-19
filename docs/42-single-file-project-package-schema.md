@@ -1,33 +1,22 @@
 # Single-File Project Package Schema
 
 対象読者: A2O 設計者 / project package author / reviewer
-文書種別: schema proposal
-
-Status: implemented by `A2O#272`.
+文書種別: schema reference
 
 ## Decision
 
 The canonical project package config file should be `project.yaml`.
 
-`manifest.yml` is deprecated as a separate author-facing file. Its former responsibilities moved into `project.yaml` under explicit runtime sections. This keeps the existing public package command shape, avoids introducing a second new name such as `a2o.yaml`, and removes the confusing split between "project config" and "manifest" for package authors.
+`manifest.yml` is not part of the public 0.5.0 package format. Runtime responsibilities live in `project.yaml` under explicit runtime sections. This keeps the public package command shape small, avoids introducing a second name such as `a2o.yaml`, and removes the confusing split between "project config" and "manifest" for package authors.
 
-The owner decisions for implementation are:
+The package schema follows these rules:
 
 - `project.yaml` is the canonical file name.
 - `manifest.yml` compatibility is not required for the new schema.
 - User-facing schema and diagnostics should use A2O names. A3 names may remain only as internal compatibility details.
 - Internal follow-up labels such as `a2o:follow-up-child` should not be exposed in normal user-authored schema.
 
-## Former Split
-
-Before `A2O#272`, package authors had to understand two files:
-
-- `project.yaml`: package metadata, kanban board, repo slots, agent prerequisites, runtime loop defaults.
-- `manifest.yml`: runtime presets, merge behavior, project surface commands and skills.
-
-That split was unclear because both files described the same runtime package. `manifest.yml` also repeated the kanban project already present in `project.yaml`.
-
-## Proposed Shape
+## Schema Shape
 
 ```yaml
 schema_version: 1
@@ -323,9 +312,7 @@ runtime:
         default: refs/heads/main
 ```
 
-## Migration Status
-
-`A2O#272` implements the migration:
+## Current Status
 
 1. A single loader reads `project.yaml` schema version `1`.
 2. The runtime bridge derives internal runtime package data from `runtime.phases`.

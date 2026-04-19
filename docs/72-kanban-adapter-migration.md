@@ -1,6 +1,4 @@
-# Kanban Adapter Migration
-
-Date: 2026-04-17
+# Kanban Adapter Boundary
 
 ## Current Contract
 
@@ -10,7 +8,7 @@ The A2O engine currently talks to Kanban through a command contract compatible w
 - write: `task-transition`, `task-comment-create`, `task-create`, `label-ensure`, `task-label-add`, `task-label-remove`, `task-relation-create`
 - text transport: long descriptions and comments use `--*-file` options to avoid shell quoting and argument size issues
 
-The command contract remains the external compatibility surface for existing tooling. The migration target is to stop making the Ruby engine depend on a Python subprocess for every Kanban operation.
+The command contract remains the external compatibility surface for existing tooling. The internal improvement target is to stop making the Ruby engine depend on a Python subprocess for every Kanban operation.
 
 ## Direction
 
@@ -21,11 +19,11 @@ Use a Ruby operation client boundary first, then move provider implementations b
 3. Keep `SubprocessKanbanCommandClient` as the compatibility implementation while native clients are introduced.
 4. Add a Ruby-native SoloBoard client behind the same operation client boundary.
 5. After runtime validation proves the native client covers the command contract, switch the runtime default from subprocess CLI to native SoloBoard.
-6. Only then revisit `A2O#253` and remove Python from the runtime image if no other runtime-owned path requires it.
+6. Only then remove Python from the runtime image if no other runtime-owned path requires it.
 
 ## Runtime Python Dependency
 
-Decision for `A2O#253`: keep `python3` in `docker/a3-runtime/Dockerfile` for now, but remove `python3-venv`.
+A2O 0.5.0 keeps `python3` in `docker/a3-runtime/Dockerfile`, but does not install `python3-venv`.
 
 The current runtime still has an Engine-owned Python dependency:
 
@@ -46,9 +44,9 @@ Ruby native is the first migration target because the engine owns task selection
 
 Go remains appropriate for the public host launcher and agent, but moving Kanban access to Go would still require the Ruby engine to cross a process boundary or to move more engine orchestration out of Ruby. That is a larger refactor and should wait until the Ruby-native boundary is proven insufficient.
 
-## First Slice
+## Current Adapter Boundary
 
-The first implementation slice adds `A3::Infra::KanbanCommandClient` and makes task source, status publisher, activity publisher, follow-up child writer, and snapshot reader depend on that operation client. Existing constructors still accept `command_argv` and create `SubprocessKanbanCommandClient`, so runtime behavior and public CLI arguments do not change.
+`A3::Infra::KanbanCommandClient` is the operation-level boundary used by task source, status publisher, activity publisher, follow-up child writer, and snapshot reader. Existing constructors still accept `command_argv` and create `SubprocessKanbanCommandClient`, so runtime behavior and public CLI arguments stay stable while native adapters are introduced.
 
 This gives tests and future adapters a typed seam:
 

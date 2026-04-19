@@ -2,7 +2,7 @@ ARG GO_VERSION=1.26.2
 
 FROM golang:${GO_VERSION}-bookworm AS agent-builder
 
-ARG A3_AGENT_VERSION=dev
+ARG A3_AGENT_VERSION=0.5.0
 
 WORKDIR /src/agent-go
 

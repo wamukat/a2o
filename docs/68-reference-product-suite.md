@@ -40,13 +40,16 @@ Core validation starts with the reference suite. If a runtime, workspace, worker
 
 External behavior changes found while improving the suite require owner discussion before implementation.
 
-## Baseline
+## Release Validation Scope
 
-The latest recorded runtime baseline is [69-reference-runtime-baseline.md](69-reference-runtime-baseline.md). It proves that the suite can exercise:
+The suite is the release validation target for:
 
 - single-repo implementation / verification / merge
 - multi-repo child implementation and verification
 - child-to-parent merge
 - parent review and verification
 - parent live merge
+- runtime watch summary and task diagnostics
 - evidence persistence
+
+Validation runs may use deterministic workers to isolate Engine behavior from model variability, but the exercised surfaces remain real: kanban pickup and transitions, branch namespace creation, workspace materialization, worker gateway transport, agent-side publication, verification commands, merge, and evidence persistence.

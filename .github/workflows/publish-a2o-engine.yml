@@ -41,6 +41,7 @@ concurrency:
 
 env:
   IMAGE_NAME: ghcr.io/wamukat/a2o-engine
+  A2O_RELEASE_VERSION: 0.5.0
 
 jobs:
   docker:
@@ -71,6 +72,7 @@ jobs:
           images: ${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ env.A2O_RELEASE_VERSION }},enable={{is_default_branch}}
             type=sha,prefix=sha-
 
       - name: Build runtime image
@@ -82,5 +84,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            A3_AGENT_VERSION=${{ env.A2O_RELEASE_VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

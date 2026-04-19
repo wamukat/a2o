@@ -10,7 +10,7 @@ import (
 	"syscall"
 )
 
-const version = "dev"
+var version = "dev"
 const instanceConfigRelativePath = ".work/a2o/runtime-instance.json"
 const legacyInstanceConfigRelativePath = ".a3/runtime-instance.json"
 const runtimeHostAgentRelativePath = ".work/a2o/runtime-host-agent"

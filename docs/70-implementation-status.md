@@ -1,9 +1,7 @@
-# Implementation Status
+# A2O 0.5.0 Release Status
 
 対象読者: A2O 利用者 / 実装者 / reviewer
 文書種別: current status
-
-Date: 2026-04-17
 
 ## Ready
 
@@ -14,18 +12,18 @@ Date: 2026-04-17
 - Runtime container lifecycle: `a2o runtime up`, `down`
 - Foreground runtime execution: `a2o runtime run-once`, `a2o runtime loop`
 - Resident scheduler lifecycle: `a2o runtime start`, `stop`, `status`
-- Runtime diagnosis: `a2o runtime doctor`, `a2o runtime describe-task <task-ref>`
+- Runtime diagnosis: `a2o runtime doctor`, `a2o runtime watch-summary`, `a2o runtime describe-task <task-ref>`
 - Single-file project package config: `project.yaml`
 - SoloBoard adapter and bootstrap tooling
 - Agent HTTP worker gateway
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates
-- Published GHCR image smoke for the reference product packages
+- GHCR image publication with `latest`, `0.5.0`, and `sha-*` tags on main
 - Full RSpec release gate passing locally
 
-## Current Baseline
+## Validation Scope
 
-[69-reference-runtime-baseline.md](69-reference-runtime-baseline.md) records the latest reference suite runtime proof. It validates single-repo and multi-repo task flows through kanban, agent gateway, verification, merge, and evidence persistence.
+Release validation uses the reference product suite to cover single-repo and multi-repo task flows through kanban, agent gateway, verification, merge, parent-child handling, runtime watch summary, describe-task diagnostics, and evidence persistence.
 
 ## Productization Gaps
 

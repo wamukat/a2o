@@ -48,7 +48,7 @@ module A3
       out.puts("  a2o worker:stdin-bundle")
       out.puts("")
       out.puts("host launcher:")
-      out.puts("  docker run --rm -v \"$PWD/.work/a2o:/out\" ghcr.io/wamukat/a2o-engine:latest a2o host install --output-dir /out/bin --share-dir /out/share")
+      out.puts("  docker run --rm -v \"$PWD/.work/a2o:/out\" ghcr.io/wamukat/a2o-engine:0.5.0 a2o host install --output-dir /out/bin --share-dir /out/share")
       out.puts("  .work/a2o/bin/a2o project template --help")
     end
 

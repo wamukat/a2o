@@ -64,9 +64,9 @@ Project package が持たないもの:
 - agent materializer configuration script
 - release asset export logic
 
-## Current Release Gate
+## Release 0.5.0 Surface
 
-The current baseline exercises the reference product suite through SoloBoard, agent-materialized workspaces, agent-http worker gateway, verification, merge, and evidence persistence. The recorded baseline is [69-reference-runtime-baseline.md](69-reference-runtime-baseline.md).
+A2O 0.5.0 is released as a local-first runtime image plus host launcher and agent package. The standard validation surface is the reference product suite: SoloBoard pickup and transitions, agent-materialized workspaces, agent HTTP worker gateway, verification, merge, parent-child flow, watch summary, describe-task diagnostics, and evidence persistence.
 
 The public launcher covers host install, project bootstrap, kanban service lifecycle, kanban diagnosis, URL discovery, agent install, runtime container up/down, one-shot runtime execution, foreground runtime loop, resident scheduler start/stop/status, runtime diagnosis, multi-task watch summary, and task/run observability.
 

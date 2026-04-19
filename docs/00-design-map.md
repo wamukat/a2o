@@ -69,12 +69,11 @@ Docker runtime image、host launcher、bundled kanban service、agent gateway、
 ### 8. reference validation
 
 - [68-reference-product-suite.md](68-reference-product-suite.md)
-- [69-reference-runtime-baseline.md](69-reference-runtime-baseline.md)
 
-core validation で使う sample product と、runtime baseline の現状を扱う。
+core validation で使う sample product と、release validation の対象範囲を扱う。
 
 ### 9. implementation status
 
 - [70-implementation-status.md](70-implementation-status.md)
 
-公開前に残っている productization gap と検証状態を追う。
+0.5.0 release 時点の公開 surface と検証状態を扱う。

@@ -42,7 +42,7 @@ for target in "${targets[@]}"; do
     GOOS="${goos}" GOARCH="${goarch}" CGO_ENABLED=0 \
       go build -trimpath -o "${out_dir}/a3-agent" ./cmd/a3-agent
     GOOS="${goos}" GOARCH="${goarch}" CGO_ENABLED=0 \
-      go build -trimpath -o "${out_dir}/a3" ./cmd/a3
+      go build -trimpath -ldflags "-X main.version=${VERSION}" -o "${out_dir}/a3" ./cmd/a3
   )
 
   archive_name="a3-agent-${VERSION}-${goos}-${goarch}"

@@ -28,7 +28,7 @@ These names may remain in implementation details:
 - `A3_*` environment variables
 - legacy `refs/heads/a3/...`
 
-Do not require users to author these names in normal setup docs. If they appear in diagnostics or baseline reproduction notes, describe them as internal compatibility surfaces.
+Do not require users to author these names in normal setup docs. If they appear in diagnostics or internal implementation docs, describe them as compatibility surfaces.
 
 ## Naming Rule
 
@@ -40,4 +40,4 @@ Do not require users to author these names in normal setup docs. If they appear 
 
 ## Known Gap
 
-User-facing runtime execution should use `a2o runtime run-once` or `a2o runtime loop`. If internal Engine CLI examples are needed for baseline reproduction, keep them in internal-context docs and do not make them the normal user path.
+User-facing runtime execution should use `a2o runtime run-once`, `a2o runtime loop`, or `a2o runtime start`. Internal Engine CLI examples must stay out of normal user setup docs.

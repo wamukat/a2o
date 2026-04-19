@@ -57,11 +57,11 @@ Verification commands are project package responsibility. Engine only interprets
 
 ## Validation
 
-The reference runtime baseline validates the gateway with:
+The reference product suite validates the gateway with:
 
 - TypeScript single-repo implementation / verification / merge
 - Go single-repo implementation / verification / merge
 - Python single-repo implementation / verification / merge
 - Multi-repo parent-child implementation, child merge, parent review, parent verification, and parent merge
 
-See [69-reference-runtime-baseline.md](69-reference-runtime-baseline.md).
+See [68-reference-product-suite.md](68-reference-product-suite.md).
