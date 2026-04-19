@@ -64,4 +64,4 @@ The reference product suite validates the gateway with:
 - Python single-repo implementation / verification / merge
 - Multi-repo parent-child implementation, child merge, parent review, parent verification, and parent merge
 
-See [68-reference-product-suite.md](68-reference-product-suite.md).
+See [90-reference-product-suite.md](90-reference-product-suite.md).

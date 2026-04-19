@@ -189,7 +189,7 @@ run または phase の帰結。
 - `retryable`
 - `terminal_noop`
 
-詳細な分類は `20-core-domain-model.md` 側で定義する。
+詳細な分類は `30-core-domain-model.md` 側で定義する。
 
 ### 5.9 Workspace
 
@@ -323,4 +323,4 @@ V2 の主要語彙としては、次を採用しない。
 - context 間の依存方向が明示されている
 - parent review と parent verification の違いが語彙レベルで固定されている
 - `repo slot` と `repo scope` が分離されている
-- 後続の `20-core-domain-model.md` がこの語彙だけで書ける
+- 後続の `30-core-domain-model.md` がこの語彙だけで書ける

@@ -16,11 +16,27 @@ This repository contains the A2O Engine, Go host launcher, Go agent, Docker runt
 
 ## Reading Order
 
-1. [docs/en/90-user-quickstart.md](docs/en/90-user-quickstart.md)
-2. [docs/en/60-container-distribution-and-project-runtime.md](docs/en/60-container-distribution-and-project-runtime.md)
-3. [docs/en/68-reference-product-suite.md](docs/en/68-reference-product-suite.md)
-4. [docs/en/00-design-map.md](docs/en/00-design-map.md)
-5. [docs/en/70-implementation-status.md](docs/en/70-implementation-status.md)
+User documentation:
+
+1. [docs/en/user/00-user-quickstart.md](docs/en/user/00-user-quickstart.md)
+2. [docs/en/user/10-project-package-schema.md](docs/en/user/10-project-package-schema.md)
+3. [docs/en/user/20-runtime-distribution.md](docs/en/user/20-runtime-distribution.md)
+4. [docs/en/user/30-runtime-naming-boundary.md](docs/en/user/30-runtime-naming-boundary.md)
+5. [docs/en/user/40-release-status.md](docs/en/user/40-release-status.md)
+
+Developer documentation:
+
+1. [docs/en/dev/00-design-map.md](docs/en/dev/00-design-map.md)
+2. [docs/en/dev/10-engineering-rulebook.md](docs/en/dev/10-engineering-rulebook.md)
+3. [docs/en/dev/20-bounded-context-and-language.md](docs/en/dev/20-bounded-context-and-language.md)
+4. [docs/en/dev/30-core-domain-model.md](docs/en/dev/30-core-domain-model.md)
+5. [docs/en/dev/40-workspace-and-repo-slot-model.md](docs/en/dev/40-workspace-and-repo-slot-model.md)
+6. [docs/en/dev/50-project-surface.md](docs/en/dev/50-project-surface.md)
+7. [docs/en/dev/60-evidence-and-rerun-diagnosis.md](docs/en/dev/60-evidence-and-rerun-diagnosis.md)
+8. [docs/en/dev/70-agent-worker-gateway-design.md](docs/en/dev/70-agent-worker-gateway-design.md)
+9. [docs/en/dev/80-runtime-extension-boundary.md](docs/en/dev/80-runtime-extension-boundary.md)
+10. [docs/en/dev/90-reference-product-suite.md](docs/en/dev/90-reference-product-suite.md)
+11. [docs/en/dev/95-kanban-adapter-boundary.md](docs/en/dev/95-kanban-adapter-boundary.md)
 
 ## Main Entrypoints
 
@@ -48,7 +64,8 @@ The public launcher covers setup, kanban lifecycle, agent installation, foregrou
 - Docker runtime assets: `docker/`
 - Kanban tooling: `tools/kanban/`
 - Reference product packages: `reference-products/`
-- English docs: [docs/en/](docs/en/)
+- English user docs: [docs/en/user/](docs/en/user/)
+- English developer docs: [docs/en/dev/](docs/en/dev/)
 - Japanese docs: [docs/ja/](docs/ja/)
 
 ## Validation
@@ -60,4 +77,4 @@ The reference product suite covers four product shapes:
 - `reference-products/python-service/`
 - `reference-products/multi-repo-fixture/`
 
-Each product has a `project-package/` directory and can create a runtime instance with `a2o project bootstrap --package <package>`. See [docs/en/68-reference-product-suite.md](docs/en/68-reference-product-suite.md) for the suite purpose, package contract, and validation boundary.
+Each product has a `project-package/` directory and can create a runtime instance with `a2o project bootstrap --package <package>`. See [docs/en/dev/90-reference-product-suite.md](docs/en/dev/90-reference-product-suite.md) for the suite purpose, package contract, and validation boundary.

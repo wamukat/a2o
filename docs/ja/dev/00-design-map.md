@@ -16,64 +16,70 @@
 
 ### 0. 利用者導線
 
-- [90-user-quickstart.md](90-user-quickstart.md)
+- [../user/00-user-quickstart.md](../user/00-user-quickstart.md)
 
-`90` は A2O を導入する利用者向けのマニュアルである。
+A2O を導入する利用者向けのマニュアルである。
 
 ### 1. 実装規律
 
-- [05-engineering-rulebook.md](05-engineering-rulebook.md)
+- [10-engineering-rulebook.md](10-engineering-rulebook.md)
 
 immutable、TDD、リファクタリング、必要修正から逃げないことを固定する。
 
 ### 2. 用語と bounded context
 
-- [10-bounded-context-and-language.md](10-bounded-context-and-language.md)
+- [20-bounded-context-and-language.md](20-bounded-context-and-language.md)
 
 task kind、phase、workspace、repo slot、evidence などの用語を固定する。
 
 ### 3. core domain model
 
-- [20-core-domain-model.md](20-core-domain-model.md)
+- [30-core-domain-model.md](30-core-domain-model.md)
 
 aggregate / entity / value object と状態遷移を扱う。
 
 ### 4. workspace / repo-slot / lifecycle
 
-- [30-workspace-and-repo-slot-model.md](30-workspace-and-repo-slot-model.md)
+- [40-workspace-and-repo-slot-model.md](40-workspace-and-repo-slot-model.md)
 
 fixed repo slot、同期方針、freshness、retention、GC、merge workspace を扱う。
 
 ### 5. project surface / presets
 
-- [40-project-surface-and-presets.md](40-project-surface-and-presets.md)
-- [42-single-file-project-package-schema.md](42-single-file-project-package-schema.md)
-- [64-runtime-extension-boundary.md](64-runtime-extension-boundary.md)
+- [50-project-surface.md](50-project-surface.md)
+- [../user/10-project-package-schema.md](../user/10-project-package-schema.md)
+- [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md)
 
 project package schema、project 固有 command、repo slot、verification、bootstrap hook の境界を扱う。
 
 ### 6. evidence / rerun / blocked diagnosis
 
-- [50-evidence-and-rerun-diagnosis.md](50-evidence-and-rerun-diagnosis.md)
+- [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md)
 
 review / merge / rerun / blocked 調査の再現性を支える内部 evidence を扱う。
 
 ### 7. runtime distribution
 
-- [60-container-distribution-and-project-runtime.md](60-container-distribution-and-project-runtime.md)
-- [62-agent-worker-gateway-design.md](62-agent-worker-gateway-design.md)
-- [66-runtime-naming-boundary.md](66-runtime-naming-boundary.md)
+- [../user/20-runtime-distribution.md](../user/20-runtime-distribution.md)
+- [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md)
+- [../user/30-runtime-naming-boundary.md](../user/30-runtime-naming-boundary.md)
 
 Docker runtime image、host launcher、bundled kanban service、agent gateway、内部互換名の境界を扱う。
 
 ### 8. reference validation
 
-- [68-reference-product-suite.md](68-reference-product-suite.md)
+- [90-reference-product-suite.md](90-reference-product-suite.md)
 
 core validation で使う sample product と、release validation の対象範囲を扱う。
 
 ### 9. implementation status
 
-- [70-implementation-status.md](70-implementation-status.md)
+- [../user/40-release-status.md](../user/40-release-status.md)
 
 0.5.0 release 時点の公開 surface と検証状態を扱う。
+
+### 10. kanban adapter boundary
+
+- [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md)
+
+kanban command contract と、将来の native adapter 実装に向けた境界を扱う。
