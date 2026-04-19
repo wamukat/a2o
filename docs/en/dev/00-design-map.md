@@ -12,49 +12,50 @@ This document explains what each design document covers and the recommended read
 ## Architecture Overview
 
 ```mermaid
-flowchart TB
-  subgraph User["User"]
-    Task["Creates a kanban task\nrequest, constraints, priority"]
-    Package["Provides project package\nproject.yaml, skills, commands"]
-    Observe["Checks the outcome\nkanban status, comments, workspace evidence"]
+flowchart LR
+  User([User])
+  CLI([a2o CLI])
+  Agent([a2o-agent])
+  AI([Generative AI])
+
+  subgraph Inputs["User-maintained inputs"]
+    ProjectYaml[/project.yaml\nrepos, phases, commands, scheduler settings/]
+    Skills[/skills/*.md\nphase guidance for AI work/]
+    Commands[/project commands\nimplementation, review, verification, merge/]
   end
 
-  subgraph CLI["a2o CLI"]
-    Runtime["Runs the resident runtime\nscheduler and status commands"]
+  subgraph Work["Work state"]
+    Kanban[(Kanban\nwork queue and visible state)]
+    Workspace[(Product workspace\nrepo slots, branches, evidence files)]
   end
 
   subgraph Engine["A2O Engine"]
-    Scheduler["Scheduler\nselects runnable kanban tasks"]
-    Plan["Builds phase instructions\nfrom project.yaml and skills"]
-    Execute["Publishes phase jobs\nimplementation, review, remediation, merge"]
-    Report["Records the result\nevidence, summaries, kanban comments, status changes"]
+    Scheduler(Scheduler\nselects runnable kanban tasks)
+    Plan(Builds phase instructions\nfrom project.yaml and skills)
+    Publish(Publishes phase jobs\nimplementation, review, remediation, merge)
+    Report(Records the result\nevidence, summaries, kanban comments, status changes)
   end
 
-  Agent["a2o-agent\nruns project commands on host or dev environment"]
-  AI["Generative AI\ninterprets task and produces work"]
-  Kanban["Kanban\nwork queue and visible state"]
-  ProjectYaml["project.yaml\nrepos, phases, commands, scheduler settings"]
-  Skills["Skills\nphase guidance for AI work"]
-  Workspace["Product workspace\nrepo slots, branches, evidence files"]
-
-  Task --> Kanban
-  Package --> ProjectYaml
-  Package --> Skills
-  Runtime --> Scheduler
+  User -->|"creates task"| Kanban
+  User -->|"maintains"| ProjectYaml
+  User -->|"maintains"| Skills
+  User -->|"maintains"| Commands
+  CLI -->|"runs resident runtime"| Scheduler
   Kanban --> Scheduler
   Scheduler --> Plan
   ProjectYaml --> Plan
   Skills --> Plan
-  Plan --> Execute
-  Execute --> Agent
-  Agent --> AI
-  AI --> Agent
-  Agent --> Workspace
+  Plan --> Publish
+  Publish --> Agent
+  Commands --> Agent
+  Agent -->|"invokes when command needs AI"| AI
+  AI -->|"assistant output"| Agent
+  Agent -->|"edits and artifacts"| Workspace
   Agent --> Report
   Report --> Workspace
   Report --> Kanban
-  Kanban --> Observe
-  Workspace --> Observe
+  Kanban -->|"status and comments"| User
+  Workspace -->|"evidence"| User
 ```
 
 In normal use, the user creates a kanban task and keeps the project package up to date. The resident scheduler picks runnable tasks from kanban. The Engine reads `project.yaml` for the project structure and executable phase commands, reads skills for phase guidance, and publishes phase jobs. `a2o-agent` runs those project commands on the host or project dev environment, including commands that call Generative AI. The Engine records the returned outcome as workspace evidence and kanban-visible status.
