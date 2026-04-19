@@ -200,9 +200,16 @@ func validatePublicWorkerPayload(payload map[string]any, request map[string]any)
 		}
 	}
 	if workerStringValue(request["phase"]) == "implementation" && success {
-		if _, ok := payload["changed_files"].(map[string]any); !ok {
+		changedFiles, ok := payload["changed_files"].(map[string]any)
+		if !ok {
 			errors = append(errors, "changed_files must be present for implementation success")
+		} else {
+			errors = append(errors, validateChangedFiles(changedFiles)...)
 		}
+	} else if changedFiles, ok := payload["changed_files"].(map[string]any); ok {
+		errors = append(errors, validateChangedFiles(changedFiles)...)
+	} else if payload["changed_files"] != nil {
+		errors = append(errors, "changed_files must be an object when present")
 	}
 	if publicWorkerNeedsReviewDisposition(request) {
 		disposition, ok := payload["review_disposition"].(map[string]any)
@@ -214,9 +221,71 @@ func validatePublicWorkerPayload(payload map[string]any, request map[string]any)
 					errors = append(errors, "review_disposition."+key+" must be a string")
 				}
 			}
+			errors = append(errors, validateReviewDisposition(disposition, request)...)
 		}
 	}
 	return errors
+}
+
+func validateChangedFiles(changedFiles map[string]any) []string {
+	errors := []string{}
+	for slotName, files := range changedFiles {
+		if slotName == "" {
+			errors = append(errors, "changed_files slot names must be strings")
+		}
+		fileList, ok := files.([]any)
+		if !ok {
+			errors = append(errors, "changed_files for "+slotName+" must be an array of strings")
+			continue
+		}
+		for _, entry := range fileList {
+			if _, ok := entry.(string); !ok {
+				errors = append(errors, "changed_files for "+slotName+" must be an array of strings")
+				break
+			}
+		}
+	}
+	return errors
+}
+
+func validateReviewDisposition(disposition map[string]any, request map[string]any) []string {
+	phase := workerStringValue(request["phase"])
+	parentReview := phase == "review" && workerNestedString(request, "phase_runtime", "task_kind") == "parent"
+	validScopes := validReviewDispositionRepoScopes(request, parentReview)
+	errors := []string{}
+	if parentReview {
+		if !containsString([]string{"completed", "follow_up_child", "blocked"}, workerStringValue(disposition["kind"])) {
+			errors = append(errors, "review_disposition.kind must be one of completed, follow_up_child, blocked")
+		}
+		if !containsString(validScopes, workerStringValue(disposition["repo_scope"])) {
+			errors = append(errors, "review_disposition.repo_scope must be one of "+strings.Join(validScopes, ", "))
+		}
+		return errors
+	}
+	if phase == "implementation" {
+		if workerStringValue(disposition["kind"]) != "completed" {
+			errors = append(errors, "review_disposition.kind must be completed for implementation evidence")
+		}
+		if !containsString(validScopes, workerStringValue(disposition["repo_scope"])) {
+			errors = append(errors, "review_disposition.repo_scope must be one of "+strings.Join(validScopes, ", "))
+		}
+	}
+	return errors
+}
+
+func validReviewDispositionRepoScopes(request map[string]any, includeUnresolved bool) []string {
+	scopes := []string{}
+	if slotPaths, ok := request["slot_paths"].(map[string]any); ok {
+		for slotName := range slotPaths {
+			if slotName != "" && !containsString(scopes, slotName) {
+				scopes = append(scopes, slotName)
+			}
+		}
+	}
+	if includeUnresolved && !containsString(scopes, "unresolved") {
+		scopes = append(scopes, "unresolved")
+	}
+	return scopes
 }
 
 func publicWorkerRequiredFields(request map[string]any) []string {
@@ -276,6 +345,7 @@ def main():
     parser.add_argument("--result", required=True)
     args = parser.parse_args()
     request = request_from_stdin()
+    repo_scope = next(iter(request.get("slot_paths", {"app": ""})), "app")
     result = {
         "task_ref": request.get("task_ref", ""),
         "run_ref": request.get("run_ref", ""),
@@ -288,7 +358,7 @@ def main():
         "changed_files": {},
         "review_disposition": {
             "kind": "completed",
-            "repo_scope": "all",
+            "repo_scope": repo_scope,
             "summary": "scaffold worker self-review clean",
             "description": "No changes were required by the scaffold worker.",
             "finding_key": "none",
@@ -321,6 +391,8 @@ rescue JSON::ParserError
 end
 request = payload.fetch("request", payload)
 request = {} unless request.is_a?(Hash)
+slot_paths = request.fetch("slot_paths", { "app" => "" })
+repo_scope = slot_paths.is_a?(Hash) && !slot_paths.empty? ? slot_paths.keys.first.to_s : "app"
 
 result = {
   "task_ref" => request.fetch("task_ref", ""),
@@ -334,7 +406,7 @@ result = {
   "changed_files" => {},
   "review_disposition" => {
     "kind" => "completed",
-    "repo_scope" => "all",
+    "repo_scope" => repo_scope,
     "summary" => "scaffold worker self-review clean",
     "description" => "No changes were required by the scaffold worker.",
     "finding_key" => "none"
@@ -388,6 +460,20 @@ json_escape() {
 task_ref="$(extract_json_string task_ref)"
 run_ref="$(extract_json_string run_ref)"
 phase="$(extract_json_string phase)"
+repo_scope="$(
+  awk '
+    /"slot_paths"[[:space:]]*:[[:space:]]*\{/ { in_slot_paths=1; next }
+    in_slot_paths && /}/ { exit }
+    in_slot_paths && match($0, /"[^"]+"[[:space:]]*:/) {
+      value=substr($0, RSTART + 1, RLENGTH - 3)
+      print value
+      exit
+    }
+  ' "$bundle_path"
+)"
+if [[ -z "$repo_scope" ]]; then
+  repo_scope="app"
+fi
 
 cat > "$result_path" <<JSON
 {
@@ -402,7 +488,7 @@ cat > "$result_path" <<JSON
   "changed_files": {},
   "review_disposition": {
     "kind": "completed",
-    "repo_scope": "all",
+    "repo_scope": "$(json_escape "$repo_scope")",
     "summary": "scaffold worker self-review clean",
     "description": "No changes were required by the scaffold worker.",
     "finding_key": "none"
@@ -434,6 +520,15 @@ func main() {
 	if !ok {
 		request = payload
 	}
+	repoScope := "app"
+	if slotPaths, ok := request["slot_paths"].(map[string]any); ok {
+		for slotName := range slotPaths {
+			if slotName != "" {
+				repoScope = slotName
+				break
+			}
+		}
+	}
 
 	result := map[string]any{
 		"task_ref":         stringValue(request["task_ref"]),
@@ -447,7 +542,7 @@ func main() {
 		"changed_files":    map[string]any{},
 		"review_disposition": map[string]any{
 			"kind":        "completed",
-			"repo_scope":  "all",
+			"repo_scope":  repoScope,
 			"summary":     "scaffold worker self-review clean",
 			"description": "No changes were required by the scaffold worker.",
 			"finding_key": "none",

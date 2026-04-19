@@ -600,9 +600,10 @@ func TestWorkerScaffoldWritesRunnablePythonWorkerAndValidateResult(t *testing.T)
 	}
 
 	request := map[string]any{
-		"task_ref": "A2O#62",
-		"run_ref":  "run-1",
-		"phase":    "implementation",
+		"task_ref":   "A2O#62",
+		"run_ref":    "run-1",
+		"phase":      "implementation",
+		"slot_paths": map[string]any{"app": filepath.Join(tempDir, "app")},
 	}
 	requestBody, err := json.Marshal(request)
 	if err != nil {
@@ -662,7 +663,12 @@ func TestWorkerScaffoldBashIsSelfContained(t *testing.T) {
 	if strings.Contains(readFileString(t, workerPath), "python") {
 		t.Fatalf("bash scaffold should not depend on python:\n%s", readFileString(t, workerPath))
 	}
-	request := map[string]any{"task_ref": "A2O#62", "run_ref": "run-bash", "phase": "implementation"}
+	request := map[string]any{
+		"task_ref":   "A2O#62",
+		"run_ref":    "run-bash",
+		"phase":      "implementation",
+		"slot_paths": map[string]any{"app": filepath.Join(tempDir, "app")},
+	}
 	writeJSONFileForTest(t, requestPath, request)
 	bundleBody, err := json.Marshal(map[string]any{"request": request})
 	if err != nil {
@@ -705,7 +711,12 @@ func TestWorkerScaffoldGoPrintsGoRunCommandAndValidates(t *testing.T) {
 	if !strings.Contains(stdout.String(), "worker_scaffold_command=go run "+workerPath+" --schema {{schema_path}} --result {{result_path}}") {
 		t.Fatalf("go scaffold should print go run command, got %q", stdout.String())
 	}
-	request := map[string]any{"task_ref": "A2O#62", "run_ref": "run-go", "phase": "implementation"}
+	request := map[string]any{
+		"task_ref":   "A2O#62",
+		"run_ref":    "run-go",
+		"phase":      "implementation",
+		"slot_paths": map[string]any{"app": filepath.Join(tempDir, "app")},
+	}
 	writeJSONFileForTest(t, requestPath, request)
 	bundleBody, err := json.Marshal(map[string]any{"request": request})
 	if err != nil {
@@ -767,6 +778,54 @@ func TestWorkerValidateResultReportsConcreteProtocolErrors(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "error_category=configuration_error") {
 		t.Fatalf("stderr should classify protocol error, got %q", stderr.String())
+	}
+}
+
+func TestWorkerValidateResultRejectsRuntimeProtocolShapeMismatches(t *testing.T) {
+	tempDir := t.TempDir()
+	requestPath := filepath.Join(tempDir, "request.json")
+	resultPath := filepath.Join(tempDir, "result.json")
+	request := map[string]any{
+		"task_ref":   "A2O#62",
+		"run_ref":    "run-1",
+		"phase":      "implementation",
+		"slot_paths": map[string]any{"app": filepath.Join(tempDir, "app")},
+	}
+	result := map[string]any{
+		"task_ref":        "A2O#62",
+		"run_ref":         "run-1",
+		"phase":           "implementation",
+		"success":         true,
+		"summary":         "bad shape",
+		"failing_command": nil,
+		"observed_state":  nil,
+		"rework_required": false,
+		"changed_files":   map[string]any{"app": "README.md"},
+		"review_disposition": map[string]any{
+			"kind":        "follow_up_child",
+			"repo_scope":  "all",
+			"summary":     "bad disposition",
+			"description": "bad disposition",
+			"finding_key": "bad-disposition",
+		},
+	}
+	writeJSONFileForTest(t, requestPath, request)
+	writeJSONFileForTest(t, resultPath, result)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"worker", "validate-result", "--request", requestPath, "--result", resultPath}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("validate-result should fail")
+	}
+	for _, want := range []string{
+		"worker_protocol_error=changed_files for app must be an array of strings",
+		"worker_protocol_error=review_disposition.kind must be completed for implementation evidence",
+		"worker_protocol_error=review_disposition.repo_scope must be one of app",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("validate-result output missing %q in:\n%s", want, stdout.String())
+		}
 	}
 }
 
