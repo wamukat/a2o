@@ -18,7 +18,7 @@ module A3
             output << "blocked diagnosis #{diagnosis.outcome} for #{result.run.ref} on #{result.task.ref}"
             output << "phase=#{phase} observed=#{diagnosis.observed_state}"
             output << "expected=#{diagnosis.expected_state}"
-            output << "failing_command=#{diagnosis.failing_command}"
+            output << "failing_command=#{FormattingHelpers.diagnostic_value(diagnosis.failing_command)}"
             output << "summary=#{diagnosis.diagnostic_summary}"
             output << "error_category=#{diagnosis.error_category}"
             output << "remediation=#{diagnosis.remediation_summary}"

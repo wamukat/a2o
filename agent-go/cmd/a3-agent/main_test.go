@@ -313,13 +313,17 @@ func TestWorkerFailureSanitizesInternalDiagnostics(t *testing.T) {
 	payload := workerFailure(
 		map[string]any{"task_ref": "A2O#1", "run_ref": "run-1", "phase": "implementation"},
 		"failed",
-		[]string{"worker"},
+		[]string{"A3_WORKER_REQUEST_PATH=/tmp/request.json", "/usr/local/bin/a3"},
 		"executor_failed",
 		map[string]any{
 			"stderr": "A3_WORKER_REQUEST_PATH /tmp/a3-engine/lib/a3/bootstrap.rb /usr/local/bin/a3 .a3/workspace.json",
 		},
 	)
 	diagnostics := payload["diagnostics"].(map[string]any)
+	failingCommand := payload["failing_command"].(string)
+	if strings.Contains(failingCommand, "A3_WORKER_REQUEST_PATH") || strings.Contains(failingCommand, "/usr/local/bin/a3") {
+		t.Fatalf("failing command was not sanitized: %s", failingCommand)
+	}
 	stderr := diagnostics["stderr"].(string)
 	for _, forbidden := range []string{"A3_WORKER_REQUEST_PATH", "/tmp/a3-engine", "/usr/local/bin/a3", ".a3"} {
 		if strings.Contains(stderr, forbidden) {

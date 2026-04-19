@@ -79,7 +79,7 @@ module A3
           result << "latest_execution phase=#{execution.phase} summary=#{execution.summary}"
           result << "verification_summary=#{execution.verification_summary}" if execution.verification_summary
           append_review_disposition_lines(result, execution.review_disposition)
-          result << "failing_command=#{execution.failing_command}" if execution.failing_command
+          result << "failing_command=#{FormattingHelpers.diagnostic_value(execution.failing_command)}" if execution.failing_command
           result << "observed_state=#{execution.observed_state}" if execution.observed_state
           result << "worker_response_bundle=#{FormattingHelpers.diagnostic_value(execution.worker_response_bundle)}" if execution.worker_response_bundle
           append_merge_recovery_lines(result, execution.merge_recovery)
@@ -129,7 +129,7 @@ module A3
           result << "blocked_remediation=#{diagnosis.remediation_summary}"
           result << "blocked_expected=#{diagnosis.expected_state}"
           result << "blocked_observed=#{diagnosis.observed_state}"
-          result << "blocked_failing_command=#{diagnosis.failing_command}" if diagnosis.failing_command
+          result << "blocked_failing_command=#{FormattingHelpers.diagnostic_value(diagnosis.failing_command)}" if diagnosis.failing_command
           diagnosis.infra_diagnostics.sort.each do |key, value|
             result << "blocked_diagnostic.#{key}=#{FormattingHelpers.diagnostic_value(value)}"
           end

@@ -42,6 +42,21 @@ RSpec.describe "worker:stdin-bundle" do
     expect(sanitized).not_to include(".a3")
   end
 
+  it "sanitizes failing_command in worker failure payloads" do
+    payload = failure(
+      base_request,
+      summary: "failed",
+      command: ["A3_WORKER_REQUEST_PATH=/tmp/request.json", "/usr/local/bin/a3"],
+      observed_state: "executor_failed",
+      diagnostics: {}
+    )
+
+    expect(payload.fetch("failing_command")).to include("A2O_WORKER_REQUEST_PATH")
+    expect(payload.fetch("failing_command")).to include("<engine-entrypoint>")
+    expect(payload.fetch("failing_command")).not_to include("A3_WORKER_REQUEST_PATH")
+    expect(payload.fetch("failing_command")).not_to include("/usr/local/bin/a3")
+  end
+
   def base_request
     {
       "task_ref" => "Sample#3112",

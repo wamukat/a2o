@@ -131,7 +131,7 @@ func workerFailure(request map[string]any, summary string, command []string, obs
 		"phase":           stringValue(request["phase"]),
 		"success":         false,
 		"summary":         summary,
-		"failing_command": strings.Join(command, " "),
+		"failing_command": sanitizeWorkerDiagnosticString(strings.Join(command, " ")),
 		"observed_state":  observedState,
 		"rework_required": false,
 		"diagnostics":     enrichedDiagnostics,

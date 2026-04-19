@@ -64,7 +64,7 @@ def failure(request, summary:, command:, observed_state:, diagnostics: {})
     "phase" => request["phase"],
     "success" => false,
     "summary" => summary,
-    "failing_command" => command.join(" "),
+    "failing_command" => sanitize_diagnostic_value(command.join(" ")),
     "observed_state" => observed_state,
     "rework_required" => false,
     "diagnostics" => sanitize_diagnostic_value(diagnostics).merge(
