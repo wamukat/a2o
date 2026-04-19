@@ -891,6 +891,14 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(packageDir, "Taskfile.yml"), []byte(taskfile), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	dockerfile := "RUN echo $A3_SECRET\n"
+	if err := os.WriteFile(filepath.Join(packageDir, "Dockerfile"), []byte(dockerfile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	justfile := "verify:\n    echo $A3_BUNDLE_PROJECT\n"
+	if err := os.WriteFile(filepath.Join(packageDir, "Justfile"), []byte(justfile), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	privateScript := "echo $A3_WORKER_REQUEST_PATH && ruby -e 'puts File.join(\".a3\", \"workspace.json\")'\n"
 	if err := os.WriteFile(filepath.Join(packageDir, "commands", "worker.sh"), []byte(privateScript), 0o644); err != nil {
 		t.Fatal(err)
@@ -924,6 +932,8 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 
 	for _, want := range []string{
 		"doctor_check name=project_script_contract status=blocked",
+		"Dockerfile:A3_*",
+		"Justfile:A3_*",
 		"Taskfile.yml:A3_*",
 		"commands/worker.sh:.a3/workspace.json",
 		"commands/worker.sh:A3_*",

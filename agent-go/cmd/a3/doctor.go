@@ -202,7 +202,7 @@ func isProjectScriptContractScanTarget(packagePath string, path string, mode os.
 
 func isPackageAutomationFile(name string) bool {
 	switch name {
-	case "project.yaml", "project.yml", "Taskfile.yml", "Taskfile.yaml", "Makefile", ".env", "package.json":
+	case "project.yaml", "project.yml", "Taskfile", "Taskfile.yml", "Taskfile.yaml", "Makefile", "Justfile", "Rakefile", "Brewfile", "Dockerfile", ".env", "package.json":
 		return true
 	default:
 		return false
