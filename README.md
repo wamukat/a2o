@@ -23,6 +23,7 @@ User documentation:
 3. [docs/en/user/20-runtime-distribution.md](docs/en/user/20-runtime-distribution.md)
 4. [docs/en/user/30-runtime-naming-boundary.md](docs/en/user/30-runtime-naming-boundary.md)
 5. [docs/en/user/40-release-status.md](docs/en/user/40-release-status.md)
+6. [docs/en/user/50-project-package-authoring-guide.md](docs/en/user/50-project-package-authoring-guide.md)
 
 Developer documentation:
 

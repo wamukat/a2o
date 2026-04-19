@@ -52,6 +52,8 @@ a2o project template \
 
 `your-ai-worker` は placeholder である。bootstrap や runtime 実行の前に、agent 環境で実行できる executor binary 名へ置き換える。A2O はこの値を `agent.required_bins` と `runtime.phases.*.executor.command` に書くため、未置換のままだと `a2o doctor` や runtime execution で missing command として止まる。
 
+Package 設計上の判断は [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md) を参照する。
+
 ### 3. 最小 4 コマンドで起動する
 
 project package を置いた後の最小手順:

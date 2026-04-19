@@ -52,6 +52,8 @@ a2o project template \
 
 `your-ai-worker` is a placeholder. Replace it with an executor binary that exists where `a2o-agent` runs. A2O writes this value into `agent.required_bins` and `runtime.phases.*.executor.command`; if it is not replaced, `a2o doctor` or runtime execution will stop with a missing command.
 
+For package design decisions, see [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md).
+
 ### 3. Start With Four Commands
 
 ```sh
