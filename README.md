@@ -1,29 +1,28 @@
 # A2O Engine
 
-対象読者: A2O 利用者 / 実装者 / reviewer / operator
-文書種別: リポジトリ入口
+[Japanese README](ja.md)
 
-A2O は kanban 上の task を読み取り、作業用 workspace、agent 実行、検証、merge、evidence 記録までを管理する automation engine である。
+A2O is an automation engine that starts from kanban tasks and manages workspaces, agent execution, verification, merge, and evidence recording.
 
-このリポジトリは A2O Engine 本体、Go host launcher、Go agent、Docker runtime image、reference product package、設計資料を含む。通常利用者向けの入口は `a2o`、`a2o-agent`、project package、bundled kanban service である。
+This repository contains the A2O Engine, Go host launcher, Go agent, Docker runtime image, reference product packages, and design documentation. The normal public entrypoints are `a2o`, `a2o-agent`, project packages, and the bundled kanban service.
 
-## 方針
+## Principles
 
-- A2O は bundled kanban service と `a2o-agent` を前提にした runtime として扱う。
-- A2O Engine は orchestration、state、kanban adapter、agent control plane、evidence を持つ。
-- project 固有 toolchain は runtime image に bake せず、host または dev-env に置いた `a2o-agent` が実行する。
-- project 固有知識は project package で宣言し、Engine core へ埋め込まない。
-- core validation は `reference-products/` の小さな複数プロダクトで行う。
+- A2O is a local-first runtime built around the bundled kanban service and `a2o-agent`.
+- The Engine owns orchestration, state, the kanban adapter, the agent control plane, and evidence.
+- Product-specific toolchains are not baked into the runtime image. They run through `a2o-agent` on the host or in a project dev environment.
+- Product-specific knowledge belongs in the project package, not in Engine core.
+- Core validation uses the small reference products under `reference-products/`.
 
-## 読み順
+## Reading Order
 
-1. [docs/90-user-quickstart.md](docs/90-user-quickstart.md)
-2. [docs/60-container-distribution-and-project-runtime.md](docs/60-container-distribution-and-project-runtime.md)
-3. [docs/68-reference-product-suite.md](docs/68-reference-product-suite.md)
-4. [docs/00-design-map.md](docs/00-design-map.md)
-5. [docs/70-implementation-status.md](docs/70-implementation-status.md)
+1. [docs/en/90-user-quickstart.md](docs/en/90-user-quickstart.md)
+2. [docs/en/60-container-distribution-and-project-runtime.md](docs/en/60-container-distribution-and-project-runtime.md)
+3. [docs/en/68-reference-product-suite.md](docs/en/68-reference-product-suite.md)
+4. [docs/en/00-design-map.md](docs/en/00-design-map.md)
+5. [docs/en/70-implementation-status.md](docs/en/70-implementation-status.md)
 
-## 代表入口
+## Main Entrypoints
 
 ```sh
 a2o host install
@@ -38,26 +37,27 @@ a2o runtime status
 a2o runtime stop
 ```
 
-runtime image の中では `bin/a3` が Engine CLI として残る。これは内部互換名であり、利用者向けの正規入口は `a2o` と `a2o-agent` である。
+The runtime image still contains `bin/a3` as the internal Engine CLI. That is an implementation compatibility name. The public user-facing entrypoints are `a2o` and `a2o-agent`.
 
-現行の公開 launcher は setup、kanban lifecycle、agent install、foreground runtime execution、resident scheduler lifecycle を提供する。
+The public launcher covers setup, kanban lifecycle, agent installation, foreground runtime execution, and resident scheduler lifecycle.
 
-## 実装位置
+## Repository Layout
 
 - Engine core: `lib/a3/`, `bin/a3`, `spec/`
 - Host launcher / agent: `agent-go/`
 - Docker runtime assets: `docker/`
 - Kanban tooling: `tools/kanban/`
 - Reference product packages: `reference-products/`
-- 利用者マニュアル: [docs/90-user-quickstart.md](docs/90-user-quickstart.md)
+- English docs: [docs/en/](docs/en/)
+- Japanese docs: [docs/ja/](docs/ja/)
 
 ## Validation
 
-reference product suite は次の 4 パターンを持つ。
+The reference product suite covers four product shapes:
 
 - `reference-products/typescript-api-web/`
 - `reference-products/go-api-cli/`
 - `reference-products/python-service/`
 - `reference-products/multi-repo-fixture/`
 
-各 product は `project-package/` を持ち、`a2o project bootstrap --package <package>` で runtime instance を作成できる。suite の目的、package contract、検証境界は [docs/68-reference-product-suite.md](docs/68-reference-product-suite.md) を参照する。
+Each product has a `project-package/` directory and can create a runtime instance with `a2o project bootstrap --package <package>`. See [docs/en/68-reference-product-suite.md](docs/en/68-reference-product-suite.md) for the suite purpose, package contract, and validation boundary.
