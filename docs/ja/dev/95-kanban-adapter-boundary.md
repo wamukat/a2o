@@ -1,69 +1,69 @@
-# Kanban Adapter Boundary
+# Kanban Adapter Boundary（kanban adapter の境界）
 
-## Current Contract
+## Current Contract（現在の contract）
 
-The A2O engine currently talks to Kanban through a command contract compatible with `tools/kanban/cli.py`. The runtime uses these operations:
+A2O engine は現在、`tools/kanban/cli.py` と互換の command contract を通じて Kanban と通信する。Runtime は次の operations を使う。
 
-- read: `task-snapshot-list`, `task-watch-summary-list`, `task-get`, `task-label-list`, `task-relation-list`, `task-find`
-- write: `task-transition`, `task-comment-create`, `task-create`, `label-ensure`, `task-label-add`, `task-label-remove`, `task-relation-create`
-- text transport: long descriptions and comments use `--*-file` options to avoid shell quoting and argument size issues
+- read operations（読み取り operations）: `task-snapshot-list`、`task-watch-summary-list`、`task-get`、`task-label-list`、`task-relation-list`、`task-find`
+- write operations（書き込み operations）: `task-transition`、`task-comment-create`、`task-create`、`label-ensure`、`task-label-add`、`task-label-remove`、`task-relation-create`
+- text transport: 長い descriptions and comments は shell quoting と argument size 問題を避けるため `--*-file` options を使う。
 
-The command contract remains the external compatibility surface for existing tooling. The internal improvement target is to stop making the Ruby engine depend on a Python subprocess for every Kanban operation.
+Command contract は existing tooling 用の external compatibility surface として残す。内部改善の target は、Ruby engine がすべての Kanban operation で Python subprocess に依存する状態をやめることである。
 
-## Direction
+## Direction（方針）
 
-Use a Ruby operation client boundary first, then move provider implementations behind that boundary.
+まず Ruby operation client boundary を使い、その後 provider implementations をその boundary の背後へ移す。
 
-1. Keep `tools/kanban/cli.py` as the developer/operator compatibility CLI.
-2. Route engine code through `A3::Infra::KanbanCommandClient`, which exposes operation-level JSON/text helpers.
-3. Keep `SubprocessKanbanCommandClient` as the compatibility implementation while native clients are introduced.
-4. Add a Ruby-native SoloBoard client behind the same operation client boundary.
-5. After runtime validation proves the native client covers the command contract, switch the runtime default from subprocess CLI to native SoloBoard.
-6. Only then remove Python from the runtime image if no other runtime-owned path requires it.
+1. `tools/kanban/cli.py` は developer/operator compatibility CLI として残す。
+2. Engine code は operation-level JSON/text helpers を持つ `A3::Infra::KanbanCommandClient` 経由にする。
+3. Native clients を導入する間、`SubprocessKanbanCommandClient` は compatibility implementation として残す。
+4. 同じ operation client boundary の背後に Ruby-native SoloBoard client を追加する。
+5. Runtime validation により native client が command contract を cover することを確認した後、runtime default を subprocess CLI から native SoloBoard へ切り替える。
+6. その後、runtime-owned path が Python を必要としない場合に限って runtime image から Python を削除する。
 
-## Runtime Python Dependency
+## Runtime Python Dependency（runtime の Python dependency）
 
-A2O 0.5.0 keeps `python3` in `docker/a3-runtime/Dockerfile`, but does not install `python3-venv`.
+A2O 0.5.0 は `docker/a3-runtime/Dockerfile` に `python3` を残すが、`python3-venv` は install しない。
 
-The current runtime still has an Engine-owned Python dependency:
+現在の runtime には、まだ Engine-owned Python dependency がある。
 
-- the Go host launcher builds the runtime command with `--kanban-command python3`
-- the command argv points at `a3-engine/tools/kanban/cli.py`
-- Ruby Engine bridge construction still defaults to the `subprocess-cli` kanban backend
-- `SubprocessKanbanCommandClient` is still the only production SoloBoard implementation behind `KanbanCommandClient`
+- Go host launcher は runtime command を `--kanban-command python3` 付きで組み立てる。
+- command argv は `a3-engine/tools/kanban/cli.py` を指す。
+- Ruby Engine bridge construction はまだ `subprocess-cli` kanban backend を default にしている。
+- `SubprocessKanbanCommandClient` は、`KanbanCommandClient` の背後にある唯一の production SoloBoard implementation である。
 
-Therefore removing Python from the runtime image today would break the standard `a2o kanban ...` runtime path even though the Ruby side now has a seam for a native adapter.
+そのため、今 runtime image から Python を削除すると、Ruby 側に native adapter 用の boundary があるとしても、標準の `a2o kanban ...` runtime path が壊れる。
 
-No runtime-owned path creates a Python virtual environment, and `tools/kanban/cli.py` is executed directly by `python3`. `python3-venv` is therefore not part of the runtime requirement and should stay out of the image unless a future runtime-owned command proves it needs venv support.
+Runtime-owned path は Python virtual environment を作成しない。`tools/kanban/cli.py` は `python3` で直接実行される。したがって、future runtime-owned command が venv を必要とすることを証明しない限り、`python3-venv` は runtime requirement に含めない。
 
-The blocker for removal is explicit: add and validate a Ruby-native SoloBoard implementation behind `KanbanCommandClient`, then change the runtime default away from `subprocess-cli`. After that, keep `tools/kanban/cli.py` as a developer/operator compatibility CLI outside the runtime hot path and remove Python from the runtime image if no other runtime-owned command still requires it.
+削除の blocker は明確である。`KanbanCommandClient` の背後に Ruby-native SoloBoard implementation を追加して validate し、その後 runtime default を `subprocess-cli` から変更する。その後、`tools/kanban/cli.py` を runtime hot path 外の developer/operator compatibility CLI として残し、他の runtime-owned command が Python を必要としない場合に runtime image から Python を削除する。
 
-## Ruby Native vs Go Client
+## Ruby Native vs Go Client（Ruby native と Go client）
 
-Ruby native is the first migration target because the engine owns task selection, status projection, review disposition handling, and evidence publication in Ruby. Keeping the adapter in-process removes JSON-over-stdout parsing, tempfile handoff, and subprocess failure translation from the hot path without introducing a second binary boundary.
+Ruby native を最初の migration target とする。理由は、engine が task selection、status projection、review disposition handling、evidence publication を Ruby で所有しているためである。Adapter を in-process に保つことで、JSON-over-stdout parsing、tempfile handoff、subprocess failure translation を hot path から取り除ける。別 binary boundary も増えない。
 
-Go remains appropriate for the public host launcher and agent, but moving Kanban access to Go would still require the Ruby engine to cross a process boundary or to move more engine orchestration out of Ruby. That is a larger refactor and should wait until the Ruby-native boundary is proven insufficient.
+Go は public host launcher と agent には適している。一方で Kanban access を Go へ移すと、Ruby engine は process boundary を越える必要が残るか、より多くの engine orchestration を Ruby から移す必要がある。それはより大きな refactor であり、Ruby-native boundary が不十分だと分かるまで待つ。
 
-## Current Adapter Boundary
+## Current Adapter Boundary（現在の adapter boundary）
 
-`A3::Infra::KanbanCommandClient` is the operation-level boundary used by task source, status publisher, activity publisher, follow-up child writer, and snapshot reader. Existing constructors still accept `command_argv` and create `SubprocessKanbanCommandClient`, so runtime behavior and public CLI arguments stay stable while native adapters are introduced.
+`A3::Infra::KanbanCommandClient` は operation-level boundary であり、task source、status publisher、activity publisher、follow-up child writer、snapshot reader が使う。既存 constructors はまだ `command_argv` を受け取り、`SubprocessKanbanCommandClient` を作成する。そのため、native adapters を導入している間も runtime behavior と public CLI arguments は安定する。
 
-This gives tests and future adapters a typed seam:
+この boundary により、tests and future adapters は typed seam を得る。
 
-- adapters can be exercised without spawning Python
-- subprocess-specific Open3 and tempfile details stay in one class
-- existing Python CLI compatibility remains intact
+- adapters は Python を spawn せずに exercise できる。
+- subprocess-specific な Open3 と tempfile の details は 1 class に閉じる。
+- 既存の Python CLI compatibility は維持される。
 
-## Compatibility Requirements
+## Compatibility Requirements（互換要件）
 
-Any native adapter must preserve:
+Native adapter は次を維持しなければならない。
 
-- canonical task refs like `Project#123`
-- external task id preference when duplicate refs exist
-- status mapping for `To do`, `In progress`, `In review`, `Inspection`, `Merging`, and `Done`
+- `Project#123` のような canonical task refs
+- duplicate refs がある場合の external task id preference
+- `To do`、`In progress`、`In review`、`Inspection`、`Merging`、`Done` の status mapping
 - blocked label add/remove behavior
-- relation shapes for parent/child tasks
-- comment and description file semantics, including multiline text
+- parent/child tasks 用 relation shapes
+- multiline text を含む comment and description file semantics
 - JSON object/array shape validation and fail-fast errors
 
-No SoloBoard API or public Kanban CLI changes are required for the first slice.
+最初の slice では SoloBoard API や public Kanban CLI の変更は不要である。

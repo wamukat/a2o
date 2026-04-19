@@ -1,28 +1,28 @@
-# A2O Reference Product Suite
+# A2O Reference Product Suite（reference product suite の構成）
 
 対象読者: A2O runtime 実装者 / validation 設計者 / operator
 文書種別: validation 方針
 
-This document defines the owned sample products used for A2O core validation.
+この文書は、A2O core validation で使う owned sample products を定義する。
 
-## Purpose
+## 目的
 
-A2O must work across common product shapes rather than depending on one stack. The reference suite gives A2O small, reviewable projects that exercise runtime, agent, kanban, verification, merge, and parent-child flows.
+A2O は 1 つの stack に依存せず、一般的な product shapes で動作する必要がある。Reference suite は、runtime、agent、kanban、verification、merge、parent-child flows を exercise する小さく review しやすい projects を A2O に提供する。
 
-## Suite Shape
+## Suite Shape（suite の構成）
 
 | Product | Path | Purpose |
 |---|---|---|
-| TypeScript API/Web | `reference-products/typescript-api-web/` | API and browser UI in one repository |
-| Go API/CLI | `reference-products/go-api-cli/` | server and CLI in one Go module |
+| TypeScript API/Web | `reference-products/typescript-api-web/` | 1 repository 内の API and browser UI |
+| Go API/CLI | `reference-products/go-api-cli/` | 1 Go module 内の server and CLI |
 | Python Service | `reference-products/python-service/` | lightweight service and Python verification |
 | Multi-repo Fixture | `reference-products/multi-repo-fixture/` | parent-child and cross-repo validation |
 
-Each product keeps its package at `project-package/`.
+各 product は package を `project-package/` に置く。
 
-## Package Contract
+## Package Contract（package contract の内容）
 
-Each package includes:
+各 package は次を含む。
 
 - `README.md`
 - `project.yaml`
@@ -30,19 +30,19 @@ Each package includes:
 - `skills/`
 - `task-templates/`
 
-The package must define a deterministic test or build command, agent prerequisites, editable source boundaries, and at least one task template that can be placed on the kanban board.
+Package は deterministic な test または build command、agent prerequisites、editable source boundaries、kanban board に置ける task template を少なくとも 1 つ定義する。
 
-`project.yaml` is the single author-facing package config file. It owns package identity, kanban selection, repo slots, agent prerequisites, runtime surface commands, and merge defaults.
+`project.yaml` は単一の author-facing package config file である。package identity、kanban selection、repo slots、agent prerequisites、runtime surface commands、merge defaults を持つ。
 
-## Validation Boundary
+## Validation Boundary（validation boundary の考え方）
 
-Core validation starts with the reference suite. If a runtime, workspace, worker gateway, verification, merge, or package preset change cannot be validated against at least one reference product, create a ticket to add or improve a reference task template before relying on external product evidence.
+Core validation は reference suite から始める。runtime、workspace、worker gateway、verification、merge、package preset の変更が少なくとも 1 つの reference product で検証できない場合、external product evidence に頼る前に reference task template を追加または改善する ticket を作成する。
 
-External behavior changes found while improving the suite require owner discussion before implementation.
+Suite 改善中に external behavior changes が見つかった場合は、implementation 前に owner と協議する。
 
-## Release Validation Scope
+## Release Validation Scope（release validation の範囲）
 
-The suite is the release validation target for:
+Suite は次の release validation target である。
 
 - single-repo implementation / verification / merge
 - multi-repo child implementation and verification
@@ -52,4 +52,4 @@ The suite is the release validation target for:
 - runtime watch summary and task diagnostics
 - evidence persistence
 
-Validation runs may use deterministic workers to isolate Engine behavior from model variability, but the exercised surfaces remain real: kanban pickup and transitions, branch namespace creation, workspace materialization, worker gateway transport, agent-side publication, verification commands, merge, and evidence persistence.
+Validation runs では、model variability を切り離すため deterministic workers を使ってよい。ただし exercise する surfaces は実物のままにする。対象は kanban pickup and transitions、branch namespace creation、workspace materialization、worker gateway transport、agent-side publication、verification commands、merge、evidence persistence である。

@@ -1,67 +1,67 @@
-# Agent Worker Gateway Design
+# Agent Worker Gateway Design（agent worker gateway 設計）
 
 対象読者: A2O runtime 実装者 / agent 実装者 / reviewer
 文書種別: protocol design
 
-The agent worker gateway lets A2O Engine delegate project-local work to an `a2o-agent` process running in the host or project dev-env. This keeps project toolchains outside the runtime image while preserving Engine-owned orchestration.
+Agent worker gateway は、A2O Engine が project-local な作業を host または project dev-env で動く `a2o-agent` process へ委譲するための境界である。これにより、project toolchain を runtime image の外へ置いたまま、Engine-owned orchestration を維持できる。
 
-## Goals
+## 目的
 
-- Engine owns task selection, phase transitions, workspace metadata, evidence, and merge decisions.
-- Agent owns project-local command execution in a materialized workspace.
-- Project package supplies repo aliases, command profiles, required binaries, and task template expectations.
-- Gateway payloads are explicit JSON contracts, not ad hoc shell argument bundles.
+- Engine は task selection、phase transitions、workspace metadata、evidence、merge decisions を所有する。
+- Agent は materialized workspace での project-local command execution を所有する。
+- Project package は repo aliases、command profiles、required binaries、task template expectations を提供する。
+- Gateway payloads は明示的な JSON contracts とし、場当たり的な shell argument bundles にしない。
 
-## Flow
+## Flow（処理の流れ）
 
-1. Engine creates or updates a workspace for the task phase.
-2. Engine publishes an agent job through the control plane.
-3. `a2o-agent` pulls the job, materializes the requested repo slots, and runs the declared command.
-4. Agent uploads structured result metadata and artifacts.
-5. Engine parses the result, records evidence, transitions the task, and publishes or merges refs when the phase allows it.
+1. Engine が task phase 用の workspace を作成または更新する。
+2. Engine が control plane 経由で agent job を publish する。
+3. `a2o-agent` が job を pull し、要求された repo slots を materialize して、宣言された command を実行する。
+4. Agent が structured result metadata と artifacts を upload する。
+5. Engine が result を parse し、evidence を記録し、task を transition し、phase が許す場合は refs を publish または merge する。
 
-## Workspace Metadata
+## Workspace Metadata（workspace の metadata）
 
-Agent jobs include:
+Agent jobs は次を含む。
 
 - task ref and phase
-- parent/child relationship when applicable
+- 該当する場合は parent/child relationship
 - workspace id and branch namespace
 - repo slot aliases
 - source refs and support refs
 - command profile and expected working directory
 - artifact upload policy
 
-The agent must not infer product-specific paths from global defaults. Paths come from the job payload and the project package used to create that payload.
+Agent は global defaults から product-specific paths を推測してはならない。Paths は job payload と、その payload を作成した project package から渡される。
 
-## Command Execution
+## Command Execution（command の実行）
 
-Project commands run agent-side. The gateway supports implementation workers, verification commands, merge commands, and diagnostic commands through the same control-plane shape.
+Project commands は agent-side で実行する。Gateway は implementation workers、verification commands、merge commands、diagnostic commands を同じ control-plane shape で扱う。
 
-The command runner records:
+Command runner は次を記録する。
 
 - exit status
 - stdout/stderr summary
-- changed files when the phase publishes edits
+- phase が edits を publish する場合の changed files
 - declared evidence artifacts
-- structured failure reason for blocked tasks
+- blocked tasks 用の structured failure reason
 
-Verification commands are project package responsibility. Engine only interprets success, failure, blocked reason, and evidence metadata.
+Verification commands は project package の責務である。Engine は success、failure、blocked reason、evidence metadata だけを解釈する。
 
-## Materialized Workspace Rules
+## Materialized Workspace Rules（materialized workspace の rules）
 
-- Repo slot names are stable package aliases, such as `app`, `repo_alpha`, or `repo_beta`.
-- User-visible branch refs created by the current runtime use `refs/heads/a2o/...`. Existing `refs/heads/a3/...` refs are legacy compatibility data.
-- Agent workspace paths are disposable and should not be used as durable project configuration.
-- Generated runtime metadata may live under `.a3/` inside the materialized workspace for compatibility, but user-facing docs should not require users to edit it.
+- Repo slot names は `app`、`repo_alpha`、`repo_beta` のような stable package aliases とする。
+- 現 runtime が作成する user-visible branch refs は `refs/heads/a2o/...` を使う。既存の `refs/heads/a3/...` refs は legacy compatibility data である。
+- Agent workspace paths は disposable であり、durable project configuration として使わない。
+- Generated runtime metadata は compatibility のため materialized workspace 内の `.a3/` に置かれることがある。ただし user-facing docs で、利用者に編集対象として扱わせてはならない。
 
-## Validation
+## Validation（検証）
 
-The reference product suite validates the gateway with:
+Reference product suite は gateway を次の観点で検証する。
 
 - TypeScript single-repo implementation / verification / merge
 - Go single-repo implementation / verification / merge
 - Python single-repo implementation / verification / merge
-- Multi-repo parent-child implementation, child merge, parent review, parent verification, and parent merge
+- Multi-repo parent-child implementation、child merge、parent review、parent verification、parent merge の flow
 
-See [90-reference-product-suite.md](90-reference-product-suite.md).
+詳細は [90-reference-product-suite.md](90-reference-product-suite.md) を参照する。
