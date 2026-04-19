@@ -77,6 +77,12 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
+	case "watch-summary":
+		if err := runRuntimeWatchSummary(args[1:], runner, stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
 	case "run-once":
 		if err := runRuntimeRunOnce(args[1:], runner, stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)
@@ -640,6 +646,38 @@ func runRuntimeDescribeTask(args []string, runner commandRunner, stdout io.Write
 	})
 }
 
+func runRuntimeWatchSummary(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a2o runtime watch-summary", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+
+	config, _, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	return withComposeEnv(effectiveConfig, func() error {
+		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
+		if err != nil {
+			return err
+		}
+		output, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "watch_summary", runtimeWatchSummaryArgs(plan)...)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(output) == "" {
+			return nil
+		}
+		fmt.Fprintln(stdout, output)
+		return nil
+	})
+}
+
 func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
 	flags := flag.NewFlagSet("a2o runtime run-once", flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -893,6 +931,7 @@ func buildRuntimeDescribeTaskPlan(config runtimeInstanceConfig) (runtimeRunOnceP
 		return runtimeRunOncePlan{}, err
 	}
 	hostRoot := envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_ROOT", "A3_RUNTIME_RUN_ONCE_HOST_ROOT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_ROOT", "A3_RUNTIME_SCHEDULER_HOST_ROOT", filepath.Join(hostRootDir, runtimeHostAgentRelativePath)))
+	_, _, _, _, repoLabels := packageRuntimeRepoArgs(hostRootDir, referencePackagePath, packageConfig)
 	return runtimeRunOncePlan{
 		ComposePrefix:        composeArgs(config),
 		StorageDir:           envDefaultCompat("A2O_BUNDLE_STORAGE_DIR", "A3_BUNDLE_STORAGE_DIR", envDefaultValue(config.StorageDir, "/var/lib/a2o/a2o-runtime")),
@@ -904,6 +943,8 @@ func buildRuntimeDescribeTaskPlan(config runtimeInstanceConfig) (runtimeRunOnceP
 		ManifestPath:         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PROJECT_CONFIG", "A3_RUNTIME_RUN_ONCE_PROJECT_CONFIG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PROJECT_CONFIG", "A3_RUNTIME_SCHEDULER_PROJECT_CONFIG", filepath.Join(referencePackagePath, "project.yaml"))),
 		SoloBoardInternalURL: envDefaultCompat("A2O_SOLOBOARD_INTERNAL_URL", "A3_SOLOBOARD_INTERNAL_URL", "http://soloboard:3000"),
 		KanbanProject:        envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_PROJECT", "A3_RUNTIME_RUN_ONCE_KANBAN_PROJECT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_PROJECT", "A3_RUNTIME_SCHEDULER_KANBAN_PROJECT", packageConfig.KanbanProject)),
+		KanbanStatus:         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_STATUS", "A3_RUNTIME_RUN_ONCE_KANBAN_STATUS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_STATUS", "A3_RUNTIME_SCHEDULER_KANBAN_STATUS", envDefaultValue(packageConfig.KanbanStatus, "To do"))),
+		KanbanRepoLabels:     envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A3_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A2O_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", "A3_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", repoLabels),
 	}, nil
 }
 
@@ -913,6 +954,28 @@ func runtimeDescribeSectionOutput(config runtimeInstanceConfig, plan runtimeRunO
 		return "", fmt.Errorf("%s command failed: %w", section, err)
 	}
 	return strings.TrimRight(string(output), "\n"), nil
+}
+
+func runtimeWatchSummaryArgs(plan runtimeRunOncePlan) []string {
+	args := []string{"a3", "watch-summary", "--storage-backend", "json", "--storage-dir", plan.StorageDir}
+	if strings.TrimSpace(plan.KanbanProject) == "" || len(plan.KanbanRepoLabels) == 0 {
+		return args
+	}
+	args = append(args,
+		"--kanban-command", "python3",
+		"--kanban-command-arg", packagedKanbanCLIPath,
+		"--kanban-command-arg", "--backend",
+		"--kanban-command-arg", "soloboard",
+		"--kanban-command-arg", "--base-url",
+		"--kanban-command-arg", plan.SoloBoardInternalURL,
+		"--kanban-project", plan.KanbanProject,
+		"--kanban-status", plan.KanbanStatus,
+		"--kanban-working-dir", "/workspace",
+	)
+	for _, repoLabel := range plan.KanbanRepoLabels {
+		args = append(args, "--kanban-repo-label", repoLabel)
+	}
+	return args
 }
 
 func latestRuntimeRunRef(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, taskRef string) (string, error) {

@@ -26,6 +26,7 @@ bootstrap は project package から runtime instance config を作成する。�
 a2o project bootstrap
 a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 a2o kanban up
+a2o runtime watch-summary
 a2o runtime run-once
 ```
 
@@ -67,7 +68,7 @@ Project package が持たないもの:
 
 The current baseline exercises the reference product suite through SoloBoard, agent-materialized workspaces, agent-http worker gateway, verification, merge, and evidence persistence. The recorded baseline is [69-reference-runtime-baseline.md](69-reference-runtime-baseline.md).
 
-The public launcher covers host install, project bootstrap, kanban service lifecycle, kanban diagnosis, URL discovery, agent install, runtime container up/down, one-shot runtime execution, foreground runtime loop, resident scheduler start/stop/status, runtime diagnosis, and task/run observability.
+The public launcher covers host install, project bootstrap, kanban service lifecycle, kanban diagnosis, URL discovery, agent install, runtime container up/down, one-shot runtime execution, foreground runtime loop, resident scheduler start/stop/status, runtime diagnosis, multi-task watch summary, and task/run observability.
 
 ## Operator Notes
 

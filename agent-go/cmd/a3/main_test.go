@@ -538,6 +538,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime image-digest",
 		"a2o runtime doctor",
 		"a2o runtime describe-task TASK_REF",
+		"a2o runtime watch-summary",
 		"a2o runtime run-once [--max-steps N] [--agent-attempts N]",
 		"a2o runtime loop [--interval DURATION] [--max-cycles N]",
 		"a2o agent install [--target auto] [--output PATH] [--build]",
@@ -596,6 +597,7 @@ func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
 		{name: "runtime image-digest", args: []string{"runtime", "image-digest", "-bad"}, want: "Usage of a2o runtime image-digest:"},
 		{name: "runtime doctor", args: []string{"runtime", "doctor", "-bad"}, want: "Usage of a2o runtime doctor:"},
 		{name: "runtime run-once", args: []string{"runtime", "run-once", "-bad"}, want: "Usage of a2o runtime run-once:"},
+		{name: "runtime watch-summary", args: []string{"runtime", "watch-summary", "-bad"}, want: "Usage of a2o runtime watch-summary:"},
 		{name: "runtime loop", args: []string{"runtime", "loop", "-bad"}, want: "Usage of a2o runtime loop:"},
 		{name: "agent install", args: []string{"agent", "install", "-bad"}, want: "Usage of a2o agent install:"},
 	} {
@@ -2052,6 +2054,65 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 	}
 }
 
+func TestRuntimeWatchSummaryRunsContainerSummaryWithKanbanContext(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "watch-summary"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "Scheduler: running") {
+		t.Fatalf("watch-summary should print existing summary output, got:\n%s", stdout.String())
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 watch-summary --storage-backend json --storage-dir /var/lib/a3/test-runtime",
+		"--kanban-command python3 --kanban-command-arg /opt/a2o/share/tools/kanban/cli.py --kanban-command-arg --backend --kanban-command-arg soloboard --kanban-command-arg --base-url --kanban-command-arg http://soloboard:3000",
+		"--kanban-project A2OReferenceMultiRepo --kanban-status To do --kanban-working-dir /workspace",
+		"--kanban-repo-label repo:catalog=repo_alpha",
+		"--kanban-repo-label repo:storefront=repo_beta",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("watch-summary missing call fragment %q in:\n%s", want, joined)
+		}
+	}
+}
+
+func TestTopLevelWatchSummaryIsNotPublicAlias(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"watch-summary"}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("top-level watch-summary alias should not succeed")
+	}
+	if !strings.Contains(stderr.String(), "unknown command: watch-summary") {
+		t.Fatalf("stderr should reject top-level alias, got %q", stderr.String())
+	}
+}
+
 func TestRuntimeDescribeTaskContinuesWhenRuntimeTaskStateIsUnavailable(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -3139,6 +3200,8 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		return []byte("run-16\n"), nil
 	case strings.Contains(joined, " a3 show-run "):
 		return []byte("run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked\nevidence workspace=runtime_workspace source=detached_commit:abc\nlatest_blocked phase=implementation summary=executor failed\nblocked_error_category=executor_failed\n"), nil
+	case strings.Contains(joined, " a3 watch-summary "):
+		return []byte("Scheduler: running\nTask Tree\nNext\nRunning\n"), nil
 	case strings.Contains(joined, " task-get "):
 		return []byte(`{"task_ref":"A2O#16","status":"Blocked"}` + "\n"), nil
 	case strings.Contains(joined, " task-comment-list "):

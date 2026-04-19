@@ -84,6 +84,7 @@ a2o kanban url
 task の状態、run、evidence、kanban comment、見るべき log は次で確認する。
 
 ```sh
+a2o runtime watch-summary
 a2o runtime describe-task <task-ref>
 ```
 
@@ -242,8 +243,11 @@ a2o runtime stop
 
 ```sh
 a2o runtime doctor
+a2o runtime watch-summary
 a2o runtime describe-task <task-ref>
 ```
+
+`runtime watch-summary` は board 上の複数 task、scheduler state、running phase をまとめて見るための overview である。個別 task の原因調査には `runtime describe-task <task-ref>` を使う。
 
 標準操作は次の流れである。
 
@@ -277,6 +281,7 @@ A2O の CLI stderr と kanban comment は、失敗時に `error_category` / `エ
 a2o doctor
 a2o kanban doctor
 a2o runtime doctor
+a2o runtime watch-summary
 a2o runtime describe-task <task-ref>
 ```
 
