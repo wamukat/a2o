@@ -40,29 +40,29 @@ a2o runtime run-once
 
 A2O Engine が持つもの:
 
-- kanban service lifecycle
-- task polling and transition
-- workspace and branch namespace management
-- worker gateway and agent job queue
-- verification and merge phase orchestration
-- evidence retention
+- kanban service の lifecycle
+- task の polling と transition
+- workspace と branch namespace の管理
+- worker gateway と agent job queue
+- verification と merge phase の orchestration
+- evidence の保持
 
 Project package が持つもの:
 
-- project name and kanban board name
-- repo slot aliases and source paths
-- trigger labels and task templates
-- verification/build/test commands
-- required toolchain names for agent-side execution
+- project name と kanban board name
+- repo slot aliases と source paths
+- trigger labels と task templates
+- verification/build/test 用 commands
+- agent-side execution に必要な toolchain names
 - declarative command では不足する場合の project-specific hook scripts
 
 Project package が持たないもの:
 
-- Engine runtime loop script
+- Engine runtime loop script（Engine runtime loop の script）
 - A2O core services 用 Docker compose file
-- kanban provider API wrapper
-- agent materializer configuration script
-- release asset export logic
+- kanban provider API wrapper（kanban provider API の wrapper）
+- agent materializer configuration script（agent materializer 設定 script）
+- release asset export logic（release asset 書き出し logic）
 
 ## Release 0.5.0 の公開 surface
 
