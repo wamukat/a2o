@@ -1,22 +1,22 @@
-# Single-File Project Package Schema
+# Single-File Project Package Schema（単一ファイル project package schema）
 
-対象読者: A2O 設計者 / project package author / reviewer
+対象読者: A2O 設計者 / project package 作成者 / reviewer
 文書種別: schema reference
 
-## Decision
+## 方針
 
-The canonical project package config file should be `project.yaml`.
+Project package config の正規ファイル名は `project.yaml` とする。
 
-`manifest.yml` is not part of the public 0.5.0 package format. Runtime responsibilities live in `project.yaml` under explicit runtime sections. This keeps the public package command shape small, avoids introducing a second name such as `a2o.yaml`, and removes the confusing split between "project config" and "manifest" for package authors.
+`manifest.yml` は公開 0.5.0 package format に含めない。runtime の責務は `project.yaml` の明示的な runtime sections に置く。これにより、公開 package の command shape を小さく保ち、`a2o.yaml` のような別名を増やさず、package author にとって分かりにくい「project config」と「manifest」の分離をなくす。
 
-The package schema follows these rules:
+Package schema は次の rules に従う。
 
-- `project.yaml` is the canonical file name.
-- `manifest.yml` compatibility is not required for the new schema.
-- User-facing schema and diagnostics should use A2O names. A3 names may remain only as internal compatibility details.
-- Internal follow-up labels such as `a2o:follow-up-child` should not be exposed in normal user-authored schema.
+- `project.yaml` を canonical file name とする。
+- 新 schema では `manifest.yml` compatibility を要求しない。
+- User-facing schema と diagnostics では A2O names を使う。A3 names は internal compatibility details としてだけ残してよい。
+- `a2o:follow-up-child` のような internal follow-up labels は、通常の user-authored schema へ露出しない。
 
-## Schema Shape
+## Schema の形
 
 ```yaml
 schema_version: 1
@@ -82,25 +82,25 @@ task_templates:
 
 Host agent binary は canonical path `.work/a2o/agent/bin/a2o-agent` に置く。導入時は `a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent` を使う。
 
-## Section Responsibilities
+## 各 section の責務
 
-`schema_version` is required. Version `1` is the first single-file schema. The implementation should reject unsupported versions with a clear error.
+`schema_version` は必須である。Version `1` は最初の single-file schema を表す。未対応 version は、分かりやすい error で reject する。
 
-`package` identifies the package, not the product repository. `package.name` replaces the current top-level scalar `project`.
+`package` は product repository ではなく package を識別する。`package.name` は従来の top-level scalar `project` を置き換える。
 
-`kanban` owns board name, project-owned labels, and task selection. The kanban backend is fixed by A2O runtime distribution and is not an author-facing `project.yaml` setting. A2O-owned lanes and internal coordination labels are runtime implementation details and should not be required in normal package schema.
+`kanban` は board name、project-owned labels、task selection を持つ。kanban backend は A2O runtime distribution によって固定されており、author-facing な `project.yaml` setting ではない。A2O-owned lanes と internal coordination labels は runtime implementation details であり、通常の package schema に書かせない。
 
-`repos` defines stable repo slots. Slot keys are runtime identities. `path` is relative to the package directory unless absolute. `label` maps kanban labels to repo slots. If omitted, the implementation may derive `repo:<slot>`.
+`repos` は stable repo slots を定義する。Slot keys は runtime identities である。`path` は absolute path でない限り package directory からの相対 path とする。`label` は kanban labels と repo slots を対応づける。省略時、implementation は `repo:<slot>` を derive してよい。
 
-`agent` owns host-side workspace, product toolchain requirements, and executor command requirements. `required_bins` remains declarative because the agent can validate prerequisites before work starts.
+`agent` は host-side workspace、product toolchain requirements、executor command requirements を持つ。`required_bins` は、agent が作業開始前に prerequisites を validate できるよう declarative に残す。
 
-`runtime` owns execution defaults and phase definitions.
+`runtime` は execution defaults と phase definitions を持つ。
 
-`runtime.phases` owns phase-specific skills, executor commands, verification/remediation commands, and merge policy. A2O renders the phase executor commands into an internal stdin-bundle launcher config; users should not create a separate `launcher.json`.
+`runtime.phases` は phase-specific skills、executor commands、verification/remediation commands、merge policy を持つ。A2O は phase executor commands を internal stdin-bundle launcher config へ render する。利用者は別途 `launcher.json` を作らない。
 
-Phase executor commands receive the worker bundle on stdin and must write worker result JSON to `{{result_path}}`. Executor command placeholders include `{{result_path}}`, `{{schema_path}}`, `{{workspace_root}}`, `{{a2o_root_dir}}`, and `{{root_dir}}`. Verification and remediation commands support `{{workspace_root}}`, `{{a2o_root_dir}}`, and `{{root_dir}}`.
+Phase executor commands は worker bundle を stdin で受け取り、worker result JSON を `{{result_path}}` に書く必要がある。Executor command placeholders は `{{result_path}}`、`{{schema_path}}`、`{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` を含む。Verification and remediation commands は `{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` を support する。
 
-For normal packages, define implementation and review phases:
+通常の packages では implementation と review phases を定義する。
 
 ```yaml
 runtime:
@@ -115,9 +115,9 @@ runtime:
         command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
 ```
 
-This expands internally to the fixed stdin-bundle command executor. `prompt_transport`, `result`, `schema`, and `default_profile` are A2O implementation details and are not valid `project.yaml` fields.
+これは内部的に fixed stdin-bundle command executor へ展開される。`prompt_transport`、`result`、`schema`、`default_profile` は A2O implementation details であり、valid な `project.yaml` fields ではない。
 
-New packages should start from the generated template instead of hand-writing the executor block:
+新しい package は executor block を手書きせず、generated template から始める。
 
 ```sh
 a2o project template \
@@ -128,15 +128,15 @@ a2o project template \
   --output ./project-package/project.yaml
 ```
 
-The template uses the phase-based executor form. `--language` controls `agent.required_bins`; `--executor-bin` and repeated `--executor-arg` flags generate implementation and review phase executor commands.
+Template は phase-based executor form を使う。`--language` は `agent.required_bins` を制御する。`--executor-bin` と repeated `--executor-arg` flags は implementation and review phase executor commands を生成する。
 
-When `--output` points to a file, the generator writes `project.yaml` only. Kanban bootstrap data is derived from `kanban.project`, `kanban.labels`, and `repos.<slot>.label`; A2O-owned lanes and internal coordination labels are provisioned by `a2o kanban up`.
+`--output` が file を指す場合、generator は `project.yaml` だけを書く。Kanban bootstrap data は `kanban.project`、`kanban.labels`、`repos.<slot>.label` から derive される。A2O-owned lanes と internal coordination labels は `a2o kanban up` が provision する。
 
-`runtime.phases.merge` owns merge target, policy, and target ref. Values may be scalar or variant maps, matching the current merge resolver behavior.
+`runtime.phases.merge` は merge target、policy、target ref を持つ。値は scalar または variant maps にでき、current merge resolver behavior と一致する。
 
-`task_templates` is optional metadata for validation and onboarding. A task template entry points to a markdown task template. Runtime task selection still comes from kanban; task templates are not auto-enqueued by default.
+`task_templates` は validation と onboarding のための optional metadata である。Task template entry は markdown task template を指す。Runtime task selection は引き続き kanban から行う。Task templates は default では auto-enqueue されない。
 
-## Reference Product Examples
+## Reference Product の例
 
 ### TypeScript API/Web
 
@@ -312,18 +312,18 @@ runtime:
         default: refs/heads/main
 ```
 
-## Current Status
+## 現在の状態
 
-1. A single loader reads `project.yaml` schema version `1`.
-2. The runtime bridge derives internal runtime package data from `runtime.phases`.
-3. Reference product packages no longer contain `manifest.yml`.
-4. The four reference packages use single-file `project.yaml`.
-5. User docs and reference package docs no longer ask authors to create `manifest.yml`.
-6. Package loading rejects old split files.
-7. Package schema, docs, and normal diagnostics use A2O-facing names.
+1. Single loader が `project.yaml` schema version `1` を読む。
+2. Runtime bridge は `runtime.phases` から internal runtime package data を derive する。
+3. Reference product packages には `manifest.yml` を含めない。
+4. 4 つの reference packages は single-file `project.yaml` を使う。
+5. User docs と reference package docs は、author に `manifest.yml` 作成を求めない。
+6. Package loading は old split files を reject する。
+7. Package schema、docs、normal diagnostics は A2O-facing names を使う。
 
-## Implementation Notes
+## 実装 notes
 
-- The new loader should reject packages that still require `manifest.yml`.
-- The schema may translate A2O-facing fields into current internal Ruby runtime structures, but errors and docs should not ask users to author A3 names.
-- Internal follow-up labels should have runtime defaults. Add advanced overrides only if a real product needs them later.
+- New loader は `manifest.yml` を必要とする packages を reject する。
+- Schema は A2O-facing fields を current internal Ruby runtime structures へ translate してよい。ただし errors と docs は、users に A3 names を author するよう求めてはならない。
+- Internal follow-up labels は runtime defaults を持つべきである。Advanced overrides は、実 product が必要とした場合だけ追加する。

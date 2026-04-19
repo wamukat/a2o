@@ -1,4 +1,4 @@
-# Container Distribution And Project Runtime
+# Container Distribution And Project Runtime（container 配布と project runtime）
 
 対象読者: A2O 利用者 / runtime 実装者 / operator
 文書種別: 配布設計 / runtime 境界
@@ -16,7 +16,7 @@ A2O の配布単位は Docker runtime image、host launcher、project package、
 
 runtime image 内の `a2o --help` は container entrypoint の help であり、host launcher の完全な help ではない。`a2o project template`、`a2o project bootstrap`、`a2o kanban ...`、`a2o runtime ...` などの通常操作は、`a2o host install` で取り出した host launcher の `a2o` から実行する。
 
-## Runtime Shape
+## Runtime の形
 
 A2O は「1 project package = 1 runtime instance」として扱う。
 
@@ -36,7 +36,7 @@ a2o runtime run-once
 
 複数 product を同時に動かす場合は、package ごとに workspace、storage dir、compose project name、port を分ける。
 
-## Responsibility Boundary
+## 責務境界
 
 A2O Engine が持つもの:
 
@@ -54,27 +54,27 @@ Project package が持つもの:
 - trigger labels and task templates
 - verification/build/test commands
 - required toolchain names for agent-side execution
-- project-specific hook scripts when a declarative command is insufficient
+- declarative command では不足する場合の project-specific hook scripts
 
 Project package が持たないもの:
 
 - Engine runtime loop script
-- Docker compose file for A2O core services
+- A2O core services 用 Docker compose file
 - kanban provider API wrapper
 - agent materializer configuration script
 - release asset export logic
 
-## Release 0.5.0 Surface
+## Release 0.5.0 の公開 surface
 
-A2O 0.5.0 is released as a local-first runtime image plus host launcher and agent package. The standard validation surface is the reference product suite: SoloBoard pickup and transitions, agent-materialized workspaces, agent HTTP worker gateway, verification, merge, parent-child flow, watch summary, describe-task diagnostics, and evidence persistence.
+A2O 0.5.0 は、local-first runtime image、host launcher、agent package として配布する。標準 validation surface は reference product suite である。SoloBoard pickup and transitions、agent-materialized workspaces、agent HTTP worker gateway、verification、merge、parent-child flow、watch summary、describe-task diagnostics、evidence persistence を確認する。
 
-The public launcher covers host install, project bootstrap, kanban service lifecycle, kanban diagnosis, URL discovery, agent install, runtime container up/down, one-shot runtime execution, foreground runtime loop, resident scheduler start/stop/status, runtime diagnosis, multi-task watch summary, and task/run observability.
+Public launcher は host install、project bootstrap、kanban service lifecycle、kanban diagnosis、URL discovery、agent install、runtime container up/down、one-shot runtime execution、foreground runtime loop、resident scheduler start/stop/status、runtime diagnosis、multi-task watch summary、task/run observability を扱う。
 
-## Operator Notes
+## Operator notes（運用 notes）
 
-- Keep project toolchains out of the runtime image. Install them in the host or dev-env where `a2o-agent` runs.
-- Keep branch namespaces instance-specific so isolated boards can reuse small task numbers without colliding with existing refs.
-- Treat `.work/a2o/` as disposable runtime output. New bootstrap state, host-agent binaries, generated launcher config, and agent workspaces should live there.
-- Existing `.a3/runtime-instance.json` is read as a compatibility fallback only. New bootstrap does not write it.
-- `.a3/` directories inside materialized repo workspaces are internal agent metadata and are not user-managed package files.
-- Prefer project package declarations over new Engine hardcoded defaults.
+- Project toolchain は runtime image に入れない。`a2o-agent` が動く host または dev-env に install する。
+- 小さい task number を複数 isolated boards で再利用しても existing refs と衝突しないよう、branch namespace は instance-specific に保つ。
+- `.work/a2o/` は disposable runtime output として扱う。new bootstrap state、host-agent binaries、generated launcher config、agent workspaces はそこに置く。
+- 既存の `.a3/runtime-instance.json` は compatibility fallback としてだけ読む。新しい bootstrap は書き出さない。
+- materialized repo workspaces 内の `.a3/` directories は internal agent metadata であり、user-managed package files ではない。
+- 新しい Engine hardcoded defaults より、project package declarations を優先する。

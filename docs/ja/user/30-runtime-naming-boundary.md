@@ -1,13 +1,13 @@
-# Runtime Naming Boundary
+# Runtime Naming Boundary（runtime 命名境界）
 
 対象読者: A2O 利用者 / runtime 実装者 / operator
 文書種別: naming policy
 
-A2O is the public product name. A3 remains an internal compatibility name in code paths, state paths, and Engine CLI surfaces that have not been renamed.
+A2O は公開 product 名である。A3 は、まだ rename していない code path、state path、Engine CLI surface に残る内部互換名として扱う。
 
-## Public Names
+## 公開名
 
-Use these names in user-facing docs and commands:
+利用者向け docs と commands では、次の名前を使う。
 
 - `A2O`
 - `a2o`
@@ -17,27 +17,27 @@ Use these names in user-facing docs and commands:
 - `refs/heads/a2o/...`
 - `reference-products`
 
-## Internal Compatibility Names
+## 内部互換名
 
-These names may remain in implementation details:
+次の名前は実装詳細として残ってよい。
 
 - `A3`
 - `a3`
 - `bin/a3`
 - `.a3`
-- `A3_*` environment variables
-- legacy `refs/heads/a3/...`
+- `A3_*` environment variables（環境変数）
+- legacy `refs/heads/a3/...`（既存互換 refs）
 
-Do not require users to author these names in normal setup docs. If they appear in diagnostics or internal implementation docs, describe them as compatibility surfaces.
+通常の setup docs で、利用者にこれらの名前を author させてはならない。diagnostics や内部実装 docs に出す場合は、互換 surface であることを明記する。
 
-## Naming Rule
+## 命名 rule
 
-- New public docs use A2O names.
-- New project packages use A2O names.
-- New CLI affordances should prefer `a2o`.
-- Existing internal Ruby Engine APIs may keep A3 names until a focused rename ticket changes them.
-- Compatibility aliases must not become the documented primary path.
+- 新しい公開 docs では A2O 名を使う。
+- 新しい project package では A2O 名を使う。
+- 新しい CLI affordance は `a2o` を優先する。
+- 既存の内部 Ruby Engine API は、専用 rename ticket で変更するまで A3 名を保持してよい。
+- 互換 alias を documented primary path にしてはならない。
 
-## Known Gap
+## 既知の gap
 
-User-facing runtime execution should use `a2o runtime run-once`, `a2o runtime loop`, or `a2o runtime start`. Internal Engine CLI examples must stay out of normal user setup docs.
+利用者向け runtime execution は `a2o runtime run-once`、`a2o runtime loop`、または `a2o runtime start` を使う。内部 Engine CLI の例は通常の利用者向け setup docs から除外する。
