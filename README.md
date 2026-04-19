@@ -44,6 +44,8 @@ Developer documentation:
 ```sh
 a2o host install
 a2o project template --with-skills --output ./project-package/project.yaml
+a2o worker scaffold --language python --output ./project-package/commands/a2o-worker.py
+a2o worker validate-result --request request.json --result result.json
 a2o project bootstrap --package ./reference-products/typescript-api-web/project-package
 a2o project lint --package ./reference-products/typescript-api-web/project-package
 a2o kanban up

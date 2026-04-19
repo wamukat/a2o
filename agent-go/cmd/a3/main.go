@@ -88,6 +88,8 @@ func run(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer
 		return runDoctor(args[1:], runner, stdout, stderr)
 	case "project":
 		return runProject(args[1:], stdout, stderr)
+	case "worker":
+		return runWorker(args[1:], stdout, stderr)
 	case "kanban":
 		return runKanban(args[1:], runner, stdout, stderr)
 	case "runtime":
@@ -115,6 +117,8 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o project bootstrap [--package DIR]")
 	fmt.Fprintln(w, "  a2o project lint [--package DIR]")
 	fmt.Fprintln(w, "  a2o project template [--language node|go|python|ruby] [--with-skills] [--output project.yaml]")
+	fmt.Fprintln(w, "  a2o worker scaffold --language bash|python|ruby|go --output PATH")
+	fmt.Fprintln(w, "  a2o worker validate-result --request request.json --result result.json")
 	fmt.Fprintln(w, "  a2o kanban up [--build]")
 	fmt.Fprintln(w, "  a2o kanban doctor")
 	fmt.Fprintln(w, "  a2o kanban url")

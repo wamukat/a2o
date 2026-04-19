@@ -78,6 +78,31 @@ runtime:
 - Project script から private `.a3` metadata や generated launcher file を読まない。
 - Worker failure は actionable にする。どの command が失敗したか、どの repo/workspace が関係したか、利用者が何を直すべきかを説明する。
 
+最小 worker は次の command で生成できる。
+
+```sh
+a2o worker scaffold --language python --output ./project-package/commands/a2o-worker.py
+```
+
+生成した worker は `runtime.phases.<phase>.executor.command` から参照する。
+
+```yaml
+command:
+  - ./project-package/commands/a2o-worker.py
+  - "--schema"
+  - "{{schema_path}}"
+  - "--result"
+  - "{{result_path}}"
+```
+
+Custom worker を作る場合は、worker request と result の組を保存して次で検証する。
+
+```sh
+a2o worker validate-result --request request.json --result result.json
+```
+
+Validator は runtime 実行前に、missing key、type error、`task_ref` / `run_ref` / `phase` mismatch を具体的に出力する。
+
 ## Verification And Remediation（検証と remediation）
 
 Verification command は task result を証明する。Remediation command は verification retry の前に format や project-approved cleanup を行う。

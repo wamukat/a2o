@@ -50,7 +50,7 @@ func printUserFacingError(w interface{ Write([]byte) (int, error) }, err error) 
 func classifyUserFacingError(message string) (string, string) {
 	text := strings.ToLower(message)
 	switch {
-	case strings.Contains(text, "project.yaml"), strings.Contains(text, "schema"), strings.Contains(text, "config"), strings.Contains(text, "executor"), strings.Contains(text, "manifest"):
+	case strings.Contains(text, "project.yaml"), strings.Contains(text, "schema"), strings.Contains(text, "config"), strings.Contains(text, "executor"), strings.Contains(text, "manifest"), strings.Contains(text, "protocol"):
 		return "configuration_error", "Review project.yaml and package settings, then rerun the A2O command."
 	case strings.Contains(text, "dirty"), strings.Contains(text, "has changes"), strings.Contains(text, "changed files"), strings.Contains(text, "working tree"):
 		return "workspace_dirty", "Clean, commit, or stash the reported repo files before rerunning A2O."

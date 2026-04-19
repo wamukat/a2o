@@ -95,7 +95,7 @@ Task-local cache と artifact paths は A2O-managed workspace の責務である
 
 ## Validation Direction
 
-`a2o doctor` と今後の package validation は次を検出すべきである。
+`a2o doctor`、`a2o project lint`、`a2o worker validate-result` は次を検出する。
 
 - project package 内の `A3_*` worker environment names
 - private `.a3` metadata files の直接読み取り

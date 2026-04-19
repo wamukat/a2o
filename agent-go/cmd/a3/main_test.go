@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -565,6 +566,121 @@ func TestProjectTemplateWithSkillsDoesNotLeaveProjectYamlOnSkillWriteFailure(t *
 	}
 	if _, err := os.Stat(filepath.Join(packageDir, "skills", "implementation", "base.md")); !os.IsNotExist(err) {
 		t.Fatalf("implementation skill should not be partially written, err=%v", err)
+	}
+}
+
+func TestWorkerScaffoldWritesRunnablePythonWorkerAndValidateResult(t *testing.T) {
+	tempDir := t.TempDir()
+	workerPath := filepath.Join(tempDir, "worker.py")
+	resultPath := filepath.Join(tempDir, "result.json")
+	requestPath := filepath.Join(tempDir, "request.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"worker",
+		"scaffold",
+		"--language",
+		"python",
+		"--output",
+		workerPath,
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "worker_scaffold_written path="+workerPath+" language=python") {
+		t.Fatalf("stdout should describe scaffold path, got %q", stdout.String())
+	}
+	info, err := os.Stat(workerPath)
+	if err != nil {
+		t.Fatalf("worker scaffold missing: %v", err)
+	}
+	if info.Mode().Perm()&0o111 == 0 {
+		t.Fatalf("worker scaffold should be executable, mode=%s", info.Mode())
+	}
+
+	request := map[string]any{
+		"task_ref": "A2O#62",
+		"run_ref":  "run-1",
+		"phase":    "implementation",
+	}
+	requestBody, err := json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(requestPath, append(requestBody, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bundleBody, err := json.Marshal(map[string]any{"request": request})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("python3", workerPath, "--schema", filepath.Join(tempDir, "schema.json"), "--result", resultPath)
+	cmd.Stdin = bytes.NewReader(bundleBody)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("generated worker failed: %v\n%s", err, string(output))
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{
+		"worker",
+		"validate-result",
+		"--request",
+		requestPath,
+		"--result",
+		resultPath,
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("validate-result returned %d, stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "worker_protocol_status=ok") {
+		t.Fatalf("validate-result should report ok, got %q", stdout.String())
+	}
+}
+
+func TestWorkerValidateResultReportsConcreteProtocolErrors(t *testing.T) {
+	tempDir := t.TempDir()
+	requestPath := filepath.Join(tempDir, "request.json")
+	resultPath := filepath.Join(tempDir, "result.json")
+	request := []byte(`{"task_ref":"A2O#62","run_ref":"run-1","phase":"implementation"}`)
+	result := []byte(`{"task_ref":"A2O#62","run_ref":"run-1","phase":"review","success":"yes","rework_required":false}`)
+	if err := os.WriteFile(requestPath, append(request, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(resultPath, append(result, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{
+		"worker",
+		"validate-result",
+		"--request",
+		requestPath,
+		"--result",
+		resultPath,
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("validate-result should fail")
+	}
+	for _, want := range []string{
+		"worker_protocol_check name=result_schema status=blocked",
+		"worker_protocol_error=summary must be present",
+		"worker_protocol_error=changed_files must be present",
+		"worker_protocol_error=review_disposition must be present",
+		"worker_protocol_error=phase must match the worker request",
+		"worker_protocol_error=success must be true or false",
+		"worker_protocol_status=blocked",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("validate-result output missing %q in:\n%s", want, stdout.String())
+		}
+	}
+	if !strings.Contains(stderr.String(), "error_category=configuration_error") {
+		t.Fatalf("stderr should classify protocol error, got %q", stderr.String())
 	}
 }
 

@@ -95,7 +95,7 @@ Task-local cache and artifact paths are A2O-managed workspace concerns. Project 
 
 ## Validation Direction
 
-`a2o doctor` and future package validation should flag:
+`a2o doctor`, `a2o project lint`, and `a2o worker validate-result` should flag:
 
 - use of `A3_*` worker environment names in project packages
 - direct reads of private `.a3` metadata files

@@ -78,6 +78,31 @@ Use these rules:
 - Do not read private `.a3` metadata or generated launcher files from project scripts.
 - Make worker failures actionable: explain which command failed, which repo/workspace was involved, and what the user should fix.
 
+Generate a minimal worker with:
+
+```sh
+a2o worker scaffold --language python --output ./project-package/commands/a2o-worker.py
+```
+
+Then reference it from `runtime.phases.<phase>.executor.command`:
+
+```yaml
+command:
+  - ./project-package/commands/a2o-worker.py
+  - "--schema"
+  - "{{schema_path}}"
+  - "--result"
+  - "{{result_path}}"
+```
+
+When developing a custom worker, save one worker request and result pair and validate it with:
+
+```sh
+a2o worker validate-result --request request.json --result result.json
+```
+
+The validator reports concrete missing keys, type errors, and `task_ref` / `run_ref` / `phase` mismatches before runtime execution.
+
 ## Verification And Remediation
 
 Verification commands prove the task result. Remediation commands may format code or perform project-approved cleanup before verification retries.

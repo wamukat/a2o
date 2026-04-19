@@ -1,0 +1,463 @@
+package main
+
+import (
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+func runWorker(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "missing worker subcommand")
+		printUsage(stderr)
+		return 2
+	}
+	if isHelpArg(args[0]) {
+		printUsage(stdout)
+		return 0
+	}
+	switch args[0] {
+	case "scaffold":
+		if err := runWorkerScaffold(args[1:], stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
+	case "validate-result":
+		if err := runWorkerValidateResult(args[1:], stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
+	default:
+		fmt.Fprintf(stderr, "unknown worker subcommand: %s\n", args[0])
+		printUsage(stderr)
+		return 2
+	}
+}
+
+func runWorkerScaffold(args []string, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a2o worker scaffold", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+
+	language := flags.String("language", "python", "worker language: bash, python, ruby, go")
+	outputPath := flags.String("output", "", "worker file path to write")
+	force := flags.Bool("force", false, "overwrite an existing worker file")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+	if strings.TrimSpace(*outputPath) == "" {
+		return fmt.Errorf("--output is required")
+	}
+	body, mode, err := workerScaffoldTemplate(*language)
+	if err != nil {
+		return err
+	}
+	if !*force {
+		if _, err := os.Stat(*outputPath); err == nil {
+			return fmt.Errorf("worker scaffold already exists: %s; pass --force to overwrite", *outputPath)
+		} else if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("inspect worker scaffold: %w", err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Dir(*outputPath), 0o755); err != nil {
+		return fmt.Errorf("create worker scaffold directory: %w", err)
+	}
+	if err := os.WriteFile(*outputPath, []byte(body), mode); err != nil {
+		return fmt.Errorf("write worker scaffold: %w", err)
+	}
+	fmt.Fprintf(stdout, "worker_scaffold_written path=%s language=%s\n", *outputPath, normalizeWorkerLanguage(*language))
+	fmt.Fprintf(stdout, "worker_scaffold_command=%s --schema {{schema_path}} --result {{result_path}}\n", *outputPath)
+	return nil
+}
+
+func runWorkerValidateResult(args []string, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a2o worker validate-result", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+
+	requestPath := flags.String("request", "", "worker request JSON path")
+	resultPath := flags.String("result", "", "worker result JSON path")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+	if strings.TrimSpace(*requestPath) == "" {
+		return fmt.Errorf("--request is required")
+	}
+	if strings.TrimSpace(*resultPath) == "" {
+		return fmt.Errorf("--result is required")
+	}
+	request := map[string]any{}
+	if err := readWorkerJSONFile(*requestPath, &request); err != nil {
+		return fmt.Errorf("read worker request: %w", err)
+	}
+	result := map[string]any{}
+	if err := readWorkerJSONFile(*resultPath, &result); err != nil {
+		return fmt.Errorf("read worker result: %w", err)
+	}
+	errors := validatePublicWorkerPayload(result, request)
+	if len(errors) == 0 {
+		fmt.Fprintln(stdout, "worker_protocol_check name=result_schema status=ok")
+		fmt.Fprintln(stdout, "worker_protocol_status=ok")
+		return nil
+	}
+	fmt.Fprintln(stdout, "worker_protocol_check name=result_schema status=blocked")
+	for _, validationError := range errors {
+		fmt.Fprintf(stdout, "worker_protocol_error=%s\n", validationError)
+	}
+	fmt.Fprintln(stdout, "worker_protocol_status=blocked")
+	return fmt.Errorf("worker result protocol invalid; fix the reported worker_protocol_error entries")
+}
+
+func readWorkerJSONFile(path string, target any) error {
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(body, target); err != nil {
+		return err
+	}
+	return nil
+}
+
+func workerScaffoldTemplate(language string) (string, os.FileMode, error) {
+	switch normalizeWorkerLanguage(language) {
+	case "bash":
+		return bashWorkerScaffold, 0o755, nil
+	case "python":
+		return pythonWorkerScaffold, 0o755, nil
+	case "ruby":
+		return rubyWorkerScaffold, 0o755, nil
+	case "go":
+		return goWorkerScaffold, 0o644, nil
+	default:
+		return "", 0, fmt.Errorf("--language must be one of bash, python, ruby, go")
+	}
+}
+
+func normalizeWorkerLanguage(language string) string {
+	switch strings.ToLower(strings.TrimSpace(language)) {
+	case "sh", "shell":
+		return "bash"
+	case "py", "python3":
+		return "python"
+	case "golang":
+		return "go"
+	default:
+		return strings.ToLower(strings.TrimSpace(language))
+	}
+}
+
+func validatePublicWorkerPayload(payload map[string]any, request map[string]any) []string {
+	errors := []string{}
+	for _, key := range publicWorkerRequiredFields(request) {
+		if _, ok := payload[key]; !ok {
+			errors = append(errors, key+" must be present")
+		}
+	}
+	if workerStringValue(payload["task_ref"]) != "" && workerStringValue(payload["task_ref"]) != workerStringValue(request["task_ref"]) {
+		errors = append(errors, "task_ref must match the worker request")
+	}
+	if workerStringValue(payload["run_ref"]) != "" && workerStringValue(payload["run_ref"]) != workerStringValue(request["run_ref"]) {
+		errors = append(errors, "run_ref must match the worker request")
+	}
+	if workerStringValue(payload["phase"]) != "" && workerStringValue(payload["phase"]) != workerStringValue(request["phase"]) {
+		errors = append(errors, "phase must match the worker request")
+	}
+	if _, ok := payload["success"].(bool); !ok {
+		errors = append(errors, "success must be true or false")
+	}
+	if _, ok := payload["summary"].(string); !ok {
+		errors = append(errors, "summary must be a string")
+	}
+	if _, ok := payload["rework_required"].(bool); !ok {
+		errors = append(errors, "rework_required must be true or false")
+	}
+	success, _ := payload["success"].(bool)
+	if !success {
+		if rework, _ := payload["rework_required"].(bool); !rework && workerStringValue(payload["failing_command"]) == "" {
+			errors = append(errors, "failing_command must be a string when success is false unless rework_required is true")
+		}
+		if workerStringValue(payload["observed_state"]) == "" {
+			errors = append(errors, "observed_state must be a string when success is false")
+		}
+	}
+	if workerStringValue(request["phase"]) == "implementation" && success {
+		if _, ok := payload["changed_files"].(map[string]any); !ok {
+			errors = append(errors, "changed_files must be present for implementation success")
+		}
+	}
+	if publicWorkerNeedsReviewDisposition(request) {
+		disposition, ok := payload["review_disposition"].(map[string]any)
+		if !ok {
+			errors = append(errors, "review_disposition must be present")
+		} else {
+			for _, key := range []string{"kind", "repo_scope", "summary", "description", "finding_key"} {
+				if workerStringValue(disposition[key]) == "" {
+					errors = append(errors, "review_disposition."+key+" must be a string")
+				}
+			}
+		}
+	}
+	return errors
+}
+
+func publicWorkerRequiredFields(request map[string]any) []string {
+	fields := []string{"task_ref", "run_ref", "phase", "success", "summary", "failing_command", "observed_state", "rework_required"}
+	phase := workerStringValue(request["phase"])
+	if phase == "implementation" {
+		fields = append(fields, "changed_files", "review_disposition")
+	}
+	if phase == "review" && workerNestedString(request, "phase_runtime", "task_kind") == "parent" {
+		fields = append(fields, "review_disposition")
+	}
+	return fields
+}
+
+func publicWorkerNeedsReviewDisposition(request map[string]any) bool {
+	phase := workerStringValue(request["phase"])
+	return phase == "implementation" || (phase == "review" && workerNestedString(request, "phase_runtime", "task_kind") == "parent")
+}
+
+func workerStringValue(value any) string {
+	if text, ok := value.(string); ok {
+		return text
+	}
+	return ""
+}
+
+func workerNestedString(value map[string]any, keys ...string) string {
+	var current any = value
+	for _, key := range keys {
+		currentMap, ok := current.(map[string]any)
+		if !ok {
+			return ""
+		}
+		current = currentMap[key]
+	}
+	return workerStringValue(current)
+}
+
+const pythonWorkerScaffold = `#!/usr/bin/env python3
+import argparse
+import json
+import sys
+
+
+def request_from_stdin():
+    try:
+        payload = json.load(sys.stdin)
+    except json.JSONDecodeError:
+        payload = {}
+    request = payload.get("request", payload)
+    return request if isinstance(request, dict) else {}
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--schema", required=False)
+    parser.add_argument("--result", required=True)
+    args = parser.parse_args()
+    request = request_from_stdin()
+    result = {
+        "task_ref": request.get("task_ref", ""),
+        "run_ref": request.get("run_ref", ""),
+        "phase": request.get("phase", ""),
+        "success": True,
+        "summary": "scaffold worker completed without changes",
+        "failing_command": None,
+        "observed_state": None,
+        "rework_required": False,
+        "changed_files": {},
+        "review_disposition": {
+            "kind": "completed",
+            "repo_scope": "all",
+            "summary": "scaffold worker self-review clean",
+            "description": "No changes were required by the scaffold worker.",
+            "finding_key": "none",
+        },
+    }
+    with open(args.result, "w", encoding="utf-8") as handle:
+        json.dump(result, handle, indent=2)
+        handle.write("\n")
+
+
+if __name__ == "__main__":
+    main()
+`
+
+const rubyWorkerScaffold = `#!/usr/bin/env ruby
+require "json"
+require "optparse"
+
+options = {}
+OptionParser.new do |parser|
+  parser.on("--schema PATH") { |value| options[:schema] = value }
+  parser.on("--result PATH") { |value| options[:result] = value }
+end.parse!
+raise "--result is required" if options[:result].to_s.strip.empty?
+
+payload = begin
+  JSON.parse(STDIN.read)
+rescue JSON::ParserError
+  {}
+end
+request = payload.fetch("request", payload)
+request = {} unless request.is_a?(Hash)
+
+result = {
+  "task_ref" => request.fetch("task_ref", ""),
+  "run_ref" => request.fetch("run_ref", ""),
+  "phase" => request.fetch("phase", ""),
+  "success" => true,
+  "summary" => "scaffold worker completed without changes",
+  "failing_command" => nil,
+  "observed_state" => nil,
+  "rework_required" => false,
+  "changed_files" => {},
+  "review_disposition" => {
+    "kind" => "completed",
+    "repo_scope" => "all",
+    "summary" => "scaffold worker self-review clean",
+    "description" => "No changes were required by the scaffold worker.",
+    "finding_key" => "none"
+  }
+}
+
+File.write(options[:result], JSON.pretty_generate(result) + "\n")
+`
+
+const bashWorkerScaffold = `#!/usr/bin/env bash
+set -euo pipefail
+
+result_path=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --schema)
+      shift 2
+      ;;
+    --result)
+      result_path="${2:-}"
+      shift 2
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "$result_path" ]]; then
+  echo "--result is required" >&2
+  exit 2
+fi
+
+bundle_path="$(mktemp)"
+trap 'rm -f "$bundle_path"' EXIT
+cat > "$bundle_path"
+
+python3 - "$bundle_path" "$result_path" <<'PY'
+import json
+import sys
+
+bundle_path, result_path = sys.argv[1:3]
+try:
+    with open(bundle_path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+except json.JSONDecodeError:
+    payload = {}
+request = payload.get("request", payload)
+if not isinstance(request, dict):
+    request = {}
+result = {
+    "task_ref": request.get("task_ref", ""),
+    "run_ref": request.get("run_ref", ""),
+    "phase": request.get("phase", ""),
+    "success": True,
+    "summary": "scaffold worker completed without changes",
+    "failing_command": None,
+    "observed_state": None,
+    "rework_required": False,
+    "changed_files": {},
+    "review_disposition": {
+        "kind": "completed",
+        "repo_scope": "all",
+        "summary": "scaffold worker self-review clean",
+        "description": "No changes were required by the scaffold worker.",
+        "finding_key": "none",
+    },
+}
+with open(result_path, "w", encoding="utf-8") as handle:
+    json.dump(result, handle, indent=2)
+    handle.write("\n")
+PY
+`
+
+const goWorkerScaffold = `package main
+
+import (
+	"encoding/json"
+	"flag"
+	"os"
+)
+
+func main() {
+	schemaPath := flag.String("schema", "", "worker response schema path")
+	resultPath := flag.String("result", "", "worker result path")
+	flag.Parse()
+	_ = schemaPath
+	if *resultPath == "" {
+		panic("--result is required")
+	}
+
+	payload := map[string]any{}
+	_ = json.NewDecoder(os.Stdin).Decode(&payload)
+	request, ok := payload["request"].(map[string]any)
+	if !ok {
+		request = payload
+	}
+
+	result := map[string]any{
+		"task_ref":         stringValue(request["task_ref"]),
+		"run_ref":          stringValue(request["run_ref"]),
+		"phase":            stringValue(request["phase"]),
+		"success":          true,
+		"summary":          "scaffold worker completed without changes",
+		"failing_command":  nil,
+		"observed_state":   nil,
+		"rework_required":  false,
+		"changed_files":    map[string]any{},
+		"review_disposition": map[string]any{
+			"kind":        "completed",
+			"repo_scope":  "all",
+			"summary":     "scaffold worker self-review clean",
+			"description": "No changes were required by the scaffold worker.",
+			"finding_key": "none",
+		},
+	}
+	file, err := os.Create(*resultPath)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(result); err != nil {
+		panic(err)
+	}
+}
+
+func stringValue(value any) string {
+	text, _ := value.(string)
+	return text
+}
+`

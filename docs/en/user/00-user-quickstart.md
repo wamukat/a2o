@@ -150,6 +150,18 @@ runtime:
 
 Implementation and review executors receive a stdin-bundle worker request and write worker result JSON to `{{result_path}}`.
 
+To create a minimal worker during package setup:
+
+```sh
+a2o worker scaffold --language python --output ./project-package/commands/a2o-worker.py
+```
+
+To check a custom worker result outside runtime execution:
+
+```sh
+a2o worker validate-result --request request.json --result result.json
+```
+
 Executor placeholders:
 
 - `{{schema_path}}`

@@ -160,6 +160,18 @@ runtime:
 
 `runtime.phases.<phase>.executor.command` は implementation / review を実行する agent 側 command である。A2O は worker request を stdin bundle として渡し、executor は `{{result_path}}` に worker result JSON を書く。executor command では `{{schema_path}}`、`{{result_path}}`、`{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` を placeholder として使える。verification / remediation command では `{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` を使える。
 
+Package setup 時に最小 worker を作る場合は次を使う。
+
+```sh
+a2o worker scaffold --language python --output ./project-package/commands/a2o-worker.py
+```
+
+Custom worker の result を runtime 実行前に確認する場合は次を使う。
+
+```sh
+a2o worker validate-result --request request.json --result result.json
+```
+
 `agent.required_bins` には agent 環境で必要な binary を書く。Node product なら `node` と `npm`、Go product なら `go`、Python product なら `python3`、executor が使う AI CLI や helper binary も含める。
 
 ### Generated files
