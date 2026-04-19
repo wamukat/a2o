@@ -56,6 +56,8 @@ runtime:
 A2O はこの command を内部 stdin-bundle protocol に展開する。
 executor は worker result JSON を `{{result_path}}` に書き出す。
 
+Stable script contract は [55-project-script-contract.md](55-project-script-contract.md) で定義する。Project scripts は private runtime metadata files ではなく、`A2O_*` worker environment names と `slot_paths` などの request fields を使う。
+
 ## 5. Verification And Remediation
 
 Verification commands と remediation commands は project が所有する。

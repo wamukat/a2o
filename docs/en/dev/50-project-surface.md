@@ -54,6 +54,8 @@ runtime:
 
 A2O expands that command into the internal stdin-bundle protocol. The executor writes worker result JSON to `{{result_path}}`.
 
+The stable script contract is defined in [55-project-script-contract.md](55-project-script-contract.md). Project scripts should use `A2O_*` worker environment names and request fields such as `slot_paths`, not private runtime metadata files.
+
 ## Verification And Remediation
 
 Verification and remediation commands are project-owned. They run in the materialized workspace and may use these placeholders:

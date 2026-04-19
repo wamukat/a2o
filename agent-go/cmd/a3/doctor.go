@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -47,6 +48,7 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 	} else {
 		report("project_package", true, "project.yaml schema_version="+packageConfig.SchemaVersion+" package="+packageConfig.PackageName, "none")
 		checkExecutorConfig(packageConfig, report)
+		checkProjectScriptContract(config.PackagePath, report)
 		checkRequiredCommands(packageConfig, runner, report)
 		checkRepoClean(config.PackagePath, packageConfig, runner, report)
 	}
@@ -124,6 +126,61 @@ func checkRequiredCommands(config projectPackageConfig, runner commandRunner, re
 			report("agent_required_command."+bin, true, bin+" found on host agent PATH", "none")
 		}
 	}
+}
+
+func checkProjectScriptContract(packagePath string, report func(string, bool, string, string)) {
+	findings := []string{}
+	patterns := []string{
+		"A3_WORKER_REQUEST_PATH",
+		"A3_WORKER_RESULT_PATH",
+		"A3_WORKSPACE_ROOT",
+		"A3_WORKER_LAUNCHER_CONFIG_PATH",
+		".a3/workspace.json",
+		".a3/slot.json",
+		"launcher.json",
+	}
+	err := filepath.WalkDir(packagePath, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		name := entry.Name()
+		if entry.IsDir() {
+			switch name {
+			case ".git", ".work", "node_modules", "vendor", "target", "dist", "build":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() || info.Size() > 1024*1024 {
+			return nil
+		}
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(body)
+		for _, pattern := range patterns {
+			if strings.Contains(text, pattern) {
+				rel, _ := filepath.Rel(packagePath, path)
+				findings = append(findings, rel+":"+pattern)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		report("project_script_contract", false, err.Error(), "inspect project package files")
+		return
+	}
+	if len(findings) > 0 {
+		sort.Strings(findings)
+		report("project_script_contract", false, strings.Join(findings, ","), "use A2O_* worker env and worker request fields instead of internal runtime files")
+		return
+	}
+	report("project_script_contract", true, "public A2O script contract only", "none")
 }
 
 func executorCommandBins(executor map[string]any) []string {

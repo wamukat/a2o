@@ -44,10 +44,11 @@ Defines fixed repo slots, synchronization, freshness, retention, garbage collect
 ### 5. Project Surface
 
 - [50-project-surface.md](50-project-surface.md)
+- [55-project-script-contract.md](55-project-script-contract.md)
 - [../user/10-project-package-schema.md](../user/10-project-package-schema.md)
 - [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md)
 
-Defines the project package schema, project commands, repo slots, verification, and extension boundaries.
+Defines the project package schema, project script contract, repo slots, verification, and extension boundaries.
 
 ### 6. Evidence / Rerun / Blocked Diagnosis
 

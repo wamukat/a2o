@@ -44,10 +44,11 @@ fixed repo slot、同期方針、freshness、retention、GC、merge workspace �
 ### 5. Project Surface
 
 - [50-project-surface.md](50-project-surface.md)
+- [55-project-script-contract.md](55-project-script-contract.md)
 - [../user/10-project-package-schema.md](../user/10-project-package-schema.md)
 - [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md)
 
-project package schema、project 固有 command、repo slot、verification、bootstrap hook の境界を扱う。
+project package schema、project script contract、repo slot、verification、bootstrap hook の境界を扱う。
 
 ### 6. evidence / rerun / blocked diagnosis
 

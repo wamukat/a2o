@@ -104,6 +104,8 @@ Verification and remediation commands support:
 - `{{a2o_root_dir}}`
 - `{{root_dir}}`
 
+Project commands should treat the worker request JSON and `A2O_*` worker environment variables as the stable contract. Do not read private `.a3` metadata files or generated `launcher.json` files from package scripts.
+
 ## Current Status
 
 1. One loader reads `project.yaml` schema version `1`.

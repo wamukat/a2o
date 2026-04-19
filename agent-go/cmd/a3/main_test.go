@@ -825,6 +825,7 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 	for _, want := range []string{
 		"doctor_check name=project_package status=ok",
 		"doctor_check name=executor_config status=ok detail=commands=sh",
+		"doctor_check name=project_script_contract status=ok detail=public A2O script contract only",
 		"doctor_check name=agent_required_command.sh status=ok",
 		"doctor_check name=repo_clean.app status=ok detail=" + repoDir,
 		"doctor_check name=agent_install status=ok",
@@ -833,6 +834,87 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 		"doctor_check name=runtime_container status=ok detail=A2O runtime container=runtime-container",
 		"doctor_check name=runtime_image_digest status=ok detail=ghcr.io/wamukat/a2o-engine@sha256:test",
 		"doctor_status=ok",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("doctor output missing %q in:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	repoDir := filepath.Join(tempDir, "repo")
+	if err := os.MkdirAll(filepath.Join(packageDir, "commands"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(repoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectYaml := strings.Join([]string{
+		"schema_version: 1",
+		"package:",
+		"  name: sample",
+		"kanban:",
+		"  project: Sample",
+		"repos:",
+		"  app:",
+		"    path: ../repo",
+		"agent:",
+		"  required_bins: [\"sh\"]",
+		"runtime:",
+		"  phases:",
+		"    implementation:",
+		"      skill: skills/implementation/base.md",
+		"      executor:",
+		"        command: [\"sh\", \"-c\", \"echo ok\"]",
+		"    review:",
+		"      skill: skills/review/default.md",
+		"    merge:",
+		"      target: merge_to_live",
+		"      policy: ff_only",
+		"      target_ref: refs/heads/main",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	privateScript := "echo $A3_WORKER_REQUEST_PATH && cat .a3/workspace.json\n"
+	if err := os.WriteFile(filepath.Join(packageDir, "commands", "worker.sh"), []byte(privateScript), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-sample",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+	})
+	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
+	if err := os.MkdirAll(filepath.Dir(agentPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(agentPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	withChdir(t, tempDir, func() {
+		code := run([]string{"doctor"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("doctor should fail for private script contract usage, stdout=%s", stdout.String())
+		}
+	})
+
+	for _, want := range []string{
+		"doctor_check name=project_script_contract status=blocked",
+		"commands/worker.sh:.a3/workspace.json",
+		"commands/worker.sh:A3_WORKER_REQUEST_PATH",
+		"action=use A2O_* worker env and worker request fields instead of internal runtime files",
 	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("doctor output missing %q in:\n%s", want, stdout.String())
