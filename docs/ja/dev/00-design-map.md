@@ -26,10 +26,11 @@ flowchart TB
   subgraph Engine["A2O Engine"]
     Scheduler["scheduler\n実行可能な kanban task を選ぶ"]
     Plan["phase instruction を組み立てる\nproject.yaml と skills から生成"]
-    Execute["phase を実行する\nimplementation / review / remediation / merge"]
+    Execute["phase job を発行する\nimplementation / review / remediation / merge"]
     Report["結果を記録する\nevidence / summaries / kanban comments / status changes"]
   end
 
+  Agent["a2o-agent\nhost または dev-env で project command を実行する"]
   AI["生成AI\ntask を解釈し作業を進める"]
   Kanban["kanban\nwork queue / visible state"]
   ProjectYaml["project.yaml\nrepos / phases / commands / scheduler settings"]
@@ -44,18 +45,19 @@ flowchart TB
   Scheduler --> Plan
   ProjectYaml --> Plan
   Skills --> Plan
-  Plan --> AI
-  AI --> Execute
-  Execute --> AI
-  Execute --> Workspace
-  Execute --> Report
+  Plan --> Execute
+  Execute --> Agent
+  Agent --> AI
+  AI --> Agent
+  Agent --> Workspace
+  Agent --> Report
   Report --> Workspace
   Report --> Kanban
   Kanban --> Observe
   Workspace --> Observe
 ```
 
-通常利用では、利用者は kanban task を作り、project package を最新に保つ。常駐 scheduler は kanban から実行可能な task を選ぶ。Engine は `project.yaml` から project 構造と実行可能な phase command を読み、skills から phase guidance を読み、生成AIに作業を進めさせる。結果は workspace evidence と kanban 上の status として記録される。
+通常利用では、利用者は kanban task を作り、project package を最新に保つ。常駐 scheduler は kanban から実行可能な task を選ぶ。Engine は `project.yaml` から project 構造と実行可能な phase command を読み、skills から phase guidance を読み、phase job を発行する。`a2o-agent` は host または project dev-env で project command を実行し、その command が生成AIを呼び出す。Engine は返却された結果を workspace evidence と kanban 上の status として記録する。
 
 ## 設計資料一覧
 

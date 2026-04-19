@@ -26,10 +26,11 @@ flowchart TB
   subgraph Engine["A2O Engine"]
     Scheduler["Scheduler\nselects runnable kanban tasks"]
     Plan["Builds phase instructions\nfrom project.yaml and skills"]
-    Execute["Executes phases\nimplementation, review, remediation, merge"]
+    Execute["Publishes phase jobs\nimplementation, review, remediation, merge"]
     Report["Records the result\nevidence, summaries, kanban comments, status changes"]
   end
 
+  Agent["a2o-agent\nruns project commands on host or dev environment"]
   AI["Generative AI\ninterprets task and produces work"]
   Kanban["Kanban\nwork queue and visible state"]
   ProjectYaml["project.yaml\nrepos, phases, commands, scheduler settings"]
@@ -44,18 +45,19 @@ flowchart TB
   Scheduler --> Plan
   ProjectYaml --> Plan
   Skills --> Plan
-  Plan --> AI
-  AI --> Execute
-  Execute --> AI
-  Execute --> Workspace
-  Execute --> Report
+  Plan --> Execute
+  Execute --> Agent
+  Agent --> AI
+  AI --> Agent
+  Agent --> Workspace
+  Agent --> Report
   Report --> Workspace
   Report --> Kanban
   Kanban --> Observe
   Workspace --> Observe
 ```
 
-In normal use, the user creates a kanban task and keeps the project package up to date. The resident scheduler picks runnable tasks from kanban. The Engine reads `project.yaml` for the project structure and executable phase commands, reads skills for phase guidance, asks Generative AI to perform the work, and records the outcome as workspace evidence and kanban-visible status.
+In normal use, the user creates a kanban task and keeps the project package up to date. The resident scheduler picks runnable tasks from kanban. The Engine reads `project.yaml` for the project structure and executable phase commands, reads skills for phase guidance, and publishes phase jobs. `a2o-agent` runs those project commands on the host or project dev environment, including commands that call Generative AI. The Engine records the returned outcome as workspace evidence and kanban-visible status.
 
 ## Documents
 
