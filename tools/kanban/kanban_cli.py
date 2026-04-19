@@ -302,6 +302,13 @@ def normalize_task_detail(task: dict[str, Any], *, project_title: str) -> dict[s
     return normalized
 
 
+def summarize_description(description: str, *, limit: int = 160) -> str:
+    single_line = " ".join(line.strip() for line in description.splitlines() if line.strip())
+    if len(single_line) <= limit:
+        return single_line
+    return single_line[: limit - 3].rstrip() + "..."
+
+
 def normalize_task_snapshot(
     base_url: str,
     token: str,
@@ -342,6 +349,7 @@ def normalize_task_snapshot(
 
     related_tasks = relation_tasks_payload(base_url, token, task_id=task_id)
     detailed_task = get_task(base_url, token, task_id)
+    description = str(detailed_task.get("description") or detailed_task.get("bodyMarkdown") or task.get("description") or "")
     tags = detailed_task.get("tags") if isinstance(detailed_task, dict) else None
     if not isinstance(tags, list):
         raise RuntimeError("Unexpected SoloBoard task tags response.")
@@ -363,6 +371,8 @@ def normalize_task_snapshot(
     ]
     normalized = {
         **normalize_task_summary(task, project_title=project_title),
+        "description": description,
+        "description_summary": summarize_description(description),
         "labels": list(label_titles),
         "blocking_task_refs": list(sorted(set(blocked_refs))),
         "parent_refs": parent_refs,
@@ -1355,6 +1365,8 @@ def cmd_task_create(args: argparse.Namespace) -> int:
             "bodyMarkdown": description,
         },
     )
+    if isinstance(created, dict) and not created.get("bodyMarkdown"):
+        created = {**created, "bodyMarkdown": description}
     board_title = str(board_shell.get("board", {}).get("name") or project_id)
     return print_json(normalize_task_detail(soloboard_normalize_ticket(created, board_title=board_title, board_shell=board_shell), project_title=board_title))
 

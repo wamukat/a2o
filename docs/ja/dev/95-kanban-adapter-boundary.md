@@ -78,3 +78,9 @@ Native adapter は次を維持しなければならない。
 - JSON object/array shape validation and fail-fast errors
 
 最初の slice では SoloBoard API や public Kanban CLI の変更は不要である。
+
+## Multiline Text Contract（multiline text contract）
+
+Automation は task description と comment を `--description-file`、`--append-description-file`、`--comment-file` のような file-backed option で渡す。Kanban CLI の successful write operation は stdout に JSON だけを返すため、呼び出し側は text scraping ではなく JSON parser で task id/ref を取得する。
+
+`task-create --description-file` と `task-update --description-file` は multiline markdown を `description` に保持する。`task-snapshot-list` は backend が本文を返す場合に full `description` を含め、dashboard や log 用に single-line preview の `description_summary` も含める。`description` が空の場合は、その task の body を backend が返さなかったことを示し、JSON transport failure ではない。

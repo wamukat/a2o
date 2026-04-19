@@ -62,3 +62,9 @@ Any native adapter must preserve:
 - JSON object/array shape validation and fail-fast errors
 
 No SoloBoard API or public kanban CLI changes are required for the first native-adapter slice.
+
+## Multiline Text Contract
+
+Automation must pass task descriptions and comments with file-backed options such as `--description-file`, `--append-description-file`, and `--comment-file`. The kanban CLI returns only JSON on stdout for successful write operations, so callers should parse the returned task id/ref with a JSON parser instead of scraping text.
+
+`task-create --description-file` and `task-update --description-file` preserve multiline markdown in `description`. `task-snapshot-list` includes the full `description` when the backend exposes it and also includes `description_summary`, a single-line preview for dashboards and logs. An empty `description` means the backend returned no body for that task; it is not a JSON transport failure.

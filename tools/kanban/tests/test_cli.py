@@ -3,9 +3,11 @@ import io
 import json
 import os
 import sys
+import tempfile
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 
@@ -155,6 +157,108 @@ class SoloBoardCliTest(unittest.TestCase):
             value="line 1\nline 2",
             file_path=None,
         )
+
+    def test_task_create_description_file_returns_parseable_json_with_multiline_description(self) -> None:
+        description = "## Scope\n\n- line 1\n- line 2\n"
+        board_shell = {
+            "board": {"id": 42, "name": "Sample"},
+            "lanes": [{"id": 7, "name": "To do", "position": 0}],
+        }
+        calls: list[tuple[str, str, dict[str, object] | None]] = []
+
+        def fake_rest_request(_base_url, _token, method, path, *, payload=None):
+            calls.append((method, path, payload))
+            if method == "GET" and path == "/api/boards":
+                return {"boards": [{"id": 42, "name": "Sample"}]}
+            if method == "GET" and path == "/api/boards/42":
+                return board_shell
+            if method == "POST" and path == "/api/boards/42/tickets":
+                self.assertEqual(description, payload["bodyMarkdown"])
+                return {
+                    "id": 101,
+                    "boardId": 42,
+                    "laneId": 7,
+                    "title": payload["title"],
+                    "isResolved": False,
+                    "position": 0,
+                    "ref": "Sample#101",
+                    "shortRef": "#101",
+                }
+            raise AssertionError(f"unexpected request: {method} {path}")
+
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
+            handle.write(description)
+            description_path = handle.name
+        try:
+            args = SimpleNamespace(
+                backend="soloboard",
+                base_url="http://localhost:3460",
+                token="",
+                project_id=None,
+                project="Sample",
+                title="Multiline task",
+                description=None,
+                description_file=description_path,
+                status=None,
+            )
+            stdout = io.StringIO()
+            with patch.object(kanban_cli, "rest_request", side_effect=fake_rest_request), contextlib.redirect_stdout(stdout):
+                self.assertEqual(0, kanban_cli.cmd_task_create(args))
+        finally:
+            os.unlink(description_path)
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(101, payload["id"])
+        self.assertEqual("Sample#101", payload["ref"])
+        self.assertEqual(description, payload["description"])
+        self.assertEqual(("POST", "/api/boards/42/tickets"), calls[-1][:2])
+
+    def test_task_snapshot_uses_full_description_and_summary_from_detail(self) -> None:
+        description = "Heading\n\nfirst line\nsecond line"
+
+        with (
+            patch.object(kanban_cli, "relation_tasks_payload", return_value={}),
+            patch.object(
+                kanban_cli,
+                "get_task",
+                return_value={
+                    "id": 101,
+                    "project_id": 42,
+                    "column_id": 7,
+                    "priority": 0,
+                    "done": False,
+                    "reference": "Sample#101",
+                    "identifier": "#101",
+                    "index": 101,
+                    "title": "Snapshot task",
+                    "description": description,
+                    "tags": [{"id": 1, "name": "trigger:auto-implement"}],
+                },
+            ),
+        ):
+            snapshot = kanban_cli.normalize_task_snapshot(
+                "http://localhost:3460",
+                "",
+                {
+                    "id": 101,
+                    "project_id": 42,
+                    "column_id": 7,
+                    "priority": 0,
+                    "done": False,
+                    "reference": "Sample#101",
+                    "identifier": "#101",
+                    "index": 101,
+                    "title": "Snapshot task",
+                    "description": "",
+                    "status": "To do",
+                },
+                project_title="Sample",
+                project_titles_by_id={42: "Sample"},
+            )
+
+        self.assertEqual(description, snapshot["description"])
+        self.assertEqual("Heading first line second line", snapshot["description_summary"])
+        self.assertEqual(["trigger:auto-implement"], snapshot["labels"])
 
 
 if __name__ == "__main__":
