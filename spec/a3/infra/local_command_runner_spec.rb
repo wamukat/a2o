@@ -51,15 +51,24 @@ RSpec.describe A3::Infra::LocalCommandRunner do
   end
 
   it "expands public command placeholders before execution" do
-    result_path = File.join(tmpdir, "placeholder-result.txt")
+    workspace_root = File.join(tmpdir, "workspace with spaces; no shell")
+    FileUtils.mkdir_p(workspace_root)
+    prepared_workspace = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: :runtime_workspace,
+      root_path: Pathname(workspace_root),
+      source_descriptor: workspace.source_descriptor,
+      slot_paths: {}
+    )
+    result_path = File.join(workspace_root, "placeholder-result.txt")
+    a2o_root = File.join(tmpdir, "a2o root; no shell")
 
     result = described_class.new.run(
       ["ruby -e 'File.write(ARGV.fetch(0), ARGV.fetch(1))' {{workspace_root}}/placeholder-result.txt {{a2o_root_dir}}"],
-      workspace: workspace,
-      env: { "A2O_ROOT_DIR" => "/opt/a2o-test" }
+      workspace: prepared_workspace,
+      env: { "A2O_ROOT_DIR" => a2o_root }
     )
 
     expect(result.success?).to be(true)
-    expect(File.read(result_path)).to eq("/opt/a2o-test")
+    expect(File.read(result_path)).to eq(a2o_root)
   end
 end

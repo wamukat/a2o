@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "open3"
+require "shellwords"
 require "a3/infra/workspace_trace_logger"
 
 module A3
@@ -58,7 +59,8 @@ module A3
           "root_dir" => env.fetch("A2O_ROOT_DIR")
         }
         command.to_s.gsub(/\{\{([a-z0-9_]+)\}\}/) do |match|
-          replacements.fetch(Regexp.last_match(1), match)
+          value = replacements.fetch(Regexp.last_match(1), nil)
+          value.nil? ? match : Shellwords.shellescape(value)
         end
       end
     end
