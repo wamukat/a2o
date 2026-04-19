@@ -38,7 +38,7 @@ a2o runtime status
 a2o runtime stop
 ```
 
-runtime image の中では `bin/a3` が Engine CLI として残る。これは内部互換名であり、利用者向けの正規入口は `a2o` と `a2o-agent` である。公開名称と内部互換名の境界は [docs/92-a2o-public-branding-boundary.md](docs/92-a2o-public-branding-boundary.md) にまとめる。
+runtime image の中では `bin/a3` が Engine CLI として残る。これは内部互換名であり、利用者向けの正規入口は `a2o` と `a2o-agent` である。
 
 現行の公開 launcher は setup、kanban lifecycle、agent install、foreground runtime execution、resident scheduler lifecycle を提供する。
 

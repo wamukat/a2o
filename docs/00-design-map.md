@@ -17,10 +17,8 @@
 ### 0. 利用者導線
 
 - [90-user-quickstart.md](90-user-quickstart.md)
-- [91-project-yaml-migration-guide.md](91-project-yaml-migration-guide.md)
-- [92-a2o-public-branding-boundary.md](92-a2o-public-branding-boundary.md)
 
-`90` は A2O を導入する利用者向けのマニュアルである。`91` は旧 package config から `project.yaml` schema v1 への移行を扱う。`92` は公開名称 `A2O` と内部互換名 `A3` の境界を扱う。
+`90` は A2O を導入する利用者向けのマニュアルである。
 
 ### 1. 実装規律
 
