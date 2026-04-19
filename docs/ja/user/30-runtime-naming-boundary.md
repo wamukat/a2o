@@ -1,6 +1,6 @@
 # Runtime Naming Boundary（runtime 命名境界）
 
-A2O の正式名称は Agent-to-Operations であり、公開 product 名である。A3 は、まだ rename していない code path、state path、Engine CLI surface に残る内部互換名として扱う。
+A2O の正式名称は Agentic AI Orchestrator であり、公開 product 名である。A3 は旧 Agentic AI Automation 名であり、まだ rename していない code path、state path、Engine CLI surface に残る内部互換名として扱う。
 
 ## 公開名
 

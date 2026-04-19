@@ -1,6 +1,6 @@
 # Runtime Naming Boundary
 
-A2O stands for Agent-to-Operations and is the public product name. A3 remains an internal compatibility name in code paths, state paths, and Engine CLI surfaces that have not been renamed.
+A2O stands for Agentic AI Orchestrator and is the public product name. A3 is the former Agentic AI Automation name and remains an internal compatibility name in code paths, state paths, and Engine CLI surfaces that have not been renamed.
 
 ## Public Names
 
