@@ -102,7 +102,7 @@
   <path class="dash" d="M246 421 C302 404 334 386 381 352"/>
   <path class="teal-line" d="M704 405 C760 392 792 334 835 286"/>
   <path class="line" d="M980 264 C1006 263 1026 263 1060 264"/>
-  <path class="line" d="M1162 374 C1139 399 1106 411 1051 425"/>
+  <path class="line" d="M1035 348 C1010 350 993 330 978 304"/>
   <path class="teal-line" d="M936 313 C930 344 934 365 960 383"/>
   <path class="line" d="M790 263 C776 258 763 250 750 232"/>
 
@@ -113,7 +113,7 @@
     <text x="304" y="386" class="muted">project inputs</text>
     <rect x="778" y="332" width="118" height="34" rx="17" fill="#ffffff" stroke="#99f6e4"/>
     <text x="799" y="355" class="muted">AI 実行 job</text>
-    <rect x="1032" y="386" width="84" height="34" rx="17" fill="#ffffff" stroke="#cbd5e1"/>
-    <text x="1051" y="409" class="muted">result</text>
+    <rect x="992" y="328" width="84" height="34" rx="17" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="1011" y="351" class="muted">result</text>
   </g>
 </svg>
