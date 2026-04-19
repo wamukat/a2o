@@ -729,6 +729,10 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	readme := "Historical note: A3_WORKER_REQUEST_PATH and .a3/workspace.json are not public.\n"
+	if err := os.WriteFile(filepath.Join(packageDir, "README.md"), []byte(readme), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
 		SchemaVersion:  1,
 		PackagePath:    packageDir,
@@ -879,7 +883,7 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	privateScript := "echo $A3_WORKER_REQUEST_PATH && cat .a3/workspace.json\n"
+	privateScript := "echo $A3_WORKER_REQUEST_PATH && ruby -e 'puts File.join(\".a3\", \"workspace.json\")'\n"
 	if err := os.WriteFile(filepath.Join(packageDir, "commands", "worker.sh"), []byte(privateScript), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -130,15 +130,6 @@ func checkRequiredCommands(config projectPackageConfig, runner commandRunner, re
 
 func checkProjectScriptContract(packagePath string, report func(string, bool, string, string)) {
 	findings := []string{}
-	patterns := []string{
-		"A3_WORKER_REQUEST_PATH",
-		"A3_WORKER_RESULT_PATH",
-		"A3_WORKSPACE_ROOT",
-		"A3_WORKER_LAUNCHER_CONFIG_PATH",
-		".a3/workspace.json",
-		".a3/slot.json",
-		"launcher.json",
-	}
 	err := filepath.WalkDir(packagePath, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -155,19 +146,16 @@ func checkProjectScriptContract(packagePath string, report func(string, bool, st
 		if err != nil {
 			return err
 		}
-		if !info.Mode().IsRegular() || info.Size() > 1024*1024 {
+		if !info.Mode().IsRegular() || info.Size() > 1024*1024 || !isProjectScriptContractScanTarget(packagePath, path, info.Mode()) {
 			return nil
 		}
 		body, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		text := string(body)
-		for _, pattern := range patterns {
-			if strings.Contains(text, pattern) {
-				rel, _ := filepath.Rel(packagePath, path)
-				findings = append(findings, rel+":"+pattern)
-			}
+		for _, violation := range projectScriptContractViolations(string(body)) {
+			rel, _ := filepath.Rel(packagePath, path)
+			findings = append(findings, rel+":"+violation)
 		}
 		return nil
 	})
@@ -181,6 +169,65 @@ func checkProjectScriptContract(packagePath string, report func(string, bool, st
 		return
 	}
 	report("project_script_contract", true, "public A2O script contract only", "none")
+}
+
+func isProjectScriptContractScanTarget(packagePath string, path string, mode os.FileMode) bool {
+	rel, err := filepath.Rel(packagePath, path)
+	if err != nil {
+		return false
+	}
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	if len(parts) > 1 {
+		switch parts[0] {
+		case "commands", "inject", "scripts", "bin":
+			return true
+		}
+	}
+	if mode&0o111 != 0 {
+		return true
+	}
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".sh", ".bash", ".zsh", ".rb", ".py", ".js", ".mjs", ".cjs", ".ts", ".go":
+		return true
+	default:
+		return false
+	}
+}
+
+func projectScriptContractViolations(text string) []string {
+	violations := []string{}
+	checks := []struct {
+		label string
+		match func(string) bool
+	}{
+		{"A3_WORKER_REQUEST_PATH", func(value string) bool {
+			return strings.Contains(value, "A3_WORKER_REQUEST_PATH") || (strings.Contains(value, "A3") && strings.Contains(value, "WORKER_REQUEST_PATH"))
+		}},
+		{"A3_WORKER_RESULT_PATH", func(value string) bool {
+			return strings.Contains(value, "A3_WORKER_RESULT_PATH") || (strings.Contains(value, "A3") && strings.Contains(value, "WORKER_RESULT_PATH"))
+		}},
+		{"A3_WORKSPACE_ROOT", func(value string) bool {
+			return strings.Contains(value, "A3_WORKSPACE_ROOT") || (strings.Contains(value, "A3") && strings.Contains(value, "WORKSPACE_ROOT"))
+		}},
+		{"A3_WORKER_LAUNCHER_CONFIG_PATH", func(value string) bool {
+			return strings.Contains(value, "A3_WORKER_LAUNCHER_CONFIG_PATH") || (strings.Contains(value, "A3") && strings.Contains(value, "WORKER_LAUNCHER_CONFIG_PATH"))
+		}},
+		{".a3/workspace.json", func(value string) bool {
+			return strings.Contains(value, ".a3/workspace.json") || (strings.Contains(value, ".a3") && strings.Contains(value, "workspace.json"))
+		}},
+		{".a3/slot.json", func(value string) bool {
+			return strings.Contains(value, ".a3/slot.json") || (strings.Contains(value, ".a3") && strings.Contains(value, "slot.json"))
+		}},
+		{"launcher.json", func(value string) bool {
+			return strings.Contains(value, "launcher.json") || (strings.Contains(value, "launcher") && strings.Contains(value, ".json"))
+		}},
+	}
+	for _, check := range checks {
+		if check.match(text) {
+			violations = append(violations, check.label)
+		}
+	}
+	return violations
 }
 
 func executorCommandBins(executor map[string]any) []string {
