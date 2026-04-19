@@ -926,6 +926,82 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 	}
 }
 
+func TestDoctorFlagsPrivateContractUsageInProjectYaml(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	repoDir := filepath.Join(tempDir, "repo")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(repoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectYaml := strings.Join([]string{
+		"schema_version: 1",
+		"package:",
+		"  name: sample",
+		"kanban:",
+		"  project: Sample",
+		"repos:",
+		"  app:",
+		"    path: ../repo",
+		"agent:",
+		"  required_bins: [\"sh\"]",
+		"runtime:",
+		"  phases:",
+		"    implementation:",
+		"      skill: skills/implementation/base.md",
+		"      executor:",
+		"        command: [\"sh\", \"-c\", \"echo $A3_WORKER_RESULT_PATH && cat .a3/slot.json\"]",
+		"    review:",
+		"      skill: skills/review/default.md",
+		"    merge:",
+		"      target: merge_to_live",
+		"      policy: ff_only",
+		"      target_ref: refs/heads/main",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-sample",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+	})
+	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
+	if err := os.MkdirAll(filepath.Dir(agentPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(agentPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	withChdir(t, tempDir, func() {
+		code := run([]string{"doctor"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("doctor should fail for private project.yaml contract usage, stdout=%s", stdout.String())
+		}
+	})
+
+	for _, want := range []string{
+		"doctor_check name=project_script_contract status=blocked",
+		"project.yaml:.a3/slot.json",
+		"project.yaml:A3_WORKER_RESULT_PATH",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("doctor output missing %q in:\n%s", want, stdout.String())
+		}
+	}
+}
+
 func TestDoctorAgentInstallFailureShowsExactOutputPath(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

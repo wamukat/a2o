@@ -177,6 +177,9 @@ func isProjectScriptContractScanTarget(packagePath string, path string, mode os.
 		return false
 	}
 	parts := strings.Split(filepath.ToSlash(rel), "/")
+	if len(parts) == 1 && parts[0] == "project.yaml" {
+		return true
+	}
 	if len(parts) > 1 {
 		switch parts[0] {
 		case "commands", "inject", "scripts", "bin":
