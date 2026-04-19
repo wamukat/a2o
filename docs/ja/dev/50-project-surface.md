@@ -1,213 +1,91 @@
-# A3 Project Surface and Presets
+# A2O Project Surface
 
-対象読者: A3 設計者 / PJ manifest 設計者 / 実装者
-文書種別: 設計メモ
+対象読者: A2O 設計者 / project package 作成者 / 実装者
+文書種別: project surface 設計
 
-この文書は、A3 における PJ 固有知識の表現面を最小集合に絞り、
-巨大な product surface にならないようにするためのもの。
+この文書は、project が所有する設定面を小さく保つためのもの。
+project package は product 固有知識を表現するが、`project.yaml` を無制限な Engine 設定ファイルにしてはならない。
 
 ## 1. 目的
 
-- PJ 固有知識の注入面を最小集合に絞る
-- V1 の複雑性を別レイヤへ横流ししない
-- manifest を「何でも書ける設定ファイル」ではなく、preset をベースに差分だけを持つ surface にする
+- project 固有の注入点を最小限に保つ。
+- 過去の product 固有複雑性を Engine core へ持ち込まない。
+- `project.yaml` を runtime 内部設定の寄せ集めではなく、明確な package config にする。
+- task lifecycle、workspace topology、evidence、merge semantics は A2O が所有する。
 
-## 2. 原則
+## 2. Minimal Surface
 
-### 2.1 最小 surface
-
-PJ が自由に差し替える surface は次を基本とする。
+Project package が設定してよいもの:
 
 - implementation skill
 - review skill
+- parent review skill
+- implementation / review executor commands
 - verification commands
 - remediation commands
+- repo slots and labels
+- A2O がサポートする範囲内の merge target and policy
 
-これ以上の注入点は、既存 surface や variant/preset で吸収できない場合に限って検討する。
+## 3. Core-Owned Behavior
 
-### 2.2 core config と PJ surface を分ける
+Project package は次を再定義しない。
 
-次は core execution config であり、PJ の自由拡張 surface とは分ける。
-
-- task kind
-- branch topology
-- merge target
-- merge policy
+- task kind semantics
+- phase semantics
 - workspace topology
 - rerun semantics
+- evidence model
+- scheduler behavior
+- kanban provider implementation
 
-PJ はこれらの意味を上書きしない。
+## 4. Phase Commands
 
-`merge target` と `merge policy` は次のように扱う。
+公開 schema は次の形を使う。
 
-- core config
-  - 許可される merge topology と merge policy の型を定義する
-  - 例: `merge_to_live`, `merge_to_parent`, `ff_only`, `no_ff`
-- preset
-  - task kind / topology に応じた既定値を選ぶ
-- project override
-  - core config が許可した候補の中から選択だけできる
-  - 新しい merge semantics を定義してはならない
+```yaml
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - your-ai-worker
+          - "--schema"
+          - "{{schema_path}}"
+          - "--result"
+          - "{{result_path}}"
+```
 
-### 2.3 variant で吸収する
+A2O はこの command を内部 stdin-bundle protocol に展開する。
+executor は worker result JSON を `{{result_path}}` に書き出す。
 
-`parent review` や `repo kind` の差を、新しい surface 増設で解かない。
+## 5. Verification And Remediation
 
-差分は次の入力で variant として解決する。
+Verification commands と remediation commands は project が所有する。
+これらは materialized workspace で実行され、次の placeholders を使える。
 
-- task kind
-- repo scope
-- phase
+- `{{workspace_root}}`
+- `{{a2o_root_dir}}`
+- `{{root_dir}}`
 
-## 3. Minimal Injection Surface
+Remediation commands は、verification failure に対して deterministic な formatting や repair command がある場合に使う。
 
-### 3.1 implementation skill
+## 6. Merge
 
-implementation worker に渡す skill。
+Merge は、A2O がサポートする behavior から選択する。
 
-役割:
+```yaml
+runtime:
+  phases:
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main
+```
 
-- 実装時の行動規範
-- 変更のまとめ方
-- commit 前に見るべき観点
+Project は target と policy を選択できるが、`project.yaml` の中で新しい merge semantics を定義しない。
 
-### 3.2 review skill
+## 7. Presets
 
-review worker に渡す skill。
-
-役割:
-
-- review 観点
-- findings の出し方
-- current canonical flow では parent review の観点差を variant で吸収する
-
-single / child では `review_skill` を phase surface としては使わず、implementation evidence の self-review / findings fix に吸収する。
-
-### 3.3 verification commands
-
-runner-owned verification で実行する deterministic gate 群。
-
-役割:
-
-- build
-- test
-- static checks
-- generated artifact checks
-
-### 3.4 remediation commands
-
-verification failure に対する自動補正・再実行前処理。
-
-役割:
-
-- formatter 適用
-- generated artifact 再生成
-- lightweight recovery
-
-ただし、意味判断を伴う修正は remediation に入れない。
-
-## 4. Variant Resolution
-
-variant 解決は、surface の種類ごとに無制限に分岐させない。
-
-初期前提の key は次とする。
-
-- `task_kind`
-- `repo_scope`
-- `phase`
-
-例:
-
-- `review skill`
-  - child + repo-alpha
-  - child + repo-beta
-  - parent + both
-
-同じ意味の分岐を skill 側と command 側に二重で持たない。
-
-### 4.1 初期解決順序
-
-variant は次の順で解決する。
-
-1. `task_kind`
-2. `repo_scope`
-3. `phase`
-
-より後段の key は、前段で選ばれた variant tree の内部でだけ評価する。
-これにより、同値な条件分岐が preset と manifest の両方へ重複するのを避ける。
-
-## 5. Preset Strategy
-
-PJ はゼロから manifest を書くのではなく、preset を土台に差分だけを定義する。
-
-### 5.1 初期 preset 候補
-
-- single issue preset
-- parent-child preset
-- Java child preset
-- frontend child preset
-
-### 5.2 preset layering
-
-例:
-
-1. base preset
-2. topology preset
-3. repo kind preset
-4. project override
-
-この順で override されることを前提とする。
-
-override 衝突は「後勝ち」で黙殺しない。
-同じ key に対して互換しない値が重なった場合は、preset loader が configuration error として fail-fast する。
-
-### 5.3 boilerplate
-
-最初から提供するもの:
-
-- sample manifest
-- sample hook
-- sample skill
-- example preset chain
-
-## 6. Manifest の責務
-
-manifest は「domain rule を書く場所」ではない。
-
-manifest が持つのは次までに留める。
-
-- どの preset を使うか
-- どの skill/command/hook を選ぶか
-- どの variant が適用されるか
-
-manifest が持たないもの:
-
-- phase transition rule
-- rerun rule
-- blocked classification rule
-- workspace existence rule
-
-## 7. Non-Goals
-
-この文書の文脈では、次を非採用とする。
-
-- formatter/test framework 名を engine 側へ増やすこと
-- parent review のためだけに専用 surface を増やすこと
-- PJ ごとに branch topology や rerun semantics を自由に上書きさせること
-- 何でも書ける巨大 manifest DSL を作ること
-
-## 8. 後続へ渡す論点
-
-- `3028`
-  - preset loader / variant resolver の初期実装
-- 実装時 TODO
-  - variant 解決順序をコード上でどう表現するか
-  - preset override の衝突をどう検出するか
-
-## 9. この文書の完了条件
-
-- PJ 注入面が最小集合として定義されている
-- core config と PJ surface の境界が定義されている
-- variant で差分を吸収する方針が定義されている
-- preset / boilerplate の前提が定義されている
-- manifest が domain rule を持たないことが明記されている
+0.5.0 の公開 package format は単一ファイルの `project.yaml` である。
+Internal presets は実装詳細として残りうるが、package author が追加の preset file を管理する必要はない。

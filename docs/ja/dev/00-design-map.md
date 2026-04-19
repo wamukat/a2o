@@ -44,7 +44,7 @@ aggregate / entity / value object と状態遷移を扱う。
 
 fixed repo slot、同期方針、freshness、retention、GC、merge workspace を扱う。
 
-### 5. project surface / presets
+### 5. Project Surface
 
 - [50-project-surface.md](50-project-surface.md)
 - [../user/10-project-package-schema.md](../user/10-project-package-schema.md)

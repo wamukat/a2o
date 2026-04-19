@@ -1,6 +1,6 @@
-# A3 Evidence and Rerun Diagnosis
+# A2O Evidence and Rerun Diagnosis
 
-対象読者: A3 設計者 / 実装者 / 運用者
+対象読者: A2O 設計者 / 実装者 / 運用者
 文書種別: 設計メモ
 
 この文書は、review / verification / merge / rerun / blocked 調査の再現性を支える evidence model を固定するためのもの。
