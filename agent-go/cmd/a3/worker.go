@@ -198,24 +198,55 @@ func validatePublicWorkerPayload(payload map[string]any, request map[string]any)
 		if workerStringValue(payload["observed_state"]) == "" {
 			errors = append(errors, "observed_state must be a string when success is false")
 		}
+	} else {
+		if value, ok := payload["failing_command"]; ok && value != nil {
+			if _, ok := value.(string); !ok {
+				errors = append(errors, "failing_command must be a string or null when success is true")
+			}
+		}
+		if value, ok := payload["observed_state"]; ok && value != nil {
+			if _, ok := value.(string); !ok {
+				errors = append(errors, "observed_state must be a string or null when success is true")
+			}
+		}
+	}
+	if diagnostics, ok := payload["diagnostics"]; ok && diagnostics != nil {
+		if _, ok := diagnostics.(map[string]any); !ok {
+			errors = append(errors, "diagnostics must be an object")
+		}
 	}
 	if workerStringValue(request["phase"]) == "implementation" && success {
-		changedFiles, ok := payload["changed_files"].(map[string]any)
+		changedFiles, ok := payload["changed_files"]
 		if !ok {
 			errors = append(errors, "changed_files must be present for implementation success")
-		} else {
-			errors = append(errors, validateChangedFiles(changedFiles)...)
+		} else if changedFiles != nil {
+			changedFilesMap, ok := changedFiles.(map[string]any)
+			if !ok {
+				errors = append(errors, "changed_files must be an object when present")
+			} else {
+				errors = append(errors, validateChangedFiles(changedFilesMap)...)
+			}
 		}
-	} else if changedFiles, ok := payload["changed_files"].(map[string]any); ok {
-		errors = append(errors, validateChangedFiles(changedFiles)...)
-	} else if payload["changed_files"] != nil {
-		errors = append(errors, "changed_files must be an object when present")
+	} else if changedFiles, ok := payload["changed_files"]; ok && changedFiles != nil {
+		changedFilesMap, ok := changedFiles.(map[string]any)
+		if !ok {
+			errors = append(errors, "changed_files must be an object when present")
+		} else {
+			errors = append(errors, validateChangedFiles(changedFilesMap)...)
+		}
 	}
 	if publicWorkerNeedsReviewDisposition(request) {
-		disposition, ok := payload["review_disposition"].(map[string]any)
+		rawDisposition, ok := payload["review_disposition"]
 		if !ok {
 			errors = append(errors, "review_disposition must be present")
+		} else if workerStringValue(request["phase"]) == "implementation" && rawDisposition == nil {
+			return errors
 		} else {
+			disposition, ok := rawDisposition.(map[string]any)
+			if !ok {
+				errors = append(errors, "review_disposition must be an object")
+				return errors
+			}
 			for _, key := range []string{"kind", "repo_scope", "summary", "description", "finding_key"} {
 				if workerStringValue(disposition[key]) == "" {
 					errors = append(errors, "review_disposition."+key+" must be a string")

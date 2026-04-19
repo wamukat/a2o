@@ -797,9 +797,10 @@ func TestWorkerValidateResultRejectsRuntimeProtocolShapeMismatches(t *testing.T)
 		"phase":           "implementation",
 		"success":         true,
 		"summary":         "bad shape",
-		"failing_command": nil,
-		"observed_state":  nil,
+		"failing_command": 123,
+		"observed_state":  true,
 		"rework_required": false,
+		"diagnostics":     "oops",
 		"changed_files":   map[string]any{"app": "README.md"},
 		"review_disposition": map[string]any{
 			"kind":        "follow_up_child",
@@ -819,6 +820,9 @@ func TestWorkerValidateResultRejectsRuntimeProtocolShapeMismatches(t *testing.T)
 		t.Fatalf("validate-result should fail")
 	}
 	for _, want := range []string{
+		"worker_protocol_error=failing_command must be a string or null when success is true",
+		"worker_protocol_error=observed_state must be a string or null when success is true",
+		"worker_protocol_error=diagnostics must be an object",
 		"worker_protocol_error=changed_files for app must be an array of strings",
 		"worker_protocol_error=review_disposition.kind must be completed for implementation evidence",
 		"worker_protocol_error=review_disposition.repo_scope must be one of app",
@@ -826,6 +830,42 @@ func TestWorkerValidateResultRejectsRuntimeProtocolShapeMismatches(t *testing.T)
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("validate-result output missing %q in:\n%s", want, stdout.String())
 		}
+	}
+}
+
+func TestWorkerValidateResultAllowsNullableImplementationEvidence(t *testing.T) {
+	tempDir := t.TempDir()
+	requestPath := filepath.Join(tempDir, "request.json")
+	resultPath := filepath.Join(tempDir, "result.json")
+	request := map[string]any{
+		"task_ref":   "A2O#62",
+		"run_ref":    "run-1",
+		"phase":      "implementation",
+		"slot_paths": map[string]any{"app": filepath.Join(tempDir, "app")},
+	}
+	result := map[string]any{
+		"task_ref":           "A2O#62",
+		"run_ref":            "run-1",
+		"phase":              "implementation",
+		"success":            true,
+		"summary":            "no changes",
+		"failing_command":    nil,
+		"observed_state":     nil,
+		"rework_required":    false,
+		"changed_files":      nil,
+		"review_disposition": nil,
+	}
+	writeJSONFileForTest(t, requestPath, request)
+	writeJSONFileForTest(t, resultPath, result)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"worker", "validate-result", "--request", requestPath, "--result", resultPath}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("validate-result returned %d, stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "worker_protocol_status=ok") {
+		t.Fatalf("validate-result should report ok, got %q", stdout.String())
 	}
 }
 
