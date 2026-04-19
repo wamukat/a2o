@@ -68,8 +68,7 @@ runtime:
       - "{{result_path}}"
   surface:
     implementation_skill: skills/implementation/base.md
-    review_skill:
-      default: skills/review/default.md
+    review_skill: skills/review/default.md
     verification_commands:
       - app/project-package/commands/verify.sh
     remediation_commands:
@@ -134,7 +133,7 @@ The template uses the compact executor form. `--language` controls `agent.requir
 
 When `--output` points to a file, the generator also writes `kanban/bootstrap.json` beside the package config. Existing files are not overwritten unless `--force` is provided. The generated bootstrap file contains project-owned labels such as repo labels; A2O-owned lanes and internal coordination labels are provisioned by `a2o kanban up`.
 
-`runtime.surface` owns skills, verification commands, remediation commands, and workspace hook. Values may be scalar or variant maps, matching the current project surface resolver behavior. It is the single user-facing place for project runtime surface configuration.
+`runtime.surface` owns skills, verification commands, remediation commands, and workspace hook. Use scalar values for the normal case, for example `implementation_skill: skills/implementation/base.md` and `review_skill: skills/review/default.md`. Use a `default` / `variants` map only when a value actually differs by task kind, repo scope, or phase.
 
 `runtime.merge` owns merge target, policy, and target ref. Values may be scalar or variant maps, matching the current merge resolver behavior.
 
@@ -166,6 +165,8 @@ runtime:
   executor:
     command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
   surface:
+    implementation_skill: skills/implementation/base.md
+    review_skill: skills/review/default.md
     verification_commands:
       - app/project-package/commands/verify.sh
     remediation_commands:
@@ -200,6 +201,8 @@ runtime:
   executor:
     command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
   surface:
+    implementation_skill: skills/implementation/base.md
+    review_skill: skills/review/default.md
     verification_commands:
       - app/project-package/commands/verify.sh
     workspace_hook: app/project-package/commands/bootstrap.sh
@@ -232,6 +235,8 @@ runtime:
   executor:
     command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
   surface:
+    implementation_skill: skills/implementation/base.md
+    review_skill: skills/review/default.md
     verification_commands:
       - app/project-package/commands/verify.sh
     workspace_hook: app/project-package/commands/bootstrap.sh
@@ -270,6 +275,7 @@ runtime:
   executor:
     command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
   surface:
+    implementation_skill: skills/implementation/base.md
     review_skill:
       default: skills/review/default.md
       variants:

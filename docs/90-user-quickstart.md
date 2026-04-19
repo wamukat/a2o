@@ -127,8 +127,7 @@ runtime:
       - "{{result_path}}"
   surface:
     implementation_skill: skills/implementation/base.md
-    review_skill:
-      default: skills/review/default.md
+    review_skill: skills/review/default.md
     verification_commands:
       - app/project-package/commands/verify.sh
     remediation_commands:
