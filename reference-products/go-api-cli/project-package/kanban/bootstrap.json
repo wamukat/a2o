@@ -2,11 +2,8 @@
   "boards": [
     {
       "name": "A2OReferenceGo",
-      "lanes": ["Backlog", "To do", "In progress", "In review", "Inspection", "Merging", "Done"],
       "tags": [
-        { "name": "trigger:auto-implement" },
-        { "name": "repo:app" },
-        { "name": "blocked" }
+        { "name": "repo:app" }
       ]
     }
   ]

@@ -15,6 +15,14 @@ if str(TOOLS_DIR) not in sys.path:
 from kanban import kanban_cli
 
 
+DEFAULT_A2O_LANES = ["Backlog", "To do", "In progress", "In review", "Inspection", "Merging", "Done"]
+DEFAULT_A2O_TAGS = [
+    {"name": kanban_cli.DEFAULT_AUTOMATION_TRIGGER_LABEL},
+    {"name": "trigger:auto-parent"},
+    {"name": "blocked"},
+]
+
+
 def load_config(path: Path) -> list[dict[str, Any]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     boards = payload.get("boards") if isinstance(payload, dict) else None
@@ -89,6 +97,28 @@ def ensure_tags(base_url: str, token: str, board_id: int, tags: list[dict[str, A
     return [kanban_cli.normalize_label(tag) for tag in ensured]
 
 
+def board_lanes(spec: dict[str, Any]) -> list[str]:
+    lanes = spec.get("lanes")
+    if lanes is None:
+        return list(DEFAULT_A2O_LANES)
+    return [str(lane) for lane in lanes]
+
+
+def board_tags(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    explicit_tags = spec.get("tags") or []
+    if not isinstance(explicit_tags, list):
+        raise RuntimeError(f"board tags must be an array: {str(spec.get('name') or '').strip()}")
+    merged: dict[str, dict[str, Any]] = {}
+    for tag in DEFAULT_A2O_TAGS + explicit_tags:
+        name = str(tag.get("name") or tag.get("title") or "").strip()
+        if not name:
+            raise RuntimeError("tag name is required")
+        item = dict(tag)
+        item["name"] = name
+        merged[name] = item
+    return list(merged.values())
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Bootstrap SoloBoard boards, lanes, and tags from a project config.")
     parser.add_argument("--config", required=True, type=Path)
@@ -110,14 +140,12 @@ def main() -> int:
     result: list[dict[str, Any]] = []
     for spec in specs:
         board_name = str(spec.get("name") or "").strip()
-        lane_names = [str(lane) for lane in spec.get("lanes") or []]
-        tags = spec.get("tags") or []
+        lane_names = board_lanes(spec)
+        tags = board_tags(spec)
         if not board_name:
             raise RuntimeError("board name is required")
         if not lane_names:
             raise RuntimeError(f"board lanes are required: {board_name}")
-        if not isinstance(tags, list):
-            raise RuntimeError(f"board tags must be an array: {board_name}")
 
         board = ensure_board(context.base_url, context.token, board_name, lane_names)
         board_id = int(board["id"])

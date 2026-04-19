@@ -109,7 +109,7 @@ a2o project template \
 ```
 
 The generated file uses the compact `runtime.executor.command` form. A2O expands it to the default stdin-bundle executor internally, so existing full executor objects remain compatible.
-When `--output` points to a file, the generator also creates `kanban/bootstrap.json`. Existing files are not overwritten unless `--force` is passed.
+When `--output` points to a file, the generator also creates `kanban/bootstrap.json`. Existing files are not overwritten unless `--force` is passed. The generated bootstrap file contains project-owned labels such as repo labels; A2O-owned lanes and internal coordination labels are provisioned by `a2o kanban up`.
 
 After `a2o project bootstrap`, runtime commands discover `.work/a2o/runtime-instance.json` from the current directory upward. If the package is not in `./a2o-project` or `./project-package`, pass `--package DIR`:
 

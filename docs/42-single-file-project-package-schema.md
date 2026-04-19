@@ -41,9 +41,6 @@ kanban:
   bootstrap: kanban/bootstrap.json
   selection:
     status: To do
-    trigger_labels:
-      - trigger:auto-implement
-      - trigger:auto-parent
 
 repos:
   app:
@@ -107,7 +104,7 @@ Host agent binary は canonical path `.work/a2o/agent/bin/a2o-agent` に置く�
 
 `package` identifies the package, not the product repository. `package.name` replaces the current top-level scalar `project`.
 
-`kanban` owns provider selection, board name, bootstrap config, task selection, and user-authored trigger labels used by the runtime bridge. The default provider remains `soloboard`. Internal coordination labels are runtime implementation details and should not be required in normal package schema.
+`kanban` owns provider selection, board name, bootstrap config, and task selection. The default provider remains `soloboard`. A2O-owned lanes and internal coordination labels are runtime implementation details and should not be required in normal package schema.
 
 `repos` defines stable repo slots. Slot keys are runtime identities. `path` is relative to the package directory unless absolute. `label` maps kanban labels to repo slots. If omitted, the implementation may derive `repo:<slot>`.
 
@@ -148,7 +145,7 @@ a2o project template \
 
 The template uses the compact executor form. `--language` controls `agent.required_bins`; `--executor-bin` and repeated `--executor-arg` flags generate `runtime.executor.command`.
 
-When `--output` points to a file, the generator also writes `kanban/bootstrap.json` beside the package config. Existing files are not overwritten unless `--force` is provided.
+When `--output` points to a file, the generator also writes `kanban/bootstrap.json` beside the package config. Existing files are not overwritten unless `--force` is provided. The generated bootstrap file contains project-owned labels such as repo labels; A2O-owned lanes and internal coordination labels are provisioned by the provider bootstrap.
 
 `runtime.presets` keeps the current preset model. Presets are still useful for common A2O behavior, but package-local overrides live beside the rest of the package config.
 

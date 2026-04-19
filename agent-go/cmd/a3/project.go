@@ -213,12 +213,9 @@ func buildKanbanBootstrapTemplate(kanbanProject string, repoLabel string) (strin
 	payload := map[string]any{
 		"boards": []any{
 			map[string]any{
-				"name":  kanbanProject,
-				"lanes": []string{"Backlog", "To do", "In progress", "In review", "Inspection", "Merging", "Done"},
+				"name": kanbanProject,
 				"tags": []any{
-					map[string]any{"name": "trigger:auto-implement"},
 					map[string]any{"name": repoLabel},
-					map[string]any{"name": "blocked"},
 				},
 			},
 		},

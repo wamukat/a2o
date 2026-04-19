@@ -2,14 +2,10 @@
   "boards": [
     {
       "name": "A2OReferenceMultiRepo",
-      "lanes": ["Backlog", "To do", "In progress", "In review", "Inspection", "Merging", "Done"],
       "tags": [
-        { "name": "trigger:auto-implement" },
-        { "name": "trigger:auto-parent" },
         { "name": "repo:catalog" },
         { "name": "repo:storefront" },
-        { "name": "repo:both" },
-        { "name": "blocked" }
+        { "name": "repo:both" }
       ]
     }
   ]

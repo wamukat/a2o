@@ -394,6 +394,11 @@ func TestProjectTemplateWritesOutputFileWithCustomExecutorArgs(t *testing.T) {
 	if !strings.Contains(string(bootstrapBody), `"name": "PythonProduct"`) || !strings.Contains(string(bootstrapBody), `"name": "repo:app"`) {
 		t.Fatalf("unexpected kanban bootstrap template:\n%s", string(bootstrapBody))
 	}
+	for _, forbidden := range []string{`"lanes"`, "trigger:auto-implement", `"name": "blocked"`} {
+		if strings.Contains(string(bootstrapBody), forbidden) {
+			t.Fatalf("kanban bootstrap template should not require A2O-owned %q:\n%s", forbidden, string(bootstrapBody))
+		}
+	}
 	command := config.Executor["default_profile"].(map[string]any)["command"].([]any)
 	if got := command[0].(string) + " " + command[1].(string) + " " + command[2].(string); got != "custom-worker run --out={{result_path}}" {
 		t.Fatalf("unexpected executor command: %s", got)

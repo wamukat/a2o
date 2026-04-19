@@ -50,7 +50,7 @@ a2o project template \
   --output ./project-package/project.yaml
 ```
 
-`--output` を使うと、A2O は `project.yaml` と同時に `kanban/bootstrap.json` も生成する。既存ファイルは `--force` なしでは上書きしない。
+`--output` を使うと、A2O は `project.yaml` と同時に `kanban/bootstrap.json` も生成する。既存ファイルは `--force` なしでは上書きしない。生成される bootstrap file は repo label など project 固有 label だけを持つ。A2O が必要とする lane と internal label は `a2o kanban up` が provider 側に用意する。
 
 `your-ai-worker` は placeholder である。bootstrap や runtime 実行の前に、agent 環境で実行できる executor binary 名へ置き換える。A2O はこの値を `agent.required_bins` と `runtime.executor.command` に書くため、未置換のままだと `a2o doctor` や runtime execution で missing command として止まる。
 
@@ -167,6 +167,8 @@ a2o kanban url
 ```
 
 `a2o kanban up` は、利用する `compose_project`、SoloBoard data volume、reuse / create mode、backup hint を表示する。同じ compose project で起動すると既存 board を再利用する。compose project が変わると Docker volume 名も変わるため、board が空に見える。
+
+SoloBoard bootstrap では、A2O が必要とする lane と internal label が自動作成される。project package の `kanban/bootstrap.json` には、repo label や人間が使う分類 label など、project 固有の label だけを書く。
 
 fresh board を意図する場合は、bootstrap 時に別の compose project を指定するか、既存 volume を backup して明示的に削除してから起動する。誤って既存 board を使いたくない場合は `a2o kanban up --fresh-board` を使う。既存 volume がある場合、この command は停止する。
 

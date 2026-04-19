@@ -18,8 +18,8 @@ A2O Engine core must stay project-neutral. Project-specific behavior enters thro
 
 ## Project Package Owns
 
-- board name and bootstrap lanes/tags
-- trigger labels
+- board name and project-owned bootstrap labels
+- project-owned task labels
 - repo slot aliases and source paths
 - build/test/format commands
 - environment prerequisites for `a2o-agent`
@@ -48,7 +48,7 @@ project-package/
   scenarios/
 ```
 
-`project.yaml` is the only author-facing package config. It owns package metadata, kanban bootstrap and selection, repo slots, agent prerequisites, runtime presets, project surface commands, and merge defaults. `commands/` contains project-owned scripts when declarative commands are not enough. `scenarios/` contains kanban task templates used for validation.
+`project.yaml` is the only author-facing package config. It owns package metadata, kanban bootstrap and selection, repo slots, agent prerequisites, runtime presets, project surface commands, and merge defaults. A2O-owned lanes and internal coordination labels are provider/runtime defaults, not package responsibilities. `commands/` contains project-owned scripts when declarative commands are not enough. `scenarios/` contains kanban task templates used for validation.
 
 ## Review Checklist
 
