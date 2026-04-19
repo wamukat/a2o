@@ -105,6 +105,14 @@ func runProjectTemplate(args []string, stdout io.Writer, stderr io.Writer) error
 			return fmt.Errorf("inspect output file: %w", err)
 		}
 	}
+	var skillTemplates []plannedSkillTemplate
+	if *withSkills {
+		var err error
+		skillTemplates, err = planProjectSkillTemplates(filepath.Dir(*outputPath), strings.TrimSpace(*skillLanguage), *force)
+		if err != nil {
+			return err
+		}
+	}
 	if err := os.MkdirAll(filepath.Dir(*outputPath), 0o755); err != nil {
 		return fmt.Errorf("create output directory: %w", err)
 	}
@@ -112,7 +120,7 @@ func runProjectTemplate(args []string, stdout io.Writer, stderr io.Writer) error
 		return fmt.Errorf("write project template: %w", err)
 	}
 	if *withSkills {
-		written, err := writeProjectSkillTemplates(filepath.Dir(*outputPath), strings.TrimSpace(*skillLanguage), *force)
+		written, err := writeProjectSkillTemplates(skillTemplates)
 		if err != nil {
 			return err
 		}
@@ -212,12 +220,17 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	return builder.String(), nil
 }
 
-func writeProjectSkillTemplates(packageDir string, language string, force bool) ([]string, error) {
+type plannedSkillTemplate struct {
+	Path string
+	Body string
+}
+
+func planProjectSkillTemplates(packageDir string, language string, force bool) ([]plannedSkillTemplate, error) {
 	templates, err := projectSkillTemplates(language)
 	if err != nil {
 		return nil, err
 	}
-	written := []string{}
+	planned := []plannedSkillTemplate{}
 	for relativePath, body := range templates {
 		path := filepath.Join(packageDir, filepath.FromSlash(relativePath))
 		if !force {
@@ -227,15 +240,26 @@ func writeProjectSkillTemplates(packageDir string, language string, force bool) 
 				return nil, fmt.Errorf("inspect skill template: %w", err)
 			}
 		}
+		planned = append(planned, plannedSkillTemplate{Path: path, Body: body})
+	}
+	sort.Slice(planned, func(left int, right int) bool {
+		return planned[left].Path < planned[right].Path
+	})
+	return planned, nil
+}
+
+func writeProjectSkillTemplates(templates []plannedSkillTemplate) ([]string, error) {
+	written := []string{}
+	for _, template := range templates {
+		path := template.Path
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return nil, fmt.Errorf("create skill template directory: %w", err)
 		}
-		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(template.Body), 0o644); err != nil {
 			return nil, fmt.Errorf("write skill template: %w", err)
 		}
 		written = append(written, path)
 	}
-	sort.Strings(written)
 	return written, nil
 }
 

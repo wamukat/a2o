@@ -491,6 +491,48 @@ func TestProjectTemplateWithSkillsRequiresOutputPath(t *testing.T) {
 	}
 }
 
+func TestProjectTemplateWithSkillsPreflightsBeforeWritingProjectYaml(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "project-package")
+	outputPath := filepath.Join(packageDir, "project.yaml")
+	existingSkill := filepath.Join(packageDir, "skills", "review", "default.md")
+	if err := os.MkdirAll(filepath.Dir(existingSkill), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(existingSkill, []byte("existing\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"project",
+		"template",
+		"--with-skills",
+		"--output",
+		outputPath,
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("run should fail when a skill template exists")
+	}
+	if !strings.Contains(stderr.String(), "skill template already exists") {
+		t.Fatalf("stderr should explain existing skill, got %q", stderr.String())
+	}
+	if _, err := os.Stat(outputPath); !os.IsNotExist(err) {
+		t.Fatalf("project.yaml should not be written after skill preflight failure, err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(packageDir, "skills", "implementation", "base.md")); !os.IsNotExist(err) {
+		t.Fatalf("implementation skill should not be partially written, err=%v", err)
+	}
+	body, err := os.ReadFile(existingSkill)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != "existing\n" {
+		t.Fatalf("existing skill should be untouched, got %q", string(body))
+	}
+}
+
 func TestProjectTemplateRefusesToOverwriteWithoutForce(t *testing.T) {
 	tempDir := t.TempDir()
 	outputPath := filepath.Join(tempDir, "project-package", "project.yaml")
