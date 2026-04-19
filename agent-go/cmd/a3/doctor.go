@@ -37,7 +37,7 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 		return 1
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
-	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
+	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
 	fmt.Fprintf(stdout, "kanban_volume=%s\n", kanbanDataVolumeName(effectiveConfig.ComposeProject))
 

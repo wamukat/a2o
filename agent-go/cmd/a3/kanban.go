@@ -191,7 +191,7 @@ func runKanbanDoctor(args []string, runner commandRunner, stdout io.Writer, stde
 		return err
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
-	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
+	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(effectiveConfig))
 	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
 	output, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "ps", "soloboard")...)

@@ -244,7 +244,7 @@ func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, std
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
 	paths := schedulerPaths(effectiveConfig)
-	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
+	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintf(stdout, "runtime_package=%s\n", effectiveConfig.PackagePath)
 	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
 	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(effectiveConfig))
@@ -501,7 +501,7 @@ func runRuntimeDoctor(args []string, runner commandRunner, stdout io.Writer, std
 		return err
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
-	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
+	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintf(stdout, "package=%s\n", effectiveConfig.PackagePath)
 	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
 	for _, check := range []struct {
@@ -560,7 +560,7 @@ func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) er
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
+	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintln(stdout, "kanban_up=a2o kanban up")
 	fmt.Fprintln(stdout, "kanban_doctor=a2o kanban doctor")
 	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(*config))
@@ -594,7 +594,7 @@ func runRuntimeDescribeTask(args []string, runner commandRunner, stdout io.Write
 			return err
 		}
 		fmt.Fprintf(stdout, "describe_task task_ref=%s\n", taskRef)
-		fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
+		fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 		fmt.Fprintf(stdout, "package=%s\n", effectiveConfig.PackagePath)
 		fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
 		fmt.Fprintf(stdout, "kanban_project=%s kanban_url=%s\n", plan.KanbanProject, kanbanPublicURL(effectiveConfig))
@@ -658,7 +658,7 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
 
-	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", configPath)
+	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
 	return withEnv(runtimeRunOnceEnv(effectiveConfig, *maxSteps, *agentAttempts), func() error {
 		return runGenericRuntimeRunOnce(effectiveConfig, *maxSteps, *agentAttempts, runner, stdout)

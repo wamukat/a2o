@@ -115,6 +115,17 @@ func findInstanceConfig(start string) (string, error) {
 	}
 }
 
+func publicInstanceConfigPath(configPath string) string {
+	cleanPath := filepath.Clean(configPath)
+	legacySuffix := filepath.FromSlash(legacyInstanceConfigRelativePath)
+	if strings.HasSuffix(cleanPath, legacySuffix) {
+		workspaceRoot := strings.TrimSuffix(cleanPath, legacySuffix)
+		workspaceRoot = strings.TrimSuffix(workspaceRoot, string(filepath.Separator))
+		return filepath.Join(workspaceRoot, filepath.FromSlash(instanceConfigRelativePath))
+	}
+	return configPath
+}
+
 func readInstanceConfig(path string) (*runtimeInstanceConfig, error) {
 	body, err := os.ReadFile(path)
 	if err != nil {

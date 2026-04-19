@@ -241,6 +241,7 @@ func TestRuntimeCommandsReadLegacyInstanceConfig(t *testing.T) {
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	writeMultiRepoProjectYaml(t, packageDir)
 	writeLegacyTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
 		SchemaVersion:  1,
 		PackagePath:    packageDir,
@@ -264,6 +265,21 @@ func TestRuntimeCommandsReadLegacyInstanceConfig(t *testing.T) {
 
 	if !strings.Contains(stdout.String(), "http://localhost:3479") {
 		t.Fatalf("legacy instance config should be discovered, got %q", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "status"}, &fakeRunner{}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("runtime status returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+	if !strings.Contains(stdout.String(), filepath.Join(tempDir, ".work", "a2o", "runtime-instance.json")) {
+		t.Fatalf("legacy instance config should be reported as public path, got %q", stdout.String())
+	}
+	if strings.Contains(stdout.String(), ".a3/runtime-instance.json") || strings.Contains(stderr.String(), ".a3/runtime-instance.json") {
+		t.Fatalf("normal output should not expose legacy instance config path, stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
 }
 
