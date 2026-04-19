@@ -2,7 +2,7 @@ Gem::Specification.new do |spec|
   spec.name = "a2o"
   spec.version = "0.5.0"
   spec.summary = "A2O orchestration runtime"
-  spec.authors = ["Takuma Watanabe"]
+  spec.authors = ["wamukat"]
   spec.files = Dir[
     "bin/*",
     "lib/**/*.rb"
