@@ -108,6 +108,22 @@ Verification and remediation commands support:
 
 Project commands should treat the worker request JSON and `A2O_*` worker environment variables as the stable contract. Do not read private `.a3` metadata files or generated `launcher.json` files from package scripts.
 
+## Template Generator
+
+New packages should start from the generator instead of hand-writing executor blocks.
+
+```sh
+a2o project template \
+  --package-name my-product \
+  --kanban-project MyProduct \
+  --language node \
+  --executor-bin your-ai-worker \
+  --with-skills \
+  --output ./project-package/project.yaml
+```
+
+`--output` writes `project.yaml`. `--with-skills` also writes starter implementation, review, and parent review skills and adds a `parent_review` phase that references the generated parent skill. Kanban bootstrap data is derived from `kanban.project`, `kanban.labels`, and `repos.<slot>.label`. A2O-owned lanes and internal coordination labels are provisioned by `a2o kanban up`.
+
 ## Current Status
 
 1. One loader reads `project.yaml` schema version `1`.

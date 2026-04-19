@@ -45,10 +45,11 @@ a2o project template \
   --kanban-project MyProduct \
   --language node \
   --executor-bin your-ai-worker \
+  --with-skills \
   --output ./project-package/project.yaml
 ```
 
-`--output` writes only `project.yaml`. The kanban board name, repo labels, and human project labels are authored in `project.yaml`. A2O-owned lanes and internal labels are provisioned by `a2o kanban up`.
+`--output` writes `project.yaml`. With `--with-skills`, A2O also writes starter phase skills under `skills/implementation/` and `skills/review/`. The kanban board name, repo labels, and human project labels are authored in `project.yaml`. A2O-owned lanes and internal labels are provisioned by `a2o kanban up`.
 
 `your-ai-worker` is a placeholder. Replace it with an executor binary that exists where `a2o-agent` runs. A2O writes this value into `agent.required_bins` and `runtime.phases.*.executor.command`; if it is not replaced, `a2o doctor` or runtime execution will stop with a missing command.
 

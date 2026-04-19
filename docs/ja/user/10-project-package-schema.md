@@ -126,12 +126,13 @@ a2o project template \
   --kanban-project MyProduct \
   --language node \
   --executor-bin your-ai-worker \
+  --with-skills \
   --output ./project-package/project.yaml
 ```
 
 Template は phase-based executor form を使う。`--language` は `agent.required_bins` を制御する。`--executor-bin` と repeated `--executor-arg` flags は implementation and review phase executor commands を生成する。
 
-`--output` が file を指す場合、generator は `project.yaml` だけを書く。Kanban bootstrap data は `kanban.project`、`kanban.labels`、`repos.<slot>.label` から derive される。A2O-owned lanes と internal coordination labels は `a2o kanban up` が provision する。
+`--output` が file を指す場合、generator は `project.yaml` を書く。`--with-skills` を付けると、implementation、review、parent review の starter skill も書き、生成した parent skill を参照する `parent_review` phase を追加する。Kanban bootstrap data は `kanban.project`、`kanban.labels`、`repos.<slot>.label` から derive される。A2O-owned lanes と internal coordination labels は `a2o kanban up` が provision する。
 
 `runtime.phases.merge` は merge target、policy、target ref を持つ。値は scalar または variant maps にでき、current merge resolver behavior と一致する。
 

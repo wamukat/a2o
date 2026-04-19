@@ -114,7 +114,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o doctor")
 	fmt.Fprintln(w, "  a2o project bootstrap [--package DIR]")
 	fmt.Fprintln(w, "  a2o project lint [--package DIR]")
-	fmt.Fprintln(w, "  a2o project template [--language node|go|python|ruby] [--output project.yaml]")
+	fmt.Fprintln(w, "  a2o project template [--language node|go|python|ruby] [--with-skills] [--output project.yaml]")
 	fmt.Fprintln(w, "  a2o kanban up [--build]")
 	fmt.Fprintln(w, "  a2o kanban doctor")
 	fmt.Fprintln(w, "  a2o kanban url")

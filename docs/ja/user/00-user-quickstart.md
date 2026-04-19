@@ -45,10 +45,11 @@ a2o project template \
   --kanban-project MyProduct \
   --language node \
   --executor-bin your-ai-worker \
+  --with-skills \
   --output ./project-package/project.yaml
 ```
 
-`--output` を使うと、A2O は `project.yaml` を生成する。kanban board 名、repo label、人間が使う project 固有 label は `project.yaml` に書く。A2O が必要とする lane と internal label は `a2o kanban up` が用意する。
+`--output` を使うと、A2O は `project.yaml` を生成する。`--with-skills` を付けると、`skills/implementation/` と `skills/review/` 配下に phase skill の雛形も生成する。kanban board 名、repo label、人間が使う project 固有 label は `project.yaml` に書く。A2O が必要とする lane と internal label は `a2o kanban up` が用意する。
 
 `your-ai-worker` は placeholder である。bootstrap や runtime 実行の前に、agent 環境で実行できる executor binary 名へ置き換える。A2O はこの値を `agent.required_bins` と `runtime.phases.*.executor.command` に書くため、未置換のままだと `a2o doctor` や runtime execution で missing command として止まる。
 

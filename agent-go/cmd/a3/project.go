@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -66,6 +67,8 @@ func runProjectTemplate(args []string, stdout io.Writer, stderr io.Writer) error
 	executorBin := flags.String("executor-bin", "your-ai-worker", "agent-side executor binary")
 	outputPath := flags.String("output", "-", "output project.yaml path, or - for stdout")
 	force := flags.Bool("force", false, "overwrite existing generated files")
+	withSkills := flags.Bool("with-skills", false, "also write phase skill templates next to project.yaml")
+	skillLanguage := flags.String("skill-language", "en", "skill template language: en or ja")
 	var executorArgs stringListFlag
 	flags.Var(&executorArgs, "executor-arg", "executor argument; repeat to override the default --schema/--result arguments")
 
@@ -83,11 +86,15 @@ func runProjectTemplate(args []string, stdout io.Writer, stderr io.Writer) error
 		Language:      strings.TrimSpace(*language),
 		ExecutorBin:   strings.TrimSpace(*executorBin),
 		ExecutorArgs:  executorArgs,
+		WithSkills:    *withSkills,
 	})
 	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(*outputPath) == "" || *outputPath == "-" {
+		if *withSkills {
+			return fmt.Errorf("--with-skills requires --output to point to project.yaml")
+		}
 		_, err := io.WriteString(stdout, template)
 		return err
 	}
@@ -104,6 +111,15 @@ func runProjectTemplate(args []string, stdout io.Writer, stderr io.Writer) error
 	if err := os.WriteFile(*outputPath, []byte(template), 0o644); err != nil {
 		return fmt.Errorf("write project template: %w", err)
 	}
+	if *withSkills {
+		written, err := writeProjectSkillTemplates(filepath.Dir(*outputPath), strings.TrimSpace(*skillLanguage), *force)
+		if err != nil {
+			return err
+		}
+		for _, path := range written {
+			fmt.Fprintf(stdout, "project_skill_template_written path=%s\n", path)
+		}
+	}
 	fmt.Fprintf(stdout, "project_template_written path=%s\n", *outputPath)
 	return nil
 }
@@ -116,6 +132,7 @@ type projectTemplateOptions struct {
 	Language      string
 	ExecutorBin   string
 	ExecutorArgs  []string
+	WithSkills    bool
 }
 
 func buildProjectTemplate(options projectTemplateOptions) (string, error) {
@@ -177,6 +194,13 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	builder.WriteString("      executor:\n")
 	builder.WriteString("        command:\n")
 	writeYAMLList(&builder, 5, executorCommand)
+	if options.WithSkills {
+		builder.WriteString("    parent_review:\n")
+		writeYAMLScalar(&builder, 3, "skill", "skills/review/parent.md")
+		builder.WriteString("      executor:\n")
+		builder.WriteString("        command:\n")
+		writeYAMLList(&builder, 5, executorCommand)
+	}
 	builder.WriteString("    verification:\n")
 	builder.WriteString("      commands: []\n")
 	builder.WriteString("    remediation:\n")
@@ -187,6 +211,182 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	writeYAMLScalar(&builder, 3, "target_ref", "refs/heads/main")
 	return builder.String(), nil
 }
+
+func writeProjectSkillTemplates(packageDir string, language string, force bool) ([]string, error) {
+	templates, err := projectSkillTemplates(language)
+	if err != nil {
+		return nil, err
+	}
+	written := []string{}
+	for relativePath, body := range templates {
+		path := filepath.Join(packageDir, filepath.FromSlash(relativePath))
+		if !force {
+			if _, err := os.Stat(path); err == nil {
+				return nil, fmt.Errorf("skill template already exists: %s; pass --force to overwrite", path)
+			} else if err != nil && !os.IsNotExist(err) {
+				return nil, fmt.Errorf("inspect skill template: %w", err)
+			}
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return nil, fmt.Errorf("create skill template directory: %w", err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			return nil, fmt.Errorf("write skill template: %w", err)
+		}
+		written = append(written, path)
+	}
+	sort.Strings(written)
+	return written, nil
+}
+
+func projectSkillTemplates(language string) (map[string]string, error) {
+	switch strings.ToLower(strings.TrimSpace(language)) {
+	case "", "en":
+		return map[string]string{
+			"skills/implementation/base.md": projectImplementationSkillTemplateEN,
+			"skills/review/default.md":      projectReviewSkillTemplateEN,
+			"skills/review/parent.md":       projectParentReviewSkillTemplateEN,
+		}, nil
+	case "ja":
+		return map[string]string{
+			"skills/implementation/base.md": projectImplementationSkillTemplateJA,
+			"skills/review/default.md":      projectReviewSkillTemplateJA,
+			"skills/review/parent.md":       projectParentReviewSkillTemplateJA,
+		}, nil
+	default:
+		return nil, fmt.Errorf("--skill-language must be one of en, ja")
+	}
+}
+
+const projectImplementationSkillTemplateEN = `# Implementation Skill
+
+Use this skill for A2O implementation phases.
+
+## Repository Boundary
+
+- Edit only the repository slots and paths named by the task.
+- Keep generated runtime files under .work/a2o/ out of commits.
+- Do not change kanban state directly from the worker.
+
+## Work Rules
+
+- Read the task, affected files, and relevant project docs before editing.
+- Keep changes scoped to the requested behavior.
+- Update docs or task templates when the behavior surface changes.
+
+## Verification Evidence
+
+- Run the narrowest command that proves the change.
+- Record command names, exit status, and important output in the worker result.
+- If verification cannot run, explain the blocker and the exact follow-up command.
+
+## Knowledge
+
+- Use only task-specific project knowledge commands described by the package.
+- Treat source, docs, tests, and verification as authoritative.
+`
+
+const projectReviewSkillTemplateEN = `# Review Skill
+
+Use this skill for A2O review phases.
+
+## Findings
+
+Report findings for correctness bugs, missing verification, unsafe repo boundary changes, public API/SPI drift, migration gaps, and documentation gaps.
+
+## Evidence
+
+- Check the implementation diff and the recorded verification evidence.
+- Confirm changed behavior has an appropriate test or an explicit reason.
+- Mention residual risk when verification is incomplete.
+
+## Output
+
+- Lead with findings, ordered by severity.
+- Say "No findings" when no actionable issue remains.
+`
+
+const projectParentReviewSkillTemplateEN = `# Parent Review Skill
+
+Use this skill for parent review or multi-repo integration phases.
+
+## Integration Boundary
+
+- Check child task outputs before reviewing the combined result.
+- Confirm repository slots, branch targets, and merge readiness.
+- Verify cross-repo API/SPI assumptions that changed during child work.
+
+## Evidence
+
+- Prefer an all-repo verification command when available.
+- Record which child outputs were reviewed and which command proves integration.
+- Report merge blockers before approving parent completion.
+`
+
+const projectImplementationSkillTemplateJA = `# Implementation Skill
+
+A2O の implementation phase で使う skill である。
+
+## Repository Boundary
+
+- Task が指定した repo slot と path だけを編集する。
+- .work/a2o/ 配下の generated runtime files は commit に含めない。
+- Worker から kanban state を直接変更しない。
+
+## Work Rules
+
+- 編集前に task、影響 file、関連 project docs を読む。
+- 変更は要求された behavior に絞る。
+- Behavior surface が変わる場合は docs や task template も更新する。
+
+## Verification Evidence
+
+- 変更を証明する最小 command を実行する。
+- Command 名、exit status、重要 output を worker result に記録する。
+- Verification を実行できない場合は blocker と follow-up command を明記する。
+
+## Knowledge
+
+- Package が説明している task-specific な project knowledge command だけを使う。
+- Source、docs、tests、verification を authoritative として扱う。
+`
+
+const projectReviewSkillTemplateJA = `# Review Skill
+
+A2O の review phase で使う skill である。
+
+## Findings
+
+Correctness bug、verification 不足、危険な repo boundary 変更、public API/SPI drift、migration gap、documentation gap を finding として報告する。
+
+## Evidence
+
+- Implementation diff と記録された verification evidence を確認する。
+- 変更 behavior に適切な test、または明示された理由があることを確認する。
+- Verification が不完全な場合は residual risk を書く。
+
+## Output
+
+- Finding を severity 順に先に書く。
+- Actionable issue が残っていない場合は "No findings" と書く。
+`
+
+const projectParentReviewSkillTemplateJA = `# Parent Review Skill
+
+Parent review または multi-repo integration phase で使う skill である。
+
+## Integration Boundary
+
+- Combined result を review する前に child task output を確認する。
+- Repository slot、branch target、merge readiness を確認する。
+- Child work で変わった cross-repo API/SPI assumption を確認する。
+
+## Evidence
+
+- 利用可能であれば all-repo verification command を優先する。
+- どの child output を確認したか、どの command が integration を証明したかを記録する。
+- Parent completion を承認する前に merge blocker を報告する。
+`
 
 func templateRequiredBins(language string, executorBin string) ([]string, error) {
 	bins := []string{"git"}

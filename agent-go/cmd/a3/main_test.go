@@ -411,6 +411,86 @@ func TestProjectTemplateWritesOutputFileWithCustomExecutorArgs(t *testing.T) {
 	}
 }
 
+func TestProjectTemplateWithSkillsWritesPhaseSkillFiles(t *testing.T) {
+	tempDir := t.TempDir()
+	outputPath := filepath.Join(tempDir, "project-package", "project.yaml")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"project",
+		"template",
+		"--package-name",
+		"skill-product",
+		"--kanban-project",
+		"SkillProduct",
+		"--executor-bin",
+		"skill-worker",
+		"--with-skills",
+		"--skill-language",
+		"en",
+		"--output",
+		outputPath,
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+	for _, rel := range []string{
+		"skills/implementation/base.md",
+		"skills/review/default.md",
+		"skills/review/parent.md",
+	} {
+		path := filepath.Join(filepath.Dir(outputPath), filepath.FromSlash(rel))
+		body, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("skill template %s missing: %v", rel, err)
+		}
+		required := map[string][]string{
+			"skills/implementation/base.md": {"Repository Boundary", "Verification Evidence"},
+			"skills/review/default.md":      {"Findings", "Evidence"},
+			"skills/review/parent.md":       {"Integration Boundary", "Evidence"},
+		}[rel]
+		for _, want := range required {
+			if !strings.Contains(string(body), want) {
+				t.Fatalf("skill template %s missing %q:\n%s", rel, want, string(body))
+			}
+		}
+		if !strings.Contains(stdout.String(), "project_skill_template_written path="+path) {
+			t.Fatalf("stdout should mention skill template %s, got %q", path, stdout.String())
+		}
+	}
+	projectYaml, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"skill: \"skills/implementation/base.md\"",
+		"skill: \"skills/review/default.md\"",
+		"skill: \"skills/review/parent.md\"",
+		"parent_review:",
+	} {
+		if !strings.Contains(string(projectYaml), want) {
+			t.Fatalf("project.yaml missing %q:\n%s", want, string(projectYaml))
+		}
+	}
+	if _, err := loadProjectPackageConfig(filepath.Dir(outputPath)); err != nil {
+		t.Fatalf("generated project.yaml should load: %v", err)
+	}
+}
+
+func TestProjectTemplateWithSkillsRequiresOutputPath(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"project", "template", "--with-skills"}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("run should fail")
+	}
+	if !strings.Contains(stderr.String(), "--with-skills requires --output") {
+		t.Fatalf("stderr should explain output requirement, got %q", stderr.String())
+	}
+}
+
 func TestProjectTemplateRefusesToOverwriteWithoutForce(t *testing.T) {
 	tempDir := t.TempDir()
 	outputPath := filepath.Join(tempDir, "project-package", "project.yaml")
