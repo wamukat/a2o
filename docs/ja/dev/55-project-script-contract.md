@@ -51,9 +51,9 @@ Verification and remediation commands は次を使える。
 
 ## Worker Environment
 
-Project worker commands は次の environment variables を使う。
+Project worker、verification、remediation command は次の environment variables を使う。
 
-- `A2O_WORKER_REQUEST_PATH`: current worker job の JSON request bundle。
+- `A2O_WORKER_REQUEST_PATH`: current job の JSON request bundle。
 - `A2O_WORKER_RESULT_PATH`: worker command が final JSON result を書き込む path。
 - `A2O_WORKSPACE_ROOT`: current job の materialized workspace root。
 - `A2O_ROOT_DIR`: worker から見える A2O runtime support files の root directory。
@@ -67,12 +67,15 @@ Worker request JSON は project script にとっての source of truth である
 
 - `task_ref`、`run_ref`、`phase`
 - `skill`
+- verification / remediation command job では `command_intent`
 - `task_packet.title` と `task_packet.description`
 - repo slot alias を key にした `slot_paths`
 - task kind や必要に応じた verification commands を含む `phase_runtime`
 - source descriptor と scope snapshot metadata
 
 Scripts は workspace directory layout を推測せず、repo paths を `slot_paths` から読む。
+Slot-local remediation では command の working directory が repo slot になる場合があるが、`A2O_WORKSPACE_ROOT` と `slot_paths` は full prepared workspace を指す。
+Private `.a3` metadata を直接読まず、`A2O_WORKER_REQUEST_PATH` を使う。
 
 ## Result Contract
 

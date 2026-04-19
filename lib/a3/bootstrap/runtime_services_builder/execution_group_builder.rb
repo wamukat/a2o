@@ -28,7 +28,8 @@ module A3
               run_repository: repositories.fetch(:run_repository),
               register_completed_run: support_group.fetch(:register_completed_run),
               command_runner: command_runner,
-              prepare_workspace: support_group.fetch(:prepare_workspace)
+              prepare_workspace: support_group.fetch(:prepare_workspace),
+              task_packet_builder: build_worker_task_packet
             ),
             run_merge: A3::Application::RunMerge.new(
               task_repository: repositories.fetch(:task_repository),

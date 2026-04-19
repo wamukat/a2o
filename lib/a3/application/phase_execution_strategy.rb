@@ -104,8 +104,10 @@ module A3
     end
 
     class VerificationExecutionStrategy
-      def initialize(command_runner:)
+      def initialize(command_runner:, task_packet_builder:, worker_protocol: A3::Infra::WorkerProtocol.new)
         @command_runner = command_runner
+        @task_packet_builder = task_packet_builder
+        @worker_protocol = worker_protocol
       end
 
       def execute(task:, run:, runtime:, workspace:)
@@ -128,7 +130,22 @@ module A3
 
         summaries = []
         resolve_remediation_workspaces(run: run, workspace: workspace).each do |target_workspace|
-          result = @command_runner.run(runtime.remediation_commands, workspace: target_workspace, task: task, run: run, command_intent: :remediation)
+          command_context = command_request_context(
+            task: task,
+            run: run,
+            runtime: runtime,
+            workspace: workspace,
+            command_intent: :remediation
+          )
+          result = @command_runner.run(
+            runtime.remediation_commands,
+            workspace: target_workspace,
+            env: command_context.fetch(:env),
+            task: task,
+            run: run,
+            command_intent: :remediation,
+            worker_protocol_request: command_context.fetch(:request)
+          )
           return result unless result.success?
 
           summaries << result.summary
@@ -156,7 +173,21 @@ module A3
       end
 
       def run_verification_commands(task:, run:, runtime:, workspace:)
-        @command_runner.run(runtime.verification_commands, workspace: workspace, task: task, run: run)
+        command_context = command_request_context(
+          task: task,
+          run: run,
+          runtime: runtime,
+          workspace: workspace,
+          command_intent: :verification
+        )
+        @command_runner.run(
+          runtime.verification_commands,
+          workspace: workspace,
+          env: command_context.fetch(:env),
+          task: task,
+          run: run,
+          worker_protocol_request: command_context.fetch(:request)
+        )
       end
 
       def blocked_expected_state
@@ -180,6 +211,33 @@ module A3
       end
 
       private
+
+      def command_request_context(task:, run:, runtime:, workspace:, command_intent:)
+        task_packet = @task_packet_builder.call(task: task)
+        request = @worker_protocol.request_form(
+          skill: nil,
+          workspace: workspace,
+          task: task,
+          run: run,
+          phase_runtime: runtime,
+          task_packet: task_packet,
+          command_intent: command_intent
+        )
+        @worker_protocol.write_request(
+          skill: nil,
+          workspace: workspace,
+          task: task,
+          run: run,
+          phase_runtime: runtime,
+          task_packet: task_packet,
+          command_intent: command_intent
+        )
+
+        {
+          env: @worker_protocol.env_for(workspace),
+          request: request
+        }
+      end
     end
 
     class MergeExecutionStrategy

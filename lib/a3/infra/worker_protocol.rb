@@ -24,9 +24,9 @@ module A3
         }
       end
 
-      def request_form(skill:, workspace:, task:, run:, phase_runtime:, task_packet:)
+      def request_form(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, command_intent: nil)
         review_target = run.evidence.review_target
-        {
+        payload = {
           "task_ref" => task.ref,
           "run_ref" => run.ref,
           "phase" => run.phase.to_s,
@@ -58,13 +58,15 @@ module A3
           "phase_runtime" => phase_runtime.worker_request_form,
           "slot_paths" => workspace.slot_paths.transform_keys(&:to_s).transform_values(&:to_s)
         }
+        payload["command_intent"] = command_intent.to_s if command_intent
+        payload
       end
 
-      def write_request(skill:, workspace:, task:, run:, phase_runtime:, task_packet:)
+      def write_request(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, command_intent: nil)
         metadata_dir = workspace.root_path.join(".a3")
         FileUtils.mkdir_p(metadata_dir)
         metadata_dir.join("worker-request.json").write(
-          JSON.pretty_generate(request_form(skill: skill, workspace: workspace, task: task, run: run, phase_runtime: phase_runtime, task_packet: task_packet))
+          JSON.pretty_generate(request_form(skill: skill, workspace: workspace, task: task, run: run, phase_runtime: phase_runtime, task_packet: task_packet, command_intent: command_intent))
         )
       end
 

@@ -107,6 +107,8 @@ Verification and remediation commands support:
 - `{{root_dir}}`
 
 Project commands should treat the worker request JSON and `A2O_*` worker environment variables as the stable contract. Do not read private `.a3` metadata files or generated `launcher.json` files from package scripts.
+Implementation, review, verification, and remediation jobs all expose `A2O_WORKER_REQUEST_PATH`. Verification and remediation request JSON includes `command_intent`, `slot_paths`, `scope_snapshot`, and `phase_runtime`; use those fields to decide which repo slots and policies to apply.
+For slot-local remediation, the command may run with a repo slot as the current directory, while the request still describes the full prepared workspace.
 
 Verification and remediation commands may also use the same `default` / `variants` shape used by merge settings. Use this only when command policy depends on `task_kind`, `repo_scope`, or phase:
 

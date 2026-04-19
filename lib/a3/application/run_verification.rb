@@ -8,8 +8,11 @@ module A3
     class RunVerification
       Result = Struct.new(:task, :run, :workspace, keyword_init: true)
 
-      def initialize(task_repository:, run_repository:, register_completed_run:, command_runner:, prepare_workspace:, blocked_diagnosis_factory: A3::Domain::BlockedDiagnosisFactory.new)
-        @strategy = A3::Application::VerificationExecutionStrategy.new(command_runner: command_runner)
+      def initialize(task_repository:, run_repository:, register_completed_run:, command_runner:, prepare_workspace:, task_packet_builder: A3::Application::BuildWorkerTaskPacket.new(external_task_source: A3::Infra::NullExternalTaskSource.new), blocked_diagnosis_factory: A3::Domain::BlockedDiagnosisFactory.new)
+        @strategy = A3::Application::VerificationExecutionStrategy.new(
+          command_runner: command_runner,
+          task_packet_builder: task_packet_builder
+        )
         @flow = A3::Application::PhaseExecutionFlow.new(
           task_repository: task_repository,
           run_repository: run_repository,

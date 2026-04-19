@@ -111,6 +111,32 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(runner.agent_owned_workspace?).to eq(true)
   end
 
+  it "passes public worker protocol requests to materialized command jobs" do
+    client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :succeeded, 0)) }
+    builder = A3::Infra::AgentWorkspaceRequestBuilder.new(source_aliases: {repo_alpha: "sample-catalog-service"})
+    runner = described_class.new(
+      control_plane_client: client,
+      runtime_profile: "docker-dev-env",
+      shared_workspace_mode: "agent-materialized",
+      workspace_request_builder: builder,
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_) {}
+    )
+    worker_protocol_request = {
+      "task_ref" => task.ref,
+      "run_ref" => run.ref,
+      "phase" => "verification",
+      "command_intent" => "verification",
+      "slot_paths" => {"repo_alpha" => "/tmp/a3-workspace/repo-alpha"}
+    }
+
+    result = runner.run(["task verify"], workspace: workspace, task: task, run: run, worker_protocol_request: worker_protocol_request)
+
+    request = client.records.values.first.request
+    expect(result.success?).to eq(true)
+    expect(request.worker_protocol_request).to eq(worker_protocol_request)
+  end
+
   it "marks remediation command jobs as publishable edit-target mutations" do
     client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :succeeded, 0)) }
     builder = A3::Infra::AgentWorkspaceRequestBuilder.new(source_aliases: {repo_alpha: "sample-catalog-service"})

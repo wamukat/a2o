@@ -165,7 +165,7 @@ RSpec.describe "phase execution strategies" do
 
   it "verification strategy exposes execution summary as verification summary and diagnostics on blocked" do
     command_runner = instance_double("CommandRunner")
-    strategy = A3::Application::VerificationExecutionStrategy.new(command_runner: command_runner)
+    strategy = A3::Application::VerificationExecutionStrategy.new(command_runner: command_runner, task_packet_builder: task_packet_builder)
     runtime_without_remediation = A3::Domain::PhaseRuntimeConfig.new(
       task_kind: runtime.task_kind,
       repo_scope: runtime.repo_scope,
@@ -194,7 +194,7 @@ RSpec.describe "phase execution strategies" do
   it "does not require an Engine workspace when verification is agent materialized" do
     command_runner = instance_double("CommandRunner")
     allow(command_runner).to receive(:agent_owned_workspace?).and_return(true)
-    strategy = A3::Application::VerificationExecutionStrategy.new(command_runner: command_runner)
+    strategy = A3::Application::VerificationExecutionStrategy.new(command_runner: command_runner, task_packet_builder: task_packet_builder)
 
     expect(strategy.requires_workspace?).to eq(false)
   end
@@ -210,29 +210,41 @@ RSpec.describe "phase execution strategies" do
       }
     )
     command_runner = instance_double("CommandRunner")
-    strategy = A3::Application::VerificationExecutionStrategy.new(command_runner: command_runner)
+    strategy = A3::Application::VerificationExecutionStrategy.new(command_runner: command_runner, task_packet_builder: task_packet_builder)
     remediation_execution = A3::Application::ExecutionResult.new(success: true, summary: "commands/apply-remediation ok")
     verification_execution = A3::Application::ExecutionResult.new(success: true, summary: "commands/verify-all ok")
 
     expect(command_runner).to receive(:run).with(
       runtime.remediation_commands,
       workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-alpha")),
+      env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: task,
       run: implementation_run,
-      command_intent: :remediation
+      command_intent: :remediation,
+      worker_protocol_request: hash_including(
+        "command_intent" => "remediation",
+        "slot_paths" => {
+          "repo_alpha" => "/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-alpha",
+          "repo_beta" => "/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-beta"
+        }
+      )
     ).ordered.and_return(remediation_execution)
     expect(command_runner).to receive(:run).with(
       runtime.remediation_commands,
       workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-beta")),
+      env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: task,
       run: implementation_run,
-      command_intent: :remediation
+      command_intent: :remediation,
+      worker_protocol_request: hash_including("command_intent" => "remediation")
     ).ordered.and_return(remediation_execution)
     expect(command_runner).to receive(:run).with(
       runtime.verification_commands,
       workspace: slot_workspace,
+      env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: task,
-      run: implementation_run
+      run: implementation_run,
+      worker_protocol_request: hash_including("command_intent" => "verification")
     ).ordered.and_return(verification_execution)
 
     result = strategy.execute(task: task, run: implementation_run, runtime: runtime, workspace: slot_workspace)
@@ -252,22 +264,26 @@ RSpec.describe "phase execution strategies" do
     )
     command_runner = instance_double("CommandRunner")
     allow(command_runner).to receive(:agent_owned_workspace?).and_return(true)
-    strategy = A3::Application::VerificationExecutionStrategy.new(command_runner: command_runner)
+    strategy = A3::Application::VerificationExecutionStrategy.new(command_runner: command_runner, task_packet_builder: task_packet_builder)
     remediation_execution = A3::Application::ExecutionResult.new(success: true, summary: "commands/apply-remediation ok")
     verification_execution = A3::Application::ExecutionResult.new(success: true, summary: "commands/verify-all ok")
 
     expect(command_runner).to receive(:run).with(
       runtime.remediation_commands,
       workspace: slot_workspace,
+      env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: task,
       run: implementation_run,
-      command_intent: :remediation
+      command_intent: :remediation,
+      worker_protocol_request: hash_including("command_intent" => "remediation")
     ).ordered.and_return(remediation_execution)
     expect(command_runner).to receive(:run).with(
       runtime.verification_commands,
       workspace: slot_workspace,
+      env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: task,
-      run: implementation_run
+      run: implementation_run,
+      worker_protocol_request: hash_including("command_intent" => "verification")
     ).ordered.and_return(verification_execution)
 
     result = strategy.execute(task: task, run: implementation_run, runtime: runtime, workspace: slot_workspace)
@@ -286,7 +302,7 @@ RSpec.describe "phase execution strategies" do
       }
     )
     command_runner = instance_double("CommandRunner")
-    strategy = A3::Application::VerificationExecutionStrategy.new(command_runner: command_runner)
+    strategy = A3::Application::VerificationExecutionStrategy.new(command_runner: command_runner, task_packet_builder: task_packet_builder)
     remediation_failure = A3::Application::ExecutionResult.new(
       success: false,
       summary: "commands/apply-remediation failed",
@@ -298,18 +314,22 @@ RSpec.describe "phase execution strategies" do
     expect(command_runner).to receive(:run).with(
       runtime.remediation_commands,
       workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-alpha")),
+      env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: task,
       run: implementation_run,
-      command_intent: :remediation
+      command_intent: :remediation,
+      worker_protocol_request: hash_including("command_intent" => "remediation")
     ).ordered.and_return(remediation_failure)
     expect(command_runner).not_to receive(:run).with(
       runtime.remediation_commands,
       workspace: have_attributes(root_path: Pathname("/tmp/a3-v2/workspaces/A3-v2-3025/ticket_workspace/repo-beta")),
+      env: anything,
       task: task,
       run: implementation_run,
-      command_intent: :remediation
+      command_intent: :remediation,
+      worker_protocol_request: anything
     )
-    expect(command_runner).not_to receive(:run).with(runtime.verification_commands, workspace: slot_workspace, task: task, run: implementation_run)
+    expect(command_runner).not_to receive(:run).with(runtime.verification_commands, workspace: slot_workspace, env: anything, task: task, run: implementation_run, worker_protocol_request: anything)
 
     result = strategy.execute(task: task, run: implementation_run, runtime: runtime, workspace: slot_workspace)
 

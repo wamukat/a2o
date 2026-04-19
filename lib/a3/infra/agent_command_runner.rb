@@ -23,14 +23,14 @@ module A3
         @shared_workspace_mode == "agent-materialized"
       end
 
-      def run(commands, workspace:, env: {}, task: nil, run: nil, command_intent: nil, **)
+      def run(commands, workspace:, env: {}, task: nil, run: nil, command_intent: nil, worker_protocol_request: nil, **)
         return invalid_configuration_result("agent command runner requires task and run context") unless task && run
         return invalid_configuration_result("agent-materialized command runner requires workspace_request_builder") if @shared_workspace_mode == "agent-materialized" && !@workspace_request_builder
         return unsupported_workspace_result unless %w[same-path agent-materialized].include?(@shared_workspace_mode)
 
         summaries = []
         Array(commands).each do |command|
-          request = build_job_request(command: command, workspace: workspace, env: env, task: task, run: run, command_intent: command_intent)
+          request = build_job_request(command: command, workspace: workspace, env: env, task: task, run: run, command_intent: command_intent, worker_protocol_request: worker_protocol_request)
           record = enqueue(request)
           return record if record.is_a?(A3::Application::ExecutionResult)
 
@@ -48,7 +48,7 @@ module A3
 
       private
 
-      def build_job_request(command:, workspace:, env:, task:, run:, command_intent:)
+      def build_job_request(command:, workspace:, env:, task:, run:, command_intent:, worker_protocol_request:)
         A3::Domain::AgentJobRequest.new(
           job_id: job_id_for(run),
           task_ref: task.ref,
@@ -62,7 +62,8 @@ module A3
           args: ["-lc", command.to_s],
           env: default_env.merge(@env).merge(env),
           timeout_seconds: @timeout_seconds,
-          artifact_rules: []
+          artifact_rules: [],
+          worker_protocol_request: worker_protocol_request
         )
       end
 

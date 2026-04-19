@@ -111,6 +111,30 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
+  it "marks command request intent when used by project verification commands" do
+    protocol = described_class.new
+    request_form = protocol.request_form(
+      skill: nil,
+      workspace: workspace,
+      task: task,
+      run: run,
+      phase_runtime: phase_runtime,
+      task_packet: task_packet,
+      command_intent: :verification
+    )
+
+    expect(request_form).to include(
+      "command_intent" => "verification",
+      "slot_paths" => {
+        "repo_beta" => workspace.slot_paths.fetch(:repo_beta).to_s
+      },
+      "phase_runtime" => hash_including(
+        "task_kind" => "child",
+        "repo_scope" => "ui_app"
+      )
+    )
+  end
+
   it "normalizes project repo labels in review_disposition repo_scope" do
     result = described_class.new(
       repo_scope_aliases: { "repo:both" => "both" },

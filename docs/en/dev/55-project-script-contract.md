@@ -51,10 +51,10 @@ Verification and remediation commands may use:
 
 ## Worker Environment
 
-Project worker commands should use these environment variables:
+Project worker, verification, and remediation commands should use these environment variables:
 
 - `A2O_WORKER_REQUEST_PATH`: JSON request bundle for the current worker job.
-- `A2O_WORKER_RESULT_PATH`: path where the worker command writes its final JSON result.
+- `A2O_WORKER_RESULT_PATH`: path where worker commands write their final JSON result.
 - `A2O_WORKSPACE_ROOT`: materialized workspace root for the current job.
 - `A2O_ROOT_DIR`: root directory containing A2O runtime support files visible to the worker.
 - `A2O_WORKER_LAUNCHER_CONFIG_PATH`: generated launcher config used by the bundled stdin worker.
@@ -67,12 +67,15 @@ The worker request JSON is the source of truth for project scripts. It includes:
 
 - `task_ref`, `run_ref`, and `phase`
 - `skill`
+- `command_intent` for verification and remediation command jobs
 - `task_packet.title` and `task_packet.description`
 - `slot_paths`, keyed by repo slot alias
 - `phase_runtime`, including task kind and verification commands when relevant
 - source descriptor and scope snapshot metadata
 
 Scripts should read repo paths from `slot_paths` rather than assuming a workspace directory layout.
+For slot-local remediation, the command working directory may be a repo slot while `A2O_WORKSPACE_ROOT` and `slot_paths` still describe the full prepared workspace.
+Do not read private `.a3` metadata directly; use `A2O_WORKER_REQUEST_PATH`.
 
 ## Result Contract
 
