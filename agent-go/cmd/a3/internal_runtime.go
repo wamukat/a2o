@@ -328,15 +328,25 @@ func printLatestRuntimeSummary(config runtimeInstanceConfig, runner commandRunne
 		fmt.Fprintf(stdout, "runtime_latest_run status=unavailable reason=%s\n", singleLine(err.Error()))
 		return
 	}
+	runHistoryPath := path.Join(plan.StorageDir, "runs.json")
+	existsOutput, err := dockerComposeExecOutput(config, plan, runner, "sh", "-c", "if test -f \"$1\"; then echo present; else echo missing; fi", "sh", runHistoryPath)
+	if err != nil {
+		fmt.Fprintf(stdout, "runtime_latest_run status=unavailable reason=%s\n", singleLine(err.Error()))
+		return
+	}
+	if strings.TrimSpace(string(existsOutput)) != "present" {
+		fmt.Fprintln(stdout, "runtime_latest_run status=no_runs reason=history_empty")
+		return
+	}
 	script := "records = JSON.parse(File.read(ARGV.fetch(0))); run = records.values.last; if run then outcome = run['terminal_outcome']; state = outcome ? 'terminal' : 'active'; puts \"runtime_latest_run run_ref=#{run['ref']} task_ref=#{run['task_ref']} phase=#{run['phase'] || '-'} state=#{state} outcome=#{outcome || '-'}\" end"
-	output, err := dockerComposeExecOutput(config, plan, runner, "ruby", "-rjson", "-e", script, path.Join(plan.StorageDir, "runs.json"))
+	output, err := dockerComposeExecOutput(config, plan, runner, "ruby", "-rjson", "-e", script, runHistoryPath)
 	if err != nil {
 		fmt.Fprintf(stdout, "runtime_latest_run status=unavailable reason=%s\n", singleLine(err.Error()))
 		return
 	}
 	summary := strings.TrimSpace(string(output))
 	if summary == "" {
-		fmt.Fprintln(stdout, "runtime_latest_run status=unavailable reason=no_runs")
+		fmt.Fprintln(stdout, "runtime_latest_run status=no_runs reason=history_empty")
 		return
 	}
 	fmt.Fprintln(stdout, sanitizePublicCommand(summary))

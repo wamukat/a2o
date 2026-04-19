@@ -1916,6 +1916,54 @@ func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
 	}
 }
 
+func TestRuntimeStatusReportsEmptyHistoryWithoutRubyReadError(t *testing.T) {
+	t.Setenv("A2O_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{missingRunHistory: true}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "status"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	if !strings.Contains(output, "runtime_status_check name=runtime_container status=running container=runtime-container") {
+		t.Fatalf("stdout should still report healthy runtime container, got:\n%s", output)
+	}
+	if !strings.Contains(output, "runtime_status_check name=kanban_service status=running container=soloboard-container") {
+		t.Fatalf("stdout should still report healthy kanban service, got:\n%s", output)
+	}
+	if !strings.Contains(output, "runtime_latest_run status=no_runs reason=history_empty") {
+		t.Fatalf("stdout should report empty history normally, got:\n%s", output)
+	}
+	for _, forbidden := range []string{"rb_sysopen", "No such file or directory", "ruby -rjson"} {
+		if strings.Contains(output, forbidden) || strings.Contains(stderr.String(), forbidden) {
+			t.Fatalf("status output should not expose low-level missing history detail %q, stdout=%q stderr=%q", forbidden, output, stderr.String())
+		}
+	}
+	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), " ruby -rjson -e ") {
+		t.Fatalf("runtime status should not read missing run history with ruby, calls:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+	}
+}
+
 func TestRuntimeStatusReportsStaleForUnrelatedReusedPID(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -2579,6 +2627,7 @@ type fakeRunner struct {
 	taskWithoutCurrentRun bool
 	legacyRuntimeOrphans  []string
 	failLegacyRuntimeRM   bool
+	missingRunHistory     bool
 	err                   error
 	lastEnv               map[string]string
 	nextPID               int
@@ -2638,6 +2687,11 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 			return []byte("\n"), nil
 		}
 		return []byte("container-123\n"), nil
+	case strings.Contains(joined, " sh -c ") && strings.Contains(joined, "test -f"):
+		if r.missingRunHistory {
+			return []byte("missing\n"), nil
+		}
+		return []byte("present\n"), nil
 	case strings.Contains(joined, " a3 show-task "):
 		if r.failShowTask {
 			return []byte("task not found\n"), errors.New("task not found")
