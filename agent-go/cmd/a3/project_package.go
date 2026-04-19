@@ -183,10 +183,8 @@ func normalizeYAMLValue[T any](value T) T {
 }
 
 func validateProjectAuthorExecutorConfig(executor map[string]any) error {
-	for _, key := range []string{"kind", "prompt_transport", "result", "schema", "default_profile"} {
-		if _, ok := executor[key]; ok {
-			return fmt.Errorf("%s is internal; use runtime.executor.command in project.yaml", key)
-		}
+	if err := rejectInternalProjectExecutorKeys(executor, "executor"); err != nil {
+		return err
 	}
 	if err := validateProjectExecutorProfile(executor, "executor"); err != nil {
 		return err
@@ -201,8 +199,25 @@ func validateProjectAuthorExecutorConfig(executor map[string]any) error {
 		if !containsString([]string{"implementation", "review", "parent_review"}, phase) {
 			return fmt.Errorf("phase_profiles contains unknown phase: %s", phase)
 		}
-		if err := validateProjectExecutorProfile(rawProfile, "phase_profiles."+phase); err != nil {
+		label := "phase_profiles." + phase
+		profile, ok := rawProfile.(map[string]any)
+		if !ok {
+			return fmt.Errorf("%s must be an object", label)
+		}
+		if err := rejectInternalProjectExecutorKeys(profile, label); err != nil {
 			return err
+		}
+		if err := validateProjectExecutorProfile(profile, label); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func rejectInternalProjectExecutorKeys(executor map[string]any, label string) error {
+	for _, key := range []string{"kind", "prompt_transport", "result", "schema", "default_profile"} {
+		if _, ok := executor[key]; ok {
+			return fmt.Errorf("%s.%s is internal; use runtime.executor.command in project.yaml", label, key)
 		}
 	}
 	return nil
