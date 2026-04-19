@@ -10,7 +10,7 @@ on:
       - Dockerfile
       - Gemfile
       - Gemfile.lock
-      - a3.gemspec
+      - a2o.gemspec
       - bin/**
       - config/**
       - lib/**
@@ -23,7 +23,7 @@ on:
       - Dockerfile
       - Gemfile
       - Gemfile.lock
-      - a3.gemspec
+      - a2o.gemspec
       - bin/**
       - config/**
       - lib/**
