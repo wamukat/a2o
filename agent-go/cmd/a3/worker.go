@@ -73,8 +73,9 @@ func runWorkerScaffold(args []string, stdout io.Writer, stderr io.Writer) error 
 	if err := os.WriteFile(*outputPath, []byte(body), mode); err != nil {
 		return fmt.Errorf("write worker scaffold: %w", err)
 	}
-	fmt.Fprintf(stdout, "worker_scaffold_written path=%s language=%s\n", *outputPath, normalizeWorkerLanguage(*language))
-	fmt.Fprintf(stdout, "worker_scaffold_command=%s --schema {{schema_path}} --result {{result_path}}\n", *outputPath)
+	normalizedLanguage := normalizeWorkerLanguage(*language)
+	fmt.Fprintf(stdout, "worker_scaffold_written path=%s language=%s\n", *outputPath, normalizedLanguage)
+	fmt.Fprintf(stdout, "worker_scaffold_command=%s\n", workerScaffoldCommand(normalizedLanguage, *outputPath))
 	return nil
 }
 
@@ -142,6 +143,13 @@ func workerScaffoldTemplate(language string) (string, os.FileMode, error) {
 	default:
 		return "", 0, fmt.Errorf("--language must be one of bash, python, ruby, go")
 	}
+}
+
+func workerScaffoldCommand(language string, outputPath string) string {
+	if language == "go" {
+		return "go run " + outputPath + " --schema {{schema_path}} --result {{result_path}}"
+	}
+	return outputPath + " --schema {{schema_path}} --result {{result_path}}"
 }
 
 func normalizeWorkerLanguage(language string) string {
@@ -365,41 +373,42 @@ bundle_path="$(mktemp)"
 trap 'rm -f "$bundle_path"' EXIT
 cat > "$bundle_path"
 
-python3 - "$bundle_path" "$result_path" <<'PY'
-import json
-import sys
-
-bundle_path, result_path = sys.argv[1:3]
-try:
-    with open(bundle_path, "r", encoding="utf-8") as handle:
-        payload = json.load(handle)
-except json.JSONDecodeError:
-    payload = {}
-request = payload.get("request", payload)
-if not isinstance(request, dict):
-    request = {}
-result = {
-    "task_ref": request.get("task_ref", ""),
-    "run_ref": request.get("run_ref", ""),
-    "phase": request.get("phase", ""),
-    "success": True,
-    "summary": "scaffold worker completed without changes",
-    "failing_command": None,
-    "observed_state": None,
-    "rework_required": False,
-    "changed_files": {},
-    "review_disposition": {
-        "kind": "completed",
-        "repo_scope": "all",
-        "summary": "scaffold worker self-review clean",
-        "description": "No changes were required by the scaffold worker.",
-        "finding_key": "none",
-    },
+extract_json_string() {
+  local key="$1"
+  sed -n "s/.*\\\"${key}\\\"[[:space:]]*:[[:space:]]*\\\"\\([^\\\"]*\\)\\\".*/\\1/p" "$bundle_path" | head -n 1
 }
-with open(result_path, "w", encoding="utf-8") as handle:
-    json.dump(result, handle, indent=2)
-    handle.write("\n")
-PY
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '%s' "$value"
+}
+
+task_ref="$(extract_json_string task_ref)"
+run_ref="$(extract_json_string run_ref)"
+phase="$(extract_json_string phase)"
+
+cat > "$result_path" <<JSON
+{
+  "task_ref": "$(json_escape "$task_ref")",
+  "run_ref": "$(json_escape "$run_ref")",
+  "phase": "$(json_escape "$phase")",
+  "success": true,
+  "summary": "scaffold worker completed without changes",
+  "failing_command": null,
+  "observed_state": null,
+  "rework_required": false,
+  "changed_files": {},
+  "review_disposition": {
+    "kind": "completed",
+    "repo_scope": "all",
+    "summary": "scaffold worker self-review clean",
+    "description": "No changes were required by the scaffold worker.",
+    "finding_key": "none"
+  }
+}
+JSON
 `
 
 const goWorkerScaffold = `package main

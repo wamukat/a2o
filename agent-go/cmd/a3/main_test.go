@@ -640,6 +640,92 @@ func TestWorkerScaffoldWritesRunnablePythonWorkerAndValidateResult(t *testing.T)
 	}
 }
 
+func TestWorkerScaffoldBashIsSelfContained(t *testing.T) {
+	tempDir := t.TempDir()
+	workerPath := filepath.Join(tempDir, "worker.sh")
+	resultPath := filepath.Join(tempDir, "result.json")
+	requestPath := filepath.Join(tempDir, "request.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"worker",
+		"scaffold",
+		"--language",
+		"bash",
+		"--output",
+		workerPath,
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+	if strings.Contains(readFileString(t, workerPath), "python") {
+		t.Fatalf("bash scaffold should not depend on python:\n%s", readFileString(t, workerPath))
+	}
+	request := map[string]any{"task_ref": "A2O#62", "run_ref": "run-bash", "phase": "implementation"}
+	writeJSONFileForTest(t, requestPath, request)
+	bundleBody, err := json.Marshal(map[string]any{"request": request})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("bash", workerPath, "--schema", filepath.Join(tempDir, "schema.json"), "--result", resultPath)
+	cmd.Stdin = bytes.NewReader(bundleBody)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("generated bash worker failed: %v\n%s", err, string(output))
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"worker", "validate-result", "--request", requestPath, "--result", resultPath}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("validate-result returned %d, stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestWorkerScaffoldGoPrintsGoRunCommandAndValidates(t *testing.T) {
+	tempDir := t.TempDir()
+	workerPath := filepath.Join(tempDir, "worker.go")
+	resultPath := filepath.Join(tempDir, "result.json")
+	requestPath := filepath.Join(tempDir, "request.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"worker",
+		"scaffold",
+		"--language",
+		"go",
+		"--output",
+		workerPath,
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "worker_scaffold_command=go run "+workerPath+" --schema {{schema_path}} --result {{result_path}}") {
+		t.Fatalf("go scaffold should print go run command, got %q", stdout.String())
+	}
+	request := map[string]any{"task_ref": "A2O#62", "run_ref": "run-go", "phase": "implementation"}
+	writeJSONFileForTest(t, requestPath, request)
+	bundleBody, err := json.Marshal(map[string]any{"request": request})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("go", "run", workerPath, "--schema", filepath.Join(tempDir, "schema.json"), "--result", resultPath)
+	cmd.Stdin = bytes.NewReader(bundleBody)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("generated go worker failed: %v\n%s", err, string(output))
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"worker", "validate-result", "--request", requestPath, "--result", resultPath}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("validate-result returned %d, stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+}
+
 func TestWorkerValidateResultReportsConcreteProtocolErrors(t *testing.T) {
 	tempDir := t.TempDir()
 	requestPath := filepath.Join(tempDir, "request.json")
@@ -681,6 +767,26 @@ func TestWorkerValidateResultReportsConcreteProtocolErrors(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "error_category=configuration_error") {
 		t.Fatalf("stderr should classify protocol error, got %q", stderr.String())
+	}
+}
+
+func readFileString(t *testing.T, path string) string {
+	t.Helper()
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(body)
+}
+
+func writeJSONFileForTest(t *testing.T, path string, payload any) {
+	t.Helper()
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, append(body, '\n'), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
