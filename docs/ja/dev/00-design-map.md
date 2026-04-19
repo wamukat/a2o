@@ -9,6 +9,37 @@
 - 利用者向け surface と内部互換名の境界を明確にする。
 - reference product suite を core validation の正本にする。
 
+## アーキテクチャ概要
+
+```mermaid
+flowchart LR
+  User["利用者"]
+  CLI["a2o CLI"]
+  Kanban["bundled kanban service"]
+  Runtime["A2O runtime container"]
+  Engine["A2O Engine\norchestration / state"]
+  Agent["a2o-agent\nhost gateway"]
+  Package["project package\nproject.yaml / skills / commands"]
+  Workspace["product workspace\nrepo slots / branches"]
+  Evidence["evidence / status\nlogs / summaries / kanban comments"]
+
+  User --> CLI
+  CLI --> Kanban
+  CLI --> Runtime
+  Kanban --> Engine
+  Runtime --> Engine
+  Engine --> Package
+  Engine --> Agent
+  Agent --> Workspace
+  Package --> Agent
+  Workspace --> Evidence
+  Engine --> Evidence
+  Evidence --> Kanban
+  Evidence --> User
+```
+
+A2O は bundled kanban service から task を読み取り、runtime container 内の Engine が orchestration を行い、product 固有の command は `a2o-agent` 経由で実行する。実行結果は evidence として workspace と kanban task に戻る。product 固有の知識は project package と product workspace に置き、Engine は orchestration、phase state、kanban integration、evidence flow を担当する。
+
 ## 設計資料一覧
 
 ### 0. 利用者導線

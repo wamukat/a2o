@@ -9,6 +9,37 @@ This document explains what each design document covers and the recommended read
 - Make the boundary between public A2O surfaces and internal compatibility names explicit.
 - Treat the reference product suite as the canonical core validation target.
 
+## Architecture Overview
+
+```mermaid
+flowchart LR
+  User["Operator"]
+  CLI["a2o CLI"]
+  Kanban["Bundled kanban service"]
+  Runtime["A2O runtime container"]
+  Engine["A2O Engine\norchestration and state"]
+  Agent["a2o-agent\nhost gateway"]
+  Package["Project package\nproject.yaml, skills, commands"]
+  Workspace["Product workspace\nrepo slots and branches"]
+  Evidence["Evidence and status\nlogs, summaries, kanban comments"]
+
+  User --> CLI
+  CLI --> Kanban
+  CLI --> Runtime
+  Kanban --> Engine
+  Runtime --> Engine
+  Engine --> Package
+  Engine --> Agent
+  Agent --> Workspace
+  Package --> Agent
+  Workspace --> Evidence
+  Engine --> Evidence
+  Evidence --> Kanban
+  Evidence --> User
+```
+
+A2O reads work from the bundled kanban service, runs the Engine inside the runtime container, delegates product-specific commands through `a2o-agent`, and records evidence back to the workspace and kanban task. Product-specific knowledge belongs in the project package and product workspace. The Engine owns orchestration, phase state, kanban integration, and evidence flow.
+
 ## Documents
 
 ### 0. User Path
