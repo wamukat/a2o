@@ -7,7 +7,6 @@ on:
       - main
     paths:
       - .github/workflows/publish-a2o-engine.yml
-      - Dockerfile
       - Gemfile
       - Gemfile.lock
       - a2o.gemspec
@@ -20,7 +19,6 @@ on:
   pull_request:
     paths:
       - .github/workflows/publish-a2o-engine.yml
-      - Dockerfile
       - Gemfile
       - Gemfile.lock
       - a2o.gemspec
