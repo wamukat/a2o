@@ -18,14 +18,14 @@ flowchart LR
   AI([生成AI])
 
   subgraph Inputs["利用者が管理する入力"]
-    ProjectInputs[/プロジェクト設定 / AI 用スキル群/]
+    ProjectInputs@{ shape: docs, label: "プロジェクト設定 / AI 用スキル群" }
   end
 
   subgraph Engine["A2O Engine"]
-    Kanban[(kanban\nwork queue / visible state)]
-    Scheduler(scheduler\n実行可能な kanban task を選ぶ)
-    Prepare(AI 実行 job を用意する\ntask / config / skills から生成)
-    Report(結果を記録する\nkanban comments / status / evidence)
+    Kanban[(カンバン\ntask queue)]
+    Scheduler(scheduler\n実行可能な task を選択)
+    Prepare(Job を準備して指示する\ntask / config / skills から生成)
+    Report(結果を記録\nkanban comments / status)
   end
 
   Repository[(Git repository)]
@@ -36,9 +36,9 @@ flowchart LR
   Scheduler --> Prepare
   ProjectInputs --> Prepare
   Prepare --> Agent
-  Agent -->|"job の実行を指示"| AI
-  AI -->|"job result"| Agent
-  Agent -->|"変更を反映する"| Repository
+  Agent -->|"Job の実行を指示"| AI
+  AI -->|"Job result"| Agent
+  Agent -->|"変更を反映"| Repository
   Agent --> Report
   Report --> Kanban
 ```

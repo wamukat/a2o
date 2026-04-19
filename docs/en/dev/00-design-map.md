@@ -18,7 +18,7 @@ flowchart LR
   AI([Generative AI])
 
   subgraph Inputs["User-maintained inputs"]
-    ProjectInputs[/Project config / AI skill files/]
+    ProjectInputs@{ shape: docs, label: "Project config / AI skill files" }
   end
 
   subgraph Engine["A2O Engine"]
