@@ -260,6 +260,46 @@ class SoloBoardCliTest(unittest.TestCase):
         self.assertEqual("Heading first line second line", snapshot["description_summary"])
         self.assertEqual(["trigger:auto-implement"], snapshot["labels"])
 
+    def test_task_transition_done_does_not_resolve_without_sync_flag(self) -> None:
+        board_shell = {
+            "board": {"id": 42, "name": "Sample"},
+            "lanes": [{"id": 9, "name": "Done", "position": 6}],
+        }
+        patch_payloads: list[dict[str, object]] = []
+
+        def fake_rest_request(_base_url, _token, method, path, *, payload=None):
+            if method == "GET" and path == "/api/tickets/101":
+                return {"id": 101, "boardId": 42, "laneId": 1, "title": "Task", "isResolved": False}
+            if method == "PATCH" and path == "/api/tickets/101/transition":
+                patch_payloads.append(payload)
+                return {
+                    "id": 101,
+                    "boardId": 42,
+                    "laneId": 9,
+                    "title": "Task",
+                    "isResolved": False,
+                    "ref": "Sample#101",
+                    "shortRef": "#101",
+                }
+            if method == "GET" and path == "/api/boards/42":
+                return board_shell
+            if method == "GET" and path == "/api/tickets/101/relations":
+                return {}
+            raise AssertionError(f"unexpected request: {method} {path}")
+
+        with patch.object(kanban_cli, "rest_request", side_effect=fake_rest_request):
+            result = kanban_cli.transition_task_status(
+                "http://localhost:3460",
+                "",
+                task_id=101,
+                status="Done",
+                sync_done_state=False,
+            )
+
+        self.assertEqual([{"laneName": "Done"}], patch_payloads)
+        self.assertEqual("Done", result["status"])
+        self.assertFalse(result["done"])
+
 
 if __name__ == "__main__":
     unittest.main()

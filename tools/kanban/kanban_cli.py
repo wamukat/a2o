@@ -1829,7 +1829,11 @@ def build_parser() -> argparse.ArgumentParser:
     task_update.add_argument("--append-description")
     task_update.add_argument("--append-description-file")
     task_update.add_argument("--reference")
-    task_update.add_argument("--done", type=lambda value: value.lower() == "true")
+    task_update.add_argument(
+        "--done",
+        type=lambda value: value.lower() == "true",
+        help="Set the backend's human-resolved flag directly. This is separate from moving an A2O task to the Done lane.",
+    )
     task_update.add_argument("--priority", type=int)
     task_update.set_defaults(func=cmd_task_update)
 
