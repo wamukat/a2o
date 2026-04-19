@@ -61,21 +61,28 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	config.AgentAttempts = scalarString(payload.Runtime.AgentAttempts)
 	config.AgentWorkspaceRoot = payload.Agent.WorkspaceRoot
 	config.AgentRequiredBins = payload.Agent.RequiredBins
-	authorExecutor := normalizeYAMLValue(payload.Runtime.Executor)
-	if len(authorExecutor) > 0 {
-		if err := validateProjectAuthorExecutorConfig(authorExecutor); err != nil {
-			return config, fmt.Errorf("project package config %s has invalid runtime.executor: %w", projectFile, err)
-		}
-	}
-	config.Executor = expandProjectExecutorConfig(authorExecutor)
-	for alias, repo := range payload.Repos {
-		config.Repos[alias] = projectPackageRepo{Path: repo.Path, Label: repo.Label}
-	}
 	if strings.TrimSpace(config.SchemaVersion) == "" {
 		return config, fmt.Errorf("project package config %s is missing schema_version", projectFile)
 	}
 	if config.SchemaVersion != "1" {
 		return config, fmt.Errorf("project package config %s has unsupported schema_version: %s", projectFile, config.SchemaVersion)
+	}
+	if len(payload.Runtime.Executor) > 0 {
+		return config, fmt.Errorf("project package config %s has invalid runtime.executor: runtime.executor is no longer supported; use runtime.phases.implementation.executor", projectFile)
+	}
+	if payload.Runtime.Surface != nil {
+		return config, fmt.Errorf("project package config %s has invalid runtime.surface: runtime.surface is no longer supported; use runtime.phases", projectFile)
+	}
+	if payload.Runtime.Merge != nil {
+		return config, fmt.Errorf("project package config %s has invalid runtime.merge: runtime.merge is no longer supported; use runtime.phases.merge", projectFile)
+	}
+	executor, err := buildProjectExecutorConfig(payload.Runtime.Phases)
+	if err != nil {
+		return config, fmt.Errorf("project package config %s has invalid runtime.phases: %w", projectFile, err)
+	}
+	config.Executor = executor
+	for alias, repo := range payload.Repos {
+		config.Repos[alias] = projectPackageRepo{Path: repo.Path, Label: repo.Label}
 	}
 	if strings.TrimSpace(config.PackageName) == "" {
 		return config, fmt.Errorf("project package config %s is missing package.name", projectFile)
@@ -89,13 +96,25 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	return config, nil
 }
 
-func expandProjectExecutorConfig(executor map[string]any) map[string]any {
-	if len(executor) == 0 {
-		return executor
+func buildProjectExecutorConfig(phases map[string]projectPackagePhaseYAML) (map[string]any, error) {
+	if len(phases) == 0 {
+		return nil, fmt.Errorf("runtime.phases must define implementation")
 	}
-	command, hasCommand := executor["command"]
-	if !hasCommand {
-		return executor
+	for phase := range phases {
+		if !containsString([]string{"implementation", "review", "parent_review", "verification", "remediation", "merge"}, phase) {
+			return nil, fmt.Errorf("contains unknown phase: %s", phase)
+		}
+	}
+	implementationPhase, ok := phases["implementation"]
+	if !ok {
+		return nil, fmt.Errorf("implementation.executor.command must be provided")
+	}
+	implementationExecutor := normalizeYAMLValue(implementationPhase.Executor)
+	if len(implementationExecutor) == 0 {
+		return nil, fmt.Errorf("implementation.executor.command must be provided")
+	}
+	if err := validateProjectAuthorExecutorConfig(implementationExecutor, "implementation.executor"); err != nil {
+		return nil, err
 	}
 	expanded := map[string]any{
 		"kind":             "command",
@@ -103,19 +122,34 @@ func expandProjectExecutorConfig(executor map[string]any) map[string]any {
 		"result":           map[string]any{"mode": "file"},
 		"schema":           map[string]any{"mode": "file"},
 		"default_profile": map[string]any{
-			"command": command,
+			"command": implementationExecutor["command"],
 		},
 		"phase_profiles": map[string]any{},
 	}
-	if env, ok := executor["env"]; ok {
+	if env, ok := implementationExecutor["env"]; ok {
 		expanded["default_profile"].(map[string]any)["env"] = env
 	} else {
 		expanded["default_profile"].(map[string]any)["env"] = map[string]any{}
 	}
-	if phaseProfiles, ok := executor["phase_profiles"]; ok {
-		expanded["phase_profiles"] = phaseProfiles
+	phaseProfiles := expanded["phase_profiles"].(map[string]any)
+	for _, phase := range []string{"review", "parent_review"} {
+		phaseConfig, ok := phases[phase]
+		if !ok || len(phaseConfig.Executor) == 0 {
+			continue
+		}
+		executor := normalizeYAMLValue(phaseConfig.Executor)
+		if err := validateProjectAuthorExecutorConfig(executor, phase+".executor"); err != nil {
+			return nil, err
+		}
+		profile := map[string]any{"command": executor["command"]}
+		if env, ok := executor["env"]; ok {
+			profile["env"] = env
+		} else {
+			profile["env"] = map[string]any{}
+		}
+		phaseProfiles[phase] = profile
 	}
-	return expanded
+	return expanded, nil
 }
 
 type projectPackageYAML struct {
@@ -139,11 +173,21 @@ type projectPackageYAML struct {
 		RequiredBins  []string `yaml:"required_bins"`
 	} `yaml:"agent"`
 	Runtime struct {
-		LiveRef       any            `yaml:"live_ref"`
-		MaxSteps      any            `yaml:"max_steps"`
-		AgentAttempts any            `yaml:"agent_attempts"`
-		Executor      map[string]any `yaml:"executor"`
+		LiveRef       any                                `yaml:"live_ref"`
+		MaxSteps      any                                `yaml:"max_steps"`
+		AgentAttempts any                                `yaml:"agent_attempts"`
+		Executor      map[string]any                     `yaml:"executor"`
+		Surface       any                                `yaml:"surface"`
+		Merge         any                                `yaml:"merge"`
+		Phases        map[string]projectPackagePhaseYAML `yaml:"phases"`
 	} `yaml:"runtime"`
+}
+
+type projectPackagePhaseYAML struct {
+	Skill         any            `yaml:"skill"`
+	Executor      map[string]any `yaml:"executor"`
+	Commands      []string       `yaml:"commands"`
+	WorkspaceHook string         `yaml:"workspace_hook"`
 }
 
 func scalarString(value any) string {
@@ -182,34 +226,15 @@ func normalizeYAMLValue[T any](value T) T {
 	return normalized
 }
 
-func validateProjectAuthorExecutorConfig(executor map[string]any) error {
-	if err := rejectInternalProjectExecutorKeys(executor, "executor"); err != nil {
+func validateProjectAuthorExecutorConfig(executor map[string]any, label string) error {
+	if err := rejectInternalProjectExecutorKeys(executor, label); err != nil {
 		return err
 	}
-	if err := validateProjectExecutorProfile(executor, "executor"); err != nil {
+	if err := validateProjectExecutorProfile(executor, label); err != nil {
 		return err
 	}
-	phaseProfiles := map[string]any{}
-	if raw, ok := executor["phase_profiles"].(map[string]any); ok {
-		phaseProfiles = raw
-	} else if executor["phase_profiles"] != nil {
-		return fmt.Errorf("phase_profiles must be an object")
-	}
-	for phase, rawProfile := range phaseProfiles {
-		if !containsString([]string{"implementation", "review", "parent_review"}, phase) {
-			return fmt.Errorf("phase_profiles contains unknown phase: %s", phase)
-		}
-		label := "phase_profiles." + phase
-		profile, ok := rawProfile.(map[string]any)
-		if !ok {
-			return fmt.Errorf("%s must be an object", label)
-		}
-		if err := rejectInternalProjectExecutorKeys(profile, label); err != nil {
-			return err
-		}
-		if err := validateProjectExecutorProfile(profile, label); err != nil {
-			return err
-		}
+	if _, ok := executor["phase_profiles"]; ok {
+		return fmt.Errorf("%s.phase_profiles is internal; define phase-specific executors under runtime.phases", label)
 	}
 	return nil
 }
@@ -217,7 +242,7 @@ func validateProjectAuthorExecutorConfig(executor map[string]any) error {
 func rejectInternalProjectExecutorKeys(executor map[string]any, label string) error {
 	for _, key := range []string{"kind", "prompt_transport", "result", "schema", "default_profile"} {
 		if _, ok := executor[key]; ok {
-			return fmt.Errorf("%s.%s is internal; use runtime.executor.command in project.yaml", label, key)
+			return fmt.Errorf("%s.%s is internal; use runtime.phases.<phase>.executor.command in project.yaml", label, key)
 		}
 	}
 	return nil

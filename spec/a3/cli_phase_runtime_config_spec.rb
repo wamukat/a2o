@@ -6,41 +6,38 @@ require "yaml"
 RSpec.describe A3::CLI do
   it "prints resolved phase runtime config from project context" do
     Dir.mktmpdir do |dir|
-      preset_dir = File.join(dir, "presets")
-      FileUtils.mkdir_p(preset_dir)
-      File.write(
-        File.join(preset_dir, "base.yml"),
-        YAML.dump(
-          {
-            "schema_version" => "1",
-            "implementation_skill" => "skills/implementation/base.md",
-            "review_skill" => {
-              "default" => "skills/review/default.md",
-              "variants" => {
-                "task_kind" => {
-                  "parent" => {
-                    "repo_scope" => {
-                      "repo_alpha" => {
-                        "phase" => {
-                          "review" => "skills/review/repo-alpha-parent.md"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            "verification_commands" => ["commands/verify-all"],
-            "remediation_commands" => ["commands/apply-remediation"],
-            "workspace_hook" => "hooks/prepare-runtime.sh"
-          }
-        )
-      )
       manifest_path = File.join(dir, "project.yaml")
       File.write(
         manifest_path,
         YAML.dump(
-          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/a2o/parent/A3-v2-3022" } } }
+          {
+            "schema_version" => 1,
+            "runtime" => {
+              "phases" => {
+                "implementation" => {
+                  "skill" => "skills/implementation/base.md",
+                  "workspace_hook" => "hooks/prepare-runtime.sh"
+                },
+                "review" => {
+                  "skill" => "skills/review/default.md"
+                },
+                "parent_review" => {
+                  "skill" => "skills/review/repo-alpha-parent.md"
+                },
+                "verification" => {
+                  "commands" => ["commands/verify-all"]
+                },
+                "remediation" => {
+                  "commands" => ["commands/apply-remediation"]
+                },
+                "merge" => {
+                  "target" => "merge_to_parent",
+                  "policy" => "ff_only",
+                  "target_ref" => "refs/heads/a2o/parent/A3-v2-3022"
+                }
+              }
+            }
+          }
         )
       )
 
@@ -50,9 +47,9 @@ RSpec.describe A3::CLI do
         [
           "show-phase-runtime-config",
           manifest_path,
-          "--preset-dir", preset_dir,
+          "--preset-dir", File.join(dir, "presets"),
           "--task-kind", "parent",
-          "--repo-scope", "repo_alpha",
+          "--repo-scope", "both",
           "--phase", "review"
         ],
         out: out
@@ -66,26 +63,35 @@ RSpec.describe A3::CLI do
 
   it "does not print review_skill for child implementation runtime config" do
     Dir.mktmpdir do |dir|
-      preset_dir = File.join(dir, "presets")
-      FileUtils.mkdir_p(preset_dir)
-      File.write(
-        File.join(preset_dir, "base.yml"),
-        YAML.dump(
-          {
-            "schema_version" => "1",
-            "implementation_skill" => "skills/implementation/base.md",
-            "review_skill" => "skills/review/default.md",
-            "verification_commands" => ["commands/verify-all"],
-            "remediation_commands" => ["commands/apply-remediation"],
-            "workspace_hook" => "hooks/prepare-runtime.sh"
-          }
-        )
-      )
       manifest_path = File.join(dir, "project.yaml")
       File.write(
         manifest_path,
         YAML.dump(
-          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/a2o/parent/A3-v2-3022" } } }
+          {
+            "schema_version" => 1,
+            "runtime" => {
+              "phases" => {
+                "implementation" => {
+                  "skill" => "skills/implementation/base.md",
+                  "workspace_hook" => "hooks/prepare-runtime.sh"
+                },
+                "review" => {
+                  "skill" => "skills/review/default.md"
+                },
+                "verification" => {
+                  "commands" => ["commands/verify-all"]
+                },
+                "remediation" => {
+                  "commands" => ["commands/apply-remediation"]
+                },
+                "merge" => {
+                  "target" => "merge_to_parent",
+                  "policy" => "ff_only",
+                  "target_ref" => "refs/heads/a2o/parent/A3-v2-3022"
+                }
+              }
+            }
+          }
         )
       )
 
@@ -95,7 +101,7 @@ RSpec.describe A3::CLI do
         [
           "show-phase-runtime-config",
           manifest_path,
-          "--preset-dir", preset_dir,
+          "--preset-dir", File.join(dir, "presets"),
           "--task-kind", "child",
           "--repo-scope", "repo_alpha",
           "--phase", "implementation"

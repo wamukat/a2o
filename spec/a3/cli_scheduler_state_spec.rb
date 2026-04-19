@@ -8,24 +8,10 @@ RSpec.describe A3::CLI do
     Dir.mktmpdir do |dir|
       preset_dir = File.join(dir, "presets")
       FileUtils.mkdir_p(preset_dir)
-      File.write(
-        File.join(preset_dir, "base.yml"),
-        YAML.dump(
-          {
-            "schema_version" => "1",
-            "implementation_skill" => "skills/implementation/base.md",
-            "review_skill" => "skills/review/default.md",
-            "verification_commands" => ["commands/verify-all"],
-            "remediation_commands" => ["commands/apply-remediation"],
-            "workspace_hook" => "hooks/prepare-runtime.sh"
-          }
-        )
-      )
-      File.write(
+      write_project_yaml(
         File.join(dir, "project.yaml"),
-        YAML.dump(
-          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/live" } } }
-        )
+        merge_target: "merge_to_parent",
+        merge_target_ref: "refs/heads/live"
       )
       out = StringIO.new
       described_class.start(

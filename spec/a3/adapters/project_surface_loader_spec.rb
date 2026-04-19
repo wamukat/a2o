@@ -15,16 +15,22 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
 
   let(:loader) { described_class.new(preset_dir: @preset_dir) }
 
-  it "loads a project config from runtime.surface without presets" do
+  it "loads project surface from runtime phases" do
     project_config_path = write_project_config(
-      {
-        "runtime" => {
-          "surface" => {
-            "implementation_skill" => "skills/implementation/base.md",
-            "review_skill" => "skills/review/project.md",
-            "verification_commands" => ["commands/verify-all"],
-            "remediation_commands" => ["commands/apply-remediation"],
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md",
             "workspace_hook" => "hooks/prepare-runtime.sh"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          },
+          "verification" => {
+            "commands" => ["commands/verify-all"]
+          },
+          "remediation" => {
+            "commands" => ["commands/apply-remediation"]
           }
         }
       }
@@ -39,24 +45,18 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     expect(surface.workspace_hook).to eq("hooks/prepare-runtime.sh")
   end
 
-  it "loads a project config from preset chain and project overrides" do
-    write_yaml(
-      "base.yml",
-      {
-        "implementation_skill" => "skills/implementation/base.md",
-        "review_skill" => "skills/review/base.md",
-        "verification_commands" => ["commands/verify-all"],
-        "remediation_commands" => ["commands/apply-remediation"],
-        "workspace_hook" => "hooks/prepare-runtime.sh"
-      }
-    )
-
+  it "maps parent_review phase skill to the parent review runtime variant" do
     project_config_path = write_project_config(
-      {
-        "runtime" => {
-          "presets" => ["base"],
-          "surface" => {
-            "review_skill" => "skills/review/project.md"
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/default.md"
+          },
+          "parent_review" => {
+            "skill" => "skills/review/parent.md"
           }
         }
       }
@@ -64,160 +64,29 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
 
     surface = loader.load(project_config_path)
 
-    expect(surface.implementation_skill).to eq("skills/implementation/base.md")
-    expect(surface.review_skill).to eq("skills/review/project.md")
-    expect(surface.verification_commands).to eq(["commands/verify-all"])
-    expect(surface.remediation_commands).to eq(["commands/apply-remediation"])
-    expect(surface.workspace_hook).to eq("hooks/prepare-runtime.sh")
-  end
-
-  it "loads yaml presets before legacy yml presets for compatibility" do
-    write_yaml(
-      "base.yml",
-      {
-        "implementation_skill" => "skills/implementation/legacy.md"
-      }
-    )
-    write_yaml(
-      "base.yaml",
-      {
-        "implementation_skill" => "skills/implementation/public.md"
-      }
-    )
-
-    project_config_path = write_project_config({ "runtime" => { "presets" => ["base"] } })
-
-    expect(loader.load(project_config_path).implementation_skill).to eq("skills/implementation/public.md")
-  end
-
-  it "fails fast when two presets define incompatible values for the same key" do
-    write_yaml(
-      "base.yml",
-      {
-        "implementation_skill" => "skills/implementation/base.md"
-      }
-    )
-    write_yaml(
-      "java-child.yml",
-      {
-        "implementation_skill" => "skills/implementation/java-child.md"
-      }
-    )
-
-    project_config_path = write_project_config({ "runtime" => { "presets" => ["base", "java-child"] } })
-
-    expect { loader.load(project_config_path) }.to raise_error(A3::Domain::ConfigurationConflictError)
-  end
-
-  it "resolves variants in task_kind -> repo_scope -> phase order" do
-    write_yaml(
-      "base.yml",
-      {
-        "review_skill" => {
-          "default" => "skills/review/default.md",
-          "variants" => {
-            "task_kind" => {
-              "parent" => {
-                "repo_scope" => {
-                  "repo_alpha" => {
-                    "phase" => {
-                      "review" => "skills/review/repo-alpha-parent.md"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    )
-
-    project_config_path = write_project_config({ "runtime" => { "presets" => ["base"] } })
-    surface = loader.load(project_config_path)
-
-    expect(surface.resolve(:review_skill, task_kind: :parent, repo_scope: :repo_alpha, phase: :review))
-      .to eq("skills/review/repo-alpha-parent.md")
-    expect(surface.resolve(:review_skill, task_kind: :parent, repo_scope: :repo_beta, phase: :review))
+    expect(surface.resolve(:review_skill, task_kind: :parent, repo_scope: :both, phase: :review))
+      .to eq("skills/review/parent.md")
+    expect(surface.resolve(:review_skill, task_kind: :child, repo_scope: :repo_alpha, phase: :implementation))
       .to eq("skills/review/default.md")
   end
 
-  it "deep-merges disjoint variant branches across presets" do
-    write_yaml(
-      "base.yml",
-      {
-        "review_skill" => {
-          "default" => "skills/review/default.md",
-          "variants" => {
-            "task_kind" => {
-              "parent" => {
-                "repo_scope" => {
-                  "repo_alpha" => {
-                    "phase" => {
-                      "review" => "skills/review/repo-alpha-parent.md"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    )
-    write_yaml(
-      "frontend-child.yml",
-      {
-        "review_skill" => {
-          "default" => "skills/review/default.md",
-          "variants" => {
-            "task_kind" => {
-              "parent" => {
-                "repo_scope" => {
-                  "repo_beta" => {
-                    "phase" => {
-                      "review" => "skills/review/repo-beta-parent.md"
-                    }
-                  }
-                }
-              }
-            }
+  it "deep-freezes resolved phase surface structures" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/default.md"
+          },
+          "parent_review" => {
+            "skill" => "skills/review/parent.md"
           }
         }
       }
     )
 
-    project_config_path = write_project_config({ "runtime" => { "presets" => ["base", "frontend-child"] } })
-    surface = loader.load(project_config_path)
-
-    expect(surface.resolve(:review_skill, task_kind: :parent, repo_scope: :repo_alpha, phase: :review))
-      .to eq("skills/review/repo-alpha-parent.md")
-    expect(surface.resolve(:review_skill, task_kind: :parent, repo_scope: :repo_beta, phase: :review))
-      .to eq("skills/review/repo-beta-parent.md")
-  end
-
-  it "deep-freezes resolved surface structures" do
-    write_yaml(
-      "base.yml",
-      {
-        "review_skill" => {
-          "default" => "skills/review/default.md",
-          "variants" => {
-            "task_kind" => {
-              "parent" => {
-                "repo_scope" => {
-                  "repo_alpha" => {
-                    "phase" => {
-                      "review" => "skills/review/repo-alpha-parent.md"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    )
-
-    project_config_path = write_project_config({ "runtime" => { "presets" => ["base"] } })
     surface = loader.load(project_config_path)
 
     expect(surface.review_skill).to be_frozen
@@ -228,9 +97,29 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     end.to raise_error(FrozenError)
   end
 
+  it "rejects legacy runtime.surface" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "surface" => {
+          "implementation_skill" => "skills/implementation/base.md"
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.surface is no longer supported; use runtime.phases")
+  end
+
+  it "rejects legacy runtime.presets" do
+    project_config_path = write_project_config("runtime" => {"presets" => ["base"]})
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.presets is no longer supported; use runtime.phases")
+  end
+
   it "rejects legacy manifest.yml paths" do
     project_config_path = File.join(@tmpdir, "manifest.yml")
-    File.write(project_config_path, YAML.dump({ "schema_version" => 1, "runtime" => { "presets" => [] } }))
+    File.write(project_config_path, YAML.dump({ "schema_version" => 1, "runtime" => { "phases" => {} } }))
 
     expect { loader.load(project_config_path) }
       .to raise_error(A3::Domain::ConfigurationError, "manifest.yml is no longer supported; use project.yaml")
@@ -242,9 +131,5 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     path = File.join(@tmpdir, "project.yaml")
     File.write(path, YAML.dump({ "schema_version" => 1 }.merge(payload)))
     path
-  end
-
-  def write_yaml(name, payload)
-    File.write(File.join(@preset_dir, name), YAML.dump({ "schema_version" => "1" }.merge(payload)))
   end
 end

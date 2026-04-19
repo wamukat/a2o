@@ -15,79 +15,39 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
 
   let(:loader) { described_class.new(preset_dir: @preset_dir) }
 
-  before do
-    File.write(
-      File.join(@preset_dir, "base.yml"),
-      YAML.dump(
-        {
-          "schema_version" => "1",
-          "implementation_skill" => "skills/implementation/base.md",
-          "review_skill" => "skills/review/base.md",
-          "verification_commands" => ["commands/verify-all"],
-          "remediation_commands" => ["commands/apply-remediation"],
-          "workspace_hook" => "hooks/prepare-runtime.sh"
-        }
-      )
-    )
-  end
-
-  it "loads project surface and core merge config together" do
+  it "loads project surface and core merge config from runtime phases" do
     project_config_path = write_project_config(
-      {
-        "runtime" => {
-          "presets" => ["base"],
+      "runtime" => {
+        "phases" => base_phases.merge(
           "merge" => {
             "target" => "merge_to_parent",
             "policy" => "ff_only",
             "target_ref" => "refs/heads/feature/prototype"
           }
-        }
+        )
       }
     )
 
     context = loader.load(project_config_path)
 
     expect(context.surface.implementation_skill).to eq("skills/implementation/base.md")
+    expect(context.surface.review_skill).to eq("skills/review/default.md")
+    expect(context.surface.verification_commands).to eq(["commands/verify-all"])
     expect(context.merge_config.target).to eq(:merge_to_parent)
     expect(context.merge_config.policy).to eq(:ff_only)
     expect(context.merge_config.target_ref).to eq("refs/heads/feature/prototype")
   end
 
-  it "loads project surface directly without runtime presets" do
-    project_config_path = write_project_config(
-      {
-        "runtime" => {
-          "surface" => {
-            "implementation_skill" => "skills/implementation/project.md",
-            "verification_commands" => ["commands/verify-project"]
-          },
-          "merge" => {
-            "target" => "merge_to_parent",
-            "policy" => "ff_only",
-            "target_ref" => "refs/heads/feature/prototype"
-          }
-        }
-      }
-    )
-
-    context = loader.load(project_config_path)
-
-    expect(context.surface.implementation_skill).to eq("skills/implementation/project.md")
-    expect(context.surface.verification_commands).to eq(["commands/verify-project"])
-    expect(context.merge_config.target).to eq(:merge_to_parent)
-  end
-
   it "rejects unknown merge target" do
     project_config_path = write_project_config(
-      {
-        "runtime" => {
-          "presets" => ["base"],
+      "runtime" => {
+        "phases" => base_phases.merge(
           "merge" => {
             "target" => "invented_target",
             "policy" => "ff_only",
             "target_ref" => "refs/heads/feature/prototype"
           }
-        }
+        )
       }
     )
 
@@ -95,65 +55,56 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
   end
 
   it "rejects missing core merge config" do
-    project_config_path = write_project_config(
-      {
-        "runtime" => {
-          "presets" => ["base"]
-        }
-      }
-    )
+    project_config_path = write_project_config("runtime" => {"phases" => base_phases})
 
     expect { loader.load(project_config_path) }
-      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.merge.target and runtime.merge.policy must be provided")
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.phases.merge.target and runtime.phases.merge.policy must be provided")
   end
 
   it "rejects missing core merge target ref" do
     project_config_path = write_project_config(
-      {
-        "runtime" => {
-          "presets" => ["base"],
+      "runtime" => {
+        "phases" => base_phases.merge(
           "merge" => {
             "target" => "merge_to_parent",
             "policy" => "ff_only"
           }
-        }
+        )
       }
     )
 
     expect { loader.load(project_config_path) }
-      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.merge.target_ref must be provided")
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.phases.merge.target_ref must be provided")
   end
 
   it "rejects blank core merge target ref" do
     project_config_path = write_project_config(
-      {
-        "runtime" => {
-          "presets" => ["base"],
+      "runtime" => {
+        "phases" => base_phases.merge(
           "merge" => {
             "target" => "merge_to_parent",
             "policy" => "ff_only",
             "target_ref" => "   "
           }
-        }
+        )
       }
     )
 
     expect { loader.load(project_config_path) }
-      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.merge.target_ref must not be blank")
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.phases.merge.target_ref must not be blank")
   end
 
   it "loads task-kind-specific merge config variants" do
     project_config_path = write_project_config(
-      {
-        "runtime" => {
-          "presets" => ["base"],
+      "runtime" => {
+        "phases" => base_phases.merge(
           "merge" => {
             "target" => {
               "default" => "merge_to_live",
               "variants" => {
                 "task_kind" => {
-                  "child" => {"default" => "merge_to_parent"},
-                  "parent" => {"default" => "merge_to_live"}
+                  "child" => { "default" => "merge_to_parent" },
+                  "parent" => { "default" => "merge_to_live" }
                 }
               }
             },
@@ -161,13 +112,13 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
               "default" => "refs/heads/live",
               "variants" => {
                 "task_kind" => {
-                  "parent" => {"default" => "refs/heads/feature/prototype"}
+                  "parent" => { "default" => "refs/heads/feature/prototype" }
                 }
               }
             },
             "policy" => "ff_only"
           }
-        }
+        )
       }
     )
 
@@ -195,13 +146,31 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
 
   it "rejects legacy manifest.yml paths" do
     project_config_path = File.join(@tmpdir, "manifest.yml")
-    File.write(project_config_path, YAML.dump({ "schema_version" => 1, "runtime" => { "presets" => [] } }))
+    File.write(project_config_path, YAML.dump({ "schema_version" => 1, "runtime" => { "phases" => {} } }))
 
     expect { loader.load(project_config_path) }
       .to raise_error(A3::Domain::ConfigurationError, "manifest.yml is no longer supported; use project.yaml")
   end
 
   private
+
+  def base_phases
+    {
+      "implementation" => {
+        "skill" => "skills/implementation/base.md",
+        "workspace_hook" => "hooks/prepare-runtime.sh"
+      },
+      "review" => {
+        "skill" => "skills/review/default.md"
+      },
+      "verification" => {
+        "commands" => ["commands/verify-all"]
+      },
+      "remediation" => {
+        "commands" => ["commands/apply-remediation"]
+      }
+    }
+  end
 
   def write_project_config(payload)
     path = File.join(@tmpdir, "project.yaml")

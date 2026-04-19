@@ -59,25 +59,36 @@ runtime:
   live_ref: refs/heads/main
   max_steps: 20
   agent_attempts: 200
-  executor:
-    command:
-      - your-ai-worker
-      - "--schema"
-      - "{{schema_path}}"
-      - "--result"
-      - "{{result_path}}"
-  surface:
-    implementation_skill: skills/implementation/base.md
-    review_skill: skills/review/default.md
-    verification_commands:
-      - app/project-package/commands/verify.sh
-    remediation_commands:
-      - app/project-package/commands/format.sh
-    workspace_hook: app/project-package/commands/bootstrap.sh
-  merge:
-    target: merge_to_live
-    policy: ff_only
-    target_ref: refs/heads/main
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - your-ai-worker
+          - "--schema"
+          - "{{schema_path}}"
+          - "--result"
+          - "{{result_path}}"
+      workspace_hook: app/project-package/commands/bootstrap.sh
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - your-ai-worker
+          - "--schema"
+          - "{{schema_path}}"
+          - "--result"
+          - "{{result_path}}"
+    verification:
+      commands:
+        - app/project-package/commands/verify.sh
+    remediation:
+      commands:
+        - app/project-package/commands/format.sh
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main
 
 scenarios:
   - path: scenarios/001-add-work-order-filter.md
@@ -97,23 +108,25 @@ Host agent binary は canonical path `.work/a2o/agent/bin/a2o-agent` に置く�
 
 `agent` owns host-side workspace, product toolchain requirements, and executor command requirements. `required_bins` remains declarative because the agent can validate prerequisites before work starts.
 
-`runtime` owns execution defaults and the project surface.
+`runtime` owns execution defaults and phase definitions.
 
-`runtime.executor` owns the agent-side implementation/review command. It is required for packaged `a2o runtime run-once`, `runtime loop`, and `runtime start` when using the default `a2o-agent worker stdin-bundle` worker. A2O renders this public `project.yaml` section into an internal compatibility launcher config; users should not create a separate `launcher.json`.
+`runtime.phases` owns phase-specific skills, executor commands, verification/remediation commands, workspace hooks, and merge policy. A2O renders the phase executor commands into an internal stdin-bundle launcher config; users should not create a separate `launcher.json`.
 
-The executor command receives the worker bundle on stdin and must write worker result JSON to `{{result_path}}`. Supported command placeholders are `{{result_path}}`, `{{schema_path}}`, `{{workspace_root}}`, `{{a2o_root_dir}}`, and `{{root_dir}}`.
+Phase executor commands receive the worker bundle on stdin and must write worker result JSON to `{{result_path}}`. Supported command placeholders are `{{result_path}}`, `{{schema_path}}`, `{{workspace_root}}`, `{{a2o_root_dir}}`, and `{{root_dir}}`.
 
-For normal packages, use the compact form:
+For normal packages, define implementation and review phases:
 
 ```yaml
 runtime:
-  executor:
-    command:
-      - your-ai-worker
-      - "--schema"
-      - "{{schema_path}}"
-      - "--result"
-      - "{{result_path}}"
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
+    review:
+      skill: skills/review/default.md
+      executor:
+        command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
 ```
 
 This expands internally to the fixed stdin-bundle command executor. `prompt_transport`, `result`, `schema`, and `default_profile` are A2O implementation details and are not valid `project.yaml` fields.
@@ -129,13 +142,11 @@ a2o project template \
   --output ./project-package/project.yaml
 ```
 
-The template uses the compact executor form. `--language` controls `agent.required_bins`; `--executor-bin` and repeated `--executor-arg` flags generate `runtime.executor.command`.
+The template uses the phase-based executor form. `--language` controls `agent.required_bins`; `--executor-bin` and repeated `--executor-arg` flags generate implementation and review phase executor commands.
 
 When `--output` points to a file, the generator also writes `kanban/bootstrap.json` beside the package config. Existing files are not overwritten unless `--force` is provided. The generated bootstrap file contains project-owned labels such as repo labels; A2O-owned lanes and internal coordination labels are provisioned by `a2o kanban up`.
 
-`runtime.surface` owns skills, verification commands, remediation commands, and workspace hook. Use scalar values for the normal case, for example `implementation_skill: skills/implementation/base.md` and `review_skill: skills/review/default.md`. Use a `default` / `variants` map only when a value actually differs by task kind, repo scope, or phase.
-
-`runtime.merge` owns merge target, policy, and target ref. Values may be scalar or variant maps, matching the current merge resolver behavior.
+`runtime.phases.merge` owns merge target, policy, and target ref. Values may be scalar or variant maps, matching the current merge resolver behavior.
 
 `scenarios` is optional metadata for validation and onboarding. A scenario entry points to a markdown task template. Runtime task selection still comes from kanban; scenarios are not auto-enqueued by default.
 
@@ -162,20 +173,26 @@ runtime:
   live_ref: refs/heads/main
   max_steps: 20
   agent_attempts: 200
-  executor:
-    command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
-  surface:
-    implementation_skill: skills/implementation/base.md
-    review_skill: skills/review/default.md
-    verification_commands:
-      - app/project-package/commands/verify.sh
-    remediation_commands:
-      - app/project-package/commands/format.sh
-    workspace_hook: app/project-package/commands/bootstrap.sh
-  merge:
-    target: merge_to_live
-    policy: ff_only
-    target_ref: refs/heads/main
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
+      workspace_hook: app/project-package/commands/bootstrap.sh
+    review:
+      skill: skills/review/default.md
+      executor:
+        command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
+    verification:
+      commands:
+        - app/project-package/commands/verify.sh
+    remediation:
+      commands:
+        - app/project-package/commands/format.sh
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main
 ```
 
 ### Go API/CLI
@@ -198,18 +215,23 @@ runtime:
   live_ref: refs/heads/main
   max_steps: 20
   agent_attempts: 200
-  executor:
-    command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
-  surface:
-    implementation_skill: skills/implementation/base.md
-    review_skill: skills/review/default.md
-    verification_commands:
-      - app/project-package/commands/verify.sh
-    workspace_hook: app/project-package/commands/bootstrap.sh
-  merge:
-    target: merge_to_live
-    policy: ff_only
-    target_ref: refs/heads/main
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
+      workspace_hook: app/project-package/commands/bootstrap.sh
+    review:
+      skill: skills/review/default.md
+      executor:
+        command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
+    verification:
+      commands:
+        - app/project-package/commands/verify.sh
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main
 ```
 
 ### Python Service
@@ -232,18 +254,23 @@ runtime:
   live_ref: refs/heads/main
   max_steps: 20
   agent_attempts: 200
-  executor:
-    command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
-  surface:
-    implementation_skill: skills/implementation/base.md
-    review_skill: skills/review/default.md
-    verification_commands:
-      - app/project-package/commands/verify.sh
-    workspace_hook: app/project-package/commands/bootstrap.sh
-  merge:
-    target: merge_to_live
-    policy: ff_only
-    target_ref: refs/heads/main
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
+      workspace_hook: app/project-package/commands/bootstrap.sh
+    review:
+      skill: skills/review/default.md
+      executor:
+        command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
+    verification:
+      commands:
+        - app/project-package/commands/verify.sh
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main
 ```
 
 ### Multi-Repo Fixture
@@ -272,36 +299,38 @@ runtime:
   live_ref: refs/heads/main
   max_steps: 40
   agent_attempts: 300
-  executor:
-    command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
-  surface:
-    implementation_skill: skills/implementation/base.md
-    review_skill:
-      default: skills/review/default.md
-      variants:
-        task_kind:
-          parent:
-            repo_scope:
-              both:
-                phase:
-                  review: skills/review/parent.md
-    verification_commands:
-      - "$A2O_ROOT_DIR/reference-products/multi-repo-fixture/project-package/commands/verify-all.sh"
-    remediation_commands:
-      - "$A2O_ROOT_DIR/reference-products/multi-repo-fixture/project-package/commands/format.sh"
-    workspace_hook: reference-products/multi-repo-fixture
-  merge:
-    target:
-      default: merge_to_live
-      variants:
-        task_kind:
-          child:
-            default: merge_to_parent
-          parent:
-            default: merge_to_live
-    policy: ff_only
-    target_ref:
-      default: refs/heads/main
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
+      workspace_hook: reference-products/multi-repo-fixture
+    review:
+      skill: skills/review/default.md
+      executor:
+        command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
+    parent_review:
+      skill: skills/review/parent.md
+      executor:
+        command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
+    verification:
+      commands:
+        - "$A2O_ROOT_DIR/reference-products/multi-repo-fixture/project-package/commands/verify-all.sh"
+    remediation:
+      commands:
+        - "$A2O_ROOT_DIR/reference-products/multi-repo-fixture/project-package/commands/format.sh"
+    merge:
+      target:
+        default: merge_to_live
+        variants:
+          task_kind:
+            child:
+              default: merge_to_parent
+            parent:
+              default: merge_to_live
+      policy: ff_only
+      target_ref:
+        default: refs/heads/main
 ```
 
 ## Migration Status
@@ -309,7 +338,7 @@ runtime:
 `A2O#272` implements the migration:
 
 1. A single loader reads `project.yaml` schema version `1`.
-2. The runtime bridge derives internal runtime package data from `runtime.surface` and `runtime.merge`.
+2. The runtime bridge derives internal runtime package data from `runtime.phases`.
 3. Reference product packages no longer contain `manifest.yml`.
 4. The four reference packages use single-file `project.yaml`.
 5. User docs and reference package docs no longer ask authors to create `manifest.yml`.

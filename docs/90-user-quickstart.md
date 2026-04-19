@@ -52,7 +52,7 @@ a2o project template \
 
 `--output` を使うと、A2O は `project.yaml` と同時に `kanban/bootstrap.json` も生成する。既存ファイルは `--force` なしでは上書きしない。生成される bootstrap file は repo label など project 固有 label だけを持つ。A2O が必要とする lane と internal label は `a2o kanban up` が用意する。
 
-`your-ai-worker` は placeholder である。bootstrap や runtime 実行の前に、agent 環境で実行できる executor binary 名へ置き換える。A2O はこの値を `agent.required_bins` と `runtime.executor.command` に書くため、未置換のままだと `a2o doctor` や runtime execution で missing command として止まる。
+`your-ai-worker` は placeholder である。bootstrap や runtime 実行の前に、agent 環境で実行できる executor binary 名へ置き換える。A2O はこの値を `agent.required_bins` と `runtime.phases.*.executor.command` に書くため、未置換のままだと `a2o doctor` や runtime execution で missing command として止まる。
 
 ### 3. 最小 4 コマンドで起動する
 
@@ -118,28 +118,39 @@ runtime:
   live_ref: refs/heads/main
   max_steps: 20
   agent_attempts: 200
-  executor:
-    command:
-      - your-ai-worker
-      - "--schema"
-      - "{{schema_path}}"
-      - "--result"
-      - "{{result_path}}"
-  surface:
-    implementation_skill: skills/implementation/base.md
-    review_skill: skills/review/default.md
-    verification_commands:
-      - app/project-package/commands/verify.sh
-    remediation_commands:
-      - app/project-package/commands/format.sh
-    workspace_hook: app/project-package/commands/bootstrap.sh
-  merge:
-    target: merge_to_live
-    policy: ff_only
-    target_ref: refs/heads/main
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - your-ai-worker
+          - "--schema"
+          - "{{schema_path}}"
+          - "--result"
+          - "{{result_path}}"
+      workspace_hook: app/project-package/commands/bootstrap.sh
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - your-ai-worker
+          - "--schema"
+          - "{{schema_path}}"
+          - "--result"
+          - "{{result_path}}"
+    verification:
+      commands:
+        - app/project-package/commands/verify.sh
+    remediation:
+      commands:
+        - app/project-package/commands/format.sh
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main
 ```
 
-`runtime.executor.command` は implementation / review を実行する agent 側 command である。A2O は worker request を stdin bundle として渡し、executor は `{{result_path}}` に worker result JSON を書く。`{{schema_path}}`、`{{result_path}}`、`{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` を command placeholder として使える。
+`runtime.phases.<phase>.executor.command` は implementation / review を実行する agent 側 command である。A2O は worker request を stdin bundle として渡し、executor は `{{result_path}}` に worker result JSON を書く。`{{schema_path}}`、`{{result_path}}`、`{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` を command placeholder として使える。
 
 `agent.required_bins` には agent 環境で必要な binary を書く。Node product なら `node` と `npm`、Go product なら `go`、Python product なら `python3`、executor が使う AI CLI や helper binary も含める。
 

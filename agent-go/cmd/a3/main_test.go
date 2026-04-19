@@ -466,15 +466,20 @@ repos:
   app:
     path: ..
 runtime:
-  executor:
-    command:
-      - worker
-      - --result
-      - "{{result_path}}"
-  merge:
-    target: merge_to_live
-    policy: ff_only
-    target_ref: refs/heads/main
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+          - --result
+          - "{{result_path}}"
+    review:
+      skill: skills/review/default.md
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main
 `
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
@@ -701,6 +706,22 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 		"repos:",
 		"  app:",
 		"    path: ..",
+		"runtime:",
+		"  phases:",
+		"    implementation:",
+		"      executor:",
+		"        command:",
+		"          - codex",
+		"          - exec",
+		"    review:",
+		"      executor:",
+		"        command:",
+		"          - codex",
+		"          - exec",
+		"    merge:",
+		"      target: merge_to_live",
+		"      policy: ff_only",
+		"      target_ref: refs/heads/main",
 		"",
 	}, "\n")
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
@@ -759,8 +780,17 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 		"agent:",
 		"  required_bins: [\"sh\"]",
 		"runtime:",
-		"  executor:",
-		"    command: [\"sh\", \"-c\", \"echo ok\"]",
+		"  phases:",
+		"    implementation:",
+		"      skill: skills/implementation/base.md",
+		"      executor:",
+		"        command: [\"sh\", \"-c\", \"echo ok\"]",
+		"    review:",
+		"      skill: skills/review/default.md",
+		"    merge:",
+		"      target: merge_to_live",
+		"      policy: ff_only",
+		"      target_ref: refs/heads/main",
 		"",
 	}, "\n")
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
@@ -833,8 +863,17 @@ func TestDoctorAgentInstallFailureShowsExactOutputPath(t *testing.T) {
 		"agent:",
 		"  required_bins: [\"sh\"]",
 		"runtime:",
-		"  executor:",
-		"    command: [\"sh\", \"-c\", \"echo ok\"]",
+		"  phases:",
+		"    implementation:",
+		"      skill: skills/implementation/base.md",
+		"      executor:",
+		"        command: [\"sh\", \"-c\", \"echo ok\"]",
+		"    review:",
+		"      skill: skills/review/default.md",
+		"    merge:",
+		"      target: merge_to_live",
+		"      policy: ff_only",
+		"      target_ref: refs/heads/main",
 		"",
 	}, "\n")
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
@@ -1279,9 +1318,12 @@ repos:
   app:
     path: ..
 runtime:
-  executor:
-    command:
-      - 123
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - 123
 `
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
@@ -1305,7 +1347,7 @@ runtime:
 		}
 	})
 
-	if !strings.Contains(stderr.String(), "invalid runtime.executor") || !strings.Contains(stderr.String(), "executor.command") {
+	if !strings.Contains(stderr.String(), "invalid runtime.phases") || !strings.Contains(stderr.String(), "implementation.executor.command") {
 		t.Fatalf("stderr should mention malformed executor command, got %q", stderr.String())
 	}
 	if len(runner.calls) != 0 {
@@ -1362,7 +1404,7 @@ runtime:
 		}
 	})
 
-	if !strings.Contains(stderr.String(), "invalid runtime.executor") || !strings.Contains(stderr.String(), "executor.kind is internal; use runtime.executor.command") {
+	if !strings.Contains(stderr.String(), "invalid runtime.executor") || !strings.Contains(stderr.String(), "runtime.executor is no longer supported") {
 		t.Fatalf("stderr should reject internal executor shape, got %q", stderr.String())
 	}
 	if len(runner.calls) != 0 {
@@ -1385,11 +1427,15 @@ repos:
   app:
     path: ..
 runtime:
-  executor:
-    command:
-      - worker
-    phase_profiles:
-      review:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+      executor:
         command:
           - review-worker
         prompt_transport: stdin-bundle
@@ -1416,7 +1462,7 @@ runtime:
 		}
 	})
 
-	if !strings.Contains(stderr.String(), "invalid runtime.executor") || !strings.Contains(stderr.String(), "phase_profiles.review.prompt_transport is internal; use runtime.executor.command") {
+	if !strings.Contains(stderr.String(), "invalid runtime.phases") || !strings.Contains(stderr.String(), "review.executor.prompt_transport is internal") {
 		t.Fatalf("stderr should reject internal phase profile shape, got %q", stderr.String())
 	}
 	if len(runner.calls) != 0 {
@@ -1461,12 +1507,12 @@ runtime:
 	withChdir(t, tempDir, func() {
 		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
 		if code == 0 {
-			t.Fatalf("run should fail without runtime.executor")
+			t.Fatalf("run should fail without runtime.phases.implementation.executor")
 		}
 	})
 
-	if !strings.Contains(stderr.String(), "project.yaml runtime.executor is required") {
-		t.Fatalf("stderr should mention missing runtime.executor, got %q", stderr.String())
+	if !strings.Contains(stderr.String(), "runtime.phases") || !strings.Contains(stderr.String(), "must define implementation") {
+		t.Fatalf("stderr should mention missing implementation phase executor, got %q", stderr.String())
 	}
 	if strings.Contains(stderr.String(), "launcher.json") {
 		t.Fatalf("stderr should not ask users for launcher.json, got %q", stderr.String())
@@ -2447,10 +2493,23 @@ runtime:
   live_ref: refs/heads/main
   max_steps: 7
   agent_attempts: 9
-  executor:
-    command:
-      - ruby
-      - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - ruby
+          - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - ruby
+          - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main
 `
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
 		t.Fatal(err)
@@ -3043,10 +3102,23 @@ runtime:
   live_ref: refs/heads/main
   max_steps: 40
   agent_attempts: 300
-  executor:
-    command:
-      - ruby
-      - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - ruby
+          - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - ruby
+          - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main
 `
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)

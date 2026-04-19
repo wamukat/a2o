@@ -17,12 +17,7 @@ RSpec.describe A3::CLI do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)
       seed_context(dir)
-      File.write(
-        File.join(dir, "project.yaml"),
-        YAML.dump(
-          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_live", "policy" => "ff_only", "target_ref" => "refs/heads/main" } } }
-        )
-      )
+      write_project_yaml(File.join(dir, "project.yaml"))
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
       task_repository.save(
         A3::Domain::Task.new(
@@ -87,12 +82,7 @@ RSpec.describe A3::CLI do
         repo_beta: File.join(dir, "repo-beta-source")
       }
       seed_context(dir)
-      File.write(
-        File.join(dir, "project.yaml"),
-        YAML.dump(
-          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_live", "policy" => "ff_only", "target_ref" => "refs/heads/main" } } }
-        )
-      )
+      write_project_yaml(File.join(dir, "project.yaml"))
       repo_sources.each_value do |repo_path|
         head = `git -C #{Shellwords.escape(repo_path)} rev-parse HEAD`.strip
         system("git", "-C", repo_path, "update-ref", "refs/heads/a2o/parent/A3-v2-3022", head, exception: true, out: File::NULL, err: File::NULL)
@@ -169,12 +159,7 @@ RSpec.describe A3::CLI do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)
       seed_context(dir)
-      File.write(
-        File.join(dir, "project.yaml"),
-        YAML.dump(
-          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_live", "policy" => "ff_only", "target_ref" => "refs/heads/main" } } }
-        )
-      )
+      write_project_yaml(File.join(dir, "project.yaml"))
       fake_cli = create_fake_kanban_cli(
         dir,
         mutate_state_on_transition: true,
@@ -382,26 +367,11 @@ RSpec.describe A3::CLI do
   end
 
   def seed_context(dir)
-    preset_dir = File.join(dir, "presets")
-    FileUtils.mkdir_p(preset_dir)
-    File.write(
-      File.join(preset_dir, "base.yml"),
-      YAML.dump(
-        {
-          "schema_version" => "1",
-          "implementation_skill" => "skills/implementation/base.md",
-          "review_skill" => "skills/review/default.md",
-          "verification_commands" => ["commands/verify-all"],
-          "remediation_commands" => ["commands/apply-remediation"],
-          "workspace_hook" => "hooks/prepare-runtime.sh"
-        }
-      )
-    )
-    File.write(
+    FileUtils.mkdir_p(File.join(dir, "presets"))
+    write_project_yaml(
       File.join(dir, "project.yaml"),
-      YAML.dump(
-          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/main" } } }
-        )
-      )
+      merge_target: "merge_to_parent",
+      merge_target_ref: "refs/heads/main"
+    )
   end
 end

@@ -6,26 +6,37 @@ require "yaml"
 RSpec.describe A3::CLI do
   it "prints merge plan from stored run and project context" do
     Dir.mktmpdir do |dir|
+      manifest_path = File.join(dir, "project.yaml")
       preset_dir = File.join(dir, "presets")
       FileUtils.mkdir_p(preset_dir)
       File.write(
-        File.join(preset_dir, "base.yml"),
-        YAML.dump(
-          {
-            "schema_version" => "1",
-            "implementation_skill" => "skills/implementation/base.md",
-            "review_skill" => "skills/review/default.md",
-            "verification_commands" => ["commands/verify-all"],
-            "remediation_commands" => ["commands/apply-remediation"],
-            "workspace_hook" => "hooks/prepare-runtime.sh"
-          }
-        )
-      )
-      manifest_path = File.join(dir, "project.yaml")
-      File.write(
         manifest_path,
         YAML.dump(
-          { "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/live" } } }
+          {
+            "schema_version" => 1,
+            "runtime" => {
+              "phases" => {
+                "implementation" => {
+                  "skill" => "skills/implementation/base.md",
+                  "workspace_hook" => "hooks/prepare-runtime.sh"
+                },
+                "review" => {
+                  "skill" => "skills/review/default.md"
+                },
+                "verification" => {
+                  "commands" => ["commands/verify-all"]
+                },
+                "remediation" => {
+                  "commands" => ["commands/apply-remediation"]
+                },
+                "merge" => {
+                  "target" => "merge_to_parent",
+                  "policy" => "ff_only",
+                  "target_ref" => "refs/heads/live"
+                }
+              }
+            }
+          }
         )
       )
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))

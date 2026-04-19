@@ -101,7 +101,7 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 func checkExecutorConfig(config projectPackageConfig, report func(string, bool, string, string)) {
 	bins := executorCommandBins(config.Executor)
 	if len(bins) == 0 {
-		report("executor_config", false, "runtime.executor command is missing", "set runtime.executor.command in project.yaml or regenerate with a2o project template")
+		report("executor_config", false, "runtime.phases executor command is missing", "set runtime.phases.implementation.executor.command in project.yaml or regenerate with a2o project template")
 		return
 	}
 	report("executor_config", true, "commands="+strings.Join(bins, ","), "none")
@@ -119,7 +119,7 @@ func checkRequiredCommands(config projectPackageConfig, runner commandRunner, re
 		}
 		seen[bin] = true
 		if _, err := runner.Run("sh", "-lc", "command -v "+shellQuote(bin)); err != nil {
-			report("agent_required_command."+bin, false, bin+" not found on host agent PATH", "install "+bin+" where a2o-agent runs or update project.yaml agent.required_bins/runtime.executor")
+			report("agent_required_command."+bin, false, bin+" not found on host agent PATH", "install "+bin+" where a2o-agent runs or update project.yaml agent.required_bins/runtime.phases")
 		} else {
 			report("agent_required_command."+bin, true, bin+" found on host agent PATH", "none")
 		}

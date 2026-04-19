@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "a3"
+require "yaml"
 Dir[File.join(__dir__, "support", "**", "*.rb")].sort.each { |path| require path }
 
 module RepoSourceFixtureHelper
@@ -52,6 +53,42 @@ module EnvFixtureHelper
   end
 end
 
+module ProjectYamlFixtureHelper
+  def project_yaml_payload(merge_target: "merge_to_live", merge_policy: "ff_only", merge_target_ref: "refs/heads/main")
+    {
+      "schema_version" => 1,
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/default.md"
+          },
+          "parent_review" => {
+            "skill" => "skills/review/parent.md"
+          },
+          "verification" => {
+            "commands" => ["commands/verify-all"]
+          },
+          "remediation" => {
+            "commands" => ["commands/apply-remediation"]
+          },
+          "merge" => {
+            "target" => merge_target,
+            "policy" => merge_policy,
+            "target_ref" => merge_target_ref
+          }
+        }
+      }
+    }
+  end
+
+  def write_project_yaml(path, **kwargs)
+    File.write(path, YAML.dump(project_yaml_payload(**kwargs)))
+  end
+end
+
 RSpec.configure do |config|
   config.disable_monkey_patching!
   config.expect_with(:rspec) { |c| c.syntax = :expect }
@@ -59,6 +96,7 @@ RSpec.configure do |config|
   config.include ParentChildTaskFixtureHelper
   config.include FakeKanbanCliHelper
   config.include EnvFixtureHelper
+  config.include ProjectYamlFixtureHelper
   config.around do |example|
     original = ENV.key?("A3_SECRET_REFERENCE") ? ENV["A3_SECRET_REFERENCE"] : :__missing__
     ENV["A3_SECRET_REFERENCE"] = "A3_SECRET"

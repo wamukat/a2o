@@ -136,29 +136,30 @@ RSpec.describe A3::Bootstrap do
     preset_dir = File.join(dir, "presets")
     FileUtils.mkdir_p(preset_dir)
     File.write(
-      File.join(preset_dir, "base.yml"),
-      YAML.dump(
-        {
-          "schema_version" => "1",
-          "implementation_skill" => "skills/implementation/base.md",
-          "review_skill" => "skills/review/default.md",
-          "verification_commands" => ["commands/verify-all"],
-          "remediation_commands" => ["commands/apply-remediation"],
-          "workspace_hook" => "hooks/prepare-runtime.sh"
-        }
-      )
-    )
-    File.write(
       manifest_path,
       YAML.dump(
         {
           "schema_version" => 1,
           "runtime" => {
-            "presets" => ["base"],
-            "merge" => {
-              "target" => "merge_to_parent",
-              "policy" => "ff_only",
-              "target_ref" => "refs/heads/live"
+            "phases" => {
+              "implementation" => {
+                "skill" => "skills/implementation/base.md",
+                "workspace_hook" => "hooks/prepare-runtime.sh"
+              },
+              "review" => {
+                "skill" => "skills/review/default.md"
+              },
+              "verification" => {
+                "commands" => ["commands/verify-all"]
+              },
+              "remediation" => {
+                "commands" => ["commands/apply-remediation"]
+              },
+              "merge" => {
+                "target" => "merge_to_parent",
+                "policy" => "ff_only",
+                "target_ref" => "refs/heads/live"
+              }
             }
           }
         }

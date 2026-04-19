@@ -9,19 +9,35 @@ RSpec.describe A3::Bootstrap do
       preset_dir = File.join(dir, "presets")
       FileUtils.mkdir_p(preset_dir)
       File.write(
-        File.join(preset_dir, "base.yml"),
+        manifest_path,
         YAML.dump(
           {
-            "schema_version" => "1",
-            "implementation_skill" => "skills/implementation/base.md",
-            "review_skill" => "skills/review/default.md",
-            "verification_commands" => ["commands/verify-all"],
-            "remediation_commands" => ["commands/apply-remediation"],
-            "workspace_hook" => "hooks/prepare-runtime.sh"
+            "schema_version" => 1,
+            "runtime" => {
+              "phases" => {
+                "implementation" => {
+                  "skill" => "skills/implementation/base.md",
+                  "workspace_hook" => "hooks/prepare-runtime.sh"
+                },
+                "review" => {
+                  "skill" => "skills/review/default.md"
+                },
+                "verification" => {
+                  "commands" => ["commands/verify-all"]
+                },
+                "remediation" => {
+                  "commands" => ["commands/apply-remediation"]
+                },
+                "merge" => {
+                  "target" => "merge_to_parent",
+                  "policy" => "ff_only",
+                  "target_ref" => "refs/heads/live"
+                }
+              }
+            }
           }
         )
       )
-      File.write(manifest_path, YAML.dump({ "schema_version" => 1, "runtime" => { "presets" => ["base"], "merge" => { "target" => "merge_to_parent", "policy" => "ff_only", "target_ref" => "refs/heads/live" } } }))
 
       runtime_environment = described_class.runtime_environment_config(
         manifest_path: manifest_path,
@@ -56,7 +72,7 @@ RSpec.describe A3::Bootstrap do
           "repo_sources" => "strategy=none slots= paths=",
           "distribution" => "image_ref=a3-engine:dev runtime_entrypoint=bin/a3 doctor_entrypoint=bin/a3 doctor-runtime",
           "schema_contract" => "project_config_schema_version=1 required_project_config_schema_version=1",
-          "preset_schema_contract" => "required_preset_schema_version=1 preset_schema_versions=base:1",
+          "preset_schema_contract" => "required_preset_schema_version=1 preset_schema_versions=",
           "migration_command" => "bin/a3 migrate-scheduler-store #{manifest_path} --preset-dir #{preset_dir} --storage-backend json --storage-dir #{dir}",
           "repo_source_contract" => "repo_source_strategy=none repo_source_slots=",
           "preset_schema_action" => "no preset schema action required",
@@ -77,7 +93,7 @@ RSpec.describe A3::Bootstrap do
           "observability_boundary_model" => "operator_logs_root=#{File.join(dir, 'logs')} blocked_diagnosis_root=#{File.join(dir, 'blocked_diagnoses')} evidence_root=#{File.join(dir, 'evidence')} validation_output=stdout_only workspace_debug_reference=path_only",
           "upgrade_contract" => "image_upgrade=independent project_config_schema_version=1 preset_schema_version=1 state_migration=explicit",
           "fail_fast_policy" => "project_config_schema_mismatch=fail_fast preset_schema_conflict=fail_fast writable_mount_missing=fail_fast secret_missing=fail_fast scheduler_store_migration_pending=fail_fast",
-          "runtime_contract" => "project_config_schema_version=1 required_project_config_schema_version=1 required_preset_schema_version=1 preset_schema_versions=base:1 repo_source_strategy=none repo_source_slots= secret_delivery_mode=environment_variable secret_reference=A3_SECRET scheduler_store_migration_state=not_required",
+          "runtime_contract" => "project_config_schema_version=1 required_project_config_schema_version=1 required_preset_schema_version=1 preset_schema_versions= repo_source_strategy=none repo_source_slots= secret_delivery_mode=environment_variable secret_reference=A3_SECRET scheduler_store_migration_state=not_required",
           "schema_action" => "update project.yaml schema to 1",
           "repo_source_action" => "no repo source action required",
           "secret_delivery_action" => "provide secrets via environment variable A3_SECRET",

@@ -21,19 +21,27 @@ runtime:
   live_ref: refs/heads/main
   max_steps: 20
   agent_attempts: 200
-  executor:
-    command:
-      - ruby
-      - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
-  surface:
-    implementation_skill: skills/implementation/base.md
-    review_skill: skills/review/default.md
-    verification_commands:
-      - app/project-package/commands/verify.sh
-    remediation_commands:
-      - app/project-package/commands/format.sh
-    workspace_hook: app/project-package/commands/bootstrap.sh
-  merge:
-    target: merge_to_live
-    policy: ff_only
-    target_ref: refs/heads/main
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - ruby
+          - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
+      workspace_hook: app/project-package/commands/bootstrap.sh
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - ruby
+          - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
+    verification:
+      commands:
+        - app/project-package/commands/verify.sh
+    remediation:
+      commands:
+        - app/project-package/commands/format.sh
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main

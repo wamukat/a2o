@@ -6,21 +6,6 @@ require "yaml"
 RSpec.describe A3::CLI do
   it "prints project context including merge config" do
     Dir.mktmpdir do |dir|
-      preset_dir = File.join(dir, "presets")
-      FileUtils.mkdir_p(preset_dir)
-      File.write(
-        File.join(preset_dir, "base.yml"),
-        YAML.dump(
-          {
-            "schema_version" => "1",
-            "implementation_skill" => "skills/implementation/base.md",
-            "review_skill" => "skills/review/default.md",
-            "verification_commands" => ["commands/verify-all"],
-            "remediation_commands" => ["commands/apply-remediation"],
-            "workspace_hook" => "hooks/prepare-runtime.sh"
-          }
-        )
-      )
       manifest_path = File.join(dir, "project.yaml")
       File.write(
         manifest_path,
@@ -28,11 +13,25 @@ RSpec.describe A3::CLI do
           {
             "schema_version" => 1,
             "runtime" => {
-              "presets" => ["base"],
-              "merge" => {
-                "target" => "merge_to_live",
-                "policy" => "no_ff",
-                "target_ref" => "refs/heads/live"
+              "phases" => {
+                "implementation" => {
+                  "skill" => "skills/implementation/base.md",
+                  "workspace_hook" => "hooks/prepare-runtime.sh"
+                },
+                "review" => {
+                  "skill" => "skills/review/default.md"
+                },
+                "verification" => {
+                  "commands" => ["commands/verify-all"]
+                },
+                "remediation" => {
+                  "commands" => ["commands/apply-remediation"]
+                },
+                "merge" => {
+                  "target" => "merge_to_live",
+                  "policy" => "no_ff",
+                  "target_ref" => "refs/heads/live"
+                }
               }
             }
           }
@@ -45,7 +44,7 @@ RSpec.describe A3::CLI do
         [
           "show-project-context",
           manifest_path,
-          "--preset-dir", preset_dir,
+          "--preset-dir", File.join(dir, "presets"),
           "--task-kind", "child",
           "--repo-scope", "repo_beta",
           "--phase", "review"
