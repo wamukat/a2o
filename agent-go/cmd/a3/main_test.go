@@ -1076,6 +1076,9 @@ func TestProjectLintFlagsFixtureAndLegacyLeaks(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(packageDir, "README.md"), []byte("Do not document $A3_WORKER_REQUEST_PATH, .a3/workspace.json, launcher.json, or tests/fixtures workers here.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(packageDir, "commands", "dummy-worker.sh"), []byte("echo $A3_WORKER_REQUEST_PATH\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -1090,6 +1093,11 @@ func TestProjectLintFlagsFixtureAndLegacyLeaks(t *testing.T) {
 		"lint_check name=project_package status=ok",
 		"lint_check name=project_script_contract status=blocked",
 		"commands/dummy-worker.sh:A3_*",
+		"lint_check name=user_facing_contract status=blocked",
+		"README.md:.a3/workspace.json",
+		"README.md:A3_*",
+		"README.md:launcher.json",
+		"README.md:tests/fixtures",
 		"lint_check name=fixture_reference status=blocked",
 		"project.yaml:tests/fixtures",
 		"commands/dummy-worker.sh:fixture-like command name",
@@ -1154,6 +1162,7 @@ func TestProjectLintReportsUnusedCommandsAsWarning(t *testing.T) {
 	for _, want := range []string{
 		"lint_check name=project_package status=ok",
 		"lint_check name=project_script_contract status=ok",
+		"lint_check name=user_facing_contract status=ok",
 		"lint_check name=fixture_reference status=ok",
 		"lint_check name=unused_commands status=warning detail=commands/unused.sh",
 		"lint_status=warning",

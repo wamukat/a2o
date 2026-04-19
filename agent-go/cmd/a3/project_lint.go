@@ -69,6 +69,7 @@ func runProjectLint(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 		report(name, severity, detail, action)
 	})
+	checkProjectUserFacingContract(absPackagePath, report)
 	checkProjectFixtureReferences(absPackagePath, report)
 	checkProjectUnusedCommands(absPackagePath, report)
 
@@ -87,6 +88,73 @@ func lintStatusName(status lintSeverity) string {
 		return "warning"
 	default:
 		return "ok"
+	}
+}
+
+func checkProjectUserFacingContract(packagePath string, report func(string, lintSeverity, string, string)) {
+	findings := []string{}
+	err := filepath.WalkDir(packagePath, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry == nil {
+			return nil
+		}
+		if entry.IsDir() {
+			switch entry.Name() {
+			case ".git", ".work", "node_modules", "vendor", "target", "dist", "build":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !isUserFacingLintScanTarget(packagePath, path) {
+			return nil
+		}
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(packagePath, path)
+		rel = filepath.ToSlash(rel)
+		for _, violation := range projectScriptContractViolations(string(body)) {
+			findings = append(findings, rel+":"+violation)
+		}
+		for _, violation := range fixtureReferenceFindings(rel, string(body)) {
+			findings = append(findings, violation)
+		}
+		return nil
+	})
+	if err != nil {
+		report("user_facing_contract", lintBlocked, err.Error(), "inspect package docs and skills")
+		return
+	}
+	if len(findings) > 0 {
+		sort.Strings(findings)
+		report("user_facing_contract", lintBlocked, strings.Join(findings, ","), "use A2O names and keep fixture/internal runtime paths out of user-facing package docs")
+		return
+	}
+	report("user_facing_contract", lintOK, "user-facing package docs avoid internal runtime leaks", "none")
+}
+
+func isUserFacingLintScanTarget(packagePath string, path string) bool {
+	rel, err := filepath.Rel(packagePath, path)
+	if err != nil {
+		return false
+	}
+	rel = filepath.ToSlash(rel)
+	parts := strings.Split(rel, "/")
+	if len(parts) == 0 {
+		return false
+	}
+	name := strings.ToLower(parts[len(parts)-1])
+	if len(parts) == 1 && (name == "readme" || strings.HasPrefix(name, "readme.")) {
+		return true
+	}
+	switch parts[0] {
+	case "docs", "skills", "task-templates":
+		return isReferenceTextFile(path)
+	default:
+		return false
 	}
 }
 
