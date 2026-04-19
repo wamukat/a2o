@@ -32,9 +32,11 @@ module A3
         return default unless task_variant
 
         repo_variant = task_variant.fetch("repo_scope", {}).fetch(repo_scope.to_s, nil)
-        return default unless repo_variant
+        if repo_variant
+          return repo_variant.fetch("phase", {}).fetch(phase.to_s, repo_variant.fetch("default", default))
+        end
 
-        repo_variant.fetch("phase", {}).fetch(phase.to_s, default)
+        task_variant.fetch("phase", {}).fetch(phase.to_s, task_variant.fetch("default", default))
       end
 
       private

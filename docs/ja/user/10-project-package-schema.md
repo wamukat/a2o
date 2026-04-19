@@ -133,6 +133,7 @@ runtime:
 ```
 
 単純な list 形式を default とする。Helper code に task-kind や repo-slot policy が隠れてしまう場合だけ variants を使う。
+`default` は top level、`task_kind` 配下、`repo_scope` 配下に指定できる。より具体的に一致した値が優先される。
 
 通常の packages では implementation と review phases を定義する。
 

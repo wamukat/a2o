@@ -140,6 +140,7 @@ runtime:
 ```
 
 The simple list form remains the recommended default. Use variants when the package would otherwise hide task-kind or repo-slot policy in helper code.
+`default` may be specified at the top level, under a `task_kind`, or under a `repo_scope`; the most specific matching value wins.
 
 ## Template Generator
 

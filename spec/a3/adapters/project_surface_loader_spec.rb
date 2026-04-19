@@ -83,13 +83,18 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
             "commands" => {
               "default" => ["commands/verify-all"],
               "variants" => {
-                "task_kind" => {
-                  "parent" => {
-                    "repo_scope" => {
-                      "both" => {
-                        "phase" => {
-                          "verification" => ["commands/verify-parent"]
-                        }
+            "task_kind" => {
+              "single" => {
+                "default" => ["commands/verify-single"]
+              },
+              "parent" => {
+                "default" => ["commands/verify-parent-default"],
+                "repo_scope" => {
+                  "both" => {
+                    "default" => ["commands/verify-parent-both-default"],
+                    "phase" => {
+                      "verification" => ["commands/verify-parent"]
+                    }
                       }
                     }
                   }
@@ -123,6 +128,12 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
 
     expect(surface.resolve(:verification_commands, task_kind: :parent, repo_scope: :both, phase: :verification))
       .to eq(["commands/verify-parent"])
+    expect(surface.resolve(:verification_commands, task_kind: :parent, repo_scope: :both, phase: :review))
+      .to eq(["commands/verify-parent-both-default"])
+    expect(surface.resolve(:verification_commands, task_kind: :parent, repo_scope: :repo_alpha, phase: :verification))
+      .to eq(["commands/verify-parent-default"])
+    expect(surface.resolve(:verification_commands, task_kind: :single, repo_scope: :both, phase: :verification))
+      .to eq(["commands/verify-single"])
     expect(surface.resolve(:verification_commands, task_kind: :child, repo_scope: :repo_beta, phase: :verification))
       .to eq(["commands/verify-all"])
     expect(surface.resolve(:remediation_commands, task_kind: :child, repo_scope: :repo_beta, phase: :verification))

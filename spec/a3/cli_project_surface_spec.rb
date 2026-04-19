@@ -98,4 +98,56 @@ RSpec.describe A3::CLI do
       expect(out.string).not_to include("review_skill=")
     end
   end
+
+  it "prints resolved verification command variants" do
+    Dir.mktmpdir do |dir|
+      manifest_path = File.join(dir, "project.yaml")
+      File.write(
+        manifest_path,
+        YAML.dump(
+          {
+            "schema_version" => 1,
+            "runtime" => {
+              "phases" => {
+                "implementation" => {
+                  "skill" => "skills/implementation/base.md"
+                },
+                "review" => {
+                  "skill" => "skills/review/default.md"
+                },
+                "verification" => {
+                  "commands" => {
+                    "default" => ["commands/verify-all"],
+                    "variants" => {
+                      "task_kind" => {
+                        "parent" => {
+                          "default" => ["commands/verify-parent"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        )
+      )
+
+      out = StringIO.new
+
+      described_class.start(
+        [
+          "show-project-surface",
+          manifest_path,
+          "--preset-dir", File.join(dir, "presets"),
+          "--task-kind", "parent",
+          "--repo-scope", "repo_alpha",
+          "--phase", "verification"
+        ],
+        out: out
+      )
+
+      expect(out.string).to include("verification_commands=commands/verify-parent")
+    end
+  end
 end

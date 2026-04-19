@@ -486,7 +486,8 @@ module A3
       if options.fetch(:task_kind) == :parent && options.fetch(:phase) == :review
         out.puts("review_skill=#{surface.resolve(:review_skill, task_kind: options.fetch(:task_kind), repo_scope: options.fetch(:repo_scope), phase: options.fetch(:phase))}")
       end
-      out.puts("verification_commands=#{surface.verification_commands.join(' ')}")
+      verification_commands = Array(surface.resolve(:verification_commands, task_kind: options.fetch(:task_kind), repo_scope: options.fetch(:repo_scope), phase: options.fetch(:phase)))
+      out.puts("verification_commands=#{verification_commands.join(' ')}")
     end
 
     def handle_show_project_context(argv, out:)
