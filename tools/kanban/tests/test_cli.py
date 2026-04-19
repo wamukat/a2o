@@ -337,6 +337,76 @@ class SoloBoardCliTest(unittest.TestCase):
         self.assertEqual(replacement, updates[0]["description"])
         self.assertEqual(f"{existing}\n{appendix}", updates[1]["description"])
 
+    def test_task_update_preserves_description_output_when_done_refresh_omits_body(self) -> None:
+        replacement = "Updated with done\n\n- keep me"
+        get_task_calls = 0
+
+        def fake_resolve_task_id(*_args, **_kwargs):
+            return 101
+
+        def fake_get_task(_base_url, _token, task_id):
+            nonlocal get_task_calls
+            get_task_calls += 1
+            self.assertEqual(101, task_id)
+            body = "Existing" if get_task_calls == 1 else ""
+            return {
+                "id": 101,
+                "project_id": 42,
+                "column_id": 7,
+                "priority": 0,
+                "done": get_task_calls > 1,
+                "reference": "Sample#101",
+                "identifier": "#101",
+                "index": 101,
+                "title": "Task",
+                "description": body,
+            }
+
+        def fake_update_task(_base_url, _token, task_id, changes):
+            self.assertEqual({"description": replacement, "done": True}, changes)
+            return {
+                "id": task_id,
+                "project_id": 42,
+                "description": replacement,
+            }
+
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as replace_file:
+            replace_file.write(replacement)
+            replace_path = replace_file.name
+        try:
+            args = SimpleNamespace(
+                backend="soloboard",
+                base_url="http://localhost:3460",
+                token="",
+                task="Sample#101",
+                task_id=None,
+                project_id=None,
+                project="Sample",
+                title=None,
+                description=None,
+                description_file=replace_path,
+                append_description=None,
+                append_description_file=None,
+                reference=None,
+                done=True,
+                priority=None,
+            )
+            stdout = io.StringIO()
+            with (
+                patch.object(kanban_cli, "resolve_task_id_from_ref", side_effect=fake_resolve_task_id),
+                patch.object(kanban_cli, "get_task", side_effect=fake_get_task),
+                patch.object(kanban_cli, "update_task", side_effect=fake_update_task),
+                patch.object(kanban_cli, "resolve_project_title", return_value="Sample"),
+                contextlib.redirect_stdout(stdout),
+            ):
+                self.assertEqual(0, kanban_cli.cmd_task_update(args))
+        finally:
+            os.unlink(replace_path)
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(replacement, payload["description"])
+        self.assertTrue(payload["done"])
+
     def test_task_snapshot_uses_full_description_and_summary_from_detail(self) -> None:
         description = "Heading\n\nfirst line\nsecond line"
 
@@ -382,6 +452,52 @@ class SoloBoardCliTest(unittest.TestCase):
 
         self.assertEqual(description, snapshot["description"])
         self.assertEqual("Heading first line second line", snapshot["description_summary"])
+        self.assertEqual("detail", snapshot["description_source"])
+        self.assertEqual(["trigger:auto-implement"], snapshot["labels"])
+
+    def test_task_snapshot_falls_back_to_list_description_when_detail_omits_body(self) -> None:
+        with (
+            patch.object(kanban_cli, "relation_tasks_payload", return_value={}),
+            patch.object(
+                kanban_cli,
+                "get_task",
+                return_value={
+                    "id": 101,
+                    "project_id": 42,
+                    "column_id": 7,
+                    "priority": 0,
+                    "done": False,
+                    "reference": "Sample#101",
+                    "identifier": "#101",
+                    "index": 101,
+                    "title": "Snapshot task",
+                    "description": "",
+                    "tags": [{"id": 1, "name": "trigger:auto-implement"}],
+                },
+            ),
+        ):
+            snapshot = kanban_cli.normalize_task_snapshot(
+                "http://localhost:3460",
+                "",
+                {
+                    "id": 101,
+                    "project_id": 42,
+                    "column_id": 7,
+                    "priority": 0,
+                    "done": False,
+                    "reference": "Sample#101",
+                    "identifier": "#101",
+                    "index": 101,
+                    "title": "Snapshot task",
+                    "description": "list body",
+                    "status": "To do",
+                },
+                project_title="Sample",
+                project_titles_by_id={42: "Sample"},
+            )
+
+        self.assertEqual("list body", snapshot["description"])
+        self.assertEqual("list", snapshot["description_source"])
         self.assertEqual(["trigger:auto-implement"], snapshot["labels"])
 
     def test_task_transition_done_does_not_resolve_without_sync_flag(self) -> None:

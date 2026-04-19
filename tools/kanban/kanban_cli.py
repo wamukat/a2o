@@ -348,10 +348,11 @@ def normalize_task_snapshot(
         return fallback
 
     related_tasks = relation_tasks_payload(base_url, token, task_id=task_id)
-    # Snapshot normalization already needs the detail endpoint for tags; reuse it
-    # as the source of truth for bodyMarkdown instead of trusting list payloads.
+    # Snapshot normalization already needs the detail endpoint for tags; prefer
+    # its bodyMarkdown while preserving a list payload body if detail omits it.
     detailed_task = get_task(base_url, token, task_id)
-    description = str(detailed_task.get("description") or detailed_task.get("bodyMarkdown") or "")
+    description = str(detailed_task.get("description") or detailed_task.get("bodyMarkdown") or task.get("description") or "")
+    description_source = "detail" if str(detailed_task.get("description") or detailed_task.get("bodyMarkdown") or "") else ("list" if description else "empty")
     tags = detailed_task.get("tags") if isinstance(detailed_task, dict) else None
     if not isinstance(tags, list):
         raise RuntimeError("Unexpected SoloBoard task tags response.")
@@ -375,6 +376,7 @@ def normalize_task_snapshot(
         **normalize_task_summary(task, project_title=project_title),
         "description": description,
         "description_summary": summarize_description(description),
+        "description_source": description_source,
         "labels": list(label_titles),
         "blocking_task_refs": list(sorted(set(blocked_refs))),
         "parent_refs": parent_refs,
@@ -1528,6 +1530,8 @@ def cmd_task_update(args: argparse.Namespace) -> int:
     updated = update_task(base_url, token, task_id, changes)
     if args.done is not None:
         updated = get_task(base_url, token, task_id)
+        if "description" in changes and not (updated.get("description") or updated.get("bodyMarkdown")):
+            updated = {**updated, "description": changes["description"]}
     project_title = resolve_project_title(base_url, token, project_id=int(updated["project_id"]))
     return print_json(normalize_task_detail(updated, project_title=project_title))
 
