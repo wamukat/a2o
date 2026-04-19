@@ -3520,6 +3520,11 @@ func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
 		"runtime_status_check name=runtime_container status=running container=runtime-container",
 		"runtime_status_check name=kanban_service status=running container=soloboard-container",
 		"runtime_image_digest=ghcr.io/wamukat/a2o-engine@sha256:test",
+		"runtime_image_pinned_ref=ghcr.io/wamukat/a2o-engine@sha256:pinned",
+		"runtime_image_local_latest_ref=ghcr.io/wamukat/a2o-engine:latest",
+		"runtime_image_running_container=runtime-container image_id=running-image-123 digest=ghcr.io/wamukat/a2o-engine@sha256:test",
+		"runtime_image_latest_status=current action=none",
+		"runtime_image_running_status=current action=none",
 		"runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation state=terminal outcome=blocked",
 	} {
 		if !strings.Contains(stdout.String(), want) {
@@ -3653,8 +3658,69 @@ func TestRuntimeImageDigestPrintsPinnedRuntimeDigest(t *testing.T) {
 	if !strings.Contains(stdout.String(), "runtime_image_digest=ghcr.io/wamukat/a2o-engine@sha256:test") {
 		t.Fatalf("stdout should print digest, got %q", stdout.String())
 	}
+	for _, want := range []string{
+		"runtime_image_pinned_ref=ghcr.io/wamukat/a2o-engine@sha256:pinned",
+		"runtime_image_pinned_digest=ghcr.io/wamukat/a2o-engine@sha256:test",
+		"runtime_image_local_latest_ref=ghcr.io/wamukat/a2o-engine:latest",
+		"runtime_image_local_latest_digest=ghcr.io/wamukat/a2o-engine@sha256:test",
+		"runtime_image_running_container=runtime-container image_id=running-image-123 digest=ghcr.io/wamukat/a2o-engine@sha256:test",
+		"runtime_image_latest_status=current action=none",
+		"runtime_image_running_status=current action=none",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("stdout should include %q in:\n%s", want, stdout.String())
+		}
+	}
 	if runner.lastEnv["A3_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine@sha256:pinned" {
 		t.Fatalf("image-digest should evaluate compose with runtime image env, got %#v", runner.lastEnv)
+	}
+}
+
+func TestRuntimeImageDigestShowsLatestAndRunningMismatches(t *testing.T) {
+	t.Setenv("A2O_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-digest",
+		RuntimeService: "a2o-runtime",
+	})
+	runner := &fakeRunner{
+		containerImageIDs: map[string]string{
+			"runtime-container": "running-image-123",
+		},
+		imageInspectDigests: map[string]string{
+			"image-123":                         "ghcr.io/wamukat/a2o-engine@sha256:pinned",
+			"ghcr.io/wamukat/a2o-engine:latest": "ghcr.io/wamukat/a2o-engine@sha256:latest",
+			"running-image-123":                 "ghcr.io/wamukat/a2o-engine@sha256:running",
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "image-digest"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	for _, want := range []string{
+		"runtime_image_pinned_digest=ghcr.io/wamukat/a2o-engine@sha256:pinned",
+		"runtime_image_local_latest_digest=ghcr.io/wamukat/a2o-engine@sha256:latest",
+		"runtime_image_running_container=runtime-container image_id=running-image-123 digest=ghcr.io/wamukat/a2o-engine@sha256:running",
+		"runtime_image_latest_status=mismatch action=validate local latest, then update the package runtime image pin if you want this version",
+		"runtime_image_running_status=mismatch action=restart runtime with a2o runtime up after confirming the desired pinned digest",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("stdout should include %q in:\n%s", want, stdout.String())
+		}
 	}
 }
 
@@ -4303,6 +4369,8 @@ type fakeRunner struct {
 	nextPID               int
 	processCommands       map[int]string
 	errorOutput           string
+	imageInspectDigests   map[string]string
+	containerImageIDs     map[string]string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -4350,7 +4418,15 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		return []byte("soloboard-container\n"), nil
 	case strings.Contains(joined, " compose ") && (strings.Contains(joined, " ps --status running -q a2o-runtime") || strings.Contains(joined, " ps --status running -q a2o-runtime")):
 		return []byte("runtime-container\n"), nil
+	case name == "docker" && len(args) >= 4 && args[0] == "inspect":
+		if imageID, ok := r.containerImageIDs[args[1]]; ok {
+			return []byte(imageID + "\n"), nil
+		}
+		return []byte("running-image-123\n"), nil
 	case name == "docker" && len(args) >= 4 && args[0] == "image" && args[1] == "inspect":
+		if digest, ok := r.imageInspectDigests[args[2]]; ok {
+			return []byte(digest + "\n"), nil
+		}
 		return []byte("ghcr.io/wamukat/a2o-engine@sha256:test\n"), nil
 	case strings.Contains(joined, " compose ") && strings.Contains(joined, " ps -q "):
 		if r.emptyContainer {

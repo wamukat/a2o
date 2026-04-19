@@ -325,6 +325,53 @@ func runtimeImageDigest(config *runtimeInstanceConfig, runner commandRunner) str
 	return strings.TrimSpace(string(digest))
 }
 
+func imageDigestForReference(reference string, runner commandRunner) string {
+	if strings.TrimSpace(reference) == "" {
+		return ""
+	}
+	digest, err := runExternal(runner, "docker", "image", "inspect", reference, "--format", "{{index .RepoDigests 0}}")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(digest))
+}
+
+func runningRuntimeImageDigest(config runtimeInstanceConfig, runner commandRunner) (string, string, string) {
+	containerOutput, err := runExternal(runner, "docker", append(composeArgs(config), "ps", "--status", "running", "-q", config.RuntimeService)...)
+	if err != nil {
+		return "", "", ""
+	}
+	containerID := strings.TrimSpace(string(containerOutput))
+	if containerID == "" {
+		return "", "", ""
+	}
+	imageOutput, err := runExternal(runner, "docker", "inspect", containerID, "--format", "{{.Image}}")
+	if err != nil {
+		return containerID, "", ""
+	}
+	imageID := strings.TrimSpace(string(imageOutput))
+	return containerID, imageID, imageDigestForReference(imageID, runner)
+}
+
+func latestRuntimeImageReference(reference string) string {
+	base := strings.TrimSpace(reference)
+	if base == "" {
+		return ""
+	}
+	if digestIndex := strings.Index(base, "@"); digestIndex >= 0 {
+		base = base[:digestIndex]
+	}
+	lastSlash := strings.LastIndex(base, "/")
+	lastColon := strings.LastIndex(base, ":")
+	if lastColon > lastSlash {
+		base = base[:lastColon]
+	}
+	if base == "" {
+		return ""
+	}
+	return base + ":latest"
+}
+
 func singleLine(value string) string {
 	return strings.Join(strings.Fields(value), " ")
 }

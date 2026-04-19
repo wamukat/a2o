@@ -289,11 +289,11 @@ func runRuntimeImageDigest(args []string, runner commandRunner, stdout io.Writer
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
 	return withComposeEnv(effectiveConfig, func() error {
-		digest := runtimeImageDigest(&effectiveConfig, runner)
-		if digest == "" {
+		report := runtimeImageDigestReport(&effectiveConfig, runner)
+		if report.ConfiguredDigest == "" {
 			return errors.New("runtime image digest unavailable; run a2o runtime up, then retry")
 		}
-		fmt.Fprintf(stdout, "runtime_image_digest=%s\n", digest)
+		printRuntimeImageDigestReport(report, stdout)
 		return nil
 	})
 }
@@ -321,11 +321,101 @@ func printRuntimeServiceStatus(config runtimeInstanceConfig, runner commandRunne
 }
 
 func printRuntimeImageStatus(config *runtimeInstanceConfig, runner commandRunner, stdout io.Writer) {
-	if digest := runtimeImageDigest(config, runner); digest != "" {
-		fmt.Fprintf(stdout, "runtime_image_digest=%s\n", digest)
+	report := runtimeImageDigestReport(config, runner)
+	if report.ConfiguredDigest != "" {
+		printRuntimeImageDigestReport(report, stdout)
 		return
 	}
 	fmt.Fprintln(stdout, "runtime_image_digest=unavailable action=pull or build runtime image")
+}
+
+type runtimeImageReport struct {
+	ConfiguredRef     string
+	ConfiguredDigest  string
+	LocalLatestRef    string
+	LocalLatestDigest string
+	RunningContainer  string
+	RunningImageID    string
+	RunningDigest     string
+}
+
+func runtimeImageDigestReport(config *runtimeInstanceConfig, runner commandRunner) runtimeImageReport {
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	configuredRef := defaultRuntimeImage()
+	report := runtimeImageReport{
+		ConfiguredRef:    configuredRef,
+		ConfiguredDigest: runtimeImageDigest(&effectiveConfig, runner),
+		LocalLatestRef:   latestRuntimeImageReference(configuredRef),
+	}
+	if report.LocalLatestRef != "" {
+		report.LocalLatestDigest = imageDigestForReference(report.LocalLatestRef, runner)
+	}
+	report.RunningContainer, report.RunningImageID, report.RunningDigest = runningRuntimeImageDigest(effectiveConfig, runner)
+	return report
+}
+
+func printRuntimeImageDigestReport(report runtimeImageReport, stdout io.Writer) {
+	fmt.Fprintf(stdout, "runtime_image_digest=%s\n", valueOrUnavailable(report.ConfiguredDigest))
+	fmt.Fprintf(stdout, "runtime_image_pinned_ref=%s\n", valueOrUnavailable(report.ConfiguredRef))
+	fmt.Fprintf(stdout, "runtime_image_pinned_digest=%s\n", valueOrUnavailable(report.ConfiguredDigest))
+	fmt.Fprintf(stdout, "runtime_image_local_latest_ref=%s\n", valueOrUnavailable(report.LocalLatestRef))
+	fmt.Fprintf(stdout, "runtime_image_local_latest_digest=%s\n", valueOrUnavailable(report.LocalLatestDigest))
+	if report.RunningContainer == "" {
+		fmt.Fprintln(stdout, "runtime_image_running_container=unavailable")
+	} else {
+		fmt.Fprintf(stdout, "runtime_image_running_container=%s image_id=%s digest=%s\n", report.RunningContainer, valueOrUnavailable(report.RunningImageID), valueOrUnavailable(report.RunningDigest))
+	}
+	fmt.Fprintf(stdout, "runtime_image_latest_status=%s action=%s\n", runtimeImageComparisonStatus(report.ConfiguredDigest, report.LocalLatestDigest), runtimeImageLatestAction(report.ConfiguredDigest, report.LocalLatestDigest))
+	fmt.Fprintf(stdout, "runtime_image_running_status=%s action=%s\n", runtimeImageComparisonStatus(report.ConfiguredDigest, report.RunningDigest), runtimeImageRunningAction(report.ConfiguredDigest, report.RunningDigest))
+}
+
+func runtimeImageComparisonStatus(expected string, actual string) string {
+	expectedDigest := digestIdentity(expected)
+	actualDigest := digestIdentity(actual)
+	if expectedDigest == "" || actualDigest == "" {
+		return "unknown"
+	}
+	if expectedDigest == actualDigest {
+		return "current"
+	}
+	return "mismatch"
+}
+
+func runtimeImageLatestAction(configuredDigest string, latestDigest string) string {
+	switch runtimeImageComparisonStatus(configuredDigest, latestDigest) {
+	case "current":
+		return "none"
+	case "mismatch":
+		return "validate local latest, then update the package runtime image pin if you want this version"
+	default:
+		return "pull ghcr.io/wamukat/a2o-engine:latest or inspect the configured runtime image, then rerun a2o runtime image-digest"
+	}
+}
+
+func runtimeImageRunningAction(configuredDigest string, runningDigest string) string {
+	switch runtimeImageComparisonStatus(configuredDigest, runningDigest) {
+	case "current":
+		return "none"
+	case "mismatch":
+		return "restart runtime with a2o runtime up after confirming the desired pinned digest"
+	default:
+		return "run a2o runtime up, then rerun a2o runtime status"
+	}
+}
+
+func digestIdentity(reference string) string {
+	parts := strings.SplitN(strings.TrimSpace(reference), "@", 2)
+	if len(parts) == 2 {
+		return parts[1]
+	}
+	return ""
+}
+
+func valueOrUnavailable(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "unavailable"
+	}
+	return value
 }
 
 func printLatestRuntimeSummary(config runtimeInstanceConfig, runner commandRunner, stdout io.Writer) {
