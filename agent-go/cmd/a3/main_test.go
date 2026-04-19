@@ -2924,6 +2924,7 @@ func TestRuntimeRunOnceAllowsEnvToOverrideStaleInstanceRuntimeValues(t *testing.
 }
 
 func TestRuntimeRunOnceRepairsStaleRunsOnStartupAndAttemptBudgetExhaustion(t *testing.T) {
+	t.Setenv("A3_RUNTIME_RUN_ONCE_ARCHIVE_STATE", "1")
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -2961,6 +2962,11 @@ func TestRuntimeRunOnceRepairsStaleRunsOnStartupAndAttemptBudgetExhaustion(t *te
 	}
 	if count := runner.callCountContains("a3 repair-runs --storage-backend json --storage-dir /var/lib/a3/test-runtime --apply"); count != 2 {
 		t.Fatalf("repair-runs call count=%d, want 2\ncalls:\n%s", count, strings.Join(runner.joinedCalls(), "\n"))
+	}
+	startupRepairIndex := firstCallIndexContains(runner.joinedCalls(), "a3 repair-runs --storage-backend json --storage-dir /var/lib/a3/test-runtime --apply")
+	archiveMoveIndex := firstCallIndexContains(runner.joinedCalls(), " mv /var/lib/a3/test-runtime ")
+	if startupRepairIndex < 0 || archiveMoveIndex < 0 || startupRepairIndex > archiveMoveIndex {
+		t.Fatalf("startup repair should run before archive moves storage, repair=%d archive=%d\ncalls:\n%s", startupRepairIndex, archiveMoveIndex, strings.Join(runner.joinedCalls(), "\n"))
 	}
 	if !strings.Contains(stderr.String(), "runtime run-once did not finish within 2 agent attempts") {
 		t.Fatalf("stderr should report attempt exhaustion, got %q", stderr.String())
@@ -3354,6 +3360,15 @@ func (r fakeRunner) callCountContains(want string) int {
 		}
 	}
 	return count
+}
+
+func firstCallIndexContains(calls []string, want string) int {
+	for index, call := range calls {
+		if strings.Contains(call, want) {
+			return index
+		}
+	}
+	return -1
 }
 
 func assertCallContains(t *testing.T, calls []string, want string) {

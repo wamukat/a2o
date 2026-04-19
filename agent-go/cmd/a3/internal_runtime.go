@@ -756,10 +756,10 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, age
 		if _, err := runExternal(runner, "docker", append(plan.ComposePrefix, "up", "-d", config.RuntimeService, "soloboard")...); err != nil {
 			return err
 		}
-		if err := archiveRuntimeStateIfRequested(config, plan, runner, stdout); err != nil {
+		if err := repairRuntimeRuns(config, plan, runner, stdout, "startup"); err != nil {
 			return err
 		}
-		if err := repairRuntimeRuns(config, plan, runner, stdout, "startup"); err != nil {
+		if err := archiveRuntimeStateIfRequested(config, plan, runner, stdout); err != nil {
 			return err
 		}
 		if err := cleanupRuntimeProcesses(config, plan, runner); err != nil {
