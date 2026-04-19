@@ -14,7 +14,6 @@ This document explains what each design document covers and the recommended read
 ```mermaid
 flowchart LR
   User([User])
-  CLI([a2o CLI])
   Agent([a2o-agent])
   AI([Generative AI])
 
@@ -30,25 +29,24 @@ flowchart LR
     Report(Records the result\nkanban comments, status, and evidence)
   end
 
-  Repository[(Git repository\ncode changes and merge result)]
+  Repository[(Git repository)]
 
   User -->|"creates task"| Kanban
-  User -->|"maintains"| ProjectConfig
-  User -->|"maintains"| SkillFiles
-  CLI -->|"runs resident runtime"| Scheduler
+  User -.->|"creates"| ProjectConfig
+  User -.->|"creates"| SkillFiles
   Kanban --> Scheduler
   Scheduler --> Prepare
   ProjectConfig --> Prepare
   SkillFiles --> Prepare
   Prepare --> Agent
-  Agent -->|"invokes when command needs AI"| AI
-  AI -->|"assistant output"| Agent
+  Agent -->|"requests job execution"| AI
+  AI -->|"job result"| Agent
   Agent -->|"applies changes"| Repository
   Agent --> Report
   Report --> Kanban
 ```
 
-In normal use, the user creates a kanban task and maintains two product inputs: a project config file and AI skill files. The resident scheduler picks runnable tasks from the Engine-managed kanban state. The Engine combines the task, config, and skills into AI execution jobs. `a2o-agent` runs those jobs on the host or project dev environment, calls Generative AI when the configured command requires it, and applies the result to the Git repository. The Engine records task status, comments, and evidence back to kanban.
+In normal use, the user creates a kanban task and two product inputs: a project config file and AI skill files. The resident scheduler picks runnable tasks from the Engine-managed kanban state. The Engine combines the task, config, and skills into AI execution jobs. `a2o-agent` runs those jobs on the host or project dev environment, requests Generative AI execution, and applies the result to the Git repository. The Engine records task status, comments, and evidence back to kanban.
 
 ## Documents
 
