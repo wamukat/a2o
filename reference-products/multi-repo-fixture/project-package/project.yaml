@@ -2,7 +2,6 @@ schema_version: 1
 package:
   name: a2o-reference-multi-repo
 kanban:
-  provider: soloboard
   project: A2OReferenceMultiRepo
   bootstrap: kanban/bootstrap.json
   selection:

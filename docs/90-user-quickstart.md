@@ -50,7 +50,7 @@ a2o project template \
   --output ./project-package/project.yaml
 ```
 
-`--output` を使うと、A2O は `project.yaml` と同時に `kanban/bootstrap.json` も生成する。既存ファイルは `--force` なしでは上書きしない。生成される bootstrap file は repo label など project 固有 label だけを持つ。A2O が必要とする lane と internal label は `a2o kanban up` が provider 側に用意する。
+`--output` を使うと、A2O は `project.yaml` と同時に `kanban/bootstrap.json` も生成する。既存ファイルは `--force` なしでは上書きしない。生成される bootstrap file は repo label など project 固有 label だけを持つ。A2O が必要とする lane と internal label は `a2o kanban up` が用意する。
 
 `your-ai-worker` は placeholder である。bootstrap や runtime 実行の前に、agent 環境で実行できる executor binary 名へ置き換える。A2O はこの値を `agent.required_bins` と `runtime.executor.command` に書くため、未置換のままだと `a2o doctor` や runtime execution で missing command として止まる。
 
@@ -99,7 +99,6 @@ schema_version: 1
 package:
   name: my-product
 kanban:
-  provider: soloboard
   project: MyProduct
   bootstrap: kanban/bootstrap.json
   selection:

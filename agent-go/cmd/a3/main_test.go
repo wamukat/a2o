@@ -316,6 +316,9 @@ func TestProjectTemplatePrintsValidMinimalProjectYaml(t *testing.T) {
 	if strings.Contains(stdout.String(), "prompt_transport") || strings.Contains(stdout.String(), "default_profile") {
 		t.Fatalf("template should use compact executor syntax, got:\n%s", stdout.String())
 	}
+	if strings.Contains(stdout.String(), "provider: soloboard") {
+		t.Fatalf("template should not expose fixed kanban provider, got:\n%s", stdout.String())
+	}
 	config, err := loadProjectPackageConfig(packageDir)
 	if err != nil {
 		t.Fatalf("generated project.yaml should load: %v\n%s", err, stdout.String())
@@ -382,6 +385,13 @@ func TestProjectTemplateWritesOutputFileWithCustomExecutorArgs(t *testing.T) {
 	bootstrapPath := filepath.Join(filepath.Dir(outputPath), "kanban", "bootstrap.json")
 	if !strings.Contains(stdout.String(), "kanban_bootstrap_template_written path="+bootstrapPath) {
 		t.Fatalf("stdout should describe bootstrap path, got %q", stdout.String())
+	}
+	body, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("project template missing: %v", err)
+	}
+	if strings.Contains(string(body), "provider: soloboard") {
+		t.Fatalf("template should not expose fixed kanban provider:\n%s", string(body))
 	}
 	config, err := loadProjectPackageConfig(filepath.Dir(outputPath))
 	if err != nil {
@@ -684,6 +694,7 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 		"package:",
 		"  name: reference",
 		"kanban:",
+		// Older project.yaml files with provider remain loadable for compatibility.
 		"  provider: soloboard",
 		"  project: A2OReference",
 		"  bootstrap: kanban/bootstrap.json",
@@ -2316,7 +2327,6 @@ func TestRuntimeRunOnceReadsProjectYaml(t *testing.T) {
 package:
   name: a2o-reference-typescript-api-web
 kanban:
-  provider: soloboard
   project: A2OReferenceTypeScript
   selection:
     status: To do
@@ -2918,7 +2928,6 @@ func writeMultiRepoProjectYaml(t *testing.T, packageDir string) {
 package:
   name: a2o-reference-multi-repo
 kanban:
-  provider: soloboard
   project: A2OReferenceMultiRepo
   selection:
     status: To do

@@ -36,7 +36,6 @@ package:
   name: a2o-reference-typescript-api-web
 
 kanban:
-  provider: soloboard
   project: A2OReferenceTypeScript
   bootstrap: kanban/bootstrap.json
   selection:
@@ -102,7 +101,7 @@ Host agent binary は canonical path `.work/a2o/agent/bin/a2o-agent` に置く�
 
 `package` identifies the package, not the product repository. `package.name` replaces the current top-level scalar `project`.
 
-`kanban` owns provider selection, board name, bootstrap config, and task selection. The default provider remains `soloboard`. A2O-owned lanes and internal coordination labels are runtime implementation details and should not be required in normal package schema.
+`kanban` owns board name, bootstrap config, and task selection. The kanban backend is fixed by A2O runtime distribution and is not an author-facing `project.yaml` setting. A2O-owned lanes and internal coordination labels are runtime implementation details and should not be required in normal package schema.
 
 `repos` defines stable repo slots. Slot keys are runtime identities. `path` is relative to the package directory unless absolute. `label` maps kanban labels to repo slots. If omitted, the implementation may derive `repo:<slot>`.
 
@@ -143,7 +142,7 @@ a2o project template \
 
 The template uses the compact executor form. `--language` controls `agent.required_bins`; `--executor-bin` and repeated `--executor-arg` flags generate `runtime.executor.command`.
 
-When `--output` points to a file, the generator also writes `kanban/bootstrap.json` beside the package config. Existing files are not overwritten unless `--force` is provided. The generated bootstrap file contains project-owned labels such as repo labels; A2O-owned lanes and internal coordination labels are provisioned by the provider bootstrap.
+When `--output` points to a file, the generator also writes `kanban/bootstrap.json` beside the package config. Existing files are not overwritten unless `--force` is provided. The generated bootstrap file contains project-owned labels such as repo labels; A2O-owned lanes and internal coordination labels are provisioned by `a2o kanban up`.
 
 `runtime.surface` owns skills, verification commands, remediation commands, and workspace hook. Values may be scalar or variant maps, matching the current project surface resolver behavior. It is the single user-facing place for project runtime surface configuration.
 
@@ -160,7 +159,6 @@ schema_version: 1
 package:
   name: a2o-reference-typescript-api-web
 kanban:
-  provider: soloboard
   project: A2OReferenceTypeScript
   bootstrap: kanban/bootstrap.json
   selection:
@@ -203,7 +201,6 @@ schema_version: 1
 package:
   name: a2o-reference-go-api-cli
 kanban:
-  provider: soloboard
   project: A2OReferenceGo
   bootstrap: kanban/bootstrap.json
   selection:
@@ -243,7 +240,6 @@ schema_version: 1
 package:
   name: a2o-reference-python-service
 kanban:
-  provider: soloboard
   project: A2OReferencePython
   bootstrap: kanban/bootstrap.json
   selection:
@@ -283,7 +279,6 @@ schema_version: 1
 package:
   name: a2o-reference-multi-repo
 kanban:
-  provider: soloboard
   project: A2OReferenceMultiRepo
   bootstrap: kanban/bootstrap.json
   selection:

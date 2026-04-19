@@ -2,7 +2,6 @@ schema_version: 1
 package:
   name: a2o-reference-python-service
 kanban:
-  provider: soloboard
   project: A2OReferencePython
   bootstrap: kanban/bootstrap.json
   selection:

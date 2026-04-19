@@ -169,7 +169,6 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	builder.WriteString("package:\n")
 	writeYAMLScalar(&builder, 1, "name", options.PackageName)
 	builder.WriteString("kanban:\n")
-	writeYAMLScalar(&builder, 1, "provider", "soloboard")
 	writeYAMLScalar(&builder, 1, "project", options.KanbanProject)
 	writeYAMLScalar(&builder, 1, "bootstrap", "kanban/bootstrap.json")
 	builder.WriteString("  selection:\n")
