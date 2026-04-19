@@ -83,4 +83,4 @@ Projects may choose target and policy, but they do not define new merge semantic
 
 ## Presets
 
-The 0.5.0 public package format is single-file `project.yaml`. Internal presets may remain implementation details, but package authors should not have to manage separate preset or manifest files.
+The 0.5.1 public package format is single-file `project.yaml`. Internal presets may remain implementation details, but package authors should not have to manage separate preset or manifest files.

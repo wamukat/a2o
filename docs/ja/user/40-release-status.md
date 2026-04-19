@@ -1,4 +1,4 @@
-# A2O 0.5.0 Release Status（release 状態）
+# A2O 0.5.1 Release Status（release 状態）
 
 ## Ready（利用可能）
 
@@ -11,11 +11,11 @@
 - Resident scheduler lifecycle（常駐 scheduler lifecycle）: `a2o runtime start`、`stop`、`status`
 - Runtime diagnosis（runtime 診断）: `a2o runtime doctor`、`a2o runtime watch-summary`、`a2o runtime describe-task <task-ref>`
 - Single-file project package config（単一ファイル project package config）: `project.yaml`
-- SoloBoard adapter and bootstrap tooling
+- SoloBoard adapter and bootstrap tooling。既定 SoloBoard image は `v0.9.14`
 - Agent HTTP worker gateway
 - Agent-materialized workspace mode
 - TypeScript、Go、Python、multi-repo task templates の reference product packages
-- main push 時の GHCR image publication。tags は `latest`、`0.5.0`、`sha-*`
+- main push 時の GHCR image publication。tags は `latest`、`0.5.1`、`sha-*`
 - Full RSpec release gate の local pass
 
 ## Validation scope（検証範囲）

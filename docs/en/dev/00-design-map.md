@@ -74,7 +74,7 @@ Defines the sample products and the release validation scope.
 
 - [../user/40-release-status.md](../user/40-release-status.md)
 
-Summarizes the public surface and validation status for A2O 0.5.0.
+Summarizes the public surface and validation status for A2O 0.5.1.
 
 ### 10. Kanban Adapter Boundary
 

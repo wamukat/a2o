@@ -38,11 +38,11 @@ exported_agent="${work_dir}/a3-agent"
 source_root="${work_dir}/source/catalog-service"
 workspace_root="${work_dir}/workspaces"
 
-SOLOBOARD_IMAGE="${SOLOBOARD_IMAGE:-ghcr.io/wamukat/soloboard:latest}" \
+SOLOBOARD_IMAGE="${SOLOBOARD_IMAGE:-ghcr.io/wamukat/soloboard:v0.9.14}" \
 A2O_BUNDLE_SOLOBOARD_PORT="${A2O_BUNDLE_SOLOBOARD_PORT:-3470}" \
 docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" build "${RUNTIME_SERVICE}"
 
-SOLOBOARD_IMAGE="${SOLOBOARD_IMAGE:-ghcr.io/wamukat/soloboard:latest}" \
+SOLOBOARD_IMAGE="${SOLOBOARD_IMAGE:-ghcr.io/wamukat/soloboard:v0.9.14}" \
 A2O_BUNDLE_SOLOBOARD_PORT="${A2O_BUNDLE_SOLOBOARD_PORT:-3470}" \
 docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" up -d --no-deps --force-recreate "${RUNTIME_SERVICE}"
 

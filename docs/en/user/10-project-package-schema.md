@@ -2,7 +2,7 @@
 
 The canonical project package config file is `project.yaml`.
 
-`manifest.yml` is not part of the public 0.5.0 package format. Runtime responsibilities live in `project.yaml` under explicit runtime sections. This keeps the package surface small and avoids a split between "project config" and "manifest".
+`manifest.yml` is not part of the public 0.5.1 package format. Runtime responsibilities live in `project.yaml` under explicit runtime sections. This keeps the package surface small and avoids a split between "project config" and "manifest".
 
 For authoring decisions and responsibility boundaries, see [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md).
 
