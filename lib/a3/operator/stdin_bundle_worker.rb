@@ -33,6 +33,29 @@ def write_json(path, payload)
   path.write(JSON.pretty_generate(payload))
 end
 
+def sanitize_diagnostic_value(value)
+  case value
+  when Hash
+    value.transform_values { |item| sanitize_diagnostic_value(item) }
+  when Array
+    value.map { |item| sanitize_diagnostic_value(item) }
+  when String
+    value
+      .gsub("A3_WORKER_REQUEST_PATH", "A2O_WORKER_REQUEST_PATH")
+      .gsub("A3_WORKER_RESULT_PATH", "A2O_WORKER_RESULT_PATH")
+      .gsub("A3_WORKSPACE_ROOT", "A2O_WORKSPACE_ROOT")
+      .gsub("A3_WORKER_LAUNCHER_CONFIG_PATH", "A2O_WORKER_LAUNCHER_CONFIG_PATH")
+      .gsub("A3_ROOT_DIR", "A2O_ROOT_DIR")
+      .gsub("/tmp/a3-engine/lib/a3", "<runtime-preset-dir>/lib/a2o-internal")
+      .gsub("/tmp/a3-engine", "<runtime-preset-dir>")
+      .gsub("/usr/local/bin/a3", "<engine-entrypoint>")
+      .gsub("lib/a3", "lib/a2o-internal")
+      .gsub(".a3", "<agent-metadata>")
+  else
+    value
+  end
+end
+
 def failure(request, summary:, command:, observed_state:, diagnostics: {})
   category = error_category(summary: summary, observed_state: observed_state, phase: request["phase"])
   payload = {
@@ -44,7 +67,7 @@ def failure(request, summary:, command:, observed_state:, diagnostics: {})
     "failing_command" => command.join(" "),
     "observed_state" => observed_state,
     "rework_required" => false,
-    "diagnostics" => diagnostics.merge(
+    "diagnostics" => sanitize_diagnostic_value(diagnostics).merge(
       "error_category" => category,
       "remediation" => remediation_for(category)
     )

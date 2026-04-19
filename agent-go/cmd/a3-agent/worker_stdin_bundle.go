@@ -121,7 +121,7 @@ func workerFailure(request map[string]any, summary string, command []string, obs
 	category := workerErrorCategory(summary, observedState, stringValue(request["phase"]))
 	enrichedDiagnostics := map[string]any{}
 	for key, value := range diagnostics {
-		enrichedDiagnostics[key] = value
+		enrichedDiagnostics[key] = sanitizeWorkerDiagnosticValue(value)
 	}
 	enrichedDiagnostics["error_category"] = category
 	enrichedDiagnostics["remediation"] = workerRemediation(category)
@@ -146,6 +146,43 @@ func workerFailure(request map[string]any, summary string, command []string, obs
 		}
 	}
 	return payload
+}
+
+func sanitizeWorkerDiagnosticValue(value any) any {
+	switch typed := value.(type) {
+	case string:
+		return sanitizeWorkerDiagnosticString(typed)
+	case []any:
+		sanitized := make([]any, 0, len(typed))
+		for _, item := range typed {
+			sanitized = append(sanitized, sanitizeWorkerDiagnosticValue(item))
+		}
+		return sanitized
+	case map[string]any:
+		sanitized := map[string]any{}
+		for key, item := range typed {
+			sanitized[key] = sanitizeWorkerDiagnosticValue(item)
+		}
+		return sanitized
+	default:
+		return value
+	}
+}
+
+func sanitizeWorkerDiagnosticString(value string) string {
+	replacer := strings.NewReplacer(
+		"A3_WORKER_REQUEST_PATH", "A2O_WORKER_REQUEST_PATH",
+		"A3_WORKER_RESULT_PATH", "A2O_WORKER_RESULT_PATH",
+		"A3_WORKSPACE_ROOT", "A2O_WORKSPACE_ROOT",
+		"A3_WORKER_LAUNCHER_CONFIG_PATH", "A2O_WORKER_LAUNCHER_CONFIG_PATH",
+		"A3_ROOT_DIR", "A2O_ROOT_DIR",
+		"/tmp/a3-engine/lib/a3", "<runtime-preset-dir>/lib/a2o-internal",
+		"/tmp/a3-engine", "<runtime-preset-dir>",
+		"/usr/local/bin/a3", "<engine-entrypoint>",
+		"lib/a3", "lib/a2o-internal",
+		".a3", "<agent-metadata>",
+	)
+	return replacer.Replace(value)
 }
 
 func workerErrorCategory(summary string, observedState string, phase string) string {

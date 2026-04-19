@@ -12,6 +12,36 @@ RSpec.describe "worker:stdin-bundle" do
   STDIN_WORKER_LIB_DIR = STDIN_WORKER_SPEC_ROOT_DIR.join("lib")
   STDIN_WORKER_LIB = STDIN_WORKER_LIB_DIR.join("a3", "operator", "stdin_bundle_worker.rb")
 
+  it "keeps legacy worker env as private compatibility fallback" do
+    original_public = ENV.delete("A2O_WORKER_REQUEST_PATH")
+    original_legacy = ENV["A3_WORKER_REQUEST_PATH"]
+    ENV["A3_WORKER_REQUEST_PATH"] = "/tmp/legacy-request.json"
+
+    expect(env_compat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH")).to eq("/tmp/legacy-request.json")
+  ensure
+    ENV["A2O_WORKER_REQUEST_PATH"] = original_public if original_public
+    if original_legacy
+      ENV["A3_WORKER_REQUEST_PATH"] = original_legacy
+    else
+      ENV.delete("A3_WORKER_REQUEST_PATH")
+    end
+  end
+
+  it "sanitizes internal diagnostic names before writing worker failure payloads" do
+    sanitized = sanitize_diagnostic_value(
+      "A3_WORKER_REQUEST_PATH /tmp/a3-engine/lib/a3/bootstrap.rb /usr/local/bin/a3 .a3/workspace.json"
+    )
+
+    expect(sanitized).to include("A2O_WORKER_REQUEST_PATH")
+    expect(sanitized).to include("<runtime-preset-dir>/lib/a2o-internal")
+    expect(sanitized).to include("<engine-entrypoint>")
+    expect(sanitized).to include("<agent-metadata>")
+    expect(sanitized).not_to include("A3_WORKER_REQUEST_PATH")
+    expect(sanitized).not_to include("/tmp/a3-engine")
+    expect(sanitized).not_to include("/usr/local/bin/a3")
+    expect(sanitized).not_to include(".a3")
+  end
+
   def base_request
     {
       "task_ref" => "Sample#3112",

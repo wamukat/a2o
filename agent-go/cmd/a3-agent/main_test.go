@@ -298,6 +298,41 @@ func TestRunWorkerStdinBundleRejectsMissingLauncherConfigEnv(t *testing.T) {
 	}
 }
 
+func TestWorkerEnvCompatFallsBackToLegacyNames(t *testing.T) {
+	t.Setenv("A3_WORKER_REQUEST_PATH", "/tmp/legacy-request.json")
+	if got := envCompat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH"); got != "/tmp/legacy-request.json" {
+		t.Fatalf("legacy fallback = %q", got)
+	}
+	t.Setenv("A2O_WORKER_REQUEST_PATH", "/tmp/public-request.json")
+	if got := envCompat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH"); got != "/tmp/public-request.json" {
+		t.Fatalf("public env should win, got %q", got)
+	}
+}
+
+func TestWorkerFailureSanitizesInternalDiagnostics(t *testing.T) {
+	payload := workerFailure(
+		map[string]any{"task_ref": "A2O#1", "run_ref": "run-1", "phase": "implementation"},
+		"failed",
+		[]string{"worker"},
+		"executor_failed",
+		map[string]any{
+			"stderr": "A3_WORKER_REQUEST_PATH /tmp/a3-engine/lib/a3/bootstrap.rb /usr/local/bin/a3 .a3/workspace.json",
+		},
+	)
+	diagnostics := payload["diagnostics"].(map[string]any)
+	stderr := diagnostics["stderr"].(string)
+	for _, forbidden := range []string{"A3_WORKER_REQUEST_PATH", "/tmp/a3-engine", "/usr/local/bin/a3", ".a3"} {
+		if strings.Contains(stderr, forbidden) {
+			t.Fatalf("diagnostic still contains %q: %s", forbidden, stderr)
+		}
+	}
+	for _, want := range []string{"A2O_WORKER_REQUEST_PATH", "<runtime-preset-dir>/lib/a2o-internal", "<engine-entrypoint>", "<agent-metadata>"} {
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("diagnostic missing %q: %s", want, stderr)
+		}
+	}
+}
+
 func TestWorkerResponseSchemaIncludesPhaseSpecificProperties(t *testing.T) {
 	tests := []struct {
 		name       string
