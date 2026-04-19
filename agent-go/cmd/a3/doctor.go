@@ -192,17 +192,12 @@ func isProjectScriptContractScanTarget(packagePath string, path string, mode os.
 	if mode&0o111 != 0 {
 		return true
 	}
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".sh", ".bash", ".zsh", ".rb", ".py", ".js", ".mjs", ".cjs", ".ts", ".go", ".env", ".json", ".yml", ".yaml":
-		return true
-	default:
-		return false
-	}
+	return false
 }
 
 func isPackageRootContractScanTarget(name string) bool {
 	lower := strings.ToLower(name)
-	if lower == "readme" || strings.HasPrefix(lower, "readme.") || lower == "license" || strings.HasPrefix(lower, "license.") || strings.HasPrefix(lower, "changelog.") {
+	if lower == "readme" || strings.HasPrefix(lower, "readme.") || lower == "license" || strings.HasPrefix(lower, "license.") || lower == "changelog" || strings.HasPrefix(lower, "changelog.") {
 		return false
 	}
 	switch strings.ToLower(filepath.Ext(name)) {

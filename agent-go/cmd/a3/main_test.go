@@ -733,6 +733,15 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(packageDir, "README.md"), []byte(readme), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(packageDir, "CHANGELOG"), []byte(readme), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(packageDir, "fixtures"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "fixtures", "sample.json"), []byte(`{"note":"A3_SECRET"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
 		SchemaVersion:  1,
 		PackagePath:    packageDir,
