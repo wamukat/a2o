@@ -37,7 +37,6 @@ package:
 
 kanban:
   project: A2OReferenceTypeScript
-  bootstrap: kanban/bootstrap.json
   selection:
     status: To do
 
@@ -102,7 +101,7 @@ Host agent binary は canonical path `.work/a2o/agent/bin/a2o-agent` に置く�
 
 `package` identifies the package, not the product repository. `package.name` replaces the current top-level scalar `project`.
 
-`kanban` owns board name, bootstrap config, and task selection. The kanban backend is fixed by A2O runtime distribution and is not an author-facing `project.yaml` setting. A2O-owned lanes and internal coordination labels are runtime implementation details and should not be required in normal package schema.
+`kanban` owns board name, project-owned labels, and task selection. The kanban backend is fixed by A2O runtime distribution and is not an author-facing `project.yaml` setting. A2O-owned lanes and internal coordination labels are runtime implementation details and should not be required in normal package schema.
 
 `repos` defines stable repo slots. Slot keys are runtime identities. `path` is relative to the package directory unless absolute. `label` maps kanban labels to repo slots. If omitted, the implementation may derive `repo:<slot>`.
 
@@ -144,7 +143,7 @@ a2o project template \
 
 The template uses the phase-based executor form. `--language` controls `agent.required_bins`; `--executor-bin` and repeated `--executor-arg` flags generate implementation and review phase executor commands.
 
-When `--output` points to a file, the generator also writes `kanban/bootstrap.json` beside the package config. Existing files are not overwritten unless `--force` is provided. The generated bootstrap file contains project-owned labels such as repo labels; A2O-owned lanes and internal coordination labels are provisioned by `a2o kanban up`.
+When `--output` points to a file, the generator writes `project.yaml` only. Kanban bootstrap data is derived from `kanban.project`, `kanban.labels`, and `repos.<slot>.label`; A2O-owned lanes and internal coordination labels are provisioned by `a2o kanban up`.
 
 `runtime.phases.merge` owns merge target, policy, and target ref. Values may be scalar or variant maps, matching the current merge resolver behavior.
 
@@ -160,12 +159,12 @@ package:
   name: a2o-reference-typescript-api-web
 kanban:
   project: A2OReferenceTypeScript
-  bootstrap: kanban/bootstrap.json
   selection:
     status: To do
 repos:
   app:
     path: ..
+    label: repo:app
     role: product
 agent:
   required_bins: [git, node, npm, your-ai-worker]
@@ -203,12 +202,12 @@ package:
   name: a2o-reference-go-api-cli
 kanban:
   project: A2OReferenceGo
-  bootstrap: kanban/bootstrap.json
   selection:
     status: To do
 repos:
   app:
     path: ..
+    label: repo:app
 agent:
   required_bins: [git, go, your-ai-worker]
 runtime:
@@ -242,12 +241,12 @@ package:
   name: a2o-reference-python-service
 kanban:
   project: A2OReferencePython
-  bootstrap: kanban/bootstrap.json
   selection:
     status: To do
 repos:
   app:
     path: ..
+    label: repo:app
 agent:
   required_bins: [git, python3, your-ai-worker]
 runtime:
@@ -281,7 +280,8 @@ package:
   name: a2o-reference-multi-repo
 kanban:
   project: A2OReferenceMultiRepo
-  bootstrap: kanban/bootstrap.json
+  labels:
+    - repo:both
   selection:
     status: To do
 repos:

@@ -42,7 +42,6 @@ Reference packages use this shape:
 project-package/
   README.md
   project.yaml
-  kanban/bootstrap.json
   commands/
   skills/
   scenarios/

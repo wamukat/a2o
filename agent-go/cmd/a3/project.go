@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -97,32 +96,13 @@ func runProjectTemplate(args []string, stdout io.Writer, stderr io.Writer) error
 			return fmt.Errorf("inspect output file: %w", err)
 		}
 	}
-	bootstrapPath := filepath.Join(filepath.Dir(*outputPath), "kanban", "bootstrap.json")
-	if !*force {
-		if _, err := os.Stat(bootstrapPath); err == nil {
-			return fmt.Errorf("kanban bootstrap file already exists: %s; pass --force to overwrite", bootstrapPath)
-		} else if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("inspect kanban bootstrap file: %w", err)
-		}
-	}
-	bootstrapTemplate, err := buildKanbanBootstrapTemplate(strings.TrimSpace(*kanbanProject), strings.TrimSpace(*repoLabel))
-	if err != nil {
-		return err
-	}
 	if err := os.MkdirAll(filepath.Dir(*outputPath), 0o755); err != nil {
 		return fmt.Errorf("create output directory: %w", err)
 	}
 	if err := os.WriteFile(*outputPath, []byte(template), 0o644); err != nil {
 		return fmt.Errorf("write project template: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(bootstrapPath), 0o755); err != nil {
-		return fmt.Errorf("create kanban bootstrap directory: %w", err)
-	}
-	if err := os.WriteFile(bootstrapPath, []byte(bootstrapTemplate), 0o644); err != nil {
-		return fmt.Errorf("write kanban bootstrap template: %w", err)
-	}
 	fmt.Fprintf(stdout, "project_template_written path=%s\n", *outputPath)
-	fmt.Fprintf(stdout, "kanban_bootstrap_template_written path=%s\n", bootstrapPath)
 	return nil
 }
 
@@ -170,7 +150,6 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	writeYAMLScalar(&builder, 1, "name", options.PackageName)
 	builder.WriteString("kanban:\n")
 	writeYAMLScalar(&builder, 1, "project", options.KanbanProject)
-	writeYAMLScalar(&builder, 1, "bootstrap", "kanban/bootstrap.json")
 	builder.WriteString("  selection:\n")
 	writeYAMLScalar(&builder, 2, "status", "To do")
 	builder.WriteString("repos:\n")
@@ -206,30 +185,6 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	writeYAMLScalar(&builder, 3, "policy", "ff_only")
 	writeYAMLScalar(&builder, 3, "target_ref", "refs/heads/main")
 	return builder.String(), nil
-}
-
-func buildKanbanBootstrapTemplate(kanbanProject string, repoLabel string) (string, error) {
-	if kanbanProject == "" {
-		return "", errors.New("--kanban-project must not be blank")
-	}
-	if strings.TrimSpace(repoLabel) == "" {
-		repoLabel = "repo:app"
-	}
-	payload := map[string]any{
-		"boards": []any{
-			map[string]any{
-				"name": kanbanProject,
-				"tags": []any{
-					map[string]any{"name": repoLabel},
-				},
-			},
-		},
-	}
-	body, err := json.MarshalIndent(payload, "", "  ")
-	if err != nil {
-		return "", fmt.Errorf("build kanban bootstrap template: %w", err)
-	}
-	return string(body) + "\n", nil
 }
 
 func templateRequiredBins(language string, executorBin string) ([]string, error) {

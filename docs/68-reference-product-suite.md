@@ -26,7 +26,6 @@ Each package includes:
 
 - `README.md`
 - `project.yaml`
-- `kanban/bootstrap.json`
 - `commands/`
 - `skills/`
 - `scenarios/`

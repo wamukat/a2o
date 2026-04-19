@@ -3,13 +3,13 @@ package:
   name: a2o-reference-go-api-cli
 kanban:
   project: A2OReferenceGo
-  bootstrap: kanban/bootstrap.json
   selection:
     status: To do
 repos:
   app:
     path: ..
     role: product
+    label: repo:app
 agent:
   workspace_root: .work/a2o/agent/workspaces
   required_bins:

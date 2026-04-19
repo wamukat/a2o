@@ -15,7 +15,7 @@ type projectPackageConfig struct {
 	SchemaVersion      string
 	PackageName        string
 	KanbanProject      string
-	KanbanBootstrap    string
+	KanbanLabels       []string
 	KanbanStatus       string
 	LiveRef            string
 	MaxSteps           string
@@ -56,10 +56,11 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 		return config, fmt.Errorf("parse project package config %s: %w", projectFile, err)
 	}
 	runtimePayload, _ := rawPayload["runtime"].(map[string]any)
+	kanbanPayload, _ := rawPayload["kanban"].(map[string]any)
 	config.SchemaVersion = scalarString(payload.SchemaVersion)
 	config.PackageName = payload.Package.Name
 	config.KanbanProject = payload.Kanban.Project
-	config.KanbanBootstrap = payload.Kanban.Bootstrap
+	config.KanbanLabels = payload.Kanban.Labels
 	config.KanbanStatus = payload.Kanban.Selection.Status
 	config.LiveRef = scalarString(payload.Runtime.LiveRef)
 	config.MaxSteps = scalarString(payload.Runtime.MaxSteps)
@@ -71,6 +72,9 @@ func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) 
 	}
 	if config.SchemaVersion != "1" {
 		return config, fmt.Errorf("project package config %s has unsupported schema_version: %s", projectFile, config.SchemaVersion)
+	}
+	if _, ok := kanbanPayload["bootstrap"]; ok {
+		return config, fmt.Errorf("project package config %s has invalid kanban.bootstrap: kanban.bootstrap is no longer supported; define project labels in kanban.labels or repos.<slot>.label", projectFile)
 	}
 	if _, ok := runtimePayload["executor"]; ok {
 		return config, fmt.Errorf("project package config %s has invalid runtime.executor: runtime.executor is no longer supported; use runtime.phases.implementation.executor", projectFile)
@@ -163,8 +167,8 @@ type projectPackageYAML struct {
 		Name string `yaml:"name"`
 	} `yaml:"package"`
 	Kanban struct {
-		Project   string `yaml:"project"`
-		Bootstrap string `yaml:"bootstrap"`
+		Project   string   `yaml:"project"`
+		Labels    []string `yaml:"labels"`
 		Selection struct {
 			Status string `yaml:"status"`
 		} `yaml:"selection"`

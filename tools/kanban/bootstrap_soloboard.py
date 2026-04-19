@@ -25,9 +25,18 @@ DEFAULT_A2O_TAGS = [
 
 def load_config(path: Path) -> list[dict[str, Any]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
+    return load_config_payload(payload, source=str(path))
+
+
+def load_config_json(raw: str) -> list[dict[str, Any]]:
+    payload = json.loads(raw)
+    return load_config_payload(payload, source="--config-json")
+
+
+def load_config_payload(payload: Any, *, source: str) -> list[dict[str, Any]]:
     boards = payload.get("boards") if isinstance(payload, dict) else None
     if not isinstance(boards, list):
-        raise RuntimeError(f"bootstrap config must contain boards array: {path}")
+        raise RuntimeError(f"bootstrap config must contain boards array: {source}")
     return boards
 
 
@@ -121,7 +130,9 @@ def board_tags(spec: dict[str, Any]) -> list[dict[str, Any]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Bootstrap SoloBoard boards, lanes, and tags from a project config.")
-    parser.add_argument("--config", required=True, type=Path)
+    config_group = parser.add_mutually_exclusive_group(required=True)
+    config_group.add_argument("--config", type=Path)
+    config_group.add_argument("--config-json")
     parser.add_argument("--base-url", default=None)
     parser.add_argument("--token", default=None)
     parser.add_argument("--board", dest="boards", action="append", default=[])
@@ -129,7 +140,7 @@ def main() -> int:
 
     context = kanban_cli.resolve_backend_context(backend="soloboard", base_url=args.base_url, token=args.token)
     selected = set(args.boards)
-    specs = load_config(args.config)
+    specs = load_config(args.config) if args.config else load_config_json(args.config_json)
     specs_by_name = {str(spec.get("name") or ""): spec for spec in specs}
     if selected:
         unknown = sorted(selected - set(specs_by_name))

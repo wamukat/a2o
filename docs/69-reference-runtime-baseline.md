@@ -50,9 +50,9 @@ Evidence state was retained under `.work/reference-baseline/`. These files are r
 
 For each product:
 
-1. Bootstrap the package board with `tools/kanban/bootstrap_soloboard.py`.
+1. Bootstrap the package board with `a2o kanban up`.
 2. Create scenario tasks from `project-package/scenarios`.
-3. Add trigger and repo labels from the package bootstrap config.
+3. Add trigger and repo labels from `project.yaml`.
 4. Start `agent-server` and `a2o-agent`.
 5. Run `execute-until-idle` with:
    - `--worker-gateway agent-http`

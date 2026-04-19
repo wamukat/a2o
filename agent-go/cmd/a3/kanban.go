@@ -1,11 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -135,32 +135,76 @@ func sanitizeBackupName(value string) string {
 }
 
 func runKanbanBootstrap(config runtimeInstanceConfig, runner commandRunner, stdout io.Writer) error {
-	projectFile := filepath.Join(config.PackagePath, "project.yaml")
-	if _, err := os.Stat(projectFile); err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("inspect project package config: %w", err)
-	}
 	packageConfig, err := loadProjectPackageConfig(config.PackagePath)
 	if err != nil {
 		return err
 	}
-	bootstrapPath := strings.TrimSpace(packageConfig.KanbanBootstrap)
-	if bootstrapPath == "" {
-		return nil
+	configJSON, err := buildKanbanBootstrapConfigJSON(packageConfig)
+	if err != nil {
+		return err
 	}
-	hostConfigPath := resolvePackagePath(config.PackagePath, bootstrapPath)
-	containerConfigPath := workspaceContainerPath(config.WorkspaceRoot, hostConfigPath)
-	args := append(composeArgs(config), "exec", "-T", config.RuntimeService, "python3", packagedKanbanBootstrapPath, "--config", containerConfigPath, "--base-url", "http://soloboard:3000")
-	if strings.TrimSpace(packageConfig.KanbanProject) != "" {
-		args = append(args, "--board", packageConfig.KanbanProject)
-	}
+	args := append(composeArgs(config), "exec", "-T", config.RuntimeService, "python3", packagedKanbanBootstrapPath, "--config-json", configJSON, "--base-url", "http://soloboard:3000", "--board", packageConfig.KanbanProject)
 	if err := runKanbanBootstrapWithRetry(runner, args); err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "kanban_bootstrapped project=%s config=%s\n", packageConfig.KanbanProject, hostConfigPath)
+	fmt.Fprintf(stdout, "kanban_bootstrapped project=%s source=project.yaml\n", packageConfig.KanbanProject)
 	return nil
+}
+
+func buildKanbanBootstrapConfigJSON(config projectPackageConfig) (string, error) {
+	boardName := strings.TrimSpace(config.KanbanProject)
+	if boardName == "" {
+		return "", fmt.Errorf("kanban.project is required")
+	}
+	tags := kanbanBootstrapTags(config)
+	payload := map[string]any{
+		"boards": []any{
+			map[string]any{
+				"name": boardName,
+				"tags": tags,
+			},
+		},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("build kanban bootstrap config: %w", err)
+	}
+	return string(body), nil
+}
+
+func kanbanBootstrapTags(config projectPackageConfig) []map[string]string {
+	names := map[string]bool{}
+	add := func(name string) {
+		name = strings.TrimSpace(name)
+		if name != "" {
+			names[name] = true
+		}
+	}
+	for _, label := range config.KanbanLabels {
+		add(label)
+	}
+	aliases := make([]string, 0, len(config.Repos))
+	for alias := range config.Repos {
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+	for _, alias := range aliases {
+		label := config.Repos[alias].Label
+		if strings.TrimSpace(label) == "" {
+			label = "repo:" + alias
+		}
+		add(label)
+	}
+	sorted := make([]string, 0, len(names))
+	for name := range names {
+		sorted = append(sorted, name)
+	}
+	sort.Strings(sorted)
+	tags := make([]map[string]string, 0, len(sorted))
+	for _, name := range sorted {
+		tags = append(tags, map[string]string{"name": name})
+	}
+	return tags
 }
 
 func runKanbanBootstrapWithRetry(runner commandRunner, args []string) error {

@@ -85,6 +85,35 @@ class SoloBoardBootstrapTest(unittest.TestCase):
                     [tag["name"] for tag in ensure_tags.call_args.args[3]],
                 )
 
+    def test_main_bootstraps_selected_board_from_inline_config_json(self) -> None:
+        config_json = json.dumps(
+            {
+                "boards": [
+                    {
+                        "name": "A2OReference",
+                        "tags": [{"name": "repo:app"}],
+                    }
+                ]
+            }
+        )
+
+        with (
+            patch.object(bootstrap_soloboard.kanban_cli, "resolve_backend_context") as context,
+            patch.object(bootstrap_soloboard, "ensure_board", return_value={"id": 10}),
+            patch.object(bootstrap_soloboard, "ensure_lanes", return_value={"bucket_ids_by_name": {"To do": 1}}),
+            patch.object(bootstrap_soloboard, "ensure_tags", return_value=[{"title": "repo:app"}]) as ensure_tags,
+            patch("sys.argv", ["bootstrap_soloboard.py", "--config-json", config_json, "--board", "A2OReference"]),
+        ):
+            context.return_value.base_url = "http://localhost:3460"
+            context.return_value.token = ""
+
+            with redirect_stdout(StringIO()):
+                self.assertEqual(0, bootstrap_soloboard.main())
+            self.assertEqual(
+                ["trigger:auto-implement", "trigger:auto-parent", "blocked", "repo:app"],
+                [tag["name"] for tag in ensure_tags.call_args.args[3]],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

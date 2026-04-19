@@ -382,9 +382,8 @@ func TestProjectTemplateWritesOutputFileWithCustomExecutorArgs(t *testing.T) {
 	if !strings.Contains(stdout.String(), "project_template_written path="+outputPath) {
 		t.Fatalf("stdout should describe output path, got %q", stdout.String())
 	}
-	bootstrapPath := filepath.Join(filepath.Dir(outputPath), "kanban", "bootstrap.json")
-	if !strings.Contains(stdout.String(), "kanban_bootstrap_template_written path="+bootstrapPath) {
-		t.Fatalf("stdout should describe bootstrap path, got %q", stdout.String())
+	if strings.Contains(stdout.String(), "kanban_bootstrap_template_written") {
+		t.Fatalf("template should not write a separate kanban bootstrap file, got %q", stdout.String())
 	}
 	body, err := os.ReadFile(outputPath)
 	if err != nil {
@@ -393,21 +392,15 @@ func TestProjectTemplateWritesOutputFileWithCustomExecutorArgs(t *testing.T) {
 	if strings.Contains(string(body), "provider: soloboard") {
 		t.Fatalf("template should not expose fixed kanban provider:\n%s", string(body))
 	}
+	if strings.Contains(string(body), "bootstrap:") || strings.Contains(string(body), "bootstrap.json") {
+		t.Fatalf("template should inline kanban bootstrap into project.yaml:\n%s", string(body))
+	}
 	config, err := loadProjectPackageConfig(filepath.Dir(outputPath))
 	if err != nil {
 		t.Fatalf("generated project.yaml should load: %v", err)
 	}
-	bootstrapBody, err := os.ReadFile(bootstrapPath)
-	if err != nil {
-		t.Fatalf("kanban bootstrap template missing: %v", err)
-	}
-	if !strings.Contains(string(bootstrapBody), `"name": "PythonProduct"`) || !strings.Contains(string(bootstrapBody), `"name": "repo:app"`) {
-		t.Fatalf("unexpected kanban bootstrap template:\n%s", string(bootstrapBody))
-	}
-	for _, forbidden := range []string{`"lanes"`, "trigger:auto-implement", `"name": "blocked"`} {
-		if strings.Contains(string(bootstrapBody), forbidden) {
-			t.Fatalf("kanban bootstrap template should not require A2O-owned %q:\n%s", forbidden, string(bootstrapBody))
-		}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(outputPath), "kanban", "bootstrap.json")); !os.IsNotExist(err) {
+		t.Fatalf("template should not create kanban/bootstrap.json, err=%v", err)
 	}
 	command := config.Executor["default_profile"].(map[string]any)["command"].([]any)
 	if got := command[0].(string) + " " + command[1].(string) + " " + command[2].(string); got != "custom-worker run --out={{result_path}}" {
@@ -629,9 +622,14 @@ func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
 
 func TestKanbanUpUsesBootstrappedInstanceConfig(t *testing.T) {
 	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
 		SchemaVersion:  1,
-		PackagePath:    filepath.Join(tempDir, "package"),
+		PackagePath:    packageDir,
 		WorkspaceRoot:  tempDir,
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
@@ -691,7 +689,7 @@ func TestKanbanUpFreshBoardFailsWhenVolumeExists(t *testing.T) {
 func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "reference", "project-package")
-	if err := os.MkdirAll(filepath.Join(packageDir, "kanban"), 0o755); err != nil {
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	projectYaml := strings.Join([]string{
@@ -702,10 +700,12 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 		// Older project.yaml files with provider remain loadable for compatibility.
 		"  provider: soloboard",
 		"  project: A2OReference",
-		"  bootstrap: kanban/bootstrap.json",
+		"  labels:",
+		"    - area:reference",
 		"repos:",
 		"  app:",
 		"    path: ..",
+		"    label: repo:app",
 		"runtime:",
 		"  phases:",
 		"    implementation:",
@@ -725,9 +725,6 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 		"",
 	}, "\n")
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(packageDir, "kanban", "bootstrap.json"), []byte(`{"boards":[]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
@@ -752,8 +749,8 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 
 	joined := runner.joinedCalls()
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime soloboard")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml exec -T a2o-runtime python3 /opt/a2o/share/tools/kanban/bootstrap_soloboard.py --config /workspace/reference/project-package/kanban/bootstrap.json --base-url http://soloboard:3000 --board A2OReference")
-	if !strings.Contains(stdout.String(), "kanban_bootstrapped project=A2OReference") {
+	assertCallContains(t, joined, `docker compose -p a3-test -f compose.yml exec -T a2o-runtime python3 /opt/a2o/share/tools/kanban/bootstrap_soloboard.py --config-json {"boards":[{"name":"A2OReference","tags":[{"name":"area:reference"},{"name":"repo:app"}]}]} --base-url http://soloboard:3000 --board A2OReference`)
+	if !strings.Contains(stdout.String(), "kanban_bootstrapped project=A2OReference source=project.yaml") {
 		t.Fatalf("stdout should describe kanban bootstrap, got %q", stdout.String())
 	}
 }
@@ -1297,6 +1294,68 @@ repos:
 
 	if !strings.Contains(stderr.String(), "missing schema_version") {
 		t.Fatalf("stderr should mention missing schema_version, got %q", stderr.String())
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
+	}
+}
+
+func TestRuntimeRunOnceRejectsLegacyKanbanBootstrap(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+  bootstrap: kanban/bootstrap.json
+repos:
+  app:
+    path: ..
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - worker
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail with legacy kanban.bootstrap")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "invalid kanban.bootstrap") || !strings.Contains(stderr.String(), "kanban.bootstrap is no longer supported") {
+		t.Fatalf("stderr should reject legacy kanban.bootstrap, got %q", stderr.String())
 	}
 	if len(runner.calls) != 0 {
 		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
