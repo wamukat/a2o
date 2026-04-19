@@ -52,6 +52,9 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 		report("project_package", true, "project.yaml schema_version="+packageConfig.SchemaVersion+" package="+packageConfig.PackageName, "none")
 		checkExecutorConfig(packageConfig, report)
 		checkProjectScriptContract(config.PackagePath, report)
+		checkProjectFixtureReferences(config.PackagePath, filepath.Join(config.PackagePath, "project.yaml"), false, func(name string, severity lintSeverity, detail string, action string) {
+			report(name, severity != lintBlocked, detail, action)
+		})
 		checkRequiredCommands(packageConfig, runner, report)
 		checkRepoClean(config.PackagePath, packageConfig, runner, report)
 	}

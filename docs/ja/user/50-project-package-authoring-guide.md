@@ -54,6 +54,20 @@ Package が test profile を必要とする場合は、明示的に分ける。
 - verification fixture は production command と間違えない名前にする。
 - test profile の実行方法を docs に書く。
 
+Alternate profile は明示的に検証する。
+
+```sh
+a2o project validate --package ./project-package --config project-test.yaml
+```
+
+Focused test profile を使う場合も明示的に実行する。
+
+```sh
+a2o runtime run-once --project-config project-test.yaml
+```
+
+Alternate config が実 board task を処理する目的でない限り、resident scheduler には `--project-config` を使わない。
+
 通常 package は「実 board task が選択されたとき、何が実行されるのか」に一目で答えられる状態にする。
 
 ## Worker Protocol（worker protocol）

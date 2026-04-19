@@ -63,6 +63,15 @@ a2o project lint --package ./project-package
 
 `a2o project lint` は `project.yaml`、旧 split file、通常 config から test fixture への参照、利用者向けに漏れた A3/internal runtime 名、package docs や config から参照されない command file を確認する。Blocked finding は runtime 実行前に修正する。Warning finding は確認し、不要なら削除し、必要なら docs に明記する。
 
+Focused test profile を持つ場合は別 file に分け、明示的に検証する。
+
+```sh
+a2o project validate --package ./project-package --config project-test.yaml
+a2o runtime run-once --project-config project-test.yaml
+```
+
+Fixture worker は明示 alternate config から参照してよいが、通常の `project.yaml` は production-oriented に保つ。
+
 ### 3. 最小 4 コマンドで起動する
 
 project package を置いた後の最小手順:

@@ -54,6 +54,20 @@ If a package needs a test profile, keep it explicit:
 - name verification fixtures so they cannot be mistaken for production commands
 - document how to run the test profile
 
+Validate the alternate profile explicitly:
+
+```sh
+a2o project validate --package ./project-package --config project-test.yaml
+```
+
+Run it explicitly when you need a focused test profile:
+
+```sh
+a2o runtime run-once --project-config project-test.yaml
+```
+
+Do not use `--project-config` for the resident scheduler unless the alternate config is intended to process real board tasks.
+
 The normal package path should answer a simple question: "What will run when a real board task is selected?"
 
 ## Worker Protocol

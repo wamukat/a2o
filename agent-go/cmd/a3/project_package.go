@@ -32,8 +32,12 @@ type projectPackageRepo struct {
 }
 
 func loadProjectPackageConfig(packagePath string) (projectPackageConfig, error) {
+	return loadProjectPackageConfigFile(filepath.Join(packagePath, "project.yaml"))
+}
+
+func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, error) {
 	config := projectPackageConfig{Repos: map[string]projectPackageRepo{}}
-	projectFile := filepath.Join(packagePath, "project.yaml")
+	packagePath := filepath.Dir(projectFile)
 	legacyManifest := filepath.Join(packagePath, "manifest.yml")
 	if _, err := os.Stat(legacyManifest); err == nil {
 		return config, fmt.Errorf("manifest.yml is no longer supported; move runtime config into project.yaml: %s", legacyManifest)

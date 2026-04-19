@@ -154,7 +154,7 @@ func runRuntimeStart(args []string, runner commandRunner, stdout io.Writer, stde
 		return err
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
-	if _, err := buildRuntimeRunOncePlan(effectiveConfig, *maxSteps, *agentAttempts); err != nil {
+	if _, err := buildRuntimeRunOncePlan(effectiveConfig, *maxSteps, *agentAttempts, ""); err != nil {
 		return err
 	}
 	paths := schedulerPaths(effectiveConfig)
@@ -215,7 +215,7 @@ func runRuntimeStop(args []string, runner commandRunner, stdout io.Writer, stder
 		return err
 	}
 	running := schedulerProcessRunning(pid, paths.CommandFile, runner)
-	plan, planErr := buildRuntimeRunOncePlan(pathsConfig(config), "", "")
+	plan, planErr := buildRuntimeRunOncePlan(pathsConfig(config), "", "", "")
 	if running {
 		if err := runner.TerminateProcessGroup(pid); err != nil {
 			return err
@@ -683,6 +683,7 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 	flags.SetOutput(stderr)
 	maxSteps := flags.String("max-steps", "", "maximum runtime steps for this cycle")
 	agentAttempts := flags.String("agent-attempts", "", "maximum host agent attempts for this cycle")
+	projectConfig := flags.String("project-config", "", "explicit project config file, for example project-test.yaml")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -699,7 +700,7 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
 	return withEnv(runtimeRunOnceEnv(effectiveConfig, *maxSteps, *agentAttempts), func() error {
-		return runGenericRuntimeRunOnce(effectiveConfig, *maxSteps, *agentAttempts, runner, stdout)
+		return runGenericRuntimeRunOnce(effectiveConfig, *maxSteps, *agentAttempts, *projectConfig, runner, stdout)
 	})
 }
 
@@ -743,8 +744,8 @@ type runtimeRunOncePlan struct {
 	BranchNamespace      string
 }
 
-func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, agentAttempts string, runner commandRunner, stdout io.Writer) error {
-	plan, err := buildRuntimeRunOncePlan(config, maxSteps, agentAttempts)
+func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, agentAttempts string, projectConfig string, runner commandRunner, stdout io.Writer) error {
+	plan, err := buildRuntimeRunOncePlan(config, maxSteps, agentAttempts, projectConfig)
 	if err != nil {
 		return err
 	}
@@ -817,7 +818,7 @@ func ensureRuntimeLauncherConfig(plan runtimeRunOncePlan, stdout io.Writer) erro
 	return nil
 }
 
-func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agentAttempts string) (runtimeRunOncePlan, error) {
+func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agentAttempts string, projectConfig string) (runtimeRunOncePlan, error) {
 	hostRootDir := envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_ROOT_DIR", "A3_RUNTIME_RUN_ONCE_HOST_ROOT_DIR", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_ROOT_DIR", "A3_RUNTIME_SCHEDULER_HOST_ROOT_DIR", config.WorkspaceRoot))
 	if strings.TrimSpace(hostRootDir) == "" {
 		hostRootDir = "."
@@ -826,10 +827,17 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 	if strings.TrimSpace(referencePackagePath) == "" {
 		return runtimeRunOncePlan{}, errors.New("runtime package path is empty; run `a2o project bootstrap` from a workspace with ./a2o-project or ./project-package first")
 	}
-	packageConfig, err := loadProjectPackageConfig(referencePackagePath)
+	projectConfigPath := envDefaultValue(projectConfig, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PROJECT_CONFIG", "A3_RUNTIME_RUN_ONCE_PROJECT_CONFIG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PROJECT_CONFIG", "A3_RUNTIME_SCHEDULER_PROJECT_CONFIG", "")))
+	if strings.TrimSpace(projectConfigPath) == "" {
+		projectConfigPath = filepath.Join(referencePackagePath, "project.yaml")
+	} else if !filepath.IsAbs(projectConfigPath) {
+		projectConfigPath = filepath.Join(referencePackagePath, projectConfigPath)
+	}
+	packageConfig, err := loadProjectPackageConfigFile(projectConfigPath)
 	if err != nil {
 		return runtimeRunOncePlan{}, err
 	}
+	effectivePackagePath := filepath.Dir(projectConfigPath)
 	hostRoot := envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_ROOT", "A3_RUNTIME_RUN_ONCE_HOST_ROOT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_ROOT", "A3_RUNTIME_SCHEDULER_HOST_ROOT", filepath.Join(hostRootDir, runtimeHostAgentRelativePath)))
 	defaultWorkspaceRoot := filepath.Join(hostRoot, "workspaces")
 	if strings.TrimSpace(packageConfig.AgentWorkspaceRoot) != "" {
@@ -863,7 +871,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		workerCommand = "ruby"
 		workerArgs = []string{effectiveWorker}
 	}
-	agentSourcePaths, agentSourceAliases, localSourceAliases, repoSources, repoLabels := packageRuntimeRepoArgs(hostRootDir, referencePackagePath, packageConfig)
+	agentSourcePaths, agentSourceAliases, localSourceAliases, repoSources, repoLabels := packageRuntimeRepoArgs(hostRootDir, effectivePackagePath, packageConfig)
 	requiredBins := packageConfig.AgentRequiredBins
 	if len(requiredBins) == 0 {
 		requiredBins = []string{"git", "node"}
@@ -898,7 +906,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		RuntimePIDFile:       envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PID_FILE", "A3_RUNTIME_RUN_ONCE_PID_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PID_FILE", "A3_RUNTIME_SCHEDULER_PID_FILE", "/tmp/a2o-runtime-run-once.pid")),
 		ServerPIDFile:        envDefaultCompat("A2O_RUNTIME_RUN_ONCE_SERVER_PID_FILE", "A3_RUNTIME_RUN_ONCE_SERVER_PID_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_SERVER_PID_FILE", "A3_RUNTIME_SCHEDULER_SERVER_PID_FILE", "/tmp/a2o-runtime-run-once-agent-server.pid")),
 		PresetDir:            envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PRESET_DIR", "A3_RUNTIME_RUN_ONCE_PRESET_DIR", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PRESET_DIR", "A3_RUNTIME_SCHEDULER_PRESET_DIR", "/tmp/a3-engine/config/presets")),
-		ManifestPath:         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PROJECT_CONFIG", "A3_RUNTIME_RUN_ONCE_PROJECT_CONFIG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PROJECT_CONFIG", "A3_RUNTIME_SCHEDULER_PROJECT_CONFIG", filepath.Join(referencePackagePath, "project.yaml"))),
+		ManifestPath:         projectConfigPath,
 		SoloBoardInternalURL: envDefaultCompat("A2O_SOLOBOARD_INTERNAL_URL", "A3_SOLOBOARD_INTERNAL_URL", "http://soloboard:3000"),
 		LiveRef:              envDefaultCompat("A2O_RUNTIME_RUN_ONCE_LIVE_REF", "A3_RUNTIME_RUN_ONCE_LIVE_REF", envDefaultCompat("A2O_RUNTIME_SCHEDULER_LIVE_REF", "A3_RUNTIME_SCHEDULER_LIVE_REF", defaultLiveRef)),
 		AgentEnv: []string{

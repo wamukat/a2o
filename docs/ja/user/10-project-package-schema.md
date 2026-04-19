@@ -134,6 +134,8 @@ Template は phase-based executor form を使う。`--language` は `agent.requi
 
 `--output` が file を指す場合、generator は `project.yaml` を書く。`--with-skills` を付けると、implementation、review、parent review の starter skill も書き、生成した parent skill を参照する `parent_review` phase を追加する。Kanban bootstrap data は `kanban.project`、`kanban.labels`、`repos.<slot>.label` から derive される。A2O-owned lanes と internal coordination labels は `a2o kanban up` が provision する。
 
+`project.yaml` は通常の production profile である。Focused test profile は `project-test.yaml` のような別 file にしてよいが、利用時は `a2o project validate --config project-test.yaml` または `a2o runtime run-once --project-config project-test.yaml` で明示的に選択する。
+
 `runtime.phases.merge` は merge target、policy、target ref を持つ。値は scalar または variant maps にでき、current merge resolver behavior と一致する。
 
 `task_templates` は validation と onboarding のための optional metadata である。Task template entry は markdown task template を指す。Runtime task selection は引き続き kanban から行う。Task templates は default では auto-enqueue されない。

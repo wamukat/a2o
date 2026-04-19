@@ -31,6 +31,8 @@ func runProject(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 0
 	case "lint":
 		return runProjectLint(args[1:], stdout, stderr)
+	case "validate":
+		return runProjectValidate(args[1:], stdout, stderr)
 	case "template":
 		if err := runProjectTemplate(args[1:], stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)

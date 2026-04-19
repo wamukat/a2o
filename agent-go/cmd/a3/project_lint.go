@@ -20,9 +20,18 @@ const (
 )
 
 func runProjectLint(args []string, stdout io.Writer, stderr io.Writer) int {
-	flags := flag.NewFlagSet("a2o project lint", flag.ContinueOnError)
+	return runProjectLintCommand("a2o project lint", args, stdout, stderr)
+}
+
+func runProjectValidate(args []string, stdout io.Writer, stderr io.Writer) int {
+	return runProjectLintCommand("a2o project validate", args, stdout, stderr)
+}
+
+func runProjectLintCommand(commandName string, args []string, stdout io.Writer, stderr io.Writer) int {
+	flags := flag.NewFlagSet(commandName, flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	packagePath := flags.String("package", "", "project package directory")
+	configPath := flags.String("config", "", "project config file; defaults to project.yaml under --package")
 	workspaceRoot := flags.String("workspace", ".", "workspace root used when discovering ./a2o-project or ./project-package")
 	if err := flags.Parse(args); err != nil {
 		return 2
@@ -55,13 +64,22 @@ func runProjectLint(args []string, stdout io.Writer, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "lint_check name=%s status=%s detail=%s action=%s\n", name, lintStatusName(severity), singleLine(detail), singleLine(action))
 	}
 
-	config, err := loadProjectPackageConfig(absPackagePath)
+	effectiveConfigPath := filepath.Join(absPackagePath, "project.yaml")
+	allowFixtureConfigReferences := false
+	if strings.TrimSpace(*configPath) != "" {
+		effectiveConfigPath = *configPath
+		if !filepath.IsAbs(effectiveConfigPath) {
+			effectiveConfigPath = filepath.Join(absPackagePath, effectiveConfigPath)
+		}
+		allowFixtureConfigReferences = filepath.Base(effectiveConfigPath) != "project.yaml"
+	}
+	config, err := loadProjectPackageConfigFile(effectiveConfigPath)
 	if err != nil {
 		report("project_package", lintBlocked, err.Error(), "fix project.yaml or rerun a2o project template")
 		fmt.Fprintf(stdout, "lint_status=%s\n", lintStatusName(status))
 		return 1
 	}
-	report("project_package", lintOK, "project.yaml schema_version="+config.SchemaVersion+" package="+config.PackageName, "none")
+	report("project_package", lintOK, filepath.Base(effectiveConfigPath)+" schema_version="+config.SchemaVersion+" package="+config.PackageName, "none")
 	checkProjectScriptContract(absPackagePath, func(name string, ok bool, detail string, action string) {
 		severity := lintOK
 		if !ok {
@@ -70,7 +88,7 @@ func runProjectLint(args []string, stdout io.Writer, stderr io.Writer) int {
 		report(name, severity, detail, action)
 	})
 	checkProjectUserFacingContract(absPackagePath, report)
-	checkProjectFixtureReferences(absPackagePath, report)
+	checkProjectFixtureReferences(absPackagePath, effectiveConfigPath, allowFixtureConfigReferences, report)
 	checkProjectUnusedCommands(absPackagePath, report)
 
 	fmt.Fprintf(stdout, "lint_status=%s\n", lintStatusName(status))
@@ -158,16 +176,21 @@ func isUserFacingLintScanTarget(packagePath string, path string) bool {
 	}
 }
 
-func checkProjectFixtureReferences(packagePath string, report func(string, lintSeverity, string, string)) {
+func checkProjectFixtureReferences(packagePath string, configPath string, allowConfigFixtureReferences bool, report func(string, lintSeverity, string, string)) {
 	findings := []string{}
-	projectFile := filepath.Join(packagePath, "project.yaml")
-	body, err := os.ReadFile(projectFile)
+	body, err := os.ReadFile(configPath)
 	if err != nil {
-		report("fixture_reference", lintBlocked, err.Error(), "inspect project.yaml")
+		report("fixture_reference", lintBlocked, err.Error(), "inspect project config")
 		return
 	}
-	for _, finding := range fixtureReferenceFindings("project.yaml", string(body)) {
-		findings = append(findings, finding)
+	if !allowConfigFixtureReferences {
+		label, _ := filepath.Rel(packagePath, configPath)
+		if label == "" || strings.HasPrefix(label, "..") {
+			label = filepath.Base(configPath)
+		}
+		for _, finding := range fixtureReferenceFindings(filepath.ToSlash(label), string(body)) {
+			findings = append(findings, finding)
+		}
 	}
 
 	commandsDir := filepath.Join(packagePath, "commands")

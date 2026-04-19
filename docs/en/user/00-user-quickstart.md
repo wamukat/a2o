@@ -63,6 +63,15 @@ a2o project lint --package ./project-package
 
 `a2o project lint` checks `project.yaml`, legacy split files, production config references to test fixtures, user-facing A3/internal runtime leaks, and command files that are not referenced by package docs or config. Blocked findings should be fixed before runtime execution. Warning findings should be reviewed and either removed or documented.
 
+If you maintain a focused test profile, keep it in a separate file and validate it explicitly:
+
+```sh
+a2o project validate --package ./project-package --config project-test.yaml
+a2o runtime run-once --project-config project-test.yaml
+```
+
+Fixture workers may be referenced from the explicit alternate config, but normal `project.yaml` must stay production-oriented.
+
 ### 3. Start With Four Commands
 
 ```sh

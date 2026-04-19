@@ -1407,6 +1407,7 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 		"doctor_check name=project_package status=ok",
 		"doctor_check name=executor_config status=ok detail=commands=sh",
 		"doctor_check name=project_script_contract status=ok detail=public A2O script contract only",
+		"doctor_check name=fixture_reference status=ok detail=no production config fixture references",
 		"doctor_check name=agent_required_command.sh status=ok",
 		"doctor_check name=repo_clean.app status=ok detail=" + repoDir,
 		"doctor_check name=agent_install status=ok",
@@ -1415,6 +1416,83 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 		"doctor_check name=runtime_container status=ok detail=A2O runtime container=runtime-container",
 		"doctor_check name=runtime_image_digest status=ok detail=ghcr.io/wamukat/a2o-engine@sha256:test",
 		"doctor_status=ok",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("doctor output missing %q in:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestDoctorFlagsFixtureReferencesInProductionProjectYaml(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	repoDir := filepath.Join(tempDir, "repo")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(repoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectYaml := strings.Join([]string{
+		"schema_version: 1",
+		"package:",
+		"  name: sample",
+		"kanban:",
+		"  project: Sample",
+		"repos:",
+		"  app:",
+		"    path: ../repo",
+		"agent:",
+		"  required_bins: [\"sh\"]",
+		"runtime:",
+		"  phases:",
+		"    implementation:",
+		"      skill: skills/implementation/base.md",
+		"      executor:",
+		"        command: [\"tests/fixtures/dummy-worker.sh\", \"--result\", \"{{result_path}}\"]",
+		"    review:",
+		"      skill: skills/review/default.md",
+		"    merge:",
+		"      target: merge_to_live",
+		"      policy: ff_only",
+		"      target_ref: refs/heads/main",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-sample",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+	})
+	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
+	if err := os.MkdirAll(filepath.Dir(agentPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(agentPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"doctor"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("doctor should fail for production fixture references, stdout=%s", stdout.String())
+		}
+	})
+
+	for _, want := range []string{
+		"doctor_check name=fixture_reference status=blocked",
+		"project.yaml:tests/fixtures",
+		"project.yaml:dummy-worker",
+		"doctor_status=blocked",
 	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("doctor output missing %q in:\n%s", want, stdout.String())
@@ -1672,6 +1750,45 @@ func TestProjectLintFlagsFixtureAndLegacyLeaks(t *testing.T) {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("project lint output missing %q in:\n%s", want, stdout.String())
 		}
+	}
+}
+
+func TestProjectLintAllowsFixtureReferencesOnlyForExplicitAlternateConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(filepath.Join(packageDir, "tests", "fixtures"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	testConfig := strings.ReplaceAll(readFileString(t, filepath.Join(packageDir, "project.yaml")), "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb", "tests/fixtures/deterministic-worker.rb")
+	if err := os.WriteFile(filepath.Join(packageDir, "project-test.yaml"), []byte(testConfig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "tests", "fixtures", "deterministic-worker.rb"), []byte("puts 'ok'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "lint", "--package", packageDir, "--config", "project-test.yaml"}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("alternate config lint should pass, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+	if strings.Contains(stdout.String(), "project-test.yaml:tests/fixtures") {
+		t.Fatalf("explicit alternate config should allow fixture references, got:\n%s", stdout.String())
+	}
+
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(testConfig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"project", "lint", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("normal project.yaml lint should fail when it references fixtures")
+	}
+	if !strings.Contains(stdout.String(), "project.yaml:tests/fixtures") {
+		t.Fatalf("normal project.yaml should report fixture reference, got:\n%s", stdout.String())
 	}
 }
 
@@ -2075,6 +2192,52 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	}
 	if runner.lastEnv["A3_HOST_AGENT_BIN"] != filepath.Join(tempDir, ".work", "a2o", "agent", "bin", "a2o-agent") {
 		t.Fatalf("agent bin env=%q", runner.lastEnv["A3_HOST_AGENT_BIN"])
+	}
+}
+
+func TestRuntimeRunOnceUsesExplicitProjectConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	testConfig := strings.ReplaceAll(readFileString(t, filepath.Join(packageDir, "project.yaml")), "A2OReferenceMultiRepo", "A2OReferenceMultiRepoTest")
+	testConfig = strings.ReplaceAll(testConfig, "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb", "tests/fixtures/deterministic-worker.rb")
+	if err := os.WriteFile(filepath.Join(packageDir, "project-test.yaml"), []byte(testConfig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once", "--project-config", "project-test.yaml", "--max-steps", "1", "--agent-attempts", "2"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(joined, "'"+filepath.Join(packageDir, "project-test.yaml")+"'") {
+		t.Fatalf("run-once should pass explicit project config to runtime, calls:\n%s", joined)
+	}
+	if !strings.Contains(joined, "'--kanban-project' 'A2OReferenceMultiRepoTest'") {
+		t.Fatalf("run-once should load kanban project from explicit config, calls:\n%s", joined)
+	}
+	launcherConfig := filepath.Join(tempDir, runtimeHostAgentRelativePath, "launcher.json")
+	if !strings.Contains(readFileString(t, launcherConfig), "tests/fixtures/deterministic-worker.rb") {
+		t.Fatalf("launcher config should come from explicit project config:\n%s", readFileString(t, launcherConfig))
 	}
 }
 
