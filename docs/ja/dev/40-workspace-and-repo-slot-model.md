@@ -2,6 +2,10 @@
 
 この文書は workspace topology、repo slot、source synchronization、freshness、retention、merge behavior を定義する。
 
+## Runtime flow 上の位置づけ
+
+この文書は、Engine が phase job を準備するときに、どの Git source をどの workspace に materialize し、どの branch namespace に publish / merge するかを扱う。Project package の repo slot はここで runtime identity になり、a2o-agent はその identity から product repository を操作する。
+
 ## Goals
 
 - Product repository layout を Engine core へ持ち込まない。

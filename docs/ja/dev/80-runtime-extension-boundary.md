@@ -2,6 +2,10 @@
 
 A2O Engine core は project-neutral に保つ。Project-specific behavior は project packages、command profiles、hook scripts、task templates、agent-side toolchains を通じて注入する。
 
+## Runtime flow 上の位置づけ
+
+この文書は、runtime flow のどこまでを A2O core が持ち、どこからを project package / command / skill に委譲するかを定義する。新しい要件が出たとき、core behavior と project-specific extension のどちらに置くべきかを判断するために読む。
+
 ## Core が知ってよいもの
 
 - task lifecycle phases

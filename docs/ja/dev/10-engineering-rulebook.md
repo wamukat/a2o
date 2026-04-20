@@ -2,6 +2,10 @@
 
 この文書は A2O の日常的な engineering rule を定義する。Design document は何を作るかを定義し、この文書はどう作るかを定義する。
 
+## Runtime flow 上の位置づけ
+
+この文書は、A2O Engine、host launcher、a2o-agent、project package、kanban adapter のどこを変更する場合にも適用する開発規律である。Runtime flow の個別設計は各詳細文書が扱い、この文書は変更時の判断基準、test 追加、review standard、public/internal boundary の守り方を定める。
+
 ## Core Rules
 
 - Domain object は immutable を優先する。

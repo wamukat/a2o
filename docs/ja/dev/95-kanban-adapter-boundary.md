@@ -1,5 +1,7 @@
 # Kanban Adapter Boundary（kanban adapter の境界）
 
+この文書は、A2O Engine が kanban task を読み書きするときの adapter 境界を定義する。Runtime flow では、scheduler の task selection、status publishing、comment/evidence reporting、parent-child relation 管理がこの境界を通る。
+
 ## Current Contract（現在の contract）
 
 A2O engine は現在、`tools/kanban/cli.py` と互換の command contract を通じて Kanban と通信する。Runtime は次の operations を使う。

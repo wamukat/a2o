@@ -2,6 +2,10 @@
 
 この文書は、A2O で使う vocabulary と bounded context を定義する。Domain、workspace、evidence、implementation document はこの用語を使う。
 
+## Runtime flow 上の位置づけ
+
+この文書は、kanban task が scheduler に pickup され、Engine が phase job を作り、a2o-agent が job を実行し、evidence と kanban state が更新されるまでの言葉を揃える。詳細文書で出てくる Task、Run、Phase、Workspace、Project Package、Operator Inspection は、この bounded context に沿って読む。
+
 ## Design Stance
 
 A2O は code structure の都合ではなく domain meaning によって概念を命名する。

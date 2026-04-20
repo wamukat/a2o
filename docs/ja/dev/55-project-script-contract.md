@@ -2,6 +2,10 @@
 
 A2O は project package が product 固有の automation を持つことを許容する。Package script は Ruby、Bash、Go、Python、Node、その他 project-local な選択でよい。安定させる境界は script の言語ではなく、A2O が提供する command、environment、request、result、workspace、evidence の contract である。
 
+## Runtime flow 上の位置づけ
+
+この文書は、A2O Engine が phase job を作り、a2o-agent が project command を実行するときの contract を定義する。Project script は workspace layout を推測せず、公開 environment variables と worker request JSON を source of truth として扱う。
+
 ## 責務
 
 A2O が所有するもの:

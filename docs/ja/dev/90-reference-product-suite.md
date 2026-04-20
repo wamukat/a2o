@@ -2,6 +2,10 @@
 
 この文書は、A2O core validation で使う owned sample products を定義する。
 
+## Runtime flow 上の位置づけ
+
+この文書は、A2O の runtime flow が特定 product に依存せず動くことを検証する reference products を定義する。Workspace、agent gateway、verification、merge、parent-child flow、diagnostics の変更は、少なくとも 1 つの reference product で再現・検証できる状態にする。
+
 ## 目的
 
 A2O は 1 つの stack に依存せず、一般的な product shapes で動作する必要がある。Reference suite は、runtime、agent、kanban、verification、merge、parent-child flows を exercise する小さく review しやすい projects を A2O に提供する。

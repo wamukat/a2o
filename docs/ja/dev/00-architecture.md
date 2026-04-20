@@ -4,6 +4,24 @@
 
 設計資料の入口として、まず全体の流れを押さえ、その後で domain model、workspace、agent gateway、kanban adapter などの詳細へ進む。
 
+## 読み進め方
+
+まずこの文書で runtime flow と責務境界を把握する。次に、知りたい設計面に合わせて詳細文書を読む。
+
+| 知りたいこと | 次に読む文書 |
+| --- | --- |
+| 日常的な開発判断と review standard | [10-engineering-rulebook.md](10-engineering-rulebook.md) |
+| A2O の用語と bounded context | [20-bounded-context-and-language.md](20-bounded-context-and-language.md) |
+| Task、Run、Phase、Evidence の domain model | [30-core-domain-model.md](30-core-domain-model.md) |
+| Workspace、repo slot、branch namespace | [40-workspace-and-repo-slot-model.md](40-workspace-and-repo-slot-model.md) |
+| Project package に公開する設定面 | [50-project-surface.md](50-project-surface.md) |
+| Project command / worker contract | [55-project-script-contract.md](55-project-script-contract.md) |
+| Evidence、blocked diagnosis、rerun | [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md) |
+| a2o-agent との job 境界 | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
+| Core と project extension の境界 | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
+| Reference product による validation | [90-reference-product-suite.md](90-reference-product-suite.md) |
+| Kanban adapter と SoloBoard 境界 | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
+
 ## A2O が実現する runtime flow
 
 A2O は「kanban task を AI 実行可能な job に変換し、検証と merge までを traceable に進める」runtime である。

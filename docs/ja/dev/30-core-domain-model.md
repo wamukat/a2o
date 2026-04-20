@@ -2,6 +2,10 @@
 
 この文書は、A2O の core domain object と責務境界を定義する。
 
+## Runtime flow 上の位置づけ
+
+この文書は、scheduler が kanban task を処理対象として選んだ後、Engine が task lifecycle をどう表現するかを扱う。Task、Run、Phase、Scope Snapshot、Source Descriptor、Evidence は、a2o-agent へ job を渡す前後の判断と、結果を kanban / evidence に戻す判断の source of truth である。
+
 ## Model Principles
 
 - Domain object は原則 immutable にする。

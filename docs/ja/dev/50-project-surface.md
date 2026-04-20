@@ -3,6 +3,10 @@
 この文書は、project が所有する設定面を小さく保つためのもの。
 project package は product 固有知識を表現するが、`project.yaml` を無制限な Engine 設定ファイルにしてはならない。
 
+## Runtime flow 上の位置づけ
+
+この文書は、利用者が管理する project package と、A2O Engine が所有する runtime behavior の境界を扱う。`project.yaml` は task selection、repo slot、phase command、skill、verification/remediation、merge policy を渡す入力であり、scheduler、workspace topology、evidence model、kanban provider implementation を再定義する場所ではない。
+
 ## 1. 目的
 
 - project 固有の注入点を最小限に保つ。

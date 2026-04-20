@@ -2,6 +2,10 @@
 
 この文書は、A2O が evidence を記録し、blocked run を診断し、rerun 判断を支援する方法を定義する。
 
+## Runtime flow 上の位置づけ
+
+この文書は、phase job の実行結果を operator が後から追える形に残し、blocked task を安全に再実行できるようにする設計を扱う。Evidence は transient log の代替ではなく、Task、Run、Phase、Source Descriptor、Artifact Owner に結びつく runtime state である。
+
 ## Goals
 
 - Transient log が消えた後も completed / blocked run を inspect できるようにする。

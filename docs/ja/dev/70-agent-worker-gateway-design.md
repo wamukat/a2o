@@ -2,6 +2,10 @@
 
 Agent worker gateway は、A2O Engine が project-local な作業を host または project dev-env で動く `a2o-agent` process へ委譲するための境界である。これにより、project toolchain を runtime image の外へ置いたまま、Engine-owned orchestration を維持できる。
 
+## Runtime flow 上の位置づけ
+
+この文書は、Engine が準備した phase job を a2o-agent に渡し、agent が生成AIや product toolchain を使って変更・検証し、result と artifact を Engine に戻す境界を扱う。Engine は lifecycle と evidence を所有し、agent は materialized workspace での command execution を所有する。
+
 ## 目的
 
 - Engine は task selection、phase transitions、workspace metadata、evidence、merge decisions を所有する。
