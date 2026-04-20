@@ -47,12 +47,6 @@ A2O 0.5.5 は `docker/a3-runtime/Dockerfile` に `python3` を残すが、`pytho
 
 `A3::Infra::KanbanCommandClient` は operation-level boundary であり、task source、status publisher、activity publisher、follow-up child writer、snapshot reader が使う。Constructors は `command_argv` を受け取り、`SubprocessKanbanCommandClient` を作成する。そのため、runtime behavior と public CLI arguments は安定する。
 
-この boundary により、tests and adapters は typed seam を得る。
-
-- adapters は Python を spawn せずに exercise できる。
-- subprocess-specific な Open3 と tempfile の details は 1 class に閉じる。
-- Python CLI command contract は維持される。
-
 ## Compatibility Requirements（互換要件）
 
 Native adapter は次を維持しなければならない。

@@ -345,8 +345,3 @@ runtime:
 3. Reference product packages は single-file `project.yaml` を使う。
 4. Package loading は unsupported split config files を reject する。
 5. Package schema、docs、normal diagnostics は A2O-facing names を使う。
-
-## 実装 notes
-
-- Schema は A2O-facing fields を current internal Ruby runtime structures へ translate してよい。ただし errors と docs は、users に A3 names を author するよう求めてはならない。
-- Internal follow-up labels は runtime defaults を持つべきである。Advanced overrides は、実 product が必要とした場合だけ追加する。
