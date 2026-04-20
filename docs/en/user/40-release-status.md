@@ -1,4 +1,4 @@
-# A2O 0.5.2 Release Status
+# A2O 0.5.3 Release Status
 
 ## Ready
 
@@ -10,12 +10,13 @@
 - Foreground runtime execution: `a2o runtime run-once`, `a2o runtime loop`
 - Resident scheduler lifecycle: `a2o runtime start`, `stop`, `status`
 - Runtime diagnosis: `a2o runtime doctor`, `a2o runtime watch-summary`, `a2o runtime describe-task <task-ref>`
+- Upgrade diagnosis: `a2o upgrade check`
 - Single-file project package config: `project.yaml`
 - SoloBoard adapter and bootstrap tooling, defaulting to SoloBoard `v0.9.15`
 - Agent HTTP worker gateway
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates
-- GHCR image publication with `latest`, `0.5.2`, and `sha-*` tags on main
+- GHCR image publication with `latest`, `0.5.3`, and `sha-*` tags on main
 - Full RSpec release gate passing locally
 
 ## Validation Scope

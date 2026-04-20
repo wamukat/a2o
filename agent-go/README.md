@@ -14,7 +14,7 @@ go build -o /tmp/a2o ./cmd/a3
 For release-style builds:
 
 ```sh
-VERSION=0.5.2 ./scripts/build-release.sh
+VERSION=0.5.3 ./scripts/build-release.sh
 ```
 
 This writes binaries and release archives under `dist/` for:
@@ -27,7 +27,7 @@ This writes binaries and release archives under `dist/` for:
 Release output includes:
 
 - platform binary directories, for example `dist/linux-amd64/a3-agent` and `dist/linux-amd64/a3`; `a2o host install` writes public `a2o-*` launcher names from these binaries
-- archives, for example `dist/a3-agent-0.5.2-linux-amd64.tar.gz`
+- archives, for example `dist/a3-agent-0.5.3-linux-amd64.tar.gz`
 - `dist/checksums.txt`
 - `dist/release-manifest.jsonl`
 
@@ -47,14 +47,14 @@ By default this installs compatibility binaries under `$HOME/.local/bin`. Public
 Install from a release archive when Go is not required on the target host:
 
 ```sh
-./scripts/install-release.sh dist/a3-agent-0.5.2-linux-amd64.tar.gz
+./scripts/install-release.sh dist/a3-agent-0.5.3-linux-amd64.tar.gz
 ```
 
 Verify the release checksum before installing:
 
 ```sh
 CHECKSUM_FILE=dist/checksums.txt \
-./scripts/install-release.sh dist/a3-agent-0.5.2-linux-amd64.tar.gz
+./scripts/install-release.sh dist/a3-agent-0.5.3-linux-amd64.tar.gz
 ```
 
 The installer installs `a2o-agent` and compatibility alias `a3-agent`. It does not install or enable OS service definitions. Standard A2O operation uses `a2o host install`, `a2o project bootstrap`, `a2o kanban ...`, `a2o agent install`, and `a2o runtime ...`; direct agent loop commands are compatibility / diagnostic tools for operators and developers.
@@ -69,11 +69,11 @@ Install the host launcher from a published A2O Engine image:
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share"
 docker run --rm \
   -v "$HOME/.local:/install" \
-  ghcr.io/wamukat/a2o-engine:0.5.2 \
+  ghcr.io/wamukat/a2o-engine:0.5.3 \
   a2o host install \
     --output-dir /install/bin \
     --share-dir /install/share/a2o \
-    --runtime-image ghcr.io/wamukat/a2o-engine:0.5.2
+    --runtime-image ghcr.io/wamukat/a2o-engine:0.5.3
 ```
 
 The container command copies platform binaries such as `a2o-darwin-amd64` and `a2o-linux-amd64`, copies A2O distribution assets such as the standard compose file under `$HOME/.local/share/a2o`, records the runtime image used by later `a2o kanban ...` commands, then writes a host-side `a2o` shell wrapper that selects the right binary with `uname`. Compatibility `a3` launchers are also installed. Mount the install prefix, not only the `bin` directory, so the share assets are exported to the host. The host does not need Ruby.

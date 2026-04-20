@@ -61,9 +61,9 @@ Project package が持たないもの:
 - agent materializer configuration script（agent materializer 設定 script）
 - release asset export logic（release asset 書き出し logic）
 
-## Release 0.5.2 の公開 surface
+## Release 0.5.3 の公開 surface
 
-A2O 0.5.2 は、local-first runtime image、host launcher、agent package として配布する。標準 validation surface は reference product suite である。SoloBoard pickup and transitions、agent-materialized workspaces、agent HTTP worker gateway、verification、merge、parent-child flow、watch summary、describe-task diagnostics、evidence persistence を確認する。
+A2O 0.5.3 は、local-first runtime image、host launcher、agent package として配布する。標準 validation surface は reference product suite である。SoloBoard pickup and transitions、agent-materialized workspaces、agent HTTP worker gateway、verification、merge、parent-child flow、watch summary、describe-task diagnostics、evidence persistence を確認する。
 
 Public launcher は host install、check-only upgrade planning、project bootstrap、kanban service lifecycle、kanban diagnosis、URL discovery、agent install、runtime container up/down、one-shot runtime execution、foreground runtime loop、resident scheduler start/stop/status、runtime diagnosis、multi-task watch summary、task/run observability を扱う。
 

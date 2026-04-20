@@ -82,4 +82,4 @@ Projects may choose policy and live target ref, but they do not choose `merge_to
 
 ## Presets
 
-The 0.5.2 public package format is single-file `project.yaml`. Internal presets may remain implementation details, but package authors should not have to manage separate preset or manifest files.
+The 0.5.3 public package format is single-file `project.yaml`. Internal presets may remain implementation details, but package authors should not have to manage separate preset or manifest files.
