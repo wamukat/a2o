@@ -44,7 +44,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ## 2. Project package を作る
 
-Workspace root に `project-package/` または `a2o-project/` を置く。
+Workspace root に `project-package/` を置く。この quickstart では、この directory を標準 package path として扱う。
 
 ```text
 project-package/
@@ -95,10 +95,10 @@ a2o project bootstrap
 
 `project bootstrap` は `.work/a2o/runtime-instance.json` を作る。以後の `kanban`、`agent`、`runtime` command はこの instance config を見つけて同じ runtime instance を使う。
 
-Package path、port、compose project を変えたい場合だけ option を指定する。
+Port、compose project を変えたい場合だけ option を指定する。
 
 ```sh
-a2o project bootstrap --package ./project-package --compose-project my-product --soloboard-port 3471 --agent-port 7394
+a2o project bootstrap --compose-project my-product --soloboard-port 3471 --agent-port 7394
 ```
 
 ## 5. Kanban を起動する
