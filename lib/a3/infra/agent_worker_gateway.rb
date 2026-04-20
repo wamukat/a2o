@@ -364,8 +364,7 @@ module A3
 
       def with_agent_job_result(execution, result)
         diagnostics = execution.diagnostics.merge(
-          "agent_job_result" => result.result_form,
-          "control_plane_url" => control_plane_url
+          "agent_artifacts" => agent_artifacts_from_result(result)
         )
         A3::Application::ExecutionResult.new(
           success: execution.success,
@@ -375,6 +374,10 @@ module A3
           diagnostics: diagnostics,
           response_bundle: execution.response_bundle
         )
+      end
+
+      def agent_artifacts_from_result(result)
+        (result.log_uploads + result.artifact_uploads).map(&:persisted_form)
       end
 
       def log_request_start(workspace:, task:, run:, skill:)

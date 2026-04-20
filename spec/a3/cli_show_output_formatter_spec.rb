@@ -848,4 +848,62 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     expect(result).to include("review_disposition_summary=No findings")
     expect(result).to include("review_disposition_description=Implementation finished and final self-review found no outstanding issues.")
   end
+
+  it "formats agent artifacts without leaking control-plane diagnostics" do
+    artifact = {
+      "artifact_id" => "worker-run-combined-log",
+      "role" => "combined-log",
+      "retention_class" => "diagnostic",
+      "media_type" => "text/plain",
+      "byte_size" => 42
+    }
+    run_view = A3::Domain::OperatorInspectionReadModel::RunView.new(
+      ref: "run-impl-1",
+      task_ref: "A2O#92",
+      task_kind: :single,
+      phase: :implementation,
+      workspace_kind: :runtime_workspace,
+      source_type: :detached_commit,
+      source_ref: "abc123",
+      terminal_outcome: :completed,
+      evidence_summary: A3::Domain::OperatorInspectionReadModel::EvidenceSummary.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :detached_commit,
+        source_ref: "abc123",
+        review_base: nil,
+        review_head: nil,
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        ownership_scope: :task,
+        artifact_owner_ref: "A2O#92",
+        artifact_owner_scope: :task,
+        artifact_snapshot_version: "abc123",
+        phase_records_count: 1
+      ),
+      latest_execution: A3::Domain::OperatorInspectionReadModel::RunView::ExecutionSnapshot.new(
+        phase: :implementation,
+        summary: "implementation completed",
+        verification_summary: nil,
+        failing_command: nil,
+        observed_state: nil,
+        diagnostics: {
+          "agent_artifacts" => [artifact],
+          "control_plane_url" => "http://127.0.0.1:7393"
+        },
+        worker_response_bundle: nil,
+        runtime_snapshot: nil,
+        review_disposition: nil,
+        agent_artifacts: [artifact]
+      ),
+      latest_blocked_diagnosis: nil,
+      rerun_decision: nil,
+      recovery: nil
+    )
+
+    result = described_class.run_lines(run_view)
+
+    expect(result).to include("agent_artifact role=combined-log id=worker-run-combined-log retention=diagnostic media_type=text/plain byte_size=42")
+    expect(result).to include("agent_artifact_read=a2o runtime show-artifact worker-run-combined-log")
+    expect(result).not_to include(a_string_matching(/control_plane_url/))
+  end
 end

@@ -84,7 +84,7 @@ module A3
           result << "worker_response_bundle=#{FormattingHelpers.diagnostic_value(execution.worker_response_bundle)}" if execution.worker_response_bundle
           append_agent_artifact_lines(result, execution.agent_artifacts)
           append_merge_recovery_lines(result, execution.merge_recovery)
-          execution.diagnostics.reject { |key, _| %w[merge_recovery agent_job_result].include?(key) }.sort.each do |key, value|
+          execution.diagnostics.reject { |key, _| %w[merge_recovery agent_job_result agent_artifacts control_plane_url].include?(key) }.sort.each do |key, value|
             result << "execution_diagnostic.#{key}=#{FormattingHelpers.diagnostic_value(value)}"
           end
           append_runtime_lines(result, execution.runtime_snapshot)

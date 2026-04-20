@@ -29,6 +29,7 @@ module A3
         return unsupported_workspace_result unless %w[same-path agent-materialized].include?(@shared_workspace_mode)
 
         summaries = []
+        artifacts = []
         Array(commands).each do |command|
           request = build_job_request(command: command, workspace: workspace, env: env, task: task, run: run, command_intent: command_intent, worker_protocol_request: worker_protocol_request)
           record = enqueue(request)
@@ -41,9 +42,16 @@ module A3
           return failed_command_result(command: command, result: result) unless result.succeeded?
 
           summaries << "#{command} ok"
+          artifacts.concat(agent_artifacts_from_result(result))
         end
 
-        A3::Application::ExecutionResult.new(success: true, summary: summaries.join("; "))
+        A3::Application::ExecutionResult.new(
+          success: true,
+          summary: summaries.join("; "),
+          diagnostics: {
+            "agent_artifacts" => artifacts
+          }
+        )
       end
 
       private
@@ -139,6 +147,10 @@ module A3
             "agent_job_result" => result.result_form
           }
         )
+      end
+
+      def agent_artifacts_from_result(result)
+        (result.log_uploads + result.artifact_uploads).map(&:persisted_form)
       end
 
       def unsupported_workspace_result

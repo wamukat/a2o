@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "digest"
 require "spec_helper"
 
 RSpec.describe A3::Infra::AgentCommandRunner do
@@ -61,6 +62,10 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(request.phase).to eq(:verification)
     expect(request.runtime_profile).to eq("docker-dev-env")
     expect(result).to have_attributes(success?: true, summary: "task test:all ok")
+    expect(result.diagnostics.fetch("agent_artifacts").fetch(0)).to include(
+      "artifact_id" => "command-run-1-verification-job-1-combined-log",
+      "role" => "combined-log"
+    )
   end
 
   it "returns agent result diagnostics when a verification command fails" do
@@ -186,7 +191,16 @@ RSpec.describe A3::Infra::AgentCommandRunner do
       started_at: "2026-04-11T08:00:00Z",
       finished_at: "2026-04-11T08:00:01Z",
       summary: "agent #{status}",
-      log_uploads: [],
+      log_uploads: [
+        A3::Domain::AgentArtifactUpload.new(
+          artifact_id: "#{job_id}-combined-log",
+          role: "combined-log",
+          digest: "sha256:#{Digest::SHA256.hexdigest('agent log')}",
+          byte_size: "agent log".bytesize,
+          retention_class: :diagnostic,
+          media_type: "text/plain"
+        )
+      ],
       artifact_uploads: [],
       workspace_descriptor: A3::Domain::AgentWorkspaceDescriptor.new(
         workspace_kind: :runtime_workspace,

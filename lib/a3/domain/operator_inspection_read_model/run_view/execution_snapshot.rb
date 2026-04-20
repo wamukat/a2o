@@ -50,6 +50,9 @@ module A3
           end
 
           def self.agent_artifacts_from_diagnostics(diagnostics)
+            direct_artifacts = diagnostics["agent_artifacts"]
+            return Array(direct_artifacts) if direct_artifacts.is_a?(Array)
+
             result = diagnostics["agent_job_result"]
             return [] unless result.is_a?(Hash)
 
