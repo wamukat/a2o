@@ -87,6 +87,7 @@ repos:
     label: repo:app
 
 agent:
+  workspace_root: .work/a2o/agent/workspaces
   required_bins:
     - git
     - node
@@ -94,6 +95,8 @@ agent:
     - your-ai-worker
 
 runtime:
+  max_steps: 20
+  agent_attempts: 200
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -109,6 +112,9 @@ runtime:
     remediation:
       commands:
         - app/project-package/commands/format.sh
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
 ```
 
 各 section の考え方は次の通りである。
