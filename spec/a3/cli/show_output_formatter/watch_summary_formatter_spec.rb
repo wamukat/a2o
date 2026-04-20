@@ -40,13 +40,13 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
     lines = described_class.lines(summary)
 
     expect(lines[0]).to include("\e[36mScheduler: idle\e[0m")
-    expect(lines).to include(a_string_matching(/○ idle\s+… waiting\s+│\s+· none\s+│\s+Merging ─+┐$/))
-    expect(lines).to include(a_string_matching(/▷ next\s+▶ running\s+│\s+▶ running\s+│\s+Inspecting ─+┐\s+│$/))
-    expect(lines).to include(a_string_matching(/✔ automation done\s+│\s+✔ phase done\s*│\s+Review ─+┐\s+│\s+│$/))
-    expect(lines).to include(a_string_matching(/✖ blocked\s+│\s+✖ blocked\s+│\s+Implementation ─+┐\s+│\s+│\s+│$/))
+    expect(lines).to include("[_] idle     [.] waiting  |  . : none     |                  Merging -----------+")
+    expect(lines).to include("[*] next     [>] running  |  > : running  |               Inspecting ---------+ |")
+    expect(lines).to include("[o] done     [!] blocked  |  o : done     |                   Review -------+ | |")
+    expect(lines).to include("                          |  ! : blocked  |           Implementation -----+ | | |")
     expect(lines).to include("\e[36mTask Tree\e[0m")
-    expect(lines).to include(a_string_including("\e[36m▷ #1"))
-    expect(lines).to include(a_string_including("\e[31m✖   #2"))
+    expect(lines).to include(a_string_including("\e[36m[*] #1"))
+    expect(lines).to include(a_string_including("\e[31m[!]   #2"))
   end
 
   it "shows review-phase tasks as running when running_entry is present" do
@@ -82,8 +82,38 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
 
     lines = described_class.lines(summary).join("\n")
 
-    expect(lines).to include("✔/▶/·/·")
+    expect(lines).to include("o/>/./.")
     expect(lines).to include("- #3141 review/review/running_command hb=?")
+  end
+
+  it "uses ASCII task and phase symbols" do
+    summary = Struct.new(:scheduler_paused, :scheduler_paused_at, :tasks, :next_candidates, :running_entries).new(
+      false,
+      nil,
+      [
+        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+          "Sample#3141",
+          nil,
+          "Review task",
+          false,
+          true,
+          false,
+          false,
+          false,
+          "review",
+          { "implementation" => 1, "review" => 1 },
+          []
+        )
+      ],
+      [],
+      []
+    )
+
+    lines = described_class.lines(summary)
+
+    expect(lines.join("\n")).to include("o/>/./.")
+    expect(lines.join("\n")).to include("[>] #3141")
+    expect(lines).to include(a_string_matching(/Merging -+\+$/))
   end
 
   it "shows scheduler as running when a running entry exists" do
@@ -145,7 +175,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
     lines = described_class.lines(summary)
     orphan_line = lines.find { |line| line.include?("#3166") }
 
-    expect(orphan_line).to include("✔ #3166")
-    expect(orphan_line).not_to include("✔   #3166")
+    expect(orphan_line).to include("[o] #3166")
+    expect(orphan_line).not_to include("[o]   #3166")
   end
 end

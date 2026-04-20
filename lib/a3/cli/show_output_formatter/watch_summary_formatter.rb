@@ -13,43 +13,35 @@ module A3
           cyan: "\e[36m"
         }.freeze
         TASK_SYMBOLS = {
-          idle: "○",
-          waiting: "…",
-          next: "▷",
-          running: "▶",
-          done: "✔",
-          blocked: "✖"
+          idle: "_",
+          waiting: ".",
+          next: "*",
+          running: ">",
+          done: "o",
+          blocked: "!"
         }.freeze
         PHASE_SYMBOLS = {
-          pending: "·",
-          done: "✔",
-          running: "▶",
-          blocked: "✖"
+          pending: ".",
+          done: "o",
+          running: ">",
+          blocked: "!"
         }.freeze
-        DISPLAY_WIDTH_OVERRIDES = {
-          "○" => 1,
-          "…" => 1,
-          "▷" => 1,
-          "▶" => 1,
-          "✔" => 1,
-          "✖" => 1,
-          "·" => 1,
-          "─" => 1,
-          "│" => 1,
-          "┬" => 1,
-          "┐" => 1,
-          "┤" => 1,
-          "├" => 1,
-          "└" => 1,
-          "┘" => 1,
-          "┼" => 1
+        BOX = {
+          horizontal: "-",
+          vertical: "|",
+          corner: "+"
         }.freeze
         PHASE_ORDER = %w[implementation review inspection merge].freeze
-        TREE_REF_MIN_WIDTH = 10
-        TREE_TITLE_WIDTH = 64
+        TREE_REF_MIN_WIDTH = 9
+        TREE_TITLE_WIDTH = 59
         HEADER_LEGEND_WIDTH = 43
-        PHASE_HEADER_DASH_COUNT = 5
-        PHASE_HEADER_OFFSET = -2
+        PHASE_HEADER_DASH_COUNTS = {
+          "implementation" => 5,
+          "review" => 7,
+          "inspection" => 9,
+          "merge" => 11
+        }.freeze
+        PHASE_HEADER_OFFSET = 0
 
         module_function
 
@@ -87,7 +79,7 @@ module A3
           end
 
           summary.tasks.each do |task|
-            lines << "#{task_symbol(task)} #{pad_right(tree_ref_label(task.ref, depth_by_ref[task.ref]), tree_ref_width)} #{pad_right(truncate(task.title, TREE_TITLE_WIDTH), TREE_TITLE_WIDTH)} #{task_phase_bar(task)}"
+            lines << "#{task_badge(task)} #{pad_right(tree_ref_label(task.ref, depth_by_ref[task.ref]), tree_ref_width)} #{pad_right(truncate(task.title, TREE_TITLE_WIDTH), TREE_TITLE_WIDTH)} #{task_phase_bar(task)}"
             task.blocked_lines.each do |line|
               lines << "#{' ' * (4 + tree_ref_width + 1)}#{truncate(single_line(line), TREE_TITLE_WIDTH + 24)}"
             end
@@ -118,10 +110,10 @@ module A3
           phase_rows = task_tree_phase_header(bar_start)
           width = phase_rows.map { |row| display_width(row) }.max
           task_legend_rows = [
-            " #{TASK_SYMBOLS.fetch(:idle)} idle     #{TASK_SYMBOLS.fetch(:waiting)} waiting   │  #{PHASE_SYMBOLS.fetch(:pending)} none      │",
-            " #{TASK_SYMBOLS.fetch(:next)} next     #{TASK_SYMBOLS.fetch(:running)} running   │  #{PHASE_SYMBOLS.fetch(:running)} running   │",
-            " #{TASK_SYMBOLS.fetch(:done)} automation done      │  #{PHASE_SYMBOLS.fetch(:done)} phase done│",
-            " #{TASK_SYMBOLS.fetch(:blocked)} blocked              │  #{PHASE_SYMBOLS.fetch(:blocked)} blocked   │"
+            "[#{TASK_SYMBOLS.fetch(:idle)}] idle     [#{TASK_SYMBOLS.fetch(:waiting)}] waiting  |  #{PHASE_SYMBOLS.fetch(:pending)} : none     |",
+            "[#{TASK_SYMBOLS.fetch(:next)}] next     [#{TASK_SYMBOLS.fetch(:running)}] running  |  #{PHASE_SYMBOLS.fetch(:running)} : running  |",
+            "[#{TASK_SYMBOLS.fetch(:done)}] done     [#{TASK_SYMBOLS.fetch(:blocked)}] blocked  |  #{PHASE_SYMBOLS.fetch(:done)} : done     |",
+            "#{' ' * 26}|  #{PHASE_SYMBOLS.fetch(:blocked)} : blocked  |"
           ]
           lines = ["Task Tree"]
           phase_rows.each_with_index do |phase_row, index|
@@ -146,21 +138,22 @@ module A3
           (labels.length - 1).downto(0) do |index|
             label, offset = labels[index]
             target = phase_columns.fetch(index)
+            dash_count = PHASE_HEADER_DASH_COUNTS.fetch(PHASE_ORDER.fetch(index))
             row = " " * width
-            start = target - (display_width(label) + 1 + PHASE_HEADER_DASH_COUNT)
+            start = target - (display_width(label) + 1 + dash_count)
             row = overlay_text(row, label, target_display_start: start)
             row = overlay_text(row, " ", target_display_start: start + display_width(label))
-            row = overlay_text(row, "─" * PHASE_HEADER_DASH_COUNT, target_display_start: start + display_width(label) + 1)
-            row = overlay_text(row, "┐", target_display_start: target)
+            row = overlay_text(row, BOX.fetch(:horizontal) * dash_count, target_display_start: start + display_width(label) + 1)
+            row = overlay_text(row, BOX.fetch(:corner), target_display_start: target)
             phase_columns[(index + 1)..].to_a.each do |column|
-              row = overlay_text(row, "│", target_display_start: column)
+              row = overlay_text(row, BOX.fetch(:vertical), target_display_start: column)
             end
             lines << row.rstrip
           end
 
           row = " " * width
           phase_columns.each do |column|
-            row = overlay_text(row, "│", target_display_start: column)
+            row = overlay_text(row, BOX.fetch(:vertical), target_display_start: column)
           end
           lines << row.rstrip
           lines
@@ -174,6 +167,10 @@ module A3
           return TASK_SYMBOLS.fetch(:done) if task.done
 
           TASK_SYMBOLS.fetch(:idle)
+        end
+
+        def task_badge(task)
+          "[#{task_symbol(task)}]"
         end
 
         def task_phase_bar(task)
@@ -230,18 +227,18 @@ module A3
 
         def display_width(text)
           text.to_s.each_char.sum do |char|
-            DISPLAY_WIDTH_OVERRIDES.fetch(char) { east_asian?(char) ? 2 : 1 }
+            east_asian?(char) ? 2 : 1
           end
         end
 
         def slice_display_width(text, width)
           used = 0
           text.each_char.each_with_object(+"") do |char, result|
-            char_width = DISPLAY_WIDTH_OVERRIDES.fetch(char) { east_asian?(char) ? 2 : 1 }
-            break result if used + char_width > width
+            width_for_char = east_asian?(char) ? 2 : 1
+            break result if used + width_for_char > width
 
             result << char
-            used += char_width
+            used += width_for_char
           end
         end
 
@@ -257,10 +254,10 @@ module A3
           used = 0
           started = false
           text.each_char.each_with_object(+"") do |char, result|
-            char_width = DISPLAY_WIDTH_OVERRIDES.fetch(char) { east_asian?(char) ? 2 : 1 }
+            width_for_char = east_asian?(char) ? 2 : 1
             started = true if used >= start_width
             result << char if started
-            used += char_width
+            used += width_for_char
             started = true if used == start_width && result.empty?
           end
         end
@@ -280,15 +277,16 @@ module A3
         end
 
         def decorate_line(line)
-          if task_tree_row?(line) && line.lstrip.start_with?(TASK_SYMBOLS.fetch(:blocked))
+          symbol = task_row_symbol(line)
+          if symbol == TASK_SYMBOLS.fetch(:blocked)
             colorize(line, :red)
-          elsif task_tree_row?(line) && line.lstrip.start_with?(TASK_SYMBOLS.fetch(:running))
+          elsif symbol == TASK_SYMBOLS.fetch(:running)
             colorize(line, :yellow)
-          elsif task_tree_row?(line) && line.lstrip.start_with?(TASK_SYMBOLS.fetch(:next))
+          elsif symbol == TASK_SYMBOLS.fetch(:next)
             colorize(line, :cyan)
-          elsif task_tree_row?(line) && line.lstrip.start_with?(TASK_SYMBOLS.fetch(:waiting))
+          elsif symbol == TASK_SYMBOLS.fetch(:waiting)
             colorize(line, :dim)
-          elsif task_tree_row?(line) && line.lstrip.start_with?(TASK_SYMBOLS.fetch(:done))
+          elsif symbol == TASK_SYMBOLS.fetch(:done)
             colorize(line, :green)
           elsif line.start_with?("- #")
             colorize(line, :cyan)
@@ -302,7 +300,12 @@ module A3
         end
 
         def task_tree_row?(line)
-          line.match?(/^\s*[#{Regexp.escape(TASK_SYMBOLS.values.join)}]\s+\#\d+/)
+          !task_row_symbol(line).nil?
+        end
+
+        def task_row_symbol(line)
+          match = line.match(/^\s*\[([#{Regexp.escape(TASK_SYMBOLS.values.join)}])\]\s+\#\d+/)
+          match && match[1]
         end
       end
     end

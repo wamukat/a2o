@@ -259,6 +259,7 @@ a2o runtime describe-task <task-ref>
 ```
 
 `runtime watch-summary` is the multi-task overview. Use `runtime describe-task <task-ref>` for one task's run, evidence, comments, and log hints.
+`watch-summary` uses ASCII symbols and ASCII guide lines so the layout stays stable across macOS, Windows terminals, WSL, and CI logs.
 When a task has agent execution artifacts, `runtime describe-task` prints `agent_artifact` lines and an `agent_artifact_read` command. Use that command to read the captured executor stdout/stderr or worker result:
 
 ```sh

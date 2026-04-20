@@ -278,6 +278,7 @@ a2o runtime describe-task <task-ref>
 ```
 
 `runtime watch-summary` は board 上の複数 task、scheduler state、running phase をまとめて見るための overview である。個別 task の原因調査には `runtime describe-task <task-ref>` を使う。
+`watch-summary` は macOS、Windows terminal、WSL、CI log で layout が安定するよう、ASCII 記号と ASCII guide line で表示する。
 task に agent execution artifact がある場合、`runtime describe-task` は `agent_artifact` と `agent_artifact_read` を表示する。executor stdout/stderr や worker result を読むには、表示された artifact ID を使う。
 
 ```sh

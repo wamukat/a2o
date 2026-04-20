@@ -65,12 +65,12 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("Next")
       expect(out.string).to include("Running")
       expect(out.string).to include("\e[36mScheduler: running\e[0m")
-      expect(out.string).to include("▶ #3138")
-      expect(out.string).to include("▷ #3141")
-      expect(out.string).to include("\e[33m▶ #3138")
-      expect(out.string).to include("\e[36m▷ #3141")
-      expect(out.string).to include("Merging ─────┐")
-      expect(out.string).to include("Implementation ─────┐")
+      expect(out.string).to include("[>] #3138")
+      expect(out.string).to include("[*] #3141")
+      expect(out.string).to include("\e[33m[>] #3138")
+      expect(out.string).to include("\e[36m[*] #3141")
+      expect(out.string).to include("Merging -----------+")
+      expect(out.string).to include("Implementation -----+")
       expect(out.string).to include("- #3141")
       expect(out.string).to include("- #3138 implementation/implementation/running_command hb=?")
     end
@@ -130,6 +130,30 @@ RSpec.describe A3::CLI do
 
       expect(out.string).to include("Kanban title [kanban=To do internal=Blocked]")
       expect(out.string).not_to include("Unrelated task")
+    end
+  end
+
+  it "uses ASCII symbols by default" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "Sample#3141",
+          kind: :child,
+          edit_scope: [:repo_beta],
+          verification_scope: [:repo_beta],
+          status: :todo
+        )
+      )
+
+      out = StringIO.new
+      described_class.start(
+        ["watch-summary", "--storage-backend", "json", "--storage-dir", dir],
+        out: out
+      )
+
+      expect(out.string).to include("[*] #3141")
+      expect(out.string).to include("./././.")
     end
   end
 end
