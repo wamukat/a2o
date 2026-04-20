@@ -62,11 +62,12 @@ Developer documentation:
 4. [docs/en/dev/30-core-domain-model.md](docs/en/dev/30-core-domain-model.md)
 5. [docs/en/dev/40-workspace-and-repo-slot-model.md](docs/en/dev/40-workspace-and-repo-slot-model.md)
 6. [docs/en/dev/50-project-surface.md](docs/en/dev/50-project-surface.md)
-7. [docs/en/dev/60-evidence-and-rerun-diagnosis.md](docs/en/dev/60-evidence-and-rerun-diagnosis.md)
-8. [docs/en/dev/70-agent-worker-gateway-design.md](docs/en/dev/70-agent-worker-gateway-design.md)
-9. [docs/en/dev/80-runtime-extension-boundary.md](docs/en/dev/80-runtime-extension-boundary.md)
-10. [docs/en/dev/90-reference-product-suite.md](docs/en/dev/90-reference-product-suite.md)
-11. [docs/en/dev/95-kanban-adapter-boundary.md](docs/en/dev/95-kanban-adapter-boundary.md)
+7. [docs/en/dev/55-project-script-contract.md](docs/en/dev/55-project-script-contract.md)
+8. [docs/en/dev/60-evidence-and-rerun-diagnosis.md](docs/en/dev/60-evidence-and-rerun-diagnosis.md)
+9. [docs/en/dev/70-agent-worker-gateway-design.md](docs/en/dev/70-agent-worker-gateway-design.md)
+10. [docs/en/dev/80-runtime-extension-boundary.md](docs/en/dev/80-runtime-extension-boundary.md)
+11. [docs/en/dev/90-reference-product-suite.md](docs/en/dev/90-reference-product-suite.md)
+12. [docs/en/dev/95-kanban-adapter-boundary.md](docs/en/dev/95-kanban-adapter-boundary.md)
 
 ## Main Entrypoints
 
