@@ -350,10 +350,13 @@ For shared product packages, release smoke, or multi-user boards, pin by digest 
 Recommended update flow:
 
 ```sh
+a2o upgrade check
 a2o runtime up --pull
 a2o runtime image-digest
 a2o doctor
 ```
+
+`a2o upgrade check` is check-only. It does not pull images, reinstall the agent, restart services, or edit project files. It prints the host launcher version, bootstrapped instance config, runtime image digest status, agent install status, and the next commands to run.
 
 `a2o runtime image-digest` prints the configured pinned digest, the local `latest` digest, and the running container digest. The configured ref comes from explicit runtime image environment variables first, then the bootstrapped runtime instance config. If `runtime_image_latest_status=mismatch`, pulling `latest` changed the local image but did not change the product package pin. Validate that image, then record the printed `runtime_image_pinned_digest=...` or desired `runtime_image_local_latest_digest=...` in the product package Taskfile, env file, or deployment note. If `runtime_image_running_status=mismatch`, restart with `a2o runtime up` after confirming the desired pin.
 

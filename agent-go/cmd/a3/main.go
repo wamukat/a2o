@@ -86,6 +86,8 @@ func run(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer
 		return 0
 	case "doctor":
 		return runDoctor(args[1:], runner, stdout, stderr)
+	case "upgrade":
+		return runUpgrade(args[1:], runner, stdout, stderr)
 	case "project":
 		return runProject(args[1:], stdout, stderr)
 	case "worker":
@@ -114,6 +116,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage:")
 	fmt.Fprintln(w, "  a2o version")
 	fmt.Fprintln(w, "  a2o doctor")
+	fmt.Fprintln(w, "  a2o upgrade check")
 	fmt.Fprintln(w, "  a2o project bootstrap [--package DIR]")
 	fmt.Fprintln(w, "  a2o project lint [--package DIR] [--config project-test.yaml]")
 	fmt.Fprintln(w, "  a2o project validate [--package DIR] [--config project-test.yaml]")

@@ -63,7 +63,7 @@ The project package does not own:
 
 A2O 0.5.2 is released as a local-first runtime image plus host launcher and agent package. The standard validation surface is the reference product suite: SoloBoard pickup and transitions, agent-materialized workspaces, agent HTTP worker gateway, verification, merge, parent-child flow, watch summary, describe-task diagnostics, and evidence persistence.
 
-The public launcher covers host install, project bootstrap, kanban service lifecycle, kanban diagnosis, URL discovery, agent install, runtime container up/down, one-shot runtime execution, foreground runtime loop, resident scheduler start/stop/status, runtime diagnosis, multi-task watch summary, and task/run observability.
+The public launcher covers host install, check-only upgrade planning, project bootstrap, kanban service lifecycle, kanban diagnosis, URL discovery, agent install, runtime container up/down, one-shot runtime execution, foreground runtime loop, resident scheduler start/stop/status, runtime diagnosis, multi-task watch summary, and task/run observability.
 
 ## Operator Notes
 

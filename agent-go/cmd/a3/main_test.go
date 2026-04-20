@@ -1115,6 +1115,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 
 	output := stdout.String()
 	for _, want := range []string{
+		"a2o upgrade check",
 		"a2o project bootstrap [--package DIR]",
 		"a2o project lint [--package DIR]",
 		"a2o kanban up [--build]",
@@ -1152,7 +1153,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 }
 
 func TestGroupHelpPrintsUsage(t *testing.T) {
-	for _, group := range []string{"project", "kanban", "runtime", "agent"} {
+	for _, group := range []string{"project", "kanban", "runtime", "agent", "upgrade"} {
 		t.Run(group, func(t *testing.T) {
 			var stdout bytes.Buffer
 			var stderr bytes.Buffer
@@ -1179,6 +1180,7 @@ func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
 	}{
 		{name: "project bootstrap", args: []string{"project", "bootstrap", "-bad"}, want: "Usage of a2o project bootstrap:"},
 		{name: "project lint", args: []string{"project", "lint", "-bad"}, want: "Usage of a2o project lint:"},
+		{name: "upgrade check", args: []string{"upgrade", "check", "-bad"}, want: "Usage of a2o upgrade check:"},
 		{name: "kanban up", args: []string{"kanban", "up", "-bad"}, want: "Usage of a2o kanban up:"},
 		{name: "kanban doctor", args: []string{"kanban", "doctor", "-bad"}, want: "Usage of a2o kanban doctor:"},
 		{name: "kanban url", args: []string{"kanban", "url", "-bad"}, want: "Usage of a2o kanban url:"},
@@ -4030,6 +4032,77 @@ func TestRuntimeImageDigestUsesInstanceRuntimeImageWhenEnvIsAbsent(t *testing.T)
 	}
 	if runner.lastEnv["A2O_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine@sha256:instance" {
 		t.Fatalf("image-digest should evaluate compose with instance runtime image env, got %#v", runner.lastEnv)
+	}
+}
+
+func TestUpgradeCheckReportsCheckOnlyPlan(t *testing.T) {
+	oldVersion := version
+	version = "0.5.test"
+	defer func() { version = oldVersion }()
+
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-upgrade",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+		RuntimeImage:   "ghcr.io/wamukat/a2o-engine@sha256:instance",
+	})
+	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
+	if err := os.MkdirAll(filepath.Dir(agentPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(agentPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{
+		imageInspectDigests: map[string]string{
+			"image-123": "ghcr.io/wamukat/a2o-engine@sha256:instance",
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"upgrade", "check"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	for _, want := range []string{
+		"upgrade_check mode=check-only apply_supported=false",
+		"host_launcher_version=0.5.test",
+		"runtime_package=" + packageDir,
+		"compose_project=a2o-upgrade",
+		"kanban_url=http://localhost:3480/",
+		"runtime_image_pinned_ref=ghcr.io/wamukat/a2o-engine@sha256:instance",
+		"runtime_image_pinned_digest=ghcr.io/wamukat/a2o-engine@sha256:instance",
+		"upgrade_agent status=installed path=" + agentPath + " action=none",
+		"upgrade_next 1 command=a2o runtime image-digest",
+		"upgrade_next 2 command=a2o runtime up --pull",
+		"upgrade_next 3 command=a2o agent install --target auto --output " + shellQuote(agentPath),
+		"upgrade_next 4 command=a2o doctor",
+		"upgrade_next 5 command=a2o runtime status",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("upgrade check missing %q in:\n%s", want, output)
+		}
+	}
+	if runner.lastEnv["A2O_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine@sha256:instance" {
+		t.Fatalf("upgrade check should evaluate compose with instance runtime image env, got %#v", runner.lastEnv)
+	}
+	forbidden := " up "
+	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), forbidden+"-d") {
+		t.Fatalf("upgrade check should not start services, calls:\n%s", strings.Join(runner.joinedCalls(), "\n"))
 	}
 }
 
