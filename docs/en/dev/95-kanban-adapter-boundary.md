@@ -34,7 +34,7 @@ Use a Ruby operation client boundary first, then move provider implementations b
 
 ## Runtime Python Dependency
 
-A2O 0.5.3 keeps `python3` in `docker/a3-runtime/Dockerfile`, but does not install `python3-venv`.
+A2O 0.5.4 keeps `python3` in `docker/a3-runtime/Dockerfile`, but does not install `python3-venv`.
 
 The runtime still has an Engine-owned Python dependency:
 
