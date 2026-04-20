@@ -1,6 +1,8 @@
-# A2O 0.5.5 Release Status（release 状態）
+# A2O 0.5.5 Current Release Surface（現在の公開 surface）
 
-## Ready（利用可能）
+A2O 0.5.5 で現在利用できる公開 surface と検証範囲を示す。
+
+## 利用可能な command と capability
 
 - Host launcher install（host launcher の install）: `a2o host install`
 - Project bootstrap: `a2o project bootstrap`、任意で `--package DIR`
@@ -16,13 +18,13 @@
 - Agent HTTP worker gateway
 - Agent-materialized workspace mode
 - TypeScript、Go、Python、multi-repo task templates の reference product packages
-- main push 時の GHCR image publication。tags は `latest`、`0.5.5`、`sha-*`
-- Full RSpec release gate の local pass
+- GHCR runtime image tags: `latest`、`0.5.5`、`sha-*`
+- Local release gate: full RSpec suite
 
-## Validation scope（検証範囲）
+## 検証範囲
 
-Release validation は reference product suite を使い、single-repo と multi-repo の task flow を kanban、agent gateway、verification、merge、parent-child handling、runtime watch summary、describe-task diagnostics、evidence persistence まで通して確認する。
+Reference product suite は、single-repo と multi-repo の task flow を kanban、agent gateway、verification、merge、parent-child handling、runtime watch summary、describe-task diagnostics、evidence persistence まで通して確認する。
 
-## Productization gaps（productization 上の gap）
+## 変更境界
 
-Productization gaps は、実装前に A2O kanban で tracking する。外部 behavior の変更が必要な場合は、coding 前に owner と協議する。
+未対応の product work は実装前に A2O kanban で tracking する。外部 behavior の変更が必要な場合は、coding 前に owner と協議する。

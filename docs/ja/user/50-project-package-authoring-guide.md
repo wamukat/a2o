@@ -169,7 +169,7 @@ Review skill には次を書く。
 
 - finding とみなす条件
 - 期待する verification evidence
-- public API、SPI、migration、documentation の確認観点
+- public API、SPI、compatibility、documentation の確認観点
 - residual risk の報告方法
 
 Parent review skill には multi-repo integration の観点を書く。

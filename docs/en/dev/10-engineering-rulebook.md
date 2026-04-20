@@ -48,4 +48,4 @@ Documentation and tests are part of the release surface.
 
 ## Boundaries
 
-Do not turn validation fixtures, migration notes, or one product's operational workaround into a standard Engine concept. If external behavior must change, discuss the product impact before implementing.
+Do not turn validation fixtures, temporary notes, or one product's operational workaround into a standard Engine concept. If external behavior must change, discuss the product impact before implementing.

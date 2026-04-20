@@ -2,7 +2,7 @@
 
 The canonical project package config file is `project.yaml`.
 
-`manifest.yml` is not part of the public 0.5.5 package format. Runtime responsibilities live in `project.yaml` under explicit runtime sections. This keeps the package surface small and avoids a split between "project config" and "manifest".
+Runtime responsibilities live in `project.yaml` under explicit runtime sections. The public package has one configuration file so package authors do not need to split responsibility between separate project and runtime manifests.
 
 For authoring decisions and responsibility boundaries, see [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md).
 
@@ -161,10 +161,10 @@ a2o project template \
 
 `project.yaml` is the normal production profile. Focused test profiles may use a separate file such as `project-test.yaml`, but they must be selected explicitly with `a2o project validate --config project-test.yaml` or `a2o runtime run-once --project-config project-test.yaml`.
 
-## Current Status
+## Current Contract
 
-1. One loader reads `project.yaml` schema version `1`.
+1. `project.yaml` schema version `1` is the public config contract.
 2. Runtime bridge data is derived from `runtime.phases`.
 3. Reference product packages use only `project.yaml`.
-4. Package loading rejects old split files.
+4. Package loading rejects unsupported split config files.
 5. Schema, docs, and diagnostics use A2O-facing names.

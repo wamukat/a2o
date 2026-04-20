@@ -241,7 +241,7 @@ rollback を前提にしない。代わりに、follow-up child は deterministi
 例:
 
 - 手動編集で title / description / labels が変わった
-- 旧 schema の child が残っている
+- unsupported schema の child が残っている
 - partial recovery の途中で comment だけ更新された
 
 この場合の固定 rule:

@@ -104,16 +104,16 @@ Docker runtime image、host launcher、bundled kanban service、agent gateway、
 
 - [90-reference-product-suite.md](90-reference-product-suite.md)
 
-core validation で使う sample product と、release validation の対象範囲を扱う。
+core validation で使う sample product と validation boundary を扱う。
 
-### 9. implementation status
+### 9. current release surface
 
 - [../user/40-release-status.md](../user/40-release-status.md)
 
-0.5.5 release 時点の公開 surface と検証状態を扱う。
+A2O 0.5.5 の supported public surface と validation boundary を扱う。
 
 ### 10. kanban adapter boundary
 
 - [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md)
 
-kanban command contract と、将来の native adapter 実装に向けた境界を扱う。
+kanban command contract と adapter boundary を扱う。

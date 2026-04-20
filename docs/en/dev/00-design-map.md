@@ -106,14 +106,14 @@ Defines the Docker runtime image, host launcher, bundled kanban service, agent g
 
 Defines the sample products and the release validation scope.
 
-### 9. Release Status
+### 9. Current Release Surface
 
 - [../user/40-release-status.md](../user/40-release-status.md)
 
-Summarizes the public surface and validation status for A2O 0.5.5.
+Summarizes the supported public surface and validation boundary for A2O 0.5.5.
 
 ### 10. Kanban Adapter Boundary
 
 - [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md)
 
-Defines the current kanban command contract and the adapter boundary for future native implementations.
+Defines the current kanban command contract and adapter boundary.

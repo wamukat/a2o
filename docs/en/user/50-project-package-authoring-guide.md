@@ -169,7 +169,7 @@ Review skills should cover:
 
 - what counts as a finding
 - expected verification evidence
-- public API, SPI, migration, and documentation checks
+- public API, SPI, compatibility, and documentation checks
 - how to report residual risk
 
 Parent review skills should cover multi-repo integration:

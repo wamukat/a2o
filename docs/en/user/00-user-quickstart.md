@@ -61,7 +61,7 @@ Before bootstrapping a package, run:
 a2o project lint --package ./project-package
 ```
 
-`a2o project lint` checks `project.yaml`, legacy split files, production config references to test fixtures, user-facing A3/internal runtime leaks, and command files that are not referenced by package docs or config. Blocked findings should be fixed before runtime execution. Warning findings should be reviewed and either removed or documented.
+`a2o project lint` checks `project.yaml`, unsupported split config files, production config references to test fixtures, user-facing A3/internal runtime leaks, and command files that are not referenced by package docs or config. Blocked findings should be fixed before runtime execution. Warning findings should be reviewed and either removed or documented.
 
 If you maintain a focused test profile, keep it in a separate file and validate it explicitly:
 
@@ -194,7 +194,7 @@ New bootstrap writes runtime instance config to `.work/a2o/runtime-instance.json
 
 `.work/a2o/` is regenerable runtime output and normally should not be committed. Users manage the project package, product source, and optional Taskfile.
 
-Legacy runtime instance config may be read for compatibility, but new bootstrap does not write it.
+Existing internal compatibility runtime instance config may be read, but new bootstrap writes `.work/a2o/runtime-instance.json`.
 
 ## Kanban
 

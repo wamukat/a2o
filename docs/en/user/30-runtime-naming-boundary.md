@@ -1,6 +1,6 @@
 # Runtime Naming Boundary
 
-A2O stands for Agentic AI Orchestrator and is the public product name. A3 is the former Agentic AI Automation name and remains an internal compatibility name in code paths, state paths, and Engine CLI surfaces that have not been renamed.
+A2O stands for Agentic AI Orchestrator and is the public product name. A3 is an internal compatibility name that may still appear in implementation code paths, state paths, and Engine CLI surfaces.
 
 ## Public Names
 
@@ -23,7 +23,7 @@ These names may remain in implementation details:
 - `bin/a3`
 - `.a3`
 - `A3_*` environment variables
-- legacy `refs/heads/a3/...`
+- compatibility `refs/heads/a3/...`
 
 Do not require users to author these names in normal setup docs. If they appear in diagnostics or internal implementation docs, describe them as compatibility surfaces.
 
@@ -32,7 +32,7 @@ Do not require users to author these names in normal setup docs. If they appear 
 - New public docs use A2O names.
 - New project packages use A2O names.
 - New CLI affordances should prefer `a2o`.
-- Existing internal Ruby Engine APIs may keep A3 names until a focused rename ticket changes them.
+- Internal Ruby Engine APIs may keep A3 names where they are not part of the public user surface.
 - Compatibility aliases must not become the documented primary path.
 
 ## User-Facing Runtime

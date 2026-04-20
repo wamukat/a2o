@@ -61,7 +61,7 @@ Bootstrap の前に次を実行する。
 a2o project lint --package ./project-package
 ```
 
-`a2o project lint` は `project.yaml`、旧 split file、通常 config から test fixture への参照、利用者向けに漏れた A3/internal runtime 名、package docs や config から参照されない command file を確認する。Blocked finding は runtime 実行前に修正する。Warning finding は確認し、不要なら削除し、必要なら docs に明記する。
+`a2o project lint` は `project.yaml`、unsupported split config file、通常 config から test fixture への参照、利用者向けに漏れた A3/internal runtime 名、package docs や config から参照されない command file を確認する。Blocked finding は runtime 実行前に修正する。Warning finding は確認し、不要なら削除し、必要なら docs に明記する。
 
 Focused test profile を持つ場合は別 file に分け、明示的に検証する。
 
@@ -190,7 +190,7 @@ Worker が configured review scope や repo-scope alias を使う場合は、rep
 
 `.work/a2o/` は A2O が再生成できる runtime output であり、通常は version control に入れない。利用者が管理するのは project package、product source、Taskfile などである。
 
-旧バージョンの runtime instance config は互換のため読み取る。ただし新規 bootstrap は旧ディレクトリに instance config を書かない。materialized workspace 内の agent metadata は利用者が編集する設定ではない。
+内部互換用の runtime instance config を読み取る場合はあるが、新規 bootstrap は `.work/a2o/runtime-instance.json` に書く。materialized workspace 内の agent metadata は利用者が編集する設定ではない。
 
 ## Operations
 

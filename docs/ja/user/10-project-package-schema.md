@@ -4,14 +4,14 @@
 
 Project package config の正規ファイル名は `project.yaml` とする。
 
-`manifest.yml` は公開 0.5.5 package format に含めない。runtime の責務は `project.yaml` の明示的な runtime sections に置く。これにより、公開 package の command shape を小さく保ち、`a2o.yaml` のような別名を増やさず、package author にとって分かりにくい「project config」と「manifest」の分離をなくす。
+runtime の責務は `project.yaml` の明示的な runtime sections に置く。公開 package の設定ファイルは 1 本にまとめ、package author が project 設定と runtime manifest の責務分担で迷わない形にする。
 
 Authoring 上の判断と責務境界は [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md) を参照する。
 
 Package schema は次の rules に従う。
 
 - `project.yaml` を canonical file name とする。
-- 新 schema では `manifest.yml` compatibility を要求しない。
+- 公開 package config は `project.yaml` だけを使う。
 - User-facing schema と diagnostics では A2O names を使う。A3 names は internal compatibility details としてだけ残してよい。
 - `a2o:follow-up-child` のような internal follow-up labels は、通常の user-authored schema へ露出しない。
 
@@ -338,18 +338,15 @@ runtime:
         default: refs/heads/main
 ```
 
-## 現在の状態
+## Current Contract（現在の contract）
 
-1. Single loader が `project.yaml` schema version `1` を読む。
+1. `project.yaml` schema version `1` が public config contract である。
 2. Runtime bridge は `runtime.phases` から internal runtime package data を derive する。
-3. Reference product packages には `manifest.yml` を含めない。
-4. 4 つの reference packages は single-file `project.yaml` を使う。
-5. User docs と reference package docs は、author に `manifest.yml` 作成を求めない。
-6. Package loading は old split files を reject する。
-7. Package schema、docs、normal diagnostics は A2O-facing names を使う。
+3. Reference product packages は single-file `project.yaml` を使う。
+4. Package loading は unsupported split config files を reject する。
+5. Package schema、docs、normal diagnostics は A2O-facing names を使う。
 
 ## 実装 notes
 
-- New loader は `manifest.yml` を必要とする packages を reject する。
 - Schema は A2O-facing fields を current internal Ruby runtime structures へ translate してよい。ただし errors と docs は、users に A3 names を author するよう求めてはならない。
 - Internal follow-up labels は runtime defaults を持つべきである。Advanced overrides は、実 product が必要とした場合だけ追加する。

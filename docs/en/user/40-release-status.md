@@ -1,6 +1,8 @@
-# A2O 0.5.5 Release Status
+# A2O 0.5.5 Current Release Surface
 
-## Ready
+This document describes the currently supported A2O 0.5.5 user surface and validation boundary.
+
+## Supported Commands And Capabilities
 
 - Host launcher install: `a2o host install`
 - Project bootstrap: `a2o project bootstrap`, optional `--package DIR`
@@ -16,13 +18,13 @@
 - Agent HTTP worker gateway
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates
-- GHCR image publication with `latest`, `0.5.5`, and `sha-*` tags on main
-- Full RSpec release gate passing locally
+- GHCR runtime image tags: `latest`, `0.5.5`, and `sha-*`
+- Local release gate: full RSpec suite
 
 ## Validation Scope
 
-Release validation uses the reference product suite to cover single-repo and multi-repo task flows through kanban, agent gateway, verification, merge, parent-child handling, runtime watch summary, describe-task diagnostics, and evidence persistence.
+The reference product suite covers single-repo and multi-repo task flows through kanban, agent gateway, verification, merge, parent-child handling, runtime watch summary, describe-task diagnostics, and evidence persistence.
 
-## Productization Gaps
+## Change Boundary
 
-Productization gaps are tracked on the A2O kanban before implementation. External behavior changes require owner discussion before coding.
+Open product work is tracked on the A2O kanban before implementation. External behavior changes require owner discussion before coding.
