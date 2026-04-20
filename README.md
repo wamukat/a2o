@@ -84,11 +84,17 @@ a2o kanban up
 a2o kanban doctor
 a2o kanban url
 a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
+a2o runtime up
 a2o runtime run-once
 a2o runtime run-once --project-config project-test.yaml
+a2o runtime loop
 a2o runtime start
 a2o runtime status
 a2o runtime stop
+a2o runtime down
+a2o runtime doctor
+a2o runtime watch-summary
+a2o runtime describe-task A2O#1
 ```
 
 The runtime image still contains `bin/a3` as the internal Engine CLI. That is an implementation compatibility name. The public user-facing entrypoints are `a2o` and `a2o-agent`.

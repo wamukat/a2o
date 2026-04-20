@@ -121,9 +121,10 @@ Kanban lanes are user-visible state. Domain objects hold the task state, current
 
 ### 0. User Path
 
+- [../user/00-overview.md](../user/00-overview.md)
 - [../user/00-user-quickstart.md](../user/00-user-quickstart.md)
 
-Entry point for installing and operating A2O.
+Entry point for understanding, installing, and operating A2O.
 
 ### 1. Engineering Discipline
 
