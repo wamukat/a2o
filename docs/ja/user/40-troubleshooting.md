@@ -22,6 +22,7 @@ a2o runtime describe-task <task-ref>
 | task が進まない | `a2o runtime status` | scheduler stopped、runtime container stopped | `a2o runtime up`、`a2o runtime start` |
 | board が空に見える | `a2o kanban doctor` | compose project / Docker volume が変わった | instance config、compose project、volume |
 | task が blocked になった | `a2o runtime describe-task <task-ref>` | configuration、dirty repo、executor、verification、merge conflict | 表示された error category の対象 |
+| Docker credential helper で止まる | `a2o doctor` | Docker config が存在しない credential helper を指している | `credsStore` / `credHelpers`、または一時 `DOCKER_CONFIG` |
 | executor が起動しない | `a2o doctor` | `your-ai-worker` placeholder、missing binary、credentials 不足 | `project.yaml`、`agent.required_bins`、AI worker 設定 |
 | dirty repo で止まる | `a2o runtime describe-task <task-ref>` | 未保存変更や generated file が残っている | 表示された repo/file を commit / stash / remove |
 | verification が失敗する | `a2o runtime describe-task <task-ref>` | product test failure、dependency、format、remediation failure | project command、test、dependency |
@@ -77,6 +78,30 @@ Dirty repo で fail-fast するのは、A2O が利用者の未保存変更を上
 
 Generated runtime file が product repository root に出ている場合は、project package や agent install path を確認する。A2O generated data は `.work/a2o/` 配下に閉じるのが基本である。
 
+## Docker credential helper の直し方
+
+`a2o doctor` が `docker_credential_helpers status=blocked` を出す場合、Docker config の `credsStore` または `credHelpers` が、現在の host に存在しない `docker-credential-*` binary を指している。
+
+確認するもの:
+
+- `~/.docker/config.json`
+- `DOCKER_CONFIG` を使っている場合は `$DOCKER_CONFIG/config.json`
+- `credsStore`
+- `credHelpers`
+- `docker-credential-<name>` が `PATH` にあるか
+
+Docker の credential helper を使うなら、該当 binary を install する。使わないなら Docker config の `credsStore` / `credHelpers` を直す。
+
+一時的に clean な Docker config で確認したい場合は、空の `auths` だけを持つ config を使う。
+
+```sh
+tmp_docker_config="$(mktemp -d)"
+printf '{"auths":{}}\n' > "$tmp_docker_config/config.json"
+DOCKER_CONFIG="$tmp_docker_config" a2o doctor
+```
+
+この確認で通る場合は、A2O ではなく通常の Docker config が原因である。恒久対応として、通常利用する Docker config を修正する。
+
 ## Blocked task の復旧
 
 ```sh
@@ -91,8 +116,10 @@ a2o runtime reset-task <task-ref>
 2. `a2o runtime watch-summary` で関連 task が running ではないことを確認する。
 3. configuration、dirty repo、missing command、executor credentials、verification failure、merge conflict などの root cause を直す。
 4. workspace / branch に残った手動変更が必要なら commit / patch / discard を明示的に行う。
-5. root cause を直してから kanban の blocked 状態を解除する。
+5. `a2o doctor` で root cause が残っていないことを確認する。
 6. `a2o runtime run-once` を実行するか、resident scheduler に再 pickup させる。
+
+Blocked label や blocked 状態は、次の runtime attempt が task を非 blocked 状態へ進めるときに A2O が更新する。通常利用では、公開 `a2o` command で手動解除しようとしない。
 
 ## Kanban が空に見える
 
