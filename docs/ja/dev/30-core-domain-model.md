@@ -70,10 +70,10 @@
 
 ソース記述子は、実行で使ったソースの由来を記録する。
 
-- branch head
-- detached commit
-- parent integration ref
-- live target ref
+- ブランチの先頭
+- 分離されたコミット
+- 親タスク統合参照
+- 本流ターゲット参照
 
 ワークスペース具体化と証跡確認は、どちらもこの記述子に依存する。
 
@@ -90,22 +90,22 @@
 
 ブロック診断は、運用者の対応のための構造化された要約である。失敗は次のような分類に分ける。
 
-- configuration error
-- workspace dirty
-- executor failed
-- verification failed
-- merge conflict
-- merge failed
-- runtime failed
+- 設定不備
+- 未整理のワークスペース
+- 実行コマンド失敗
+- 検証失敗
+- マージ競合
+- マージ失敗
+- ランタイム失敗
 
 ## リポジトリ
 
 ドメインリポジトリは次の永続化契約を提供する。
 
-- tasks
-- runs
-- scheduler state
-- scheduler cycles
-- evidence and blocked diagnosis read models
+- タスク
+- 実行
+- スケジューラ状態
+- スケジューラサイクル
+- 証跡とブロック診断の参照用モデル
 
-JSON と SQLite は、同じ repository contract の背後にある infrastructure choice である。
+JSON と SQLite は、同じリポジトリ契約の背後にあるインフラ実装の選択肢である。
