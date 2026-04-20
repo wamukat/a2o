@@ -1,6 +1,6 @@
 # Operating The Runtime
 
-This document explains the commands and state checks used in day-to-day A2O operation. For first setup, read [00-user-quickstart.md](00-user-quickstart.md). For package design, read [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md). For failures, read [70-troubleshooting.md](70-troubleshooting.md).
+This document explains the commands and state checks used in day-to-day A2O operation. For first setup, read [10-quickstart.md](10-quickstart.md). For package design, read [20-project-package.md](20-project-package.md). For failures, read [40-troubleshooting.md](40-troubleshooting.md).
 
 The purpose is to treat A2O as a runtime that keeps watching kanban, not as a one-time container command. In normal operation, use the resident scheduler, then inspect state, run diagnostics, and update images from the commands below.
 
@@ -141,4 +141,4 @@ Move from broad checks to narrow checks.
 | Progress across tasks | `a2o runtime watch-summary` |
 | One task's run / evidence / logs | `a2o runtime describe-task <task-ref>` |
 
-For blocked tasks, dirty repositories, executor failures, verification failures, and merge issues, read [70-troubleshooting.md](70-troubleshooting.md).
+For blocked tasks, dirty repositories, executor failures, verification failures, and merge issues, read [40-troubleshooting.md](40-troubleshooting.md).

@@ -1,4 +1,4 @@
-# A2O Design Map
+# A2O Architecture
 
 This document explains how A2O Engine connects kanban, project packages, `a2o-agent`, Generative AI, and Git repositories to automate task work.
 
@@ -122,7 +122,7 @@ Kanban lanes are user-visible state. Domain objects hold the task state, current
 ### 0. User Path
 
 - [../user/00-overview.md](../user/00-overview.md)
-- [../user/00-user-quickstart.md](../user/00-user-quickstart.md)
+- [../user/10-quickstart.md](../user/10-quickstart.md)
 
 Entry point for understanding, installing, and operating A2O.
 
@@ -154,7 +154,7 @@ Covers fixed repo slots, synchronization, freshness, retention, garbage collecti
 
 - [50-project-surface.md](50-project-surface.md)
 - [55-project-script-contract.md](55-project-script-contract.md)
-- [../user/10-project-package-schema.md](../user/10-project-package-schema.md)
+- [../user/90-project-package-schema.md](../user/90-project-package-schema.md)
 - [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md)
 
 Covers the project package schema, project script contract, repo slots, verification, and initialization hook boundaries.
@@ -167,9 +167,9 @@ Covers internal evidence that supports reproducible review, merge, rerun, and bl
 
 ### 7. Runtime Distribution
 
-- [../user/20-runtime-distribution.md](../user/20-runtime-distribution.md)
+- [../user/30-operating-runtime.md](../user/30-operating-runtime.md)
 - [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md)
-- [../user/30-runtime-naming-boundary.md](../user/30-runtime-naming-boundary.md)
+- [../user/95-runtime-naming-boundary.md](../user/95-runtime-naming-boundary.md)
 
 Covers the Docker runtime image, host launcher, bundled kanban service, agent boundary, and internal compatibility names.
 
@@ -181,7 +181,7 @@ Covers sample products and validation boundaries used by core verification.
 
 ### 9. Current Release Surface
 
-- [../user/40-release-status.md](../user/40-release-status.md)
+- [../user/80-current-release-surface.md](../user/80-current-release-surface.md)
 
 Summarizes the supported public surface and validation boundary for A2O 0.5.5.
 

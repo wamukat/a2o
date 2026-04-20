@@ -1,8 +1,8 @@
-# Project Package Authoring Guide
+# Project Package
 
 Use this guide when designing or reviewing an A2O project package. A project package is the input that tells A2O how to handle one product: which repositories exist, which skills and commands to use, how verification works, and what kinds of kanban tasks humans create.
 
-The full `project.yaml` field reference is [10-project-package-schema.md](10-project-package-schema.md). This guide is about intent and responsibility. Treat `project.yaml` as the product specification A2O runs from, not just as a configuration file.
+The full `project.yaml` field reference is [90-project-package-schema.md](90-project-package-schema.md). This guide is about intent and responsibility. Treat `project.yaml` as the product specification A2O runs from, not just as a configuration file.
 
 ## Package Inputs
 

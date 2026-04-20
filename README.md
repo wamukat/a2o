@@ -45,18 +45,18 @@ Start with [docs/en/user/00-overview.md](docs/en/user/00-overview.md) to underst
 User documentation:
 
 1. [docs/en/user/00-overview.md](docs/en/user/00-overview.md)
-2. [docs/en/user/00-user-quickstart.md](docs/en/user/00-user-quickstart.md)
-3. [docs/en/user/50-project-package-authoring-guide.md](docs/en/user/50-project-package-authoring-guide.md)
-4. [docs/en/user/20-runtime-distribution.md](docs/en/user/20-runtime-distribution.md)
-5. [docs/en/user/70-troubleshooting.md](docs/en/user/70-troubleshooting.md)
-6. [docs/en/user/60-parent-child-task-flow.md](docs/en/user/60-parent-child-task-flow.md)
-7. [docs/en/user/40-release-status.md](docs/en/user/40-release-status.md)
-8. [docs/en/user/10-project-package-schema.md](docs/en/user/10-project-package-schema.md)
-9. [docs/en/user/30-runtime-naming-boundary.md](docs/en/user/30-runtime-naming-boundary.md)
+2. [docs/en/user/10-quickstart.md](docs/en/user/10-quickstart.md)
+3. [docs/en/user/20-project-package.md](docs/en/user/20-project-package.md)
+4. [docs/en/user/30-operating-runtime.md](docs/en/user/30-operating-runtime.md)
+5. [docs/en/user/40-troubleshooting.md](docs/en/user/40-troubleshooting.md)
+6. [docs/en/user/50-parent-child-task-flow.md](docs/en/user/50-parent-child-task-flow.md)
+7. [docs/en/user/80-current-release-surface.md](docs/en/user/80-current-release-surface.md)
+8. [docs/en/user/90-project-package-schema.md](docs/en/user/90-project-package-schema.md)
+9. [docs/en/user/95-runtime-naming-boundary.md](docs/en/user/95-runtime-naming-boundary.md)
 
 Developer documentation:
 
-1. [docs/en/dev/00-design-map.md](docs/en/dev/00-design-map.md)
+1. [docs/en/dev/00-architecture.md](docs/en/dev/00-architecture.md)
 2. [docs/en/dev/10-engineering-rulebook.md](docs/en/dev/10-engineering-rulebook.md)
 3. [docs/en/dev/20-bounded-context-and-language.md](docs/en/dev/20-bounded-context-and-language.md)
 4. [docs/en/dev/30-core-domain-model.md](docs/en/dev/30-core-domain-model.md)
@@ -72,7 +72,9 @@ Developer documentation:
 ## Main Entrypoints
 
 ```sh
+a2o version
 a2o host install
+a2o doctor
 a2o upgrade check
 a2o project template --with-skills --output ./project-package/project.yaml
 a2o worker scaffold --language python --output ./project-package/commands/a2o-worker.py
@@ -83,6 +85,7 @@ a2o project validate --package ./reference-products/typescript-api-web/project-p
 a2o kanban up
 a2o kanban doctor
 a2o kanban url
+a2o agent target
 a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 a2o runtime up
 a2o runtime run-once
@@ -92,14 +95,17 @@ a2o runtime start
 a2o runtime status
 a2o runtime stop
 a2o runtime down
+a2o runtime image-digest
 a2o runtime doctor
 a2o runtime watch-summary
 a2o runtime describe-task A2O#1
+a2o runtime reset-task A2O#1
+a2o runtime show-artifact worker-run-1-implementation-combined-log
 ```
 
 The runtime image still contains `bin/a3` as the internal Engine CLI. That is an implementation compatibility name. The public user-facing entrypoints are `a2o` and `a2o-agent`.
 
-The quickest setup path is [docs/en/user/00-user-quickstart.md](docs/en/user/00-user-quickstart.md). For the published command surface and runtime image boundary, see [docs/en/user/40-release-status.md](docs/en/user/40-release-status.md).
+The quickest setup path is [docs/en/user/10-quickstart.md](docs/en/user/10-quickstart.md). For the published command surface and runtime image boundary, see [docs/en/user/80-current-release-surface.md](docs/en/user/80-current-release-surface.md).
 
 ## Repository Layout
 

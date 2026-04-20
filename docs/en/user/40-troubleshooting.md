@@ -1,6 +1,6 @@
 # Troubleshooting
 
-This document explains where to look and what to fix when A2O execution stops. For day-to-day runtime commands, read [20-runtime-distribution.md](20-runtime-distribution.md).
+This document explains where to look and what to fix when A2O execution stops. For day-to-day runtime commands, read [30-operating-runtime.md](30-operating-runtime.md).
 
 The goal is to narrow failures through `doctor`, `status`, `watch-summary`, and `describe-task` instead of hunting through logs first. A2O classifies common failures as configuration errors, dirty repositories, executor failures, verification failures, merge conflicts, and runtime failures. Start from the category, then fix the related file or command.
 

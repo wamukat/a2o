@@ -71,7 +71,7 @@ a2o project template \
 
 The command writes `project.yaml` and starter skill files. Replace `your-ai-worker` with the actual executor command before running the runtime.
 
-For package design, read [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md). For the full schema, read [10-project-package-schema.md](10-project-package-schema.md).
+For package design, read [20-project-package.md](20-project-package.md). For the full schema, read [90-project-package-schema.md](90-project-package-schema.md).
 
 ## 3. Check The Package
 
@@ -112,7 +112,7 @@ a2o kanban url
 
 `kanban up` starts the bundled kanban service and provisions the lanes and internal labels A2O needs. `kanban url` prints the board URL.
 
-The same Compose project reuses the existing board. If the board looks empty, check whether the Compose project or Docker volume changed. Runtime operations are covered in [20-runtime-distribution.md](20-runtime-distribution.md).
+The same Compose project reuses the existing board. If the board looks empty, check whether the Compose project or Docker volume changed. Runtime operations are covered in [30-operating-runtime.md](30-operating-runtime.md).
 
 ## 6. Install The Agent
 
@@ -184,14 +184,14 @@ a2o runtime watch-summary
 a2o runtime describe-task <task-ref>
 ```
 
-Error categories, agent artifacts, and blocked task recovery are covered in [70-troubleshooting.md](70-troubleshooting.md).
+Error categories, agent artifacts, and blocked task recovery are covered in [40-troubleshooting.md](40-troubleshooting.md).
 
 ## Next Documents
 
 | Goal | Document |
 |---|---|
-| Understand project package design | [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md) |
-| Operate runtime / kanban / agent / image updates | [20-runtime-distribution.md](20-runtime-distribution.md) |
-| Investigate blocked or failed tasks | [70-troubleshooting.md](70-troubleshooting.md) |
-| Use multi-repo / parent-child tasks | [60-parent-child-task-flow.md](60-parent-child-task-flow.md) |
-| Read every `project.yaml` field | [10-project-package-schema.md](10-project-package-schema.md) |
+| Understand project package design | [20-project-package.md](20-project-package.md) |
+| Operate runtime / kanban / agent / image updates | [30-operating-runtime.md](30-operating-runtime.md) |
+| Investigate blocked or failed tasks | [40-troubleshooting.md](40-troubleshooting.md) |
+| Use multi-repo / parent-child tasks | [50-parent-child-task-flow.md](50-parent-child-task-flow.md) |
+| Read every `project.yaml` field | [90-project-package-schema.md](90-project-package-schema.md) |

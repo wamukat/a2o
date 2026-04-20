@@ -7,13 +7,16 @@ A2O 0.5.5 で現在利用できる公開機能と検証範囲を示す。
 ## 利用可能なコマンドと機能
 
 - ホスト用ランチャーの導入: `a2o host install`
-- プロジェクトの初期化: `a2o project bootstrap`、任意で `--package DIR`
+- バージョン確認: `a2o version`
+- ホスト環境の診断: `a2o doctor`
+- プロジェクトパッケージの作成・検証・初期化: `a2o project template`、`lint`、`validate`、`bootstrap`
+- ワーカー補助コマンド: `a2o worker scaffold`、`a2o worker validate-result`
 - カンバンサービスの起動・診断: `a2o kanban up`、`doctor`、`url`
-- エージェントバイナリの書き出し: `a2o agent install`
+- エージェント対象の判定とバイナリの書き出し: `a2o agent target`、`a2o agent install`
 - ランタイムコンテナの起動・停止: `a2o runtime up`、`down`
 - 手動でのランタイム実行: `a2o runtime run-once`、`a2o runtime loop`
 - 常駐スケジューラの起動・停止・状態確認: `a2o runtime start`、`stop`、`status`
-- ランタイム診断: `a2o runtime doctor`、`a2o runtime watch-summary`、`a2o runtime describe-task <task-ref>`
+- ランタイム診断・復旧: `a2o runtime image-digest`、`doctor`、`watch-summary`、`describe-task <task-ref>`、`reset-task <task-ref>`、`show-artifact <artifact-id>`
 - アップグレード診断: `a2o upgrade check`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
 - SoloBoard アダプターと初期化ツール。既定の SoloBoard イメージは `v0.9.15`

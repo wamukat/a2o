@@ -1,6 +1,6 @@
 # Project Package Schema Reference
 
-This document is the detailed `project.yaml` reference. For setup intent and responsibility boundaries, read [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md) first.
+This document is the detailed `project.yaml` reference. For setup intent and responsibility boundaries, read [20-project-package.md](20-project-package.md) first.
 
 Use this document when adding or changing settings. First understand why the package needs a setting, then use this reference to confirm YAML shape, default responsibility boundaries, and supported placeholders.
 

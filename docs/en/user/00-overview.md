@@ -73,9 +73,9 @@ Git repositories hold the final output. A2O uses branch namespaces and merge pha
 
 Start with these documents:
 
-1. [00-user-quickstart.md](00-user-quickstart.md): run the smallest working setup.
-2. [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md): understand the inputs users own.
-3. [20-runtime-distribution.md](20-runtime-distribution.md): operate the scheduler, agent, kanban, and runtime image.
-4. [70-troubleshooting.md](70-troubleshooting.md): know where to look when a task blocks or fails.
+1. [10-quickstart.md](10-quickstart.md): run the smallest working setup.
+2. [20-project-package.md](20-project-package.md): understand the inputs users own.
+3. [30-operating-runtime.md](30-operating-runtime.md): operate the scheduler, agent, kanban, and runtime image.
+4. [40-troubleshooting.md](40-troubleshooting.md): know where to look when a task blocks or fails.
 
 Detailed schemas and compatibility names are references to read later.

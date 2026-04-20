@@ -2,7 +2,7 @@
 
 This document defines A2O's everyday engineering discipline. Design documents define what to build; this document defines how to build it.
 
-Read it to align implementation decisions. A2O favors changes that keep ticket scope, tests, responsibility boundaries, and user-facing diagnostics coherent over changes that merely work in the short term. For design details, start at [00-design-map.md](00-design-map.md) and follow the relevant detail document.
+Read it to align implementation decisions. A2O favors changes that keep ticket scope, tests, responsibility boundaries, and user-facing diagnostics coherent over changes that merely work in the short term. For design details, start at [00-architecture.md](00-architecture.md) and follow the relevant detail document.
 
 ## Runtime Placement
 
