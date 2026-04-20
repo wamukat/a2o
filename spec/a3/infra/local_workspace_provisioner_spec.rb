@@ -6,6 +6,14 @@ require "tmpdir"
 RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
   let(:tmpdir) { Dir.mktmpdir("a3-v2-workspace") }
 
+  def slot_metadata_path(slot_path)
+    slot_path.parent.join(".a2o", "slots", slot_path.basename.to_s, "slot.json")
+  end
+
+  def materialized_marker_path(slot_path)
+    slot_path.parent.join(".a2o", "slots", slot_path.basename.to_s, "materialized.json")
+  end
+
   after do
     FileUtils.remove_entry(tmpdir)
   end
@@ -48,12 +56,14 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     expect(workspace.root_path).to exist
     expect(workspace.slot_paths.fetch(:repo_alpha)).to exist
     expect(workspace.slot_paths.fetch(:repo_beta)).to exist
-    expect(workspace.slot_paths.fetch(:repo_alpha).join(".a3", "slot.json")).to exist
-    expect(workspace.slot_paths.fetch(:repo_beta).join(".a3", "slot.json")).to exist
+    expect(workspace.slot_paths.fetch(:repo_alpha).join(".a3")).not_to exist
+    expect(workspace.slot_paths.fetch(:repo_beta).join(".a3")).not_to exist
+    expect(slot_metadata_path(workspace.slot_paths.fetch(:repo_alpha))).to exist
+    expect(slot_metadata_path(workspace.slot_paths.fetch(:repo_beta))).to exist
     expect(workspace.slot_paths.fetch(:repo_alpha).join("README.md").read).to eq("repo_alpha source\n")
     expect(workspace.slot_paths.fetch(:repo_beta).join("README.md").read).to eq("repo_beta source\n")
-    expect(workspace.slot_paths.fetch(:repo_alpha).join(".a3", "materialized.json")).to exist
-    expect(workspace.slot_paths.fetch(:repo_beta).join(".a3", "materialized.json")).to exist
+    expect(materialized_marker_path(workspace.slot_paths.fetch(:repo_alpha))).to exist
+    expect(materialized_marker_path(workspace.slot_paths.fetch(:repo_beta))).to exist
     expect(workspace.slot_paths.fetch(:repo_alpha).join(".git", "HEAD").read).to eq("abc123\n")
     expect(workspace.slot_paths.fetch(:repo_beta).join(".git", "HEAD").read).to eq("abc123\n")
 
@@ -69,7 +79,7 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
       { "repo_slot" => "repo_alpha", "sync_class" => "eager" },
       { "repo_slot" => "repo_beta", "sync_class" => "lazy_but_guaranteed" }
     )
-    slot_metadata = JSON.parse(workspace.slot_paths.fetch(:repo_alpha).join(".a3", "slot.json").read)
+    slot_metadata = JSON.parse(slot_metadata_path(workspace.slot_paths.fetch(:repo_alpha)).read)
     expect(slot_metadata).to include(
       "repo_source_root" => repo_sources.fetch(:repo_alpha),
       "artifact_owner_ref" => "A3-v2#3022",
@@ -156,13 +166,15 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     )
     provisioner = described_class.new(base_dir: tmpdir, repo_sources: repo_sources)
     stale_slot = Pathname(tmpdir).join("workspaces", "A3-v2-3025", "runtime_workspace", "repo_alpha")
-    FileUtils.mkdir_p(stale_slot.join(".a3"))
+    FileUtils.mkdir_p(stale_slot)
+    FileUtils.mkdir_p(slot_metadata_path(stale_slot).dirname)
     stale_slot.join("stale.txt").write("obsolete")
-    stale_slot.join(".a3", "slot.json").write(
+    slot_metadata_path(stale_slot).write(
       JSON.pretty_generate(
         "task_ref" => "A3-v2#3025",
         "workspace_kind" => "runtime_workspace",
         "repo_slot" => "repo_alpha",
+        "slot_path" => stale_slot.to_s,
         "sync_class" => "eager",
         "source_type" => "detached_commit",
         "source_ref" => "stale-123"
@@ -181,7 +193,7 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     )
 
     slot_path = workspace.slot_paths.fetch(:repo_alpha)
-    slot_metadata = JSON.parse(slot_path.join(".a3", "slot.json").read)
+    slot_metadata = JSON.parse(slot_metadata_path(slot_path).read)
     expect(slot_metadata).to include(
       "source_ref" => "fresh-456",
       "sync_class" => "eager",
@@ -212,13 +224,15 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     )
     provisioner = described_class.new(base_dir: tmpdir, repo_sources: repo_sources)
     slot_path = Pathname(tmpdir).join("workspaces", "A3-v2-3025", "runtime_workspace", "repo_alpha")
-    FileUtils.mkdir_p(slot_path.join(".a3"))
+    FileUtils.mkdir_p(slot_path)
+    FileUtils.mkdir_p(slot_metadata_path(slot_path).dirname)
     slot_path.join("corrupt.txt").write("not a real checkout")
-    slot_path.join(".a3", "slot.json").write(
+    slot_metadata_path(slot_path).write(
       JSON.pretty_generate(
         "task_ref" => "A3-v2#3025",
         "workspace_kind" => "runtime_workspace",
         "repo_slot" => "repo_alpha",
+        "slot_path" => slot_path.to_s,
         "sync_class" => "eager",
         "source_type" => "detached_commit",
         "source_ref" => "fresh-789",
@@ -240,7 +254,7 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
       bootstrap_marker: "workspace-hook:v3"
     )
 
-    materialized = JSON.parse(workspace.slot_paths.fetch(:repo_alpha).join(".a3", "materialized.json").read)
+    materialized = JSON.parse(materialized_marker_path(workspace.slot_paths.fetch(:repo_alpha)).read)
     expect(materialized).to include(
       "source_ref" => "fresh-789",
       "source_type" => "detached_commit"
@@ -270,12 +284,13 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     )
     provisioner = described_class.new(base_dir: tmpdir, repo_sources: repo_sources)
     slot_path = Pathname(tmpdir).join("workspaces", "A3-v2-3025", "runtime_workspace", "repo_alpha")
-    FileUtils.mkdir_p(slot_path.join(".a3"))
-    slot_path.join(".a3", "slot.json").write(
+    FileUtils.mkdir_p(slot_metadata_path(slot_path).dirname)
+    slot_metadata_path(slot_path).write(
       JSON.pretty_generate(
         "task_ref" => "A3-v2#3025",
         "workspace_kind" => "runtime_workspace",
         "repo_slot" => "repo_alpha",
+        "slot_path" => slot_path.to_s,
         "sync_class" => "eager",
         "source_type" => "detached_commit",
         "source_ref" => "expected-head",
@@ -285,7 +300,7 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
         "bootstrap_marker" => "workspace-hook:v4"
       )
     )
-    slot_path.join(".a3", "materialized.json").write(
+    materialized_marker_path(slot_path).write(
       JSON.pretty_generate(
         "workspace_kind" => "runtime_workspace",
         "source_type" => "detached_commit",
@@ -386,6 +401,9 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     slot_path = workspace.slot_paths.fetch(:repo_alpha)
     expect(slot_path.join("README.md").read).to eq("git-backed repo-alpha\n")
     expect(`git -C #{slot_path} rev-parse HEAD`.strip).to eq(head_sha)
+    status = `git -C #{slot_path} status --porcelain --untracked-files=all`
+    expect(status).not_to include(".a3")
+    expect(status).not_to include(".a2o")
   end
 
   it "quarantines terminal git-backed workspaces without leaving source worktree residue" do

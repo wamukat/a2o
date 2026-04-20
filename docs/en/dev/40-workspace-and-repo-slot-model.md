@@ -63,7 +63,7 @@ Dirty source repositories should fail fast with the repo and file list included 
 
 Generated runtime output should live under `.work/a2o/`.
 
-Agent metadata inside materialized workspaces may still use `.a3/` as internal compatibility data. Users should not edit those files.
+Agent metadata for materialized repo slots should live in A2O-managed metadata paths outside the product repo slot checkout. Product repo slots should not contain A2O-owned `.a3/slot.json` or `.a3/materialized.json` files.
 
 Cleanup policy should preserve evidence needed for blocked diagnosis and release validation while allowing disposable workspaces to be regenerated.
 

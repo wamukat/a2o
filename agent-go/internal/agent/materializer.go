@@ -1107,7 +1107,7 @@ func pathInside(root string, path string) bool {
 }
 
 func repoSourceRootFromSlotMetadata(slotPath string) (string, error) {
-	content, err := os.ReadFile(filepath.Join(slotPath, ".a3", "slot.json"))
+	content, err := os.ReadFile(slotMetadataPath(slotPath))
 	if err != nil {
 		return "", err
 	}
@@ -1435,13 +1435,14 @@ func writeWorkspaceMetadata(root string, request WorkspaceRequest) error {
 }
 
 func writeSlotMetadata(slotPath string, sourceRoot string, request WorkspaceRequest, slotName string, slot WorkspaceSlotRequest) error {
-	metadataDir := filepath.Join(slotPath, ".a3")
+	metadataDir := slotMetadataDir(slotPath)
 	if err := os.MkdirAll(metadataDir, 0o755); err != nil {
 		return err
 	}
 	payload := map[string]any{
 		"workspace_kind":   request.WorkspaceKind,
 		"repo_slot":        slotName,
+		"slot_path":        slotPath,
 		"repo_source_root": sourceRoot,
 		"sync_class":       "copy",
 		"source_type":      "branch_head",
@@ -1457,6 +1458,14 @@ func writeSlotMetadata(slotPath string, sourceRoot string, request WorkspaceRequ
 		"source_type":    "branch_head",
 		"source_ref":     slot.Ref,
 	})
+}
+
+func slotMetadataDir(slotPath string) string {
+	return filepath.Join(filepath.Dir(slotPath), ".a2o", "slots", filepath.Base(slotPath))
+}
+
+func slotMetadataPath(slotPath string) string {
+	return filepath.Join(slotMetadataDir(slotPath), "slot.json")
 }
 
 func workspaceSourceRef(request WorkspaceRequest) string {

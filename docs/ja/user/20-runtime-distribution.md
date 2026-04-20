@@ -73,5 +73,5 @@ Public launcher は host install、check-only upgrade planning、project bootstr
 - 小さい task number を複数 isolated boards で再利用しても existing refs と衝突しないよう、branch namespace は instance-specific に保つ。
 - `.work/a2o/` は disposable runtime output として扱う。new bootstrap state、host-agent binaries、generated launcher config、agent workspaces はそこに置く。
 - 既存の `.a3/runtime-instance.json` は compatibility fallback としてだけ読む。新しい bootstrap は書き出さない。
-- materialized repo workspaces 内の `.a3/` directories は internal agent metadata であり、user-managed package files ではない。
+- Materialized repo workspace の agent metadata は product repo slot 内ではなく、`.work/a2o/agent/` 管理 path 配下に置く。
 - 新しい Engine hardcoded defaults より、project package declarations を優先する。

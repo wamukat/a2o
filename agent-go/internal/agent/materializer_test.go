@@ -41,9 +41,18 @@ func TestWorkspaceMaterializerPreparesAndCleansWorktreeSlots(t *testing.T) {
 	if workspaceMetadata["workspace_kind"] != "ticket_workspace" || workspaceMetadata["source_ref"] != "refs/heads/a3/work/Sample-42" {
 		t.Fatalf("unexpected workspace metadata: %#v", workspaceMetadata)
 	}
-	slotMetadata := readJSON(t, filepath.Join(slotPath, ".a3", "slot.json"))
+	if _, err := os.Stat(filepath.Join(slotPath, ".a3")); !os.IsNotExist(err) {
+		t.Fatalf("slot metadata must not be written inside the repo slot, stat err=%v", err)
+	}
+	slotMetadata := readJSON(t, filepath.Join(prepared.Root, ".a2o", "slots", "repo_alpha", "slot.json"))
 	if slotMetadata["repo_source_root"] != sourceRoot || slotMetadata["repo_slot"] != "repo_alpha" {
 		t.Fatalf("unexpected slot metadata: %#v", slotMetadata)
+	}
+	if slotMetadata["slot_path"] != slotPath {
+		t.Fatalf("unexpected slot path metadata: %#v", slotMetadata)
+	}
+	if status := git(t, slotPath, "status", "--porcelain", "--untracked-files=all"); strings.Contains(status, ".a3") || strings.Contains(status, ".a2o") {
+		t.Fatalf("agent metadata should not appear in slot git status: %s", status)
 	}
 	if out := git(t, sourceRoot, "worktree", "list", "--porcelain"); !contains(out, slotPath) {
 		t.Fatalf("worktree was not registered: %s", out)

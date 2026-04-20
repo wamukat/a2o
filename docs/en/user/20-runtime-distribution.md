@@ -71,5 +71,5 @@ The public launcher covers host install, check-only upgrade planning, project bo
 - Keep branch namespaces instance-specific.
 - Treat `.work/a2o/` as disposable runtime output.
 - Existing `.a3/runtime-instance.json` is read only as a compatibility fallback.
-- `.a3/` directories inside materialized repo workspaces are internal agent metadata.
+- Agent metadata for materialized repo workspaces belongs under `.work/a2o/agent/` management paths, not inside product repo slots.
 - Prefer project package declarations over hard-coded Engine defaults.

@@ -210,7 +210,7 @@ module A3
             head_path = checkout_head_path(slot_path)
             head_path.exist? && head_path.read == "#{workspace_plan.source_descriptor.ref}\n"
           end
-        metadata == slot_metadata(task_ref, workspace_plan, requirement, artifact_owner, bootstrap_marker) &&
+        metadata == slot_metadata(slot_path, task_ref, workspace_plan, requirement, artifact_owner, bootstrap_marker) &&
           materialized == materialized_marker(workspace_plan) &&
           checkout_ready
       end
@@ -267,10 +267,10 @@ module A3
       end
 
       def write_slot_metadata(slot_path, source_root, task_ref, workspace_plan, requirement, artifact_owner, bootstrap_marker)
-        metadata_dir = slot_path.join(".a3")
+        metadata_dir = slot_metadata_dir(slot_path)
         FileUtils.mkdir_p(metadata_dir)
         slot_metadata_path(slot_path).write(
-          JSON.pretty_generate(slot_metadata(task_ref, workspace_plan, requirement, artifact_owner, bootstrap_marker))
+          JSON.pretty_generate(slot_metadata(slot_path, task_ref, workspace_plan, requirement, artifact_owner, bootstrap_marker))
         )
         materialized_marker_path(slot_path).write(
           JSON.pretty_generate(materialized_marker(workspace_plan))
@@ -281,11 +281,12 @@ module A3
         end
       end
 
-      def slot_metadata(task_ref, workspace_plan, requirement, artifact_owner, bootstrap_marker)
+      def slot_metadata(slot_path, task_ref, workspace_plan, requirement, artifact_owner, bootstrap_marker)
         {
           "task_ref" => task_ref,
           "workspace_kind" => workspace_plan.workspace_kind.to_s,
           "repo_slot" => requirement.repo_slot.to_s,
+          "slot_path" => slot_path.to_s,
           "repo_source_root" => repo_source_for(requirement.repo_slot).to_s,
           "sync_class" => requirement.sync_class.to_s,
           "source_type" => workspace_plan.source_descriptor.source_type.to_s,
@@ -298,11 +299,15 @@ module A3
       end
 
       def slot_metadata_path(slot_path)
-        slot_path.join(".a3", "slot.json")
+        slot_metadata_dir(slot_path).join("slot.json")
       end
 
       def materialized_marker_path(slot_path)
-        slot_path.join(".a3", "materialized.json")
+        slot_metadata_dir(slot_path).join("materialized.json")
+      end
+
+      def slot_metadata_dir(slot_path)
+        slot_path.parent.join(".a2o", "slots", slot_path.basename.to_s)
       end
 
       def checkout_head_path(slot_path)
@@ -388,9 +393,9 @@ module A3
       end
 
       def git_worktree_slots(source_root)
-        source_root.glob("**/.a3/slot.json").each_with_object([]) do |metadata_path, slots|
-          slot_path = metadata_path.parent.parent
+        source_root.glob("**/.a2o/slots/*/slot.json").each_with_object([]) do |metadata_path, slots|
           metadata = JSON.parse(metadata_path.read)
+          slot_path = Pathname(metadata.fetch("slot_path"))
           repo_slot = metadata.fetch("repo_slot").to_sym
           repo_source = repo_source_for(repo_slot)
           next unless git_repo_source?(repo_source)
@@ -428,7 +433,7 @@ module A3
           )
           FileUtils.mkdir_p(slot_path)
           copy_repo_source!(repo_source, slot_path)
-          metadata_dir = slot_path.join(".a3")
+          metadata_dir = slot_metadata_dir(slot_path)
           FileUtils.mkdir_p(metadata_dir)
           slot_metadata_path(slot_path).write(JSON.pretty_generate(metadata)) if metadata
           materialized_marker_path(slot_path).write(JSON.pretty_generate(materialized)) if materialized
