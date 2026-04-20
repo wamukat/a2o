@@ -314,6 +314,25 @@ A2O の CLI stderr と kanban comment は、失敗時に `error_category` / `エ
 | `merge_failed` | merge target ref と branch policy を確認する。 |
 | `runtime_failed` | Docker / compose / runtime process の状態と出力を確認する。 |
 
+Docker credential helper error:
+
+`a2o doctor` は Docker の `credsStore` と `credHelpers` を確認する。Docker config が現在の host で使えない helper を指している場合、たとえば WSL に残った Windows helper などでは、`docker_credential_helpers status=blocked` を出す。
+
+一時回避:
+
+```sh
+tmp_docker_config="$(mktemp -d)"
+printf '{"auths":{}}\n' > "$tmp_docker_config/config.json"
+DOCKER_CONFIG="$tmp_docker_config" a2o doctor
+```
+
+恒久対応:
+
+1. `${DOCKER_CONFIG:-$HOME/.docker}/config.json` を開く。
+2. 古い `credsStore` / `credHelpers` entry を削除または修正する。
+3. 参照している `docker-credential-*` helper が host の PATH に存在することを確認する。
+4. `a2o doctor` を再実行する。
+
 診断の入口:
 
 ```sh

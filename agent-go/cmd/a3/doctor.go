@@ -1,11 +1,14 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -44,6 +47,8 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
 	fmt.Fprintf(stdout, "kanban_volume=%s\n", kanbanDataVolumeName(effectiveConfig.ComposeProject))
+
+	checkDockerCredentialHelpers(report)
 
 	packageConfig, err := loadProjectPackageConfig(config.PackagePath)
 	if err != nil {
@@ -104,6 +109,88 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 		return 1
 	}
 	return 0
+}
+
+type dockerCredentialConfig struct {
+	CredsStore  string            `json:"credsStore"`
+	CredHelpers map[string]string `json:"credHelpers"`
+}
+
+func checkDockerCredentialHelpers(report func(string, bool, string, string)) {
+	configPath, err := dockerConfigPath()
+	if err != nil {
+		report("docker_credential_helpers", false, err.Error(), "set DOCKER_CONFIG to a readable Docker config directory or fix HOME")
+		return
+	}
+	body, err := os.ReadFile(configPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			report("docker_credential_helpers", true, "config_not_found path="+configPath, "none")
+			return
+		}
+		report("docker_credential_helpers", false, err.Error(), "fix Docker config permissions or set DOCKER_CONFIG to a readable directory")
+		return
+	}
+	var config dockerCredentialConfig
+	if err := json.Unmarshal(body, &config); err != nil {
+		report("docker_credential_helpers", false, "invalid Docker config JSON path="+configPath+" error="+err.Error(), "fix Docker config JSON or set DOCKER_CONFIG to a clean directory")
+		return
+	}
+
+	helpers := []string{}
+	if strings.TrimSpace(config.CredsStore) != "" {
+		helpers = append(helpers, "credsStore="+strings.TrimSpace(config.CredsStore))
+	}
+	for registry, helper := range config.CredHelpers {
+		helper = strings.TrimSpace(helper)
+		if helper == "" {
+			continue
+		}
+		helpers = append(helpers, "credHelpers["+registry+"]="+helper)
+	}
+	sort.Strings(helpers)
+	if len(helpers) == 0 {
+		report("docker_credential_helpers", true, "no credential helper configured path="+configPath, "none")
+		return
+	}
+
+	missing := []string{}
+	for _, helper := range helpers {
+		name := helper[strings.LastIndex(helper, "=")+1:]
+		binary := dockerCredentialHelperBinary(name)
+		if _, err := exec.LookPath(binary); err != nil {
+			missing = append(missing, helper+" binary="+binary)
+		}
+	}
+	if len(missing) > 0 {
+		report(
+			"docker_credential_helpers",
+			false,
+			"path="+configPath+" missing="+strings.Join(missing, ","),
+			`fix Docker config credsStore/credHelpers or run with temporary DOCKER_CONFIG containing {"auths":{}}`,
+		)
+		return
+	}
+	report("docker_credential_helpers", true, "path="+configPath+" helpers="+strings.Join(helpers, ","), "none")
+}
+
+func dockerConfigPath() (string, error) {
+	if value := strings.TrimSpace(os.Getenv("DOCKER_CONFIG")); value != "" {
+		return filepath.Join(value, "config.json"), nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".docker", "config.json"), nil
+}
+
+func dockerCredentialHelperBinary(helper string) string {
+	helper = strings.TrimSpace(helper)
+	if strings.HasPrefix(helper, "docker-credential-") {
+		return helper
+	}
+	return "docker-credential-" + helper
 }
 
 func checkExecutorConfig(config projectPackageConfig, report func(string, bool, string, string)) {

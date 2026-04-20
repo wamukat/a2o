@@ -12,6 +12,13 @@ import (
 	"testing"
 )
 
+func setEmptyDockerConfig(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("DOCKER_CONFIG", dir)
+	return dir
+}
+
 func TestAgentTargetPrintsSupportedTarget(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -1340,6 +1347,7 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 
 func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 	tempDir := t.TempDir()
+	setEmptyDockerConfig(t)
 	packageDir := filepath.Join(tempDir, "package")
 	repoDir := filepath.Join(tempDir, "repo")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -1404,6 +1412,7 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 
 	for _, want := range []string{
 		"doctor_check name=project_package status=ok",
+		"doctor_check name=docker_credential_helpers status=ok detail=config_not_found",
 		"doctor_check name=executor_config status=ok detail=commands=sh",
 		"doctor_check name=project_script_contract status=ok detail=public A2O script contract only",
 		"doctor_check name=fixture_reference status=ok detail=no production config fixture references",
@@ -1422,8 +1431,47 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 	}
 }
 
+func TestDoctorDetectsMissingDockerCredentialHelper(t *testing.T) {
+	dockerConfigDir := t.TempDir()
+	t.Setenv("DOCKER_CONFIG", dockerConfigDir)
+	if err := os.WriteFile(filepath.Join(dockerConfigDir, "config.json"), []byte(`{"credsStore":"wincred.exe"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	type reportLine struct {
+		name   string
+		ok     bool
+		detail string
+		action string
+	}
+	reports := []reportLine{}
+	checkDockerCredentialHelpers(func(name string, ok bool, detail string, action string) {
+		reports = append(reports, reportLine{name: name, ok: ok, detail: detail, action: action})
+	})
+
+	if len(reports) != 1 {
+		t.Fatalf("expected one report, got %#v", reports)
+	}
+	got := reports[0]
+	if got.name != "docker_credential_helpers" || got.ok {
+		t.Fatalf("expected blocked docker credential helper report, got %#v", got)
+	}
+	for _, want := range []string{
+		"missing=credsStore=wincred.exe binary=docker-credential-wincred.exe",
+		"config.json",
+	} {
+		if !strings.Contains(got.detail, want) {
+			t.Fatalf("detail missing %q in %q", want, got.detail)
+		}
+	}
+	if !strings.Contains(got.action, "temporary DOCKER_CONFIG") || !strings.Contains(got.action, `{"auths":{}}`) {
+		t.Fatalf("action should explain temporary DOCKER_CONFIG workaround, got %q", got.action)
+	}
+}
+
 func TestDoctorFlagsFixtureReferencesInProductionProjectYaml(t *testing.T) {
 	tempDir := t.TempDir()
+	setEmptyDockerConfig(t)
 	packageDir := filepath.Join(tempDir, "package")
 	repoDir := filepath.Join(tempDir, "repo")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -1500,6 +1548,7 @@ func TestDoctorFlagsFixtureReferencesInProductionProjectYaml(t *testing.T) {
 
 func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 	tempDir := t.TempDir()
+	setEmptyDockerConfig(t)
 	packageDir := filepath.Join(tempDir, "package")
 	repoDir := filepath.Join(tempDir, "repo")
 	if err := os.MkdirAll(filepath.Join(packageDir, "commands"), 0o755); err != nil {
@@ -1610,6 +1659,7 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 
 func TestDoctorFlagsPrivateContractUsageInProjectYaml(t *testing.T) {
 	tempDir := t.TempDir()
+	setEmptyDockerConfig(t)
 	packageDir := filepath.Join(tempDir, "package")
 	repoDir := filepath.Join(tempDir, "repo")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -1964,6 +2014,7 @@ func TestProjectLintRejectsUnsupportedAgentWorkspaceCleanupPolicy(t *testing.T) 
 
 func TestDoctorAgentInstallFailureShowsExactOutputPath(t *testing.T) {
 	tempDir := t.TempDir()
+	setEmptyDockerConfig(t)
 	packageDir := filepath.Join(tempDir, "package")
 	repoDir := filepath.Join(tempDir, "repo")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {

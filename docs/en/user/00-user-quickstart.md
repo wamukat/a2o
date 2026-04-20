@@ -281,6 +281,25 @@ A2O CLI stderr and kanban comments include `error_category` and remediation guid
 | `merge_failed` | Check merge target ref and branch policy. |
 | `runtime_failed` | Check Docker, compose, runtime processes, and printed command output. |
 
+Docker credential helper errors:
+
+`a2o doctor` checks Docker `credsStore` and `credHelpers` entries. If the Docker config points at a helper that is not available on the current host, such as a stale Windows helper in WSL, doctor reports `docker_credential_helpers status=blocked`.
+
+Temporary workaround for one command:
+
+```sh
+tmp_docker_config="$(mktemp -d)"
+printf '{"auths":{}}\n' > "$tmp_docker_config/config.json"
+DOCKER_CONFIG="$tmp_docker_config" a2o doctor
+```
+
+Permanent fix:
+
+1. Open `${DOCKER_CONFIG:-$HOME/.docker}/config.json`.
+2. Remove or correct stale `credsStore` / `credHelpers` entries.
+3. Confirm the referenced `docker-credential-*` helper exists on the host PATH.
+4. Rerun `a2o doctor`.
+
 Diagnostic entrypoints:
 
 ```sh
