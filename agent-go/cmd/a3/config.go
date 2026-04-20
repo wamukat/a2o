@@ -18,6 +18,7 @@ type runtimeInstanceConfig struct {
 	SoloBoardPort  string `json:"soloboard_port"`
 	AgentPort      string `json:"agent_port"`
 	StorageDir     string `json:"storage_dir"`
+	RuntimeImage   string `json:"runtime_image,omitempty"`
 }
 
 func defaultComposeFile() string {
@@ -59,6 +60,16 @@ func defaultRuntimeImage() string {
 				return strings.TrimSpace(string(body))
 			}
 		}
+	}
+	return ""
+}
+
+func runtimeImageReference(config *runtimeInstanceConfig) string {
+	if value := defaultRuntimeImage(); value != "" {
+		return value
+	}
+	if config != nil {
+		return strings.TrimSpace(config.RuntimeImage)
 	}
 	return ""
 }
@@ -230,7 +241,7 @@ func composeEnv(config runtimeInstanceConfig) map[string]string {
 		overrides["A3_WORKSPACE_ROOT"] = config.WorkspaceRoot
 		overrides["A3_HOST_WORKSPACE_ROOT"] = config.WorkspaceRoot
 	}
-	if runtimeImage := defaultRuntimeImage(); runtimeImage != "" {
+	if runtimeImage := runtimeImageReference(&config); runtimeImage != "" {
 		overrides["A2O_RUNTIME_IMAGE"] = runtimeImage
 		overrides["A3_RUNTIME_IMAGE"] = runtimeImage
 	}

@@ -355,7 +355,7 @@ a2o runtime image-digest
 a2o doctor
 ```
 
-`a2o runtime image-digest` prints the configured pinned digest, the local `latest` digest, and the running container digest. If `runtime_image_latest_status=mismatch`, pulling `latest` changed the local image but did not change the product package pin. Validate that image, then record the printed `runtime_image_pinned_digest=...` or desired `runtime_image_local_latest_digest=...` in the product package Taskfile, env file, or deployment note. If `runtime_image_running_status=mismatch`, restart with `a2o runtime up` after confirming the desired pin.
+`a2o runtime image-digest` prints the configured pinned digest, the local `latest` digest, and the running container digest. The configured ref comes from explicit runtime image environment variables first, then the bootstrapped runtime instance config. If `runtime_image_latest_status=mismatch`, pulling `latest` changed the local image but did not change the product package pin. Validate that image, then record the printed `runtime_image_pinned_digest=...` or desired `runtime_image_local_latest_digest=...` in the product package Taskfile, env file, or deployment note. If `runtime_image_running_status=mismatch`, restart with `a2o runtime up` after confirming the desired pin.
 
 After updating the package pin, verify:
 

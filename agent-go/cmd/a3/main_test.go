@@ -122,6 +122,7 @@ func TestAgentInstallExportsAgentFromRuntimeImage(t *testing.T) {
 }
 
 func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
+	t.Setenv("A2O_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:bootstrap")
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "a3-project")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -169,6 +170,9 @@ func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
 	}
 	if config.StorageDir != "/var/lib/a2o/a2o-runtime" {
 		t.Fatalf("StorageDir=%q", config.StorageDir)
+	}
+	if config.RuntimeImage != "ghcr.io/wamukat/a2o-engine@sha256:bootstrap" {
+		t.Fatalf("RuntimeImage=%q", config.RuntimeImage)
 	}
 }
 
@@ -3968,6 +3972,51 @@ func TestRuntimeImageDigestPrintsPinnedRuntimeDigest(t *testing.T) {
 	}
 	if runner.lastEnv["A3_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine@sha256:pinned" {
 		t.Fatalf("image-digest should evaluate compose with runtime image env, got %#v", runner.lastEnv)
+	}
+}
+
+func TestRuntimeImageDigestUsesInstanceRuntimeImageWhenEnvIsAbsent(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-digest",
+		RuntimeService: "a2o-runtime",
+		RuntimeImage:   "ghcr.io/wamukat/a2o-engine@sha256:instance",
+	})
+	runner := &fakeRunner{
+		imageInspectDigests: map[string]string{
+			"image-123": "ghcr.io/wamukat/a2o-engine@sha256:instance",
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "image-digest"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	for _, want := range []string{
+		"runtime_image_pinned_ref=ghcr.io/wamukat/a2o-engine@sha256:instance",
+		"runtime_image_pinned_digest=ghcr.io/wamukat/a2o-engine@sha256:instance",
+		"runtime_image_local_latest_ref=ghcr.io/wamukat/a2o-engine:latest",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout should include %q in:\n%s", want, output)
+		}
+	}
+	if runner.lastEnv["A2O_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine@sha256:instance" {
+		t.Fatalf("image-digest should evaluate compose with instance runtime image env, got %#v", runner.lastEnv)
 	}
 }
 

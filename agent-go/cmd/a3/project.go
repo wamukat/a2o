@@ -547,6 +547,7 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 		SoloBoardPort:  strings.TrimSpace(*soloBoardPort),
 		AgentPort:      strings.TrimSpace(*agentPort),
 		StorageDir:     strings.TrimSpace(*storageDir),
+		RuntimeImage:   defaultRuntimeImage(),
 	}
 	if err := writeInstanceConfig(absWorkspaceRoot, config); err != nil {
 		return err

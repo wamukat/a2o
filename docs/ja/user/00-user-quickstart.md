@@ -430,7 +430,7 @@ a2o runtime image-digest
 a2o doctor
 ```
 
-`a2o runtime image-digest` は configured pinned digest、local `latest` digest、running container digest を出す。`runtime_image_latest_status=mismatch` の場合、`latest` の pull は local image を更新しているが、product package の pin は変わっていない。対象 image を検証してから、`runtime_image_pinned_digest=...` または採用する `runtime_image_local_latest_digest=...` を project package の Taskfile / env file / deployment note の runtime image 値に反映する。`runtime_image_running_status=mismatch` の場合、採用する pin を確認してから `a2o runtime up` で再起動する。
+`a2o runtime image-digest` は configured pinned digest、local `latest` digest、running container digest を出す。Configured ref は明示された runtime image environment variable を最優先し、次に bootstrap 済み runtime instance config から読む。`runtime_image_latest_status=mismatch` の場合、`latest` の pull は local image を更新しているが、product package の pin は変わっていない。対象 image を検証してから、`runtime_image_pinned_digest=...` または採用する `runtime_image_local_latest_digest=...` を project package の Taskfile / env file / deployment note の runtime image 値に反映する。`runtime_image_running_status=mismatch` の場合、採用する pin を確認してから `a2o runtime up` で再起動する。
 
 更新後は次を確認する。
 

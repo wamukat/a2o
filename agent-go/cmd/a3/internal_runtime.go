@@ -350,7 +350,7 @@ type runtimeImageReport struct {
 
 func runtimeImageDigestReport(config *runtimeInstanceConfig, runner commandRunner) runtimeImageReport {
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
-	configuredRef := defaultRuntimeImage()
+	configuredRef := runtimeImageReference(config)
 	report := runtimeImageReport{
 		ConfiguredRef:    configuredRef,
 		ConfiguredDigest: runtimeImageDigest(&effectiveConfig, runner),
