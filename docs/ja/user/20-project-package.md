@@ -1,46 +1,46 @@
-# Project Package
+# プロジェクトパッケージ
 
-Project package は、A2O に「この product をどう扱えばよいか」を渡す入力である。A2O Engine は kanban task を見つけ、workspace を用意し、phase を進める。Project package は、そのときに必要な product 固有の設定、AI への指示、検証 command、task の型を渡す。
+プロジェクトパッケージは、A2O に「このプロダクトをどう扱えばよいか」を渡す入力である。A2O Engine はカンバンタスクを見つけ、ワークスペースを用意し、フェーズを進める。プロジェクトパッケージは、そのときに必要なプロダクト固有の設定、AI への指示、検証コマンド、タスクの型を渡す。
 
-この文書は、package に何を置き、それが A2O のどこで使われるかを説明する。`project.yaml` の全 field は [90-project-package-schema.md](90-project-package-schema.md) を参照する。
+この文書は、パッケージに何を置き、それが A2O のどこで使われるかを説明する。`project.yaml` の全項目は [90-project-package-schema.md](90-project-package-schema.md) を参照する。
 
 ## 何を入力するか
 
-Project package は、次の 4 種類の入力を 1 つの directory にまとめる。
+プロジェクトパッケージは、次の 4 種類の入力を 1 つのディレクトリにまとめる。
 
 | 入力 | 役割 | A2O が使うタイミング |
 | --- | --- | --- |
-| `project.yaml` | package 名、kanban project、repo slot、phase、executor、検証 command を定義する | bootstrap、kanban 起動、runtime 実行 |
-| `skills/` | AI worker に渡す product 固有の判断基準を書く | implementation、review、parent review |
-| `commands/` | build、test、verification、remediation、worker command を置く | phase 実行、検証、修復 |
-| `task-templates/` | 人間が kanban task を作るときの型を置く | task 作成時の参考 |
+| `project.yaml` | パッケージ名、カンバンプロジェクト、リポジトリスロット、フェーズ、実行コマンド、検証コマンドを定義する | 初期化、カンバン起動、ランタイム実行 |
+| `skills/` | AI ワーカーに渡すプロダクト固有の判断基準を書く | 実装、レビュー、親タスクレビュー |
+| `commands/` | ビルド、テスト、検証、修復、ワーカー用コマンドを置く | フェーズ実行、検証、修復 |
+| `task-templates/` | 人間がカンバンタスクを作るときの型を置く | タスク作成時の参考 |
 
-A2O は product policy を source code から自動推測しない。Repository の境界、使う command、AI に守らせる rule、検証方法は project package に明示する。
+A2O はプロダクトの方針をソースコードから自動推測しない。リポジトリの境界、使うコマンド、AI に守らせるルール、検証方法はプロジェクトパッケージに明示する。
 
 ## 実行時のつながり
 
 ```mermaid
 flowchart LR
   U@{ shape: rounded, label: "利用者" }
-  P@{ shape: docs, label: "Project package" }
-  K@{ shape: cyl, label: "Kanban task" }
+  P@{ shape: docs, label: "プロジェクトパッケージ" }
+  K@{ shape: cyl, label: "カンバンタスク" }
   E@{ shape: rounded, label: "A2O Engine" }
   A@{ shape: rounded, label: "a2o-agent" }
-  G@{ shape: cyl, label: "Git repository" }
+  G@{ shape: cyl, label: "Git リポジトリ" }
 
   U -. "作成する" .-> P
-  U -. "task を登録する" .-> K
+  U -. "タスクを登録する" .-> K
   E -->|"project.yaml を読む"| P
-  E -->|"task を選ぶ"| K
-  E -->|"phase job を渡す"| A
-  A -->|"skills / commands を使う"| P
+  E -->|"タスクを選ぶ"| K
+  E -->|"フェーズジョブを渡す"| A
+  A -->|"スキル / コマンドを使う"| P
   A -->|"変更・検証する"| G
   E -->|"結果を記録する"| K
 ```
 
-利用者が管理するものは project package と kanban task である。A2O Engine は `project.yaml` を読んで、どの kanban を見るか、どの repo を扱うか、各 phase で何を実行するかを決める。a2o-agent は Engine から渡された job を実行し、package 内の skill と command を使って Git repository を変更・検証する。
+利用者が管理するものはプロジェクトパッケージとカンバンタスクである。A2O Engine は `project.yaml` を読んで、どのカンバンを見るか、どのリポジトリを扱うか、各フェーズで何を実行するかを決める。a2o-agent は Engine から渡されたジョブを実行し、パッケージ内のスキルとコマンドを使って Git リポジトリを変更・検証する。
 
-## 推奨 layout
+## 推奨レイアウト
 
 ```text
 project-package/
@@ -55,19 +55,19 @@ project-package/
     fixtures/
 ```
 
-`project.yaml` は唯一の公開 package config である。`manifest.yml` や `kanban/bootstrap.json` のような別設定 file を利用者に管理させない。
+`project.yaml` は唯一の公開パッケージ設定である。`manifest.yml` や `kanban/bootstrap.json` のような別設定ファイルを利用者に管理させない。
 
-`commands/` には runtime phase から呼ばれてよい project-owned script を置く。Production command と test fixture は混ぜない。
+`commands/` には、ランタイムフェーズから呼ばれてよいプロジェクト管理のスクリプトを置く。本番用コマンドとテスト用フィクスチャは混ぜない。
 
-`skills/` には AI worker に渡す rule を置く。Skill は短く、具体的に書く。Repository boundary、編集してよい path、review 観点、evidence expectation など、AI が安全に推測できない判断を明記する。
+`skills/` には AI ワーカーに渡すルールを置く。スキルは短く、具体的に書く。リポジトリの境界、編集してよいパス、レビュー観点、残すべき証跡など、AI が安全に推測できない判断を明記する。
 
-`task-templates/` には人間が task を作るときの template を置く。A2O は template を自動投入しない。実行対象は kanban に登録された task である。
+`task-templates/` には人間がタスクを作るときのテンプレートを置く。A2O はテンプレートを自動投入しない。実行対象はカンバンに登録されたタスクである。
 
-`tests/fixtures/` には package validation fixture や deterministic worker を置く。通常運用の runtime phase から fixture を呼ばない。
+`tests/fixtures/` にはパッケージ検証用のフィクスチャや、結果が決まっているテスト用ワーカーを置く。通常運用のランタイムフェーズからフィクスチャを呼ばない。
 
 ## project.yaml の役割
 
-`project.yaml` は、A2O が runtime instance を作り、task を選び、phase を実行するための入口である。
+`project.yaml` は、A2O がランタイムインスタンスを作り、タスクを選び、フェーズを実行するための入口である。
 
 ```yaml
 schema_version: 1
@@ -121,46 +121,46 @@ runtime:
 
 | section | 利用者が決めること | A2O がそれを使う場所 |
 | --- | --- | --- |
-| `package` | package identity | branch/ref、workspace、diagnostics |
-| `kanban` | 対象 project と task selection | task polling、board provisioning |
-| `repos` | repo slot、path、kanban label | workspace preparation、repo-scoped task |
-| `agent` | host 側に必要な command | agent install、preflight diagnosis |
-| `runtime.phases` | phase ごとの skill、executor、検証 command | implementation、review、verification、remediation、merge |
+| `package` | パッケージの識別子 | ブランチ / 参照、ワークスペース、診断 |
+| `kanban` | 対象プロジェクトとタスク選択 | タスクの取得、ボードの準備 |
+| `repos` | リポジトリスロット、パス、カンバンラベル | ワークスペース準備、リポジトリ単位のタスク |
+| `agent` | ホスト側に必要なコマンド | エージェント配置、事前診断 |
+| `runtime.phases` | フェーズごとのスキル、実行コマンド、検証コマンド | 実装、レビュー、検証、修復、マージ |
 
-A2O-owned lane や internal label は書かない。`a2o kanban up` が必要な lane と internal label を用意する。
+A2O が管理するレーンや内部ラベルは書かない。`a2o kanban up` が必要なレーンと内部ラベルを用意する。
 
-## Skill の書き方
+## スキルの書き方
 
-Skill は AI worker に渡す product 固有の instruction である。一般論ではなく、この product で守るべき判断を書く。
+スキルは AI ワーカーに渡すプロダクト固有の指示である。一般論ではなく、このプロダクトで守るべき判断を書く。
 
-Implementation skill に書くこと:
+実装用スキルに書くこと:
 
-- 変更してよい repository と path
-- coding rule
-- 実装後に必要な verification
-- task comment や evidence に残すべき情報
-- project knowledge command を使う条件
+- 変更してよいリポジトリとパス
+- コーディングルール
+- 実装後に必要な検証
+- タスクコメントや証跡に残すべき情報
+- プロジェクト固有の知識検索コマンドを使う条件
 
-Review skill に書くこと:
+レビュー用スキルに書くこと:
 
-- finding とみなす条件
-- public API、SPI、compatibility、documentation の確認観点
-- 必須の verification evidence
-- residual risk の書き方
+- 指摘事項とみなす条件
+- 公開 API、SPI、互換性、ドキュメントの確認観点
+- 必須の検証証跡
+- 残リスクの書き方
 
-Parent review skill に書くこと:
+親タスクレビュー用スキルに書くこと:
 
-- child task の成果をどう統合して見るか
-- multi-repo integration の確認観点
-- merge 前に必要な evidence
+- 子タスクの成果をどう統合して見るか
+- 複数リポジトリ統合の確認観点
+- マージ前に必要な証跡
 
-Skill は、運用チームが実際に保守できる言語で書く。日本語で運用する product なら日本語でよい。
+スキルは、運用チームが実際に保守できる言語で書く。日本語で運用するプロダクトなら日本語でよい。
 
-## Command の書き方
+## コマンドの書き方
 
-Command は A2O が phase 中に呼ぶ product-owned executable である。A2O の内部 file ではなく、公開 placeholder と environment variables を使う。
+コマンドは、A2O がフェーズ中に呼ぶプロダクト管理の実行ファイルである。A2O の内部ファイルではなく、公開されているプレースホルダーと環境変数を使う。
 
-Worker command は request bundle を stdin で受け取り、result JSON を `{{result_path}}` に書く。
+ワーカーコマンドは要求データ一式を標準入力で受け取り、結果 JSON を `{{result_path}}` に書く。
 
 ```yaml
 runtime:
@@ -176,45 +176,45 @@ runtime:
           - "{{result_path}}"
 ```
 
-Verification command は task result を証明する。Remediation command は verification retry の前に format や generated file 更新など、project が認めた保守的な修復だけを行う。
+検証コマンドはタスク結果を証明する。修復コマンドは再検証の前に、整形や生成ファイル更新など、プロジェクトが認めた保守的な修復だけを行う。
 
-良い command の条件:
+良いコマンドの条件:
 
-- deterministic に動く
-- failure reason と対象 repo/path が分かる
-- hidden global dependency を避ける
-- commit、push、kanban state 編集をしない
-- private `.a3` metadata や generated launcher file を読まない
+- 同じ入力なら同じ結果になる
+- 失敗理由と対象リポジトリ / パスが分かる
+- 隠れたグローバル依存を避ける
+- commit、push、カンバン状態の編集をしない
+- private な `.a3` metadata や生成された launcher file を読まない
 
-Command が task kind や repo slot によって変わる場合だけ、`project.yaml` の variants を使う。単純な package では default command を優先する。
+コマンドがタスク種別やリポジトリスロットによって変わる場合だけ、`project.yaml` の variants を使う。単純なパッケージでは既定のコマンドを優先する。
 
-## Task template の位置づけ
+## タスクテンプレートの位置づけ
 
-Task template は、人間が kanban task を作るときの入力例である。Runtime が task template を読んで自動実行するわけではない。
+タスクテンプレートは、人間がカンバンタスクを作るときの入力例である。ランタイムがタスクテンプレートを読んで自動実行するわけではない。
 
-Template には、A2O が task を正しく解釈するための情報を含める。
+テンプレートには、A2O がタスクを正しく解釈するための情報を含める。
 
 - 目的
-- 対象 repo label
+- 対象リポジトリラベル
 - 期待する変更
 - 完了条件
 - 検証観点
 - 制約や触ってはいけない範囲
 
-Multi-repo の parent task では、対象 repo label をすべて task に付ける。`all` や `both` のような合成 label ではなく、実 repo slot に対応する label を使う。
+複数リポジトリの親タスクでは、対象リポジトリラベルをすべてタスクに付ける。`all` や `both` のような合成ラベルではなく、実際のリポジトリスロットに対応するラベルを使う。
 
-## 通常 config と test fixture を分ける
+## 通常設定とテスト用フィクスチャを分ける
 
-`project.yaml` は通常運用用に保つ。Production の implementation / review phase から deterministic fixture worker を呼ばない。
+`project.yaml` は通常運用用に保つ。本番運用の実装 / レビューフェーズから、結果が決まっているテスト用ワーカーを呼ばない。
 
-Package が test profile を必要とする場合は、明示的に分ける。
+パッケージが検証用プロファイルを必要とする場合は、明示的に分ける。
 
-- `project-test.yaml` のような別 config を使う。
-- fixture worker は `tests/fixtures/` 配下に置く。
-- fixture command は production command と間違えない名前にする。
-- test profile の実行方法を docs に書く。
+- `project-test.yaml` のような別設定を使う。
+- フィクスチャ用ワーカーは `tests/fixtures/` 配下に置く。
+- フィクスチャ用コマンドは本番用コマンドと間違えない名前にする。
+- 検証用プロファイルの実行方法をドキュメントに書く。
 
-Alternate profile は、使うときに明示する。
+別プロファイルは、使うときに明示する。
 
 ```sh
 a2o project validate --package ./project-package --config project-test.yaml
@@ -223,7 +223,7 @@ a2o runtime run-once --project-config project-test.yaml
 
 ## 作成と確認
 
-新規 package は template から始める。
+新規パッケージはテンプレートから始める。
 
 ```sh
 a2o project template \
@@ -235,27 +235,27 @@ a2o project template \
   --output ./project-package/project.yaml
 ```
 
-生成後に `your-ai-worker`、verification command、skill の中身を product に合わせて変更する。
+生成後に `your-ai-worker`、検証コマンド、スキルの中身をプロダクトに合わせて変更する。
 
-Package を runtime に使う前に確認する。
+パッケージをランタイムに使う前に確認する。
 
 ```sh
 a2o project lint --package ./project-package
 ```
 
-`blocked` finding は実行前に直す。Schema の詳細、placeholder、variants の細かな仕様は [90-project-package-schema.md](90-project-package-schema.md) を参照する。
+`blocked` の指摘は実行前に直す。スキーマの詳細、プレースホルダー、variants の細かな仕様は [90-project-package-schema.md](90-project-package-schema.md) を参照する。
 
-## Review checklist
+## レビュー観点
 
-実 task に使う前に、次を確認する。
+実際のタスクに使う前に、次を確認する。
 
-- `project.yaml` が唯一の公開 config file になっている。
-- `a2o project lint --package ./project-package` に blocked finding がない。
-- A2O-owned lane と internal label を手書きしていない。
-- `agent.required_bins` に product toolchain と worker executable が含まれている。
-- Production phase が `tests/fixtures/` を呼んでいない。
-- Verification command が失敗理由と対象 scope を出す。
-- Remediation command が広範な予期しない変更を起こさない。
-- Skill に repo boundary、review criteria、evidence expectation が書かれている。
-- Generated files が `.work/a2o/` 配下に閉じている。
-- 利用者向け docs と commands が A2O 名を使っている。
+- `project.yaml` が唯一の公開設定ファイルになっている。
+- `a2o project lint --package ./project-package` に `blocked` の指摘がない。
+- A2O が管理するレーンと内部ラベルを手書きしていない。
+- `agent.required_bins` にプロダクトのツールチェーンとワーカー実行ファイルが含まれている。
+- 本番運用のフェーズが `tests/fixtures/` を呼んでいない。
+- 検証コマンドが失敗理由と対象範囲を出す。
+- 修復コマンドが広範な予期しない変更を起こさない。
+- スキルにリポジトリ境界、レビュー基準、必要な証跡が書かれている。
+- 生成ファイルが `.work/a2o/` 配下に閉じている。
+- 利用者向けドキュメントとコマンドが A2O 名を使っている。

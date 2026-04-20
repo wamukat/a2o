@@ -1,23 +1,23 @@
-# Project Package Schema Reference
+# プロジェクトパッケージスキーマのリファレンス
 
-この文書は `project.yaml` の詳細 reference である。導入時の考え方は先に [20-project-package.md](20-project-package.md) を読む。
+この文書は `project.yaml` の詳細リファレンスである。導入時の考え方は先に [20-project-package.md](20-project-package.md) を読む。
 
 ## 方針
 
-Project package config の正規ファイル名は `project.yaml` とする。
+プロジェクトパッケージ設定の正規ファイル名は `project.yaml` とする。
 
-runtime の責務は `project.yaml` の明示的な runtime sections に置く。公開 package の設定ファイルは 1 本にまとめ、package author が project 設定と runtime manifest の責務分担で迷わない形にする。
+ランタイムの責務は `project.yaml` の明示的なランタイムセクションに置く。公開パッケージの設定ファイルは 1 本にまとめ、パッケージ作成者がプロジェクト設定とランタイム定義の責務分担で迷わない形にする。
 
-Authoring 上の判断と責務境界は [20-project-package.md](20-project-package.md) を参照する。
+作成時の判断と責務境界は [20-project-package.md](20-project-package.md) を参照する。
 
-Package schema は次の rules に従う。
+パッケージスキーマは次のルールに従う。
 
-- `project.yaml` を canonical file name とする。
-- 公開 package config は `project.yaml` だけを使う。
-- User-facing schema と diagnostics では A2O names を使う。A3 names は internal compatibility details としてだけ残してよい。
-- `a2o:follow-up-child` のような internal follow-up labels は、通常の user-authored schema へ露出しない。
+- `project.yaml` を正規ファイル名とする。
+- 公開パッケージ設定は `project.yaml` だけを使う。
+- 利用者向けのスキーマと診断では A2O 名を使う。A3 名は内部互換の詳細としてだけ残してよい。
+- `a2o:follow-up-child` のような内部 follow-up ラベルは、通常の利用者作成スキーマへ露出しない。
 
-## Schema の形
+## スキーマの形
 
 ```yaml
 schema_version: 1
@@ -80,33 +80,33 @@ task_templates:
   - path: task-templates/001-add-work-order-filter.md
 ```
 
-Host agent binary は canonical path `.work/a2o/agent/bin/a2o-agent` に置く。導入時は `a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent` を使う。
+ホスト側のエージェントバイナリは正規パス `.work/a2o/agent/bin/a2o-agent` に置く。導入時は `a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent` を使う。
 
-## 各 section の責務
+## 各セクションの責務
 
-`schema_version` は必須である。Version `1` は最初の single-file schema を表す。未対応 version は、分かりやすい error で reject する。
+`schema_version` は必須である。Version `1` は最初の単一ファイルスキーマを表す。未対応 version は、分かりやすいエラーで拒否する。
 
-`package` は product repository ではなく package を識別する。`package.name` は stable package identity であり、filesystem と branch ref で安全に使える名前にする。
+`package` はプロダクトのリポジトリではなく、パッケージを識別する。`package.name` は安定したパッケージ識別子であり、ファイルシステムとブランチ参照で安全に使える名前にする。
 
-`kanban` は board name、project-owned labels、task selection を持つ。kanban backend は A2O runtime distribution によって固定されており、author-facing な `project.yaml` setting ではない。A2O-owned lanes と internal coordination labels は runtime implementation details であり、通常の package schema に書かせない。
+`kanban` はボード名、プロジェクトが所有するラベル、タスク選択条件を持つ。カンバンのバックエンドは A2O ランタイム配布物によって固定されており、作成者向けの `project.yaml` 設定ではない。A2O が管理するレーンと内部調整ラベルはランタイム実装の詳細であり、通常のパッケージスキーマには書かせない。
 
-Multi-repo の parent task には、対象 repo label をすべて付ける。「全 repo」や「両方」を意味する合成 label は作らない。合成 label は 2 repo を超える構成に拡張できず、repo slot と直接対応しない。
+複数リポジトリの親タスクには、対象リポジトリラベルをすべて付ける。「全リポジトリ」や「両方」を意味する合成ラベルは作らない。合成ラベルは 2 リポジトリを超える構成に拡張できず、リポジトリスロットと直接対応しない。
 
-`repos` は stable repo slots を定義する。Slot keys は runtime identities である。`path` は absolute path でない限り package directory からの相対 path とする。`label` は kanban labels と repo slots を対応づける。省略時、implementation は `repo:<slot>` を derive してよい。
+`repos` は安定したリポジトリスロットを定義する。スロットキーはランタイム上の識別子である。`path` は絶対パスでない限り、パッケージディレクトリからの相対パスとする。`label` はカンバンラベルとリポジトリスロットを対応づける。省略時、実装処理は `repo:<slot>` を導出してよい。
 
-`agent` は host-side workspace、product toolchain requirements、executor command requirements を持つ。`required_bins` は、agent が作業開始前に prerequisites を validate できるよう declarative に残す。
+`agent` はホスト側ワークスペース、プロダクトのツールチェーン要件、実行コマンド要件を持つ。`required_bins` は、エージェントが作業開始前に前提条件を検証できるよう宣言的に残す。
 
-`runtime` は execution defaults と phase definitions を持つ。
+`runtime` は実行時の既定値とフェーズ定義を持つ。
 
-`runtime.phases` は phase-specific skills、executor commands、verification/remediation commands、merge policy を持つ。A2O は phase executor commands を internal stdin-bundle launcher config へ render する。利用者は別途 `launcher.json` を作らない。
+`runtime.phases` はフェーズごとのスキル、実行コマンド、検証 / 修復コマンド、マージ方針を持つ。A2O はフェーズごとの実行コマンドを内部の標準入力バンドル用ランチャー設定へ変換する。利用者は別途 `launcher.json` を作らない。
 
-Phase executor commands は worker bundle を stdin で受け取り、worker result JSON を `{{result_path}}` に書く必要がある。Executor command placeholders は `{{result_path}}`、`{{schema_path}}`、`{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` を含む。Verification and remediation commands は `{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` を support する。
+フェーズ実行コマンドはワーカーバンドルを標準入力で受け取り、ワーカー結果 JSON を `{{result_path}}` に書く必要がある。実行コマンド用プレースホルダーには `{{result_path}}`、`{{schema_path}}`、`{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` が含まれる。検証コマンドと修復コマンドは `{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` を使える。
 
-Project commands は worker request JSON と `A2O_*` worker environment variables を stable contract として扱う。Package scripts から private `.a3` metadata files や generated `launcher.json` files を読んではならない。
-Implementation、review、verification、remediation jobs はすべて `A2O_WORKER_REQUEST_PATH` を expose する。Verification と remediation の request JSON は `command_intent`、`slot_paths`、`scope_snapshot`、`phase_runtime` を含むため、対象 repo slot や適用 policy はこれらから判断する。
-Slot-local remediation では command の current directory が repo slot になる場合があるが、request は full prepared workspace を表す。
+プロジェクトコマンドは、ワーカー要求 JSON と `A2O_*` ワーカー環境変数を安定した契約として扱う。パッケージスクリプトから private な `.a3` メタデータファイルや生成された `launcher.json` ファイルを読んではならない。
+実装、レビュー、検証、修復のジョブはすべて `A2O_WORKER_REQUEST_PATH` を公開する。検証と修復の要求 JSON は `command_intent`、`slot_paths`、`scope_snapshot`、`phase_runtime` を含むため、対象リポジトリスロットや適用方針はこれらから判断する。
+スロット単位の修復では、コマンドのカレントディレクトリがリポジトリスロットになる場合があるが、要求は準備済みワークスペース全体を表す。
 
-Verification と remediation commands は、merge settings と同じ `default` / `variants` 形も使える。`task_kind`、`repo_scope`、phase によって command policy が変わる場合だけ使う。
+検証コマンドと修復コマンドは、マージ設定と同じ `default` / `variants` 形式も使える。`task_kind`、`repo_scope`、フェーズによってコマンド方針が変わる場合だけ使う。
 
 ```yaml
 runtime:
@@ -135,10 +135,10 @@ runtime:
                       - app/project-package/commands/format-repo-beta.sh
 ```
 
-単純な list 形式を default とする。Helper code に task-kind や repo-slot policy が隠れてしまう場合だけ variants を使う。
-`default` は top level、`task_kind` 配下、`repo_scope` 配下に指定できる。より具体的に一致した値が優先される。
+単純なリスト形式を既定とする。ヘルパーコードにタスク種別やリポジトリスロット方針が隠れてしまう場合だけ variants を使う。
+`default` はトップレベル、`task_kind` 配下、`repo_scope` 配下に指定できる。より具体的に一致した値が優先される。
 
-通常の packages では implementation と review phases を定義する。
+通常のパッケージでは実装フェーズとレビューフェーズを定義する。
 
 ```yaml
 runtime:
@@ -153,9 +153,9 @@ runtime:
         command: [your-ai-worker, --schema, "{{schema_path}}", --result, "{{result_path}}"]
 ```
 
-これは内部的に fixed stdin-bundle command executor へ展開される。`prompt_transport`、`result`、`schema`、`default_profile` は A2O implementation details であり、valid な `project.yaml` fields ではない。
+これは内部的に固定の標準入力バンドル用実行コマンドへ展開される。`prompt_transport`、`result`、`schema`、`default_profile` は A2O の実装詳細であり、有効な `project.yaml` 項目ではない。
 
-新しい package は executor block を手書きせず、generated template から始める。
+新しいパッケージは実行コマンドブロックを手書きせず、生成テンプレートから始める。
 
 ```sh
 a2o project template \
@@ -167,19 +167,19 @@ a2o project template \
   --output ./project-package/project.yaml
 ```
 
-Template は phase-based executor form を使う。`--language` は `agent.required_bins` を制御する。`--executor-bin` と repeated `--executor-arg` flags は implementation and review phase executor commands を生成する。
+テンプレートはフェーズ単位の実行コマンド形式を使う。`--language` は `agent.required_bins` を制御する。`--executor-bin` と繰り返し指定できる `--executor-arg` は、実装フェーズとレビューフェーズの実行コマンドを生成する。
 
-`--output` が file を指す場合、generator は `project.yaml` を書く。`--with-skills` を付けると、implementation、review、parent review の starter skill も書き、生成した parent skill を参照する `parent_review` phase を追加する。Kanban bootstrap data は `kanban.project`、`kanban.labels`、`repos.<slot>.label` から derive される。A2O-owned lanes と internal coordination labels は `a2o kanban up` が provision する。
+`--output` がファイルを指す場合、生成器は `project.yaml` を書く。`--with-skills` を付けると、実装、レビュー、親タスクレビューの初期スキルも書き、生成した親タスク用スキルを参照する `parent_review` フェーズを追加する。カンバン初期化データは `kanban.project`、`kanban.labels`、`repos.<slot>.label` から導出される。A2O が管理するレーンと内部調整ラベルは `a2o kanban up` が用意する。
 
-`project.yaml` は通常の production profile である。Focused test profile は `project-test.yaml` のような別 file にしてよいが、利用時は `a2o project validate --config project-test.yaml` または `a2o runtime run-once --project-config project-test.yaml` で明示的に選択する。
+`project.yaml` は通常の本番運用プロファイルである。検証用プロファイルは `project-test.yaml` のような別ファイルにしてよいが、利用時は `a2o project validate --config project-test.yaml` または `a2o runtime run-once --project-config project-test.yaml` で明示的に選択する。
 
-`runtime.phases.merge` は merge policy と live target ref を持つ。merge target は A2O が task topology から導出するため、利用者は設定しない。
+`runtime.phases.merge` はマージ方針と本流のターゲット参照を持つ。マージ先は A2O がタスク構造から導出するため、利用者は設定しない。
 
-`task_templates` は validation と onboarding のための optional metadata である。Task template entry は markdown task template を指す。Runtime task selection は引き続き kanban から行う。Task templates は default では auto-enqueue されない。
+`task_templates` は検証と導入支援のための任意メタデータである。タスクテンプレートの項目は Markdown のタスクテンプレートを指す。ランタイムのタスク選択は引き続きカンバンから行う。タスクテンプレートは既定では自動登録されない。
 
-## Reference Product の例
+## 参照用プロダクトの例
 
-### TypeScript API/Web
+### TypeScript API / Web
 
 ```yaml
 schema_version: 1
@@ -219,7 +219,7 @@ runtime:
       target_ref: refs/heads/main
 ```
 
-### Go API/CLI
+### Go API / CLI
 
 ```yaml
 schema_version: 1
@@ -255,7 +255,7 @@ runtime:
       target_ref: refs/heads/main
 ```
 
-### Python Service
+### Python サービス
 
 ```yaml
 schema_version: 1
@@ -291,7 +291,7 @@ runtime:
       target_ref: refs/heads/main
 ```
 
-### Multi-Repo Fixture
+### 複数リポジトリのフィクスチャ
 
 ```yaml
 schema_version: 1
@@ -340,10 +340,10 @@ runtime:
         default: refs/heads/main
 ```
 
-## Current Contract（現在の contract）
+## 現在の契約
 
-1. `project.yaml` schema version `1` が public config contract である。
-2. Runtime bridge は `runtime.phases` から internal runtime package data を derive する。
-3. Reference product packages は single-file `project.yaml` を使う。
-4. Package loading は unsupported split config files を reject する。
-5. Package schema、docs、normal diagnostics は A2O-facing names を使う。
+1. `project.yaml` のスキーマバージョン `1` が公開設定の契約である。
+2. ランタイムブリッジは `runtime.phases` から内部ランタイム用のパッケージデータを導出する。
+3. 参照用プロダクトパッケージは単一ファイルの `project.yaml` を使う。
+4. パッケージ読み込みは、未対応の分割設定ファイルを拒否する。
+5. パッケージスキーマ、ドキュメント、通常診断は A2O 向けの名前を使う。

@@ -1,55 +1,55 @@
-# A2O Engineering Rulebook
+# A2O 開発ルールブック
 
-この文書は A2O の日常的な engineering rule を定義する。Design document は何を作るかを定義し、この文書はどう作るかを定義する。
+この文書は A2O の日常的な開発規律を定義する。設計文書は何を作るかを定義し、この文書はどう作るかを定義する。
 
-## Runtime flow 上の位置づけ
+## ランタイムの流れ上の位置づけ
 
-この文書は、A2O Engine、host launcher、a2o-agent、project package、kanban adapter のどこを変更する場合にも適用する開発規律である。Runtime flow の個別設計は各詳細文書が扱い、この文書は変更時の判断基準、test 追加、review standard、public/internal boundary の守り方を定める。
+この文書は、A2O Engine、ホスト用ランチャー、a2o-agent、プロジェクトパッケージ、カンバンアダプターのどこを変更する場合にも適用する開発規律である。ランタイムの流れに関する個別設計は各詳細文書が扱い、この文書は変更時の判断基準、テスト追加、レビュー基準、公開 / 内部境界の守り方を定める。
 
-## Core Rules
+## 中核ルール
 
-- Domain object は immutable を優先する。
-- Red -> Green -> Refactor の短い loop を使う。
-- Behavior を変える前に failing test を追加する。
-- 重複した knowledge や不明瞭な責務が見えたら refactor する。
+- ドメインオブジェクトは不変に保つことを優先する。
+- Red -> Green -> Refactor の短いサイクルを使う。
+- 振る舞いを変える前に、失敗するテストを追加する。
+- 重複した知識や不明瞭な責務が見えたらリファクタリングする。
 - 変更を小さく見せるために必要な修正を避けない。
-- Product-specific behavior を Engine core へ入れない。
+- プロダクト固有の振る舞いを Engine コアへ入れない。
 
-## Immutability
+## 不変性
 
-Domain object は原則 immutable である。State change は existing object を mutate するのではなく、新しい object を返すべきである。Mutable state を許すのは infrastructure や adapter concern の場合だけであり、その boundary は明示する。
+ドメインオブジェクトは原則として不変に保つ。状態を変える場合は既存オブジェクトを書き換えるのではなく、新しいオブジェクトを返す。変更可能な状態を許すのはインフラやアダプターの責務に限り、その境界を明示する。
 
-Task、run、evidence のような core concept に ad hoc setter や hidden mutation を増やしてはならない。
+タスク、実行、証跡のような中核概念に、場当たり的な setter や隠れた状態変更を増やしてはならない。
 
 ## TDD
 
-最小で有効な loop を使う。
+最小で有効なサイクルを使う。
 
-1. Code 上の design pressure を固定する failing test を書く。
-2. その test を通す最小実装を追加する。
-3. Behavior を変えずに refactor する。
+1. コード上の設計圧力を固定する、失敗するテストを書く。
+2. そのテストを通す最小実装を追加する。
+3. 振る舞いを変えずにリファクタリングする。
 
-Test を省略してよいのは、完全に機械的な変更または documentation-only change の場合だけである。Shared behavior、public CLI behavior、runtime orchestration、workspace materialization、verification、merge、diagnostics には test が必要である。
+テストを省略してよいのは、完全に機械的な変更またはドキュメントだけの変更の場合だけである。共有される動作、公開 CLI の動作、ランタイム進行、ワークスペース具体化、検証、マージ、診断にはテストが必要である。
 
-## Refactoring
+## リファクタリング
 
-Refactoring は postponed cleanup phase ではなく、通常の実装中に行う。同じ knowledge が 2 箇所に現れたら、ownership boundary を早めに確認する。
+リファクタリングは後回しの片付け工程ではなく、通常の実装中に行う。同じ知識が 2 箇所に現れたら、所有者の境界を早めに確認する。
 
-Future variation だけを理由に abstraction を追加しない。現在の complexity を減らす、意味のある duplication を減らす、または既存 local pattern に合う場合に追加する。
+将来の変化だけを理由に抽象化を追加しない。現在の複雑さを減らす、意味のある重複を減らす、または既存の局所的なパターンに合う場合に追加する。
 
-## Review Standard
+## レビュー基準
 
-Reviewer は次を優先して確認する。
+レビューでは次を優先して確認する。
 
-- behavioral regressions
-- incomplete ticket coverage
-- missing tests
-- unclear public/internal surface boundaries
-- product-specific assumptions in core code
-- user-facing diagnostics that do not explain the next action
+- 振る舞いの退行
+- チケット範囲の対応漏れ
+- 必要なテストの不足
+- 公開面と内部面の境界の曖昧さ
+- コアコードに入り込んだプロダクト固有の前提
+- 次の対応が分からない利用者向け診断
 
-Documentation と tests は release surface の一部である。
+ドキュメントとテストはリリース対象の一部である。
 
-## Boundaries
+## 境界
 
-Validation fixture、temporary note、特定 product の operational workaround を standard Engine concept にしてはならない。External behavior の変更が必要な場合は、実装前に product impact を協議する。
+検証用フィクスチャ、一時メモ、特定プロダクトの運用回避策を、標準の Engine 概念にしてはならない。外部仕様の変更が必要な場合は、実装前にプロダクトへの影響を協議する。

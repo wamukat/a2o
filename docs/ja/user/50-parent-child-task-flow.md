@@ -1,12 +1,12 @@
-# Parent-Child Task Flow
+# 親子タスクの流れ
 
-この文書は、複数 repository にまたがる作業を child task と parent task に分け、最後に統合 review / verification / merge する流れを説明する。
+この文書は、複数リポジトリにまたがる作業を子タスクと親タスクに分け、最後に統合レビュー / 検証 / マージする流れを説明する。
 
-1 つの product change が複数の repo slot にまたがり、repo ごとに child task として実装したい場合は parent-child task を使う。A2O は kanban relation をもとに、child task、integration review、verification、merge、evidence を連携させる。
+1 つのプロダクト変更が複数のリポジトリスロットにまたがり、リポジトリごとに子タスクとして実装したい場合は親子タスクを使う。A2O はカンバン上の関連をもとに、子タスク、統合レビュー、検証、マージ、証跡を連携させる。
 
-## Package Setup
+## パッケージ設定
 
-`project.yaml` では repository ごとに repo slot を宣言する。
+`project.yaml` ではリポジトリごとにリポジトリスロットを宣言する。
 
 ```yaml
 repos:
@@ -33,19 +33,19 @@ runtime:
         default: refs/heads/main
 ```
 
-Repo label は `repos.<slot>.label` で定義する。A2O が必要とする lane と internal label は A2O が用意する。「全 repo」や「両方」を意味する合成 label は使わない。2 repo 前提の表現になり、3 repo 以上に広がったときに意味が崩れる。
+リポジトリラベルは `repos.<slot>.label` で定義する。A2O が必要とするレーンと内部ラベルは A2O が用意する。「全リポジトリ」や「両方」を意味する合成ラベルは使わない。2 リポジトリ前提の表現になり、3 リポジトリ以上に広がったときに意味が崩れる。
 
-## Kanban Setup
+## カンバン設定
 
-Parent task を runnable lane、通常は `To do` に 1 つ作成する。
+親タスクを実行対象のレーン、通常は `To do` に 1 つ作成する。
 
-Parent labels:
+親タスクのラベル:
 
 - `trigger:auto-parent`
 - `repo:catalog`
 - `repo:storefront`
 
-Parent body:
+親タスクの本文:
 
 ```text
 Coordinate a cross-repo catalog contract change.
@@ -54,19 +54,19 @@ The storefront child should render that field in the summary output.
 Verify both repositories before parent completion.
 ```
 
-Repo ごとに child task を作成する。
+リポジトリごとに子タスクを作成する。
 
-Catalog child labels:
+Catalog 側の子タスクラベル:
 
 - `trigger:auto-implement`
 - `repo:catalog`
 
-Storefront child labels:
+Storefront 側の子タスクラベル:
 
 - `trigger:auto-implement`
 - `repo:storefront`
 
-Runtime 実行前に child を parent の subtask として関連づける。
+ランタイム実行前に、子タスクを親タスクの subtask として関連づける。
 
 ```sh
 python3 tools/kanban/cli.py task-relation-create \
@@ -82,22 +82,22 @@ python3 tools/kanban/cli.py task-relation-create \
   --relation-kind subtask
 ```
 
-A2O は `subtask` relation から parent / child の task kind を判断する。`kind:*` label は追加しない。
+A2O は `subtask` の関連から親 / 子のタスク種別を判断する。`kind:*` ラベルは追加しない。
 
-## Runtime Flow
+## ランタイムの流れ
 
-1. A2O は設定された kanban lane から runnable な child task を選択する。
-2. 各 child task は implementation、review、verification、必要に応じた remediation、merge を実行する。
-3. Child merge は parent integration branch を target にする。
-4. Child work が完了すると、parent task で `parent_review` を実行する。
-5. Parent verification は integrated workspace に対して実行する。
-6. Parent merge は `runtime.phases.merge.target_ref` に publish する。
+1. A2O は設定されたカンバンレーンから実行可能な子タスクを選択する。
+2. 各子タスクは実装、レビュー、検証、必要に応じた修復、マージを実行する。
+3. 子タスクのマージは親タスクの統合ブランチを対象にする。
+4. 子タスクの作業が完了すると、親タスクで `parent_review` を実行する。
+5. 親タスクの検証は、統合済みワークスペースに対して実行する。
+6. 親タスクのマージは `runtime.phases.merge.target_ref` に反映する。
 
-利用者が設定するのは merge policy と live target ref である。`merge_to_parent` や `merge_to_live` は利用者が設定しない。A2O は parent-child topology から child-to-parent と parent-to-live の挙動を導出する。
+利用者が設定するのはマージ方針と本流のターゲット参照である。`merge_to_parent` や `merge_to_live` は利用者が設定しない。A2O は親子タスクの構造から、子タスクから親タスクへのマージと、親タスクから本流へのマージを導出する。
 
-## Inspecting Progress
+## 進行状況の確認
 
-進行状況は runtime summary で確認する。
+進行状況はランタイムの要約で確認する。
 
 ```sh
 a2o runtime watch-summary
@@ -105,11 +105,11 @@ a2o runtime describe-task <parent-ref>
 a2o runtime describe-task <child-ref>
 ```
 
-Kanban comment、workspace evidence、phase result、blocked diagnostics を対応づけて見る場合は `describe-task` を使う。
+カンバンコメント、ワークスペースの証跡、フェーズ結果、ブロック時の診断を対応づけて見る場合は `describe-task` を使う。
 
-## Reference Package
+## 参照用パッケージ
 
-実行可能な reference package は `reference-products/multi-repo-fixture/project-package/` にある。
+実行可能な参照用パッケージは `reference-products/multi-repo-fixture/project-package/` にある。
 
 まず次を見る。
 

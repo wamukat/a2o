@@ -1,22 +1,22 @@
-# A2O Workspace And Repo Slot Model
+# A2O ワークスペースとリポジトリスロットのモデル
 
-この文書は workspace topology、repo slot、source synchronization、freshness、retention、merge behavior を定義する。
+この文書はワークスペース構成、リポジトリスロット、ソース同期、鮮度、保持、マージ動作を定義する。
 
-## Runtime flow 上の位置づけ
+## ランタイムの流れ上の位置づけ
 
-この文書は、Engine が phase job を準備するときに、どの Git source をどの workspace に materialize し、どの branch namespace に publish / merge するかを扱う。Project package の repo slot はここで runtime identity になり、a2o-agent はその identity から product repository を操作する。
+この文書は、Engine がフェーズジョブを準備するときに、どの Git ソースをどのワークスペースに具体化し、どのブランチ名前空間に公開 / マージするかを扱う。プロジェクトパッケージのリポジトリスロットはここでランタイム上の識別子になり、a2o-agent はその識別子からプロダクトのリポジトリを操作する。
 
-## Goals
+## 目標
 
-- Product repository layout を Engine core へ持ち込まない。
-- Runtime state と job payload では stable repo slot alias を使う。
-- Phase execution の前に source refs を明示する。
-- Agent workspace は disposable に保つ。
-- Blocked / completed work を調査できる evidence を保持する。
+- プロダクトリポジトリのレイアウトを Engine コアへ持ち込まない。
+- ランタイム状態とジョブペイロードでは、安定したリポジトリスロット別名を使う。
+- フェーズ実行の前にソース参照を明示する。
+- エージェントワークスペースは使い捨てに保つ。
+- ブロックまたは完了した作業を調査できる証跡を保持する。
 
-## Repo Slots
+## リポジトリスロット
 
-Repo slot は repository に対する stable project package alias である。
+リポジトリスロットは、repository に対する安定したプロジェクトパッケージ上の別名である。
 
 例:
 
@@ -28,57 +28,57 @@ repos:
     label: repo:app
 ```
 
-Runtime code は local filesystem path ではなく `app` を stable identifier として使う。
+ランタイムコードはローカルファイルシステムのパスではなく、`app` を安定した識別子として使う。
 
-## Source Aliases
+## ソース別名
 
-Host launcher は package repo slots を agent source aliases へ展開する。Agent は project package を parse せず、その alias を使って workspace を materialize する。
+ホスト用ランチャーは、パッケージのリポジトリスロットをエージェント用のソース別名へ展開する。エージェントはプロジェクトパッケージを解析せず、その別名を使ってワークスペースを具体化する。
 
-## Workspace Kinds
+## ワークスペース種別
 
-### Ticket Workspace
+### チケットワークスペース
 
-Implementation 用に使う。Agent は task 用の editable source を materialize し、結果を task work branch へ publish する。
+実装用に使う。エージェントはタスク用の編集可能なソースを具体化し、結果をタスク作業ブランチへ公開する。
 
-### Runtime Workspace
+### ランタイムワークスペース
 
-Review、verification、merge 用に使う。明示的な source descriptor から作成し、偶然の local checkout state に依存しない。
+レビュー、検証、マージ用に使う。明示的なソース記述子から作成し、偶然のローカルチェックアウト状態に依存しない。
 
-## Branch Namespace
+## ブランチ名前空間
 
-User-visible branch refs は A2O 名を使う。
+利用者に見えるブランチ参照は A2O 名を使う。
 
 ```text
 refs/heads/a2o/<instance>/work/<task>
 refs/heads/a2o/<instance>/parent/<task>
 ```
 
-Namespace には runtime instance を含める。これにより、isolated boards が小さい task number を再利用しても衝突しない。
+名前空間にはランタイムインスタンスを含める。これにより、分離されたボードが小さいタスク番号を再利用しても衝突しない。
 
-A2O は user-visible branch refs を `refs/heads/a2o/...` 配下へ書く。`refs/heads/a3/...` refs を見つけた場合は public branch naming ではなく internal compatibility data として扱う。
+A2O は利用者に見えるブランチ参照を `refs/heads/a2o/...` 配下へ書く。`refs/heads/a3/...` 参照を見つけた場合は、公開ブランチ名ではなく内部互換データとして扱う。
 
-## Freshness
+## 鮮度
 
-Workspace materialization は、workspace が requested source descriptor と一致することを確認しなければならない。一致しない場合、A2O は stale state を黙って再利用せず、recreate または refresh する。
+ワークスペース具体化では、ワークスペースが要求されたソース記述子と一致することを確認しなければならない。一致しない場合、A2O は古い状態を黙って再利用せず、再作成または更新する。
 
-Dirty source repository は fail fast し、diagnostics に repo と file list を含める。
+未整理のソースリポジトリは即時停止し、診断にリポジトリとファイル一覧を含める。
 
-## Cleanup
+## クリーンアップ
 
-Generated runtime output は `.work/a2o/` 配下に置く。
+生成されたランタイム出力は `.work/a2o/` 配下に置く。
 
-Materialized repo slot の agent metadata は product repo slot checkout の外にある A2O-managed metadata path に置く。Product repo slot に A2O-owned `.a3/slot.json` や `.a3/materialized.json` を置いてはならない。
+具体化済みリポジトリスロットのエージェントメタデータは、プロダクトリポジトリスロットのチェックアウト外にある A2O 管理メタデータパスに置く。プロダクトリポジトリスロットに A2O 所有の `.a3/slot.json` や `.a3/materialized.json` を置いてはならない。
 
-Cleanup policy は、disposable workspace を再生成可能にしつつ、blocked diagnosis と release validation に必要な evidence を保持する。
+クリーンアップ方針は、使い捨てワークスペースを再生成可能にしつつ、ブロック診断とリリース検証に必要な証跡を保持する。
 
-## Merge
+## マージ
 
-Merge は project package と runtime state にある明示的な source / target refs を使う。
+マージは、プロジェクトパッケージとランタイム状態にある明示的なソース / ターゲット参照を使う。
 
-Internal merge targets:
+内部マージ先:
 
 - child to parent integration ref
 - parent to live target
 - single task to live target
 
-Merge policy は project package の一部である。Package が別 policy を明示しない限り、default policy は fast-forward only である。
+マージ方針はプロジェクトパッケージの一部である。パッケージが別方針を明示しない限り、既定の方針は fast-forward only である。

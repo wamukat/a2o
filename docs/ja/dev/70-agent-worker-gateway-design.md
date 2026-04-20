@@ -1,79 +1,79 @@
-# Agent Worker Gateway Design（agent worker gateway 設計）
+# エージェントワーカー境界の設計
 
-Agent worker gateway は、A2O Engine が project-local な作業を host または project dev-env で動く `a2o-agent` process へ委譲するための境界である。これにより、project toolchain を runtime image の外へ置いたまま、Engine-owned orchestration を維持できる。
+エージェントワーカー境界は、A2O Engine がプロジェクト内の作業を、ホストまたはプロジェクトの開発環境で動く `a2o-agent` プロセスへ委譲するための境界である。これにより、プロジェクトのツールチェーンをランタイムイメージの外へ置いたまま、Engine が所有する進行管理を維持できる。
 
-## Runtime flow 上の位置づけ
+## ランタイムの流れ上の位置づけ
 
-この文書は、Engine が準備した phase job を a2o-agent に渡し、agent が生成AIや product toolchain を使って変更・検証し、result と artifact を Engine に戻す境界を扱う。Engine は lifecycle と evidence を所有し、agent は materialized workspace での command execution を所有する。
+この文書は、Engine が準備したフェーズジョブを a2o-agent に渡し、エージェントが生成AIやプロダクトのツールチェーンを使って変更・検証し、結果と成果物を Engine に戻す境界を扱う。Engine はライフサイクルと証跡を所有し、エージェントは具体化済みワークスペースでのコマンド実行を所有する。
 
 ## 目的
 
-- Engine は task selection、phase transitions、workspace metadata、evidence、merge decisions を所有する。
-- Agent は materialized workspace での project-local command execution を所有する。
-- Project package は repo aliases、command profiles、required binaries、task template expectations を提供する。
-- Gateway payloads は明示的な JSON contracts とし、場当たり的な shell argument bundles にしない。
+- Engine はタスク選択、フェーズ遷移、ワークスペースメタデータ、証跡、マージ判断を所有する。
+- エージェントは具体化済みワークスペースでのプロジェクト内コマンド実行を所有する。
+- プロジェクトパッケージはリポジトリ別名、コマンドプロファイル、必須バイナリ、タスクテンプレートの期待値を提供する。
+- 境界で受け渡すデータは明示的な JSON 契約とし、場当たり的なシェル引数の束にしない。
 
-## Flow（処理の流れ）
+## 処理の流れ
 
-1. Engine が task phase 用の workspace を作成または更新する。
-2. Engine が control plane 経由で agent job を publish する。
-3. `a2o-agent` が job を pull し、要求された repo slots を materialize して、宣言された command を実行する。
-4. Agent が structured result metadata と artifacts を upload する。
-5. Engine が result を parse し、evidence を記録し、task を transition し、phase が許す場合は refs を publish または merge する。
+1. Engine がタスクフェーズ用のワークスペースを作成または更新する。
+2. Engine が制御面を通じてエージェントジョブを公開する。
+3. `a2o-agent` がジョブを取得し、要求されたリポジトリスロットを具体化して、宣言されたコマンドを実行する。
+4. エージェントが構造化された結果メタデータと成果物をアップロードする。
+5. Engine が結果を解析し、証跡を記録し、タスクを遷移させる。フェーズが許す場合は参照を公開またはマージする。
 
-## Workspace Metadata（workspace の metadata）
+## ワークスペースメタデータ
 
-Agent jobs は次を含む。
+エージェントジョブは次を含む。
 
-- task ref and phase
-- 該当する場合は parent/child relationship
-- workspace id and branch namespace
-- repo slot aliases
-- source refs and support refs
-- command profile and expected working directory
-- artifact upload policy
+- タスク参照とフェーズ
+- 該当する場合は親子関係
+- ワークスペース ID とブランチ名前空間
+- リポジトリスロット別名
+- ソース参照と補助参照
+- コマンドプロファイルと想定作業ディレクトリ
+- 成果物アップロード方針
 
-Agent は global defaults から product-specific paths を推測してはならない。Paths は job payload と、その payload を作成した project package から渡される。
+エージェントはグローバル既定値からプロダクト固有のパスを推測してはならない。パスはジョブペイロードと、そのペイロードを作成したプロジェクトパッケージから渡される。
 
-## Command Execution（command の実行）
+## コマンド実行
 
-Project commands は agent-side で実行する。Gateway は implementation workers、verification commands、merge commands、diagnostic commands を同じ control-plane shape で扱う。
+プロジェクトコマンドはエージェント側で実行する。境界では、実装ワーカー、検証コマンド、マージコマンド、診断コマンドを同じ制御面の形で扱う。
 
-Command runner は次を記録する。
+コマンド実行部は次を記録する。
 
-- exit status
-- stdout/stderr summary
-- phase が edits を publish する場合の changed files
-- declared evidence artifacts
-- blocked tasks 用の structured failure reason
+- 終了状態
+- stdout / stderr の要約
+- フェーズが編集内容を公開する場合は変更ファイル
+- 宣言された証跡成果物
+- ブロックされたタスク用の構造化された失敗理由
 
-Verification commands は project package の責務である。Engine は success、failure、blocked reason、evidence metadata だけを解釈する。
+検証コマンドはプロジェクトパッケージの責務である。Engine は成功、失敗、ブロック理由、証跡メタデータだけを解釈する。
 
-## Worker Protocol Environment（worker protocol の環境変数）
+## ワーカープロトコルの環境変数
 
-Project package の command は、公開 contract として次の A2O 名を使う。
+プロジェクトパッケージのコマンドは、公開契約として次の A2O 名を使う。
 
-- `A2O_WORKER_REQUEST_PATH`: current job の JSON request bundle。
-- `A2O_WORKER_RESULT_PATH`: command が final worker result JSON を書き込む path。
-- `A2O_WORKSPACE_ROOT`: job の materialized workspace root。
-- `A2O_WORKER_LAUNCHER_CONFIG_PATH`: bundled stdin worker が使う generated launcher config。
+- `A2O_WORKER_REQUEST_PATH`: 現在のジョブの JSON 要求一式。
+- `A2O_WORKER_RESULT_PATH`: コマンドが最終ワーカー結果 JSON を書き込むパス。
+- `A2O_WORKSPACE_ROOT`: ジョブの具体化済みワークスペースルート。
+- `A2O_WORKER_LAUNCHER_CONFIG_PATH`: 標準入力バンドル用ワーカーが使う生成済みランチャー設定。
 
-`A3_*` 名は internal compatibility alias に限定する。Project package、template、user-facing diagnostics では使わない。
+`A3_*` 名は内部互換エイリアスに限定する。プロジェクトパッケージ、テンプレート、利用者向け診断では使わない。
 
-## Materialized Workspace Rules（materialized workspace の rules）
+## 具体化済みワークスペースのルール
 
-- Repo slot names は `app`、`repo_alpha`、`repo_beta` のような stable package aliases とする。
-- 現 runtime が作成する user-visible branch refs は `refs/heads/a2o/...` を使う。`refs/heads/a3/...` refs は internal compatibility data として扱う。
-- Agent workspace paths は disposable であり、durable project configuration として使わない。
-- Generated runtime metadata は product repo slot 内に置かず、`.work/a2o/agent/` 管理 path 配下へ閉じる。利用者が commit する source tree に A2O metadata を露出させない。
+- リポジトリスロット名は `app`、`repo_alpha`、`repo_beta` のような安定したパッケージ別名とする。
+- 現在のランタイムが作成する利用者に見えるブランチ参照は `refs/heads/a2o/...` を使う。`refs/heads/a3/...` 参照は内部互換データとして扱う。
+- エージェントワークスペースのパスは使い捨てであり、永続的なプロジェクト設定として使わない。
+- 生成されたランタイムメタデータはプロダクトのリポジトリスロット内に置かず、`.work/a2o/agent/` 管理パス配下へ閉じる。利用者がコミットするソースツリーに A2O メタデータを露出させない。
 
-## Validation（検証）
+## 検証
 
-Reference product suite は gateway を次の観点で検証する。
+参照用プロダクト群は、境界を次の観点で検証する。
 
-- TypeScript single-repo implementation / verification / merge
-- Go single-repo implementation / verification / merge
-- Python single-repo implementation / verification / merge
-- Multi-repo parent-child implementation、child merge、parent review、parent verification、parent merge の flow
+- TypeScript の単一リポジトリでの実装 / 検証 / マージ
+- Go の単一リポジトリでの実装 / 検証 / マージ
+- Python の単一リポジトリでの実装 / 検証 / マージ
+- 複数リポジトリでの親子タスク実装、子タスクのマージ、親タスクレビュー、親タスク検証、親タスクのマージ
 
 詳細は [90-reference-product-suite.md](90-reference-product-suite.md) を参照する。

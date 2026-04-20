@@ -1,47 +1,47 @@
-# A2O Project Surface
+# A2O プロジェクト設定面
 
-この文書は、project が所有する設定面を小さく保つためのもの。
-project package は product 固有知識を表現するが、`project.yaml` を無制限な Engine 設定ファイルにしてはならない。
+この文書は、プロジェクトが所有する設定面を小さく保つためのもの。
+プロジェクトパッケージはプロダクト固有知識を表現するが、`project.yaml` を無制限な Engine 設定ファイルにしてはならない。
 
-## Runtime flow 上の位置づけ
+## ランタイムの流れ上の位置づけ
 
-この文書は、利用者が管理する project package と、A2O Engine が所有する runtime behavior の境界を扱う。`project.yaml` は task selection、repo slot、phase command、skill、verification/remediation、merge policy を渡す入力であり、scheduler、workspace topology、evidence model、kanban provider implementation を再定義する場所ではない。
+この文書は、利用者が管理するプロジェクトパッケージと、A2O Engine が所有するランタイム動作の境界を扱う。`project.yaml` はタスク選択、リポジトリスロット、フェーズコマンド、スキル、検証 / 修復、マージ方針を渡す入力であり、スケジューラ、ワークスペース構成、証跡モデル、カンバンプロバイダー実装を再定義する場所ではない。
 
 ## 1. 目的
 
-- project 固有の注入点を最小限に保つ。
-- 過去の product 固有複雑性を Engine core へ持ち込まない。
-- `project.yaml` を runtime 内部設定の寄せ集めではなく、明確な package config にする。
-- task lifecycle、workspace topology、evidence、merge semantics は A2O が所有する。
+- プロジェクト固有の注入点を最小限に保つ。
+- 過去のプロダクト固有複雑性を Engine コアへ持ち込まない。
+- `project.yaml` をランタイム内部設定の寄せ集めではなく、明確なパッケージ設定にする。
+- タスクライフサイクル、ワークスペース構成、証跡、マージの意味論は A2O が所有する。
 
-## 2. Minimal Surface
+## 2. 最小の設定面
 
-Project package が設定してよいもの:
+プロジェクトパッケージが設定してよいもの:
 
-- implementation skill
-- review skill
-- parent review skill
-- implementation / review executor commands
-- verification commands
-- remediation commands
-- repo slots and labels
-- A2O がサポートする範囲内の merge policy と live target ref
+- 実装スキル
+- レビュースキル
+- 親タスクレビュースキル
+- 実装 / レビューの実行コマンド
+- 検証コマンド
+- 修復コマンド
+- リポジトリスロットとラベル
+- A2O がサポートする範囲内のマージ方針と本流ターゲット参照
 
-## 3. Core-Owned Behavior
+## 3. コアが所有する動作
 
-Project package は次を再定義しない。
+プロジェクトパッケージは次を再定義しない。
 
-- task kind semantics
-- phase semantics
-- workspace topology
-- rerun semantics
-- evidence model
-- scheduler behavior
-- kanban provider implementation
+- タスク種別の意味論
+- フェーズの意味論
+- ワークスペース構成
+- 再実行の意味論
+- 証跡モデル
+- スケジューラの動作
+- カンバンプロバイダー実装
 
-## 4. Phase Commands
+## 4. フェーズコマンド
 
-公開 schema は次の形を使う。
+公開スキーマは次の形を使う。
 
 ```yaml
 runtime:
@@ -57,25 +57,25 @@ runtime:
           - "{{result_path}}"
 ```
 
-A2O はこの command を内部 stdin-bundle protocol に展開する。
-executor は worker result JSON を `{{result_path}}` に書き出す。
+A2O はこのコマンドを内部の標準入力バンドル用プロトコルに展開する。
+実行コマンドはワーカー結果 JSON を `{{result_path}}` に書き出す。
 
-Stable script contract は [55-project-script-contract.md](55-project-script-contract.md) で定義する。Project scripts は private runtime metadata files ではなく、`A2O_*` worker environment names と `slot_paths` などの request fields を使う。
+安定したスクリプト契約は [55-project-script-contract.md](55-project-script-contract.md) で定義する。プロジェクトスクリプトは非公開ランタイムメタデータファイルではなく、`A2O_*` ワーカー環境変数名と `slot_paths` などの要求フィールドを使う。
 
-## 5. Verification And Remediation
+## 5. 検証と修復
 
-Verification commands と remediation commands は project が所有する。
-これらは materialized workspace で実行され、次の placeholders を使える。
+検証コマンドと修復コマンドはプロジェクトが所有する。
+これらは具体化済みワークスペースで実行され、次のプレースホルダーを使える。
 
 - `{{workspace_root}}`
 - `{{a2o_root_dir}}`
 - `{{root_dir}}`
 
-Remediation commands は、verification failure に対して deterministic な formatting や repair command がある場合に使う。
+修復コマンドは、検証失敗に対して結果が決まっている整形や修復コマンドがある場合に使う。
 
-## 6. Merge
+## 6. マージ
 
-Merge は、project-owned policy と live target ref で設定する。実際の merge target は A2O が task topology から導出する。
+マージは、プロジェクトが所有する方針と本流ターゲット参照で設定する。実際のマージ先は A2O がタスク構造から導出する。
 
 ```yaml
 runtime:
@@ -85,9 +85,9 @@ runtime:
       target_ref: refs/heads/main
 ```
 
-Project は policy と live target ref を選択できるが、`project.yaml` の中で `merge_to_live` や `merge_to_parent` は選択しない。
+プロジェクトは方針と本流ターゲット参照を選択できるが、`project.yaml` の中で `merge_to_live` や `merge_to_parent` は選択しない。
 
-## 7. Presets
+## 7. プリセット
 
-0.5.5 の公開 package format は単一ファイルの `project.yaml` である。
-Internal presets は実装詳細として残りうるが、package author が追加の preset file を管理する必要はない。
+0.5.5 の公開パッケージ形式は、単一ファイルの `project.yaml` である。
+内部プリセットは実装詳細として残りうるが、パッケージ作成者が追加のプリセットファイルを管理する必要はない。

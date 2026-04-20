@@ -1,43 +1,43 @@
-# Runtime Extension Boundary（runtime extension の境界）
+# ランタイム拡張境界
 
-A2O Engine core は project-neutral に保つ。Project-specific behavior は project packages、command profiles、hook scripts、task templates、agent-side toolchains を通じて注入する。
+A2O Engine コアはプロジェクト非依存に保つ。プロジェクト固有の動作は、プロジェクトパッケージ、コマンドプロファイル、hook スクリプト、タスクテンプレート、エージェント側ツールチェーンを通じて注入する。
 
-## Runtime flow 上の位置づけ
+## ランタイムの流れ上の位置づけ
 
-この文書は、runtime flow のどこまでを A2O core が持ち、どこからを project package / command / skill に委譲するかを定義する。新しい要件が出たとき、core behavior と project-specific extension のどちらに置くべきかを判断するために読む。
+この文書は、ランタイムの流れのどこまでを A2O コアが持ち、どこからをプロジェクトパッケージ / コマンド / スキルに委譲するかを定義する。新しい要件が出たとき、コア動作とプロジェクト固有拡張のどちらに置くべきかを判断するために読む。
 
-## Core が知ってよいもの
+## コアが知ってよいもの
 
-- task lifecycle phases
-- kanban provider interface
-- repo slot model
-- workspace materialization
-- worker gateway protocol
-- verification result semantics
-- merge publication semantics
-- evidence storage
+- タスクライフサイクルのフェーズ
+- カンバンプロバイダーインターフェース
+- リポジトリスロットモデル
+- ワークスペース具体化
+- ワーカー境界プロトコル
+- 検証結果の意味論
+- マージ公開の意味論
+- 証跡保存
 
-## Project Package が所有するもの
+## プロジェクトパッケージが所有するもの
 
-- board name and project-owned bootstrap labels
-- project-owned task labels
-- repo slot aliases and source paths
-- build/test/format commands
-- `a2o-agent` 用 environment prerequisites
-- validation 用 task templates
-- project-specific bootstrap、remediation、verification hooks（project 固有 hooks）
+- ボード名とプロジェクトが所有する初期化ラベル
+- プロジェクトが所有するタスクラベル
+- リポジトリスロット別名とソースパス
+- ビルド / テスト / 整形コマンド
+- `a2o-agent` 用の環境前提条件
+- 検証用タスクテンプレート
+- プロジェクト固有の初期化、修復、検証 hook
 
-## Injection Rules（注入 rules）
+## 注入ルール
 
-1. product、repository、domain concept、build tool、verification command を指す値は project package に置く。
-2. すべての A2O project に必要な behavior は Engine domain logic として表現し、core tests で cover する。
-3. 1 つの project だけが必要とする behavior は package hook または command profile を優先する。
-4. 2 つ以上の reference products が同じ behavior を必要とする場合は、documented preset への昇格を検討する。
-5. config 不在時に project package を黙って再生成する fallback defaults を追加しない。
+1. プロダクト、リポジトリ、ドメイン概念、ビルドツール、検証コマンドを指す値はプロジェクトパッケージに置く。
+2. すべての A2O プロジェクトに必要な振る舞いは Engine のドメインロジックとして表現し、コアテストでカバーする。
+3. 1 つのプロジェクトだけが必要とする振る舞いは、パッケージ hook またはコマンドプロファイルを優先する。
+4. 2 つ以上の参照用プロダクトが同じ振る舞いを必要とする場合は、文書化されたプリセットへの昇格を検討する。
+5. 設定がないときにプロジェクトパッケージを黙って再生成する代替既定値を追加しない。
 
-## Current Package Layout（現在の package layout）
+## 現在のパッケージレイアウト
 
-Reference packages は次の形を使う。
+参照用パッケージは次の形を使う。
 
 ```text
 project-package/
@@ -48,13 +48,13 @@ project-package/
   task-templates/
 ```
 
-`project.yaml` は唯一の author-facing package config である。package metadata、kanban bootstrap and selection、repo slots、agent prerequisites、runtime surface commands、merge defaults を持つ。A2O-owned lanes と internal coordination labels は provider/runtime defaults であり、package responsibilities ではない。`commands/` は declarative commands では不足する場合の project-owned scripts を置く。`task-templates/` は validation に使う kanban task templates を置く。
+`project.yaml` は唯一の作成者向けパッケージ設定である。パッケージメタデータ、カンバン初期化と選択条件、リポジトリスロット、エージェントの前提条件、ランタイム公開コマンド、マージ既定値を持つ。A2O が管理するレーンと内部調整ラベルはプロバイダー / ランタイムの既定値であり、パッケージの責務ではない。`commands/` は宣言的なコマンドでは不足する場合のプロジェクト管理スクリプトを置く。`task-templates/` は検証に使うカンバンタスクテンプレートを置く。
 
-## Review Checklist（review checklist の確認項目）
+## レビュー時の確認項目
 
-- Package は `a2o project bootstrap` で bootstrap できる。`./a2o-project` または `./project-package` にない場合は `--package DIR` を使う。
-- Repo aliases は stable であり、local machine paths を encode しない。
-- Required binaries は `agent.required_bins` に列挙する。
-- Build and verification commands は agent-materialized workspace から実行できる。
-- Scenario tasks は deterministic validation に使える小ささに保つ。
-- Package が必要とする外部 A2O behavior change は、implementation 前に別 ticket として track する。
+- パッケージは `a2o project bootstrap` で初期化できる。`./a2o-project` または `./project-package` にない場合は `--package DIR` を使う。
+- リポジトリ別名は安定しており、ローカルマシンのパスを埋め込まない。
+- 必須バイナリは `agent.required_bins` に列挙する。
+- ビルドコマンドと検証コマンドは、エージェントが具体化したワークスペースから実行できる。
+- シナリオタスクは決定的な検証に使える小ささに保つ。
+- パッケージが必要とする外部 A2O 仕様変更は、実装前に別チケットとして追跡する。

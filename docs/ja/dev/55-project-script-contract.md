@@ -1,34 +1,34 @@
-# Project Script Contract
+# プロジェクトスクリプトの契約
 
-A2O は project package が product 固有の automation を持つことを許容する。Package script は Ruby、Bash、Go、Python、Node、その他 project-local な選択でよい。安定させる境界は script の言語ではなく、A2O が提供する command、environment、request、result、workspace、evidence の contract である。
+A2O はプロジェクトパッケージがプロダクト固有の自動化を持つことを許容する。パッケージスクリプトは Ruby、Bash、Go、Python、Node、その他プロジェクト内で保守できる選択でよい。安定させる境界はスクリプトの言語ではなく、A2O が提供するコマンド、環境変数、要求、結果、ワークスペース、証跡の契約である。
 
-## Runtime flow 上の位置づけ
+## ランタイムの流れ上の位置づけ
 
-この文書は、A2O Engine が phase job を作り、a2o-agent が project command を実行するときの contract を定義する。Project script は workspace layout を推測せず、公開 environment variables と worker request JSON を source of truth として扱う。
+この文書は、A2O Engine がフェーズジョブを作り、a2o-agent がプロジェクトコマンドを実行するときの契約を定義する。プロジェクトスクリプトはワークスペース構成を推測せず、公開環境変数とワーカー要求 JSON を正本として扱う。
 
 ## 責務
 
 A2O が所有するもの:
 
-- phase lifecycle と許可される phase names
-- kanban task selection と transitions
-- workspace materialization と repo slot paths
-- worker request/result transport
-- evidence publication と merge orchestration
-- diagnostic categories と remediation hints
+- フェーズライフサイクルと許可されるフェーズ名
+- カンバンタスク選択と遷移
+- ワークスペース具体化とリポジトリスロットのパス
+- ワーカー要求 / 結果の受け渡し
+- 証跡の公開とマージ進行
+- 診断分類と修復の手がかり
 
-Project package が所有するもの:
+プロジェクトパッケージが所有するもの:
 
-- product build、test、verification、remediation commands
-- local dependency cache preparation など project 固有 bootstrap
-- その product が必要とする support repo setup
-- implementation / review で使う AI または deterministic executor command
+- プロダクトのビルド、テスト、検証、修復コマンド
+- ローカル依存キャッシュの準備など、プロジェクト固有の初期化
+- そのプロダクトが必要とする補助リポジトリの準備
+- 実装 / レビューで使う AI または結果が決まっている実行コマンド
 
-Project scripts は `.a3/workspace.json`、`.a3/slot.json`、generated `launcher.json`、internal A3 environment names のような private runtime files に依存してはならない。
+プロジェクトスクリプトは `.a3/workspace.json`、`.a3/slot.json`、生成された `launcher.json`、内部 A3 環境変数名のような非公開ランタイムファイルに依存してはならない。
 
-## Phase Command Contract
+## フェーズコマンドの契約
 
-A2O は package command 用に次の public phases を定義する。
+A2O はパッケージコマンド用に次の公開フェーズを定義する。
 
 - `implementation`
 - `review`
@@ -37,9 +37,9 @@ A2O は package command 用に次の public phases を定義する。
 - `remediation`
 - `merge`
 
-Implementation、review、parent review は worker protocol 経由で実行する。Verification と remediation は materialized workspace 内の project command として実行する。Merge は policy で設定し、A2O が実行する。Project package はサポート済み merge behavior を選ぶだけで、新しい merge engine を実装しない。
+実装、レビュー、親タスクレビューはワーカープロトコル経由で実行する。検証と修復は具体化済みワークスペース内のプロジェクトコマンドとして実行する。マージは方針で設定し、A2O が実行する。プロジェクトパッケージはサポート済みのマージ動作を選ぶだけで、新しいマージエンジンを実装しない。
 
-Executor commands は次の placeholders を使える。
+実行コマンドは次のプレースホルダーを使える。
 
 - `{{result_path}}`
 - `{{schema_path}}`
@@ -47,43 +47,43 @@ Executor commands は次の placeholders を使える。
 - `{{a2o_root_dir}}`
 - `{{root_dir}}`
 
-Verification and remediation commands は次を使える。
+検証コマンドと修復コマンドは次を使える。
 
 - `{{workspace_root}}`
 - `{{a2o_root_dir}}`
 - `{{root_dir}}`
 
-## Worker Environment
+## ワーカー環境
 
-Project worker、verification、remediation command は次の environment variables を使う。
+プロジェクトワーカー、検証コマンド、修復コマンドは次の環境変数を使う。
 
-- `A2O_WORKER_REQUEST_PATH`: current job の JSON request bundle。
-- `A2O_WORKER_RESULT_PATH`: worker command が final JSON result を書き込む path。
-- `A2O_WORKSPACE_ROOT`: current job の materialized workspace root。
-- `A2O_ROOT_DIR`: worker から見える A2O runtime support files の root directory。
-- `A2O_WORKER_LAUNCHER_CONFIG_PATH`: bundled stdin worker が使う generated launcher config。
+- `A2O_WORKER_REQUEST_PATH`: 現在のジョブの JSON 要求一式。
+- `A2O_WORKER_RESULT_PATH`: ワーカーコマンドが最終 JSON 結果を書き込むパス。
+- `A2O_WORKSPACE_ROOT`: 現在のジョブの具体化済みワークスペースルート。
+- `A2O_ROOT_DIR`: ワーカーから見える A2O ランタイム補助ファイルのルートディレクトリ。
+- `A2O_WORKER_LAUNCHER_CONFIG_PATH`: 標準入力バンドル用ワーカーが使う生成済みランチャー設定。
 
-`A3_*` names は compatibility aliases に限定する。Public project script contract ではない。
+`A3_*` 名は互換エイリアスに限定する。公開プロジェクトスクリプト契約ではない。
 
-## Request Contract
+## 要求の契約
 
-Worker request JSON は project script にとっての source of truth である。含まれるもの:
+ワーカー要求 JSON はプロジェクトスクリプトにとっての正本である。含まれるもの:
 
 - `task_ref`、`run_ref`、`phase`
 - `skill`
-- verification / remediation command job では `command_intent`
+- 検証 / 修復コマンドのジョブでは `command_intent`
 - `task_packet.title` と `task_packet.description`
-- repo slot alias を key にした `slot_paths`
-- task kind や必要に応じた verification commands を含む `phase_runtime`
-- source descriptor と scope snapshot metadata
+- リポジトリスロット別名をキーにした `slot_paths`
+- タスク種別や必要に応じた検証コマンドを含む `phase_runtime`
+- ソース記述子とスコープスナップショットのメタデータ
 
-Scripts は workspace directory layout を推測せず、repo paths を `slot_paths` から読む。
-Slot-local remediation では command の working directory が repo slot になる場合があるが、`A2O_WORKSPACE_ROOT` と `slot_paths` は full prepared workspace を指す。
-Private `.a3` metadata を直接読まず、`A2O_WORKER_REQUEST_PATH` を使う。
+スクリプトはワークスペースのディレクトリ構成を推測せず、リポジトリパスを `slot_paths` から読む。
+スロット単位の修復では、コマンドの作業ディレクトリがリポジトリスロットになる場合があるが、`A2O_WORKSPACE_ROOT` と `slot_paths` は準備済みワークスペース全体を指す。
+非公開の `.a3` メタデータを直接読まず、`A2O_WORKER_REQUEST_PATH` を使う。
 
-## Result Contract
+## 結果の契約
 
-Worker commands は `A2O_WORKER_RESULT_PATH` に JSON object を 1 つ書く。Required keys は次の通り。
+ワーカーコマンドは `A2O_WORKER_RESULT_PATH` に JSON オブジェクトを 1 つ書く。必須キーは次の通り。
 
 - `task_ref`
 - `run_ref`
@@ -94,22 +94,22 @@ Worker commands は `A2O_WORKER_RESULT_PATH` に JSON object を 1 つ書く。R
 - `observed_state`
 - `rework_required`
 
-Implementation success は repo slot ごとの `changed_files` も含める。Review と parent review は worker response schema に従って `review_disposition` を含められる。
+実装成功時はリポジトリスロットごとの `changed_files` も含める。レビューと親タスクレビューは、ワーカー応答スキーマに従って `review_disposition` を含められる。
 
-## Cache And Artifacts
+## キャッシュと成果物
 
-Task-local cache と artifact paths は A2O-managed workspace の責務である。Project package は materialized workspace 配下に product 固有 cache directories を作ってよいが、durable cache policy と evidence retention は A2O が所有する。新しい stable cache/artifact discovery helper が必要な場合は、script が private runtime paths に依存する前に A2O contract として追加する。
+タスク単位のキャッシュと成果物パスは、A2O が管理するワークスペースの責務である。プロジェクトパッケージは具体化済みワークスペース配下にプロダクト固有のキャッシュディレクトリを作ってよいが、永続キャッシュ方針と証跡保持は A2O が所有する。新しい安定したキャッシュ / 成果物検出ヘルパーが必要な場合は、スクリプトが内部ランタイムパスに依存する前に A2O 契約として追加する。
 
-## Validation Direction
+## 検証方針
 
 `a2o doctor`、`a2o project lint`、`a2o worker validate-result` は次を検出する。
 
-- project package 内の `A3_*` worker environment names
-- private `.a3` metadata files の直接読み取り
-- required worker result keys の欠落
-- public placeholders を使っていない executor commands
-- undeclared binaries を必要とする verification/remediation commands
+- プロジェクトパッケージ内の `A3_*` ワーカー環境変数名
+- 非公開の `.a3` メタデータファイルの直接読み取り
+- 必須ワーカー結果キーの欠落
+- 公開プレースホルダーを使っていない実行コマンド
+- 宣言されていないバイナリを必要とする検証 / 修復コマンド
 
-Lint output には次の修正手順を含める。例えば `A3_*` names は対応する `A2O_*` variables、`.a3` metadata reads は `A2O_WORKER_REQUEST_PATH` の `slot_paths`、`scope_snapshot`、`phase_runtime`、`launcher.json` references は `project.yaml` の phase executor settings へ誘導する。
+Lint の出力には次の修正手順を含める。例えば `A3_*` 名は対応する `A2O_*` 変数へ、`.a3` メタデータの読み取りは `A2O_WORKER_REQUEST_PATH` の `slot_paths`、`scope_snapshot`、`phase_runtime` へ、`launcher.json` 参照は `project.yaml` のフェーズ実行コマンド設定へ誘導する。
 
-目的は、project-specific automation を可能にしたまま、A2O release 間で安定した境界を維持することである。
+目的は、プロジェクト固有の自動化を可能にしたまま、A2O リリース間で安定した境界を維持することである。

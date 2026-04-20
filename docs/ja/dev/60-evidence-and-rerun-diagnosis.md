@@ -1,21 +1,21 @@
-# Evidence And Rerun Diagnosis
+# 証跡と再実行診断
 
-この文書は、A2O が evidence を記録し、blocked run を診断し、rerun 判断を支援する方法を定義する。
+この文書は、A2O が証跡を記録し、ブロックされた実行を診断し、再実行判断を支援する方法を定義する。
 
-## Runtime flow 上の位置づけ
+## ランタイムの流れ上の位置づけ
 
-この文書は、phase job の実行結果を operator が後から追える形に残し、blocked task を安全に再実行できるようにする設計を扱う。Evidence は transient log の代替ではなく、Task、Run、Phase、Source Descriptor、Artifact Owner に結びつく runtime state である。
+この文書は、フェーズジョブの実行結果を運用者が後から追える形に残し、ブロックされたタスクを安全に再実行できるようにする設計を扱う。証跡は一時ログの代替ではなく、タスク、実行、フェーズ、ソース記述子、成果物の所有者に結びつくランタイム状態である。
 
-## Goals
+## 目標
 
-- Transient log が消えた後も completed / blocked run を inspect できるようにする。
-- Evidence を source descriptor と artifact owner に結びつける。
-- Operator が何を直すべきか分かるように failure を分類する。
-- 推測せず安全に rerun できるだけの state を保持する。
+- 一時ログが消えた後も、完了またはブロックされた実行を確認できるようにする。
+- 証跡をソース記述子と成果物の所有者に結びつける。
+- 運用者が何を直すべきか分かるように失敗を分類する。
+- 推測せず安全に再実行できるだけの状態を保持する。
 
-## Evidence
+## 証跡
 
-Evidence record は次を含む。
+証跡レコードは次を含む。
 
 - task ref
 - run ref
@@ -28,17 +28,17 @@ Evidence record は次を含む。
 - output artifact references
 - terminal outcome
 
-Evidence は runtime-owned である。利用者に generated workspace metadata の直接確認を要求してはならない。
+証跡はランタイムが所有する。利用者に生成済みワークスペースメタデータの直接確認を要求してはならない。
 
-## Artifact Owner
+## 成果物の所有者
 
-Artifact owner は evidence を所有する task または parent task を識別する。Snapshot version は evidence を source state に結びつける。
+成果物の所有者は、証跡を所有するタスクまたは親タスクを識別する。スナップショットのバージョンは、証跡をソース状態に結びつける。
 
-Single / child task は通常 task-scoped evidence を所有する。Parent integration flow は parent-scoped evidence を所有できる。
+単独タスクと子タスクは通常、タスク単位の証跡を所有する。親タスクの統合処理では、親タスク単位の証跡を所有できる。
 
-## Blocked Diagnosis
+## ブロック診断
 
-Blocked diagnosis は low-level errors を operator category へ変換する。
+ブロック診断は、低レベルのエラーを運用者向けの分類へ変換する。
 
 - `configuration_error`
 - `workspace_dirty`
@@ -48,40 +48,40 @@ Blocked diagnosis は low-level errors を operator category へ変換する。
 - `merge_failed`
 - `runtime_failed`
 
-Diagnostics は次を含める。
+診断には次を含める。
 
-- category
-- short summary
-- affected repo or phase
-- relevant file list when available
-- next action
-- `a2o runtime describe-task <task-ref>` と logs への pointer
+- 分類
+- 短い要約
+- 影響を受けたリポジトリまたはフェーズ
+- 取得できる場合は関連ファイル一覧
+- 次に行うこと
+- `a2o runtime describe-task <task-ref>` とログへの手がかり
 
-## Rerun Policy
+## 再実行方針
 
-Rerun が安全なのは、A2O が次を判断できる場合だけである。
+再実行が安全なのは、A2O が次を判断できる場合だけである。
 
-- どの task / phase が失敗したか
-- どの source descriptor を使ったか
-- workspace が clean か、再作成できるか
-- previous failure が terminal か retryable か
-- previous run の evidence を保持すべきか
+- どのタスク / フェーズが失敗したか
+- どのソース記述子を使ったか
+- ワークスペースが整理済みか、再作成できるか
+- 前回の失敗が終了扱いか、再試行可能か
+- 前回実行の証跡を保持すべきか
 
-Rerun は evidence を黙って上書きしてはならない。新しい attempt は新しい run を作る。
+再実行は証跡を黙って上書きしてはならない。新しい試行は新しい実行を作る。
 
-## Operator Inspection
+## 運用者による確認
 
-Operator は次から確認を始める。
+運用者は次から確認を始める。
 
 ```sh
 a2o runtime watch-summary
 a2o runtime describe-task <task-ref>
 ```
 
-`watch-summary` は multi-task overview を表示する。`describe-task` は 1 task の task state、run state、evidence、kanban comments、log hints を集約する。
+`watch-summary` は複数タスクの概況を表示する。`describe-task` は 1 タスクの状態、実行状態、証跡、カンバンコメント、ログの手がかりを集約する。
 
-## Retention
+## 保持
 
-Terminal workspace cleanup と evidence retention は別である。A2O は disposable workspace を削除しても、run を inspect するために必要な evidence と blocked diagnosis data を保持できる。
+終了済みワークスペースのクリーンアップと証跡の保持は別である。A2O は使い捨てワークスペースを削除しても、実行を確認するために必要な証跡とブロック診断データを保持できる。
 
-Generated state は、internal workspace metadata を除き `.work/a2o/` 配下に置く。
+生成された状態は、内部ワークスペースメタデータを除き `.work/a2o/` 配下に置く。

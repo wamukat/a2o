@@ -1,86 +1,86 @@
-# A2O Bounded Contexts And Language
+# A2O の文脈境界と言葉
 
-この文書は、A2O で使う vocabulary と bounded context を定義する。Domain、workspace、evidence、implementation document はこの用語を使う。
+この文書は、A2O で使う語彙と境界づけられた文脈を定義する。ドメイン、ワークスペース、証跡、実装文書はこの用語を使う。
 
-## Runtime flow 上の位置づけ
+## ランタイムの流れ上の位置づけ
 
-この文書は、kanban task が scheduler に pickup され、Engine が phase job を作り、a2o-agent が job を実行し、evidence と kanban state が更新されるまでの言葉を揃える。詳細文書で出てくる Task、Run、Phase、Workspace、Project Package、Operator Inspection は、この bounded context に沿って読む。
+この文書は、カンバンタスクがスケジューラに取り込まれ、Engine がフェーズジョブを作り、a2o-agent がジョブを実行し、証跡とカンバン状態が更新されるまでの言葉を揃える。詳細文書で出てくるタスク、実行、フェーズ、ワークスペース、プロジェクトパッケージ、運用者確認は、この境界づけられた文脈に沿って読む。
 
-## Design Stance
+## 設計姿勢
 
-A2O は code structure の都合ではなく domain meaning によって概念を命名する。
+A2O はコード構造の都合ではなく、ドメイン上の意味によって概念を命名する。
 
-- 先に意味を定義し、その後で class / module / file 名を合わせる。
-- Phase-specific rescue branch を domain language に入れない。
-- Public vocabulary は A2O 名を使う。A3 は internal compatibility name として必要な場合だけ残る。
+- 先に意味を定義し、その後でクラス / モジュール / ファイル名を合わせる。
+- フェーズ固有の救済ブランチをドメイン語彙に入れない。
+- 公開語彙は A2O 名を使う。A3 は内部互換名として必要な場合だけ残す。
 
-## Context Map
+## 文脈マップ
 
-### Task Execution Context
+### タスク実行の文脈
 
-Owns:
+所有するもの:
 
-- task kind
-- phase
-- run
-- terminal outcome
-- rerun eligibility
+- タスク種別
+- フェーズ
+- 実行
+- 終了結果
+- 再実行可否
 
-この context は task が lifecycle のどこにいるか、次に何が起きるかを決める。
+この文脈は、タスクがライフサイクルのどこにいるか、次に何が起きるかを決める。
 
-### Workspace Context
+### ワークスペースの文脈
 
-Owns:
+所有するもの:
 
-- workspace kind
-- repo slot
-- source descriptor
-- artifact owner
-- freshness and cleanup policy
+- ワークスペース種別
+- リポジトリスロット
+- ソース記述子
+- 成果物の所有者
+- 鮮度とクリーンアップ方針
 
-この context は phase が使う source tree と、work の materialization 方法を決める。
+この文脈は、フェーズが使うソースツリーと、作業内容の具体化方法を決める。
 
-### Project Package Context
+### プロジェクトパッケージの文脈
 
-Owns:
+所有するもの:
 
-- package identity
-- kanban board name
-- repo slots and labels
-- agent prerequisites
-- phase commands and skills
-- verification and remediation commands
-- merge defaults
+- パッケージ識別子
+- カンバンボード名
+- リポジトリスロットとラベル
+- エージェントの前提条件
+- フェーズコマンドとスキル
+- 検証コマンドと修復コマンド
+- マージの既定値
 
-この context は product-owned configuration surface である。
+この文脈は、プロダクトが所有する設定面である。
 
-### Operator Inspection Context
+### 運用者確認の文脈
 
-Owns:
+所有するもの:
 
-- evidence summary
-- blocked-run diagnosis
-- watch summary
-- describe-task output
-- runtime status and doctor output
+- 証跡の要約
+- ブロックされた実行の診断
+- 要約表示
+- `describe-task` の出力
+- ランタイム状態と `doctor` の出力
 
-この context は何が起きたか、operator が次に何をすべきかを説明する。
+この文脈は、何が起きたか、運用者が次に何をすべきかを説明する。
 
-## Core Terms
+## 中核用語
 
-### Task
+### タスク
 
-Kanban から取り込む、または parent-child flow の一部として作成される work unit。
+カンバンから取り込む、または親子タスクの流れの一部として作成される作業単位。
 
-### Task Kind
+### タスク種別
 
-- `single`: standalone task。
-- `child`: parent scope の一部を変更する task。
-- `parent`: child aggregation、parent review、parent verification、live merge を所有する integration task。
+- `single`: 単独タスク。
+- `child`: 親タスクの範囲の一部を変更するタスク。
+- `parent`: 子タスクの集約、親タスクレビュー、親タスク検証、本流へのマージを所有する統合タスク。
 
-### Phase
+### フェーズ
 
-現在処理中の execution step。Public project package は次を使う。
+現在処理中の実行ステップ。公開プロジェクトパッケージは次を使う。
 
 - `implementation`
 - `review`
@@ -89,38 +89,38 @@ Kanban から取り込む、または parent-child flow の一部として作成
 - `remediation`
 - `merge`
 
-### Run
+### 実行
 
-1 task phase を実行する 1 attempt。Run は phase、workspace、source descriptor、outcome、evidence、blocked details を記録する。
+1 つのタスクフェーズを実行する 1 回の試行。実行はフェーズ、ワークスペース、ソース記述子、結果、証跡、ブロック詳細を記録する。
 
-### Terminal Outcome
+### 終了結果
 
-Run の最終結果。例: success、blocked、failed verification、merge conflict、executor failure。
+実行の最終結果。例: success、blocked、failed verification、merge conflict、executor failure。
 
-### Repo Slot
+### リポジトリスロット
 
-Repository に対する stable project package alias。例: `app`、`repo_alpha`、`repo_beta`。Runtime behavior は hard-coded product path ではなく repo slot を使う。
+リポジトリに対する安定したプロジェクトパッケージ上の別名。例: `app`、`repo_alpha`、`repo_beta`。ランタイム動作はハードコードされたプロダクトパスではなく、リポジトリスロットを使う。
 
-### Workspace Kind
+### ワークスペース種別
 
-- `ticket_workspace`: implementation work に使う。
-- `runtime_workspace`: review、verification、merge に使う。
+- `ticket_workspace`: 実装作業に使う。
+- `runtime_workspace`: レビュー、検証、マージに使う。
 
-### Evidence
+### 証跡
 
-Transient log に依存せず、operator が何が起きたかを inspect できる structured records and artifacts。
+一時ログに依存せず、運用者が何が起きたかを確認できる構造化された記録と成果物。
 
-### Source Descriptor
+### ソース記述子
 
-Run が使った code を定義する source ref と workspace kind。
+実行が使ったコードを定義するソース参照とワークスペース種別。
 
-### Artifact Owner
+### 成果物の所有者
 
-Evidence snapshot を所有する task または parent task。
+証跡スナップショットを所有するタスクまたは親タスク。
 
-## Public Naming
+## 公開名
 
-Users should see A2O names:
+利用者には A2O 名を見せる。
 
 - `A2O`
 - `a2o`
@@ -128,4 +128,4 @@ Users should see A2O names:
 - `.work/a2o`
 - `refs/heads/a2o/...`
 
-Internal compatibility names は、必要な場合だけ implementation details と diagnostics に残してよい。
+内部互換名は、必要な場合だけ実装詳細と診断に残してよい。

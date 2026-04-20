@@ -1,12 +1,12 @@
-# Runtime Naming Boundary
+# ランタイム命名境界
 
-この文書は、利用者に見せる A2O 名と、実装内部に残る互換名の境界を説明する reference である。
+この文書は、利用者に見せる A2O 名と、実装内部に残る互換名の境界を説明するリファレンスである。
 
-A2O の正式名称は Agentic AI Orchestrator であり、公開 product 名である。A3 は内部互換名であり、実装 code path、state path、Engine CLI surface に現れる場合がある。
+A2O の正式名称は Agentic AI Orchestrator であり、公開プロダクト名である。A3 は内部互換名であり、実装上のコードパス、状態保存パス、Engine CLI の内部面に現れる場合がある。
 
 ## 公開名
 
-利用者向け docs と commands では、次の名前を使う。
+利用者向けドキュメントとコマンドでは、次の名前を使う。
 
 - `A2O`
 - `a2o`
@@ -25,18 +25,18 @@ A2O の正式名称は Agentic AI Orchestrator であり、公開 product 名で
 - `bin/a3`
 - `.a3`
 - `A3_*` environment variables（環境変数）
-- compatibility `refs/heads/a3/...`（内部互換 refs）
+- compatibility `refs/heads/a3/...`（内部互換参照）
 
-通常の setup docs で、利用者にこれらの名前を author させてはならない。diagnostics や内部実装 docs に出す場合は、互換 surface であることを明記する。
+通常のセットアップ文書で、利用者にこれらの名前を書かせてはならない。診断や内部実装文書に出す場合は、互換用の面であることを明記する。
 
-## 命名 rule
+## 命名ルール
 
-- 新しい公開 docs では A2O 名を使う。
-- 新しい project package では A2O 名を使う。
-- 新しい CLI affordance は `a2o` を優先する。
-- 内部 Ruby Engine API は、公開 user surface に出ない範囲で A3 名を保持してよい。
-- 互換 alias を documented primary path にしてはならない。
+- 新しい公開ドキュメントでは A2O 名を使う。
+- 新しいプロジェクトパッケージでは A2O 名を使う。
+- 新しい CLI 操作は `a2o` を優先する。
+- 内部 Ruby Engine API は、公開利用者向けの面に出ない範囲で A3 名を保持してよい。
+- 互換エイリアスをドキュメント上の主経路にしてはならない。
 
-## 利用者向け runtime
+## 利用者向けランタイム
 
-利用者向け runtime execution は `a2o runtime run-once`、`a2o runtime loop`、または `a2o runtime start` を使う。内部 Engine CLI の例は通常の利用者向け setup docs から除外する。
+利用者向けのランタイム実行は `a2o runtime run-once`、`a2o runtime loop`、または `a2o runtime start` を使う。内部 Engine CLI の例は通常の利用者向けセットアップ文書から除外する。

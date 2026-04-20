@@ -1,30 +1,30 @@
-# Current Release Surface
+# 現在の公開機能
 
-A2O 0.5.5 で現在利用できる公開 surface と検証範囲を示す。
+A2O 0.5.5 で現在利用できる公開機能と検証範囲を示す。
 
-## 利用可能な command と capability
+## 利用可能なコマンドと機能
 
-- Host launcher install（host launcher の install）: `a2o host install`
-- Project bootstrap: `a2o project bootstrap`、任意で `--package DIR`
-- Kanban service lifecycle（kanban service の起動・診断）: `a2o kanban up`、`doctor`、`url`
-- Agent binary export（agent binary の書き出し）: `a2o agent install`
-- Runtime container lifecycle（runtime container の起動・停止）: `a2o runtime up`、`down`
-- Foreground runtime execution（foreground 実行）: `a2o runtime run-once`、`a2o runtime loop`
-- Resident scheduler lifecycle（常駐 scheduler lifecycle）: `a2o runtime start`、`stop`、`status`
-- Runtime diagnosis（runtime 診断）: `a2o runtime doctor`、`a2o runtime watch-summary`、`a2o runtime describe-task <task-ref>`
-- Upgrade diagnosis（upgrade 診断）: `a2o upgrade check`
-- Single-file project package config（単一ファイル project package config）: `project.yaml`
-- SoloBoard adapter and bootstrap tooling。既定 SoloBoard image は `v0.9.15`
-- Agent HTTP worker gateway
-- Agent-materialized workspace mode
-- TypeScript、Go、Python、multi-repo task templates の reference product packages
-- GHCR runtime image tags: `latest`、`0.5.5`、`sha-*`
-- Local release gate: full RSpec suite
+- ホスト用ランチャーの導入: `a2o host install`
+- プロジェクトの初期化: `a2o project bootstrap`、任意で `--package DIR`
+- カンバンサービスの起動・診断: `a2o kanban up`、`doctor`、`url`
+- エージェントバイナリの書き出し: `a2o agent install`
+- ランタイムコンテナの起動・停止: `a2o runtime up`、`down`
+- 手動でのランタイム実行: `a2o runtime run-once`、`a2o runtime loop`
+- 常駐スケジューラの起動・停止・状態確認: `a2o runtime start`、`stop`、`status`
+- ランタイム診断: `a2o runtime doctor`、`a2o runtime watch-summary`、`a2o runtime describe-task <task-ref>`
+- アップグレード診断: `a2o upgrade check`
+- 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
+- SoloBoard アダプターと初期化ツール。既定の SoloBoard イメージは `v0.9.15`
+- エージェント HTTP ワーカー境界
+- エージェントが具体化するワークスペース方式
+- TypeScript、Go、Python、複数リポジトリタスクテンプレートの参照用プロダクトパッケージ
+- GHCR ランタイムイメージタグ: `latest`、`0.5.5`、`sha-*`
+- ローカルリリース判定: RSpec 全体
 
 ## 検証範囲
 
-Reference product suite は、single-repo と multi-repo の task flow を kanban、agent gateway、verification、merge、parent-child handling、runtime watch summary、describe-task diagnostics、evidence persistence まで通して確認する。
+参照用プロダクト群では、単一リポジトリと複数リポジトリのタスク処理を、カンバン、エージェント境界、検証、マージ、親子タスク処理、ランタイム要約表示、`describe-task` の診断、証跡保持まで通して確認する。
 
 ## 変更境界
 
-未対応の product work は実装前に A2O kanban で tracking する。外部 behavior の変更が必要な場合は、coding 前に owner と協議する。
+未対応のプロダクト作業は、実装前に A2O カンバンで追跡する。外部仕様の変更が必要な場合は、実装前に owner と協議する。
