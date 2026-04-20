@@ -1,12 +1,28 @@
 # Quickstart
 
-この文書は、A2O を最小手順で起動し、kanban task を 1 つ処理できる状態にするための導入手順である。全体像は先に [00-overview.md](00-overview.md) を読む。
+この文書は、A2O を初めて導入し、kanban task を 1 つ A2O に処理させるまでの最短手順を説明する。全体像は先に [00-overview.md](00-overview.md) を読む。
 
-A2O は kanban task を起点に、workspace 作成、agent 実行、検証、merge、evidence 記録を進める automation engine である。利用者は project package を用意し、A2O の公開コマンドで runtime を起動する。
+## この手順で到達する状態
 
-## Getting Started
+| Step | 達成すること |
+|---|---|
+| Host launcher install | host から `a2o` command を実行できる |
+| Project package setup | A2O が product repository、skill、command、kanban board を読める |
+| Runtime bootstrap | `.work/a2o/runtime-instance.json` に runtime instance を作る |
+| Kanban up | A2O 用 board、lane、internal label を用意する |
+| Agent install | product 環境で job を実行する `a2o-agent` を配置する |
+| Task pickup | kanban task を A2O が拾い、結果を board / Git / evidence に残す |
 
-### 1. Host launcher を入れる
+## 前提
+
+- Docker が使える。
+- Product repository がある。
+- A2O 用の project package を repository root に置ける。
+- `a2o-agent` を実行する環境に product toolchain と AI executor command を用意できる。
+
+Executor command は、実際に agent 環境で実行できる binary に置き換える。Template の `your-ai-worker` のままでは `a2o doctor` または runtime execution で止まる。
+
+## 1. Host launcher を入れる
 
 ```sh
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share"
@@ -22,13 +38,13 @@ docker run --rm \
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-`a2o host install` は runtime image から host launcher と shared runtime asset を取り出す。host に Ruby runtime は要求しない。
+`a2o host install` は runtime image から host launcher と shared runtime asset を取り出す。Host に Ruby runtime は要求しない。
 
-`docker run ... a2o --help` は runtime container entrypoint の help であり、host launcher の全コマンド一覧ではない。`a2o project template` などの setup command は、host install 後の `a2o` を使う。
+`docker run ... a2o --help` は runtime container entrypoint の help であり、host launcher の全 command 一覧ではない。以後は install 済みの `a2o` を使う。
 
-### 2. Project package を置く
+## 2. Project package を作る
 
-workspace root に `project-package/` または `a2o-project/` を置く。
+Workspace root に `project-package/` または `a2o-project/` を置く。
 
 ```text
 project-package/
@@ -51,217 +67,85 @@ a2o project template \
   --output ./project-package/project.yaml
 ```
 
-`--output` を使うと、A2O は `project.yaml` を生成する。`--with-skills` を付けると、`skills/implementation/` と `skills/review/` 配下に phase skill の雛形も生成する。kanban board 名、repo label、人間が使う project 固有 label は `project.yaml` に書く。A2O が必要とする lane と internal label は `a2o kanban up` が用意する。
+この command は `project.yaml` と starter skill files を作る。作成後に `your-ai-worker` を実際の executor command に置き換える。
 
-`your-ai-worker` は placeholder である。bootstrap や runtime 実行の前に、agent 環境で実行できる executor binary 名へ置き換える。A2O はこの値を `agent.required_bins` と `runtime.phases.*.executor.command` に書くため、未置換のままだと `a2o doctor` や runtime execution で missing command として止まる。
+Package の考え方は [20-project-package.md](20-project-package.md)、schema 詳細は [90-project-package-schema.md](90-project-package-schema.md) を読む。
 
-Package 設計上の判断は [20-project-package.md](20-project-package.md) を参照する。
-
-Bootstrap の前に次を実行する。
+## 3. Package を確認する
 
 ```sh
 a2o project lint --package ./project-package
 ```
 
-`a2o project lint` は `project.yaml`、unsupported split config file、通常 config から test fixture への参照、利用者向けに漏れた A3/internal runtime 名、package docs や config から参照されない command file を確認する。Blocked finding は runtime 実行前に修正する。Warning finding は確認し、不要なら削除し、必要なら docs に明記する。
+`project lint` は `project.yaml`、command file、test fixture 参照、user-facing に漏れた internal name を確認する。`blocked` finding は runtime 実行前に直す。
 
-Focused test profile を持つ場合は別 file に分け、明示的に検証する。
+Focused test profile を使う場合だけ、明示的に config を指定して確認する。
 
 ```sh
 a2o project validate --package ./project-package --config project-test.yaml
-a2o runtime run-once --project-config project-test.yaml
 ```
 
-Fixture worker は明示 alternate config から参照してよいが、通常の `project.yaml` は production-oriented に保つ。
+通常の `project.yaml` は production-oriented に保つ。
 
-### 3. 最小 4 コマンドで起動する
-
-project package を置いた後の最小手順:
+## 4. Runtime instance を作る
 
 ```sh
 a2o project bootstrap
-a2o kanban up
-a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
-a2o runtime run-once
 ```
 
-`a2o project bootstrap` は `.work/a2o/runtime-instance.json` を作り、`kanban`、`agent`、`runtime` command が同じ runtime instance を使えるようにする。`a2o agent install` は既定で `.work/a2o/agent/bin/a2o-agent` に agent を配置する。
+`project bootstrap` は `.work/a2o/runtime-instance.json` を作る。以後の `kanban`、`agent`、`runtime` command はこの instance config を見つけて同じ runtime instance を使う。
 
-`run-once` の前に、board 上に runnable task を 1 つ用意する。`a2o kanban up` は lane と label を作るが、作業 task は自動投入しない。
-
-1. `a2o kanban url` で board を開く。
-2. `project-package/task-templates/` の内容をもとに task を作成する。
-3. task を `project.yaml` の `kanban.selection.status` に置く。既定は `To do`。
-4. task に trigger label と、必要なら repo label を付ける。
-
-board URL は次で確認する。
+Package path、port、compose project を変えたい場合だけ option を指定する。
 
 ```sh
-a2o kanban url
+a2o project bootstrap --package ./project-package --compose-project my-product --soloboard-port 3471 --agent-port 7394
 ```
 
-task の状態、run、evidence、kanban comment、見るべき log は次で確認する。
-
-```sh
-a2o runtime watch-summary
-a2o runtime describe-task <task-ref>
-```
-
-## Configuration
-
-### project.yaml
-
-`project.yaml` は project package の唯一の公開 config である。A2O は package metadata、kanban bootstrap、repo slot、agent prerequisites、runtime surface command、merge default をここから読む。
-
-最小構成では single repo、single live target ref、one executor から始める。
-
-```yaml
-schema_version: 1
-package:
-  name: my-product
-kanban:
-  project: MyProduct
-  selection:
-    status: To do
-repos:
-  app:
-    path: ..
-    role: product
-    label: repo:app
-agent:
-  workspace_root: .work/a2o/agent/workspaces
-  required_bins:
-    - git
-    - node
-    - npm
-    - your-ai-worker
-runtime:
-  max_steps: 20
-  agent_attempts: 200
-  phases:
-    implementation:
-      skill: skills/implementation/base.md
-      executor:
-        command:
-          - your-ai-worker
-          - "--schema"
-          - "{{schema_path}}"
-          - "--result"
-          - "{{result_path}}"
-    review:
-      skill: skills/review/default.md
-      executor:
-        command:
-          - your-ai-worker
-          - "--schema"
-          - "{{schema_path}}"
-          - "--result"
-          - "{{result_path}}"
-    verification:
-      commands:
-        - app/project-package/commands/verify.sh
-    remediation:
-      commands:
-        - app/project-package/commands/format.sh
-    merge:
-      policy: ff_only
-      target_ref: refs/heads/main
-```
-
-`runtime.phases.<phase>.executor.command` は implementation / review を実行する agent 側 command である。A2O は worker request を stdin bundle として渡し、executor は `{{result_path}}` に worker result JSON を書く。executor command では `{{schema_path}}`、`{{result_path}}`、`{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` を placeholder として使える。verification / remediation command では `{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` を使える。
-
-Package setup 時に最小 worker を作る場合は次を使う。
-
-```sh
-a2o worker scaffold --language python --output ./project-package/commands/a2o-worker.py
-```
-
-Custom worker の result を runtime 実行前に確認する場合は次を使う。
-
-```sh
-a2o worker validate-result --request request.json --result result.json
-```
-
-Worker が configured review scope や repo-scope alias を使う場合は、repeated `--review-scope SCOPE` と `--repo-scope-alias FROM=TO` を追加する。
-
-`agent.required_bins` には agent 環境で必要な binary を書く。Node product なら `node` と `npm`、Go product なら `go`、Python product なら `python3`、executor が使う AI CLI や helper binary も含める。
-
-### Generated files
-
-新規 `a2o project bootstrap` は runtime instance config を `.work/a2o/runtime-instance.json` に書く。`a2o agent install` と runtime execution で生成される host agent、launcher config、agent workspace も原則 `.work/a2o/` 配下に置く。
-
-`.work/a2o/` は A2O が再生成できる runtime output であり、通常は version control に入れない。利用者が管理するのは project package、product source、Taskfile などである。
-
-内部互換用の runtime instance config を読み取る場合はあるが、新規 bootstrap は `.work/a2o/runtime-instance.json` に書く。materialized workspace 内の agent metadata は利用者が編集する設定ではない。
-
-## Operations
-
-### Kanban
+## 5. Kanban を起動する
 
 ```sh
 a2o kanban up
-a2o kanban doctor
 a2o kanban url
 ```
 
-`a2o kanban up` は、利用する `compose_project`、SoloBoard data volume、reuse / create mode、backup hint を表示する。同じ compose project で起動すると既存 board を再利用する。compose project が変わると Docker volume 名も変わるため、board が空に見える。
+`kanban up` は bundled kanban service を起動し、A2O が必要とする lane と internal label を用意する。`kanban url` は board URL を表示する。
 
-SoloBoard bootstrap では、A2O が必要とする lane と internal label が自動作成される。repo label は `repos.<slot>.label` に書く。人間が使う分類 label など project 固有の label は `kanban.labels` に書く。
+同じ compose project なら既存 board を再利用する。Board が空に見える場合は compose project / Docker volume が変わっていないか確認する。運用の詳細は [30-operating-runtime.md](30-operating-runtime.md) を読む。
 
-fresh board を意図する場合は、bootstrap 時に別の compose project を指定するか、既存 volume を backup して明示的に削除してから起動する。誤って既存 board を使いたくない場合は `a2o kanban up --fresh-board` を使う。既存 volume がある場合、この command は停止する。
-
-### Agent
+## 6. Agent を install する
 
 ```sh
 a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
+```
+
+`a2o-agent` は product 環境で executor command、product toolchain、生成AI呼び出しを実行する。既定の配置先は `.work/a2o/agent/bin/a2o-agent` である。
+
+次に全体診断を行う。
+
+```sh
 a2o doctor
 ```
 
-`a2o agent install` は runtime image から host 用 `a2o-agent` を取り出す。canonical path は `.work/a2o/agent/bin/a2o-agent` である。`a2o doctor` は release-readiness の一括診断で、project package、executor config、required command、repo clean 状態、agent install、kanban volume / service、runtime container、runtime image digest を確認する。問題がある check は `status=blocked` と `action=...` を出す。
+`status=blocked` の check がある場合は、表示された `action=` を先に直す。
 
-### Task
+## 7. Task を 1 つ作る
 
-task template は `project-package/task-templates/` に置く。task template は kanban task として作成できる粒度にする。
+1. `a2o kanban url` で board を開く。
+2. `project-package/task-templates/` をもとに task を作る。
+3. task を `project.yaml` の `kanban.selection.status` に置く。既定は `To do`。
+4. task に trigger label と、必要なら repo label を付ける。
 
-よい task template:
+`a2o kanban up` は lane と label を用意するが、作業 task は自動投入しない。
 
-- small source change
-- deterministic test command
-- clear acceptance criteria
-- repo label or trigger label included
-- generated/cache file boundary documented
+## 8. A2O に実行させる
 
-避ける task template:
-
-- product-wide rewrite
-- unclear acceptance criteria
-- local machine path dependency
-- manual-only verification
-
-### Runtime
-
-container を起動または更新する場合:
-
-```sh
-a2o runtime up
-a2o runtime down
-```
-
-`runtime up/down` は container lifecycle だけを扱う。scheduler は開始しない。
-
-一回だけ実行する場合:
+初回確認では 1 cycle だけ実行する。
 
 ```sh
 a2o runtime run-once
 ```
 
-foreground で繰り返し実行する場合:
-
-```sh
-a2o runtime loop --interval 60s
-```
-
-常駐 scheduler として自動実行する場合:
+常駐 scheduler として動かす場合は次を使う。
 
 ```sh
 a2o runtime start --interval 60s
@@ -269,43 +153,28 @@ a2o runtime status
 a2o runtime stop
 ```
 
-`runtime start/stop/status` は scheduler lifecycle の command である。`runtime start` は task processing を自動開始するため、container refresh だけが目的なら `runtime up` を使う。`runtime status` は scheduler 状態に加えて、runtime container、kanban service、kanban URL、runtime image digest、project package、latest run summary をまとめて表示する。
+`runtime start` は task processing を自動開始する。Container lifecycle だけを扱いたい場合は `a2o runtime up` / `a2o runtime down` を使う。
 
-状態確認:
+## 9. 結果を確認する
 
 ```sh
-a2o runtime doctor
 a2o runtime watch-summary
 a2o runtime describe-task <task-ref>
 ```
 
-`runtime watch-summary` は board 上の複数 task、scheduler state、running phase をまとめて見るための overview である。個別 task の原因調査には `runtime describe-task <task-ref>` を使う。
-`watch-summary` は macOS、Windows terminal、WSL、CI log で layout が安定するよう、ASCII 記号と ASCII guide line で表示する。
-task に agent execution artifact がある場合、`runtime describe-task` は `agent_artifact` と `agent_artifact_read` を表示する。executor stdout/stderr や worker result を読むには、表示された artifact ID を使う。
+`watch-summary` は board 上の複数 task、scheduler state、running phase をまとめて見る。`describe-task` は 1 task の run、evidence、kanban comment、log hint を表示する。
+
+Task に agent execution artifact がある場合、`describe-task` は `agent_artifact_read` command を表示する。
 
 ```sh
 a2o runtime show-artifact <artifact-id>
 ```
 
-A2O は Generative AI provider を直接呼び出さない。provider 固有の raw transcript は project executor command の責務である。A2O 経由で確認したい場合は、executor または AI CLI が transcript を stdout/stderr または worker result に出し、A2O が agent execution artifact として収集できるようにする。
-
-標準操作は次の流れである。
-
-1. `a2o kanban url` で board を開く。
-2. `project-package/task-templates/` をもとに task を作成する。
-3. task に trigger label と repo label を付ける。
-4. `a2o runtime start` で常駐 scheduler を開始する。focused validation では `a2o runtime run-once` または `a2o runtime loop` を使う。
-5. A2O が workspace を作成し、`a2o-agent` に implementation / verification / merge job を渡す。
-6. A2O が kanban comment、phase transition、evidence、branch publication を記録する。
-7. task が `Done` または `Blocked` になったことを board と evidence で確認する。
-
-Board 上の `Done` は、A2O の automation が完了した状態である。SoloBoard の `Resolved` / `done=true` は、人間が最終確認したことを示す別の状態である。そのため API snapshot で `status=Done` かつ `done=false` と表示されても正常である。
-
-利用者は `execute-until-idle` の引数、agent control plane、workspace materializer、merge runner を直接組み立てない。
+Board 上の `Done` は A2O automation が完了した状態である。SoloBoard の `Resolved` / `done=true` は人間の最終確認を表す別状態である。
 
 ## 問題が起きたら
 
-まず次を確認する。
+まず次を見る。
 
 ```sh
 a2o doctor
@@ -315,89 +184,12 @@ a2o runtime describe-task <task-ref>
 
 Error category、agent artifact、blocked task の復旧手順は [40-troubleshooting.md](40-troubleshooting.md) にまとめている。
 
-## Advanced Examples
+## 次に読む文書
 
-### Package path / port / compose project を指定する
-
-project package が `./project-package` または `./a2o-project` 以外にある場合や、port / compose project を分ける場合だけ option を指定する。
-
-```sh
-a2o project bootstrap --package ./reference-products/typescript-api-web/project-package
-a2o project bootstrap --package ./project-package --compose-project my-product --soloboard-port 3471 --agent-port 7394
-a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
-a2o doctor
-a2o runtime up
-a2o runtime start --interval 60s
-```
-
-### Reference products
-
-A2O は次の sample product を持つ。
-
-| Product | Package | Use case |
-|---|---|---|
-| TypeScript API/Web | `reference-products/typescript-api-web/project-package/` | API and Web UI |
-| Go API/CLI | `reference-products/go-api-cli/project-package/` | HTTP API and CLI |
-| Python Service | `reference-products/python-service/project-package/` | Python service |
-| Multi-repo Fixture | `reference-products/multi-repo-fixture/project-package/` | parent-child and cross-repo flow |
-
-自分の product package を作る前に、近い形の reference package をコピーして不要な task template と command を削る。
-
-### Multi-repo package
-
-multi-repo package は repo slot を複数持つ。
-
-```yaml
-repos:
-  repo_alpha:
-    path: ../repos/catalog-service
-    role: product
-    label: repo:catalog
-  repo_beta:
-    path: ../repos/storefront
-    role: product
-    label: repo:storefront
-```
-
-task は repo label を使って対象 slot を指定する。parent-child flow では child が各 repo の作業を進め、parent が統合 review、verification、merge を担当する。全体の流れは [50-parent-child-task-flow.md](50-parent-child-task-flow.md) を参照する。
-
-## Runtime Image Updates
-
-A2O 0.5.5 の runtime image は `ghcr.io/wamukat/a2o-engine:0.5.5` で取得する。実 product package、release smoke、複数人が同じ board / package を使う環境では digest pinning を使う。tag は動く参照であり、digest は同じ image を再現する参照である。
-
-推奨手順:
-
-```sh
-a2o upgrade check
-a2o runtime up --pull
-a2o runtime image-digest
-a2o doctor
-```
-
-`a2o upgrade check` は check-only である。Image pull、agent reinstall、service restart、project file 編集は行わない。Host launcher version、bootstrap 済み instance config、runtime image digest status、agent install status、次に実行する command を出す。
-
-`a2o runtime image-digest` は configured pinned digest、local `latest` digest、running container digest を出す。Configured ref は明示された runtime image environment variable を最優先し、次に bootstrap 済み runtime instance config から読む。`runtime_image_latest_status=mismatch` の場合、`latest` の pull は local image を更新しているが、product package の pin は変わっていない。対象 image を検証してから、`runtime_image_pinned_digest=...` または採用する `runtime_image_local_latest_digest=...` を project package の Taskfile / env file / deployment note の runtime image 値に反映する。`runtime_image_running_status=mismatch` の場合、採用する pin を確認してから `a2o runtime up` で再起動する。
-
-更新後は次を確認する。
-
-```sh
-a2o runtime down
-a2o runtime up
-a2o runtime status
-a2o doctor
-```
-
-package 側では runtime image 値を 1 箇所に寄せる。Taskfile を使う場合は `A2O_RUNTIME_IMAGE` に digest を置く。A2O launcher は `A2O_RUNTIME_IMAGE` を読み取り、compose 実行時の runtime image として使う。test expectation に digest を直接複数箇所へ書かない。既存 product package を更新する場合も、`a2o runtime image-digest` の出力を source of truth として Taskfile と smoke test expectation を同時に更新する。
-
-`latest` を使ってよい場面:
-
-- local trial
-- reference project の短い動作確認
-- digest を採取する前の一時起動
-
-digest pinning が必要な場面:
-
-- release smoke
-- 実 product package の共有運用
-- CI / regression validation
-- 利用者へ再現手順を案内する場合
+| 目的 | 文書 |
+|---|---|
+| project package の設計を理解する | [20-project-package.md](20-project-package.md) |
+| runtime / kanban / agent / image update を運用する | [30-operating-runtime.md](30-operating-runtime.md) |
+| blocked / failed task を調査する | [40-troubleshooting.md](40-troubleshooting.md) |
+| multi-repo / parent-child flow を使う | [50-parent-child-task-flow.md](50-parent-child-task-flow.md) |
+| `project.yaml` の詳細を見る | [90-project-package-schema.md](90-project-package-schema.md) |
