@@ -17,7 +17,7 @@ services:
     restart: unless-stopped
 
   soloboard:
-    image: ${SOLOBOARD_IMAGE:-ghcr.io/wamukat/soloboard:v0.9.14}
+    image: ${SOLOBOARD_IMAGE:-ghcr.io/wamukat/soloboard:v0.9.15}
     environment:
       HOST: 0.0.0.0
       PORT: 3000
