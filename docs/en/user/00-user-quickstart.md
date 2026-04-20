@@ -291,6 +291,31 @@ a2o runtime watch-summary
 a2o runtime describe-task <task-ref>
 ```
 
+Blocked task recovery:
+
+```sh
+a2o runtime reset-task <task-ref>
+```
+
+`reset-task` prints a dry-run recovery plan. It does not mutate kanban, runtime state, workspaces, or branches. Use it when a task is blocked and you need a safe checklist before retrying.
+
+The plan names the affected artifacts:
+
+- kanban task, comments, and `blocked` label
+- runtime `tasks.json` and `runs.json`
+- persisted evidence and blocked diagnosis directories
+- agent workspace path
+- task branches under the runtime branch namespace
+
+Recommended recovery flow:
+
+1. Run `a2o runtime describe-task <task-ref>` and read the blocked reason, evidence, kanban comments, and logs.
+2. Run `a2o runtime watch-summary` and confirm no related task is still running.
+3. Fix the root cause: configuration, dirty repo, missing command, executor credentials, verification failure, or merge conflict.
+4. Preserve useful manual changes from the listed workspace or branches. Commit, patch, or discard them intentionally.
+5. Clear the kanban `blocked` label only after the root cause is fixed.
+6. Run `a2o runtime run-once`, or let the resident scheduler pick the task up again.
+
 `Done` in the board is A2O's automation-complete state. SoloBoard's `Resolved` flag is a separate human-confirmation state. It is normal for API snapshots to show `status=Done` with `done=false` until a human marks the task resolved.
 
 ## Runtime Image Updates

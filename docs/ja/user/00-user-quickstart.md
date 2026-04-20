@@ -324,6 +324,31 @@ a2o runtime watch-summary
 a2o runtime describe-task <task-ref>
 ```
 
+Blocked task の復旧:
+
+```sh
+a2o runtime reset-task <task-ref>
+```
+
+`reset-task` は dry-run の recovery plan を出す。Kanban、runtime state、workspace、branch は変更しない。Task が blocked になり、retry 前に安全な確認手順が必要な場合に使う。
+
+Plan は次の artifact を明示する。
+
+- kanban task、comment、`blocked` label
+- runtime `tasks.json` と `runs.json`
+- persisted evidence と blocked diagnosis directory
+- agent workspace path
+- runtime branch namespace 配下の task branch
+
+推奨 recovery flow:
+
+1. `a2o runtime describe-task <task-ref>` を実行し、blocked reason、evidence、kanban comment、log を読む。
+2. `a2o runtime watch-summary` で関連 task がまだ running でないことを確認する。
+3. Root cause を直す。対象は configuration、dirty repo、missing command、executor credential、verification failure、merge conflict などである。
+4. 表示された workspace や branch に有用な手動変更がある場合は、commit、patch、または明示的に discard する。
+5. Root cause を直した後に kanban の `blocked` label を外す。
+6. `a2o runtime run-once` を実行する。常駐 scheduler 運用では次の cycle に任せてもよい。
+
 `a2o doctor` は primary diagnostic である。project package、executor config、required command、repo clean 状態、agent install、kanban volume / service、runtime container、runtime image digest をまとめて確認する。`status=blocked` の check は `action=` に次の操作を出す。既存 kanban volume の reuse など正常な情報は `status=ok` / `action=none` として表示する。`a2o kanban doctor` と `a2o runtime doctor` は focused inspection 用に使う。
 
 User-facing diagnostics は A2O/project.yaml の語彙に寄せる。内部互換名が必要な場合も、通常の導入手順では編集対象として扱わない。

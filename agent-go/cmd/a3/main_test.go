@@ -1104,6 +1104,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime image-digest",
 		"a2o runtime doctor",
 		"a2o runtime describe-task TASK_REF",
+		"a2o runtime reset-task TASK_REF",
 		"a2o runtime watch-summary",
 		"a2o runtime show-artifact ARTIFACT_ID",
 		"a2o runtime run-once [--max-steps N] [--agent-attempts N]",
@@ -3326,6 +3327,60 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("describe-task missing call %q in:\n%s", want, joined)
 		}
+	}
+}
+
+func TestRuntimeResetTaskPrintsBlockedRecoveryPlan(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a2o/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "reset-task", "A2O#16"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	for _, want := range []string{
+		"reset_task_plan task_ref=A2O#16 mode=dry-run",
+		"kanban_project=A2OReferenceMultiRepo kanban_url=http://localhost:3480",
+		"runtime_storage=internal-managed project_config=" + filepath.Join(packageDir, "project.yaml") + " surface_source=project-package",
+		"affected_artifact kind=kanban task_ref=A2O#16",
+		"affected_artifact kind=runtime_state file=tasks.json action=preserve",
+		"affected_artifact kind=runtime_state file=runs.json action=preserve",
+		"affected_artifact kind=evidence directory=evidence action=preserve",
+		"affected_artifact kind=blocked_diagnosis directory=blocked_diagnoses action=preserve",
+		"affected_artifact kind=workspace path=" + filepath.Join(tempDir, ".work", "a2o", "agent", "workspaces"),
+		"affected_artifact kind=branch namespace=test",
+		"recovery_step 1 command=a2o runtime describe-task A2O#16",
+		"recovery_step 6 command=a2o runtime run-once",
+		"apply_supported=false",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("reset-task missing %q in:\n%s", want, output)
+		}
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("reset-task dry-run should not call external commands, got %v", runner.calls)
 	}
 }
 

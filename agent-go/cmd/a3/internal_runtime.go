@@ -77,6 +77,12 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
+	case "reset-task":
+		if err := runRuntimeResetTask(args[1:], stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
 	case "watch-summary":
 		if err := runRuntimeWatchSummary(args[1:], runner, stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)
@@ -740,6 +746,52 @@ func runRuntimeDescribeTask(args []string, runner commandRunner, stdout io.Write
 		)
 		return nil
 	})
+}
+
+func runRuntimeResetTask(args []string, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a2o runtime reset-task", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 1 {
+		return fmt.Errorf("usage: a2o runtime reset-task TASK_REF")
+	}
+	taskRef := strings.TrimSpace(flags.Arg(0))
+	if taskRef == "" {
+		return fmt.Errorf("task ref is required")
+	}
+
+	config, configPath, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	plan, err := buildRuntimeRunOncePlan(effectiveConfig, "", "", "")
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(stdout, "reset_task_plan task_ref=%s mode=dry-run\n", taskRef)
+	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
+	fmt.Fprintf(stdout, "kanban_project=%s kanban_url=%s\n", plan.KanbanProject, kanbanPublicURL(effectiveConfig))
+	fmt.Fprintf(stdout, "runtime_storage=internal-managed project_config=%s surface_source=project-package\n", plan.ManifestPath)
+	fmt.Fprintf(stdout, "runtime_logs runtime=%s server=%s host_agent=%s\n", plan.RuntimeLog, plan.ServerLog, plan.HostAgentLog)
+	fmt.Fprintf(stdout, "affected_artifact kind=kanban task_ref=%s action=inspect task, comments, and blocked label with describe-task before changing anything\n", taskRef)
+	fmt.Fprintln(stdout, "affected_artifact kind=runtime_state file=tasks.json action=preserve; scheduler resyncs kanban task state")
+	fmt.Fprintln(stdout, "affected_artifact kind=runtime_state file=runs.json action=preserve; rerun history and blocked diagnosis stay inspectable")
+	fmt.Fprintln(stdout, "affected_artifact kind=evidence directory=evidence action=preserve for review and blocked diagnosis")
+	fmt.Fprintln(stdout, "affected_artifact kind=blocked_diagnosis directory=blocked_diagnoses action=preserve until the rerun is accepted")
+	fmt.Fprintf(stdout, "affected_artifact kind=workspace path=%s action=quarantine or remove only after preserving needed manual changes\n", plan.WorkspaceRoot)
+	fmt.Fprintf(stdout, "affected_artifact kind=branch namespace=%s action=inspect task branches and remove stale branches only after preserving needed commits\n", plan.BranchNamespace)
+	fmt.Fprintf(stdout, "recovery_step 1 command=a2o runtime describe-task %s purpose=read blocked reason, run, evidence, kanban comments, and logs\n", taskRef)
+	fmt.Fprintln(stdout, "recovery_step 2 command=a2o runtime watch-summary purpose=confirm the scheduler sees the task as blocked and no sibling task is still running")
+	fmt.Fprintln(stdout, "recovery_step 3 action=fix_root_cause purpose=repair executor config, dirty repo, missing command, merge conflict, or product failure reported by describe-task")
+	fmt.Fprintln(stdout, "recovery_step 4 action=preserve_manual_changes purpose=commit, patch, or discard any useful changes in the listed workspace and branches")
+	fmt.Fprintln(stdout, "recovery_step 5 action=clear_blocked_label purpose=remove the kanban blocked label only after the root cause is fixed")
+	fmt.Fprintln(stdout, "recovery_step 6 command=a2o runtime run-once purpose=let A2O resync kanban state and start a fresh run")
+	fmt.Fprintln(stdout, "apply_supported=false")
+	return nil
 }
 
 func runRuntimeWatchSummary(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
