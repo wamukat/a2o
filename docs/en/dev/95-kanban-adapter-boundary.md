@@ -1,5 +1,9 @@
 # Kanban Adapter Boundary
 
+This document defines the adapter boundary used when A2O Engine reads and writes kanban tasks. In the runtime flow, scheduler task selection, status publication, comments, evidence reporting, and parent/child task relation management all pass through this boundary.
+
+Read this to keep A2O domain state separate from SoloBoard API and CLI details. Kanban is the user-visible task queue, but Engine code should read and write it through an operation-level client that explicitly maps lane names and resolved flags into A2O semantics.
+
 ## Current Contract
 
 The A2O engine talks to kanban through a command contract compatible with `tools/kanban/cli.py`. Runtime operations include:
@@ -26,7 +30,7 @@ Therefore a SoloBoard snapshot with `status=Done` and `done=false` is valid. Run
 Kanban access is organized around a Ruby operation client boundary:
 
 1. `tools/kanban/cli.py` is the developer/operator CLI for the command contract.
-2. Engine code routes kanban operations through `A3::Infra::KanbanCommandClient`.
+2. Engine code routes kanban operations through `A3::Infra::KanbanCommandClient`, including operation-level JSON and text helpers.
 3. `SubprocessKanbanCommandClient` is the current production SoloBoard implementation behind that boundary.
 4. Additional provider implementations must preserve the same operation-level semantics before becoming runtime defaults.
 
@@ -37,11 +41,11 @@ A2O 0.5.5 keeps `python3` in `docker/a3-runtime/Dockerfile`, but does not instal
 The runtime still has an Engine-owned Python dependency:
 
 - the Go host launcher builds runtime commands with `--kanban-command python3`
-- the command argv points at `tools/kanban/cli.py`
+- the command argv points at `a3-engine/tools/kanban/cli.py`
 - Ruby Engine bridge construction still defaults to the `subprocess-cli` kanban backend
-- `SubprocessKanbanCommandClient` is still the production SoloBoard implementation behind `KanbanCommandClient`
+- `SubprocessKanbanCommandClient` is still the only production SoloBoard implementation behind `KanbanCommandClient`
 
-Removing Python from the runtime image while the subprocess CLI remains the runtime default would break the standard runtime path.
+Removing Python from the runtime image while the subprocess CLI remains the runtime default would break the standard `a2o kanban ...` runtime path.
 
 ## Current Adapter Boundary
 

@@ -2,6 +2,12 @@
 
 This document defines how A2O records evidence, diagnoses blocked runs, and supports rerun decisions.
 
+Read this to understand what state must remain available after a failed run so an operator can inspect it safely and rerun it when appropriate. Evidence is not just log retention; it is investigation data that ties together the task, run, phase, source state, and artifact owner.
+
+## Runtime Placement
+
+This document covers the runtime state produced after phase jobs complete or block. Evidence is a runtime-owned record attached to a task, run, phase, source descriptor, and artifact owner. It lets operators diagnose task state after transient logs or disposable workspaces are gone.
+
 ## Goals
 
 - Make completed and blocked runs inspectable after transient logs disappear.

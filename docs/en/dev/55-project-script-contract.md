@@ -2,6 +2,12 @@
 
 A2O allows project packages to own product-specific automation. Package scripts may be Ruby, Bash, Go, Python, Node, or another project-local choice. The stable boundary is not the script language; it is the command, environment, request, result, workspace, and evidence contract that A2O provides.
 
+Read this when writing or reviewing project scripts that run under A2O. The language and local implementation are project choices, but inputs, outputs, and failure information must be shaped so the Engine can interpret them consistently.
+
+## Runtime Placement
+
+This document defines the contract used after the A2O Engine creates a phase job and `a2o-agent` executes a project command. Project scripts should not infer workspace layout or read generated internal files. They should treat the public environment variables and worker request JSON as the source of truth.
+
 ## Responsibilities
 
 A2O owns:

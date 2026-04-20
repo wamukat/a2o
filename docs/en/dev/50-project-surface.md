@@ -2,14 +2,20 @@
 
 This document defines the small project-owned configuration surface. The project package should express product-specific knowledge without turning `project.yaml` into an unrestricted Engine configuration file.
 
-## Goals
+Read this when deciding what belongs in `project.yaml` and what must remain owned by A2O core. A broad configuration surface weakens the task lifecycle, evidence, and merge guarantees that A2O is responsible for preserving. The script boundary that project packages can rely on is defined in [55-project-script-contract.md](55-project-script-contract.md).
+
+## Runtime Placement
+
+This document sits at the boundary between a user-managed project package and Engine-owned runtime behavior. `project.yaml` is input for task selection, repo slots, phase commands, skills, verification and remediation, and merge policy. It is not the place to redefine scheduler behavior, workspace topology, the evidence model, or kanban provider implementation.
+
+## 1. Goals
 
 - Keep project-specific injection points minimal.
 - Avoid carrying old product-specific complexity into Engine core.
 - Make `project.yaml` a clear package config rather than a bag of runtime internals.
 - Let A2O own task lifecycle, workspace topology, evidence, and merge semantics.
 
-## Minimal Surface
+## 2. Minimal Surface
 
 Project packages may configure:
 
@@ -22,7 +28,7 @@ Project packages may configure:
 - repo slots and labels
 - merge policy and live target ref within A2O-supported choices
 
-## Core-Owned Behavior
+## 3. Core-Owned Behavior
 
 The project package does not redefine:
 
@@ -34,7 +40,7 @@ The project package does not redefine:
 - scheduler behavior
 - kanban provider implementation
 
-## Phase Commands
+## 4. Phase Commands
 
 The public schema uses:
 
@@ -56,7 +62,7 @@ A2O expands that command into the internal stdin-bundle protocol. The executor w
 
 The stable script contract is defined in [55-project-script-contract.md](55-project-script-contract.md). Project scripts should use `A2O_*` worker environment names and request fields such as `slot_paths`, not private runtime metadata files.
 
-## Verification And Remediation
+## 5. Verification And Remediation
 
 Verification and remediation commands are project-owned. They run in the materialized workspace and may use these placeholders:
 
@@ -66,7 +72,7 @@ Verification and remediation commands are project-owned. They run in the materia
 
 Remediation commands are used when verification fails and the package has a deterministic formatting or repair command.
 
-## Merge
+## 6. Merge
 
 Merge is configured with a project-owned policy and live target ref. A2O derives the actual merge target from task topology:
 
@@ -80,6 +86,6 @@ runtime:
 
 Projects may choose policy and live target ref, but they do not choose `merge_to_live` or `merge_to_parent` inside `project.yaml`.
 
-## Presets
+## 7. Presets
 
 The 0.5.5 public package format is single-file `project.yaml`. Internal presets may remain implementation details, but package authors should not have to manage separate preset or manifest files.

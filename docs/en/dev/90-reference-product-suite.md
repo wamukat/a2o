@@ -2,6 +2,12 @@
 
 This document defines the owned sample products used for A2O core validation.
 
+Read this to avoid validating A2O changes only against real external products. The reference suite gives A2O small, reproducible products for single-repo, multi-repo, parent-child, verification, and merge flows.
+
+## Runtime Placement
+
+This document defines the products used to prove that A2O runtime flow does not depend on one product. Changes to workspace behavior, the agent boundary, verification, merge, parent-child flow, and diagnostics should be reproducible against at least one reference product.
+
 ## Purpose
 
 A2O must work across common product shapes rather than depending on one stack. The reference suite gives A2O small, reviewable projects that exercise runtime, agent, kanban, verification, merge, and parent-child flows.

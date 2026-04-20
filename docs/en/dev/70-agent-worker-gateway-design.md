@@ -2,6 +2,12 @@
 
 The agent worker gateway lets A2O delegate project-local work to an `a2o-agent` process running on the host or in a project dev environment. This keeps project toolchains out of the runtime image while preserving Engine-owned orchestration.
 
+Read this when deciding whether behavior belongs in the Engine or in the agent. The Engine owns lifecycle and evidence; the agent owns command execution inside a product environment. This separation lets A2O manage task progress without knowing every product toolchain.
+
+## Runtime Placement
+
+This document covers the boundary where the Engine publishes a prepared phase job to `a2o-agent`, the agent uses project tools or AI workers to modify or verify a materialized workspace, and the result and artifacts return to the Engine. The Engine owns lifecycle and evidence; the agent owns command execution in the workspace.
+
 ## Goals
 
 - Keep runtime images small and product-agnostic.
@@ -9,15 +15,51 @@ The agent worker gateway lets A2O delegate project-local work to an `a2o-agent` 
 - Keep Engine scheduling, evidence, phase transitions, and merge orchestration centralized.
 - Use a clear request/result protocol between Engine and agent.
 
-## Runtime Shape
+## Flow
 
-The runtime container starts an internal control plane. `a2o-agent` polls that control plane, receives a job, materializes the requested workspace, runs the command, uploads artifacts, and posts the result.
+1. The Engine creates or refreshes the workspace for a task phase.
+2. The Engine publishes an agent job through the control plane.
+3. `a2o-agent` accepts the job, materializes the requested repo slots, and runs the declared command.
+4. The agent uploads structured result metadata and declared artifacts.
+5. The Engine parses the result, records evidence, transitions the task, and publishes or merges refs when the phase allows it.
 
 The host launcher installs the agent with:
 
 ```sh
 a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 ```
+
+## Workspace Metadata
+
+An agent job includes:
+
+- job id
+- task ref
+- run ref
+- phase
+- parent/child relationship when relevant
+- workspace id and branch namespace
+- repo slot aliases
+- source refs and support refs
+- command profile and expected working directory
+- artifact upload rules
+
+The agent must not infer product-specific paths from global defaults. Paths come from the job payload and the project package that produced it.
+
+## Command Execution
+
+Project commands run on the agent side. The boundary treats implementation workers, verification commands, merge commands, and diagnostic commands through the same control-plane shape.
+
+Command execution records:
+
+- terminal outcome
+- exit code
+- stdout/stderr summary
+- changed files when the phase publishes edits
+- declared evidence artifacts
+- structured failure reason for blocked tasks
+
+Verification commands are the project package's responsibility. The Engine only interprets success, failure, blocked reason, and evidence metadata.
 
 ## Job Contract
 
@@ -56,15 +98,16 @@ Project package commands should use the A2O worker environment names:
 
 ## Workspace Materialization
 
-The agent owns materialized job workspaces under the configured workspace root. A2O provides source aliases and source descriptors. The agent must not invent source refs.
-
-Dirty or stale workspaces should fail fast or be recreated according to the cleanup/freshness policy.
+- Repo slot names are stable package aliases such as `app`, `repo_alpha`, and `repo_beta`.
+- User-visible branch refs created by the current runtime use `refs/heads/a2o/...`. Treat `refs/heads/a3/...` refs as internal compatibility data.
+- Agent workspace paths are disposable and must not become durable project configuration.
+- Generated runtime metadata stays under `.work/a2o/agent/` managed paths, not inside product repo slots. A2O metadata should not leak into source trees users commit.
 
 ## Verification
 
-Verification commands are project package responsibility. Engine only interprets their result and records evidence.
+The reference product suite validates the gateway boundary through real package commands and deterministic fixtures when model variability should be isolated.
 
-## Validation
+## Validation Scope
 
 The reference product suite validates:
 
