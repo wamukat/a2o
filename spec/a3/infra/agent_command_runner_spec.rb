@@ -183,6 +183,33 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(request.env.fetch("A3_ROOT_DIR")).to eq("/host/a3")
   end
 
+  it "expands public command placeholders before enqueueing agent jobs" do
+    client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :succeeded, 0)) }
+    runner = described_class.new(
+      control_plane_client: client,
+      runtime_profile: "docker-dev-env",
+      shared_workspace_mode: "same-path",
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_) {}
+    )
+
+    result = runner.run(
+      ["ruby {{a2o_root_dir}}/commands/verify.rb --workspace {{workspace_root}}"],
+      workspace: workspace,
+      task: task,
+      run: run,
+      env: { "A2O_ROOT_DIR" => "/host/a2o-root" }
+    )
+
+    request = client.records.values.first.request
+    expect(result).to have_attributes(
+      success?: true,
+      summary: "ruby /host/a2o-root/commands/verify.rb --workspace /tmp/a3-workspace ok"
+    )
+    expect(request.args).to eq(["-lc", "ruby /host/a2o-root/commands/verify.rb --workspace /tmp/a3-workspace"])
+    expect(request.env.fetch("A2O_ROOT_DIR")).to eq("/host/a2o-root")
+  end
+
   def agent_result(job_id, status, exit_code)
     A3::Domain::AgentJobResult.new(
       job_id: job_id,
