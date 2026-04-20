@@ -142,7 +142,10 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
         observed_state: "repo-beta missing",
         failing_command: "codex exec --json -",
         diagnostic_summary: "review launch could not resolve runtime workspace",
-        infra_diagnostics: { "missing_path" => "/tmp/repo-beta" }
+        infra_diagnostics: {
+          "missing_path" => "/tmp/repo-beta",
+          "control_plane_url" => "http://127.0.0.1:7393"
+        }
       ),
       execution_record: A3::Domain::PhaseExecutionRecord.new(
         summary: "review launch could not resolve runtime workspace",
@@ -701,6 +704,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     expect(result).to include("runtime_package_guidance=run doctor-runtime and inspect repo sources, secret delivery, and scheduler store migration before rerun")
     expect(result).to include("runtime merge_target=merge_to_parent merge_policy=ff_only")
     expect(result).to include("blocked_diagnostic.missing_path=/tmp/repo-beta")
+    expect(result).not_to include(a_string_matching(/control_plane_url/))
   end
 
   it "formats merge recovery evidence in run lines" do

@@ -84,10 +84,14 @@ module A3
           result << "worker_response_bundle=#{FormattingHelpers.diagnostic_value(execution.worker_response_bundle)}" if execution.worker_response_bundle
           append_agent_artifact_lines(result, execution.agent_artifacts)
           append_merge_recovery_lines(result, execution.merge_recovery)
-          execution.diagnostics.reject { |key, _| %w[merge_recovery agent_job_result agent_artifacts control_plane_url].include?(key) }.sort.each do |key, value|
+          public_diagnostics(execution.diagnostics).sort.each do |key, value|
             result << "execution_diagnostic.#{key}=#{FormattingHelpers.diagnostic_value(value)}"
           end
           append_runtime_lines(result, execution.runtime_snapshot)
+        end
+
+        def public_diagnostics(diagnostics)
+          diagnostics.reject { |key, _| %w[merge_recovery agent_job_result agent_artifacts control_plane_url].include?(key) }
         end
 
         def append_agent_artifact_lines(result, artifacts)
@@ -147,7 +151,7 @@ module A3
           result << "blocked_expected=#{diagnosis.expected_state}"
           result << "blocked_observed=#{diagnosis.observed_state}"
           result << "blocked_failing_command=#{FormattingHelpers.diagnostic_value(diagnosis.failing_command)}" if diagnosis.failing_command
-          diagnosis.infra_diagnostics.sort.each do |key, value|
+          public_diagnostics(diagnosis.infra_diagnostics).sort.each do |key, value|
             result << "blocked_diagnostic.#{key}=#{FormattingHelpers.diagnostic_value(value)}"
           end
         end
