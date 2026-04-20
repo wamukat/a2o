@@ -1434,7 +1434,7 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 func TestDoctorDetectsMissingDockerCredentialHelper(t *testing.T) {
 	dockerConfigDir := t.TempDir()
 	t.Setenv("DOCKER_CONFIG", dockerConfigDir)
-	if err := os.WriteFile(filepath.Join(dockerConfigDir, "config.json"), []byte(`{"credsStore":"wincred.exe"}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dockerConfigDir, "config.json"), []byte(`{"credsStore":"a2o-missing-test-helper"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1457,7 +1457,7 @@ func TestDoctorDetectsMissingDockerCredentialHelper(t *testing.T) {
 		t.Fatalf("expected blocked docker credential helper report, got %#v", got)
 	}
 	for _, want := range []string{
-		"missing=credsStore=wincred.exe binary=docker-credential-wincred.exe",
+		"missing=credsStore=a2o-missing-test-helper binary=docker-credential-a2o-missing-test-helper",
 		"config.json",
 	} {
 		if !strings.Contains(got.detail, want) {
