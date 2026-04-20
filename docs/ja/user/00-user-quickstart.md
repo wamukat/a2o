@@ -372,7 +372,7 @@ repos:
     label: repo:storefront
 ```
 
-task は repo label を使って対象 slot を指定する。parent-child flow では child が各 repo の作業を進め、parent が統合 review、verification、merge を担当する。
+task は repo label を使って対象 slot を指定する。parent-child flow では child が各 repo の作業を進め、parent が統合 review、verification、merge を担当する。全体の流れは [60-parent-child-task-flow.md](60-parent-child-task-flow.md) を参照する。
 
 ## Runtime Image Updates
 

@@ -207,7 +207,7 @@ workspace 内の固定 repo path。
 
 ### 5.11 Repo Scope
 
-task が編集責務や verification scope を持つ repo の集合。`repo:alpha`, `repo:beta`, `repo:both` はこの領域に属する。
+task が編集責務や verification scope を持つ repo の集合。single-repo task は 1 つの repo label を持ち、multi-repo parent task は対象 repo label をすべて持つ。
 
 ### 5.12 Integration Branch
 

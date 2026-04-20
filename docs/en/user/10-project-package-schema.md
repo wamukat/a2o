@@ -71,6 +71,8 @@ runtime:
 
 Project-specific human labels can be declared in `kanban.labels`. A2O-owned trigger and internal coordination labels should not be user-authored unless a future public option requires it.
 
+For multi-repo parent tasks, add every affected repo label to the kanban task. Do not create aggregate labels that mean "all repos" or "both repos"; aggregate labels do not scale beyond two repositories and do not map directly to repo slots.
+
 ## Repos
 
 Each repo slot defines:
@@ -121,11 +123,9 @@ runtime:
         variants:
           task_kind:
             parent:
-              repo_scope:
-                both:
-                  phase:
-                    verification:
-                      - app/project-package/commands/verify-parent.sh
+              phase:
+                verification:
+                  - app/project-package/commands/verify-parent.sh
     remediation:
       commands:
         default:

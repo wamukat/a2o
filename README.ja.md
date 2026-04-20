@@ -24,6 +24,7 @@ A2O の正式名称は Agentic AI Orchestrator である。A2O は kanban 上の
 4. [docs/ja/user/30-runtime-naming-boundary.md](docs/ja/user/30-runtime-naming-boundary.md)
 5. [docs/ja/user/40-release-status.md](docs/ja/user/40-release-status.md)
 6. [docs/ja/user/50-project-package-authoring-guide.md](docs/ja/user/50-project-package-authoring-guide.md)
+7. [docs/ja/user/60-parent-child-task-flow.md](docs/ja/user/60-parent-child-task-flow.md)
 
 開発者向けドキュメント:
 

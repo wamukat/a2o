@@ -12,6 +12,8 @@ The package targets two repositories:
 - `repo_alpha`: `repos/catalog-service`
 - `repo_beta`: `repos/storefront`
 
+Parent tasks that span both repositories should use both concrete repo labels, `repo:catalog` and `repo:storefront`. Do not create a synthetic aggregate label that means "both repos".
+
 Validation commands:
 
 - `commands/bootstrap.sh`: lightweight fixture readiness check.

@@ -3,8 +3,6 @@ package:
   name: a2o-reference-multi-repo
 kanban:
   project: A2OReferenceMultiRepo
-  labels:
-    - repo:both
   selection:
     status: To do
 repos:

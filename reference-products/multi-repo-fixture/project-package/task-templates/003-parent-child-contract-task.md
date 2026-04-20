@@ -3,7 +3,8 @@
 Create one parent task with labels:
 
 - `trigger:auto-parent`
-- `repo:both`
+- `repo:catalog`
+- `repo:storefront`
 
 Parent task body:
 
@@ -22,3 +23,5 @@ python3 tools/kanban/cli.py task-relation-create --project "A2OReferenceMultiRep
 ```
 
 A2O derives parent and child task kind from these relations, not from `kind:*` labels.
+
+Do not use an aggregate label that means "both repos". A parent task should carry every affected repo label so the same rule works for two or more repositories.

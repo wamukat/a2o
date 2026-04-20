@@ -338,4 +338,4 @@ repos:
     label: repo:storefront
 ```
 
-Tasks use repo labels to select target slots. Parent-child flows let child tasks work in individual repos while the parent task handles integration review, verification, and merge.
+Tasks use repo labels to select target slots. Parent-child flows let child tasks work in individual repos while the parent task handles integration review, verification, and merge. For the complete flow, see [60-parent-child-task-flow.md](60-parent-child-task-flow.md).

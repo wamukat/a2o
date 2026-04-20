@@ -41,6 +41,8 @@ project-package/
 
 `task-templates/` には人間向け task template を置く。A2O は task template を自動投入しない。
 
+Multi-repo の parent-child workflow では、task template に具体的な repo label を書く。2 つの repository にまたがる parent task には、例えば `repo:catalog` と `repo:storefront` の両方を付ける。「全 repo」や「両方」を意味する合成 label は使わない。
+
 `tests/fixtures/` には deterministic worker、fake input、package validation fixture を置く。Production 用 runtime config からこの directory を参照してはならない。
 
 ## Production Config And Test Fixtures（通常 config と test fixture）
@@ -140,11 +142,9 @@ runtime:
         variants:
           task_kind:
             parent:
-              repo_scope:
-                both:
-                  phase:
-                    verification:
-                      - app/project-package/commands/verify-parent.sh
+              phase:
+                verification:
+                  - app/project-package/commands/verify-parent.sh
 ```
 
 良い remediation command は保守的である。
@@ -175,7 +175,7 @@ Review skill には次を書く。
 Parent review skill には multi-repo integration の観点を書く。
 
 - child output をどう統合するか
-- live integration target はどの repo か
+- publish 前に通すべき integration check
 - merge readiness check
 - merge 前に必要な evidence
 

@@ -41,6 +41,8 @@ project-package/
 
 `task-templates/` contains human-facing task templates. A2O does not enqueue them automatically.
 
+For multi-repo parent-child workflows, write task templates with explicit repo labels. A parent task that affects two repositories should carry both repo labels, for example `repo:catalog` and `repo:storefront`. Avoid synthetic aggregate labels that mean "all repos" or "both repos".
+
 `tests/fixtures/` contains deterministic workers, fake inputs, or package validation fixtures. Runtime production config should not reference this directory.
 
 ## Production Config And Test Fixtures
@@ -140,11 +142,9 @@ runtime:
         variants:
           task_kind:
             parent:
-              repo_scope:
-                both:
-                  phase:
-                    verification:
-                      - app/project-package/commands/verify-parent.sh
+              phase:
+                verification:
+                  - app/project-package/commands/verify-parent.sh
 ```
 
 Good remediation commands are conservative:
@@ -175,7 +175,7 @@ Review skills should cover:
 Parent review skills should cover multi-repo integration:
 
 - how child outputs are combined
-- which repo is the live integration target
+- which integration checks must pass before publishing
 - merge readiness checks
 - evidence expected before merge
 

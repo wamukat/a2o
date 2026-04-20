@@ -26,6 +26,7 @@ User documentation:
 4. [docs/en/user/30-runtime-naming-boundary.md](docs/en/user/30-runtime-naming-boundary.md)
 5. [docs/en/user/40-release-status.md](docs/en/user/40-release-status.md)
 6. [docs/en/user/50-project-package-authoring-guide.md](docs/en/user/50-project-package-authoring-guide.md)
+7. [docs/en/user/60-parent-child-task-flow.md](docs/en/user/60-parent-child-task-flow.md)
 
 Developer documentation:
 
