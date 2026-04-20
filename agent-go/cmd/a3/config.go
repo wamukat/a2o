@@ -246,9 +246,14 @@ func withComposeEnv(config runtimeInstanceConfig, fn func() error) error {
 
 func composeEnv(config runtimeInstanceConfig) map[string]string {
 	overrides := map[string]string{}
-	if soloboardPort := envDefaultCompat("A2O_BUNDLE_SOLOBOARD_PORT", "A3_BUNDLE_SOLOBOARD_PORT", config.SoloBoardPort); strings.TrimSpace(soloboardPort) != "" {
-		overrides["A2O_BUNDLE_SOLOBOARD_PORT"] = soloboardPort
-		overrides["A3_BUNDLE_SOLOBOARD_PORT"] = soloboardPort
+	if kanbanPort := envDefaultCompat("A2O_BUNDLE_KANBALONE_PORT", "A2O_BUNDLE_SOLOBOARD_PORT", ""); strings.TrimSpace(kanbanPort) != "" {
+		overrides["A2O_BUNDLE_KANBALONE_PORT"] = kanbanPort
+		overrides["A2O_BUNDLE_SOLOBOARD_PORT"] = kanbanPort
+		overrides["A3_BUNDLE_SOLOBOARD_PORT"] = kanbanPort
+	} else if kanbanPort := envDefaultCompat("A2O_BUNDLE_SOLOBOARD_PORT", "A3_BUNDLE_SOLOBOARD_PORT", config.SoloBoardPort); strings.TrimSpace(kanbanPort) != "" {
+		overrides["A2O_BUNDLE_KANBALONE_PORT"] = kanbanPort
+		overrides["A2O_BUNDLE_SOLOBOARD_PORT"] = kanbanPort
+		overrides["A3_BUNDLE_SOLOBOARD_PORT"] = kanbanPort
 	}
 	if agentPort := envDefaultCompat("A2O_BUNDLE_AGENT_PORT", "A3_BUNDLE_AGENT_PORT", config.AgentPort); strings.TrimSpace(agentPort) != "" {
 		overrides["A2O_BUNDLE_AGENT_PORT"] = agentPort

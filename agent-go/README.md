@@ -129,7 +129,7 @@ Execution-loop commands live under `a2o runtime ...`, not `a2o kanban ...`. Bran
 
 ## Deployment Shapes
 
-`a2o-agent` is the project-runtime side of the A2O distribution. A2O is a local-first runtime: A2O, SoloBoard, and the agent run on the same host or inside the same local Docker compose/dev-env network. The current data model is not a central A2O server with remote multi-agent workers.
+`a2o-agent` is the project-runtime side of the A2O distribution. A2O is a local-first runtime: A2O, Kanbalone, and the agent run on the same host or inside the same local Docker compose/dev-env network. The current data model is not a central A2O server with remote multi-agent workers.
 
 Supported shapes:
 

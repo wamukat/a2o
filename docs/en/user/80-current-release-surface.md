@@ -19,7 +19,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Runtime diagnosis and recovery: `a2o runtime image-digest`, `doctor`, `watch-summary`, `describe-task <task-ref>`, `reset-task <task-ref>`, `show-artifact <artifact-id>`
 - Upgrade diagnosis: `a2o upgrade check`
 - Single-file project package config: `project.yaml`
-- SoloBoard adapter and bootstrap tooling, defaulting to SoloBoard `v0.9.15`
+- Kanbalone adapter and bootstrap tooling, defaulting to Kanbalone `v0.9.16`
 - Agent HTTP worker gateway
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates

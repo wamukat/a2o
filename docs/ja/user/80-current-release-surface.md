@@ -19,7 +19,7 @@ A2O 0.5.5 で現在利用できる公開機能と検証範囲を示す。
 - ランタイム診断・復旧: `a2o runtime image-digest`、`doctor`、`watch-summary`、`describe-task <task-ref>`、`reset-task <task-ref>`、`show-artifact <artifact-id>`
 - アップグレード診断: `a2o upgrade check`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
-- SoloBoard アダプターと初期化ツール。既定の SoloBoard イメージは `v0.9.15`
+- Kanbalone アダプターと初期化ツール。既定の Kanbalone イメージは `v0.9.16`
 - エージェント HTTP ワーカー境界
 - エージェントが具体化するワークスペース方式
 - TypeScript、Go、Python、複数リポジトリタスクテンプレートの参照用プロダクトパッケージ

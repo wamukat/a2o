@@ -17,13 +17,13 @@ services:
     restart: unless-stopped
 
   soloboard:
-    image: ${SOLOBOARD_IMAGE:-ghcr.io/wamukat/soloboard:v0.9.15}
+    image: ${KANBALONE_IMAGE:-${SOLOBOARD_IMAGE:-ghcr.io/wamukat/kanbalone:v0.9.16}}
     environment:
       HOST: 0.0.0.0
       PORT: 3000
-      SOLOBOARD_DB_FILE: /app/data/soloboard.sqlite
+      KANBALONE_DB_FILE: /app/data/soloboard.sqlite
     ports:
-      - "${A2O_BUNDLE_SOLOBOARD_PORT:-3470}:3000"
+      - "${A2O_BUNDLE_KANBALONE_PORT:-${A2O_BUNDLE_SOLOBOARD_PORT:-3470}}:3000"
     volumes:
       - soloboard-data:/app/data
     restart: unless-stopped

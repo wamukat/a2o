@@ -22,7 +22,7 @@
 | a2o-agent とのジョブ境界 | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
 | コアとプロジェクト拡張の境界 | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
 | 参照用プロダクトによる検証 | [90-reference-product-suite.md](90-reference-product-suite.md) |
-| カンバンアダプターと SoloBoard 境界 | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
+| カンバンアダプターと Kanbalone 境界 | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
 
 ## A2O が実現するランタイムの流れ
 

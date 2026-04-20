@@ -100,7 +100,7 @@ a2o project bootstrap
 ポートや Compose プロジェクト名を変えたい場合だけオプションを指定する。
 
 ```sh
-a2o project bootstrap --compose-project my-product --soloboard-port 3471 --agent-port 7394
+a2o project bootstrap --compose-project my-product --kanbalone-port 3471 --agent-port 7394
 ```
 
 ## 5. カンバンを起動する
@@ -172,7 +172,7 @@ a2o runtime describe-task <task-ref>
 a2o runtime show-artifact <artifact-id>
 ```
 
-ボード上の `Done` は A2O による自動処理が完了した状態である。SoloBoard の `Resolved` / `done=true` は人間の最終確認を表す別状態である。
+ボード上の `Done` は A2O による自動処理が完了した状態である。Kanbalone の `Resolved` / `done=true` は人間の最終確認を表す別状態である。
 
 ## 問題が起きたら
 

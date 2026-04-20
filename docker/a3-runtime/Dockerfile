@@ -21,7 +21,7 @@ ARG GO_TASK_VERSION=3.41.0
 ARG BUNDLER_VERSION=2.5.22
 
 # Transitional dependency: the runtime still invokes tools/kanban/cli.py
-# through the subprocess kanban adapter until the Ruby-native SoloBoard
+# through the subprocess kanban adapter until the Ruby-native Kanbalone
 # adapter becomes the runtime default.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

@@ -51,7 +51,7 @@ func runKanbanUp(args []string, runner commandRunner, stdout io.Writer, stderr i
 	flags := flag.NewFlagSet("a2o kanban up", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	build := flags.Bool("build", false, "build the runtime image before starting services")
-	freshBoard := flags.Bool("fresh-board", false, "fail if the configured SoloBoard data volume already exists")
+	freshBoard := flags.Bool("fresh-board", false, "fail if the configured Kanbalone data volume already exists")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}

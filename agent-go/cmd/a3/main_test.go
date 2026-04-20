@@ -176,6 +176,72 @@ func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
 	}
 }
 
+func TestProjectBootstrapAcceptsKanbalonePort(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "a2o-project")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"project",
+		"bootstrap",
+		"--package",
+		packageDir,
+		"--workspace",
+		tempDir,
+		"--kanbalone-port",
+		"3481",
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+
+	configPath := filepath.Join(tempDir, ".work", "a2o", "runtime-instance.json")
+	body, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("instance config missing: %v", err)
+	}
+	var config runtimeInstanceConfig
+	if err := json.Unmarshal(body, &config); err != nil {
+		t.Fatalf("invalid instance config: %v", err)
+	}
+	if config.SoloBoardPort != "3481" {
+		t.Fatalf("SoloBoardPort=%q", config.SoloBoardPort)
+	}
+}
+
+func TestProjectBootstrapRejectsConflictingKanbanPorts(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "a2o-project")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"project",
+		"bootstrap",
+		"--package",
+		packageDir,
+		"--workspace",
+		tempDir,
+		"--kanbalone-port",
+		"3481",
+		"--soloboard-port",
+		"3482",
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("run succeeded unexpectedly, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "--kanbalone-port and --soloboard-port specify different values") {
+		t.Fatalf("stderr=%q", stderr.String())
+	}
+}
+
 func TestProjectBootstrapDefaultsToProjectPackageDirectory(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "project-package")

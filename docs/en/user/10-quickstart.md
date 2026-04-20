@@ -100,7 +100,7 @@ a2o project bootstrap
 Specify options only when you need different ports or a different Compose project name.
 
 ```sh
-a2o project bootstrap --compose-project my-product --soloboard-port 3471 --agent-port 7394
+a2o project bootstrap --compose-project my-product --kanbalone-port 3471 --agent-port 7394
 ```
 
 ## 5. Start Kanban
@@ -172,7 +172,7 @@ When a task has agent artifacts, `describe-task` prints an `agent_artifact_read`
 a2o runtime show-artifact <artifact-id>
 ```
 
-Board `Done` means A2O automated processing completed. SoloBoard `Resolved` / `done=true` is a separate final human confirmation state.
+Board `Done` means A2O automated processing completed. Kanbalone `Resolved` / `done=true` is a separate final human confirmation state.
 
 ## If Something Fails
 

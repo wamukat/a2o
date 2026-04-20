@@ -2,7 +2,7 @@
 
 This document defines the adapter boundary used when A2O Engine reads and writes kanban tasks. In the runtime flow, scheduler task selection, status publication, comments, evidence reporting, and parent/child task relation management all pass through this boundary.
 
-Read this to keep A2O domain state separate from SoloBoard API and CLI details. Kanban is the user-visible task queue, but Engine code should read and write it through an operation-level client that explicitly maps lane names and resolved flags into A2O semantics.
+Read this to keep A2O domain state separate from Kanbalone API and CLI details. Kanbalone is the renamed successor of SoloBoard; some internal adapter names still use `soloboard` as a compatibility backend identifier. Kanban is the user-visible task queue, but Engine code should read and write it through an operation-level client that explicitly maps lane names and resolved flags into A2O semantics.
 
 ## Current Contract
 
@@ -19,11 +19,11 @@ The command contract is the external tooling surface. Internally, Ruby code reac
 A2O distinguishes automation completion from human confirmation.
 
 - `status=Done` means A2O completed the automation flow for the task, including implementation, verification, and merge when those phases apply.
-- SoloBoard `done=true` / `isResolved=true` means a human has confirmed the task as resolved in the board.
-- A2O runtime status publishing moves tasks to the `Done` lane but does not set the SoloBoard resolved flag.
+- Kanbalone `done=true` / `isResolved=true` means a human has confirmed the task as resolved in the board.
+- A2O runtime status publishing moves tasks to the `Done` lane but does not set the Kanbalone resolved flag.
 - `task-transition --sync-done-state` is reserved for operator actions that intentionally synchronize the human-resolved flag.
 
-Therefore a SoloBoard snapshot with `status=Done` and `done=false` is valid. Runtime task selection, watch summary, and reporting must use the lane/status as the A2O automation state and must not treat `done=false` as a failed merge or incomplete automation.
+Therefore a Kanbalone snapshot with `status=Done` and `done=false` is valid. Runtime task selection, watch summary, and reporting must use the lane/status as the A2O automation state and must not treat `done=false` as a failed merge or incomplete automation.
 
 ## Adapter Structure
 
@@ -31,7 +31,7 @@ Kanban access is organized around a Ruby operation client boundary:
 
 1. `tools/kanban/cli.py` is the developer/operator CLI for the command contract.
 2. Engine code routes kanban operations through `A3::Infra::KanbanCommandClient`, including operation-level JSON and text helpers.
-3. `SubprocessKanbanCommandClient` is the current production SoloBoard implementation behind that boundary.
+3. `SubprocessKanbanCommandClient` is the current production Kanbalone-compatible implementation behind that boundary.
 4. Additional provider implementations must preserve the same operation-level semantics before becoming runtime defaults.
 
 ## Runtime Python Dependency
@@ -43,7 +43,7 @@ The runtime still has an Engine-owned Python dependency:
 - the Go host launcher builds runtime commands with `--kanban-command python3`
 - the command argv points at `a3-engine/tools/kanban/cli.py`
 - Ruby Engine bridge construction still defaults to the `subprocess-cli` kanban backend
-- `SubprocessKanbanCommandClient` is still the only production SoloBoard implementation behind `KanbanCommandClient`
+- `SubprocessKanbanCommandClient` is still the only production Kanbalone-compatible implementation behind `KanbanCommandClient`
 
 Removing Python from the runtime image while the subprocess CLI remains the runtime default would break the standard `a2o kanban ...` runtime path.
 
@@ -63,7 +63,7 @@ Any native adapter must preserve:
 - multiline comment and description file semantics
 - JSON object/array shape validation and fail-fast errors
 
-No SoloBoard API or public kanban CLI changes are required to preserve the current command contract.
+No Kanbalone API or public kanban CLI changes are required to preserve the current command contract.
 
 ## Multiline Text Contract
 

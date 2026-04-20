@@ -495,7 +495,8 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 	composeProject := flags.String("compose-project", "", "docker compose project name for this runtime instance")
 	composeFile := flags.String("compose-file", "", "A2O distribution compose file")
 	runtimeService := flags.String("runtime-service", "a2o-runtime", "docker compose runtime service name")
-	soloBoardPort := flags.String("soloboard-port", "3470", "host kanban service port")
+	kanbalonePort := flags.String("kanbalone-port", "", "host kanban service port")
+	soloBoardPort := flags.String("soloboard-port", "", "host kanban service port (compatibility alias for --kanbalone-port)")
 	agentPort := flags.String("agent-port", "7393", "host A2O agent control-plane port")
 	storageDir := flags.String("storage-dir", "/var/lib/a2o/a2o-runtime", "runtime storage dir inside the A2O runtime container")
 
@@ -504,6 +505,10 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 	}
 	if flags.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+	resolvedKanbanPort, err := resolveKanbanPort(*kanbalonePort, *soloBoardPort)
+	if err != nil {
+		return err
 	}
 	absWorkspaceRoot, err := filepath.Abs(*workspaceRoot)
 	if err != nil {
@@ -544,7 +549,7 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 		ComposeFile:    resolvedComposeFile,
 		ComposeProject: projectName,
 		RuntimeService: strings.TrimSpace(*runtimeService),
-		SoloBoardPort:  strings.TrimSpace(*soloBoardPort),
+		SoloBoardPort:  resolvedKanbanPort,
 		AgentPort:      strings.TrimSpace(*agentPort),
 		StorageDir:     strings.TrimSpace(*storageDir),
 		RuntimeImage:   defaultRuntimeImage(),
@@ -555,6 +560,21 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 
 	fmt.Fprintf(stdout, "project_bootstrapped package=%s instance_config=%s\n", config.PackagePath, filepath.Join(absWorkspaceRoot, instanceConfigRelativePath))
 	return nil
+}
+
+func resolveKanbanPort(kanbalonePort string, soloBoardPort string) (string, error) {
+	kanbalonePort = strings.TrimSpace(kanbalonePort)
+	soloBoardPort = strings.TrimSpace(soloBoardPort)
+	if kanbalonePort != "" && soloBoardPort != "" && kanbalonePort != soloBoardPort {
+		return "", fmt.Errorf("--kanbalone-port and --soloboard-port specify different values")
+	}
+	if kanbalonePort != "" {
+		return kanbalonePort, nil
+	}
+	if soloBoardPort != "" {
+		return soloBoardPort, nil
+	}
+	return "3470", nil
 }
 
 func resolveBootstrapPackagePath(packagePath string, workspaceRoot string) (string, error) {
