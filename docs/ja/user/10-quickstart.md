@@ -1,4 +1,6 @@
-# A2O User Manual
+# Quickstart
+
+この文書は、A2O を最小手順で起動し、kanban task を 1 つ処理できる状態にするための導入手順である。全体像は先に [00-overview.md](00-overview.md) を読む。
 
 A2O は kanban task を起点に、workspace 作成、agent 実行、検証、merge、evidence 記録を進める automation engine である。利用者は project package を用意し、A2O の公開コマンドで runtime を起動する。
 
@@ -53,7 +55,7 @@ a2o project template \
 
 `your-ai-worker` は placeholder である。bootstrap や runtime 実行の前に、agent 環境で実行できる executor binary 名へ置き換える。A2O はこの値を `agent.required_bins` と `runtime.phases.*.executor.command` に書くため、未置換のままだと `a2o doctor` や runtime execution で missing command として止まる。
 
-Package 設計上の判断は [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md) を参照する。
+Package 設計上の判断は [20-project-package.md](20-project-package.md) を参照する。
 
 Bootstrap の前に次を実行する。
 
@@ -301,77 +303,17 @@ Board 上の `Done` は、A2O の automation が完了した状態である。So
 
 利用者は `execute-until-idle` の引数、agent control plane、workspace materializer、merge runner を直接組み立てない。
 
-## Troubleshooting
+## 問題が起きたら
 
-A2O の CLI stderr と kanban comment は、失敗時に `error_category` / `エラー分類` と remediation を出す。最初に分類を見て、次に `a2o runtime describe-task <task-ref>` で task/run/evidence/comment/log を確認する。
-
-| Category | What to fix |
-|---|---|
-| `configuration_error` | `project.yaml`、executor、package path、schema を直す。generated `launcher.json` は編集しない。 |
-| `workspace_dirty` | 表示された repo / file の未コミット変更を commit、stash、または削除する。 |
-| `executor_failed` | executor binary、認証、必要 toolchain、worker result JSON を確認する。 |
-| `verification_failed` | verification / remediation command の出力を見て product test、lint、依存関係を直す。 |
-| `merge_conflict` | merge conflict または base branch を整理する。 |
-| `merge_failed` | merge target ref と branch policy を確認する。 |
-| `runtime_failed` | Docker / compose / runtime process の状態と出力を確認する。 |
-
-Docker credential helper error:
-
-`a2o doctor` は Docker の `credsStore` と `credHelpers` を確認する。Docker config が現在の host で使えない helper を指している場合、たとえば WSL に残った Windows helper などでは、`docker_credential_helpers status=blocked` を出す。
-
-一時回避:
-
-```sh
-tmp_docker_config="$(mktemp -d)"
-printf '{"auths":{}}\n' > "$tmp_docker_config/config.json"
-DOCKER_CONFIG="$tmp_docker_config" a2o doctor
-```
-
-恒久対応:
-
-1. `${DOCKER_CONFIG:-$HOME/.docker}/config.json` を開く。
-2. 古い `credsStore` / `credHelpers` entry を削除または修正する。
-3. 参照している `docker-credential-*` helper が host の PATH に存在することを確認する。
-4. `a2o doctor` を再実行する。
-
-診断の入口:
+まず次を確認する。
 
 ```sh
 a2o doctor
-a2o kanban doctor
-a2o runtime doctor
 a2o runtime watch-summary
 a2o runtime describe-task <task-ref>
 ```
 
-Blocked task の復旧:
-
-```sh
-a2o runtime reset-task <task-ref>
-```
-
-`reset-task` は dry-run の recovery plan を出す。Kanban、runtime state、workspace、branch は変更しない。Task が blocked になり、retry 前に安全な確認手順が必要な場合に使う。
-
-Plan は次の artifact を明示する。
-
-- kanban task、comment、`blocked` label
-- runtime `tasks.json` と `runs.json`
-- persisted evidence と blocked diagnosis directory
-- agent workspace path
-- runtime branch namespace 配下の task branch
-
-推奨 recovery flow:
-
-1. `a2o runtime describe-task <task-ref>` を実行し、blocked reason、evidence、kanban comment、log を読む。
-2. `a2o runtime watch-summary` で関連 task がまだ running でないことを確認する。
-3. Root cause を直す。対象は configuration、dirty repo、missing command、executor credential、verification failure、merge conflict などである。
-4. 表示された workspace や branch に有用な手動変更がある場合は、commit、patch、または明示的に discard する。
-5. Root cause を直した後に kanban の `blocked` label を外す。
-6. `a2o runtime run-once` を実行する。常駐 scheduler 運用では次の cycle に任せてもよい。
-
-`a2o doctor` は primary diagnostic である。project package、executor config、required command、repo clean 状態、agent install、kanban volume / service、runtime container、runtime image digest をまとめて確認する。`status=blocked` の check は `action=` に次の操作を出す。既存 kanban volume の reuse など正常な情報は `status=ok` / `action=none` として表示する。`a2o kanban doctor` と `a2o runtime doctor` は focused inspection 用に使う。
-
-User-facing diagnostics は A2O/project.yaml の語彙に寄せる。内部互換名が必要な場合も、通常の導入手順では編集対象として扱わない。
+Error category、agent artifact、blocked task の復旧手順は [40-troubleshooting.md](40-troubleshooting.md) にまとめている。
 
 ## Advanced Examples
 
@@ -417,7 +359,7 @@ repos:
     label: repo:storefront
 ```
 
-task は repo label を使って対象 slot を指定する。parent-child flow では child が各 repo の作業を進め、parent が統合 review、verification、merge を担当する。全体の流れは [60-parent-child-task-flow.md](60-parent-child-task-flow.md) を参照する。
+task は repo label を使って対象 slot を指定する。parent-child flow では child が各 repo の作業を進め、parent が統合 review、verification、merge を担当する。全体の流れは [50-parent-child-task-flow.md](50-parent-child-task-flow.md) を参照する。
 
 ## Runtime Image Updates
 

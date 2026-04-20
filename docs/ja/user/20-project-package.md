@@ -1,4 +1,6 @@
-# Project Package Authoring Guide（project package 作成ガイド）
+# Project Package
+
+この文書は、利用者が管理する project package の役割と作り方を説明する。A2O Engine の内部設定ではなく、product 固有の知識を A2O に渡すための入力として読む。
 
 この guide は、A2O の project package を設計・レビューするときに使う。Schema doc は有効な field を説明する。この guide は、どの責務をどこに置くべきかを説明する。
 

@@ -1,4 +1,6 @@
-# Single-File Project Package Schema（単一ファイル project package schema）
+# Project Package Schema Reference
+
+この文書は `project.yaml` の詳細 reference である。導入時の考え方は先に [20-project-package.md](20-project-package.md) を読む。
 
 ## 方針
 
@@ -6,7 +8,7 @@ Project package config の正規ファイル名は `project.yaml` とする。
 
 runtime の責務は `project.yaml` の明示的な runtime sections に置く。公開 package の設定ファイルは 1 本にまとめ、package author が project 設定と runtime manifest の責務分担で迷わない形にする。
 
-Authoring 上の判断と責務境界は [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md) を参照する。
+Authoring 上の判断と責務境界は [20-project-package.md](20-project-package.md) を参照する。
 
 Package schema は次の rules に従う。
 

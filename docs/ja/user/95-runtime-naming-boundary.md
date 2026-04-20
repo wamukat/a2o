@@ -1,4 +1,6 @@
-# Runtime Naming Boundary（runtime 命名境界）
+# Runtime Naming Boundary
+
+この文書は、利用者に見せる A2O 名と、実装内部に残る互換名の境界を説明する reference である。
 
 A2O の正式名称は Agentic AI Orchestrator であり、公開 product 名である。A3 は内部互換名であり、実装 code path、state path、Engine CLI surface に現れる場合がある。
 

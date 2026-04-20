@@ -1,4 +1,6 @@
-# Container Distribution And Project Runtime（container 配布と project runtime）
+# Operating Runtime
+
+この文書は、A2O runtime、host launcher、agent、kanban service、runtime image をどう運用するかを説明する。
 
 A2O の配布単位は Docker runtime image、host launcher、project package、`a2o-agent` である。利用者は Engine 内部の長い command line や runtime shell script を作らない。
 

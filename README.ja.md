@@ -6,6 +6,20 @@ A2O の正式名称は Agentic AI Orchestrator である。A2O は kanban 上の
 
 このリポジトリは A2O Engine 本体、Go host launcher、Go agent、Docker runtime image、reference product package、設計資料を含む。通常利用者向けの入口は `a2o`、`a2o-agent`、project package、bundled kanban service である。
 
+## 基本の流れ
+
+A2O の通常利用は次の流れで進む。
+
+1. 利用者が `project.yaml` と AI 用 skill files を用意する。
+2. 利用者が kanban に task を作る。
+3. A2O Engine の scheduler が runnable task を選ぶ。
+4. A2O Engine が task / project config / skill から phase job を組み立てる。
+5. `a2o-agent` が product 環境で executor command を実行する。
+6. Executor が生成AIと product toolchain を使って変更を作る。
+7. A2O Engine が verification、merge、evidence、kanban comment を記録する。
+
+この関係を先に理解するには [docs/ja/user/00-overview.md](docs/ja/user/00-overview.md) を読む。
+
 ## 方針
 
 - A2O は bundled kanban service と `a2o-agent` を前提にした runtime として扱う。
@@ -18,17 +32,19 @@ A2O の正式名称は Agentic AI Orchestrator である。A2O は kanban 上の
 
 利用者向けドキュメント:
 
-1. [docs/ja/user/00-user-quickstart.md](docs/ja/user/00-user-quickstart.md)
-2. [docs/ja/user/10-project-package-schema.md](docs/ja/user/10-project-package-schema.md)
-3. [docs/ja/user/20-runtime-distribution.md](docs/ja/user/20-runtime-distribution.md)
-4. [docs/ja/user/30-runtime-naming-boundary.md](docs/ja/user/30-runtime-naming-boundary.md)
-5. [docs/ja/user/40-release-status.md](docs/ja/user/40-release-status.md)
-6. [docs/ja/user/50-project-package-authoring-guide.md](docs/ja/user/50-project-package-authoring-guide.md)
-7. [docs/ja/user/60-parent-child-task-flow.md](docs/ja/user/60-parent-child-task-flow.md)
+1. [docs/ja/user/00-overview.md](docs/ja/user/00-overview.md)
+2. [docs/ja/user/10-quickstart.md](docs/ja/user/10-quickstart.md)
+3. [docs/ja/user/20-project-package.md](docs/ja/user/20-project-package.md)
+4. [docs/ja/user/30-operating-runtime.md](docs/ja/user/30-operating-runtime.md)
+5. [docs/ja/user/40-troubleshooting.md](docs/ja/user/40-troubleshooting.md)
+6. [docs/ja/user/50-parent-child-task-flow.md](docs/ja/user/50-parent-child-task-flow.md)
+7. [docs/ja/user/80-current-release-surface.md](docs/ja/user/80-current-release-surface.md)
+8. [docs/ja/user/90-project-package-schema.md](docs/ja/user/90-project-package-schema.md)
+9. [docs/ja/user/95-runtime-naming-boundary.md](docs/ja/user/95-runtime-naming-boundary.md)
 
 開発者向けドキュメント:
 
-1. [docs/ja/dev/00-design-map.md](docs/ja/dev/00-design-map.md)
+1. [docs/ja/dev/00-architecture.md](docs/ja/dev/00-architecture.md)
 2. [docs/ja/dev/10-engineering-rulebook.md](docs/ja/dev/10-engineering-rulebook.md)
 3. [docs/ja/dev/20-bounded-context-and-language.md](docs/ja/dev/20-bounded-context-and-language.md)
 4. [docs/ja/dev/30-core-domain-model.md](docs/ja/dev/30-core-domain-model.md)

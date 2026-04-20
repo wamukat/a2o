@@ -1,4 +1,4 @@
-# A2O 0.5.5 Current Release Surface（現在の公開 surface）
+# Current Release Surface
 
 A2O 0.5.5 で現在利用できる公開 surface と検証範囲を示す。
 

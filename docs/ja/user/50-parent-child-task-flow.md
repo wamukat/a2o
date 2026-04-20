@@ -1,5 +1,7 @@
 # Parent-Child Task Flow
 
+この文書は、複数 repository にまたがる作業を child task と parent task に分け、最後に統合 review / verification / merge する流れを説明する。
+
 1 つの product change が複数の repo slot にまたがり、repo ごとに child task として実装したい場合は parent-child task を使う。A2O は kanban relation をもとに、child task、integration review、verification、merge、evidence を連携させる。
 
 ## Package Setup
