@@ -138,6 +138,39 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
+  it "fails with an actionable diagnostic when trigger-matched labels do not map to repo scopes" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 3038,
+          "ref" => "Sample#3038",
+          "status" => "To do",
+          "labels" => ["repo:both", "trigger:auto-parent"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:starters" => [:repo_alpha],
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-parent"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      expect { source.load }.to raise_error(
+        A3::Domain::ConfigurationError,
+        /Sample#3038.*repo:both.*repo:starters, repo:ui-app.*add one or more configured repo labels/
+      )
+    end
+  end
+
   it "passes through a kanban status filter when configured" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,

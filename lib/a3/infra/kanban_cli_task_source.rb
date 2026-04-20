@@ -108,6 +108,7 @@ module A3
           end
         resolved_task_id = Integer(payload.fetch("id"))
         labels = load_task_labels(resolved_task_id)
+        task_ref = String(payload.fetch("ref")).strip
         relations = @client.run_json_command("task-relation-list", "--project", @project, "--task-id", resolved_task_id.to_s)
         raise A3::Domain::ConfigurationError, "kanban task-relation-list must return an object" unless relations.is_a?(Hash)
 
@@ -117,9 +118,9 @@ module A3
         [
           {
             "task_id" => resolved_task_id,
-            "ref" => String(payload.fetch("ref")).strip,
+            "ref" => task_ref,
             "status" => normalize_status(payload.fetch("status", nil), labels: labels),
-            "edit_scope" => labels.flat_map { |label| @repo_label_map.fetch(label, []) }.uniq.freeze,
+            "edit_scope" => resolve_edit_scope(labels: labels, task_ref: task_ref),
             "parent_ref" => parent_refs.first&.first
           },
           (parent_refs + child_refs).to_h
@@ -230,10 +231,10 @@ module A3
         raise A3::Domain::ConfigurationError, "kanban task snapshot must be an object" unless raw_snapshot.is_a?(Hash)
 
         labels = Array(raw_snapshot["labels"]).map(&:to_s).reject(&:empty?).freeze
+        task_ref = String(raw_snapshot.fetch("ref")).strip
         return nil unless ignore_trigger_filter || @trigger_labels.empty? || (labels & @trigger_labels).any?
 
-        edit_scope = labels.flat_map { |label| @repo_label_map.fetch(label, []) }.uniq.freeze
-        return nil if edit_scope.empty?
+        edit_scope = resolve_edit_scope(labels: labels, task_ref: task_ref)
 
         status = normalize_status(raw_snapshot.fetch("status", nil), labels: labels)
         return nil unless status
@@ -241,11 +242,24 @@ module A3
 
         {
           "task_id" => Integer(raw_snapshot.fetch("id")),
-          "ref" => String(raw_snapshot.fetch("ref")).strip,
+          "ref" => task_ref,
           "status" => status,
           "edit_scope" => edit_scope,
           "parent_ref" => normalize_parent_ref(raw_snapshot["parent_ref"])
         }
+      end
+
+      def resolve_edit_scope(labels:, task_ref:)
+        edit_scope = labels.flat_map { |label| @repo_label_map.fetch(label, []) }.uniq.freeze
+        return edit_scope unless edit_scope.empty?
+
+        configured_labels = @repo_label_map.keys.sort
+        label_summary = labels.empty? ? "(none)" : labels.sort.join(", ")
+        configured_summary = configured_labels.empty? ? "(none)" : configured_labels.join(", ")
+        raise A3::Domain::ConfigurationError,
+              "kanban task #{task_ref} has no repo label that maps to an A2O edit scope; " \
+              "task labels=#{label_summary}; configured repo labels=#{configured_summary}; " \
+              "add one or more configured repo labels to the kanban task"
       end
 
       def normalize_status(raw_status, labels:)
