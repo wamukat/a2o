@@ -17,7 +17,7 @@ runtime image 内の `a2o --help` は container entrypoint の help であり、
 
 A2O は「1 project package = 1 runtime instance」として扱う。
 
-bootstrap は project package から runtime instance config を作成する。以後の `a2o kanban ...` と `a2o agent install` はカレントディレクトリから instance config を探索し、対象 package、storage、compose project、runtime image を解決する。
+bootstrap は project package から `.work/a2o/runtime-instance.json` を作成する。以後の `a2o kanban ...`、`a2o agent install`、`a2o runtime ...` はカレントディレクトリから上位へ instance config を探索し、同じ runtime instance を使う。
 
 ```sh
 a2o project bootstrap

@@ -51,7 +51,7 @@ refs/heads/a2o/<instance>/parent/<task>
 
 The namespace includes the runtime instance so isolated boards can reuse small task numbers without colliding.
 
-Legacy `refs/heads/a3/...` refs may exist as compatibility data, but new public behavior should use A2O refs.
+A2O writes user-visible branch refs under `refs/heads/a2o/...`. If `refs/heads/a3/...` refs are encountered, treat them as internal compatibility data rather than public branch naming.
 
 ## Freshness
 

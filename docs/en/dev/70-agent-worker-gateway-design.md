@@ -52,7 +52,7 @@ Project package commands should use the A2O worker environment names:
 - `A2O_WORKSPACE_ROOT`: materialized workspace root for the job.
 - `A2O_WORKER_LAUNCHER_CONFIG_PATH`: generated launcher config used by the bundled stdin worker.
 
-Older `A3_*` names are internal compatibility aliases only. Do not use them in project packages, templates, or user-facing diagnostics.
+`A3_*` names are internal compatibility aliases only. Do not use them in project packages, templates, or user-facing diagnostics.
 
 ## Workspace Materialization
 
