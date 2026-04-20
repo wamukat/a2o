@@ -11,7 +11,7 @@
 | 知りたいこと | 次に読む文書 |
 | --- | --- |
 | 日常的な開発判断とレビュー基準 | [10-engineering-rulebook.md](10-engineering-rulebook.md) |
-| A2O の用語と文脈境界 | [20-bounded-context-and-language.md](20-bounded-context-and-language.md) |
+| A2O の用語と Bounded Context | [20-bounded-context-and-language.md](20-bounded-context-and-language.md) |
 | タスク、実行、フェーズ、証跡のドメインモデル | [30-core-domain-model.md](30-core-domain-model.md) |
 | ワークスペース、リポジトリスロット、ブランチ名前空間 | [40-workspace-and-repo-slot-model.md](40-workspace-and-repo-slot-model.md) |
 | プロジェクトパッケージに公開する設定面 | [50-project-surface.md](50-project-surface.md) |
@@ -130,7 +130,7 @@ A2O の全体像と導入手順を扱う。
 
 不変性、TDD、リファクタリング、必要修正から逃げないことを固定する。
 
-### 2. 用語と境界づけられた文脈
+### 2. 用語と Bounded Context
 
 - [20-bounded-context-and-language.md](20-bounded-context-and-language.md)
 
