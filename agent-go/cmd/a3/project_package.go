@@ -209,6 +209,7 @@ type projectPackagePhaseYAML struct {
 	Skill     any            `yaml:"skill"`
 	Executor  map[string]any `yaml:"executor"`
 	Commands  []string       `yaml:"commands"`
+	Policy    any            `yaml:"policy"`
 	TargetRef any            `yaml:"target_ref"`
 }
 
@@ -247,13 +248,29 @@ func rejectMergeTarget(runtimePayload map[string]any) error {
 func projectLiveRefFromMergePhase(phases map[string]projectPackagePhaseYAML) (string, error) {
 	mergePhase, ok := phases["merge"]
 	if !ok {
-		return "", fmt.Errorf("target_ref must be provided")
+		return "", fmt.Errorf("policy and target_ref must be provided")
+	}
+	if err := validateMergePolicy(mergePhase.Policy); err != nil {
+		return "", err
 	}
 	ref := targetRefDefaultValue(mergePhase.TargetRef)
 	if strings.TrimSpace(ref) == "" {
 		return "", fmt.Errorf("target_ref must be provided")
 	}
 	return ref, nil
+}
+
+func validateMergePolicy(value any) error {
+	policy := targetRefDefaultValue(value)
+	if strings.TrimSpace(policy) == "" {
+		return fmt.Errorf("policy must be provided")
+	}
+	switch policy {
+	case "ff_only", "ff_or_merge", "no_ff":
+		return nil
+	default:
+		return fmt.Errorf("unsupported policy: %s", policy)
+	}
 }
 
 func targetRefDefaultValue(value any) string {

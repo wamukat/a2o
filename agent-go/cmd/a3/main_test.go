@@ -2598,6 +2598,52 @@ runtime:
 	}
 }
 
+func TestProjectValidateRejectsMissingMergePolicy(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - worker
+    merge:
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should fail for missing merge policy, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "lint_check name=project_package status=blocked") ||
+		!strings.Contains(stdout.String(), "invalid runtime.phases.merge") ||
+		!strings.Contains(stdout.String(), "policy must be provided") {
+		t.Fatalf("project validate should reject missing merge policy, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
 func TestRuntimeRunOnceRejectsLegacyWorkspaceHook(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
