@@ -11,7 +11,7 @@
 - Resident scheduler lifecycle（常駐 scheduler lifecycle）: `a2o runtime start`、`stop`、`status`
 - Runtime diagnosis（runtime 診断）: `a2o runtime doctor`、`a2o runtime watch-summary`、`a2o runtime describe-task <task-ref>`
 - Single-file project package config（単一ファイル project package config）: `project.yaml`
-- SoloBoard adapter and bootstrap tooling。既定 SoloBoard image は `v0.9.14`
+- SoloBoard adapter and bootstrap tooling。既定 SoloBoard image は `v0.9.15`
 - Agent HTTP worker gateway
 - Agent-materialized workspace mode
 - TypeScript、Go、Python、multi-repo task templates の reference product packages

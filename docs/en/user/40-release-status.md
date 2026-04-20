@@ -11,7 +11,7 @@
 - Resident scheduler lifecycle: `a2o runtime start`, `stop`, `status`
 - Runtime diagnosis: `a2o runtime doctor`, `a2o runtime watch-summary`, `a2o runtime describe-task <task-ref>`
 - Single-file project package config: `project.yaml`
-- SoloBoard adapter and bootstrap tooling, defaulting to SoloBoard `v0.9.14`
+- SoloBoard adapter and bootstrap tooling, defaulting to SoloBoard `v0.9.15`
 - Agent HTTP worker gateway
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates
