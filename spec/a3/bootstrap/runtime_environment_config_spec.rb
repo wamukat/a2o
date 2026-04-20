@@ -28,7 +28,6 @@ RSpec.describe A3::Bootstrap do
                   "commands" => ["commands/apply-remediation"]
                 },
                 "merge" => {
-                  "target" => "merge_to_parent",
                   "policy" => "ff_only",
                   "target_ref" => "refs/heads/live"
                 }
@@ -62,7 +61,7 @@ RSpec.describe A3::Bootstrap do
       expect(runtime_environment.storage_backend).to eq(:json)
       expect(runtime_environment.storage_dir.to_s).to eq(dir)
       expect(runtime_environment.project_surface.implementation_skill).to eq("skills/implementation/base.md")
-      expect(runtime_environment.project_context.merge_config.target).to eq(:merge_to_parent)
+      expect(runtime_environment.project_context.merge_config.target).to eq(:merge_to_live)
       expect(runtime_environment.container.fetch(:show_scheduler_state)).to be_a(A3::Application::ShowSchedulerState)
       expect(runtime_environment.operator_summary).to eq(
         {

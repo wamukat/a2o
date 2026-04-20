@@ -86,14 +86,6 @@ RSpec.describe A3::Domain::ProjectContext do
 
   it "uses a task-kind-specific merge config resolver when present" do
     resolver = A3::Domain::MergeConfigResolver.new(
-      target_spec: {
-        "default" => "merge_to_live",
-        "variants" => {
-          "task_kind" => {
-            "child" => {"default" => "merge_to_parent"}
-          }
-        }
-      },
       policy_spec: "ff_only",
       target_ref_spec: {
         "default" => "refs/heads/live",

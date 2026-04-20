@@ -51,14 +51,6 @@ runtime:
       commands:
         - "{{a2o_root_dir}}/reference-products/multi-repo-fixture/project-package/commands/format.sh"
     merge:
-      target:
-        default: merge_to_live
-        variants:
-          task_kind:
-            child:
-              default: merge_to_parent
-            parent:
-              default: merge_to_live
       policy: ff_only
       target_ref:
         default: refs/heads/main

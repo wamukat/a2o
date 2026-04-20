@@ -54,7 +54,7 @@ module EnvFixtureHelper
 end
 
 module ProjectYamlFixtureHelper
-  def project_yaml_payload(merge_target: "merge_to_live", merge_policy: "ff_only", merge_target_ref: "refs/heads/main")
+  def project_yaml_payload(merge_policy: "ff_only", merge_target_ref: "refs/heads/main")
     {
       "schema_version" => 1,
       "runtime" => {
@@ -75,7 +75,6 @@ module ProjectYamlFixtureHelper
             "commands" => ["commands/apply-remediation"]
           },
           "merge" => {
-            "target" => merge_target,
             "policy" => merge_policy,
             "target_ref" => merge_target_ref
           }

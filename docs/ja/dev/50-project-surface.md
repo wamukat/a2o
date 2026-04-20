@@ -21,7 +21,7 @@ Project package が設定してよいもの:
 - verification commands
 - remediation commands
 - repo slots and labels
-- A2O がサポートする範囲内の merge target and policy
+- A2O がサポートする範囲内の merge policy と live target ref
 
 ## 3. Core-Owned Behavior
 
@@ -71,18 +71,17 @@ Remediation commands は、verification failure に対して deterministic な f
 
 ## 6. Merge
 
-Merge は、A2O がサポートする behavior から選択する。
+Merge は、project-owned policy と live target ref で設定する。実際の merge target は A2O が task topology から導出する。
 
 ```yaml
 runtime:
   phases:
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 ```
 
-Project は target と policy を選択できるが、`project.yaml` の中で新しい merge semantics を定義しない。
+Project は policy と live target ref を選択できるが、`project.yaml` の中で `merge_to_live` や `merge_to_parent` は選択しない。
 
 ## 7. Presets
 

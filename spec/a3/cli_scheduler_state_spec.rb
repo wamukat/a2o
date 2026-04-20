@@ -10,7 +10,6 @@ RSpec.describe A3::CLI do
       FileUtils.mkdir_p(preset_dir)
       write_project_yaml(
         File.join(dir, "project.yaml"),
-        merge_target: "merge_to_parent",
         merge_target_ref: "refs/heads/live"
       )
       out = StringIO.new

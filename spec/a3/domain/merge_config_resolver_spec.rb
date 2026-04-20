@@ -3,19 +3,6 @@
 RSpec.describe A3::Domain::MergeConfigResolver do
   subject(:resolver) do
     described_class.new(
-      target_spec: {
-        "default" => "merge_to_live",
-        "variants" => {
-          "task_kind" => {
-            "child" => {
-              "default" => "merge_to_parent"
-            },
-            "parent" => {
-              "default" => "merge_to_live"
-            }
-          }
-        }
-      },
       policy_spec: {
         "default" => "ff_or_merge",
         "variants" => {
@@ -74,7 +61,6 @@ RSpec.describe A3::Domain::MergeConfigResolver do
   it "requires an explicit merge target ref specification" do
     expect do
       described_class.new(
-        target_spec: "merge_to_live",
         policy_spec: "ff_only"
       )
     end.to raise_error(A3::Domain::ConfigurationError, /merge target ref must be provided/)
@@ -83,7 +69,6 @@ RSpec.describe A3::Domain::MergeConfigResolver do
   it "rejects a blank merge target ref specification" do
     expect do
       described_class.new(
-        target_spec: "merge_to_live",
         policy_spec: "ff_only",
         target_ref_spec: "   "
       )

@@ -34,13 +34,13 @@ module A3
           raise A3::Domain::ConfigurationError, "project.yaml runtime.phases must be a mapping"
         end
         merge = phases.fetch("merge") do
-          raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.merge.target and runtime.phases.merge.policy must be provided"
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.merge.policy and runtime.phases.merge.target_ref must be provided"
         end
         unless merge.is_a?(Hash)
           raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.merge must be a mapping"
         end
-        merge_target = merge.fetch("target") do
-          raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.merge.target must be provided"
+        if merge.key?("target")
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.merge.target is no longer supported; A2O derives merge target from task topology"
         end
         merge_policy = merge.fetch("policy") do
           raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.merge.policy must be provided"
@@ -51,7 +51,6 @@ module A3
         raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.merge.target_ref must not be blank" if String(merge_target_ref).strip.empty?
 
         merge_config_resolver = A3::Domain::MergeConfigResolver.new(
-          target_spec: merge_target,
           policy_spec: merge_policy,
           target_ref_spec: merge_target_ref
         )

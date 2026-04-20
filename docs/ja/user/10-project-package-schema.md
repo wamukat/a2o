@@ -71,7 +71,6 @@ runtime:
       commands:
         - app/project-package/commands/format.sh
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 
@@ -172,7 +171,7 @@ Template は phase-based executor form を使う。`--language` は `agent.requi
 
 `project.yaml` は通常の production profile である。Focused test profile は `project-test.yaml` のような別 file にしてよいが、利用時は `a2o project validate --config project-test.yaml` または `a2o runtime run-once --project-config project-test.yaml` で明示的に選択する。
 
-`runtime.phases.merge` は merge target、policy、target ref を持つ。値は scalar または variant maps にでき、current merge resolver behavior と一致する。
+`runtime.phases.merge` は merge policy と live target ref を持つ。merge target は A2O が task topology から導出するため、利用者は設定しない。
 
 `task_templates` は validation と onboarding のための optional metadata である。Task template entry は markdown task template を指す。Runtime task selection は引き続き kanban から行う。Task templates は default では auto-enqueue されない。
 
@@ -214,7 +213,6 @@ runtime:
       commands:
         - app/project-package/commands/format.sh
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 ```
@@ -251,7 +249,6 @@ runtime:
       commands:
         - app/project-package/commands/verify.sh
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 ```
@@ -288,7 +285,6 @@ runtime:
       commands:
         - app/project-package/commands/verify.sh
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 ```
@@ -339,14 +335,6 @@ runtime:
       commands:
         - "{{a2o_root_dir}}/reference-products/multi-repo-fixture/project-package/commands/format.sh"
     merge:
-      target:
-        default: merge_to_live
-        variants:
-          task_kind:
-            child:
-              default: merge_to_parent
-            parent:
-              default: merge_to_live
       policy: ff_only
       target_ref:
         default: refs/heads/main

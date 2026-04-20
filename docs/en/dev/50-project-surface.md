@@ -20,7 +20,7 @@ Project packages may configure:
 - verification commands
 - remediation commands
 - repo slots and labels
-- merge target and policy within A2O-supported choices
+- merge policy and live target ref within A2O-supported choices
 
 ## Core-Owned Behavior
 
@@ -68,18 +68,17 @@ Remediation commands are used when verification fails and the package has a dete
 
 ## Merge
 
-Merge is configured as a selection among A2O-supported behavior:
+Merge is configured with a project-owned policy and live target ref. A2O derives the actual merge target from task topology:
 
 ```yaml
 runtime:
   phases:
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 ```
 
-Projects may choose target and policy, but they do not define new merge semantics inside `project.yaml`.
+Projects may choose policy and live target ref, but they do not choose `merge_to_live` or `merge_to_parent` inside `project.yaml`.
 
 ## Presets
 

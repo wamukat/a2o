@@ -21,7 +21,7 @@ Project packages may provide:
 - repo labels
 - human project labels
 - task templates
-- merge target and policy within supported Engine semantics
+- merge policy and live target ref within supported Engine semantics
 
 ## Engine-Owned Runtime
 

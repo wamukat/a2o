@@ -30,7 +30,6 @@ RSpec.describe A3::CLI do
                   "commands" => ["commands/apply-remediation"]
                 },
                 "merge" => {
-                  "target" => "merge_to_parent",
                   "policy" => "ff_only",
                   "target_ref" => "refs/heads/a2o/parent/A3-v2-3022"
                 }
@@ -56,7 +55,7 @@ RSpec.describe A3::CLI do
 
       expect(out.string).to include("implementation_skill=skills/implementation/base.md")
       expect(out.string).to include("review_skill=skills/review/repo-alpha-parent.md")
-      expect(out.string).to include("merge_target=merge_to_parent")
+      expect(out.string).to include("merge_target=merge_to_live")
     end
   end
 
@@ -83,7 +82,6 @@ RSpec.describe A3::CLI do
                   "commands" => ["commands/apply-remediation"]
                 },
                 "merge" => {
-                  "target" => "merge_to_parent",
                   "policy" => "ff_only",
                   "target_ref" => "refs/heads/a2o/parent/A3-v2-3022"
                 }

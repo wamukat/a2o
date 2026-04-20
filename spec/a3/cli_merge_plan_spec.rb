@@ -29,7 +29,6 @@ RSpec.describe A3::CLI do
                   "commands" => ["commands/apply-remediation"]
                 },
                 "merge" => {
-                  "target" => "merge_to_parent",
                   "policy" => "ff_only",
                   "target_ref" => "refs/heads/live"
                 }

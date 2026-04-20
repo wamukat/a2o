@@ -20,7 +20,6 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
       "runtime" => {
         "phases" => base_phases.merge(
           "merge" => {
-            "target" => "merge_to_parent",
             "policy" => "ff_only",
             "target_ref" => "refs/heads/feature/prototype"
           }
@@ -33,7 +32,7 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
     expect(context.surface.implementation_skill).to eq("skills/implementation/base.md")
     expect(context.surface.review_skill).to eq("skills/review/default.md")
     expect(context.surface.verification_commands).to eq(["commands/verify-all"])
-    expect(context.merge_config.target).to eq(:merge_to_parent)
+    expect(context.merge_config.target).to eq(:merge_to_live)
     expect(context.merge_config.policy).to eq(:ff_only)
     expect(context.merge_config.target_ref).to eq("refs/heads/feature/prototype")
   end
@@ -77,7 +76,6 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
         }
       },
       "merge" => {
-        "target" => "merge_to_parent",
         "policy" => "ff_only",
         "target_ref" => "refs/heads/feature/prototype"
       }
@@ -106,12 +104,12 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
     expect(parent_runtime.remediation_commands).to eq(["commands/format-all"])
   end
 
-  it "rejects unknown merge target" do
+  it "rejects public merge target configuration" do
     project_config_path = write_project_config(
       "runtime" => {
         "phases" => base_phases.merge(
           "merge" => {
-            "target" => "invented_target",
+            "target" => "merge_to_parent",
             "policy" => "ff_only",
             "target_ref" => "refs/heads/feature/prototype"
           }
@@ -119,14 +117,15 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
       }
     )
 
-    expect { loader.load(project_config_path) }.to raise_error(A3::Domain::ConfigurationError)
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.phases.merge.target is no longer supported; A2O derives merge target from task topology")
   end
 
   it "rejects missing core merge config" do
     project_config_path = write_project_config("runtime" => {"phases" => base_phases})
 
     expect { loader.load(project_config_path) }
-      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.phases.merge.target and runtime.phases.merge.policy must be provided")
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.phases.merge.policy and runtime.phases.merge.target_ref must be provided")
   end
 
   it "rejects missing core merge target ref" do
@@ -134,7 +133,6 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
       "runtime" => {
         "phases" => base_phases.merge(
           "merge" => {
-            "target" => "merge_to_parent",
             "policy" => "ff_only"
           }
         )
@@ -150,7 +148,6 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
       "runtime" => {
         "phases" => base_phases.merge(
           "merge" => {
-            "target" => "merge_to_parent",
             "policy" => "ff_only",
             "target_ref" => "   "
           }
@@ -167,7 +164,6 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
       "runtime" => {
         "phases" => base_phases.merge(
           "merge" => {
-            "target" => "merge_to_parent",
             "policy" => "ff_only",
             "target_ref" => "refs/heads/feature/prototype"
           }
@@ -185,7 +181,6 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
       "runtime" => {
         "phases" => base_phases.merge(
           "merge" => {
-            "target" => "merge_to_parent",
             "policy" => "ff_only",
             "target_ref" => "refs/heads/feature/prototype"
           }
@@ -203,7 +198,6 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
       "runtime" => {
         "phases" => base_phases.merge(
           "merge" => {
-            "target" => "merge_to_parent",
             "policy" => "ff_only",
             "target_ref" => "refs/heads/feature/prototype"
           }
@@ -216,20 +210,11 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
       .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.live_ref is no longer supported; use runtime.phases.merge.target_ref")
   end
 
-  it "loads task-kind-specific merge config variants" do
+  it "loads task-kind-specific target ref variants while deriving merge targets from topology" do
     project_config_path = write_project_config(
       "runtime" => {
         "phases" => base_phases.merge(
           "merge" => {
-            "target" => {
-              "default" => "merge_to_live",
-              "variants" => {
-                "task_kind" => {
-                  "child" => { "default" => "merge_to_parent" },
-                  "parent" => { "default" => "merge_to_live" }
-                }
-              }
-            },
             "target_ref" => {
               "default" => "refs/heads/live",
               "variants" => {

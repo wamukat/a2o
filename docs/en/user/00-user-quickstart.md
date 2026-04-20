@@ -152,7 +152,6 @@ runtime:
       commands:
         - app/project-package/commands/format.sh
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 ```

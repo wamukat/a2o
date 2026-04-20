@@ -214,7 +214,6 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	builder.WriteString("    remediation:\n")
 	builder.WriteString("      commands: []\n")
 	builder.WriteString("    merge:\n")
-	writeYAMLScalar(&builder, 3, "target", "merge_to_live")
 	writeYAMLScalar(&builder, 3, "policy", "ff_only")
 	writeYAMLScalar(&builder, 3, "target_ref", "refs/heads/main")
 	return builder.String(), nil

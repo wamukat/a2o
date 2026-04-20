@@ -3,14 +3,13 @@
 module A3
   module Domain
     class MergeConfigResolver
-      def initialize(target_spec:, policy_spec:, target_ref_spec: nil)
-        @target_spec = deep_freeze(target_spec)
+      def initialize(policy_spec:, target_ref_spec: nil)
         @policy_spec = deep_freeze(policy_spec)
         raise ConfigurationError, "merge target ref must be provided" if target_ref_spec.nil?
 
         @target_ref_spec = deep_freeze(target_ref_spec)
         @default_merge_config = A3::Domain::MergeConfig.new(
-          target: resolve_variant(@target_spec, task_kind: :single, repo_scope: :both, phase: :merge),
+          target: merge_target_for(:single),
           policy: resolve_variant(@policy_spec, task_kind: :single, repo_scope: :both, phase: :merge),
           target_ref: resolve_variant(@target_ref_spec, task_kind: :single, repo_scope: :both, phase: :merge)
         )
@@ -21,13 +20,17 @@ module A3
 
       def resolve(task:, phase:)
         A3::Domain::MergeConfig.new(
-          target: resolve_variant(@target_spec, task_kind: task.kind, repo_scope: task.repo_scope_key, phase: phase),
+          target: merge_target_for(task.kind),
           policy: resolve_variant(@policy_spec, task_kind: task.kind, repo_scope: task.repo_scope_key, phase: phase),
           target_ref: resolve_variant(@target_ref_spec, task_kind: task.kind, repo_scope: task.repo_scope_key, phase: phase)
         )
       end
 
       private
+
+      def merge_target_for(task_kind)
+        task_kind.to_sym == :child ? :merge_to_parent : :merge_to_live
+      end
 
       def resolve_variant(spec, task_kind:, repo_scope:, phase:)
         return normalize_variant_value(spec) unless spec.is_a?(Hash)

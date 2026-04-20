@@ -111,7 +111,7 @@ a2o runtime describe-task <task-ref>
 
 `project.yaml` は project package の唯一の公開 config である。A2O は package metadata、kanban bootstrap、repo slot、agent prerequisites、runtime surface command、merge default をここから読む。
 
-最小構成では single repo、single merge target、one executor から始める。
+最小構成では single repo、single live target ref、one executor から始める。
 
 ```yaml
 schema_version: 1
@@ -162,7 +162,6 @@ runtime:
       commands:
         - app/project-package/commands/format.sh
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 ```

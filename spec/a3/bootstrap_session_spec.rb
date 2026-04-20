@@ -15,7 +15,7 @@ RSpec.describe A3::Bootstrap do
 
       expect(session).to be_frozen
       expect(session.project_surface.implementation_skill).to eq("skills/implementation/base.md")
-      expect(session.project_context.merge_config.target).to eq(:merge_to_parent)
+      expect(session.project_context.merge_config.target).to eq(:merge_to_live)
       expect(session.project_context.merge_config.policy).to eq(:ff_only)
     end
   end
@@ -155,7 +155,6 @@ RSpec.describe A3::Bootstrap do
                 "commands" => ["commands/apply-remediation"]
               },
               "merge" => {
-                "target" => "merge_to_parent",
                 "policy" => "ff_only",
                 "target_ref" => "refs/heads/live"
               }

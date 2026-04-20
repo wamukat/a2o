@@ -1036,7 +1036,6 @@ runtime:
     review:
       skill: skills/review/default.md
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 `
@@ -1290,7 +1289,6 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 		"          - codex",
 		"          - exec",
 		"    merge:",
-		"      target: merge_to_live",
 		"      policy: ff_only",
 		"      target_ref: refs/heads/main",
 		"",
@@ -1369,7 +1367,6 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 		"    review:",
 		"      skill: skills/review/default.md",
 		"    merge:",
-		"      target: merge_to_live",
 		"      policy: ff_only",
 		"      target_ref: refs/heads/main",
 		"",
@@ -1454,7 +1451,6 @@ func TestDoctorFlagsFixtureReferencesInProductionProjectYaml(t *testing.T) {
 		"    review:",
 		"      skill: skills/review/default.md",
 		"    merge:",
-		"      target: merge_to_live",
 		"      policy: ff_only",
 		"      target_ref: refs/heads/main",
 		"",
@@ -1531,7 +1527,6 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 		"    review:",
 		"      skill: skills/review/default.md",
 		"    merge:",
-		"      target: merge_to_live",
 		"      policy: ff_only",
 		"      target_ref: refs/heads/main",
 		"",
@@ -1642,7 +1637,6 @@ func TestDoctorFlagsPrivateContractUsageInProjectYaml(t *testing.T) {
 		"    review:",
 		"      skill: skills/review/default.md",
 		"    merge:",
-		"      target: merge_to_live",
 		"      policy: ff_only",
 		"      target_ref: refs/heads/main",
 		"",
@@ -1714,7 +1708,6 @@ func TestProjectLintFlagsFixtureAndLegacyLeaks(t *testing.T) {
 		"    review:",
 		"      skill: skills/review/default.md",
 		"    merge:",
-		"      target: merge_to_live",
 		"      policy: ff_only",
 		"      target_ref: refs/heads/main",
 		"",
@@ -1854,7 +1847,6 @@ func TestProjectLintReportsUnusedCommandsAsWarning(t *testing.T) {
 		"      commands:",
 		"        - app/project-package/commands/verify.sh",
 		"    merge:",
-		"      target: merge_to_live",
 		"      policy: ff_only",
 		"      target_ref: refs/heads/main",
 		"",
@@ -1946,7 +1938,6 @@ func TestDoctorAgentInstallFailureShowsExactOutputPath(t *testing.T) {
 		"    review:",
 		"      skill: skills/review/default.md",
 		"    merge:",
-		"      target: merge_to_live",
 		"      policy: ff_only",
 		"      target_ref: refs/heads/main",
 		"",
@@ -2452,7 +2443,6 @@ runtime:
         command:
           - worker
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 `
@@ -2514,7 +2504,6 @@ runtime:
         command:
           - worker
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 `
@@ -2542,6 +2531,67 @@ runtime:
 
 	if !strings.Contains(stderr.String(), "invalid runtime.live_ref") || !strings.Contains(stderr.String(), "runtime.live_ref is no longer supported") {
 		t.Fatalf("stderr should reject legacy runtime.live_ref, got %q", stderr.String())
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
+	}
+}
+
+func TestRuntimeRunOnceRejectsPublicMergeTarget(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - worker
+    merge:
+      target: merge_to_live
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail with public merge target")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "invalid runtime.phases.merge") || !strings.Contains(stderr.String(), "target is no longer supported") {
+		t.Fatalf("stderr should reject public merge target, got %q", stderr.String())
 	}
 	if len(runner.calls) != 0 {
 		t.Fatalf("runtime should fail before docker calls, got:\n%s", runner.joinedCalls())
@@ -2576,7 +2626,6 @@ runtime:
         command:
           - worker
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 `
@@ -2747,7 +2796,6 @@ runtime:
         command:
           - worker
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 `
@@ -4095,7 +4143,6 @@ runtime:
           - ruby
           - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 `
@@ -4782,7 +4829,6 @@ runtime:
           - ruby
           - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
     merge:
-      target: merge_to_live
       policy: ff_only
       target_ref: refs/heads/main
 `

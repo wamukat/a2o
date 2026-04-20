@@ -71,7 +71,7 @@ Cleanup policy should preserve evidence needed for blocked diagnosis and release
 
 Merge uses explicit source and target refs from the project package and runtime state.
 
-Supported merge targets:
+Internal merge targets:
 
 - child to parent integration ref
 - parent to live target

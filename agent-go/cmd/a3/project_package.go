@@ -91,6 +91,9 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	if _, ok := runtimePayload["merge"]; ok {
 		return config, fmt.Errorf("project package config %s has invalid runtime.merge: runtime.merge is no longer supported; use runtime.phases.merge", projectFile)
 	}
+	if err := rejectMergeTarget(runtimePayload); err != nil {
+		return config, fmt.Errorf("project package config %s has invalid runtime.phases.merge: %w", projectFile, err)
+	}
 	if err := rejectLegacyPhaseWorkspaceHook(runtimePayload); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.phases: %w", projectFile, err)
 	}
@@ -222,6 +225,21 @@ func rejectLegacyPhaseWorkspaceHook(runtimePayload map[string]any) error {
 		if _, ok := phase["workspace_hook"]; ok {
 			return fmt.Errorf("%s.workspace_hook is no longer supported; use phase commands or project package commands", phaseName)
 		}
+	}
+	return nil
+}
+
+func rejectMergeTarget(runtimePayload map[string]any) error {
+	phases, ok := normalizeYAMLValue(runtimePayload["phases"]).(map[string]any)
+	if !ok {
+		return nil
+	}
+	mergePhase, ok := phases["merge"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	if _, ok := mergePhase["target"]; ok {
+		return fmt.Errorf("target is no longer supported; A2O derives merge target from task topology")
 	}
 	return nil
 }
