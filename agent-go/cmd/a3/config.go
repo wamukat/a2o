@@ -47,12 +47,23 @@ func defaultComposeFile() string {
 }
 
 func defaultRuntimeImage() string {
+	if value := explicitRuntimeImageReference(); value != "" {
+		return value
+	}
+	return packagedRuntimeImageReference()
+}
+
+func explicitRuntimeImageReference() string {
 	if value := strings.TrimSpace(os.Getenv("A2O_RUNTIME_IMAGE")); value != "" {
 		return value
 	}
 	if value := strings.TrimSpace(os.Getenv("A3_RUNTIME_IMAGE")); value != "" {
 		return value
 	}
+	return ""
+}
+
+func packagedRuntimeImageReference() string {
 	if executablePath, err := os.Executable(); err == nil {
 		for _, shareName := range []string{"a2o", "a3"} {
 			path := filepath.Join(filepath.Dir(executablePath), "..", "share", shareName, "runtime-image")
@@ -65,13 +76,19 @@ func defaultRuntimeImage() string {
 }
 
 func runtimeImageReference(config *runtimeInstanceConfig) string {
-	if value := defaultRuntimeImage(); value != "" {
+	return selectRuntimeImageReference(config, explicitRuntimeImageReference(), packagedRuntimeImageReference())
+}
+
+func selectRuntimeImageReference(config *runtimeInstanceConfig, explicitRef string, packagedRef string) string {
+	if value := strings.TrimSpace(explicitRef); value != "" {
 		return value
 	}
 	if config != nil {
-		return strings.TrimSpace(config.RuntimeImage)
+		if value := strings.TrimSpace(config.RuntimeImage); value != "" {
+			return value
+		}
 	}
-	return ""
+	return strings.TrimSpace(packagedRef)
 }
 
 func writeInstanceConfig(workspaceRoot string, config runtimeInstanceConfig) error {

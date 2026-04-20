@@ -227,6 +227,19 @@ func TestDefaultBranchNamespaceStripsLegacyA3Prefix(t *testing.T) {
 	}
 }
 
+func TestRuntimeImageReferencePrefersExplicitEnvThenInstanceThenPackagedDefault(t *testing.T) {
+	config := runtimeInstanceConfig{RuntimeImage: "ghcr.io/wamukat/a2o-engine@sha256:instance"}
+	if got := selectRuntimeImageReference(&config, "ghcr.io/wamukat/a2o-engine@sha256:env", "ghcr.io/wamukat/a2o-engine:packaged"); got != "ghcr.io/wamukat/a2o-engine@sha256:env" {
+		t.Fatalf("explicit env should win, got %q", got)
+	}
+	if got := selectRuntimeImageReference(&config, "", "ghcr.io/wamukat/a2o-engine:packaged"); got != "ghcr.io/wamukat/a2o-engine@sha256:instance" {
+		t.Fatalf("instance config should win over packaged default, got %q", got)
+	}
+	if got := selectRuntimeImageReference(&runtimeInstanceConfig{}, "", "ghcr.io/wamukat/a2o-engine:packaged"); got != "ghcr.io/wamukat/a2o-engine:packaged" {
+		t.Fatalf("packaged default should be fallback, got %q", got)
+	}
+}
+
 func TestApplyAgentInstallOverridesMapsLegacyRuntimeServiceToA2O(t *testing.T) {
 	config := applyAgentInstallOverrides(runtimeInstanceConfig{
 		ComposeProject: "a2o-upgraded",
