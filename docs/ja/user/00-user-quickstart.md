@@ -83,7 +83,7 @@ a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 a2o runtime run-once
 ```
 
-`a2o project bootstrap` は `.work/a2o/runtime-instance.json` を作り、後続の `kanban`、`agent`、`runtime` command が同じ runtime instance を使えるようにする。`a2o agent install` は既定で `.work/a2o/agent/bin/a2o-agent` に agent を配置する。
+`a2o project bootstrap` は `.work/a2o/runtime-instance.json` を作り、`kanban`、`agent`、`runtime` command が同じ runtime instance を使えるようにする。`a2o agent install` は既定で `.work/a2o/agent/bin/a2o-agent` に agent を配置する。
 
 `run-once` の前に、board 上に runnable task を 1 つ用意する。`a2o kanban up` は lane と label を作るが、作業 task は自動投入しない。
 
