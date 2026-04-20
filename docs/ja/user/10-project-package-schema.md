@@ -4,7 +4,7 @@
 
 Project package config の正規ファイル名は `project.yaml` とする。
 
-`manifest.yml` は公開 0.5.4 package format に含めない。runtime の責務は `project.yaml` の明示的な runtime sections に置く。これにより、公開 package の command shape を小さく保ち、`a2o.yaml` のような別名を増やさず、package author にとって分かりにくい「project config」と「manifest」の分離をなくす。
+`manifest.yml` は公開 0.5.5 package format に含めない。runtime の責務は `project.yaml` の明示的な runtime sections に置く。これにより、公開 package の command shape を小さく保ち、`a2o.yaml` のような別名を増やさず、package author にとって分かりにくい「project config」と「manifest」の分離をなくす。
 
 Authoring 上の判断と責務境界は [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md) を参照する。
 

@@ -1,4 +1,4 @@
-# A2O 0.5.4 Release Status（release 状態）
+# A2O 0.5.5 Release Status（release 状態）
 
 ## Ready（利用可能）
 
@@ -16,7 +16,7 @@
 - Agent HTTP worker gateway
 - Agent-materialized workspace mode
 - TypeScript、Go、Python、multi-repo task templates の reference product packages
-- main push 時の GHCR image publication。tags は `latest`、`0.5.4`、`sha-*`
+- main push 時の GHCR image publication。tags は `latest`、`0.5.5`、`sha-*`
 - Full RSpec release gate の local pass
 
 ## Validation scope（検証範囲）
