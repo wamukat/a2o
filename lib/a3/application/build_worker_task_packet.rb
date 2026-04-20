@@ -46,7 +46,10 @@ module A3
         title = String(snapshot["title"]).strip
         raise A3::Domain::ConfigurationError, "external task packet title is blank for #{task.ref}" if title.empty?
         description = String(snapshot["description"]).strip
-        raise A3::Domain::ConfigurationError, "external task packet description is blank for #{task.ref}" if description.empty?
+        if description.empty?
+          raise A3::Domain::ConfigurationError,
+                "kanban task #{task.ref} description is blank; fill in the ticket body/description before running A2O"
+        end
 
         {
           "title" => title,
