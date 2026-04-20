@@ -2,13 +2,19 @@
 
 This document defines workspace topology, repo slots, source synchronization, freshness, retention, and merge behavior.
 
+Read it to understand which source A2O uses, which workspace it uses, and which branch receives the result. To turn AI execution results safely into Git changes, A2O must make source descriptors and repo slots explicit instead of relying on the incidental state of a local checkout.
+
+## Runtime Placement
+
+This document covers how Engine materializes Git sources into workspaces and publishes or merges them under a branch namespace while preparing phase jobs. Repo slots from the project package become runtime identifiers here, and `a2o-agent` uses those identifiers to operate on product repositories.
+
 ## Goals
 
 - Keep product repository layout out of Engine core.
 - Use stable repo slot aliases in runtime state and job payloads.
 - Make source refs explicit before phase execution.
 - Keep agent workspaces disposable.
-- Preserve enough evidence to inspect blocked and completed work.
+- Preserve evidence for blocked and completed work.
 
 ## Repo Slots
 
@@ -28,7 +34,7 @@ Runtime code should use `app`, not the local filesystem path, as the stable iden
 
 ## Source Aliases
 
-The host launcher expands package repo slots into agent source aliases. The agent uses those aliases to materialize workspaces without needing to parse the project package.
+The host launcher expands package repo slots into source aliases for the agent. The agent uses those aliases to materialize workspaces without parsing the project package.
 
 ## Workspace Kinds
 
@@ -38,11 +44,11 @@ Used for implementation. The agent materializes editable source for the task and
 
 ### Runtime Workspace
 
-Used for review, verification, and merge. It is created from explicit source descriptors and should not rely on incidental local checkout state.
+Used for review, verification, and merge. It is created from an explicit source descriptor and does not rely on incidental local checkout state.
 
 ## Branch Namespace
 
-User-visible branch refs should use A2O names:
+User-visible branch refs use A2O names:
 
 ```text
 refs/heads/a2o/<instance>/work/<task>
@@ -51,21 +57,21 @@ refs/heads/a2o/<instance>/parent/<task>
 
 The namespace includes the runtime instance so isolated boards can reuse small task numbers without colliding.
 
-A2O writes user-visible branch refs under `refs/heads/a2o/...`. If `refs/heads/a3/...` refs are encountered, treat them as internal compatibility data rather than public branch naming.
+A2O writes user-visible branch refs under `refs/heads/a2o/...`. If `refs/heads/a3/...` refs are encountered, treat them as internal compatibility data rather than public branch names.
 
 ## Freshness
 
-Workspace materialization must verify that the workspace matches the requested source descriptor. If it does not, A2O should recreate or refresh it rather than silently reusing stale state.
+Workspace materialization must verify that a workspace matches the requested source descriptor. If it does not match, A2O recreates or refreshes it instead of silently reusing stale state.
 
-Dirty source repositories should fail fast with the repo and file list included in diagnostics.
+Dirty source repositories fail fast, with the repo and file list included in diagnostics.
 
 ## Cleanup
 
-Generated runtime output should live under `.work/a2o/`.
+Generated runtime output lives under `.work/a2o/`.
 
-Agent metadata for materialized repo slots should live in A2O-managed metadata paths outside the product repo slot checkout. Product repo slots should not contain A2O-owned `.a3/slot.json` or `.a3/materialized.json` files.
+Agent metadata for materialized repo slots lives in A2O-managed metadata paths outside the product repo slot checkout. Product repo slots must not contain A2O-owned `.a3/slot.json` or `.a3/materialized.json` files.
 
-Cleanup policy should preserve evidence needed for blocked diagnosis and release validation while allowing disposable workspaces to be regenerated.
+Cleanup policy preserves evidence needed for blocked diagnosis and release validation while allowing disposable workspaces to be regenerated.
 
 ## Merge
 
@@ -73,8 +79,8 @@ Merge uses explicit source and target refs from the project package and runtime 
 
 Internal merge targets:
 
-- child to parent integration ref
-- parent to live target
+- child task to parent integration ref
+- parent task to live target
 - single task to live target
 
-Merge policy is part of the project package. The default policy is fast-forward only unless the package explicitly allows another policy.
+Merge policy is part of the project package. The default policy is fast-forward only unless the package explicitly declares another policy.

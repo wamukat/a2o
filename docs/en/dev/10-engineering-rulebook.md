@@ -1,6 +1,12 @@
 # A2O Engineering Rulebook
 
-This document fixes the day-to-day engineering rules for A2O. Design documents define what to build; this document defines how to build it.
+This document defines A2O's everyday engineering discipline. Design documents define what to build; this document defines how to build it.
+
+Read it to align implementation decisions. A2O favors changes that keep ticket scope, tests, responsibility boundaries, and user-facing diagnostics coherent over changes that merely work in the short term. For design details, start at [00-design-map.md](00-design-map.md) and follow the relevant detail document.
+
+## Runtime Placement
+
+This rulebook applies when changing any part of A2O Engine, the host launcher, `a2o-agent`, project packages, or kanban adapters. The focused design documents describe specific runtime flows. This document sets the decision standard for changes, test additions, review, and protection of public / internal boundaries.
 
 ## Core Rules
 
@@ -8,34 +14,34 @@ This document fixes the day-to-day engineering rules for A2O. Design documents d
 - Use short Red -> Green -> Refactor loops.
 - Add failing tests before changing behavior.
 - Refactor when duplicated knowledge or unclear responsibility appears.
-- Do not avoid necessary fixes only to keep the current change smaller.
+- Do not avoid necessary fixes only to make the current change look smaller.
 - Keep product-specific behavior out of Engine core.
 
 ## Immutability
 
-Domain objects are immutable by default. State changes should return new objects rather than mutating existing ones. Mutable state is acceptable only when it is an infrastructure or adapter concern, and that boundary must stay explicit.
+Domain objects are immutable by default. A state change should return a new object rather than mutate an existing one. Mutable state is acceptable only when it belongs to infrastructure or adapter responsibilities, and that boundary must stay explicit.
 
-Core concepts such as task, run, and evidence must not grow ad hoc setters or hidden mutation.
+Core concepts such as task, run, and evidence must not accumulate ad hoc setters or hidden state changes.
 
 ## TDD
 
 Use the smallest useful loop:
 
-1. Write a failing test that fixes the design pressure in code.
+1. Write a failing test that captures the design pressure in code.
 2. Add the smallest implementation that passes.
 3. Refactor without changing behavior.
 
-Skipping tests is acceptable only for truly mechanical or documentation-only changes. Shared behavior, public CLI behavior, runtime orchestration, workspace materialization, verification, merge, and diagnostics require tests.
+Skipping tests is acceptable only for purely mechanical changes or documentation-only changes. Shared behavior, public CLI behavior, runtime progression, workspace materialization, verification, merge, and diagnostics require tests.
 
 ## Refactoring
 
-Refactoring should happen during normal implementation, not as a postponed cleanup phase. When the same knowledge appears twice, review the ownership boundary early.
+Refactoring is part of normal implementation, not a postponed cleanup phase. When the same knowledge appears in two places, review the ownership boundary early.
 
-Do not add abstraction only because future variation might appear. Add it when it removes current complexity, reduces meaningful duplication, or matches an established local pattern.
+Do not add an abstraction only because future variation might appear. Add one when it reduces current complexity, removes meaningful duplication, or matches an established local pattern.
 
 ## Review Standard
 
-Reviewers should prioritize:
+Reviews should prioritize:
 
 - behavioral regressions
 - incomplete ticket coverage

@@ -1,12 +1,18 @@
 # A2O Bounded Contexts And Language
 
-This document fixes the vocabulary and bounded contexts used by A2O. Later domain, workspace, evidence, and implementation documents use these terms.
+This document defines the vocabulary and Bounded Context used by A2O. Domain, workspace, evidence, and implementation documents use these terms.
+
+Read it to keep the same word from taking on multiple meanings. Task, run, phase, workspace, and evidence are A2O decision units, separate from UI labels and implementation convenience names. For state transitions, read [30-core-domain-model.md](30-core-domain-model.md). For workspace details, read [40-workspace-and-repo-slot-model.md](40-workspace-and-repo-slot-model.md).
+
+## Runtime Placement
+
+This document aligns the language used from the moment a kanban task is imported by the scheduler, through Engine creating phase jobs, `a2o-agent` executing jobs, and evidence and kanban state being updated. When other design documents mention task, run, phase, workspace, project package, or operator inspection, read those terms through this Bounded Context.
 
 ## Design Stance
 
-A2O names concepts by domain meaning, not by temporary code structure.
+A2O names concepts by domain meaning, not by incidental code structure.
 
-- Define meaning first, then align class/module/file names.
+- Define meaning first, then align class / module / file names.
 - Do not add phase-specific rescue branches to domain language.
 - Public vocabulary uses A2O names. A3 may remain only as an internal compatibility name.
 
@@ -57,8 +63,8 @@ Owns:
 - evidence summary
 - blocked-run diagnosis
 - watch summary
-- describe-task output
-- runtime status and doctor output
+- `describe-task` output
+- runtime status and `doctor` output
 
 This context explains what happened and what the operator should do next.
 
@@ -66,7 +72,7 @@ This context explains what happened and what the operator should do next.
 
 ### Task
 
-A unit of work imported from kanban or created internally as part of a parent-child flow.
+A unit of work imported from kanban or created as part of a parent-child flow.
 
 ### Task Kind
 
@@ -87,7 +93,7 @@ The execution step currently being processed. The public project package uses:
 
 ### Run
 
-One attempt to execute a task phase. A run records phase, workspace, source descriptor, outcome, evidence, and blocked details.
+One attempt to execute one task phase. A run records phase, workspace, source descriptor, result, evidence, and blocked details.
 
 ### Terminal Outcome
 
@@ -95,7 +101,7 @@ The final result of a run, such as success, blocked, failed verification, merge 
 
 ### Repo Slot
 
-A stable project package alias for a repository, such as `app`, `repo_alpha`, or `repo_beta`. Runtime behavior should use repo slots rather than hard-coded product paths.
+A stable project package alias for a repository, such as `app`, `repo_alpha`, or `repo_beta`. Runtime behavior uses repo slots rather than hard-coded product paths.
 
 ### Workspace Kind
 
@@ -108,7 +114,7 @@ Structured records and artifacts that let an operator inspect what happened with
 
 ### Source Descriptor
 
-The source ref and workspace kind that define what code was used for a run.
+The source ref and workspace kind that define what code a run used.
 
 ### Artifact Owner
 

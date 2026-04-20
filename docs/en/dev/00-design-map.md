@@ -1,13 +1,41 @@
 # A2O Design Map
 
-This document explains what each design document covers and the recommended reading order.
+This document explains how A2O Engine connects kanban, project packages, `a2o-agent`, Generative AI, and Git repositories to automate task work.
 
-## Goals
+Use it as the entry point for the design documentation. Start with the overall runtime flow, then move to the detailed documents for the domain model, workspaces, agent boundary, kanban adapter, and other focused areas.
 
-- Keep domain, application, infrastructure, and project surface responsibilities separate.
-- Keep product-specific rescue branches and workspace assumptions out of Engine core.
-- Make the boundary between public A2O surfaces and internal compatibility names explicit.
-- Treat the reference product suite as the canonical core validation target.
+The goal is to understand A2O as a flow: select a task, create a job, delegate it to the agent, and record the result. Before making a design change, use this document to find the affected boundary, then read the matching detail document.
+
+## Reading Path
+
+Read this document first to understand runtime flow and responsibility boundaries. Then choose the next document based on the design surface you need.
+
+| Topic | Next document |
+| --- | --- |
+| Everyday development decisions and review standards | [10-engineering-rulebook.md](10-engineering-rulebook.md) |
+| A2O vocabulary and Bounded Context | [20-bounded-context-and-language.md](20-bounded-context-and-language.md) |
+| Domain model for tasks, runs, phases, and evidence | [30-core-domain-model.md](30-core-domain-model.md) |
+| Workspaces, repo slots, and branch namespace | [40-workspace-and-repo-slot-model.md](40-workspace-and-repo-slot-model.md) |
+| Configuration surface exposed to project packages | [50-project-surface.md](50-project-surface.md) |
+| Project command and worker contract | [55-project-script-contract.md](55-project-script-contract.md) |
+| Evidence, blocked diagnosis, and reruns | [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md) |
+| Job boundary with `a2o-agent` | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
+| Boundary between core and project extensions | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
+| Validation through reference products | [90-reference-product-suite.md](90-reference-product-suite.md) |
+| Kanban adapter and SoloBoard boundary | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
+
+## Runtime Flow
+
+A2O is a runtime that turns kanban tasks into AI-executable jobs and keeps the path through verification and merge traceable.
+
+1. A user prepares a project package and kanban task.
+2. The scheduler selects a runnable task.
+3. Engine builds a phase job from the task, `project.yaml`, skills, and repo slots.
+4. `a2o-agent` runs execution commands on the host or in the development environment.
+5. The execution commands use Generative AI and the product toolchain to create changes.
+6. Engine manages verification, merge, evidence, and kanban state.
+
+The supporting boundaries are deliberately separate. The domain model owns the task lifecycle. The workspace model owns source and branch materialization. The agent boundary owns external command execution. The kanban adapter owns the task state visible to users.
 
 ## System Overview
 
@@ -22,10 +50,10 @@ flowchart LR
   end
 
   subgraph Engine["A2O Engine"]
-    Kanban@{ shape: cyl, label: "Kanban\nwork queue and visible state" }
-    Scheduler@{ shape: rounded, label: "Scheduler\nselects runnable kanban tasks" }
-    Prepare@{ shape: rounded, label: "Prepares AI execution jobs\nfrom task, config, and skills" }
-    Report@{ shape: rounded, label: "Records the result\nkanban comments, status, and evidence" }
+    Kanban@{ shape: cyl, label: "Kanban\ntask queue" }
+    Scheduler@{ shape: rounded, label: "Scheduler\nselects runnable tasks" }
+    Prepare@{ shape: rounded, label: "Prepares and instructs jobs\nfrom task / config / skills" }
+    Report@{ shape: rounded, label: "Records results\nkanban comments / status" }
   end
 
   Repository@{ shape: cyl, label: "Git repository" }
@@ -43,54 +71,98 @@ flowchart LR
   Report --> Kanban
 ```
 
-In normal use, the user creates a kanban task and project inputs. The resident scheduler picks runnable tasks from the Engine-managed kanban state. The Engine combines the task, project config, and AI skills into AI execution jobs. `a2o-agent` runs those jobs on the host or project dev environment, requests Generative AI execution, and applies the result to the Git repository. The Engine records task status, comments, and evidence back to kanban.
+In normal operation, the user creates kanban tasks and project inputs. The resident scheduler selects runnable tasks from Engine-managed kanban state. Engine combines the task, project configuration, and AI skill files into AI execution jobs. `a2o-agent` runs the jobs on the host or in the project's development environment, asks Generative AI to perform the job, and applies the result to the Git repository. Engine records task state, comments, and evidence back to kanban.
 
-## Documents
+## Responsibility Boundaries
+
+- A2O Engine: task lifecycle, scheduler, phase progression, kanban adapters, evidence, and merge progression.
+- Project package: project-specific repo slots, labels, skills, execution commands, verification / remediation commands, and merge defaults.
+- `a2o-agent`: command execution in the product environment, workspace materialization, and artifact publication.
+- Generative AI: implementation and review assistance requested by execution commands.
+- Git repository: durable artifact for AI execution results and merge results.
+
+## Task Lifecycle
+
+| State | Meaning | Primary owner |
+| --- | --- | --- |
+| `To do` | Candidate that the scheduler can import | Kanban / Engine |
+| `In progress` | Implementation or runtime phase is active | Engine |
+| `In review` | Review or confirmation stage | Engine / agent job |
+| `Inspection` | Stage for inspecting verification results or parent-child integration decisions | Engine |
+| `Merging` | Source is being integrated into the target ref | Engine / Git workspace |
+| `Done` | A2O automation has completed | Engine / kanban |
+| `Blocked` | Operator action is required | Engine / operator |
+
+Kanban lanes are user-visible state. Domain objects hold the task state, current run, phase, and terminal outcome that Engine uses for scheduling and transition decisions.
+
+## Phases And Responsibilities
+
+| Phase | Purpose | Main input | Main output |
+| --- | --- | --- | --- |
+| `implementation` | Create changes | Task, skills, repo slots | Work branch, agent artifacts |
+| `review` | Inspect implementation results | Source descriptor, review skills | Review decision, evidence |
+| `parent_review` | Decide how child task results integrate | Parent task scope, child task outputs | Parent task evidence |
+| `verification` | Run deterministic verification | Workspace, verification commands | Success / failure evidence |
+| `remediation` | Try deterministic repair | Failed verification context | Formatted / repaired workspace |
+| `merge` | Integrate into the target ref | Source ref, target ref, merge policy | Merge result, kanban update |
+
+## Data Ownership
+
+| Data | Owner | Use |
+| --- | --- | --- |
+| Kanban tasks / lanes / comments | Kanban adapter | User-visible queue and state |
+| Runtime tasks / run state | A2O Engine | Scheduler and phase transition decisions |
+| Project package | User / product team | Declares repo slots, skills, commands, and verification |
+| Agent workspace / artifacts | `a2o-agent` | Product-environment execution results and logs |
+| Git branches / merge results | Git repository | Final artifacts and integration results |
+| Evidence / blocked diagnosis | A2O Engine | Investigation of failed or completed runs |
+
+## Document Index
 
 ### 0. User Path
 
 - [../user/00-user-quickstart.md](../user/00-user-quickstart.md)
 
-The user manual for installing and operating A2O.
+Entry point for installing and operating A2O.
 
 ### 1. Engineering Discipline
 
 - [10-engineering-rulebook.md](10-engineering-rulebook.md)
 
-Rules for immutability, TDD, refactoring, and avoiding shortcut fixes.
+Sets the rules for immutability, TDD, refactoring, and not avoiding necessary fixes.
 
-### 2. Language and Bounded Contexts
+### 2. Language And Bounded Context
 
 - [20-bounded-context-and-language.md](20-bounded-context-and-language.md)
 
-Defines task kind, phase, workspace, repo slot, evidence, and other core vocabulary.
+Fixes terms such as task kind, phase, workspace, repo slot, and evidence.
 
 ### 3. Core Domain Model
 
 - [30-core-domain-model.md](30-core-domain-model.md)
 
-Defines aggregates, entities, value objects, and state transitions.
+Covers aggregates, entities, value objects, and state transitions.
 
 ### 4. Workspace / Repo Slot / Lifecycle
 
 - [40-workspace-and-repo-slot-model.md](40-workspace-and-repo-slot-model.md)
 
-Defines fixed repo slots, synchronization, freshness, retention, garbage collection, and merge workspaces.
+Covers fixed repo slots, synchronization, freshness, retention, garbage collection, and merge workspaces.
 
-### 5. Project Surface
+### 5. Project Configuration Surface
 
 - [50-project-surface.md](50-project-surface.md)
 - [55-project-script-contract.md](55-project-script-contract.md)
 - [../user/10-project-package-schema.md](../user/10-project-package-schema.md)
 - [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md)
 
-Defines the project package schema, project script contract, repo slots, verification, and extension boundaries.
+Covers the project package schema, project script contract, repo slots, verification, and initialization hook boundaries.
 
 ### 6. Evidence / Rerun / Blocked Diagnosis
 
 - [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md)
 
-Defines the internal evidence model for review, merge, rerun, and blocked-run diagnosis.
+Covers internal evidence that supports reproducible review, merge, rerun, and blocked-run investigation.
 
 ### 7. Runtime Distribution
 
@@ -98,13 +170,13 @@ Defines the internal evidence model for review, merge, rerun, and blocked-run di
 - [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md)
 - [../user/30-runtime-naming-boundary.md](../user/30-runtime-naming-boundary.md)
 
-Defines the Docker runtime image, host launcher, bundled kanban service, agent gateway, and internal compatibility names.
+Covers the Docker runtime image, host launcher, bundled kanban service, agent boundary, and internal compatibility names.
 
 ### 8. Reference Validation
 
 - [90-reference-product-suite.md](90-reference-product-suite.md)
 
-Defines the sample products and the release validation scope.
+Covers sample products and validation boundaries used by core verification.
 
 ### 9. Current Release Surface
 
@@ -116,4 +188,16 @@ Summarizes the supported public surface and validation boundary for A2O 0.5.5.
 
 - [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md)
 
-Defines the current kanban command contract and adapter boundary.
+Covers the kanban command contract and adapter boundary.
+
+## Find By Question
+
+| Question | Read |
+| --- | --- |
+| How do task / run / phase states transition? | [30-core-domain-model.md](30-core-domain-model.md) |
+| How are workspaces and branches created? | [40-workspace-and-repo-slot-model.md](40-workspace-and-repo-slot-model.md) |
+| What can Engine read from a project package? | [50-project-surface.md](50-project-surface.md) |
+| What contract do project scripts follow? | [55-project-script-contract.md](55-project-script-contract.md) |
+| How are agent jobs handed off? | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
+| What evidence exists when a task is blocked? | [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md) |
+| What is the kanban adapter responsible for? | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
