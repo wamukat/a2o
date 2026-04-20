@@ -429,7 +429,7 @@ module A3
             next
           end
           expected_alias = @source_aliases.fetch(slot_name.to_sym).to_s
-          expected_runtime_path_fragment = File.join(workspace_id_for(merge_plan), slot_name.to_s.tr("_", "-"))
+          expected_runtime_path_fragment = File.join(workspace_id_for(merge_plan), slot_name.to_s)
           errors << "#{slot_name}.source_alias must match configured agent source alias" unless descriptor["source_alias"] == expected_alias
           errors << "#{slot_name}.runtime_path must identify the agent merge workspace" unless descriptor["runtime_path"].to_s.include?(expected_runtime_path_fragment)
           errors << "#{slot_name}.merge_source_ref must match merge plan" unless descriptor["merge_source_ref"] == merge_plan.merge_source.source_ref
