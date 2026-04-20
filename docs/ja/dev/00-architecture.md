@@ -61,6 +61,42 @@ flowchart LR
 - 生成AI: executor command から指示される実装・レビュー補助。
 - Git repository: AI 実行結果と merge 結果を保持する成果物。
 
+## Task lifecycle
+
+| 状態 | 意味 | 主な所有者 |
+|---|---|---|
+| `To do` | scheduler が pickup できる候補 | Kanban / Engine |
+| `In progress` | implementation または runtime phase が進行中 | Engine |
+| `In review` | review / inspection 相当の確認中 | Engine / agent job |
+| `Inspection` | 検証結果や親子 task の統合判断を確認する段階 | Engine |
+| `Merging` | source を target ref へ統合する段階 | Engine / Git workspace |
+| `Done` | A2O automation が完了した状態 | Engine / Kanban |
+| `Blocked` | operator action が必要な状態 | Engine / operator |
+
+Kanban lane は visible state であり、domain object は task status、current run、phase、terminal outcome を保持する。
+
+## Phase と責務
+
+| Phase | 目的 | 主な入力 | 主な出力 |
+|---|---|---|---|
+| `implementation` | 変更を作る | task、skill、repo slot | work branch、agent artifact |
+| `review` | 実装結果を確認する | source descriptor、review skill | review disposition、evidence |
+| `parent_review` | child 結果を統合判断する | parent scope、child outputs | parent evidence |
+| `verification` | deterministic gate を通す | workspace、verification command | pass / failed evidence |
+| `remediation` | deterministic repair を試す | failed verification context | formatted / repaired workspace |
+| `merge` | target ref へ統合する | source ref、target ref、merge policy | merge result、kanban update |
+
+## Data ownership
+
+| Data | 所有者 | 使い道 |
+|---|---|---|
+| kanban task / lane / comment | Kanban adapter | 利用者に見える queue と status |
+| runtime task / run state | A2O Engine | scheduler と phase transition の判断 |
+| project package | 利用者 / product team | repo slots、skills、commands、verification の宣言 |
+| agent workspace / artifact | a2o-agent | product 環境での実行結果とログ |
+| Git branch / merge result | Git repository | 最終成果物と統合結果 |
+| evidence / blocked diagnosis | A2O Engine | failed / completed run の調査 |
+
 ## 設計資料一覧
 
 ### 0. 利用者導線
@@ -134,3 +170,15 @@ A2O 0.5.5 の supported public surface と validation boundary を扱う。
 - [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md)
 
 kanban command contract と adapter boundary を扱う。
+
+## 知りたいことから探す
+
+| 知りたいこと | 読む文書 |
+|---|---|
+| task / run / phase の状態遷移 | [30-core-domain-model.md](30-core-domain-model.md) |
+| workspace と branch の作り方 | [40-workspace-and-repo-slot-model.md](40-workspace-and-repo-slot-model.md) |
+| project package から何を読めるか | [50-project-surface.md](50-project-surface.md) |
+| project script の contract | [55-project-script-contract.md](55-project-script-contract.md) |
+| agent job の受け渡し | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
+| blocked 時の evidence | [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md) |
+| kanban adapter の責務境界 | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
