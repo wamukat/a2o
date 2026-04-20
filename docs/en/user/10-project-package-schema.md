@@ -69,7 +69,7 @@ runtime:
 
 `kanban.selection.status` selects runnable tasks. The default is `To do`.
 
-Project-specific human labels can be declared in `kanban.labels`. A2O-owned trigger and internal coordination labels should not be user-authored unless a future public option requires it.
+Project-specific human labels can be declared in `kanban.labels`. A2O-owned trigger and internal coordination labels are not user-authored.
 
 For multi-repo parent tasks, add every affected repo label to the kanban task. Do not create aggregate labels that mean "all repos" or "both repos"; aggregate labels do not scale beyond two repositories and do not map directly to repo slots.
 
