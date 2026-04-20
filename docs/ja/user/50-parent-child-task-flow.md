@@ -48,10 +48,10 @@ runtime:
 親タスクの本文:
 
 ```text
-Coordinate a cross-repo catalog contract change.
-The catalog-service child should expose an inactive field in the summary.
-The storefront child should render that field in the summary output.
-Verify both repositories before parent completion.
+複数リポジトリにまたがるカタログ契約変更をまとめる。
+catalog-service 側の子タスクでは、summary に inactive フィールドを公開する。
+storefront 側の子タスクでは、そのフィールドを summary 出力に表示する。
+親タスクの完了前に両方のリポジトリを検証する。
 ```
 
 リポジトリごとに子タスクを作成する。
