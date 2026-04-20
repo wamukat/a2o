@@ -58,6 +58,7 @@ module A3
         "host" => Definition.new(handler: :handle_host, session_kind: :host_distribution),
         "agent" => Definition.new(handler: :handle_agent, session_kind: :agent_distribution),
         "agent-server" => Definition.new(handler: :handle_agent_server, session_kind: :agent_control),
+        "agent-artifact-read" => Definition.new(handler: :handle_agent_artifact_read, session_kind: :agent_control),
         "agent-artifact-cleanup" => Definition.new(handler: :handle_agent_artifact_cleanup, session_kind: :agent_control),
         "run-verification" => Definition.new(handler: :handle_run_verification, needs_worker_gateway: true, session_kind: :runtime),
         "run-worker-phase" => Definition.new(handler: :handle_run_worker_phase, needs_worker_gateway: true, session_kind: :runtime),

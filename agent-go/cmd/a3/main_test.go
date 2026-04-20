@@ -1106,6 +1106,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime doctor",
 		"a2o runtime describe-task TASK_REF",
 		"a2o runtime watch-summary",
+		"a2o runtime show-artifact ARTIFACT_ID",
 		"a2o runtime run-once [--max-steps N] [--agent-attempts N]",
 		"a2o runtime loop [--interval DURATION] [--max-cycles N]",
 		"a2o agent install [--target auto] [--output PATH] [--build]",
@@ -3143,6 +3144,8 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 		"task A2O#16 kind=single status=blocked current_run=run-16",
 		"run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked",
 		"evidence workspace=runtime_workspace source=detached_commit:abc",
+		"agent_artifact role=combined-log id=worker-run-16-implementation-combined-log retention=diagnostic media_type=text/plain byte_size=42",
+		"agent_artifact_read=a2o runtime show-artifact worker-run-16-implementation-combined-log",
 		"--- kanban_task ---",
 		"\"task_ref\":\"A2O#16\"",
 		"comment_count=1",
@@ -3176,6 +3179,45 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("describe-task missing call %q in:\n%s", want, joined)
 		}
+	}
+}
+
+func TestRuntimeShowArtifactReadsContainerArtifact(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "show-artifact", "worker-run-16-implementation-combined-log"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "agent raw log line") {
+		t.Fatalf("show-artifact should print artifact content, got:\n%s", stdout.String())
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	want := "docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 agent-artifact-read --storage-dir /var/lib/a3/test-runtime worker-run-16-implementation-combined-log"
+	if !strings.Contains(joined, want) {
+		t.Fatalf("show-artifact missing call %q in:\n%s", want, joined)
 	}
 }
 
@@ -4507,7 +4549,9 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	case strings.Contains(joined, " ruby -rjson -e "):
 		return []byte("run-16\n"), nil
 	case strings.Contains(joined, "show-run"):
-		return []byte("run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked\nevidence workspace=runtime_workspace source=detached_commit:abc\nlatest_blocked phase=implementation summary=executor failed\nblocked_error_category=executor_failed\n"), nil
+		return []byte("run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked\nevidence workspace=runtime_workspace source=detached_commit:abc\nagent_artifact role=combined-log id=worker-run-16-implementation-combined-log retention=diagnostic media_type=text/plain byte_size=42\nagent_artifact_read=a2o runtime show-artifact worker-run-16-implementation-combined-log\nlatest_blocked phase=implementation summary=executor failed\nblocked_error_category=executor_failed\n"), nil
+	case strings.Contains(joined, "agent-artifact-read"):
+		return []byte("agent raw log line\n"), nil
 	case strings.Contains(joined, " a3 watch-summary "):
 		return []byte("Scheduler: running\nTask Tree\nNext\nRunning\n"), nil
 	case strings.Contains(joined, " task-get "):

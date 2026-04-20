@@ -260,6 +260,13 @@ a2o runtime describe-task <task-ref>
 ```
 
 `runtime watch-summary` is the multi-task overview. Use `runtime describe-task <task-ref>` for one task's run, evidence, comments, and log hints.
+When a task has agent execution artifacts, `runtime describe-task` prints `agent_artifact` lines and an `agent_artifact_read` command. Use that command to read the captured executor stdout/stderr or worker result:
+
+```sh
+a2o runtime show-artifact <artifact-id>
+```
+
+A2O does not call the Generative AI provider directly. The project executor command owns provider-specific raw transcripts. To inspect them through A2O, configure the executor or AI CLI to write the transcript to stdout/stderr or the worker result so A2O captures it as an agent execution artifact.
 
 ## Troubleshooting
 

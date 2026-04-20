@@ -7,9 +7,9 @@ module A3
     class OperatorInspectionReadModel
       class RunView
         class ExecutionSnapshot
-          attr_reader :phase, :summary, :verification_summary, :failing_command, :observed_state, :diagnostics, :worker_response_bundle, :merge_recovery, :runtime_snapshot, :review_disposition
+          attr_reader :phase, :summary, :verification_summary, :failing_command, :observed_state, :diagnostics, :worker_response_bundle, :merge_recovery, :runtime_snapshot, :review_disposition, :agent_artifacts
 
-          def initialize(phase:, summary:, verification_summary:, failing_command:, observed_state:, diagnostics:, worker_response_bundle:, runtime_snapshot:, review_disposition:, merge_recovery: nil)
+          def initialize(phase:, summary:, verification_summary:, failing_command:, observed_state:, diagnostics:, worker_response_bundle:, runtime_snapshot:, review_disposition:, agent_artifacts: [], merge_recovery: nil)
             @phase = phase.to_sym
             @summary = summary
             @verification_summary = verification_summary
@@ -20,6 +20,7 @@ module A3
             @merge_recovery = merge_recovery
             @runtime_snapshot = runtime_snapshot
             @review_disposition = review_disposition
+            @agent_artifacts = Array(agent_artifacts).freeze
             freeze
           end
 
@@ -43,8 +44,16 @@ module A3
               worker_response_bundle: worker_response_bundle,
               merge_recovery: merge_recovery,
               review_disposition: phase_record.execution_record.review_disposition,
+              agent_artifacts: agent_artifacts_from_diagnostics(diagnostics),
               runtime_snapshot: runtime_snapshot
             )
+          end
+
+          def self.agent_artifacts_from_diagnostics(diagnostics)
+            result = diagnostics["agent_job_result"]
+            return [] unless result.is_a?(Hash)
+
+            Array(result["log_uploads"]) + Array(result["artifact_uploads"])
           end
 
           def self.canonical_phase(task_kind:, phase:)

@@ -83,6 +83,12 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
+	case "show-artifact":
+		if err := runRuntimeShowArtifact(args[1:], runner, stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
 	case "run-once":
 		if err := runRuntimeRunOnce(args[1:], runner, stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)
@@ -757,6 +763,42 @@ func runRuntimeWatchSummary(args []string, runner commandRunner, stdout io.Write
 			return err
 		}
 		output, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "watch_summary", runtimeWatchSummaryArgs(plan)...)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(output) == "" {
+			return nil
+		}
+		fmt.Fprintln(stdout, output)
+		return nil
+	})
+}
+
+func runRuntimeShowArtifact(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a2o runtime show-artifact", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 1 {
+		return fmt.Errorf("usage: a2o runtime show-artifact ARTIFACT_ID")
+	}
+	artifactID := strings.TrimSpace(flags.Arg(0))
+	if artifactID == "" {
+		return fmt.Errorf("artifact id is required")
+	}
+
+	config, _, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	return withComposeEnv(effectiveConfig, func() error {
+		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
+		if err != nil {
+			return err
+		}
+		output, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "agent_artifact", "a3", "agent-artifact-read", "--storage-dir", plan.StorageDir, artifactID)
 		if err != nil {
 			return err
 		}

@@ -279,6 +279,13 @@ a2o runtime describe-task <task-ref>
 ```
 
 `runtime watch-summary` は board 上の複数 task、scheduler state、running phase をまとめて見るための overview である。個別 task の原因調査には `runtime describe-task <task-ref>` を使う。
+task に agent execution artifact がある場合、`runtime describe-task` は `agent_artifact` と `agent_artifact_read` を表示する。executor stdout/stderr や worker result を読むには、表示された artifact ID を使う。
+
+```sh
+a2o runtime show-artifact <artifact-id>
+```
+
+A2O は Generative AI provider を直接呼び出さない。provider 固有の raw transcript は project executor command の責務である。A2O 経由で確認したい場合は、executor または AI CLI が transcript を stdout/stderr または worker result に出し、A2O が agent execution artifact として収集できるようにする。
 
 標準操作は次の流れである。
 

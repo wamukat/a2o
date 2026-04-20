@@ -4,6 +4,34 @@ require "digest"
 require "tmpdir"
 
 RSpec.describe A3::CLI do
+  it "reads one agent artifact from the configured storage dir" do
+    Dir.mktmpdir do |dir|
+      store = A3::Infra::FileAgentArtifactStore.new(File.join(dir, "agent_artifacts"))
+      content = "raw ai executor log\nsecond line"
+      upload = A3::Domain::AgentArtifactUpload.new(
+        artifact_id: "worker-log",
+        role: "combined-log",
+        digest: "sha256:#{Digest::SHA256.hexdigest(content)}",
+        byte_size: content.bytesize,
+        retention_class: :diagnostic,
+        media_type: "text/plain"
+      )
+      store.put(upload, content)
+
+      out = StringIO.new
+      described_class.start(
+        [
+          "agent-artifact-read",
+          "--storage-dir", dir,
+          "worker-log"
+        ],
+        out: out
+      )
+
+      expect(out.string).to eq("raw ai executor log\nsecond line\n")
+    end
+  end
+
   it "cleans expired agent artifacts from the configured storage dir" do
     Dir.mktmpdir do |dir|
       store = A3::Infra::FileAgentArtifactStore.new(File.join(dir, "agent_artifacts"))

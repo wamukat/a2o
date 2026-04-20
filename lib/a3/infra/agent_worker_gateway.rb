@@ -72,7 +72,7 @@ module A3
           expected_run_ref: run.ref,
           expected_phase: run.phase
         )
-        return execution if execution
+        return with_agent_job_result(execution, completed.result) if execution
         return agent_result_execution(completed.result) unless completed.result.succeeded?
 
         @worker_protocol.missing_result
@@ -135,7 +135,7 @@ module A3
           expected_phase: run.phase,
           canonical_changed_files: canonical_changed_files
         )
-        return execution if execution
+        return with_agent_job_result(execution, completed.result) if execution
 
         @worker_protocol.missing_result
       end
@@ -359,6 +359,21 @@ module A3
           response_bundle: {
             "agent_job_result" => result.result_form
           }
+        )
+      end
+
+      def with_agent_job_result(execution, result)
+        diagnostics = execution.diagnostics.merge(
+          "agent_job_result" => result.result_form,
+          "control_plane_url" => control_plane_url
+        )
+        A3::Application::ExecutionResult.new(
+          success: execution.success,
+          summary: execution.summary,
+          failing_command: execution.failing_command,
+          observed_state: execution.observed_state,
+          diagnostics: diagnostics,
+          response_bundle: execution.response_bundle
         )
       end
 

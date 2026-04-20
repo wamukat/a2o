@@ -82,11 +82,28 @@ module A3
           result << "failing_command=#{FormattingHelpers.diagnostic_value(execution.failing_command)}" if execution.failing_command
           result << "observed_state=#{execution.observed_state}" if execution.observed_state
           result << "worker_response_bundle=#{FormattingHelpers.diagnostic_value(execution.worker_response_bundle)}" if execution.worker_response_bundle
+          append_agent_artifact_lines(result, execution.agent_artifacts)
           append_merge_recovery_lines(result, execution.merge_recovery)
-          execution.diagnostics.reject { |key, _| key == "merge_recovery" }.sort.each do |key, value|
+          execution.diagnostics.reject { |key, _| %w[merge_recovery agent_job_result].include?(key) }.sort.each do |key, value|
             result << "execution_diagnostic.#{key}=#{FormattingHelpers.diagnostic_value(value)}"
           end
           append_runtime_lines(result, execution.runtime_snapshot)
+        end
+
+        def append_agent_artifact_lines(result, artifacts)
+          Array(artifacts).each do |artifact|
+            next unless artifact.is_a?(Hash)
+
+            artifact_id = artifact["artifact_id"]
+            next if artifact_id.to_s.empty?
+
+            role = artifact["role"] || "artifact"
+            retention = artifact["retention_class"] || "unknown"
+            media_type = artifact["media_type"] || "application/octet-stream"
+            byte_size = artifact["byte_size"] || "unknown"
+            result << "agent_artifact role=#{role} id=#{artifact_id} retention=#{retention} media_type=#{media_type} byte_size=#{byte_size}"
+            result << "agent_artifact_read=a2o runtime show-artifact #{artifact_id}"
+          end
         end
 
         def append_merge_recovery_lines(result, merge_recovery)

@@ -804,6 +804,14 @@ module A3
       out.puts("missing_blob_artifact_ids=#{result.missing_blob_artifact_ids.join(',')}") unless result.missing_blob_artifact_ids.empty?
     end
 
+    def handle_agent_artifact_read(argv, out:)
+      options = parse_agent_artifact_read_options(argv)
+      artifact_store = A3::Infra::FileAgentArtifactStore.new(options.fetch(:artifact_store_dir))
+      content = artifact_store.read(options.fetch(:artifact_id))
+      out.write(content)
+      out.write("\n") unless content.end_with?("\n")
+    end
+
     def parse_agent_package_options(argv)
       options = {
         package_dir: ENV.fetch("A2O_AGENT_PACKAGE_DIR", ENV.fetch("A3_AGENT_PACKAGE_DIR", A3::Infra::AgentPackageStore::DEFAULT_PACKAGE_DIR))
@@ -1257,6 +1265,23 @@ module A3
       parser.on("--evidence-max-mb MB") { |value| options.fetch(:max_bytes_by_class)[:evidence] = megabytes(value) }
       parser.parse(argv)
 
+      options[:artifact_store_dir] ||= File.join(options.fetch(:storage_dir), "agent_artifacts")
+      options
+    end
+
+    def parse_agent_artifact_read_options(argv)
+      options = {
+        storage_dir: default_storage_dir,
+        artifact_store_dir: nil
+      }
+
+      parser = OptionParser.new
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--artifact-store-dir DIR") { |value| options[:artifact_store_dir] = File.expand_path(value) }
+      remaining = parser.parse(argv)
+      raise ArgumentError, "usage: a3 agent-artifact-read [--storage-dir DIR] ARTIFACT_ID" unless remaining.size == 1
+
+      options[:artifact_id] = remaining.fetch(0)
       options[:artifact_store_dir] ||= File.join(options.fetch(:storage_dir), "agent_artifacts")
       options
     end

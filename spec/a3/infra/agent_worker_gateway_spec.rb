@@ -618,6 +618,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       success: true,
       summary: "worker completed via http"
     )
+    expect(execution.diagnostics.fetch("agent_job_result").fetch("log_uploads").fetch(0).fetch("role")).to eq("combined-log")
     completed = job_store.fetch("worker-run-1-implementation-integration-1")
     expect(completed).to have_attributes(state: :completed)
     upload = completed.result.log_uploads.find { |entry| entry.role == "combined-log" }
