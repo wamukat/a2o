@@ -2,6 +2,8 @@
 
 A2O 0.5.5 で現在利用できる公開機能と検証範囲を示す。
 
+この文書は、リリース時点で「利用者に案内してよい機能」と「検証済みとして扱える範囲」を確認するための一覧である。導入手順を知りたい場合は [10-quickstart.md](10-quickstart.md)、設定項目を知りたい場合は [90-project-package-schema.md](90-project-package-schema.md) を読む。
+
 ## 利用可能なコマンドと機能
 
 - ホスト用ランチャーの導入: `a2o host install`

@@ -2,6 +2,8 @@
 
 この文書は `project.yaml` の詳細リファレンスである。導入時の考え方は先に [20-project-package.md](20-project-package.md) を読む。
 
+この文書は、設定値を追加・変更するときに参照する。先に [20-project-package.md](20-project-package.md) で「なぜその設定が必要か」を理解し、この文書では実際の YAML 形、既定の責務境界、使えるプレースホルダーを確認する。
+
 ## 方針
 
 プロジェクトパッケージ設定の正規ファイル名は `project.yaml` とする。
