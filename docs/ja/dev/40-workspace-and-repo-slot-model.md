@@ -77,8 +77,8 @@ A2O は利用者に見えるブランチ参照を `refs/heads/a2o/...` 配下へ
 
 内部マージ先:
 
-- child to parent integration ref
-- parent to live target
-- single task to live target
+- 子タスクから親タスクへの統合参照
+- 親タスクから本流ターゲット
+- 単独タスクから本流ターゲット
 
 マージ方針はプロジェクトパッケージの一部である。パッケージが別方針を明示しない限り、既定の方針は fast-forward only である。

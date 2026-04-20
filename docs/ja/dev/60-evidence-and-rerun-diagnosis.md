@@ -17,16 +17,16 @@
 
 証跡レコードは次を含む。
 
-- task ref
-- run ref
-- phase
-- workspace kind
-- source descriptor
-- artifact owner
-- snapshot version
-- command summary
-- output artifact references
-- terminal outcome
+- タスク参照
+- 実行参照
+- フェーズ
+- ワークスペース種別
+- ソース記述子
+- 成果物の所有者
+- スナップショットバージョン
+- コマンド要約
+- 出力成果物の参照
+- 終了結果
 
 証跡はランタイムが所有する。利用者に生成済みワークスペースメタデータの直接確認を要求してはならない。
 
