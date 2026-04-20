@@ -242,6 +242,16 @@ func TestProjectBootstrapRejectsConflictingKanbanPorts(t *testing.T) {
 	}
 }
 
+func TestKanbanPublicURLPrefersKanbalonePortEnv(t *testing.T) {
+	t.Setenv("A2O_BUNDLE_KANBALONE_PORT", "3498")
+	t.Setenv("A2O_BUNDLE_SOLOBOARD_PORT", "3501")
+
+	got := kanbanPublicURL(runtimeInstanceConfig{SoloBoardPort: "3479"})
+	if got != "http://localhost:3498/" {
+		t.Fatalf("kanbanPublicURL=%q", got)
+	}
+}
+
 func TestProjectBootstrapDefaultsToProjectPackageDirectory(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "project-package")

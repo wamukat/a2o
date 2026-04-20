@@ -38,14 +38,10 @@ exported_agent="${work_dir}/a3-agent"
 source_root="${work_dir}/source/catalog-service"
 workspace_root="${work_dir}/workspaces"
 
-KANBALONE_IMAGE="${KANBALONE_IMAGE:-ghcr.io/wamukat/kanbalone:v0.9.16}" \
-SOLOBOARD_IMAGE="${SOLOBOARD_IMAGE:-ghcr.io/wamukat/kanbalone:v0.9.16}" \
 A2O_BUNDLE_KANBALONE_PORT="${A2O_BUNDLE_KANBALONE_PORT:-${A2O_BUNDLE_SOLOBOARD_PORT:-3470}}" \
 A2O_BUNDLE_SOLOBOARD_PORT="${A2O_BUNDLE_SOLOBOARD_PORT:-${A2O_BUNDLE_KANBALONE_PORT:-3470}}" \
 docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" build "${RUNTIME_SERVICE}"
 
-KANBALONE_IMAGE="${KANBALONE_IMAGE:-ghcr.io/wamukat/kanbalone:v0.9.16}" \
-SOLOBOARD_IMAGE="${SOLOBOARD_IMAGE:-ghcr.io/wamukat/kanbalone:v0.9.16}" \
 A2O_BUNDLE_KANBALONE_PORT="${A2O_BUNDLE_KANBALONE_PORT:-${A2O_BUNDLE_SOLOBOARD_PORT:-3470}}" \
 A2O_BUNDLE_SOLOBOARD_PORT="${A2O_BUNDLE_SOLOBOARD_PORT:-${A2O_BUNDLE_KANBALONE_PORT:-3470}}" \
 docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" up -d --no-deps --force-recreate "${RUNTIME_SERVICE}"

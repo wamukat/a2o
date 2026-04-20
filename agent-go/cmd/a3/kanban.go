@@ -265,5 +265,12 @@ func runKanbanURL(args []string, stdout io.Writer, stderr io.Writer) error {
 }
 
 func kanbanPublicURL(config runtimeInstanceConfig) string {
-	return "http://localhost:" + envDefaultValue(config.SoloBoardPort, "3470") + "/"
+	return "http://localhost:" + publicKanbanPort(config) + "/"
+}
+
+func publicKanbanPort(config runtimeInstanceConfig) string {
+	if value := envDefaultCompat("A2O_BUNDLE_KANBALONE_PORT", "A2O_BUNDLE_SOLOBOARD_PORT", ""); strings.TrimSpace(value) != "" {
+		return value
+	}
+	return envDefaultCompat("A2O_BUNDLE_SOLOBOARD_PORT", "A3_BUNDLE_SOLOBOARD_PORT", envDefaultValue(config.SoloBoardPort, "3470"))
 }
