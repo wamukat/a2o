@@ -1908,6 +1908,59 @@ func TestProjectLintRejectsLegacyManifest(t *testing.T) {
 	}
 }
 
+func TestProjectLintRejectsUnsupportedAgentWorkspaceCleanupPolicy(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectYaml := strings.Join([]string{
+		"schema_version: 1",
+		"package:",
+		"  name: sample",
+		"kanban:",
+		"  project: Sample",
+		"repos:",
+		"  app:",
+		"    path: ..",
+		"agent:",
+		"  workspace_cleanup_policy: keep",
+		"  required_bins: [\"sh\"]",
+		"runtime:",
+		"  phases:",
+		"    implementation:",
+		"      skill: skills/implementation/base.md",
+		"      executor:",
+		"        command: [\"sh\", \"-c\", \"echo ok\"]",
+		"    review:",
+		"      skill: skills/review/default.md",
+		"    merge:",
+		"      policy: ff_only",
+		"      target_ref: refs/heads/main",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "lint", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project lint should fail for unsupported workspace cleanup policy, stdout=%s", stdout.String())
+	}
+	for _, want := range []string{
+		"lint_check name=project_package status=blocked",
+		"invalid agent.workspace_cleanup_policy",
+		"workspace cleanup policy is managed by A2O runtime and is not supported in project.yaml",
+		"lint_status=blocked",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("project lint output missing %q in:\n%s", want, stdout.String())
+		}
+	}
+}
+
 func TestDoctorAgentInstallFailureShowsExactOutputPath(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

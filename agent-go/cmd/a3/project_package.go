@@ -61,6 +61,7 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	}
 	runtimePayload, _ := rawPayload["runtime"].(map[string]any)
 	kanbanPayload, _ := rawPayload["kanban"].(map[string]any)
+	agentPayload, _ := rawPayload["agent"].(map[string]any)
 	config.SchemaVersion = scalarString(payload.SchemaVersion)
 	config.PackageName = payload.Package.Name
 	config.KanbanProject = payload.Kanban.Project
@@ -90,6 +91,9 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	}
 	if _, ok := runtimePayload["merge"]; ok {
 		return config, fmt.Errorf("project package config %s has invalid runtime.merge: runtime.merge is no longer supported; use runtime.phases.merge", projectFile)
+	}
+	if _, ok := agentPayload["workspace_cleanup_policy"]; ok {
+		return config, fmt.Errorf("project package config %s has invalid agent.workspace_cleanup_policy: workspace cleanup policy is managed by A2O runtime and is not supported in project.yaml", projectFile)
 	}
 	if err := rejectMergeTarget(runtimePayload); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.phases.merge: %w", projectFile, err)
