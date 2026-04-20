@@ -50,7 +50,7 @@ func defaultRuntimeImage() string {
 	if value := explicitRuntimeImageReference(); value != "" {
 		return value
 	}
-	return packagedRuntimeImageReference()
+	return packagedRuntimeImageReferenceFunc()
 }
 
 func explicitRuntimeImageReference() string {
@@ -75,8 +75,10 @@ func packagedRuntimeImageReference() string {
 	return ""
 }
 
+var packagedRuntimeImageReferenceFunc = packagedRuntimeImageReference
+
 func runtimeImageReference(config *runtimeInstanceConfig) string {
-	return selectRuntimeImageReference(config, explicitRuntimeImageReference(), packagedRuntimeImageReference())
+	return selectRuntimeImageReference(config, explicitRuntimeImageReference(), packagedRuntimeImageReferenceFunc())
 }
 
 func selectRuntimeImageReference(config *runtimeInstanceConfig, explicitRef string, packagedRef string) string {

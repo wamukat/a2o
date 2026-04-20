@@ -4039,10 +4039,48 @@ func TestUpgradeCheckReportsCheckOnlyPlan(t *testing.T) {
 	oldVersion := version
 	version = "0.5.test"
 	defer func() { version = oldVersion }()
+	oldPackagedRuntimeImageReferenceFunc := packagedRuntimeImageReferenceFunc
+	packagedRuntimeImageReferenceFunc = func() string {
+		return "ghcr.io/wamukat/a2o-engine@sha256:packaged"
+	}
+	defer func() { packagedRuntimeImageReferenceFunc = oldPackagedRuntimeImageReferenceFunc }()
+	dockerConfigDir := t.TempDir()
+	t.Setenv("DOCKER_CONFIG", dockerConfigDir)
 
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
+	repoDir := filepath.Join(tempDir, "repo")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(repoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectYaml := strings.Join([]string{
+		"schema_version: 1",
+		"package:",
+		"  name: upgrade-sample",
+		"kanban:",
+		"  project: UpgradeSample",
+		"repos:",
+		"  app:",
+		"    path: ../repo",
+		"agent:",
+		"  required_bins: [\"sh\"]",
+		"runtime:",
+		"  phases:",
+		"    implementation:",
+		"      skill: skills/implementation/base.md",
+		"      executor:",
+		"        command: [\"sh\", \"-c\", \"echo ok\"]",
+		"    review:",
+		"      skill: skills/review/default.md",
+		"    merge:",
+		"      policy: ff_only",
+		"      target_ref: refs/heads/main",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
@@ -4084,9 +4122,16 @@ func TestUpgradeCheckReportsCheckOnlyPlan(t *testing.T) {
 		"runtime_package=" + packageDir,
 		"compose_project=a2o-upgrade",
 		"kanban_url=http://localhost:3480/",
+		"runtime_image_instance_ref=ghcr.io/wamukat/a2o-engine@sha256:instance",
+		"runtime_image_packaged_ref=ghcr.io/wamukat/a2o-engine@sha256:packaged",
+		"runtime_image_package_status=stale action=run a2o project bootstrap, then a2o runtime up --pull after confirming the desired pin",
 		"runtime_image_pinned_ref=ghcr.io/wamukat/a2o-engine@sha256:instance",
 		"runtime_image_pinned_digest=ghcr.io/wamukat/a2o-engine@sha256:instance",
 		"upgrade_agent status=installed path=" + agentPath + " action=none",
+		"upgrade_doctor_begin",
+		"doctor_check name=project_package status=ok",
+		"doctor_status=ok",
+		"upgrade_doctor_status=ok exit_code=0",
 		"upgrade_next 1 command=a2o runtime image-digest",
 		"upgrade_next 2 command=a2o runtime up --pull",
 		"upgrade_next 3 command=a2o agent install --target auto --output " + shellQuote(agentPath),
