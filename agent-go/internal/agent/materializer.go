@@ -72,6 +72,11 @@ type mergeRecoveryPlan struct {
 	changedFiles []string
 }
 
+type gitWorktreeEntry struct {
+	path   string
+	branch string
+}
+
 func (e mergeConflictError) Error() string {
 	return e.err.Error()
 }
@@ -1141,6 +1146,9 @@ func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot
 	if err != nil {
 		return nil, err
 	}
+	if err := m.removeStaleWorkspaceWorktrees(sourceRoot, slotPath, branchName); err != nil {
+		return nil, err
+	}
 	bootstrapHead, bootstrappedRef, bootstrappedBaseRef, err := ensureWorkspaceSlotRef(sourceRoot, slot.Ref, slot.BootstrapRef, slot.BootstrapBaseRef)
 	if err != nil {
 		return nil, err
@@ -1195,6 +1203,72 @@ func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot
 		descriptor["bootstrapped_base_ref"] = true
 	}
 	return descriptor, nil
+}
+
+func (m WorkspaceMaterializer) removeStaleWorkspaceWorktrees(sourceRoot, slotPath, branchName string) error {
+	if err := runGit(sourceRoot, "worktree", "prune"); err != nil {
+		return err
+	}
+	entries, err := gitWorktreeEntries(sourceRoot)
+	if err != nil {
+		return err
+	}
+	absSlotPath, err := filepath.Abs(slotPath)
+	if err != nil {
+		return err
+	}
+	absWorkspaceRoot, err := filepath.Abs(m.WorkspaceRoot)
+	if err != nil {
+		return err
+	}
+	branchRef := "refs/heads/" + branchName
+	var cleanupErr error
+	for _, entry := range entries {
+		absEntryPath, err := filepath.Abs(entry.path)
+		if err != nil {
+			cleanupErr = errors.Join(cleanupErr, err)
+			continue
+		}
+		reusesSlotPath := filepath.Clean(absEntryPath) == filepath.Clean(absSlotPath)
+		reusesBranchInA2OWorkspace := entry.branch == branchRef && pathInside(absWorkspaceRoot, absEntryPath)
+		if !reusesSlotPath && !reusesBranchInA2OWorkspace {
+			continue
+		}
+		cleanupErr = errors.Join(cleanupErr, runGit(sourceRoot, "worktree", "remove", "--force", absEntryPath))
+	}
+	if cleanupErr != nil {
+		return cleanupErr
+	}
+	return runGit(sourceRoot, "worktree", "prune")
+}
+
+func gitWorktreeEntries(sourceRoot string) ([]gitWorktreeEntry, error) {
+	out, err := gitOutput(sourceRoot, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil, err
+	}
+	entries := []gitWorktreeEntry{}
+	current := gitWorktreeEntry{}
+	appendCurrent := func() {
+		if current.path == "" {
+			return
+		}
+		entries = append(entries, current)
+		current = gitWorktreeEntry{}
+	}
+	for _, line := range strings.Split(out, "\n") {
+		switch {
+		case line == "":
+			appendCurrent()
+		case strings.HasPrefix(line, "worktree "):
+			appendCurrent()
+			current.path = strings.TrimSpace(strings.TrimPrefix(line, "worktree "))
+		case strings.HasPrefix(line, "branch "):
+			current.branch = strings.TrimSpace(strings.TrimPrefix(line, "branch "))
+		}
+	}
+	appendCurrent()
+	return entries, nil
 }
 
 func ensureWorkspaceSlotRef(root, targetRef, bootstrapRef, bootstrapBaseRef string) (string, bool, bool, error) {

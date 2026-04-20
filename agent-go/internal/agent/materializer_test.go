@@ -60,6 +60,41 @@ func TestWorkspaceMaterializerPreparesAndCleansWorktreeSlots(t *testing.T) {
 	}
 }
 
+func TestWorkspaceMaterializerRepairsStaleWorktreeBeforePreparingSlot(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"sample-catalog-service": sourceRoot,
+		},
+	}
+	request := testWorkspaceRequest("sample-catalog-service")
+
+	stale, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	staleSlotPath := filepath.Join(stale.Root, "repo_alpha")
+	if out := git(t, sourceRoot, "worktree", "list", "--porcelain"); !contains(out, staleSlotPath) {
+		t.Fatalf("stale worktree was not registered: %s", out)
+	}
+
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prepared.Root != stale.Root {
+		t.Fatalf("unexpected workspace root: got=%s want=%s", prepared.Root, stale.Root)
+	}
+	if out := git(t, sourceRoot, "worktree", "list", "--porcelain"); strings.Count(out, staleSlotPath) != 1 {
+		t.Fatalf("expected one repaired worktree registration for %s, got:\n%s", staleSlotPath, out)
+	}
+	if err := materializer.Cleanup(prepared); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestWorkspaceMaterializerUsesParentChildTopologyRoot(t *testing.T) {
 	tmp := t.TempDir()
 	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
