@@ -459,8 +459,3 @@ digest pinning が必要な場面:
 - 実 product package の共有運用
 - CI / regression validation
 - 利用者へ再現手順を案内する場合
-
-## Known Gaps
-
-- `project.yaml` のさらに短い guided bootstrap は未実装である。導入時の候補生成は backlog の feature として扱う。
-- runtime state には内部互換名が残る場合がある。通常の manual では編集対象にしない。

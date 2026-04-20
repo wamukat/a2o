@@ -43,16 +43,6 @@ A2O 0.5.5 は `docker/a3-runtime/Dockerfile` に `python3` を残すが、`pytho
 
 そのため、subprocess CLI が runtime default である間に runtime image から Python を削除すると、標準の `a2o kanban ...` runtime path が壊れる。
 
-Runtime-owned path は Python virtual environment を作成しない。`tools/kanban/cli.py` は `python3` で直接実行される。したがって、`python3-venv` は runtime requirement に含めない。
-
-Python runtime requirement は `SubprocessKanbanCommandClient` が production SoloBoard implementation であることに由来する。Python を runtime image から外すには、同じ command contract を満たす non-Python implementation が runtime default になっている必要がある。
-
-## Ruby Native vs Go Client（Ruby native と Go client）
-
-Ruby native adapter は自然な extension point である。理由は、engine が task selection、status projection、review disposition handling、evidence publication を Ruby で所有しているためである。Adapter を in-process に保つことで、JSON-over-stdout parsing、tempfile handoff、subprocess failure translation を hot path から取り除ける。別 binary boundary も増えない。
-
-Go は public host launcher と agent に適している。一方で Kanban access を Go へ移すと、Ruby engine は process boundary を越える必要が残るか、より多くの engine orchestration を Ruby から移す必要がある。
-
 ## Current Adapter Boundary（現在の adapter boundary）
 
 `A3::Infra::KanbanCommandClient` は operation-level boundary であり、task source、status publisher、activity publisher、follow-up child writer、snapshot reader が使う。Constructors は `command_argv` を受け取り、`SubprocessKanbanCommandClient` を作成する。そのため、runtime behavior と public CLI arguments は安定する。
