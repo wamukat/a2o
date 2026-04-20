@@ -1,10 +1,30 @@
-# A2O User Manual
+# Quickstart
 
-A2O starts from kanban tasks and manages workspace creation, agent execution, verification, merge, and evidence recording. Users prepare a project package and operate the runtime through public A2O commands.
+This document gives the shortest path from a first A2O install to having A2O process one kanban task. Read [00-overview.md](00-overview.md) first for the runtime model.
 
-## Getting Started
+The goal is to get one task moving before you refine the project package. By the end, the host `a2o` command, kanban board, `a2o-agent`, and runtime instance all point at the same project.
 
-### 1. Install The Host Launcher
+## Target State
+
+| Step | Result |
+|---|---|
+| Install the host launcher | The host can run `a2o` |
+| Create a project package | A2O can read the product repositories, skills, commands, and kanban board |
+| Bootstrap the runtime | `.work/a2o/runtime-instance.json` identifies the runtime instance |
+| Start kanban | A2O board lanes and internal labels exist |
+| Install the agent | `a2o-agent` can run jobs in the product environment |
+| Create a task | A2O can pick up the task and record results in kanban, Git, and evidence |
+
+## Prerequisites
+
+- Docker is available.
+- You have a product repository.
+- You can place an A2O project package at the repository root.
+- The environment that runs `a2o-agent` has the product toolchain and AI executor command.
+
+Replace the template `your-ai-worker` with a real executable available to the agent. If it remains unchanged, `a2o doctor` or runtime execution will stop.
+
+## 1. Install The Host Launcher
 
 ```sh
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share"
@@ -22,11 +42,11 @@ export PATH="$HOME/.local/bin:$PATH"
 
 `a2o host install` extracts the host launcher and shared runtime assets from the runtime image. Ruby is not required on the host.
 
-`docker run ... a2o --help` is runtime-container entrypoint help, not the full host launcher command list. Setup commands such as `a2o project template` are available from the installed host launcher.
+`docker run ... a2o --help` shows runtime-container entrypoint help, not the full host launcher command list. Use the installed `a2o` command after this point.
 
-### 2. Add A Project Package
+## 2. Create A Project Package
 
-Place `project-package/` or `a2o-project/` at the workspace root.
+Place `project-package/` at the workspace root. This quickstart treats that directory as the standard package path.
 
 ```text
 project-package/
@@ -37,7 +57,7 @@ project-package/
   task-templates/
 ```
 
-Start new packages from the template generator:
+Start a new package from the template generator.
 
 ```sh
 a2o project template \
@@ -49,200 +69,85 @@ a2o project template \
   --output ./project-package/project.yaml
 ```
 
-`--output` writes `project.yaml`. With `--with-skills`, A2O also writes starter phase skills under `skills/implementation/` and `skills/review/`. The kanban board name, repo labels, and human project labels are authored in `project.yaml`. A2O-owned lanes and internal labels are provisioned by `a2o kanban up`.
+The command writes `project.yaml` and starter skill files. Replace `your-ai-worker` with the actual executor command before running the runtime.
 
-`your-ai-worker` is a placeholder. Replace it with an executor binary that exists where `a2o-agent` runs. A2O writes this value into `agent.required_bins` and `runtime.phases.*.executor.command`; if it is not replaced, `a2o doctor` or runtime execution will stop with a missing command.
+For package design, read [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md). For the full schema, read [10-project-package-schema.md](10-project-package-schema.md).
 
-For package design decisions, see [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md).
-
-Before bootstrapping a package, run:
+## 3. Check The Package
 
 ```sh
 a2o project lint --package ./project-package
 ```
 
-`a2o project lint` checks `project.yaml`, unsupported split config files, production config references to test fixtures, user-facing A3/internal runtime leaks, and command files that are not referenced by package docs or config. Blocked findings should be fixed before runtime execution. Warning findings should be reviewed and either removed or documented.
+`project lint` checks `project.yaml`, command files, test fixture references, and internal names that leaked into user-facing locations. Fix `blocked` findings before runtime execution.
 
-If you maintain a focused test profile, keep it in a separate file and validate it explicitly:
+Only specify a separate config file when validating an explicit test profile.
 
 ```sh
 a2o project validate --package ./project-package --config project-test.yaml
-a2o runtime run-once --project-config project-test.yaml
 ```
 
-Fixture workers may be referenced from the explicit alternate config, but normal `project.yaml` must stay production-oriented.
+Keep normal `project.yaml` as the production configuration.
 
-### 3. Start With Four Commands
+## 4. Bootstrap The Runtime Instance
 
 ```sh
 a2o project bootstrap
-a2o kanban up
-a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
-a2o runtime run-once
 ```
 
-`a2o project bootstrap` writes `.work/a2o/runtime-instance.json`. Later `kanban`, `agent`, and `runtime` commands discover the same runtime instance.
+`project bootstrap` writes `.work/a2o/runtime-instance.json`. Later `kanban`, `agent`, and `runtime` commands discover that file and use the same runtime instance.
 
-Before `run-once`, create one runnable task on the board:
+Specify options only when you need different ports or a different Compose project name.
+
+```sh
+a2o project bootstrap --compose-project my-product --soloboard-port 3471 --agent-port 7394
+```
+
+## 5. Start Kanban
+
+```sh
+a2o kanban up
+a2o kanban url
+```
+
+`kanban up` starts the bundled kanban service and provisions the lanes and internal labels A2O needs. `kanban url` prints the board URL.
+
+The same Compose project reuses the existing board. If the board looks empty, check whether the Compose project or Docker volume changed. Runtime operations are covered in [20-runtime-distribution.md](20-runtime-distribution.md).
+
+## 6. Install The Agent
+
+```sh
+a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
+```
+
+`a2o-agent` runs executor commands, product toolchains, and Generative AI calls in the product environment. The default install path is `.work/a2o/agent/bin/a2o-agent`.
+
+Run the full diagnosis next.
+
+```sh
+a2o doctor
+```
+
+Fix any `status=blocked` item before continuing.
+
+## 7. Create One Task
 
 1. Open the board with `a2o kanban url`.
 2. Create a task from `project-package/task-templates/`.
 3. Put the task in `project.yaml`'s `kanban.selection.status`; the default is `To do`.
 4. Add a trigger label and, when needed, a repo label.
 
-Inspect task state and evidence with:
+`a2o kanban up` prepares lanes and labels; it does not create work tasks.
 
-```sh
-a2o runtime watch-summary
-a2o runtime describe-task <task-ref>
-```
+## 8. Run A2O
 
-## `project.yaml`
-
-`project.yaml` is the only public project package config file. A2O reads package metadata, kanban bootstrap data, repo slots, agent prerequisites, runtime phase commands, and merge defaults from it.
-
-Minimal single-repo shape:
-
-```yaml
-schema_version: 1
-package:
-  name: my-product
-kanban:
-  project: MyProduct
-  selection:
-    status: To do
-repos:
-  app:
-    path: ..
-    role: product
-    label: repo:app
-agent:
-  workspace_root: .work/a2o/agent/workspaces
-  required_bins:
-    - git
-    - node
-    - npm
-    - your-ai-worker
-runtime:
-  max_steps: 20
-  agent_attempts: 200
-  phases:
-    implementation:
-      skill: skills/implementation/base.md
-      executor:
-        command:
-          - your-ai-worker
-          - "--schema"
-          - "{{schema_path}}"
-          - "--result"
-          - "{{result_path}}"
-    review:
-      skill: skills/review/default.md
-      executor:
-        command:
-          - your-ai-worker
-          - "--schema"
-          - "{{schema_path}}"
-          - "--result"
-          - "{{result_path}}"
-    verification:
-      commands:
-        - app/project-package/commands/verify.sh
-    remediation:
-      commands:
-        - app/project-package/commands/format.sh
-    merge:
-      policy: ff_only
-      target_ref: refs/heads/main
-```
-
-Implementation and review executors receive a stdin-bundle worker request and write worker result JSON to `{{result_path}}`.
-
-To create a minimal worker during package setup:
-
-```sh
-a2o worker scaffold --language python --output ./project-package/commands/a2o-worker.py
-```
-
-To check a custom worker result outside runtime execution:
-
-```sh
-a2o worker validate-result --request request.json --result result.json
-```
-
-When the worker uses configured review scopes or repo-scope aliases, add repeated `--review-scope SCOPE` and `--repo-scope-alias FROM=TO`.
-
-Executor placeholders:
-
-- `{{schema_path}}`
-- `{{result_path}}`
-- `{{workspace_root}}`
-- `{{a2o_root_dir}}`
-- `{{root_dir}}`
-
-Verification and remediation placeholders:
-
-- `{{workspace_root}}`
-- `{{a2o_root_dir}}`
-- `{{root_dir}}`
-
-`agent.required_bins` lists commands that must exist where the agent runs, including language toolchains and AI/helper executors.
-
-## Generated Files
-
-New bootstrap writes runtime instance config to `.work/a2o/runtime-instance.json`. Agent install and runtime execution also place host agent binaries, launcher config, and agent workspaces under `.work/a2o/`.
-
-`.work/a2o/` is regenerable runtime output and normally should not be committed. Users manage the project package, product source, and optional Taskfile.
-
-Existing internal compatibility runtime instance config may be read, but new bootstrap writes `.work/a2o/runtime-instance.json`.
-
-## Kanban
-
-```sh
-a2o kanban up
-a2o kanban doctor
-a2o kanban url
-```
-
-`a2o kanban up` shows the compose project, SoloBoard data volume, reuse/create mode, and backup hint. The same compose project reuses the existing board. A different compose project creates a different Docker volume, so the board may look empty.
-
-A2O provisions required lanes and internal labels. Repo labels are authored in `repos.<slot>.label`. Human project labels are authored in `kanban.labels`.
-
-Use `a2o kanban up --fresh-board` when an empty board is required. If an existing volume is present, the command stops rather than reusing it.
-
-## Agent
-
-```sh
-a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
-a2o doctor
-```
-
-`a2o agent install` exports `a2o-agent` from the runtime image. The canonical path is `.work/a2o/agent/bin/a2o-agent`.
-
-`a2o doctor` checks project package config, executor config, required commands, repo cleanliness, agent install, kanban volume/service, runtime container, and runtime image digest.
-
-## Runtime
-
-Container lifecycle only:
-
-```sh
-a2o runtime up
-a2o runtime down
-```
-
-One cycle:
+For the first check, run one cycle.
 
 ```sh
 a2o runtime run-once
 ```
 
-Foreground loop:
-
-```sh
-a2o runtime loop --interval 60s
-```
-
-Resident scheduler:
+For resident scheduling, use:
 
 ```sh
 a2o runtime start --interval 60s
@@ -250,140 +155,43 @@ a2o runtime status
 a2o runtime stop
 ```
 
-Runtime diagnosis:
+`runtime start` begins task processing. If you only need container lifecycle, use `a2o runtime up` / `a2o runtime down`.
+
+## 9. Inspect The Result
 
 ```sh
-a2o runtime doctor
 a2o runtime watch-summary
 a2o runtime describe-task <task-ref>
 ```
 
-`runtime watch-summary` is the multi-task overview. Use `runtime describe-task <task-ref>` for one task's run, evidence, comments, and log hints.
-`watch-summary` uses ASCII symbols and ASCII guide lines so the layout stays stable across macOS, Windows terminals, WSL, and CI logs.
-When a task has agent execution artifacts, `runtime describe-task` prints `agent_artifact` lines and an `agent_artifact_read` command. Use that command to read the captured executor stdout/stderr or worker result:
+`watch-summary` shows task state, scheduler state, and active phases across the board. `describe-task` focuses on one task and shows run state, evidence, kanban comments, and log hints.
+
+When a task has agent artifacts, `describe-task` prints an `agent_artifact_read` command.
 
 ```sh
 a2o runtime show-artifact <artifact-id>
 ```
 
-A2O does not call the Generative AI provider directly. The project executor command owns provider-specific raw transcripts. To inspect them through A2O, configure the executor or AI CLI to write the transcript to stdout/stderr or the worker result so A2O captures it as an agent execution artifact.
+Board `Done` means A2O automated processing completed. SoloBoard `Resolved` / `done=true` is a separate final human confirmation state.
 
-## Troubleshooting
+## If Something Fails
 
-A2O CLI stderr and kanban comments include `error_category` and remediation guidance.
-
-| Category | What to fix |
-|---|---|
-| `configuration_error` | Fix `project.yaml`, executor config, package path, or schema. |
-| `workspace_dirty` | Commit, stash, or remove the listed dirty repo files. |
-| `executor_failed` | Check executor binary, credentials, required toolchain, and worker result JSON. |
-| `verification_failed` | Check product tests, lint, dependencies, or remediation command output. |
-| `merge_conflict` | Resolve merge conflict or base branch state. |
-| `merge_failed` | Check merge target ref and branch policy. |
-| `runtime_failed` | Check Docker, compose, runtime processes, and printed command output. |
-
-Docker credential helper errors:
-
-`a2o doctor` checks Docker `credsStore` and `credHelpers` entries. If the Docker config points at a helper that is not available on the current host, such as a stale Windows helper in WSL, doctor reports `docker_credential_helpers status=blocked`.
-
-Temporary workaround for one command:
-
-```sh
-tmp_docker_config="$(mktemp -d)"
-printf '{"auths":{}}\n' > "$tmp_docker_config/config.json"
-DOCKER_CONFIG="$tmp_docker_config" a2o doctor
-```
-
-Permanent fix:
-
-1. Open `${DOCKER_CONFIG:-$HOME/.docker}/config.json`.
-2. Remove or correct stale `credsStore` / `credHelpers` entries.
-3. Confirm the referenced `docker-credential-*` helper exists on the host PATH.
-4. Rerun `a2o doctor`.
-
-Diagnostic entrypoints:
+Start with:
 
 ```sh
 a2o doctor
-a2o kanban doctor
-a2o runtime doctor
 a2o runtime watch-summary
 a2o runtime describe-task <task-ref>
 ```
 
-Blocked task recovery:
+Error categories, agent artifacts, and blocked task recovery are covered in [70-troubleshooting.md](70-troubleshooting.md).
 
-```sh
-a2o runtime reset-task <task-ref>
-```
+## Next Documents
 
-`reset-task` prints a dry-run recovery plan. It does not mutate kanban, runtime state, workspaces, or branches. Use it when a task is blocked and you need a safe checklist before retrying.
-
-The plan names the affected artifacts:
-
-- kanban task, comments, and `blocked` label
-- runtime `tasks.json` and `runs.json`
-- persisted evidence and blocked diagnosis directories
-- agent workspace path
-- task branches under the runtime branch namespace
-
-Recommended recovery flow:
-
-1. Run `a2o runtime describe-task <task-ref>` and read the blocked reason, evidence, kanban comments, and logs.
-2. Run `a2o runtime watch-summary` and confirm no related task is still running.
-3. Fix the root cause: configuration, dirty repo, missing command, executor credentials, verification failure, or merge conflict.
-4. Preserve useful manual changes from the listed workspace or branches. Commit, patch, or discard them intentionally.
-5. Clear the kanban `blocked` label only after the root cause is fixed.
-6. Run `a2o runtime run-once`, or let the resident scheduler pick the task up again.
-
-`Done` in the board is A2O's automation-complete state. SoloBoard's `Resolved` flag is a separate human-confirmation state. It is normal for API snapshots to show `status=Done` with `done=false` until a human marks the task resolved.
-
-## Runtime Image Updates
-
-A2O 0.5.5 uses:
-
-```text
-ghcr.io/wamukat/a2o-engine:0.5.5
-```
-
-For shared product packages, release smoke, or multi-user boards, pin by digest after validation.
-
-Recommended update flow:
-
-```sh
-a2o upgrade check
-a2o runtime up --pull
-a2o runtime image-digest
-a2o doctor
-```
-
-`a2o upgrade check` is check-only. It does not pull images, reinstall the agent, restart services, or edit project files. It prints the host launcher version, bootstrapped instance config, runtime image digest status, agent install status, and the next commands to run.
-
-`a2o runtime image-digest` prints the configured pinned digest, the local `latest` digest, and the running container digest. The configured ref comes from explicit runtime image environment variables first, then the bootstrapped runtime instance config. If `runtime_image_latest_status=mismatch`, pulling `latest` changed the local image but did not change the product package pin. Validate that image, then record the printed `runtime_image_pinned_digest=...` or desired `runtime_image_local_latest_digest=...` in the product package Taskfile, env file, or deployment note. If `runtime_image_running_status=mismatch`, restart with `a2o runtime up` after confirming the desired pin.
-
-After updating the package pin, verify:
-
-```sh
-a2o runtime down
-a2o runtime up
-a2o runtime status
-a2o doctor
-```
-
-## Multi-Repo Packages
-
-Multi-repo packages define one repo slot per repository:
-
-```yaml
-repos:
-  repo_alpha:
-    path: ../repos/catalog-service
-    role: product
-    label: repo:catalog
-  repo_beta:
-    path: ../repos/storefront
-    role: product
-    label: repo:storefront
-```
-
-Tasks use repo labels to select target slots. Parent-child flows let child tasks work in individual repos while the parent task handles integration review, verification, and merge. For the complete flow, see [60-parent-child-task-flow.md](60-parent-child-task-flow.md).
+| Goal | Document |
+|---|---|
+| Understand project package design | [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md) |
+| Operate runtime / kanban / agent / image updates | [20-runtime-distribution.md](20-runtime-distribution.md) |
+| Investigate blocked or failed tasks | [70-troubleshooting.md](70-troubleshooting.md) |
+| Use multi-repo / parent-child tasks | [60-parent-child-task-flow.md](60-parent-child-task-flow.md) |
+| Read every `project.yaml` field | [10-project-package-schema.md](10-project-package-schema.md) |

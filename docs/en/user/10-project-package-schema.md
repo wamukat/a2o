@@ -1,10 +1,14 @@
-# Single-File Project Package Schema
+# Project Package Schema Reference
+
+This document is the detailed `project.yaml` reference. For setup intent and responsibility boundaries, read [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md) first.
+
+Use this document when adding or changing settings. First understand why the package needs a setting, then use this reference to confirm YAML shape, default responsibility boundaries, and supported placeholders.
+
+## Policy
 
 The canonical project package config file is `project.yaml`.
 
 Runtime responsibilities live in `project.yaml` under explicit runtime sections. The public package has one configuration file so package authors do not need to split responsibility between separate project and runtime manifests.
-
-For authoring decisions and responsibility boundaries, see [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md).
 
 ## Rules
 

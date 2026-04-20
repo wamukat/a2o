@@ -1,6 +1,44 @@
 # Project Package Authoring Guide
 
-Use this guide when designing or reviewing an A2O project package. The schema document explains valid fields. This guide explains where each responsibility belongs.
+Use this guide when designing or reviewing an A2O project package. A project package is the input that tells A2O how to handle one product: which repositories exist, which skills and commands to use, how verification works, and what kinds of kanban tasks humans create.
+
+The full `project.yaml` field reference is [10-project-package-schema.md](10-project-package-schema.md). This guide is about intent and responsibility. Treat `project.yaml` as the product specification A2O runs from, not just as a configuration file.
+
+## Package Inputs
+
+A project package collects four kinds of user-managed input in one directory.
+
+| Input | Role | When A2O uses it |
+|---|---|---|
+| `project.yaml` | Defines package name, kanban project, repo slots, phases, executor commands, and verification commands | Bootstrap, kanban setup, runtime execution |
+| `skills/` | Product-specific judgment rules passed to AI workers | Implementation, review, parent review |
+| `commands/` | Build, test, verification, remediation, and worker commands | Phase execution, verification, remediation |
+| `task-templates/` | Human-facing examples for creating kanban tasks | Task authoring |
+
+A2O does not infer product policy from source code. If a worker needs a repository boundary, command, rule, or verification method, put it in the project package.
+
+## Runtime Connection
+
+```mermaid
+flowchart LR
+  U@{ shape: rounded, label: "User" }
+  P@{ shape: docs, label: "Project package" }
+  K@{ shape: cyl, label: "Kanban task" }
+  E@{ shape: rounded, label: "A2O Engine" }
+  A@{ shape: rounded, label: "a2o-agent" }
+  G@{ shape: cyl, label: "Git repository" }
+
+  U -. "authors" .-> P
+  U -. "creates" .-> K
+  E -->|"reads project.yaml"| P
+  E -->|"selects task"| K
+  E -->|"sends phase job"| A
+  A -->|"uses skills / commands"| P
+  A -->|"changes / verifies"| G
+  E -->|"records result"| K
+```
+
+Users manage the project package and kanban tasks. A2O Engine reads `project.yaml` to decide which kanban board to watch, which repositories to handle, and what to run in each phase. `a2o-agent` executes the jobs using package skills and commands, then changes and verifies Git repositories.
 
 ## Package Boundary
 
@@ -16,7 +54,7 @@ The project package owns product-specific decisions:
 - optional knowledge catalog commands
 - task templates used by humans to create board tasks
 
-A2O does not infer product policy from source code. If a worker needs a rule, command, or repository boundary, put it in the project package.
+A2O-managed lanes and internal labels are not part of the package authoring surface. `a2o kanban up` provisions them.
 
 ## Recommended Layout
 

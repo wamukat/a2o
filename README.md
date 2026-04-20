@@ -6,7 +6,31 @@ A2O stands for Agentic AI Orchestrator. A2O is an automation engine that starts 
 
 ![A2O system overview](docs/assets/a2o-system-overview.svg)
 
-This repository contains the A2O Engine, Go host launcher, Go agent, Docker runtime image, reference product packages, and design documentation. The normal public entrypoints are `a2o`, `a2o-agent`, project packages, and the bundled kanban service.
+The diagram shows the normal flow: a user prepares kanban tasks and a project package, A2O Engine selects runnable work, `a2o-agent` runs Generative AI and the product toolchain, Git receives the resulting changes, and the kanban board and evidence store keep the outcome.
+
+## What A2O Solves
+
+A2O packages the work around AI-assisted implementation into a runtime.
+
+| Area | Content |
+|---|---|
+| What users provide | Git repositories, a project package, AI skills, kanban tasks |
+| What A2O runs | Task intake, phase job creation, agent execution, verification, merge |
+| Where results remain | Git branches / merge results, kanban status / comments, evidence, agent artifacts |
+| What users inspect | Board state, `watch-summary`, `describe-task`, Git changes |
+
+## Normal Flow
+
+```text
+Kanban task
+  -> A2O Engine selects runnable work
+  -> project.yaml / skills define phase jobs
+  -> a2o-agent runs Generative AI and the product toolchain
+  -> changes are written to the Git repository
+  -> comments, state, and evidence are recorded on the kanban side
+```
+
+Start with [docs/en/user/00-overview.md](docs/en/user/00-overview.md) to understand how these parts fit together.
 
 ## Principles
 
@@ -20,13 +44,15 @@ This repository contains the A2O Engine, Go host launcher, Go agent, Docker runt
 
 User documentation:
 
-1. [docs/en/user/00-user-quickstart.md](docs/en/user/00-user-quickstart.md)
-2. [docs/en/user/10-project-package-schema.md](docs/en/user/10-project-package-schema.md)
-3. [docs/en/user/20-runtime-distribution.md](docs/en/user/20-runtime-distribution.md)
-4. [docs/en/user/30-runtime-naming-boundary.md](docs/en/user/30-runtime-naming-boundary.md)
-5. [docs/en/user/40-release-status.md](docs/en/user/40-release-status.md)
-6. [docs/en/user/50-project-package-authoring-guide.md](docs/en/user/50-project-package-authoring-guide.md)
-7. [docs/en/user/60-parent-child-task-flow.md](docs/en/user/60-parent-child-task-flow.md)
+1. [docs/en/user/00-overview.md](docs/en/user/00-overview.md)
+2. [docs/en/user/00-user-quickstart.md](docs/en/user/00-user-quickstart.md)
+3. [docs/en/user/50-project-package-authoring-guide.md](docs/en/user/50-project-package-authoring-guide.md)
+4. [docs/en/user/20-runtime-distribution.md](docs/en/user/20-runtime-distribution.md)
+5. [docs/en/user/70-troubleshooting.md](docs/en/user/70-troubleshooting.md)
+6. [docs/en/user/60-parent-child-task-flow.md](docs/en/user/60-parent-child-task-flow.md)
+7. [docs/en/user/40-release-status.md](docs/en/user/40-release-status.md)
+8. [docs/en/user/10-project-package-schema.md](docs/en/user/10-project-package-schema.md)
+9. [docs/en/user/30-runtime-naming-boundary.md](docs/en/user/30-runtime-naming-boundary.md)
 
 Developer documentation:
 
@@ -66,7 +92,7 @@ a2o runtime stop
 
 The runtime image still contains `bin/a3` as the internal Engine CLI. That is an implementation compatibility name. The public user-facing entrypoints are `a2o` and `a2o-agent`.
 
-The public launcher covers setup, kanban lifecycle, agent installation, foreground runtime execution, and resident scheduler lifecycle.
+The quickest setup path is [docs/en/user/00-user-quickstart.md](docs/en/user/00-user-quickstart.md). For the published command surface and runtime image boundary, see [docs/en/user/40-release-status.md](docs/en/user/40-release-status.md).
 
 ## Repository Layout
 

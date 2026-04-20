@@ -2,6 +2,8 @@
 
 A2O stands for Agentic AI Orchestrator and is the public product name. A3 is an internal compatibility name that may still appear in implementation code paths, state paths, and Engine CLI surfaces.
 
+Use this reference when writing user-facing guidance, project packages, or diagnostic text. Normal setup does not require users to write A3 names. If an A3 name appears, decide whether it is an acceptable compatibility detail or a leak from the internal implementation.
+
 ## Public Names
 
 Use these names in user-facing docs and commands:

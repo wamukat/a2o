@@ -2,6 +2,8 @@
 
 Use parent-child tasks when one product change spans multiple repo slots and each repo should be implemented as its own child task. A2O coordinates the child tasks, integration review, verification, merge, and evidence from the kanban relations.
 
+The purpose of this workflow is to avoid turning a cross-repository change into one oversized task. Split implementation by repository, then use a parent task for the integrated review, verification, and final merge. If the work fits in one repository, read [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md) and [20-runtime-distribution.md](20-runtime-distribution.md) instead.
+
 ## Package Setup
 
 Declare each repository as its own repo slot in `project.yaml`.

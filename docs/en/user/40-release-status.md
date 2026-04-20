@@ -2,6 +2,8 @@
 
 This document describes the currently supported A2O 0.5.5 user surface and validation boundary.
 
+Use it to confirm which features can be documented for users and what can be treated as validated at this release. For setup steps, read [00-user-quickstart.md](00-user-quickstart.md). For configuration fields, read [10-project-package-schema.md](10-project-package-schema.md).
+
 ## Supported Commands And Capabilities
 
 - Host launcher install: `a2o host install`

@@ -1,75 +1,144 @@
-# Container Distribution And Project Runtime
+# Operating The Runtime
 
-A2O is distributed as a Docker runtime image, host launcher, project package, and `a2o-agent`. Users should not assemble long internal Engine command lines or runtime shell scripts.
+This document explains the commands and state checks used in day-to-day A2O operation. For first setup, read [00-user-quickstart.md](00-user-quickstart.md). For package design, read [50-project-package-authoring-guide.md](50-project-package-authoring-guide.md). For failures, read [70-troubleshooting.md](70-troubleshooting.md).
 
-## Artifacts
+The purpose is to treat A2O as a runtime that keeps watching kanban, not as a one-time container command. In normal operation, use the resident scheduler, then inspect state, run diagnostics, and update images from the commands below.
 
-- Runtime image: Engine CLI, compose assets, host install assets, and agent release binaries.
-- Host launcher: `a2o`, a thin Go binary that controls the runtime image from the host.
-- Agent: `a2o-agent`, which runs project commands on the host or in a project dev environment.
-- Project package: package identity, kanban bootstrap data, repo slots, runtime parameters, agent requirements, and task templates.
+## Runtime Parts
 
-The runtime image still contains `a3` and `.a3` compatibility paths internally. Public user surfaces use `a2o` and `a2o-agent`.
+A normal A2O setup has four parts.
 
-The `a2o --help` output inside the runtime container is container-entrypoint help, not the full host launcher help. Normal operations such as `a2o project template`, `a2o project bootstrap`, `a2o kanban ...`, and `a2o runtime ...` are run through the host launcher installed by `a2o host install`.
+| Part | Role | Main commands |
+|---|---|---|
+| Host launcher `a2o` | Controls the runtime image and instance from the host | `a2o project bootstrap`, `a2o kanban ...`, `a2o runtime ...` |
+| A2O Engine | Selects kanban tasks, creates phase jobs, records results | `a2o runtime up`, `a2o runtime start`, `a2o runtime status` |
+| `a2o-agent` | Runs jobs in the product environment and changes / verifies Git repositories | `a2o agent install` |
+| Project package | Defines product repositories, skills, commands, and phases | `a2o project lint` |
 
-## Runtime Shape
-
-A2O treats one project package as one runtime instance.
-
-Bootstrap creates `.work/a2o/runtime-instance.json` from the project package. Later `a2o kanban ...`, `a2o agent install`, and `a2o runtime ...` commands discover that instance config from the current directory upward.
+The runtime instance is created from the project package. After bootstrap, `a2o kanban ...`, `a2o agent install`, and `a2o runtime ...` discover `.work/a2o/runtime-instance.json` and operate on the same instance.
 
 ```sh
 a2o project bootstrap
-a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
+```
+
+Specify the package path only when it is not in the standard location.
+
+```sh
+a2o project bootstrap --package ./path/to/project-package
+```
+
+## Daily Operation
+
+Normally, start kanban, install the agent, and start the scheduler.
+
+```sh
 a2o kanban up
+a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
+a2o runtime up
+a2o runtime start --interval 60s
+```
+
+Check state with:
+
+```sh
+a2o runtime status
 a2o runtime watch-summary
+```
+
+`runtime status` shows scheduler state, runtime container state, kanban instance information, image digest, and the latest run. `runtime watch-summary` shows where board tasks currently are.
+
+Use `describe-task` for one task.
+
+```sh
+a2o runtime describe-task <task-ref>
+```
+
+`describe-task` gathers run state, phases, workspace details, evidence, kanban comments, log hints, and agent artifact commands.
+
+## Scheduler And Manual Runs
+
+Use the resident scheduler for normal operation.
+
+```sh
+a2o runtime start --interval 60s
+a2o runtime status
+a2o runtime stop
+```
+
+`runtime start` runs task processing as a resident scheduler. `runtime stop` stops the scheduler. `runtime status` confirms whether the scheduler is running, whether the runtime image matches expectations, and how the latest run ended.
+
+Use `runtime run-once` for manual checks, test runs, or a retry after fixing a root cause.
+
+```sh
 a2o runtime run-once
 ```
 
-Use `a2o project bootstrap --package DIR` when the package is not under `./project-package` or `./a2o-project`.
+Use `runtime up` / `down` only for container lifecycle. They do not start the scheduler.
 
-`a2o runtime up` and `down` manage only container lifecycle. Use `a2o runtime start` when task processing should run as a resident scheduler.
+```sh
+a2o runtime up
+a2o runtime down
+```
 
-## Responsibility Boundary
+## Kanban Operation
 
-A2O Engine owns:
+Kanban is the input queue A2O Engine reads.
 
-- kanban service lifecycle
-- task polling and transition
-- workspace and branch namespace management
-- worker gateway and agent job queue
-- verification and merge orchestration
-- evidence retention
+```sh
+a2o kanban up
+a2o kanban doctor
+a2o kanban url
+```
 
-The project package owns:
+`kanban up` starts the bundled kanban service and provisions the lanes and internal labels A2O needs. Users should not hand-author A2O-managed lanes or internal labels in the project package.
 
-- project and kanban board name
-- repo slot aliases and source paths
-- trigger labels and task templates
-- verification/build/test commands
-- required agent-side toolchains
-- project-specific hook scripts when declarative commands are insufficient
+The same Compose project reuses the existing board. If the Compose project or Docker volume changes, the same product can appear to have a different empty board. When that happens, first check instance settings, Compose project, and volume through `a2o runtime status` and `a2o kanban doctor`.
 
-The project package does not own:
+## Agent Operation
 
-- Engine runtime loop scripts
-- Docker compose files for A2O core services
-- kanban provider API wrappers
-- agent materializer configuration scripts
-- release asset export logic
+`a2o-agent` is the binary that runs jobs from A2O Engine in the product environment. The standard install path is `.work/a2o/agent/bin/a2o-agent`.
 
-## Current 0.5.5 Surface
+```sh
+a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
+```
 
-A2O 0.5.5 is a local-first runtime image plus host launcher and agent package. The standard validation surface is the reference product suite: SoloBoard pickup and transitions, agent-materialized workspaces, agent HTTP worker gateway, verification, merge, parent-child flow, watch summary, describe-task diagnostics, and evidence persistence.
+Agent workspaces, materialized data, and launcher settings stay under `.work/a2o/agent/`. Avoid putting generated runtime files in product repository roots.
 
-The public launcher covers host install, check-only upgrade planning, project bootstrap, kanban service lifecycle, kanban diagnosis, URL discovery, agent install, runtime container up/down, one-shot runtime execution, foreground runtime loop, resident scheduler start/stop/status, runtime diagnosis, multi-task watch summary, and task/run observability.
+Declare the product toolchain and AI executor in `agent.required_bins`. A placeholder such as `your-ai-worker` will block `a2o doctor` or runtime execution until replaced.
 
-## Operator Notes
+## Image Updates And Digests
 
-- Keep project toolchains out of the runtime image.
-- Keep branch namespaces instance-specific.
-- Treat `.work/a2o/` as disposable runtime output.
-- Existing `.a3/runtime-instance.json` is read only as a compatibility fallback.
-- Agent metadata for materialized repo workspaces belongs under `.work/a2o/agent/` management paths, not inside product repo slots.
-- Prefer project package declarations over hard-coded Engine defaults.
+Before using a new runtime image, inspect the planned change.
+
+```sh
+a2o upgrade check
+a2o runtime image-digest
+```
+
+`upgrade check` does not pull images, restart services, or edit files. It reports the host launcher version, initialized instance config, runtime image digest, agent install state, and the next commands to run.
+
+To pull and restart the runtime image:
+
+```sh
+a2o runtime up --pull
+a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
+a2o doctor
+a2o runtime status
+```
+
+`runtime image-digest` compares configured pinned references, local `latest`, and the running container image. If they differ, decide which image should be active before restarting with `a2o runtime up`.
+
+## Diagnostics
+
+Move from broad checks to narrow checks.
+
+| Need | Command |
+|---|---|
+| Package, agent, kanban, runtime, and image check | `a2o doctor` |
+| Runtime container and scheduler state | `a2o runtime status` |
+| Runtime-specific diagnosis | `a2o runtime doctor` |
+| Kanban service and board state | `a2o kanban doctor` |
+| Progress across tasks | `a2o runtime watch-summary` |
+| One task's run / evidence / logs | `a2o runtime describe-task <task-ref>` |
+
+For blocked tasks, dirty repositories, executor failures, verification failures, and merge issues, read [70-troubleshooting.md](70-troubleshooting.md).
