@@ -341,7 +341,7 @@ module A3
       end
 
       def repo_slot_directory(repo_slot)
-        repo_slot.to_s.gsub("_", "-")
+        repo_slot.to_s.gsub(/[^A-Za-z0-9._:-]+/, "-")
       end
 
       def git_repo_source?(source_root)

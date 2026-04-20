@@ -44,15 +44,15 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("prepared workspace")
 
       workspace_root = Pathname(storage_dir).join("workspaces", "A3-v2-3025", "runtime_workspace")
-      expect(workspace_root.join("repo-alpha")).to exist
-      expect(workspace_root.join("repo-beta")).to exist
+      expect(workspace_root.join("repo_alpha")).to exist
+      expect(workspace_root.join("repo_beta")).to exist
 
       metadata = JSON.parse(workspace_root.join(".a3", "workspace.json").read)
       expect(metadata.fetch("workspace_kind")).to eq("runtime_workspace")
-      slot_metadata = JSON.parse(workspace_root.join("repo-alpha", ".a3", "slot.json").read)
+      slot_metadata = JSON.parse(workspace_root.join("repo_alpha", ".a3", "slot.json").read)
       expect(slot_metadata.fetch("bootstrap_marker")).to eq("workspace-hook:v1")
-      expect(workspace_root.join("repo-alpha", "README.md").read).to eq("repo_alpha source\n")
-      expect(workspace_root.join("repo-beta", "README.md").read).to eq("repo_beta source\n")
+      expect(workspace_root.join("repo_alpha", "README.md").read).to eq("repo_alpha source\n")
+      expect(workspace_root.join("repo_beta", "README.md").read).to eq("repo_beta source\n")
     end
   end
 end

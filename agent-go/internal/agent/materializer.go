@@ -1328,14 +1328,7 @@ func gitError(args []string, err error) error {
 }
 
 func slotDirectory(slotName string) string {
-	switch slotName {
-	case "repo_alpha":
-		return "repo-alpha"
-	case "repo_beta":
-		return "repo-beta"
-	default:
-		return safeID(slotName)
-	}
+	return safeID(slotName)
 }
 
 func writeWorkspaceMetadata(root string, request WorkspaceRequest) error {

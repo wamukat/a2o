@@ -1557,7 +1557,7 @@ module A3
     end
 
     def parse_cleanup_list(value)
-      value.split(",").map { |entry| entry.strip.tr("-", "_") }.reject(&:empty?).map(&:to_sym)
+      value.split(",").map(&:strip).reject(&:empty?).map(&:to_sym)
     end
 
     def default_storage_dir

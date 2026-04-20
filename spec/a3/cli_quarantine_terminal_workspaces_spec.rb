@@ -47,6 +47,12 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "keeps cleanup scope names exact instead of normalizing hyphens" do
+    expect(described_class.send(:parse_cleanup_list, "ticket-workspace,runtime_workspace")).to eq(
+      [:"ticket-workspace", :runtime_workspace]
+    )
+  end
+
   it "quarantines done task workspaces through sqlite backend" do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)

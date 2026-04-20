@@ -26,15 +26,15 @@ ticket workspace は task ごとの作業面であり、少なくとも次の固
 
 sample topology の初期前提:
 
-- `repo-alpha`
-- `repo-beta`
+- `repo_alpha`
+- `repo_beta`
 
 例:
 
 ```text
 ticket-workspace/
-  repo-alpha/
-  repo-beta/
+  repo_alpha/
+  repo_beta/
   .work/
 ```
 

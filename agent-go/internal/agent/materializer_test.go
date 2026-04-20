@@ -23,7 +23,7 @@ func TestWorkspaceMaterializerPreparesAndCleansWorktreeSlots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	slotPath := filepath.Join(prepared.Root, "repo-alpha")
+	slotPath := filepath.Join(prepared.Root, "repo_alpha")
 	if _, err := os.Stat(filepath.Join(slotPath, "README.md")); err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestWorkspaceMaterializerRejectsDescriptorSlotOutsideTopologyRoot(t *testin
 		SourceDescriptor: SourceDescriptor{WorkspaceKind: "ticket_workspace", SourceType: "branch_head"},
 		SlotDescriptors: map[string]map[string]any{
 			"repo_alpha": {
-				"runtime_path": filepath.Join(tmp, "agent-workspaces", "Sample-999-parent", "children", "Sample-135", "ticket_workspace", "repo-alpha"),
+				"runtime_path": filepath.Join(tmp, "agent-workspaces", "Sample-999-parent", "children", "Sample-135", "ticket_workspace", "repo_alpha"),
 			},
 		},
 		Topology: &WorkspaceTopology{
@@ -380,10 +380,10 @@ func TestPublishWorkspaceChangesValidatesAllSlotsBeforeCommitting(t *testing.T) 
 		t.Fatal(err)
 	}
 	alphaHead := git(t, alphaRoot, "rev-parse", "a3/work/Sample-42")
-	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-alpha", "alpha.txt"), []byte("alpha\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "alpha.txt"), []byte("alpha\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-beta", "beta.txt"), []byte("beta\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_beta", "beta.txt"), []byte("beta\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -432,7 +432,7 @@ func TestPublishWorkspaceChangesCommitsAllEditTargetChangesOnCommandSuccess(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-alpha", "formatted.txt"), []byte("formatted\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "formatted.txt"), []byte("formatted\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -469,10 +469,10 @@ func TestPublishWorkspaceChangesCommitsAllEditTargetChangesOnWorkerSuccess(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-alpha", "declared.txt"), []byte("declared\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "declared.txt"), []byte("declared\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-alpha", "generated.txt"), []byte("generated\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "generated.txt"), []byte("generated\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -523,7 +523,7 @@ func TestPublishWorkspaceChangesRejectsSupportSlotChangesDuringCommandPublish(t 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-beta", "unexpected.txt"), []byte("unexpected\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_beta", "unexpected.txt"), []byte("unexpected\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -549,13 +549,13 @@ func TestPublishWorkspaceChangesRollsBackAlreadyCommittedSlots(t *testing.T) {
 		t.Fatal(err)
 	}
 	alphaHead := git(t, alphaRoot, "rev-parse", "a3/work/Sample-42")
-	if err := os.WriteFile(filepath.Join(prepared.Root, "repo-alpha", "alpha.txt"), []byte("alpha\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "alpha.txt"), []byte("alpha\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	prepared.SlotDescriptors["repo_beta"] = map[string]any{}
 
 	err = executePublishPlans(prepared, []publishPlan{
-		{slotName: "repo_alpha", runtimePath: filepath.Join(prepared.Root, "repo-alpha"), declared: []string{"alpha.txt"}},
+		{slotName: "repo_alpha", runtimePath: filepath.Join(prepared.Root, "repo_alpha"), declared: []string{"alpha.txt"}},
 		{slotName: "repo_beta", runtimePath: filepath.Join(prepared.Root, "missing-repo"), declared: []string{"beta.txt"}},
 	}, "test rollback")
 
@@ -587,7 +587,7 @@ func TestPublishWorkspaceChangesRollsBackCurrentSlotOnStageFailure(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	alphaPath := filepath.Join(prepared.Root, "repo-alpha")
+	alphaPath := filepath.Join(prepared.Root, "repo_alpha")
 	if err := os.WriteFile(filepath.Join(alphaPath, "alpha.txt"), []byte("alpha\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -155,7 +155,7 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
       ]
     )
     provisioner = described_class.new(base_dir: tmpdir, repo_sources: repo_sources)
-    stale_slot = Pathname(tmpdir).join("workspaces", "A3-v2-3025", "runtime_workspace", "repo-alpha")
+    stale_slot = Pathname(tmpdir).join("workspaces", "A3-v2-3025", "runtime_workspace", "repo_alpha")
     FileUtils.mkdir_p(stale_slot.join(".a3"))
     stale_slot.join("stale.txt").write("obsolete")
     stale_slot.join(".a3", "slot.json").write(
@@ -211,7 +211,7 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
       ]
     )
     provisioner = described_class.new(base_dir: tmpdir, repo_sources: repo_sources)
-    slot_path = Pathname(tmpdir).join("workspaces", "A3-v2-3025", "runtime_workspace", "repo-alpha")
+    slot_path = Pathname(tmpdir).join("workspaces", "A3-v2-3025", "runtime_workspace", "repo_alpha")
     FileUtils.mkdir_p(slot_path.join(".a3"))
     slot_path.join("corrupt.txt").write("not a real checkout")
     slot_path.join(".a3", "slot.json").write(
@@ -269,7 +269,7 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
       ]
     )
     provisioner = described_class.new(base_dir: tmpdir, repo_sources: repo_sources)
-    slot_path = Pathname(tmpdir).join("workspaces", "A3-v2-3025", "runtime_workspace", "repo-alpha")
+    slot_path = Pathname(tmpdir).join("workspaces", "A3-v2-3025", "runtime_workspace", "repo_alpha")
     FileUtils.mkdir_p(slot_path.join(".a3"))
     slot_path.join(".a3", "slot.json").write(
       JSON.pretty_generate(
@@ -433,7 +433,7 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     quarantine_path = provisioner.quarantine_task(task_ref: task.ref)
 
     expect(Pathname(quarantine_path)).to exist
-    expect(Pathname(quarantine_path).join("runtime_workspace", "repo-alpha", "README.md").read).to eq("git-backed repo-alpha\n")
+    expect(Pathname(quarantine_path).join("runtime_workspace", "repo_alpha", "README.md").read).to eq("git-backed repo-alpha\n")
     expect(workspace.root_path).not_to exist
     worktree_list = `git -C #{repo_dir} worktree list --porcelain`
     expect(worktree_list).not_to include(slot_path.to_s)
@@ -483,14 +483,14 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
       ),
       bootstrap_marker: "workspace-hook:mixed"
     )
-    node_bin = workspace.root_path.join("repo-beta", "node_modules", ".bin")
+    node_bin = workspace.root_path.join("repo_beta", "node_modules", ".bin")
     FileUtils.mkdir_p(node_bin)
     File.symlink("../tool", node_bin.join("tool"))
 
     quarantine_path = provisioner.quarantine_task(task_ref: task.ref)
 
     expect(Pathname(quarantine_path)).to exist
-    expect(Pathname(quarantine_path).join("runtime_workspace", "repo-beta", "node_modules", ".bin", "tool")).to be_symlink
+    expect(Pathname(quarantine_path).join("runtime_workspace", "repo_beta", "node_modules", ".bin", "tool")).to be_symlink
     expect(workspace.root_path).not_to exist
   end
 
@@ -705,9 +705,9 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     )
 
     parent_root = Pathname(tmpdir).join("workspaces", "Sample-134-parent", "runtime_workspace")
-    parent_slot = parent_root.join("repo-alpha")
+    parent_slot = parent_root.join("repo_alpha")
     expect(workspace.root_path).to eq(Pathname(tmpdir).join("workspaces", "Sample-134-parent", "children", "Sample-135", "ticket_workspace"))
-    expect(workspace.slot_paths.fetch(:repo_alpha)).to eq(workspace.root_path.join("repo-alpha"))
+    expect(workspace.slot_paths.fetch(:repo_alpha)).to eq(workspace.root_path.join("repo_alpha"))
     expect(parent_slot).to exist
     expect(`git -C #{repo_root} worktree list --porcelain`).to include(parent_slot.to_s)
     expect(`git -C #{repo_root} rev-parse refs/heads/a2o/parent/Sample-134`.strip).to eq(`git -C #{parent_slot} rev-parse HEAD`.strip)

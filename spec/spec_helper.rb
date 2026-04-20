@@ -10,7 +10,7 @@ module RepoSourceFixtureHelper
     FileUtils.mkdir_p(sources_dir)
 
     slots.each_with_object({}) do |slot, repo_sources|
-      slot_dir = File.join(sources_dir, slot.to_s.gsub("_", "-"))
+      slot_dir = File.join(sources_dir, slot.to_s)
       FileUtils.mkdir_p(slot_dir)
       File.write(File.join(slot_dir, "README.md"), "#{slot} source\n")
       repo_sources[slot] = slot_dir

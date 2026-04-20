@@ -393,7 +393,12 @@ func (executor workerProtocolExecutor) Execute(request JobRequest) ExecutionResu
 		code := 1
 		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
 	}
-	if err := os.WriteFile(filepath.Join(request.WorkingDir, "repo-alpha", "changed.txt"), []byte("changed\n"), 0o644); err != nil {
+	slotPaths, _ := payload["slot_paths"].(map[string]any)
+	slotPath, _ := slotPaths["repo_alpha"].(string)
+	if slotPath == "" {
+		slotPath = filepath.Join(request.WorkingDir, "repo_alpha")
+	}
+	if err := os.WriteFile(filepath.Join(slotPath, "changed.txt"), []byte("changed\n"), 0o644); err != nil {
 		code := 1
 		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
 	}
