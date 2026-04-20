@@ -1,6 +1,6 @@
-# A2O 0.5.5 Current Release Surface
+# A2O 0.5.6 Current Release Surface
 
-This document describes the currently supported A2O 0.5.5 user surface and validation boundary.
+This document describes the currently supported A2O 0.5.6 user surface and validation boundary.
 
 Use it to confirm which features can be documented for users and what can be treated as validated at this release. For setup steps, read [10-quickstart.md](10-quickstart.md). For configuration fields, read [90-project-package-schema.md](90-project-package-schema.md).
 
@@ -23,7 +23,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Agent HTTP worker gateway
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates
-- GHCR runtime image tags: `latest`, `0.5.5`, and `sha-*`
+- GHCR runtime image tags: `latest`, `0.5.6`, and `sha-*`
 - Local release gate: full RSpec suite
 
 ## Validation Scope
