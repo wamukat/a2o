@@ -380,6 +380,65 @@ RSpec.describe A3::Application::ShowWatchSummary do
     task_repository.save(parent_task)
     task_repository.save(blocked_task)
     task_repository.save(waiting_task)
+    run_repository.save(
+      A3::Domain::Run.new(
+        ref: "run-20",
+        task_ref: "Sample#20",
+        phase: :verification,
+        workspace_kind: :runtime_workspace,
+        source_descriptor: A3::Domain::SourceDescriptor.new(
+          workspace_kind: :runtime_workspace,
+          source_type: :branch_head,
+          ref: "refs/heads/a2o/work/Sample-20",
+          task_ref: "Sample#20"
+        ),
+        scope_snapshot: A3::Domain::ScopeSnapshot.new(
+          edit_scope: [:repo_alpha],
+          verification_scope: [:repo_alpha],
+          ownership_scope: :task
+        ),
+        artifact_owner: A3::Domain::ArtifactOwner.new(
+          owner_ref: "Sample#10",
+          owner_scope: :task,
+          snapshot_version: "refs/heads/a2o/work/Sample-20"
+        ),
+        terminal_outcome: :blocked
+      ).append_blocked_diagnosis(
+        A3::Domain::BlockedDiagnosis.new(
+          task_ref: "Sample#20",
+          run_ref: "run-20",
+          phase: :verification,
+          outcome: :blocked,
+          review_target: A3::Domain::ReviewTarget.new(
+            base_commit: "base",
+            head_commit: "head",
+            task_ref: "Sample#20",
+            phase_ref: :verification
+          ),
+          source_descriptor: A3::Domain::SourceDescriptor.new(
+            workspace_kind: :runtime_workspace,
+            source_type: :branch_head,
+            ref: "refs/heads/a2o/work/Sample-20",
+            task_ref: "Sample#20"
+          ),
+          scope_snapshot: A3::Domain::ScopeSnapshot.new(
+            edit_scope: [:repo_alpha],
+            verification_scope: [:repo_alpha],
+            ownership_scope: :task
+          ),
+          artifact_owner: A3::Domain::ArtifactOwner.new(
+            owner_ref: "Sample#10",
+            owner_scope: :task,
+            snapshot_version: "refs/heads/a2o/work/Sample-20"
+          ),
+          expected_state: "verification succeeds",
+          observed_state: "lint failed on inherited parent line",
+          failing_command: "commands/verify-all",
+          diagnostic_summary: "verification failed",
+          infra_diagnostics: {}
+        )
+      )
+    )
 
     result = use_case.call
     task_entry = result.tasks.find { |item| item.ref == "Sample#21" }

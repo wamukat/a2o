@@ -2,6 +2,7 @@
 
 RSpec.describe A3::Application::ScheduleNextRun do
   let(:task_repository) { A3::Infra::InMemoryTaskRepository.new }
+  let(:run_repository) { A3::Infra::InMemoryRunRepository.new }
   let(:plan_next_runnable_task) { A3::Application::PlanNextRunnableTask.new(task_repository: task_repository) }
   let(:start_run) { instance_double(A3::Application::StartRun) }
   let(:build_scope_snapshot) { A3::Application::BuildScopeSnapshot.new }
@@ -21,6 +22,7 @@ RSpec.describe A3::Application::ScheduleNextRun do
       start_run: start_run,
       build_scope_snapshot: build_scope_snapshot,
       build_artifact_owner: build_artifact_owner,
+      run_repository: run_repository,
       integration_ref_readiness_checker: integration_ref_readiness_checker
     )
   end
@@ -137,7 +139,158 @@ RSpec.describe A3::Application::ScheduleNextRun do
     expect(result.phase).to eq(:verification)
   end
 
-  it "does not start a new child implementation while the same parent line has a blocked sibling" do
+  it "does not start a new child implementation while a sibling is blocked on verification under the same parent line" do
+    verification_blocked_run = A3::Domain::Run.new(
+      ref: "run-3031",
+      task_ref: "A3-v2#3031",
+      phase: :verification,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :branch_head,
+        ref: "refs/heads/a2o/work/A3-v2-3031",
+        task_ref: "A3-v2#3031"
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_beta],
+        verification_scope: %i[repo_alpha repo_beta],
+        ownership_scope: :task
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: task.parent_ref,
+        owner_scope: :task,
+        snapshot_version: "refs/heads/a2o/work/A3-v2-3031"
+      ),
+      terminal_outcome: :blocked
+    ).append_blocked_diagnosis(
+      A3::Domain::BlockedDiagnosis.new(
+        task_ref: "A3-v2#3031",
+        run_ref: "run-3031",
+        phase: :verification,
+        outcome: :blocked,
+        review_target: A3::Domain::ReviewTarget.new(
+          base_commit: "base",
+          head_commit: "head",
+          task_ref: "A3-v2#3031",
+          phase_ref: :verification
+        ),
+        source_descriptor: A3::Domain::SourceDescriptor.new(
+          workspace_kind: :runtime_workspace,
+          source_type: :branch_head,
+          ref: "refs/heads/a2o/work/A3-v2-3031",
+          task_ref: "A3-v2#3031"
+        ),
+        scope_snapshot: A3::Domain::ScopeSnapshot.new(
+          edit_scope: [:repo_beta],
+          verification_scope: %i[repo_alpha repo_beta],
+          ownership_scope: :task
+        ),
+        artifact_owner: A3::Domain::ArtifactOwner.new(
+          owner_ref: task.parent_ref,
+          owner_scope: :task,
+          snapshot_version: "refs/heads/a2o/work/A3-v2-3031"
+        ),
+        expected_state: "verification succeeds",
+        observed_state: "lint failed on inherited parent line",
+        failing_command: "commands/verify-all",
+        diagnostic_summary: "verification failed",
+        infra_diagnostics: {}
+      )
+    )
+    run_repository.save(verification_blocked_run)
+    task_repository.save(
+      build_child_task(
+        ref: "A3-v2#3031",
+        edit_scope: [:repo_beta],
+        status: :blocked,
+        parent_ref: task.parent_ref
+      )
+    )
+
+    expect(start_run).not_to receive(:call)
+
+    result = use_case.call(project_context: project_context)
+
+    expect(result.task).to be_nil
+    expect(result.phase).to be_nil
+    expect(result.started_run).to be_nil
+  end
+
+  it "does not resume child verification while a sibling is blocked on verification under the same parent line" do
+    verification_blocked_run = A3::Domain::Run.new(
+      ref: "run-3031",
+      task_ref: "A3-v2#3031",
+      phase: :verification,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :branch_head,
+        ref: "refs/heads/a2o/work/A3-v2-3031",
+        task_ref: "A3-v2#3031"
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_beta],
+        verification_scope: %i[repo_alpha repo_beta],
+        ownership_scope: :task
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: task.parent_ref,
+        owner_scope: :task,
+        snapshot_version: "refs/heads/a2o/work/A3-v2-3031"
+      ),
+      terminal_outcome: :blocked
+    ).append_blocked_diagnosis(
+      A3::Domain::BlockedDiagnosis.new(
+        task_ref: "A3-v2#3031",
+        run_ref: "run-3031",
+        phase: :verification,
+        outcome: :blocked,
+        review_target: A3::Domain::ReviewTarget.new(
+          base_commit: "base",
+          head_commit: "head",
+          task_ref: "A3-v2#3031",
+          phase_ref: :verification
+        ),
+        source_descriptor: A3::Domain::SourceDescriptor.new(
+          workspace_kind: :runtime_workspace,
+          source_type: :branch_head,
+          ref: "refs/heads/a2o/work/A3-v2-3031",
+          task_ref: "A3-v2#3031"
+        ),
+        scope_snapshot: A3::Domain::ScopeSnapshot.new(
+          edit_scope: [:repo_beta],
+          verification_scope: %i[repo_alpha repo_beta],
+          ownership_scope: :task
+        ),
+        artifact_owner: A3::Domain::ArtifactOwner.new(
+          owner_ref: task.parent_ref,
+          owner_scope: :task,
+          snapshot_version: "refs/heads/a2o/work/A3-v2-3031"
+        ),
+        expected_state: "verification succeeds",
+        observed_state: "lint failed on inherited parent line",
+        failing_command: "commands/verify-all",
+        diagnostic_summary: "verification failed",
+        infra_diagnostics: {}
+      )
+    )
+    run_repository.save(verification_blocked_run)
+    task_repository.save(
+      build_child_task(
+        ref: task.ref,
+        edit_scope: task.edit_scope,
+        status: :done,
+        parent_ref: task.parent_ref
+      )
+    )
+    task_repository.save(
+      build_child_task(
+        ref: "A3-v2#3030",
+        edit_scope: [:repo_alpha],
+        status: :verifying,
+        parent_ref: task.parent_ref
+      )
+    )
     task_repository.save(
       build_child_task(
         ref: "A3-v2#3031",

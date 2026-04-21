@@ -24,6 +24,7 @@ module A3
             start_run: start_run,
             build_scope_snapshot: support_group.fetch(:build_scope_snapshot),
             build_artifact_owner: support_group.fetch(:build_artifact_owner),
+            run_repository: repositories.fetch(:run_repository),
             integration_ref_readiness_checker: support_group.fetch(:integration_ref_readiness_checker)
           )
 

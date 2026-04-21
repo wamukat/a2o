@@ -180,6 +180,7 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
         ),
         build_scope_snapshot: build_scope_snapshot,
         build_artifact_owner: build_artifact_owner,
+        run_repository: run_repository,
         integration_ref_readiness_checker: instance_double(
           A3::Infra::IntegrationRefReadinessChecker,
           check: A3::Infra::IntegrationRefReadinessChecker::Result.new(ready: true, missing_slots: [], ref: "refs/heads/a2o/parent/A3-v2-3022")

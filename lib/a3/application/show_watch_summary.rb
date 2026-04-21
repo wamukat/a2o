@@ -2,6 +2,7 @@
 
 require_relative "../domain/task_phase_projection"
 require_relative "../domain/runnable_task_assessment"
+require_relative "../domain/upstream_line_guard"
 
 module A3
   module Application
@@ -42,12 +43,13 @@ module A3
         keyword_init: true
       )
 
-      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {})
+      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {}, upstream_line_guard: A3::Domain::UpstreamLineGuard.new)
         @task_repository = task_repository
         @run_repository = run_repository
         @scheduler_state_repository = scheduler_state_repository
         @kanban_snapshots_by_ref = kanban_snapshots_by_ref || {}
         @kanban_snapshots_by_id = kanban_snapshots_by_id || {}
+        @upstream_line_guard = upstream_line_guard
       end
 
       def call
@@ -60,7 +62,7 @@ module A3
         state = @scheduler_state_repository.fetch
 
         task_entries = tasks.each_with_object([]) do |task, entries|
-          entries << build_task_entry(task, runs_by_task: runs_by_task, assessment: assessments_by_ref.fetch(task.ref))
+          entries << build_task_entry(task, runs_by_task: runs_by_task, assessment: assessments_by_ref.fetch(task.ref), tasks: tasks, runs: runs)
         end
 
         Summary.new(
@@ -74,24 +76,26 @@ module A3
 
       private
 
-      def build_task_entry(task, runs_by_task:, assessment:)
+      def build_task_entry(task, runs_by_task:, assessment:, tasks:, runs:)
         task_runs = runs_by_task.fetch(task.ref, [])
         current_run = task.current_run_ref && task_runs.find { |candidate| candidate.ref == task.current_run_ref }
         latest_run = task_runs.last
         canonical_status = canonical_status_for(task)
         latest_phase = resolve_latest_phase(task: task, current_run: current_run, latest_run: latest_run)
         running_entry = build_running_entry(task, run: current_run)
-        blocked_lines = build_detail_lines(task, latest_run, assessment)
+        upstream_assessment = @upstream_line_guard.evaluate(task: task, phase: task.runnable_phase, tasks: tasks, runs: runs)
+        blocked_lines = build_detail_lines(task, latest_run, assessment, upstream_assessment)
         kanban_snapshot = resolve_kanban_snapshot(task)
+        waiting = waiting_assessment?(assessment) || !upstream_assessment.healthy?
 
         TaskEntry.new(
           ref: task.ref,
           title: display_title(task, kanban_snapshot: kanban_snapshot),
           status: display_status(canonical_status),
           parent_ref: task.parent_ref,
-          next_candidate: assessment.runnable?,
+          next_candidate: assessment.runnable? && upstream_assessment.healthy?,
           running: !running_entry.nil?,
-          waiting: waiting_assessment?(assessment),
+          waiting: waiting,
           done: canonical_status == :done,
           blocked: canonical_status == :blocked,
           blocked_lines: blocked_lines,
@@ -148,10 +152,16 @@ module A3
         %i[in_progress in_review verifying merging].include?(status)
       end
 
-      def build_detail_lines(task, run, assessment)
+      def build_detail_lines(task, run, assessment, upstream_assessment)
         lines = []
         if task.verification_source_ref
           lines << "merge_recovery verification_source_ref=#{task.verification_source_ref}"
+        end
+        unless upstream_assessment.healthy?
+          lines << "waiting_reason=#{upstream_assessment.reason}"
+          unless upstream_assessment.blocking_task_refs.empty?
+            lines << "waiting_on=#{upstream_assessment.blocking_task_refs.join(',')}"
+          end
         end
         if waiting_assessment?(assessment)
           lines << "waiting_reason=#{assessment.reason}"
