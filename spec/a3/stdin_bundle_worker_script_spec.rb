@@ -57,6 +57,32 @@ RSpec.describe "worker:stdin-bundle" do
     expect(payload.fetch("failing_command")).not_to include("/usr/local/bin/a3")
   end
 
+  it "classifies verification failures ahead of dirty-word diagnostics in worker helper output" do
+    payload = failure(
+      base_request.merge("phase" => "verification"),
+      summary: "verification failed because lint found an untracked generated file",
+      command: ["commands/verify-all"],
+      observed_state: "exit 1 due to untracked generated file",
+      diagnostics: {}
+    )
+
+    expect(payload.fetch("diagnostics").fetch("error_category")).to eq("verification_failed")
+    expect(payload.fetch("diagnostics").fetch("remediation")).to include("verification")
+  end
+
+  it "keeps publish workspace dirtiness classified as workspace_dirty in worker helper output" do
+    payload = failure(
+      base_request.merge("phase" => "verification"),
+      summary: "slot app has changes but is not an edit target: [README.md]",
+      command: ["publish_workspace_changes"],
+      observed_state: "slot app has changes but is not an edit target: [README.md]",
+      diagnostics: {}
+    )
+
+    expect(payload.fetch("diagnostics").fetch("error_category")).to eq("workspace_dirty")
+    expect(payload.fetch("diagnostics").fetch("remediation")).to include("commit")
+  end
+
   def base_request
     {
       "task_ref" => "Sample#3112",

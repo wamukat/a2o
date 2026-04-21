@@ -69,9 +69,10 @@ module A3
       def error_category
         text = [phase, diagnostic_summary, observed_state, failing_command, infra_diagnostics.values].join(" ").downcase
         return "configuration_error" if text.match?(/configuration|config|schema|manifest|project\.yaml|executor config|invalid_executor_config|launcher/)
+        return "workspace_dirty" if failing_command.to_s == "publish_workspace_changes" || text.match?(/slot .* has changes|changed files do not match|working tree is dirty/)
+        return "verification_failed" if phase == :verification || text.match?(/verification/)
         return "workspace_dirty" if text.match?(/dirty|has changes|changed files do not match|untracked|working tree/)
         return "merge_conflict" if text.match?(/merge conflict|conflict marker|would be overwritten|unmerged/)
-        return "verification_failed" if phase == :verification || text.match?(/verification/)
         return "merge_failed" if phase == :merge
         return "executor_failed" if %i[implementation review parent_review worker].include?(phase) || text.match?(/worker|executor/)
 

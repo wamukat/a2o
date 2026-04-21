@@ -48,6 +48,26 @@ func TestPublicAgentEnvironmentAliasesTakePrecedence(t *testing.T) {
 	}
 }
 
+func TestWorkerErrorCategoryPrioritizesVerificationFailuresOverDirtyWords(t *testing.T) {
+	if got := workerErrorCategory(
+		"verification failed because lint found an untracked generated file",
+		"exit 1 due to untracked generated file",
+		"verification",
+	); got != "verification_failed" {
+		t.Fatalf("workerErrorCategory() = %q, want verification_failed", got)
+	}
+}
+
+func TestWorkerErrorCategoryKeepsPublishWorkspaceDirtinessAsWorkspaceDirty(t *testing.T) {
+	if got := workerErrorCategory(
+		"slot app has changes but is not an edit target: [README.md]",
+		"slot app has changes but is not an edit target: [README.md]",
+		"verification",
+	); got != "workspace_dirty" {
+		t.Fatalf("workerErrorCategory() = %q, want workspace_dirty", got)
+	}
+}
+
 func TestMergeSourceAliases(t *testing.T) {
 	got := mergeSourceAliases(
 		map[string]string{"repo-a": "/config/a", "repo-b": "/config/b"},

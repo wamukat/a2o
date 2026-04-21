@@ -87,8 +87,9 @@ end
 def error_category(summary:, observed_state:, phase:)
   text = [summary, observed_state, phase].join(" ").downcase
   return "configuration_error" if text.match?(/config|schema|project\.yaml|executor config|invalid_executor_config|launcher/)
-  return "workspace_dirty" if text.match?(/dirty|has changes|changed files|untracked|working tree/)
+  return "workspace_dirty" if text.match?(/slot .* has changes|changed files|working tree is dirty/)
   return "verification_failed" if phase.to_s == "verification"
+  return "workspace_dirty" if text.match?(/dirty|has changes|untracked|working tree/)
   return "merge_conflict" if text.match?(/merge conflict|conflict marker|unmerged/)
   return "merge_failed" if phase.to_s == "merge"
 
