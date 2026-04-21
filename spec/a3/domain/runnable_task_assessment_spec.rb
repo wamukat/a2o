@@ -63,6 +63,23 @@ RSpec.describe A3::Domain::RunnableTaskAssessment do
     expect(assessment.phase).to be_nil
   end
 
+  it "holds new child implementation until the same parent line has no blocked siblings" do
+    blocked_sibling = A3::Domain::Task.new(
+      ref: "A3-v2#3022",
+      kind: :child,
+      edit_scope: [:repo_gamma],
+      status: :blocked,
+      parent_ref: "A3-v2#3019"
+    )
+
+    assessment = described_class.evaluate(task: tasks[1], tasks: [tasks[0], tasks[1], blocked_sibling, tasks[2]])
+
+    expect(assessment.runnable?).to eq(false)
+    expect(assessment.reason).to eq(:upstream_unhealthy)
+    expect(assessment.phase).to eq(:implementation)
+    expect(assessment.blocking_task_refs).to eq(["A3-v2#3022"])
+  end
+
   it "treats a missing cached child as pending once parent topology is known" do
     parent = A3::Domain::Task.new(
       ref: "A3-v2#3040",

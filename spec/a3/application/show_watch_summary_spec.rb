@@ -135,7 +135,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
     result = use_case.call
 
     expect(result.scheduler_paused).to be(false)
-    expect(result.next_candidates).to eq(["Sample#3"])
+    expect(result.next_candidates).to eq([])
     expect(result.running_entries.map(&:task_ref)).to eq(["Sample#1"])
     expect(result.running_entries.first.phase).to eq("implementation")
     expect(result.running_entries.first.internal_phase).to eq("implementation")
@@ -148,6 +148,9 @@ RSpec.describe A3::Application::ShowWatchSummary do
       "remediation=executor command が agent 環境で実行可能か、必要な binary と認証、出力 JSON を確認してください。",
       "publish failed"
     ])
+    expect(result.tasks.find { |item| item.ref == "Sample#3" }.waiting).to be(true)
+    expect(result.tasks.find { |item| item.ref == "Sample#3" }.blocked_lines).to include("waiting_reason=parent_waiting_for_children")
+    expect(result.tasks.find { |item| item.ref == "Sample#3" }.blocked_lines).to include("waiting_on=Sample#1,Sample#2")
     expect(result.tasks.find { |item| item.ref == "Sample#2" }.title).to include("[kanban=To do internal=Blocked]")
   end
 
@@ -347,5 +350,44 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(task_entry.latest_phase).to eq("inspection")
     expect(result.running_entries.map(&:task_ref)).to eq(["Sample#3141"])
     expect(result.running_entries.first.phase).to eq("verification")
+  end
+
+  it "marks todo children as waiting when a sibling under the same parent is blocked" do
+    blocked_task = A3::Domain::Task.new(
+      ref: "Sample#20",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :blocked,
+      parent_ref: "Sample#10"
+    )
+    waiting_task = A3::Domain::Task.new(
+      ref: "Sample#21",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :todo,
+      parent_ref: "Sample#10"
+    )
+    parent_task = A3::Domain::Task.new(
+      ref: "Sample#10",
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      verification_scope: %i[repo_alpha repo_beta],
+      status: :todo,
+      child_refs: %w[Sample#20 Sample#21]
+    )
+    task_repository.save(parent_task)
+    task_repository.save(blocked_task)
+    task_repository.save(waiting_task)
+
+    result = use_case.call
+    task_entry = result.tasks.find { |item| item.ref == "Sample#21" }
+
+    expect(result.next_candidates).to eq([])
+    expect(task_entry.waiting).to be(true)
+    expect(task_entry.next_candidate).to be(false)
+    expect(task_entry.blocked_lines).to include("waiting_reason=upstream_unhealthy")
+    expect(task_entry.blocked_lines).to include("waiting_on=Sample#20")
   end
 end

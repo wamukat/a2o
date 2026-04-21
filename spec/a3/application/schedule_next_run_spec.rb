@@ -137,6 +137,25 @@ RSpec.describe A3::Application::ScheduleNextRun do
     expect(result.phase).to eq(:verification)
   end
 
+  it "does not start a new child implementation while the same parent line has a blocked sibling" do
+    task_repository.save(
+      build_child_task(
+        ref: "A3-v2#3031",
+        edit_scope: [:repo_beta],
+        status: :blocked,
+        parent_ref: task.parent_ref
+      )
+    )
+
+    expect(start_run).not_to receive(:call)
+
+    result = use_case.call(project_context: project_context)
+
+    expect(result.task).to be_nil
+    expect(result.phase).to be_nil
+    expect(result.started_run).to be_nil
+  end
+
   it "does not schedule legacy child review tasks" do
     task_repository.save(
       build_child_task(

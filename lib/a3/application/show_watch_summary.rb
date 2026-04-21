@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../domain/task_phase_projection"
+require_relative "../domain/runnable_task_assessment"
 
 module A3
   module Application
@@ -53,10 +54,13 @@ module A3
         tasks = @task_repository.all
         runs = @run_repository.all
         runs_by_task = runs.group_by(&:task_ref)
+        assessments_by_ref = tasks.each_with_object({}) do |task, memo|
+          memo[task.ref] = A3::Domain::RunnableTaskAssessment.evaluate(task: task, tasks: tasks)
+        end
         state = @scheduler_state_repository.fetch
 
         task_entries = tasks.each_with_object([]) do |task, entries|
-          entries << build_task_entry(task, runs_by_task: runs_by_task)
+          entries << build_task_entry(task, runs_by_task: runs_by_task, assessment: assessments_by_ref.fetch(task.ref))
         end
 
         Summary.new(
@@ -70,14 +74,14 @@ module A3
 
       private
 
-      def build_task_entry(task, runs_by_task:)
+      def build_task_entry(task, runs_by_task:, assessment:)
         task_runs = runs_by_task.fetch(task.ref, [])
         current_run = task.current_run_ref && task_runs.find { |candidate| candidate.ref == task.current_run_ref }
         latest_run = task_runs.last
         canonical_status = canonical_status_for(task)
         latest_phase = resolve_latest_phase(task: task, current_run: current_run, latest_run: latest_run)
         running_entry = build_running_entry(task, run: current_run)
-        blocked_lines = build_detail_lines(task, latest_run)
+        blocked_lines = build_detail_lines(task, latest_run, assessment)
         kanban_snapshot = resolve_kanban_snapshot(task)
 
         TaskEntry.new(
@@ -85,9 +89,9 @@ module A3
           title: display_title(task, kanban_snapshot: kanban_snapshot),
           status: display_status(canonical_status),
           parent_ref: task.parent_ref,
-          next_candidate: canonical_status == :todo,
+          next_candidate: assessment.runnable?,
           running: !running_entry.nil?,
-          waiting: false,
+          waiting: waiting_assessment?(assessment),
           done: canonical_status == :done,
           blocked: canonical_status == :blocked,
           blocked_lines: blocked_lines,
@@ -144,10 +148,16 @@ module A3
         %i[in_progress in_review verifying merging].include?(status)
       end
 
-      def build_detail_lines(task, run)
+      def build_detail_lines(task, run, assessment)
         lines = []
         if task.verification_source_ref
           lines << "merge_recovery verification_source_ref=#{task.verification_source_ref}"
+        end
+        if waiting_assessment?(assessment)
+          lines << "waiting_reason=#{assessment.reason}"
+          unless assessment.blocking_task_refs.empty?
+            lines << "waiting_on=#{assessment.blocking_task_refs.join(',')}"
+          end
         end
         if run
           phase_record = run.phase_records.reverse_each.find { |item| !item.blocked_diagnosis.nil? }
@@ -159,6 +169,10 @@ module A3
           end
         end
         lines.freeze
+      end
+
+      def waiting_assessment?(assessment)
+        %i[sibling_running parent_waiting_for_children upstream_unhealthy].include?(assessment.reason)
       end
 
       def phase_counts_for(task, task_runs)
