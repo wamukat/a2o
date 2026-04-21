@@ -3717,6 +3717,59 @@ func TestRunHostAgentLoopPreservesExistingLogAcrossRestarts(t *testing.T) {
 	}
 }
 
+func TestRuntimeLoopPreservesHostAgentLogAcrossRunOnceCycles(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+
+	hostAgentLog := filepath.Join(tempDir, ".work", "a2o", "runtime-host-agent", "agent.log")
+	if err := os.MkdirAll(filepath.Dir(hostAgentLog), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hostAgentLog, []byte("before loop\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "loop", "--interval", "0s", "--max-cycles", "2", "--agent-attempts", "1"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	body, err := os.ReadFile(hostAgentLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(body)
+	if !strings.Contains(text, "before loop\n") {
+		t.Fatalf("existing log content should be preserved, got:\n%s", text)
+	}
+	if count := strings.Count(text, "===== host agent session start "); count != 2 {
+		t.Fatalf("expected two session headers across loop cycles, got %d in:\n%s", count, text)
+	}
+	if !strings.Contains(stdout.String(), "kanban_loop_finished cycles=2") {
+		t.Fatalf("runtime loop should finish two cycles, got %q", stdout.String())
+	}
+}
+
 func TestRuntimeDescribeTaskFindsLatestRunWhenTaskHasNoCurrentRun(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
