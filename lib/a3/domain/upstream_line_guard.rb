@@ -3,8 +3,8 @@
 module A3
   module Domain
     class UpstreamLineGuard
-      def initialize(branch_namespace: ENV.fetch("A2O_BRANCH_NAMESPACE", ENV.fetch("A3_BRANCH_NAMESPACE", nil)))
-        @branch_namespace = normalize_branch_namespace(branch_namespace)
+      def initialize(inherited_parent_state_resolver: nil)
+        @inherited_parent_state_resolver = inherited_parent_state_resolver
       end
 
       Assessment = Struct.new(:healthy, :reason, :blocking_task_refs, keyword_init: true) do
@@ -13,10 +13,11 @@ module A3
         end
       end
 
-      def evaluate(task:, phase:, tasks:, runs:, source_ref: nil)
-        return healthy_assessment unless child_phase_guarded?(task, phase, source_ref)
+      def evaluate(task:, phase:, tasks:, runs:)
+        current_snapshot = @inherited_parent_state_resolver&.snapshot_for(task: task, phase: phase)
+        return healthy_assessment unless current_snapshot
 
-        blocked_refs = verification_blocked_sibling_refs(task, tasks, runs)
+        blocked_refs = verification_blocked_sibling_refs(task, tasks, runs, current_snapshot)
         return healthy_assessment if blocked_refs.empty?
 
         Assessment.new(
@@ -28,19 +29,10 @@ module A3
 
       private
 
-      def child_phase_guarded?(task, phase, source_ref)
-        return false unless task.kind == :child
-        return false if task.parent_ref.to_s.empty?
-        return false if phase.nil?
-        return true if phase.to_sym == :implementation
-
-        phase.to_sym == :verification && source_ref == parent_integration_ref_for(task.parent_ref)
-      end
-
-      def verification_blocked_sibling_refs(task, tasks, runs)
+      def verification_blocked_sibling_refs(task, tasks, runs, current_snapshot)
         runs_by_task = Array(runs).group_by(&:task_ref)
         siblings_for(task, tasks).select do |candidate|
-          candidate.status == :blocked && latest_run_verification_blocked?(candidate, runs_by_task.fetch(candidate.ref, []).last)
+          candidate.status == :blocked && latest_run_verification_blocked?(runs_by_task.fetch(candidate.ref, []).last, current_snapshot)
         end.map(&:ref)
       end
 
@@ -50,31 +42,20 @@ module A3
         end
       end
 
-      def latest_run_verification_blocked?(task, run)
+      def latest_run_verification_blocked?(run, current_snapshot)
         return false unless run&.terminal_outcome == :blocked
 
-        diagnosis = run.phase_records.reverse_each.find { |record| !record.blocked_diagnosis.nil? }&.blocked_diagnosis
+        phase_record = run.phase_records.reverse_each.find { |record| !record.blocked_diagnosis.nil? }
+        diagnosis = phase_record&.blocked_diagnosis
         return false unless diagnosis&.error_category == "verification_failed"
 
-        run.source_descriptor.ref == parent_integration_ref_for(task.parent_ref)
+        diagnostics = phase_record.execution_record&.diagnostics || {}
+        diagnostics["inherited_parent_ref"] == current_snapshot.ref &&
+          diagnostics["inherited_parent_head"] == current_snapshot.head
       end
 
       def healthy_assessment
         Assessment.new(healthy: true, reason: :healthy, blocking_task_refs: [].freeze)
-      end
-
-      def parent_integration_ref_for(parent_ref)
-        parts = ["refs/heads/a2o"]
-        parts << @branch_namespace if @branch_namespace
-        parts << "parent"
-        parts << parent_ref.to_s.tr("#", "-")
-        parts.join("/")
-      end
-
-      def normalize_branch_namespace(value)
-        normalized = value.to_s.strip.gsub(%r{[^A-Za-z0-9._/-]}, "-").gsub(%r{/+}, "/").gsub(%r{\A/+|/+\z}, "")
-        normalized = normalized.split("/").map { |part| part.sub(/\Aa3(?:-|\z)/, "") }.reject(&:empty?).join("/")
-        normalized.empty? ? nil : normalized
       end
     end
   end

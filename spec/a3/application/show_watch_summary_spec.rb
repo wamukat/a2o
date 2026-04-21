@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe A3::Application::ShowWatchSummary do
+  let(:inherited_parent_state_resolver) { instance_double("InheritedParentStateResolver") }
+  let(:upstream_line_guard) { A3::Domain::UpstreamLineGuard.new(inherited_parent_state_resolver: inherited_parent_state_resolver) }
   subject(:use_case) do
     described_class.new(
       task_repository: task_repository,
@@ -10,13 +12,18 @@ RSpec.describe A3::Application::ShowWatchSummary do
         "Sample#1" => { "title" => "Running task", "status" => "In progress" },
         "Sample#2" => { "title" => "Blocked task", "status" => "To do" },
         "Sample#3" => { "title" => "Parent task", "status" => "To do" }
-      }
+      },
+      upstream_line_guard: upstream_line_guard
     )
   end
 
   let(:task_repository) { A3::Infra::InMemoryTaskRepository.new }
   let(:run_repository) { A3::Infra::InMemoryRunRepository.new }
   let(:scheduler_state_repository) { A3::Infra::InMemorySchedulerStateRepository.new }
+
+  before do
+    allow(inherited_parent_state_resolver).to receive(:snapshot_for).and_return(nil)
+  end
 
   it "summarizes scheduler state, task tree ordering, and kanban mismatch markers" do
     running_task = A3::Domain::Task.new(
@@ -381,6 +388,12 @@ RSpec.describe A3::Application::ShowWatchSummary do
     task_repository.save(parent_task)
     task_repository.save(blocked_task)
     task_repository.save(waiting_task)
+    allow(inherited_parent_state_resolver).to receive(:snapshot_for).with(
+      task: waiting_task,
+      phase: :implementation
+    ).and_return(
+      Struct.new(:ref, :head).new(parent_ref, "parent-head-1")
+    )
     run_repository.save(
       A3::Domain::Run.new(
         ref: "run-20",
@@ -437,6 +450,13 @@ RSpec.describe A3::Application::ShowWatchSummary do
           failing_command: "commands/verify-all",
           diagnostic_summary: "verification failed",
           infra_diagnostics: {}
+        ),
+        execution_record: A3::Domain::PhaseExecutionRecord.new(
+          summary: "verification failed",
+          diagnostics: {
+            "inherited_parent_ref" => parent_ref,
+            "inherited_parent_head" => "parent-head-1"
+          }
         )
       )
     )

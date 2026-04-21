@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "a3/infra/integration_ref_readiness_checker"
+require "a3/infra/inherited_parent_state_resolver"
 
 module A3
   module Bootstrap
@@ -13,6 +14,7 @@ module A3
             run_id_generator: run_id_generator
           )
           integration_ref_readiness_checker = A3::Infra::IntegrationRefReadinessChecker.new(repo_sources: repo_sources)
+          inherited_parent_state_resolver = A3::Infra::InheritedParentStateResolver.new(repo_sources: repo_sources)
           parent_review_disposition_handler = build_parent_review_disposition_handler(external_follow_up_child_writer)
           register_started_run = A3::Application::RegisterStartedRun.new(
             task_repository: repositories.fetch(:task_repository),
@@ -55,6 +57,7 @@ module A3
             build_scope_snapshot: build_scope_snapshot,
             build_artifact_owner: build_artifact_owner,
             integration_ref_readiness_checker: integration_ref_readiness_checker,
+            inherited_parent_state_resolver: inherited_parent_state_resolver,
             workspace_provisioner: workspace_provisioner,
             prepare_workspace: prepare_workspace,
             plan_rerun: A3::Application::PlanRerun.new,

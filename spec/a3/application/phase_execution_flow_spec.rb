@@ -19,13 +19,15 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
   end
   let(:prepare_workspace) { instance_double(A3::Application::PrepareWorkspace) }
   let(:strategy) { instance_double("ExecutionStrategy") }
+  let(:inherited_parent_state_resolver) { instance_double("InheritedParentStateResolver") }
 
   subject(:flow) do
     described_class.new(
       task_repository: task_repository,
       run_repository: run_repository,
       register_completed_run: register_completed_run,
-      prepare_workspace: prepare_workspace
+      prepare_workspace: prepare_workspace,
+      inherited_parent_state_resolver: inherited_parent_state_resolver
     )
   end
 
@@ -89,6 +91,7 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
   end
 
   before do
+    allow(inherited_parent_state_resolver).to receive(:snapshot_for).and_return(nil)
     task_repository.save(task)
     run_repository.save(run)
   end
@@ -208,5 +211,43 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
     expect(result.task.status).to eq(:blocked)
     expect(result.run.phase_records.last.blocked_diagnosis&.expected_state).to eq("phase succeeds")
     expect(result.run.phase_records.last.execution_record.runtime_snapshot.phase).to eq(:implementation)
+  end
+
+  it "persists inherited parent state in the execution record when present" do
+    prepared_workspace = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: :ticket_workspace,
+      root_path: "/tmp/work",
+      source_descriptor: run.source_descriptor,
+      slot_paths: { repo_alpha: "/tmp/work/repo-alpha" }
+    )
+    execution = A3::Application::ExecutionResult.new(success: true, summary: "completed")
+
+    allow(inherited_parent_state_resolver).to receive(:snapshot_for).with(task: task, phase: :implementation).and_return(
+      Struct.new(:ref, :head) do
+        def to_h
+          { "inherited_parent_ref" => ref, "inherited_parent_head" => head }
+        end
+      end.new("refs/heads/a2o/parent/A3-v2-3022", "parent-head-1")
+    )
+    allow(prepare_workspace).to receive(:call).and_return(
+      A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
+    )
+    allow(strategy).to receive(:execute).and_return(execution)
+    allow(strategy).to receive(:verification_summary).with(execution).and_return(nil)
+    allow(strategy).to receive(:blocked_expected_state).and_return("phase succeeds")
+    allow(strategy).to receive(:blocked_default_failing_command).and_return("adapter")
+    allow(strategy).to receive(:blocked_extra_diagnostics).with(execution).and_return(execution.diagnostics)
+
+    result = flow.call(
+      task_ref: task.ref,
+      run_ref: run.ref,
+      project_context: project_context,
+      strategy: strategy
+    )
+
+    expect(result.run.phase_records.last.execution_record.diagnostics).to include(
+      "inherited_parent_ref" => "refs/heads/a2o/parent/A3-v2-3022",
+      "inherited_parent_head" => "parent-head-1"
+    )
   end
 end

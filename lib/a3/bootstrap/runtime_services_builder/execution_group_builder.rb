@@ -21,7 +21,8 @@ module A3
               register_completed_run: support_group.fetch(:register_completed_run),
               prepare_workspace: support_group.fetch(:prepare_workspace),
               worker_gateway: worker_gateway,
-              task_packet_builder: build_worker_task_packet
+              task_packet_builder: build_worker_task_packet,
+              inherited_parent_state_resolver: support_group.fetch(:inherited_parent_state_resolver)
             ),
             run_verification: A3::Application::RunVerification.new(
               task_repository: repositories.fetch(:task_repository),
@@ -29,7 +30,8 @@ module A3
               register_completed_run: support_group.fetch(:register_completed_run),
               command_runner: command_runner,
               prepare_workspace: support_group.fetch(:prepare_workspace),
-              task_packet_builder: build_worker_task_packet
+              task_packet_builder: build_worker_task_packet,
+              inherited_parent_state_resolver: support_group.fetch(:inherited_parent_state_resolver)
             ),
             run_merge: A3::Application::RunMerge.new(
               task_repository: repositories.fetch(:task_repository),

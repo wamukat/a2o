@@ -8,10 +8,11 @@ module A3
     class PhaseExecutionFlow
       Result = Struct.new(:task, :run, :workspace, keyword_init: true)
 
-      def initialize(task_repository:, run_repository:, register_completed_run:, prepare_workspace:, blocked_diagnosis_factory: A3::Domain::BlockedDiagnosisFactory.new)
+      def initialize(task_repository:, run_repository:, register_completed_run:, prepare_workspace:, inherited_parent_state_resolver: nil, blocked_diagnosis_factory: A3::Domain::BlockedDiagnosisFactory.new)
         @task_repository = task_repository
         @run_repository = run_repository
         @register_completed_run = register_completed_run
+        @inherited_parent_state_resolver = inherited_parent_state_resolver
         @blocked_diagnosis_factory = blocked_diagnosis_factory
         @orchestrator = A3::Application::PhaseExecutionOrchestrator.new(
           run_repository: run_repository,
@@ -70,7 +71,7 @@ module A3
             default_failing_command: strategy.blocked_default_failing_command,
             extra_diagnostics: strategy.blocked_extra_diagnostics(execution)
           ),
-          execution_record: execution_record || default_execution_record(execution: execution, runtime: runtime)
+          execution_record: execution_record || default_execution_record(task: task, run: run, execution: execution, runtime: runtime)
         )
         A3::Infra::WorkspaceTraceLogger.log(
           workspace_root: prepared_workspace.workspace.root_path,
@@ -105,9 +106,13 @@ module A3
         value.to_s.gsub(/[^A-Za-z0-9._:-]/, "-")
       end
 
-      def default_execution_record(execution:, runtime:)
+      def default_execution_record(task:, run:, execution:, runtime:)
+        diagnostics = execution.diagnostics.dup
+        inherited_parent_snapshot = @inherited_parent_state_resolver&.snapshot_for(task: task, phase: run.phase)
+        diagnostics.merge!(inherited_parent_snapshot.to_h) if inherited_parent_snapshot
+
         A3::Domain::PhaseExecutionRecord.from_execution_result(
-          execution,
+          execution.with_diagnostics(diagnostics),
           runtime_snapshot: A3::Domain::PhaseRuntimeSnapshot.from_phase_runtime(runtime)
         )
       end

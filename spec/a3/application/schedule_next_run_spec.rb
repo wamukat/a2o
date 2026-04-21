@@ -8,6 +8,8 @@ RSpec.describe A3::Application::ScheduleNextRun do
   let(:build_scope_snapshot) { A3::Application::BuildScopeSnapshot.new }
   let(:build_artifact_owner) { A3::Application::BuildArtifactOwner.new }
   let(:integration_ref_readiness_checker) { instance_double(A3::Infra::IntegrationRefReadinessChecker, check: readiness_result) }
+  let(:inherited_parent_state_resolver) { instance_double("InheritedParentStateResolver") }
+  let(:upstream_line_guard) { A3::Domain::UpstreamLineGuard.new(inherited_parent_state_resolver: inherited_parent_state_resolver) }
   let(:readiness_result) do
     A3::Infra::IntegrationRefReadinessChecker::Result.new(
       ready: true,
@@ -23,7 +25,8 @@ RSpec.describe A3::Application::ScheduleNextRun do
       build_scope_snapshot: build_scope_snapshot,
       build_artifact_owner: build_artifact_owner,
       run_repository: run_repository,
-      integration_ref_readiness_checker: integration_ref_readiness_checker
+      integration_ref_readiness_checker: integration_ref_readiness_checker,
+      upstream_line_guard: upstream_line_guard
     )
   end
 
@@ -53,6 +56,7 @@ RSpec.describe A3::Application::ScheduleNextRun do
   end
 
   before do
+    allow(inherited_parent_state_resolver).to receive(:snapshot_for).and_return(nil)
     task_repository.save(task)
   end
 
@@ -196,7 +200,20 @@ RSpec.describe A3::Application::ScheduleNextRun do
         failing_command: "commands/verify-all",
         diagnostic_summary: "verification failed",
         infra_diagnostics: {}
+      ),
+      execution_record: A3::Domain::PhaseExecutionRecord.new(
+        summary: "verification failed",
+        diagnostics: {
+          "inherited_parent_ref" => parent_ref,
+          "inherited_parent_head" => "parent-head-1"
+        }
       )
+    )
+    allow(inherited_parent_state_resolver).to receive(:snapshot_for).with(
+      task: task,
+      phase: :implementation
+    ).and_return(
+      Struct.new(:ref, :head).new(parent_ref, "parent-head-1")
     )
     run_repository.save(verification_blocked_run)
     task_repository.save(
@@ -274,7 +291,20 @@ RSpec.describe A3::Application::ScheduleNextRun do
         failing_command: "commands/verify-all",
         diagnostic_summary: "verification failed",
         infra_diagnostics: {}
+      ),
+      execution_record: A3::Domain::PhaseExecutionRecord.new(
+        summary: "verification failed",
+        diagnostics: {
+          "inherited_parent_ref" => parent_ref,
+          "inherited_parent_head" => "parent-head-1"
+        }
       )
+    )
+    allow(inherited_parent_state_resolver).to receive(:snapshot_for).with(
+      task: have_attributes(ref: "A3-v2#3030"),
+      phase: :verification
+    ).and_return(
+      Struct.new(:ref, :head).new(parent_ref, "parent-head-1")
     )
     run_repository.save(verification_blocked_run)
     task_repository.save(

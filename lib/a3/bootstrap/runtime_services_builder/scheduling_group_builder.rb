@@ -25,7 +25,10 @@ module A3
             build_scope_snapshot: support_group.fetch(:build_scope_snapshot),
             build_artifact_owner: support_group.fetch(:build_artifact_owner),
             run_repository: repositories.fetch(:run_repository),
-            integration_ref_readiness_checker: support_group.fetch(:integration_ref_readiness_checker)
+            integration_ref_readiness_checker: support_group.fetch(:integration_ref_readiness_checker),
+            upstream_line_guard: A3::Domain::UpstreamLineGuard.new(
+              inherited_parent_state_resolver: support_group.fetch(:inherited_parent_state_resolver)
+            )
           )
 
           {

@@ -3,7 +3,10 @@
 require "a3/domain/upstream_line_guard"
 
 RSpec.describe A3::Domain::UpstreamLineGuard do
-  subject(:guard) { described_class.new }
+  Snapshot = Struct.new(:ref, :head, keyword_init: true)
+
+  let(:resolver) { instance_double("InheritedParentStateResolver") }
+  subject(:guard) { described_class.new(inherited_parent_state_resolver: resolver) }
 
   let(:task) do
     A3::Domain::Task.new(
@@ -38,18 +41,22 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
     )
   end
 
+  let(:current_snapshot) do
+    Snapshot.new(
+      ref: "refs/heads/a2o/parent/A3-v2-3022",
+      head: "parent-head-1"
+    )
+  end
+
   let(:verification_blocked_run) do
-    parent_ref = "refs/heads/a2o/parent/A3-v2-3022"
     A3::Domain::Run.new(
       ref: "run-3031",
       task_ref: blocked_sibling.ref,
       phase: :verification,
       workspace_kind: :runtime_workspace,
-      source_descriptor: A3::Domain::SourceDescriptor.new(
-        workspace_kind: :runtime_workspace,
-        source_type: :integration_record,
-        ref: parent_ref,
-        task_ref: blocked_sibling.ref
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(
+        task_ref: blocked_sibling.ref,
+        ref: current_snapshot.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
         edit_scope: [:repo_beta],
@@ -74,11 +81,9 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
           task_ref: blocked_sibling.ref,
           phase_ref: :verification
         ),
-        source_descriptor: A3::Domain::SourceDescriptor.new(
-          workspace_kind: :runtime_workspace,
-          source_type: :integration_record,
-          ref: parent_ref,
-          task_ref: blocked_sibling.ref
+        source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(
+          task_ref: blocked_sibling.ref,
+          ref: current_snapshot.ref
         ),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(
           edit_scope: [:repo_beta],
@@ -95,17 +100,27 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
         failing_command: "commands/verify-all",
         diagnostic_summary: "verification failed",
         infra_diagnostics: {}
+      ),
+      execution_record: A3::Domain::PhaseExecutionRecord.new(
+        summary: "verification failed",
+        diagnostics: {
+          "inherited_parent_ref" => current_snapshot.ref,
+          "inherited_parent_head" => current_snapshot.head
+        }
       )
     )
   end
 
-  it "holds child implementation when a sibling is blocked on verification" do
+  before do
+    allow(resolver).to receive(:snapshot_for).and_return(current_snapshot)
+  end
+
+  it "holds child implementation when a sibling is blocked on verification for the same inherited parent head" do
     assessment = guard.evaluate(
       task: task,
       phase: :implementation,
       tasks: [task, blocked_sibling, healthy_sibling],
-      runs: [verification_blocked_run],
-      source_ref: "refs/heads/a2o/work/A3-v2-3030"
+      runs: [verification_blocked_run]
     )
 
     expect(assessment.healthy?).to eq(false)
@@ -113,7 +128,7 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
     expect(assessment.blocking_task_refs).to eq([blocked_sibling.ref])
   end
 
-  it "also holds resumed child verification against the same parent line" do
+  it "holds ordinary child verification against the same inherited parent head" do
     verifying_task = A3::Domain::Task.new(
       ref: task.ref,
       kind: :child,
@@ -127,8 +142,7 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
       task: verifying_task,
       phase: :verification,
       tasks: [verifying_task, blocked_sibling, healthy_sibling],
-      runs: [verification_blocked_run],
-      source_ref: "refs/heads/a2o/parent/A3-v2-3022"
+      runs: [verification_blocked_run]
     )
 
     expect(assessment.healthy?).to eq(false)
@@ -141,11 +155,9 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
       task_ref: blocked_sibling.ref,
       phase: :implementation,
       workspace_kind: :ticket_workspace,
-      source_descriptor: A3::Domain::SourceDescriptor.new(
-        workspace_kind: :ticket_workspace,
-        source_type: :branch_head,
-        ref: "refs/heads/a2o/work/A3-v2-3031",
-        task_ref: blocked_sibling.ref
+      source_descriptor: A3::Domain::SourceDescriptor.ticket_branch_head(
+        task_ref: blocked_sibling.ref,
+        ref: "refs/heads/a2o/work/A3-v2-3031"
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
         edit_scope: [:repo_beta],
@@ -170,11 +182,9 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
           task_ref: blocked_sibling.ref,
           phase_ref: :implementation
         ),
-        source_descriptor: A3::Domain::SourceDescriptor.new(
-          workspace_kind: :ticket_workspace,
-          source_type: :branch_head,
-          ref: "refs/heads/a2o/work/A3-v2-3031",
-          task_ref: blocked_sibling.ref
+        source_descriptor: A3::Domain::SourceDescriptor.ticket_branch_head(
+          task_ref: blocked_sibling.ref,
+          ref: "refs/heads/a2o/work/A3-v2-3031"
         ),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(
           edit_scope: [:repo_beta],
@@ -191,6 +201,13 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
         failing_command: "codex exec --json -",
         diagnostic_summary: "executor failed",
         infra_diagnostics: {}
+      ),
+      execution_record: A3::Domain::PhaseExecutionRecord.new(
+        summary: "executor failed",
+        diagnostics: {
+          "inherited_parent_ref" => current_snapshot.ref,
+          "inherited_parent_head" => current_snapshot.head
+        }
       )
     )
 
@@ -198,15 +215,30 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
       task: task,
       phase: :implementation,
       tasks: [task, blocked_sibling, healthy_sibling],
-      runs: [executor_failed_run],
-      source_ref: "refs/heads/a2o/work/A3-v2-3030"
+      runs: [executor_failed_run]
     )
 
     expect(assessment.healthy?).to eq(true)
     expect(assessment.blocking_task_refs).to eq([])
   end
 
-  it "does not hold merge-recovery verification against a non-parent source ref" do
+  it "does not hold child work when the current inherited parent head has advanced" do
+    allow(resolver).to receive(:snapshot_for).and_return(
+      Snapshot.new(ref: current_snapshot.ref, head: "parent-head-2")
+    )
+
+    assessment = guard.evaluate(
+      task: task,
+      phase: :implementation,
+      tasks: [task, blocked_sibling, healthy_sibling],
+      runs: [verification_blocked_run]
+    )
+
+    expect(assessment.healthy?).to eq(true)
+    expect(assessment.blocking_task_refs).to eq([])
+  end
+
+  it "does not hold merge-recovery verification when there is no inherited parent snapshot" do
     verifying_task = A3::Domain::Task.new(
       ref: task.ref,
       kind: :child,
@@ -216,13 +248,13 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
       parent_ref: task.parent_ref,
       verification_source_ref: "refs/heads/main"
     )
+    allow(resolver).to receive(:snapshot_for).with(task: verifying_task, phase: :verification).and_return(nil)
 
     assessment = guard.evaluate(
       task: verifying_task,
       phase: :verification,
       tasks: [verifying_task, blocked_sibling, healthy_sibling],
-      runs: [verification_blocked_run],
-      source_ref: "refs/heads/main"
+      runs: [verification_blocked_run]
     )
 
     expect(assessment.healthy?).to eq(true)

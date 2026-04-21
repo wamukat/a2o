@@ -46,6 +46,17 @@ module A3
 
         nil
       end
+
+      def with_diagnostics(value)
+        self.class.new(
+          success: success?,
+          summary: summary,
+          failing_command: failing_command,
+          observed_state: observed_state,
+          diagnostics: value,
+          response_bundle: response_bundle
+        )
+      end
     end
   end
 end

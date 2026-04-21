@@ -56,8 +56,7 @@ module A3
 
         plan.assessments.each do |assessment|
           next unless assessment.runnable?
-          source_ref = @phase_source_policy.source_descriptor_for(task: assessment.task, phase: assessment.phase).ref
-          next unless upstream_healthy?(task: assessment.task, phase: assessment.phase, tasks: tasks, runs: runs, source_ref: source_ref)
+          next unless upstream_healthy?(task: assessment.task, phase: assessment.phase, tasks: tasks, runs: runs)
 
           return [assessment.task, assessment.phase]
         end
@@ -65,13 +64,12 @@ module A3
         [nil, nil]
       end
 
-      def upstream_healthy?(task:, phase:, tasks:, runs:, source_ref:)
+      def upstream_healthy?(task:, phase:, tasks:, runs:)
         @upstream_line_guard.evaluate(
           task: task,
           phase: phase,
           tasks: tasks,
-          runs: runs,
-          source_ref: source_ref
+          runs: runs
         ).healthy?
       end
 

@@ -3,7 +3,6 @@
 require_relative "../domain/task_phase_projection"
 require_relative "../domain/runnable_task_assessment"
 require_relative "../domain/upstream_line_guard"
-require_relative "../domain/phase_source_policy"
 
 module A3
   module Application
@@ -44,14 +43,13 @@ module A3
         keyword_init: true
       )
 
-      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {}, upstream_line_guard: A3::Domain::UpstreamLineGuard.new, phase_source_policy: A3::Domain::PhaseSourcePolicy.new)
+      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {}, upstream_line_guard: A3::Domain::UpstreamLineGuard.new)
         @task_repository = task_repository
         @run_repository = run_repository
         @scheduler_state_repository = scheduler_state_repository
         @kanban_snapshots_by_ref = kanban_snapshots_by_ref || {}
         @kanban_snapshots_by_id = kanban_snapshots_by_id || {}
         @upstream_line_guard = upstream_line_guard
-        @phase_source_policy = phase_source_policy
       end
 
       def call
@@ -86,11 +84,7 @@ module A3
         latest_phase = resolve_latest_phase(task: task, current_run: current_run, latest_run: latest_run)
         running_entry = build_running_entry(task, run: current_run)
         runnable_phase = task.runnable_phase
-        source_ref =
-          if runnable_phase
-            @phase_source_policy.source_descriptor_for(task: task, phase: runnable_phase).ref
-          end
-        upstream_assessment = @upstream_line_guard.evaluate(task: task, phase: runnable_phase, tasks: tasks, runs: runs, source_ref: source_ref)
+        upstream_assessment = @upstream_line_guard.evaluate(task: task, phase: runnable_phase, tasks: tasks, runs: runs)
         blocked_lines = build_detail_lines(task, latest_run, assessment, upstream_assessment)
         kanban_snapshot = resolve_kanban_snapshot(task)
         waiting = waiting_assessment?(assessment) || !upstream_assessment.healthy?
