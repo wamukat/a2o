@@ -39,6 +39,7 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
   end
 
   let(:verification_blocked_run) do
+    parent_ref = "refs/heads/a2o/parent/A3-v2-3022"
     A3::Domain::Run.new(
       ref: "run-3031",
       task_ref: blocked_sibling.ref,
@@ -46,8 +47,8 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
       workspace_kind: :runtime_workspace,
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
-        source_type: :branch_head,
-        ref: "refs/heads/a2o/work/A3-v2-3031",
+        source_type: :integration_record,
+        ref: parent_ref,
         task_ref: blocked_sibling.ref
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -75,8 +76,8 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
         ),
         source_descriptor: A3::Domain::SourceDescriptor.new(
           workspace_kind: :runtime_workspace,
-          source_type: :branch_head,
-          ref: "refs/heads/a2o/work/A3-v2-3031",
+          source_type: :integration_record,
+          ref: parent_ref,
           task_ref: blocked_sibling.ref
         ),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -103,7 +104,8 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
       task: task,
       phase: :implementation,
       tasks: [task, blocked_sibling, healthy_sibling],
-      runs: [verification_blocked_run]
+      runs: [verification_blocked_run],
+      source_ref: "refs/heads/a2o/work/A3-v2-3030"
     )
 
     expect(assessment.healthy?).to eq(false)
@@ -125,7 +127,8 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
       task: verifying_task,
       phase: :verification,
       tasks: [verifying_task, blocked_sibling, healthy_sibling],
-      runs: [verification_blocked_run]
+      runs: [verification_blocked_run],
+      source_ref: "refs/heads/a2o/parent/A3-v2-3022"
     )
 
     expect(assessment.healthy?).to eq(false)
@@ -195,7 +198,31 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
       task: task,
       phase: :implementation,
       tasks: [task, blocked_sibling, healthy_sibling],
-      runs: [executor_failed_run]
+      runs: [executor_failed_run],
+      source_ref: "refs/heads/a2o/work/A3-v2-3030"
+    )
+
+    expect(assessment.healthy?).to eq(true)
+    expect(assessment.blocking_task_refs).to eq([])
+  end
+
+  it "does not hold merge-recovery verification against a non-parent source ref" do
+    verifying_task = A3::Domain::Task.new(
+      ref: task.ref,
+      kind: :child,
+      edit_scope: task.edit_scope,
+      verification_scope: task.verification_scope,
+      status: :verifying,
+      parent_ref: task.parent_ref,
+      verification_source_ref: "refs/heads/main"
+    )
+
+    assessment = guard.evaluate(
+      task: verifying_task,
+      phase: :verification,
+      tasks: [verifying_task, blocked_sibling, healthy_sibling],
+      runs: [verification_blocked_run],
+      source_ref: "refs/heads/main"
     )
 
     expect(assessment.healthy?).to eq(true)

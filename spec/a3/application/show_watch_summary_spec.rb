@@ -353,6 +353,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
   end
 
   it "marks todo children as waiting when a sibling under the same parent is blocked" do
+    parent_ref = "refs/heads/a2o/parent/Sample-10"
     blocked_task = A3::Domain::Task.new(
       ref: "Sample#20",
       kind: :child,
@@ -388,8 +389,8 @@ RSpec.describe A3::Application::ShowWatchSummary do
         workspace_kind: :runtime_workspace,
         source_descriptor: A3::Domain::SourceDescriptor.new(
           workspace_kind: :runtime_workspace,
-          source_type: :branch_head,
-          ref: "refs/heads/a2o/work/Sample-20",
+          source_type: :integration_record,
+          ref: parent_ref,
           task_ref: "Sample#20"
         ),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -417,8 +418,8 @@ RSpec.describe A3::Application::ShowWatchSummary do
           ),
           source_descriptor: A3::Domain::SourceDescriptor.new(
             workspace_kind: :runtime_workspace,
-            source_type: :branch_head,
-            ref: "refs/heads/a2o/work/Sample-20",
+            source_type: :integration_record,
+            ref: parent_ref,
             task_ref: "Sample#20"
           ),
           scope_snapshot: A3::Domain::ScopeSnapshot.new(

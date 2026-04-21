@@ -140,6 +140,7 @@ RSpec.describe A3::Application::ScheduleNextRun do
   end
 
   it "does not start a new child implementation while a sibling is blocked on verification under the same parent line" do
+    parent_ref = "refs/heads/a2o/parent/A3-v2-3022"
     verification_blocked_run = A3::Domain::Run.new(
       ref: "run-3031",
       task_ref: "A3-v2#3031",
@@ -147,8 +148,8 @@ RSpec.describe A3::Application::ScheduleNextRun do
       workspace_kind: :runtime_workspace,
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
-        source_type: :branch_head,
-        ref: "refs/heads/a2o/work/A3-v2-3031",
+        source_type: :integration_record,
+        ref: parent_ref,
         task_ref: "A3-v2#3031"
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -176,8 +177,8 @@ RSpec.describe A3::Application::ScheduleNextRun do
         ),
         source_descriptor: A3::Domain::SourceDescriptor.new(
           workspace_kind: :runtime_workspace,
-          source_type: :branch_head,
-          ref: "refs/heads/a2o/work/A3-v2-3031",
+          source_type: :integration_record,
+          ref: parent_ref,
           task_ref: "A3-v2#3031"
         ),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -217,6 +218,7 @@ RSpec.describe A3::Application::ScheduleNextRun do
   end
 
   it "does not resume child verification while a sibling is blocked on verification under the same parent line" do
+    parent_ref = "refs/heads/a2o/parent/A3-v2-3022"
     verification_blocked_run = A3::Domain::Run.new(
       ref: "run-3031",
       task_ref: "A3-v2#3031",
@@ -224,8 +226,8 @@ RSpec.describe A3::Application::ScheduleNextRun do
       workspace_kind: :runtime_workspace,
       source_descriptor: A3::Domain::SourceDescriptor.new(
         workspace_kind: :runtime_workspace,
-        source_type: :branch_head,
-        ref: "refs/heads/a2o/work/A3-v2-3031",
+        source_type: :integration_record,
+        ref: parent_ref,
         task_ref: "A3-v2#3031"
       ),
       scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -253,8 +255,8 @@ RSpec.describe A3::Application::ScheduleNextRun do
         ),
         source_descriptor: A3::Domain::SourceDescriptor.new(
           workspace_kind: :runtime_workspace,
-          source_type: :branch_head,
-          ref: "refs/heads/a2o/work/A3-v2-3031",
+          source_type: :integration_record,
+          ref: parent_ref,
           task_ref: "A3-v2#3031"
         ),
         scope_snapshot: A3::Domain::ScopeSnapshot.new(
@@ -288,7 +290,8 @@ RSpec.describe A3::Application::ScheduleNextRun do
         ref: "A3-v2#3030",
         edit_scope: [:repo_alpha],
         status: :verifying,
-        parent_ref: task.parent_ref
+        parent_ref: task.parent_ref,
+        verification_source_ref: parent_ref
       )
     )
     task_repository.save(
