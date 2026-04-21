@@ -58,6 +58,7 @@ a2o runtime describe-task <task-ref>
 - ワークスペースとソース参照
 - 証跡の場所
 - カンバンコメントの要約
+- `host_agent_log` を含む operator log の場所
 - `agent_artifact_read` コマンド
 
 エージェント成果物がある場合は、表示されたコマンドで実行コマンドの stdout/stderr やワーカー結果を読む。
@@ -67,6 +68,8 @@ a2o runtime show-artifact <artifact-id>
 ```
 
 生成AIの生ログを A2O 側で見たい場合は、プロジェクトの実行コマンドまたは AI CLI が transcript を stdout / stderr またはワーカー結果に書くようにする。A2O はそれをエージェント実行の成果物として保持する。
+
+`host_agent_log` は scheduler / control-plane / host agent 側の補助診断ログである。source of truth は `describe-task` に出る run、blocked diagnosis、evidence、artifact であり、operator log はそれを補足するために読む。
 
 ## 未整理のリポジトリの直し方
 

@@ -58,6 +58,7 @@ In `describe-task`, check:
 - workspace and source refs
 - evidence location
 - kanban comment summary
+- operator log locations including `host_agent_log`
 - `agent_artifact_read` command
 
 When agent artifacts exist, use the printed command to read executor stdout/stderr or worker results.
@@ -65,6 +66,8 @@ When agent artifacts exist, use the printed command to read executor stdout/stde
 ```sh
 a2o runtime show-artifact <artifact-id>
 ```
+
+`host_agent_log` is a supporting diagnostic log for scheduler, control-plane, and host-agent behavior. The source of truth remains the run, blocked diagnosis, evidence, and artifacts shown by `describe-task`; operator logs support that investigation.
 
 If you need raw Generative AI transcripts in A2O output, configure the project executor or AI CLI to write the transcript to stdout, stderr, or the worker result. A2O stores that as an agent execution artifact.
 

@@ -87,3 +87,24 @@ a2o runtime describe-task <task-ref>
 終了済みワークスペースのクリーンアップと証跡の保持は別である。A2O は使い捨てワークスペースを削除しても、実行を確認するために必要な証跡とブロック診断データを保持できる。
 
 生成された状態は、内部ワークスペースメタデータを除き `.work/a2o/` 配下に置く。
+
+## トレーサビリティ境界
+
+運用者が後から原因を追えるようにするため、A2O は次を分けて扱う。
+
+- 永続的に残すべき source of truth:
+  - 実行 / フェーズ状態
+  - blocked diagnosis
+  - `describe-task` が表示する証跡要約
+  - agent artifact (`combined-log`、worker result など)
+  - カンバンコメント
+- 診断補助として残すべき supporting logs:
+  - host agent log
+  - runtime / server の operator log
+- 再生成可能なので消してよい一時状態:
+  - pid file
+  - exit file
+  - 再起動で再生成される一時ログ
+  - 証跡保持方針と独立に消せる使い捨てワークスペース
+
+`a2o runtime describe-task <task-ref>` は、まず永続証跡を案内し、その後で supporting logs を補助情報として示す。スケジューラ再起動は、設定不備か runtime 障害かを切り分けるために必要な host agent history を消してはならない。

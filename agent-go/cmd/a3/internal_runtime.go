@@ -1634,7 +1634,7 @@ func executeUntilIdleArgs(plan runtimeRunOncePlan) []string {
 
 func runHostAgentLoop(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
 	fmt.Fprintf(stdout, "runtime_host_agent_loop attempts=%d\n", plan.AgentAttempts)
-	_ = os.Remove(plan.HostAgentLog)
+	_ = appendFile(plan.HostAgentLog, []byte(fmt.Sprintf("\n===== host agent session start %s attempts=%d =====\n", time.Now().UTC().Format(time.RFC3339), plan.AgentAttempts)))
 	var agentStatus error
 	for attempt := 1; attempt <= plan.AgentAttempts; attempt++ {
 		fmt.Fprintf(stdout, "runtime_host_agent_attempt=%d\n", attempt)

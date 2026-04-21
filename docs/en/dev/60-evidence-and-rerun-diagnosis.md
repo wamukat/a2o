@@ -87,3 +87,24 @@ a2o runtime describe-task <task-ref>
 Terminal workspace cleanup is separate from evidence retention. A2O may remove disposable workspaces while keeping enough evidence and blocked diagnosis data to inspect the run.
 
 Generated state belongs under `.work/a2o/` unless it is internal workspace metadata.
+
+## Traceability Boundary
+
+For operator diagnosis, A2O treats these layers differently:
+
+- durable sources of truth:
+  - run and phase state
+  - blocked diagnosis
+  - the evidence summary shown by `describe-task`
+  - agent artifacts such as `combined-log` and worker results
+  - kanban comments
+- supporting logs kept for diagnosis:
+  - host agent log
+  - runtime and server operator logs
+- temporary state that may still be cleared:
+  - pid files
+  - exit files
+  - transient logs regenerated for the current process
+  - disposable workspaces, subject to the evidence retention policy
+
+`a2o runtime describe-task <task-ref>` should lead operators to durable evidence first and supporting logs second. A scheduler restart must not erase the host-agent history needed to distinguish configuration problems from runtime or executor failures.

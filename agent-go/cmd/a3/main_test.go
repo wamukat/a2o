@@ -3444,7 +3444,7 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 		"\"task_ref\":\"A2O#16\"",
 		"comment_count=1",
 		"comment[0] id=61 updated=2026-04-18T07:46:17.996Z body=blocked evidence is available",
-		"operator_logs runtime_log=/tmp/a2o-runtime-run-once.log server_log=/tmp/a2o-runtime-run-once-agent-server.log",
+		"operator_logs runtime_log=/tmp/a2o-runtime-run-once.log server_log=/tmp/a2o-runtime-run-once-agent-server.log host_agent_log=",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("describe-task missing %q in:\n%s", want, output)
@@ -3664,11 +3664,56 @@ func TestRuntimeDescribeTaskContinuesWhenRuntimeTaskStateIsUnavailable(t *testin
 		"run run-16 task=A2O#16 phase=implementation workspace=runtime_workspace source=detached_commit:abc outcome=blocked",
 		"--- kanban_task ---",
 		"comment_count=1",
-		"operator_logs runtime_log=/tmp/a2o-runtime-run-once.log server_log=/tmp/a2o-runtime-run-once-agent-server.log",
+		"operator_logs runtime_log=/tmp/a2o-runtime-run-once.log server_log=/tmp/a2o-runtime-run-once-agent-server.log host_agent_log=",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("describe-task missing %q in:\n%s", want, output)
 		}
+	}
+}
+
+func TestRunHostAgentLoopPreservesExistingLogAcrossRestarts(t *testing.T) {
+	tempDir := t.TempDir()
+	hostAgentLog := filepath.Join(tempDir, ".work", "a2o", "runtime-host-agent", "agent.log")
+	if err := os.MkdirAll(filepath.Dir(hostAgentLog), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hostAgentLog, []byte("previous session\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
+	plan := runtimeRunOncePlan{
+		ComposePrefix:   []string{"compose", "-p", "a3-test", "-f", "compose.yml"},
+		AgentAttempts:   1,
+		AgentPort:       "7394",
+		HostAgentBin:    "a2o-agent",
+		HostAgentLog:    hostAgentLog,
+		RuntimeExitFile: "/tmp/a2o-runtime-run-once.exit",
+	}
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+
+	if err := runHostAgentLoop(config, plan, runner, &stdout); err != nil {
+		t.Fatalf("first loop failed: %v", err)
+	}
+	if err := runHostAgentLoop(config, plan, runner, &stdout); err != nil {
+		t.Fatalf("second loop failed: %v", err)
+	}
+
+	body, err := os.ReadFile(hostAgentLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(body)
+	if !strings.Contains(text, "previous session\n") {
+		t.Fatalf("existing log content should be preserved, got:\n%s", text)
+	}
+	if count := strings.Count(text, "===== host agent session start "); count != 2 {
+		t.Fatalf("expected two session headers, got %d in:\n%s", count, text)
+	}
+	if count := strings.Count(text, "===== host agent attempt 001 "); count != 2 {
+		t.Fatalf("expected two attempt headers, got %d in:\n%s", count, text)
 	}
 }
 
