@@ -3,7 +3,11 @@
 require "a3/domain/upstream_line_guard"
 
 RSpec.describe A3::Domain::UpstreamLineGuard do
-  Snapshot = Struct.new(:ref, :head, keyword_init: true)
+  Snapshot = Struct.new(:ref, :heads_by_slot, keyword_init: true) do
+    def fingerprint
+      heads_by_slot.sort_by { |slot, _head| slot.to_s }.map { |slot, head| "#{slot}=#{head}" }.join("|")
+    end
+  end
 
   let(:resolver) { instance_double("InheritedParentStateResolver") }
   subject(:guard) { described_class.new(inherited_parent_state_resolver: resolver) }
@@ -44,7 +48,10 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
   let(:current_snapshot) do
     Snapshot.new(
       ref: "refs/heads/a2o/parent/A3-v2-3022",
-      head: "parent-head-1"
+      heads_by_slot: {
+        "repo_alpha" => "parent-head-alpha-1",
+        "repo_beta" => "parent-head-beta-1"
+      }
     )
   end
 
@@ -105,7 +112,7 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
         summary: "verification failed",
         diagnostics: {
           "inherited_parent_ref" => current_snapshot.ref,
-          "inherited_parent_head" => current_snapshot.head
+          "inherited_parent_state_fingerprint" => current_snapshot.fingerprint
         }
       )
     )
@@ -206,7 +213,7 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
         summary: "executor failed",
         diagnostics: {
           "inherited_parent_ref" => current_snapshot.ref,
-          "inherited_parent_head" => current_snapshot.head
+          "inherited_parent_state_fingerprint" => current_snapshot.fingerprint
         }
       )
     )
@@ -224,7 +231,13 @@ RSpec.describe A3::Domain::UpstreamLineGuard do
 
   it "does not hold child work when the current inherited parent head has advanced" do
     allow(resolver).to receive(:snapshot_for).and_return(
-      Snapshot.new(ref: current_snapshot.ref, head: "parent-head-2")
+      Snapshot.new(
+        ref: current_snapshot.ref,
+        heads_by_slot: {
+          "repo_alpha" => "parent-head-alpha-2",
+          "repo_beta" => "parent-head-beta-2"
+        }
+      )
     )
 
     assessment = guard.evaluate(

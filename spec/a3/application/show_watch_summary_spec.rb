@@ -392,7 +392,11 @@ RSpec.describe A3::Application::ShowWatchSummary do
       task: waiting_task,
       phase: :implementation
     ).and_return(
-      Struct.new(:ref, :head).new(parent_ref, "parent-head-1")
+      Struct.new(:ref, :heads_by_slot) do
+        def fingerprint
+          heads_by_slot.sort_by { |slot, _head| slot.to_s }.map { |slot, head| "#{slot}=#{head}" }.join("|")
+        end
+      end.new(parent_ref, { "repo_alpha" => "parent-head-alpha-1", "repo_beta" => "parent-head-beta-1" })
     )
     run_repository.save(
       A3::Domain::Run.new(
@@ -455,7 +459,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
           summary: "verification failed",
           diagnostics: {
             "inherited_parent_ref" => parent_ref,
-            "inherited_parent_head" => "parent-head-1"
+            "inherited_parent_state_fingerprint" => "repo_alpha=parent-head-alpha-1|repo_beta=parent-head-beta-1"
           }
         )
       )

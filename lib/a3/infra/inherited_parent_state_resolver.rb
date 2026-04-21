@@ -6,9 +6,13 @@ require "pathname"
 module A3
   module Infra
     class InheritedParentStateResolver
-      Snapshot = Struct.new(:ref, :head, keyword_init: true) do
+      Snapshot = Struct.new(:ref, :heads_by_slot, keyword_init: true) do
+        def fingerprint
+          heads_by_slot.sort_by { |slot, _head| slot.to_s }.map { |slot, head| "#{slot}=#{head}" }.join("|")
+        end
+
         def to_h
-          { "inherited_parent_ref" => ref, "inherited_parent_head" => head }
+          { "inherited_parent_ref" => ref, "inherited_parent_state_fingerprint" => fingerprint }
         end
       end
 
@@ -21,10 +25,10 @@ module A3
         ref = inherited_parent_ref_for(task: task, phase: phase)
         return nil unless ref
 
-        head = resolve_consistent_head(ref: ref, repo_slots: task.edit_scope)
-        return nil unless head
+        heads_by_slot = resolve_heads(ref: ref, repo_slots: inherited_repo_slots_for(task))
+        return nil if heads_by_slot.empty?
 
-        Snapshot.new(ref: ref, head: head)
+        Snapshot.new(ref: ref, heads_by_slot: heads_by_slot)
       end
 
       private
@@ -51,16 +55,20 @@ module A3
         source_ref != inherited_parent_ref_for(task: task, phase: :implementation)
       end
 
-      def resolve_consistent_head(ref:, repo_slots:)
-        heads = Array(repo_slots).map(&:to_sym).filter_map do |slot|
+      def resolve_heads(ref:, repo_slots:)
+        Array(repo_slots).map(&:to_sym).each_with_object({}) do |slot, heads|
           source_root = @repo_sources[slot]
           next unless source_root
 
-          resolve_head(source_root: source_root, ref: ref)
-        end.uniq
-        return nil unless heads.size == 1
+          head = resolve_head(source_root: source_root, ref: ref)
+          return {} unless head
 
-        heads.first
+          heads[slot.to_s] = head
+        end.freeze
+      end
+
+      def inherited_repo_slots_for(task)
+        @repo_sources.keys
       end
 
       def resolve_head(source_root:, ref:)

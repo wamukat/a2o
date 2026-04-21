@@ -51,7 +51,7 @@ module A3
 
         diagnostics = phase_record.execution_record&.diagnostics || {}
         diagnostics["inherited_parent_ref"] == current_snapshot.ref &&
-          diagnostics["inherited_parent_head"] == current_snapshot.head
+          diagnostics["inherited_parent_state_fingerprint"] == current_snapshot.fingerprint
       end
 
       def healthy_assessment

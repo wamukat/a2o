@@ -223,11 +223,14 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
     execution = A3::Application::ExecutionResult.new(success: true, summary: "completed")
 
     allow(inherited_parent_state_resolver).to receive(:snapshot_for).with(task: task, phase: :implementation).and_return(
-      Struct.new(:ref, :head) do
+      Struct.new(:ref, :heads_by_slot) do
         def to_h
-          { "inherited_parent_ref" => ref, "inherited_parent_head" => head }
+          {
+            "inherited_parent_ref" => ref,
+            "inherited_parent_state_fingerprint" => heads_by_slot.sort_by { |slot, _head| slot.to_s }.map { |slot, head| "#{slot}=#{head}" }.join("|")
+          }
         end
-      end.new("refs/heads/a2o/parent/A3-v2-3022", "parent-head-1")
+      end.new("refs/heads/a2o/parent/A3-v2-3022", { "repo_alpha" => "parent-head-alpha-1", "repo_beta" => "parent-head-beta-1" })
     )
     allow(prepare_workspace).to receive(:call).and_return(
       A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
@@ -247,7 +250,7 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
 
     expect(result.run.phase_records.last.execution_record.diagnostics).to include(
       "inherited_parent_ref" => "refs/heads/a2o/parent/A3-v2-3022",
-      "inherited_parent_head" => "parent-head-1"
+      "inherited_parent_state_fingerprint" => "repo_alpha=parent-head-alpha-1|repo_beta=parent-head-beta-1"
     )
   end
 end
