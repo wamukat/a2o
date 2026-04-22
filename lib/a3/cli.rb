@@ -1811,12 +1811,14 @@ module A3
 
       source_aliases = options.fetch(:agent_source_aliases, {})
       raise ArgumentError, "--agent-source-alias is required for --agent-shared-workspace-mode agent-materialized" if source_aliases.empty?
+      repo_source_slots = options.fetch(:repo_sources, {}).keys
+      repo_source_slots = nil if repo_source_slots.empty?
 
       A3::Infra::AgentWorkspaceRequestBuilder.new(
         source_aliases: source_aliases,
         repo_slot_policy: A3::Infra::AgentWorkspaceRepoPolicy.new(
           available_slots: source_aliases.keys,
-          required_slots: options.fetch(:repo_sources, {}).keys
+          required_slots: repo_source_slots
         ),
         freshness_policy: options.fetch(:agent_workspace_freshness_policy, :reuse_if_clean_and_ref_matches),
         cleanup_policy: options.fetch(:agent_workspace_cleanup_policy, :retain_until_a3_cleanup),
