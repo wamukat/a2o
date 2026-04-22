@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   soloboard:
-    image: ${KANBALONE_IMAGE:-${SOLOBOARD_IMAGE:-ghcr.io/wamukat/kanbalone:v0.9.16}}
+    image: ${KANBALONE_IMAGE:-${SOLOBOARD_IMAGE:-ghcr.io/wamukat/kanbalone:v0.9.17}}
     environment:
       HOST: 0.0.0.0
       PORT: 3000

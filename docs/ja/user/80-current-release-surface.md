@@ -1,6 +1,6 @@
 # 現在の公開機能
 
-A2O 0.5.8 で現在利用できる公開機能と検証範囲を示す。
+A2O 0.5.9 で現在利用できる公開機能と検証範囲を示す。
 
 この文書は、リリース時点で「利用者に案内してよい機能」と「検証済みとして扱える範囲」を確認するための一覧である。導入手順を知りたい場合は [10-quickstart.md](10-quickstart.md)、設定項目を知りたい場合は [90-project-package-schema.md](90-project-package-schema.md) を読む。
 
@@ -19,11 +19,11 @@ A2O 0.5.8 で現在利用できる公開機能と検証範囲を示す。
 - ランタイム診断・復旧: `a2o runtime image-digest`、`doctor`、`watch-summary`、`logs <task-ref>`、`describe-task <task-ref>`、`reset-task <task-ref>`、`show-artifact <artifact-id>`
 - アップグレード診断: `a2o upgrade check`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
-- Kanbalone アダプターと初期化ツール。既定の Kanbalone イメージは `v0.9.16`
+- Kanbalone アダプターと初期化ツール。既定の Kanbalone イメージは `v0.9.17`
 - エージェント HTTP ワーカー境界
 - エージェントが具体化するワークスペース方式
 - TypeScript、Go、Python、複数リポジトリタスクテンプレートの参照用プロダクトパッケージ
-- GHCR ランタイムイメージタグ: `latest`、`0.5.8`、`sha-*`
+- GHCR ランタイムイメージタグ: `latest`、`0.5.9`、`sha-*`
 - ローカルリリース判定: RSpec 全体
 
 ## 検証範囲

@@ -2,7 +2,7 @@ ARG GO_VERSION=1.26.2
 
 FROM golang:${GO_VERSION}-bookworm AS agent-builder
 
-ARG A3_AGENT_VERSION=0.5.8
+ARG A3_AGENT_VERSION=0.5.9
 
 WORKDIR /src/agent-go
 
@@ -16,7 +16,7 @@ RUN DIST_DIR=/opt/a2o/agents VERSION="${A3_AGENT_VERSION}" ./scripts/build-relea
 
 FROM ruby:3.1-slim
 
-ARG A3_IMAGE_VERSION=0.5.8
+ARG A3_IMAGE_VERSION=0.5.9
 ARG GO_TASK_VERSION=3.41.0
 ARG BUNDLER_VERSION=2.5.22
 
