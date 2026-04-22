@@ -136,8 +136,15 @@ func TestWorkerUsesEngineProvidedAgentEnvironmentForMaterialization(t *testing.T
 	result, idle, err := Worker{
 		AgentName: "host-local",
 		Client:    client,
-		Executor:  envAwareWorkerProtocolExecutor{key: "A3_ENGINE_MANAGED_ENV", value: "true"},
-		Now:       func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+		Executor: envAwareWorkerProtocolExecutor{
+			key:   "A3_ENGINE_MANAGED_ENV",
+			value: "true",
+			checks: map[string]string{
+				"AUTOMATION_ISSUE_WORKSPACE": filepath.Join(tmp, "engine-managed-workspaces", "Sample-42-ticket"),
+				"MAVEN_REPO_LOCAL":           filepath.Join(tmp, "engine-managed-workspaces", "Sample-42-ticket", ".work", "m2", "repository"),
+			},
+		},
+		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
 	}.RunOnce()
 	if err != nil {
 		t.Fatal(err)
@@ -344,14 +351,21 @@ type workerProtocolExecutor struct {
 }
 
 type envAwareWorkerProtocolExecutor struct {
-	key   string
-	value string
+	key    string
+	value  string
+	checks map[string]string
 }
 
 func (executor envAwareWorkerProtocolExecutor) Execute(request JobRequest) ExecutionResult {
 	if request.Env[executor.key] != executor.value {
 		code := 1
 		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte("missing engine-managed agent environment")}
+	}
+	for key, value := range executor.checks {
+		if request.Env[key] != value {
+			code := 1
+			return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte("missing workspace automation environment")}
+		}
 	}
 	return workerProtocolExecutor{requireSlotPaths: true}.Execute(request)
 }

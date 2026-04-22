@@ -526,6 +526,8 @@ func workerProtocolEnv(base map[string]string, workspaceRoot string, hasWorkerPr
 	}
 	env["A2O_WORKSPACE_ROOT"] = workspaceRoot
 	env["A2O_WORKER_RESULT_PATH"] = workerResultPath(workspaceRoot)
+	env["AUTOMATION_ISSUE_WORKSPACE"] = workspaceRoot
+	env["MAVEN_REPO_LOCAL"] = filepath.Join(workspaceRoot, ".work", "m2", "repository")
 	if hasWorkerProtocolRequest {
 		env["A2O_WORKER_REQUEST_PATH"] = workerRequestPath(workspaceRoot)
 	}

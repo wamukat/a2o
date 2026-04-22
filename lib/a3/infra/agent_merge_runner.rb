@@ -209,6 +209,7 @@ module A3
       end
 
       def build_merge_recovery_worker_request(merge_plan, recovery_candidate)
+        working_dir = first_recovery_runtime_path(recovery_candidate) || "."
         A3::Domain::AgentJobRequest.new(
           job_id: recovery_worker_job_id_for(merge_plan),
           task_ref: merge_plan.task_ref,
@@ -219,10 +220,10 @@ module A3
             ref: merge_plan.integration_target.target_ref
           ),
           agent_environment: @agent_environment,
-          working_dir: first_recovery_runtime_path(recovery_candidate) || ".",
+          working_dir: working_dir,
           command: @merge_recovery_command,
           args: @merge_recovery_args,
-          env: @merge_recovery_env.merge("A3_MERGE_RECOVERY" => JSON.generate(recovery_candidate)),
+          env: workspace_automation_env(working_dir).merge(@merge_recovery_env).merge("A3_MERGE_RECOVERY" => JSON.generate(recovery_candidate)),
           timeout_seconds: @timeout_seconds,
           artifact_rules: []
         )
@@ -287,6 +288,15 @@ module A3
             "merge_recovery_required" => true
           }
         )
+      end
+
+      def workspace_automation_env(workspace_root)
+        return {} if workspace_root.to_s.empty? || workspace_root == "."
+
+        {
+          "AUTOMATION_ISSUE_WORKSPACE" => workspace_root,
+          "MAVEN_REPO_LOCAL" => File.join(workspace_root, ".work", "m2", "repository")
+        }
       end
 
       def recovery_infra_failure_result(merge_result, infra_result, recovery_candidate, stage)

@@ -61,6 +61,10 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(request.args).to eq(["-lc", "task test:all"])
     expect(request.phase).to eq(:verification)
     expect(request.runtime_profile).to eq("docker-dev-env")
+    expect(request.env).to include(
+      "AUTOMATION_ISSUE_WORKSPACE" => "/tmp/a3-workspace",
+      "MAVEN_REPO_LOCAL" => "/tmp/a3-workspace/.work/m2/repository"
+    )
     expect(result).to have_attributes(success?: true, summary: "task test:all ok")
     expect(result.diagnostics.fetch("agent_artifacts").fetch(0)).to include(
       "artifact_id" => "command-run-1-verification-job-1-combined-log",
@@ -140,6 +144,10 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     request = client.records.values.first.request
     expect(result.success?).to eq(true)
     expect(request.worker_protocol_request).to eq(worker_protocol_request)
+    expect(request.env).to include(
+      "AUTOMATION_ISSUE_WORKSPACE" => "/tmp/a3-workspace",
+      "MAVEN_REPO_LOCAL" => "/tmp/a3-workspace/.work/m2/repository"
+    )
   end
 
   it "marks remediation command jobs as publishable edit-target mutations" do

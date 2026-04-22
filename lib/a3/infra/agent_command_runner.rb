@@ -32,7 +32,7 @@ module A3
         summaries = []
         artifacts = []
         Array(commands).each do |command|
-          command_env = default_env.merge(@env).merge(env)
+          command_env = default_env.merge(workspace_automation_env(workspace)).merge(@env).merge(env)
           expanded_command = expand_command_placeholders(command, workspace: workspace, env: command_env)
           request = build_job_request(command: expanded_command, workspace: workspace, env: command_env, task: task, run: run, command_intent: command_intent, worker_protocol_request: worker_protocol_request)
           record = enqueue(request)
@@ -183,6 +183,14 @@ module A3
         {
           "A3_ROOT_DIR" => ENV.fetch("A3_ROOT_DIR", Dir.pwd),
           "A2O_ROOT_DIR" => ENV.fetch("A2O_ROOT_DIR", ENV.fetch("A3_ROOT_DIR", Dir.pwd))
+        }
+      end
+
+      def workspace_automation_env(workspace)
+        workspace_root = workspace.root_path.to_s
+        {
+          "AUTOMATION_ISSUE_WORKSPACE" => workspace_root,
+          "MAVEN_REPO_LOCAL" => File.join(workspace_root, ".work", "m2", "repository")
         }
       end
 

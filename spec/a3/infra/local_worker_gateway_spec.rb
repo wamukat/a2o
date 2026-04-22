@@ -102,7 +102,9 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       env: {
         "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
         "A2O_WORKER_RESULT_PATH" => workspace.root_path.join(".a3", "worker-result.json").to_s,
-        "A2O_WORKSPACE_ROOT" => workspace.root_path.to_s
+        "A2O_WORKSPACE_ROOT" => workspace.root_path.to_s,
+        "AUTOMATION_ISSUE_WORKSPACE" => workspace.root_path.to_s,
+        "MAVEN_REPO_LOCAL" => workspace.root_path.join(".work", "m2", "repository").to_s
       }
     ) do
       request_path = workspace.root_path.join(".a3", "worker-request.json")
@@ -174,7 +176,9 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       env: {
         "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
         "A2O_WORKER_RESULT_PATH" => workspace.root_path.join(".a3", "worker-result.json").to_s,
-        "A2O_WORKSPACE_ROOT" => workspace.root_path.to_s
+        "A2O_WORKSPACE_ROOT" => workspace.root_path.to_s,
+        "AUTOMATION_ISSUE_WORKSPACE" => workspace.root_path.to_s,
+        "MAVEN_REPO_LOCAL" => workspace.root_path.join(".work", "m2", "repository").to_s
       }
     ) do
       request = JSON.parse(workspace.root_path.join(".a3", "worker-request.json").read)

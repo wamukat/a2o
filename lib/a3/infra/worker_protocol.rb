@@ -17,11 +17,12 @@ module A3
       end
 
       def env_for(workspace)
+        workspace_root = workspace.root_path.to_s
         {
           "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
           "A2O_WORKER_RESULT_PATH" => result_path(workspace).to_s,
-          "A2O_WORKSPACE_ROOT" => workspace.root_path.to_s
-        }
+          "A2O_WORKSPACE_ROOT" => workspace_root
+        }.merge(workspace_automation_env(workspace_root))
       end
 
       def request_form(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, command_intent: nil)
@@ -173,6 +174,13 @@ module A3
           diagnostics: { "validation_errors" => [message] },
           response_bundle: raw.is_a?(Hash) ? raw : { "raw" => raw }
         )
+      end
+
+      def workspace_automation_env(workspace_root)
+        {
+          "AUTOMATION_ISSUE_WORKSPACE" => workspace_root,
+          "MAVEN_REPO_LOCAL" => File.join(workspace_root, ".work", "m2", "repository")
+        }
       end
 
       def canonicalize_response_bundle(worker_response, workspace:, expected_phase:, diagnostics:, canonical_changed_files: nil)
