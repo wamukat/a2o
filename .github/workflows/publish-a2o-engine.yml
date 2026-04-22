@@ -39,7 +39,7 @@ concurrency:
 
 env:
   IMAGE_NAME: ghcr.io/wamukat/a2o-engine
-  A2O_RELEASE_VERSION: 0.5.14
+  A2O_RELEASE_VERSION: 0.5.15
 
 jobs:
   docker:
