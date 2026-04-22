@@ -17,7 +17,7 @@ module A3
       def call(workspace:, task:, run:, command_intent: nil)
         validate_phase!(run.phase)
         command_intent = normalize_command_intent(command_intent)
-        slots = repo_slots_for(workspace).each_with_object({}) do |slot_name, request_slots|
+        slots = repo_slots_for(workspace: workspace).each_with_object({}) do |slot_name, request_slots|
           alias_name = @source_aliases[slot_name]
           raise A3::Domain::ConfigurationError, "missing agent source alias for #{slot_name}" if alias_name.to_s.empty?
 
@@ -51,11 +51,19 @@ module A3
 
       private
 
-      def repo_slots_for(workspace)
+      def repo_slots_for(workspace:)
         materialized_slots = workspace.slot_paths.keys.map(&:to_sym).uniq.sort
-        return materialized_slots unless materialized_slots.empty?
+        return @repo_slots if materialized_slots.empty?
 
-        @repo_slots
+        return @repo_slots if materialized_slots == @repo_slots
+
+        missing_slots = @repo_slots - materialized_slots
+        extra_slots = materialized_slots - @repo_slots
+        details = []
+        details << "missing=#{missing_slots.join(',')}" unless missing_slots.empty?
+        details << "extra=#{extra_slots.join(',')}" unless extra_slots.empty?
+        raise A3::Domain::ConfigurationError,
+          "materialized workspace slots must match the required agent repo set (#{details.join(' ')})"
       end
 
       def validate_phase!(phase)

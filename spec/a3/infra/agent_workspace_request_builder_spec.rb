@@ -328,7 +328,22 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
 
     expect do
       builder.call(workspace: workspace, task: task, run: run(:verification))
-    end.to raise_error(A3::Domain::ConfigurationError, /missing agent source alias for repo_beta/)
+    end.to raise_error(A3::Domain::ConfigurationError, /extra=repo_beta/)
+  end
+
+  it "fails when the materialized verification workspace omits a required support repo" do
+    partial_workspace = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: :ticket_workspace,
+      root_path: "/tmp/a3-local-workspace",
+      source_descriptor: source_descriptor,
+      slot_paths: {
+        repo_alpha: "/tmp/a3-local-workspace/repo_alpha"
+      }
+    )
+
+    expect do
+      support_ref_builder.call(workspace: partial_workspace, task: task, run: run(:verification))
+    end.to raise_error(A3::Domain::ConfigurationError, /missing=repo_beta/)
   end
 
   it "fails for unsupported merge phase" do
