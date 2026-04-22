@@ -77,6 +77,15 @@ a2o runtime pause
 
 `runtime resume` はタスク処理を常駐実行する。`runtime pause` は現在の作業が終わったあとにスケジューラを止め、新しいタスクを拾わない。`runtime status` はスケジューラが動いているか、pause 済みか、ランタイムイメージが期待通りか、最新実行がどう終わったかを確認する。
 
+スケジューラの選択基準は、カンバンを正本として次の通り固定する。
+
+- `Resolved` / `Archived` のタスクは選択対象にせず、`watch-summary` にも出さない。
+- `Done` は人間が resolve するまで current view に残し、`watch-summary` にも表示する。
+- 未解決の kanban blocker があるタスクは runnable にしない。
+- 親子関係による制約と sibling の順序制約は、kanban blocker に加えて適用する。
+- runnable な候補が複数ある場合は、kanban の priority が高いものを先に選ぶ。
+- priority が同じ場合は task ref で順序を決める。
+
 `runtime run-once` は手動確認や検証用である。スケジューラを使う前に 1 回だけ取り込みたいときや、問題を直した後に再同期したいときに使う。
 
 ```sh

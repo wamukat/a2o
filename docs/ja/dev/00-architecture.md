@@ -30,13 +30,22 @@
 A2O は「カンバンタスクを AI 実行可能なジョブに変換し、検証とマージまで追跡可能に進める」ランタイムである。
 
 1. 利用者がプロジェクトパッケージとカンバンタスクを用意する。
-2. スケジューラが実行可能なタスクを選ぶ。
+2. スケジューラが、カンバンの current task をもとに `Resolved` / `Archived` を除外し、親子制約と blocker 制約を適用したうえで、priority が最も高い runnable task を選ぶ。
 3. Engine がタスク、`project.yaml`、スキル、リポジトリスロットからフェーズジョブを作る。
 4. `a2o-agent` がホスト / 開発環境で実行コマンドを実行する。
 5. 実行コマンドが生成AIとプロダクトのツールチェーンを使って変更を作る。
 6. Engine が検証、マージ、証跡、カンバン状態を管理する。
 
 この流れを支えるために、ドメインモデルはタスクライフサイクルを、ワークスペースモデルはソースとブランチを、エージェント境界は外部コマンド実行を、カンバンアダプターは利用者に見えるタスク状態を担当する。
+
+スケジューラの選択契約は、実装の細部ではなくアーキテクチャの一部として固定する。
+
+- カンバンが current task 集合の正本である。
+- `Done` は人間が resolve するまで current view に残る。
+- `Resolved` / `Archived` は scheduler selection と watch-summary の対象外である。
+- 未解決の kanban blocker は runnable selection を止める。
+- 親子制約と sibling 順序制約は blocker 制約に加えて適用する。
+- runnable な候補は kanban priority を優先し、同順位のときは task ref で並べる。
 
 ## システム概観
 

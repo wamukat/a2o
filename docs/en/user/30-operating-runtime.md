@@ -77,6 +77,15 @@ a2o runtime pause
 
 `runtime resume` runs task processing as a resident scheduler. `runtime pause` reserves scheduler pause after current work finishes and prevents the next task from starting. `runtime status` confirms whether the scheduler is running, whether it is paused, whether the runtime image matches expectations, and how the latest run ended.
 
+Scheduler selection follows the kanban board as the source of truth.
+
+- Tasks in `Resolved` or `Archived` are not scheduling targets and do not appear in `watch-summary`.
+- Tasks in `Done` remain visible and remain part of the current board view until a human resolves them.
+- An unresolved kanban blocker keeps the blocked task out of runnable selection.
+- Parent/child gating and sibling ordering still apply in addition to kanban blockers.
+- When multiple tasks are runnable, the scheduler chooses the highest kanban priority first.
+- If priorities are equal, the scheduler breaks ties by task ref.
+
 Use `runtime run-once` for manual checks, test runs, or a retry after fixing a root cause.
 
 ```sh

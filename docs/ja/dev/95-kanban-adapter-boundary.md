@@ -25,6 +25,19 @@ A2O は自動処理の完了と人間の最終確認を分けて扱う。
 
 そのため Kanbalone スナップショットで `status=Done` かつ `done=false` になっていても正常である。ランタイムのタスク選択、要約表示、報告はレーン / 状態を A2O の自動処理状態として使い、`done=false` をマージ失敗や自動処理未完了として扱ってはいけない。
 
+## スケジューラ選択で読む入力
+
+カンバンアダプターは、スケジューラ選択に使う入力も提供する。
+
+- `status` / レーンは、そのタスクが current view に属するかを決める。
+- `Resolved` / `Archived` は runtime selection と watch-summary の対象外である。
+- `Done` は人間が resolve するまで current view に残す。
+- `priority` はスケジューリング入力として取り込む。priority が高いものを先に選ぶ。
+- `blocking_task_refs` はスケジューリング blocker として取り込む。未解決 blocker があるタスクは runnable にしない。
+- 親子 relation は blocker relation とは別であり、親判定と sibling 進行制御を引き続き担う。
+
+アダプター境界は、snapshot と relation を読むときにこれらの項目と意味論を維持しなければならない。将来の provider がこれらの項目を欠く場合、現在の runtime task selection 契約とは互換でなくなる。
+
 ## アダプター構造
 
 カンバンアクセスは Ruby の操作クライアント境界を中心に構成する。

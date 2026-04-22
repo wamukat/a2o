@@ -25,6 +25,19 @@ A2O distinguishes automation completion from human confirmation.
 
 Therefore a Kanbalone snapshot with `status=Done` and `done=false` is valid. Runtime task selection, watch summary, and reporting must use the lane/status as the A2O automation state and must not treat `done=false` as a failed merge or incomplete automation.
 
+## Scheduler Selection Inputs
+
+The kanban adapter provides the inputs used by scheduler selection.
+
+- `status` / lane determines whether the task is part of the current view.
+- `Resolved` and `Archived` are excluded from runtime selection and watch-summary.
+- `Done` remains part of the current view until a human-resolved transition removes it.
+- `priority` is imported as a scheduling input. Higher kanban priority wins.
+- `blocking_task_refs` are imported as scheduling blockers. An unresolved blocker prevents runnable selection.
+- parent/child relations remain separate from blocker relations and continue to gate parent and sibling progression.
+
+The adapter boundary must preserve these fields and semantics when reading snapshots or relations. If a future provider omits one of these fields, runtime task selection is no longer compatible with the current contract.
+
 ## Adapter Structure
 
 Kanban access is organized around a Ruby operation client boundary:
