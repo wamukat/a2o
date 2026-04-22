@@ -1208,7 +1208,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o kanban url",
 		"a2o runtime up [--build] [--pull]",
 		"a2o runtime down",
-		"a2o runtime start [--interval DURATION]  # start scheduler",
+		"a2o runtime start [--interval DURATION] [--agent-poll-interval DURATION]  # start scheduler",
 		"a2o runtime stop                         # stop scheduler",
 		"a2o runtime status",
 		"a2o runtime image-digest",
@@ -1219,7 +1219,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime logs TASK_REF [--follow]",
 		"a2o runtime show-artifact ARTIFACT_ID",
 		"a2o runtime run-once [--max-steps N] [--agent-attempts N] [--agent-poll-interval DURATION]",
-		"a2o runtime loop [--interval DURATION] [--max-cycles N]",
+		"a2o runtime loop [--interval DURATION] [--max-cycles N] [--agent-poll-interval DURATION]",
 		"a2o agent install [--target auto] [--output PATH] [--build]",
 	} {
 		if !strings.Contains(output, want) {
