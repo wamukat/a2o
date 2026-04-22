@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -90,9 +91,25 @@ func TestExecutorPrefersRequestLiveLogRootOverProcessEnv(t *testing.T) {
 	}
 }
 
+func TestBestEffortWriterSwallowsWriteErrors(t *testing.T) {
+	written, err := bestEffortWriter{writer: errWriter{}}.Write([]byte("hello"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if written != len("hello") {
+		t.Fatalf("written = %d, want %d", written, len("hello"))
+	}
+}
+
 func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}
 	os.Exit(0)
+}
+
+type errWriter struct{}
+
+func (errWriter) Write(_ []byte) (int, error) {
+	return 0, errors.New("disk full")
 }

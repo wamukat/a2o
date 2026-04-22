@@ -20,6 +20,20 @@ type ExecutionResult struct {
 
 type Executor struct{}
 
+type bestEffortWriter struct {
+	writer io.Writer
+}
+
+func (w bestEffortWriter) Write(p []byte) (int, error) {
+	if w.writer == nil {
+		return len(p), nil
+	}
+	if _, err := w.writer.Write(p); err != nil {
+		return len(p), nil
+	}
+	return len(p), nil
+}
+
 func (Executor) Execute(request JobRequest) ExecutionResult {
 	timeout := time.Duration(request.TimeoutSeconds) * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -32,7 +46,7 @@ func (Executor) Execute(request JobRequest) ExecutionResult {
 	writer, cleanup := liveLogWriterFor(request)
 	defer cleanup()
 	if writer != nil {
-		multiWriter := io.MultiWriter(&combined, writer)
+		multiWriter := io.MultiWriter(&combined, bestEffortWriter{writer: writer})
 		cmd.Stdout = multiWriter
 		cmd.Stderr = multiWriter
 	} else {
