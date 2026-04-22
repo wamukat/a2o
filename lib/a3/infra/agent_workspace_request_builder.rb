@@ -3,10 +3,11 @@
 module A3
   module Infra
     class AgentWorkspaceRequestBuilder
-      def initialize(source_aliases:, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, support_ref: nil, support_refs: {}, branch_namespace: ENV.fetch("A2O_BRANCH_NAMESPACE", ENV.fetch("A3_BRANCH_NAMESPACE", nil)))
+      def initialize(source_aliases:, repo_slots: nil, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, support_ref: nil, support_refs: {}, branch_namespace: ENV.fetch("A2O_BRANCH_NAMESPACE", ENV.fetch("A3_BRANCH_NAMESPACE", nil)))
         @source_aliases = source_aliases.transform_keys(&:to_sym).transform_values(&:to_s).freeze
         @branch_namespace = normalize_branch_namespace(branch_namespace)
         @repo_slots = @source_aliases.keys.sort.freeze
+        @required_repo_slots = normalize_required_repo_slots(repo_slots)
         @freshness_policy = freshness_policy.to_sym
         @cleanup_policy = cleanup_policy.to_sym
         @support_refs = normalize_support_refs(support_ref: support_ref, support_refs: support_refs)
@@ -52,13 +53,14 @@ module A3
       private
 
       def repo_slots_for(workspace:)
+        required_slots = @required_repo_slots || @repo_slots
         materialized_slots = workspace.slot_paths.keys.map(&:to_sym).uniq.sort
-        return @repo_slots if materialized_slots.empty?
+        return required_slots if materialized_slots.empty?
 
-        return @repo_slots if materialized_slots == @repo_slots
+        return required_slots if materialized_slots == required_slots
 
-        missing_slots = @repo_slots - materialized_slots
-        extra_slots = materialized_slots - @repo_slots
+        missing_slots = required_slots - materialized_slots
+        extra_slots = materialized_slots - required_slots
         details = []
         details << "missing=#{missing_slots.join(',')}" unless missing_slots.empty?
         details << "extra=#{extra_slots.join(',')}" unless extra_slots.empty?
@@ -149,6 +151,11 @@ module A3
         default_ref = support_ref.to_s.strip
         normalized[:default] = default_ref unless default_ref.empty?
         normalized.freeze
+      end
+
+      def normalize_required_repo_slots(repo_slots)
+        normalized = Array(repo_slots).map(&:to_sym).uniq.sort.freeze
+        normalized.empty? ? nil : normalized
       end
 
       def publish_policy_for(task:, run:, command_intent:)

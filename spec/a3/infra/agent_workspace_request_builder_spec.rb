@@ -346,6 +346,25 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     end.to raise_error(A3::Domain::ConfigurationError, /missing=repo_beta/)
   end
 
+  it "fails when configured aliases are narrower than the required verification repo set" do
+    builder = described_class.new(
+      source_aliases: { repo_alpha: "sample-alpha" },
+      repo_slots: %i[repo_alpha repo_beta]
+    )
+    partial_workspace = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: :ticket_workspace,
+      root_path: "/tmp/a3-local-workspace",
+      source_descriptor: source_descriptor,
+      slot_paths: {
+        repo_alpha: "/tmp/a3-local-workspace/repo_alpha"
+      }
+    )
+
+    expect do
+      builder.call(workspace: partial_workspace, task: task, run: run(:verification))
+    end.to raise_error(A3::Domain::ConfigurationError, /missing=repo_beta/)
+  end
+
   it "fails for unsupported merge phase" do
     expect do
       builder.call(workspace: workspace, task: task, run: run(:merge))
