@@ -189,6 +189,55 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "does not reintroduce resolved child tasks through kanban topology expansion" do
+    Dir.mktmpdir do |dir|
+      fake_cli = create_fake_kanban_cli(
+        dir,
+        snapshots: [
+          {
+            "id" => 3138,
+            "ref" => "Sample#3138",
+            "title" => "Current parent task",
+            "status" => "Done",
+            "labels" => ["trigger:auto-implement", "repo:ui-app"]
+          },
+          {
+            "id" => 3999,
+            "ref" => "Sample#3999",
+            "title" => "Resolved child task",
+            "status" => "Resolved",
+            "parent_ref" => "Sample#3138",
+            "labels" => ["trigger:auto-implement", "repo:ui-app"]
+          }
+        ]
+      )
+
+      out = StringIO.new
+      with_env(fake_cli.fetch(:env)) do
+        expect do
+          described_class.start(
+            [
+              "watch-summary",
+              "--storage-backend", "json",
+              "--storage-dir", dir,
+              "--kanban-command", "ruby",
+              "--kanban-command-arg", fake_cli.fetch(:script_path),
+              "--kanban-project", "Sample",
+              "--kanban-working-dir", dir,
+              "--kanban-trigger-label", "trigger:auto-implement",
+              "--kanban-repo-label", "repo:ui-app=repo_alpha"
+            ],
+            out: out
+          )
+        end.not_to raise_error
+      end
+
+      expect(out.string).to include("Current parent task")
+      expect(out.string).not_to include("Resolved child task")
+      expect(out.string).not_to include("#3999")
+    end
+  end
+
   it "uses ASCII symbols by default" do
     Dir.mktmpdir do |dir|
       task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))

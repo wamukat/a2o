@@ -86,7 +86,7 @@ module A3
         until queue.empty?
           task_ref, task_id = queue.shift
           topology_snapshot, related_refs = fetch_topology_snapshot(task_ref: task_ref, task_id: task_id)
-          snapshots_by_ref[topology_snapshot.fetch("ref")] = topology_snapshot
+          snapshots_by_ref[topology_snapshot.fetch("ref")] = topology_snapshot if topology_snapshot
 
           related_refs.each do |related_ref, related_task_id|
             next if snapshots_by_ref.key?(related_ref) || queued_refs.include?(related_ref)
@@ -116,15 +116,28 @@ module A3
         child_refs = normalize_relation_refs(relations.fetch("subtask", []))
 
         [
-          {
-            "task_id" => resolved_task_id,
-            "ref" => task_ref,
-            "status" => normalize_status(payload.fetch("status", nil), labels: labels),
-            "edit_scope" => resolve_edit_scope(labels: labels, task_ref: task_ref),
-            "parent_ref" => parent_refs.first&.first
-          },
+          normalize_topology_snapshot(
+            task_id: resolved_task_id,
+            task_ref: task_ref,
+            raw_status: payload.fetch("status", nil),
+            labels: labels,
+            parent_ref: parent_refs.first&.first
+          ),
           (parent_refs + child_refs).to_h
         ]
+      end
+
+      def normalize_topology_snapshot(task_id:, task_ref:, raw_status:, labels:, parent_ref:)
+        status = normalize_status(raw_status, labels: labels)
+        return nil unless status
+
+        {
+          "task_id" => task_id,
+          "ref" => task_ref,
+          "status" => status,
+          "edit_scope" => resolve_edit_scope(labels: labels, task_ref: task_ref),
+          "parent_ref" => parent_ref
+        }
       end
 
       def normalize_relation_refs(items)
@@ -133,7 +146,8 @@ module A3
 
           ref = String(item["ref"]).strip
           task_id = integer_or_nil(item["id"])
-          next if ref.empty? || task_id.nil?
+          status = String(item["status"]).strip
+          next if ref.empty? || task_id.nil? || !ACTIVE_STATUS_MAP.key?(status)
 
           refs << [ref, task_id]
         end
