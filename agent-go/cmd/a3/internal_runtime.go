@@ -1315,7 +1315,7 @@ func runtimeTaskLogManifest(config runtimeInstanceConfig, plan runtimeRunOncePla
 		"run ||= records.values.select { |record| record['task_ref'] == task_ref }.last",
 		"effective_current_run = current_run",
 		"if run.nil? then puts JSON.generate({'run_ref' => '', 'current_run' => effective_current_run, 'phase' => '', 'source_type' => '', 'source_ref' => '', 'active' => false, 'artifacts' => []}); exit 0 end",
-		"effective_current_run = run['ref'].to_s if effective_current_run.empty?",
+		"effective_current_run = run['ref'].to_s if effective_current_run.empty? || effective_current_run != run['ref'].to_s",
 		"phase_records = Array(run.dig('evidence', 'phase_records'))",
 		"artifacts = phase_records.each_with_object([]) do |phase_record, result|",
 		"  entries = Array(phase_record.dig('execution_record', 'diagnostics', 'agent_artifacts'))",
