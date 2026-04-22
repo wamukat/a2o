@@ -108,6 +108,21 @@ Risk:
 - medium
 - requires package-source and install-path redesign
 
+Before this option can move into implementation, the design has to be split into concrete decisions:
+
+1. Package publication surface
+   - where host agent manifests and archives are published
+   - how versioned artifacts are addressed
+   - how checksums and integrity verification are carried
+2. Install-time resolution and fallback policy
+   - how `a2o agent install` and `a2o host install` find the right package
+   - what happens offline or when the preferred package source is unavailable
+   - whether the runtime image remains a fallback source during migration
+3. Runtime-image compatibility boundary
+   - which host artifacts stay embedded during migration
+   - when it is safe to reduce embedded targets
+   - how compatibility with current macOS install flows is preserved
+
 ### Option C: After separation, slim runtime image contents
 
 Once the install flow no longer depends on the runtime image for every host target, reduce what the runtime image embeds.
@@ -127,10 +142,13 @@ Risk:
 
 ## Recommended Sequence
 
-1. Separate host agent distribution assembly from runtime-image publish while preserving the CLI surface
-2. Switch install/export implementation to the new distribution source
-3. Reduce runtime-image embedded host package contents
-4. Apply smaller Dockerfile/cache cleanup on top
+1. Decide the package publication surface
+2. Decide install-time resolution and fallback policy
+3. Decide the runtime-image compatibility boundary during migration
+4. Implement distribution separation while preserving the CLI surface
+5. Switch install/export implementation to the new distribution source
+6. Reduce runtime-image embedded host package contents
+7. Apply smaller Dockerfile/cache cleanup on top
 
 ## Expected Improvement Range
 
@@ -141,3 +159,14 @@ Based on current timings:
 - full boundary cleanup after separation: large improvement potential
 
 A realistic target is to reduce publish from the current mid-to-high teens of minutes into a clearly smaller range, but that requires the structural change rather than only image-layer tuning.
+
+## Follow-up Breakdown
+
+The current follow-up tickets map to the work as follows:
+
+- `A2O#155`: structural change
+  - package publication surface
+  - install-time resolution and fallback policy
+  - runtime-image compatibility boundary
+  - implementation of distribution separation
+- `A2O#156`: second-order Dockerfile/cache optimization after the structural boundary is improved

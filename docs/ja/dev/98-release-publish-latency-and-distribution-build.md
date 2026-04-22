@@ -108,6 +108,21 @@ CLI surface は維持したまま、host agent package assembly を runtime imag
 - 中程度
 - package source と install path の設計変更が必要
 
+この option を実装へ進める前に、設計判断を次の単位に分解する必要がある。
+
+1. package publication surface
+   - host agent manifest / archive をどこへ publish するか
+   - version 付き artifact をどう address するか
+   - checksum / integrity verification をどう運ぶか
+2. install-time resolution / fallback policy
+   - `a2o agent install` / `a2o host install` が対象 package をどう見つけるか
+   - offline 時や primary source 不達時にどう振る舞うか
+   - 移行中に runtime image を fallback source として残すか
+3. runtime-image compatibility boundary
+   - 移行中にどの host artifact を image に残すか
+   - いつ embedded target を減らしてよいか
+   - 現在の macOS install flow 互換をどう保つか
+
 ### Option C: 分離後に runtime image の同梱物を減らす
 
 install flow が runtime image に全面依存しなくなった後で、runtime image に載せる host package 内容を減らす。
@@ -128,10 +143,13 @@ install flow が runtime image に全面依存しなくなった後で、runtime
 
 ## 推奨順序
 
-1. host agent distribution assembly を runtime-image publish から分離する。ただし CLI surface は維持する
-2. install/export 実装を新しい distribution source に切り替える
-3. runtime image に埋め込む host package 内容を減らす
-4. その上で Dockerfile / cache の小改善を重ねる
+1. package publication surface を決める
+2. install-time resolution / fallback policy を決める
+3. migration 中の runtime-image compatibility boundary を決める
+4. CLI surface を維持したまま distribution separation を実装する
+5. install/export 実装を新しい distribution source に切り替える
+6. runtime image に埋め込む host package 内容を減らす
+7. その上で Dockerfile / cache の小改善を重ねる
 
 ## 改善幅の見込み
 
@@ -142,3 +160,14 @@ install flow が runtime image に全面依存しなくなった後で、runtime
 - 境界整理まで含めた本格対応: 大きな短縮余地がある
 
 現在の十数分級 publish を、明確に短いレンジへ下げるには、image layer の微調整よりも構造改善が必要である。
+
+## Follow-up Breakdown
+
+現在の follow-up ticket は次のように対応する。
+
+- `A2O#155`: 構造改善
+  - package publication surface
+  - install-time resolution / fallback policy
+  - runtime-image compatibility boundary
+  - distribution separation の実装
+- `A2O#156`: 構造改善後の second-order Dockerfile / cache 最適化
