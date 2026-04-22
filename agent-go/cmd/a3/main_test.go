@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -3626,6 +3627,59 @@ func TestRuntimeLogsPrintsCompletedPhaseArtifacts(t *testing.T) {
 	}
 }
 
+func TestRuntimeLogsFollowsLatestActiveRunWhenTaskCurrentRunIsBlank(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	liveLogRoot := filepath.Join(tempDir, "host-root", "live-logs")
+	liveLogPath := filepath.Join(liveLogRoot, "A2O-16", "implementation.log")
+	if err := os.MkdirAll(filepath.Dir(liveLogPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(liveLogPath, []byte("live log line\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		taskWithoutCurrentRun: true,
+		logManifestOutputs: []string{
+			`{"run_ref":"run-16","current_run":"run-16","phase":"implementation","source_type":"detached_commit","source_ref":"abc","active":true,"artifacts":[]}`,
+			`{"run_ref":"run-16","current_run":"run-16","phase":"implementation","source_type":"detached_commit","source_ref":"abc","active":false,"artifacts":[]}`,
+		},
+	}
+	t.Setenv("A2O_RUNTIME_RUN_ONCE_HOST_ROOT", filepath.Join(tempDir, "host-root"))
+	t.Setenv("A2O_BUNDLE_STORAGE_DIR", "/var/lib/a3/test-runtime")
+	t.Setenv("A2O_RUNTIME_RUN_ONCE_REFERENCE_PACKAGE", packageDir)
+
+	var stdout bytes.Buffer
+	withChdir(t, tempDir, func() {
+		if err := runRuntimeLogs([]string{"--follow", "--poll-interval", "1ms", "A2O#16"}, runner, &stdout, io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	output := stdout.String()
+	if !strings.Contains(output, "=== phase: implementation (live) task=A2O#16 run=run-16 source=detached_commit:abc ===") {
+		t.Fatalf("expected live header, got %q", output)
+	}
+	if !strings.Contains(output, "live log line") {
+		t.Fatalf("expected live log body, got %q", output)
+	}
+}
+
 func TestRuntimeWatchSummaryRunsContainerSummaryWithKanbanContext(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -5128,6 +5182,7 @@ type fakeRunner struct {
 	imageInspectDigests   map[string]string
 	containerImageIDs     map[string]string
 	logManifestOutput     string
+	logManifestOutputs    []string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -5211,6 +5266,11 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "runtime_latest_run"):
 		return []byte("runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation state=terminal outcome=blocked\n"), nil
 	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "phase_records"):
+		if len(r.logManifestOutputs) > 0 {
+			output := r.logManifestOutputs[0]
+			r.logManifestOutputs = r.logManifestOutputs[1:]
+			return []byte(output + "\n"), nil
+		}
 		if r.logManifestOutput != "" {
 			return []byte(r.logManifestOutput + "\n"), nil
 		}

@@ -67,7 +67,13 @@ func (Executor) Execute(request JobRequest) ExecutionResult {
 }
 
 func liveLogWriterFor(request JobRequest) (io.Writer, func()) {
-	root := os.Getenv("A2O_AGENT_LIVE_LOG_ROOT")
+	root := strings.TrimSpace(request.Env["A2O_AGENT_LIVE_LOG_ROOT"])
+	if root == "" {
+		root = strings.TrimSpace(request.Env["A3_AGENT_LIVE_LOG_ROOT"])
+	}
+	if root == "" {
+		root = os.Getenv("A2O_AGENT_LIVE_LOG_ROOT")
+	}
 	if strings.TrimSpace(root) == "" {
 		root = os.Getenv("A3_AGENT_LIVE_LOG_ROOT")
 	}

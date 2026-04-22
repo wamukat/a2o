@@ -1312,7 +1312,9 @@ func runtimeTaskLogManifest(config runtimeInstanceConfig, plan runtimeRunOncePla
 		"task_ref = ARGV.fetch(1)",
 		"current_run = ARGV.fetch(2)",
 		"run = if !current_run.empty? then records[current_run] else records.values.select { |record| record['task_ref'] == task_ref }.last end",
-		"if run.nil? then puts JSON.generate({'run_ref' => '', 'current_run' => current_run, 'phase' => '', 'source_type' => '', 'source_ref' => '', 'active' => false, 'artifacts' => []}); exit 0 end",
+		"effective_current_run = current_run",
+		"if run.nil? then puts JSON.generate({'run_ref' => '', 'current_run' => effective_current_run, 'phase' => '', 'source_type' => '', 'source_ref' => '', 'active' => false, 'artifacts' => []}); exit 0 end",
+		"effective_current_run = run['ref'].to_s if effective_current_run.empty?",
 		"phase_records = Array(run.dig('evidence', 'phase_records'))",
 		"artifacts = phase_records.each_with_object([]) do |phase_record, result|",
 		"  entries = Array(phase_record.dig('execution_record', 'diagnostics', 'agent_artifacts'))",
@@ -1320,7 +1322,7 @@ func runtimeTaskLogManifest(config runtimeInstanceConfig, plan runtimeRunOncePla
 		"  next unless artifact",
 		"  result << {'phase' => phase_record['phase'].to_s, 'artifact_id' => artifact['artifact_id'].to_s}",
 		"end",
-		"payload = {'run_ref' => run['ref'].to_s, 'current_run' => current_run, 'phase' => run['phase'].to_s, 'source_type' => run.dig('source_descriptor', 'source_type').to_s, 'source_ref' => run.dig('source_descriptor', 'ref').to_s, 'active' => run['terminal_outcome'].nil?, 'artifacts' => artifacts}",
+		"payload = {'run_ref' => run['ref'].to_s, 'current_run' => effective_current_run, 'phase' => run['phase'].to_s, 'source_type' => run.dig('source_descriptor', 'source_type').to_s, 'source_ref' => run.dig('source_descriptor', 'ref').to_s, 'active' => run['terminal_outcome'].nil?, 'artifacts' => artifacts}",
 		"puts JSON.generate(payload)",
 	}, "; ")
 	output, err := dockerComposeExecOutput(config, plan, runner, "ruby", "-rjson", "-e", script, path.Join(plan.StorageDir, "runs.json"), taskRef, currentRunRef)
