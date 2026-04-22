@@ -7,7 +7,7 @@ func WorkerCategory(summary string, observedState string, phase string) string {
 	switch {
 	case strings.Contains(text, "config"), strings.Contains(text, "schema"), strings.Contains(text, "project.yaml"), strings.Contains(text, "executor config"), strings.Contains(text, "invalid_executor_config"), strings.Contains(text, "launcher"):
 		return "configuration_error"
-	case strings.Contains(text, "slot ") && strings.Contains(text, "has changes"), strings.Contains(text, "changed files"), strings.Contains(text, "working tree is dirty"):
+	case strings.Contains(text, "slot ") && strings.Contains(text, "has changes"), strings.Contains(text, "changed files do not match"), strings.Contains(text, "changed files"), strings.Contains(text, "working tree is dirty"):
 		return "workspace_dirty"
 	case phase == "verification":
 		return "verification_failed"

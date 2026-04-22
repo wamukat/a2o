@@ -22,6 +22,13 @@
       "category": "configuration_error"
     },
     {
+      "name": "changed files do not match stays dirty",
+      "summary": "changed files do not match the editable scope",
+      "observed_state": "changed files do not match the editable scope",
+      "phase": "implementation",
+      "category": "workspace_dirty"
+    },
+    {
       "name": "merge conflict is classified",
       "summary": "merge conflict detected while applying patch",
       "observed_state": "unmerged paths remain",

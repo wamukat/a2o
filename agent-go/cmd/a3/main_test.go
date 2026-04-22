@@ -60,6 +60,11 @@ func TestClassifyUserFacingError(t *testing.T) {
 			message:  "verification command failed",
 			category: "verification_failed",
 		},
+		{
+			name:     "docker runtime",
+			message:  "docker compose failed to start runtime",
+			category: "runtime_failed",
+		},
 	}
 
 	for _, tt := range tests {
@@ -70,6 +75,9 @@ func TestClassifyUserFacingError(t *testing.T) {
 			}
 			if strings.TrimSpace(remediation) == "" {
 				t.Fatalf("remediation should be present")
+			}
+			if tt.name == "docker runtime" && !strings.Contains(remediation, "Docker runtime status") {
+				t.Fatalf("docker remediation=%q", remediation)
 			}
 		})
 	}
