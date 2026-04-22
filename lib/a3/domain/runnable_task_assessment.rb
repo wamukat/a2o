@@ -17,6 +17,14 @@ module A3
         phase = task.runnable_phase
         return new(task: task, phase: nil, reason: :already_running, blocking_task_refs: [task.current_run_ref]) if task.current_run_ref
         return new(task: task, phase: nil, reason: :not_runnable_status) unless phase
+        if blocker_waiting?(task, tasks)
+          return new(
+            task: task,
+            phase: phase,
+            reason: :blocked_by_tasks,
+            blocking_task_refs: unresolved_blocker_refs(task, tasks)
+          )
+        end
 
         if sibling_running?(task, tasks)
           return new(
@@ -64,6 +72,17 @@ module A3
           return false unless task.parent_ref
 
           siblings_for(task, tasks).any? { |candidate| !candidate.current_run_ref.nil? }
+        end
+
+        def blocker_waiting?(task, tasks)
+          unresolved_blocker_refs(task, tasks).any?
+        end
+
+        def unresolved_blocker_refs(task, tasks)
+          task.blocking_task_refs.select do |blocker_ref|
+            blocker = find_task(tasks, blocker_ref)
+            blocker.nil? || blocker.status != :done
+          end.freeze
         end
 
         def sibling_running_refs(task, tasks)

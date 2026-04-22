@@ -729,4 +729,123 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
       expect(source.load).to eq([])
     end
   end
+
+  it "imports kanban blocking relations so the scheduler can respect unresolved blockers" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 5500,
+          "ref" => "Sample#5500",
+          "status" => "To do",
+          "labels" => ["repo:ui-app", "trigger:auto-scheduler-validation"],
+          "parent_ref" => nil
+        },
+        {
+          "id" => 5501,
+          "ref" => "Sample#5501",
+          "status" => "To do",
+          "labels" => ["repo:ui-app", "trigger:auto-scheduler-validation"],
+          "parent_ref" => nil,
+          "blocking_task_refs" => ["Sample#5500"]
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-scheduler-validation"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+
+      expect(tasks.find { |task| task.ref == "Sample#5501" }.blocking_task_refs).to eq(["Sample#5500"])
+    end
+  end
+
+  it "keeps blocker refs even when the blocker task is outside A2O repo-label management" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 5600,
+          "ref" => "Sample#5600",
+          "status" => "To do",
+          "labels" => [],
+          "parent_ref" => nil
+        },
+        {
+          "id" => 5601,
+          "ref" => "Sample#5601",
+          "status" => "To do",
+          "labels" => ["repo:ui-app", "trigger:auto-scheduler-validation"],
+          "parent_ref" => nil,
+          "blocking_task_refs" => ["Sample#5600"]
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-scheduler-validation"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+
+      expect(tasks.map(&:ref)).to eq(["Sample#5601"])
+      expect(tasks.fetch(0).blocking_task_refs).to eq(["Sample#5600"])
+    end
+  end
+
+  it "drops blocker refs once a non-A2O blocker is already Done" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 5700,
+          "ref" => "Sample#5700",
+          "status" => "Done",
+          "labels" => [],
+          "parent_ref" => nil
+        },
+        {
+          "id" => 5701,
+          "ref" => "Sample#5701",
+          "status" => "To do",
+          "labels" => ["repo:ui-app", "trigger:auto-scheduler-validation"],
+          "parent_ref" => nil,
+          "blocking_task_refs" => ["Sample#5700"]
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-scheduler-validation"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+
+      expect(tasks.map(&:ref)).to eq(["Sample#5701"])
+      expect(tasks.fetch(0).blocking_task_refs).to eq([])
+    end
+  end
 end

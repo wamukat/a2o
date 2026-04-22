@@ -123,6 +123,7 @@ module A3
 
         parent_refs = normalize_relation_refs(relations.fetch("parenttask", []))
         child_refs = normalize_relation_refs(relations.fetch("subtask", []))
+        blocking_refs = normalize_blocking_relation_refs(relations.fetch("blocked", []))
 
         [
           normalize_topology_snapshot(
@@ -130,24 +131,28 @@ module A3
             task_ref: task_ref,
             raw_status: payload.fetch("status", nil),
             labels: labels,
-            parent_ref: parent_refs.first&.first
+            parent_ref: parent_refs.first&.first,
+            blocking_task_refs: blocking_refs.map(&:first)
           ),
           parent_refs.first&.first,
           !closed_status?(payload.fetch("status", nil)),
-          (parent_refs + child_refs).to_h
+          (parent_refs + child_refs + blocking_refs).to_h
         ]
       end
 
-      def normalize_topology_snapshot(task_id:, task_ref:, raw_status:, labels:, parent_ref:)
+      def normalize_topology_snapshot(task_id:, task_ref:, raw_status:, labels:, parent_ref:, blocking_task_refs:)
         status = normalize_status(raw_status, labels: labels)
         return nil unless status
+        edit_scope = resolve_topology_edit_scope(labels)
+        return nil unless edit_scope
 
         {
           "task_id" => task_id,
           "ref" => task_ref,
           "status" => status,
-          "edit_scope" => resolve_edit_scope(labels: labels, task_ref: task_ref),
-          "parent_ref" => parent_ref
+          "edit_scope" => edit_scope,
+          "parent_ref" => parent_ref,
+          "blocking_task_refs" => normalize_blocking_refs(blocking_task_refs)
         }
       end
 
@@ -160,6 +165,20 @@ module A3
           status = String(item["status"]).strip
           next if ref.empty? || task_id.nil?
           next if !status.empty? && closed_status?(status)
+
+          refs << [ref, task_id]
+        end
+      end
+
+      def normalize_blocking_relation_refs(items)
+        Array(items).each_with_object([]) do |item, refs|
+          next unless item.is_a?(Hash)
+
+          ref = String(item["ref"]).strip
+          task_id = integer_or_nil(item["id"])
+          status = String(item["status"]).strip
+          next if ref.empty? || task_id.nil?
+          next if !status.empty? && blocking_status_resolved?(status)
 
           refs << [ref, task_id]
         end
@@ -197,6 +216,13 @@ module A3
             selected_refs << child_ref
             queue << child_ref
           end
+
+          snapshot.fetch("blocking_task_refs", []).each do |blocker_ref|
+            next if selected_refs.include?(blocker_ref)
+
+            selected_refs << blocker_ref
+            queue << blocker_ref
+          end
         end
 
         topology_snapshots.select { |snapshot| selected_refs.include?(snapshot.fetch("ref")) }.freeze
@@ -227,6 +253,7 @@ module A3
           status: canonicalize_status_for_kind(snapshot.fetch("status"), task_kind),
           parent_ref: snapshot.fetch("parent_ref"),
           child_refs: child_refs,
+          blocking_task_refs: snapshot.fetch("blocking_task_refs", []),
           external_task_id: snapshot.fetch("task_id")
         )
       end
@@ -241,6 +268,7 @@ module A3
           status: canonicalize_status_for_kind(snapshot.fetch("status"), task_kind),
           parent_ref: snapshot.fetch("parent_ref"),
           child_refs: [],
+          blocking_task_refs: snapshot.fetch("blocking_task_refs", []),
           external_task_id: snapshot.fetch("task_id")
         )
       end
@@ -276,7 +304,8 @@ module A3
           "ref" => task_ref,
           "status" => status,
           "edit_scope" => edit_scope,
-          "parent_ref" => normalize_parent_ref(raw_snapshot["parent_ref"])
+          "parent_ref" => normalize_parent_ref(raw_snapshot["parent_ref"]),
+          "blocking_task_refs" => normalize_blocking_refs(raw_snapshot["blocking_task_refs"])
         }
       end
 
@@ -293,6 +322,11 @@ module A3
               "add one or more configured repo labels to the kanban task"
       end
 
+      def resolve_topology_edit_scope(labels)
+        edit_scope = labels.flat_map { |label| @repo_label_map.fetch(label, []) }.uniq.freeze
+        edit_scope.empty? ? nil : edit_scope
+      end
+
       def normalize_status(raw_status, labels:)
         return :blocked if labels.include?(@blocked_label)
 
@@ -303,9 +337,17 @@ module A3
         %w[Resolved Archived].include?(String(raw_status))
       end
 
+      def blocking_status_resolved?(raw_status)
+        closed_status?(raw_status) || String(raw_status) == "Done"
+      end
+
       def normalize_parent_ref(value)
         normalized = String(value).strip
         normalized.empty? ? nil : normalized
+      end
+
+      def normalize_blocking_refs(values)
+        Array(values).map { |value| String(value).strip }.reject(&:empty?).uniq.freeze
       end
 
       def normalize_repo_label_map(repo_label_map)

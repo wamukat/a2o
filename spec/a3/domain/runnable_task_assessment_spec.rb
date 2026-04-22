@@ -63,6 +63,29 @@ RSpec.describe A3::Domain::RunnableTaskAssessment do
     expect(assessment.phase).to be_nil
   end
 
+  it "blocks a task when kanban blockers are still unresolved" do
+    blocker = A3::Domain::Task.new(
+      ref: "A3-v2#3039",
+      kind: :single,
+      edit_scope: [:repo_alpha],
+      status: :todo
+    )
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3040",
+      kind: :single,
+      edit_scope: [:repo_beta],
+      status: :todo,
+      blocking_task_refs: [blocker.ref]
+    )
+
+    assessment = described_class.evaluate(task: task, tasks: [blocker, task])
+
+    expect(assessment.runnable?).to eq(false)
+    expect(assessment.reason).to eq(:blocked_by_tasks)
+    expect(assessment.phase).to eq(:implementation)
+    expect(assessment.blocking_task_refs).to eq([blocker.ref])
+  end
+
   it "treats a missing cached child as pending once parent topology is known" do
     parent = A3::Domain::Task.new(
       ref: "A3-v2#3040",

@@ -127,11 +127,12 @@ module FakeKanbanCliHelper
               "project_title" => item["ref"].split("#", 2).first
             }
           end
+          blockers = snapshots.select { |item| Array(task["blocking_task_refs"]).include?(item["ref"]) }
           print JSON.generate(
             {
               "parenttask" => parent ? [render_relation.call(parent)] : [],
               "subtask" => children.map { |item| render_relation.call(item) },
-              "blocked" => [],
+              "blocked" => blockers.map { |item| render_relation.call(item) },
               "blocking" => [],
               "related" => [],
               "duplicateof" => [],

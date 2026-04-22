@@ -115,6 +115,33 @@ RSpec.describe A3::Application::PlanNextRunnableTask do
     expect(result.assessments.find { |assessment| assessment.task_ref == "A3-v2#3019" }.reason).to eq(:parent_waiting_for_children)
   end
 
+  it "does not schedule a task while kanban blockers remain unresolved" do
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#4000",
+        kind: :single,
+        edit_scope: [:repo_alpha],
+        status: :todo
+      )
+    )
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#4001",
+        kind: :single,
+        edit_scope: [:repo_beta],
+        status: :todo,
+        blocking_task_refs: ["A3-v2#4000"]
+      )
+    )
+
+    result = use_case.call
+
+    expect(result.task&.ref).to eq("A3-v2#4000")
+    blocked_assessment = result.assessments.find { |assessment| assessment.task_ref == "A3-v2#4001" }
+    expect(blocked_assessment.reason).to eq(:blocked_by_tasks)
+    expect(blocked_assessment.blocking_task_refs).to eq(["A3-v2#4000"])
+  end
+
   it "schedules the parent review when all children are done" do
     task_repository.save(
       A3::Domain::Task.new(
