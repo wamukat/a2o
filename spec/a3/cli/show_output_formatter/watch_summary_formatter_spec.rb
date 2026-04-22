@@ -49,6 +49,47 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
     expect(lines).to include(a_string_including("\e[31m[!]   #2"))
   end
 
+  it "indents child task refs when the parent is present" do
+    summary = Struct.new(:scheduler_paused, :scheduler_paused_at, :tasks, :next_candidates, :running_entries).new(
+      false,
+      nil,
+      [
+        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+          "Sample#51",
+          nil,
+          "Parent task",
+          false,
+          false,
+          false,
+          false,
+          false,
+          nil,
+          {},
+          []
+        ),
+        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+          "Sample#52",
+          "Sample#51",
+          "Child task",
+          false,
+          false,
+          false,
+          true,
+          false,
+          nil,
+          {},
+          []
+        )
+      ],
+      [],
+      []
+    )
+
+    child_line = described_class.lines(summary).find { |line| line.include?("#52") }
+
+    expect(child_line).to include("[.]   #52")
+  end
+
   it "shows review-phase tasks as running when running_entry is present" do
     running_entry = Struct.new(:task_ref, :phase, :internal_phase, :state, :heartbeat_age_seconds, :detail).new(
       "Sample#3141",

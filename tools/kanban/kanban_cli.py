@@ -393,12 +393,26 @@ def normalize_task_snapshot(
     return normalized
 
 
-def normalize_task_watch_summary(task: dict[str, Any], *, project_title: str) -> dict[str, Any]:
+def normalize_task_watch_summary(
+    base_url: str,
+    token: str,
+    task: dict[str, Any],
+    *,
+    project_title: str,
+) -> dict[str, Any]:
+    task_id = int(task["id"])
+    related_tasks = relation_tasks_payload(base_url, token, task_id=task_id)
+    parent_refs = [
+        ref
+        for item in related_tasks.get("parenttask", [])
+        if (ref := str(item.get("ref") or "").strip())
+    ]
     return {
-        "id": int(task["id"]),
+        "id": task_id,
         "ref": canonical_human_task_ref_for_task(task, project_title=project_title),
         "title": task.get("title") or "",
         "status": task.get("status"),
+        "parent_ref": parent_refs[0] if parent_refs else None,
     }
 
 
@@ -1297,7 +1311,12 @@ def cmd_task_watch_summary_list(args: argparse.Namespace) -> int:
             columns_by_project_id[project_id] = columns
         column = find_column_by_id(columns, int(task.get("column_id") or 0))
         task["status"] = column.get("title") if column else None
-        normalized_by_id[resolved_task_id] = normalize_task_watch_summary(task, project_title=project_title)
+        normalized_by_id[resolved_task_id] = normalize_task_watch_summary(
+            base_url,
+            token,
+            task,
+            project_title=project_title,
+        )
 
     for task_id in task_ids:
         resolve_task_for_summary(task_id=task_id)

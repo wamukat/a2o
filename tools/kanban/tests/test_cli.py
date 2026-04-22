@@ -37,6 +37,28 @@ def patched_env(values: dict[str, str | None]):
 
 
 class SoloBoardCliTest(unittest.TestCase):
+    def test_normalize_task_watch_summary_preserves_parent_ref(self) -> None:
+        task = {
+            "id": 52,
+            "ref": "A2O#52",
+            "title": "Child task",
+            "status": "To do",
+        }
+
+        with patch.object(
+            kanban_cli,
+            "relation_tasks_payload",
+            return_value={"parenttask": [{"id": 51, "ref": "A2O#51"}]},
+        ):
+            normalized = kanban_cli.normalize_task_watch_summary(
+                "http://localhost:3000",
+                "",
+                task,
+                project_title="A2O",
+            )
+
+        self.assertEqual("A2O#51", normalized["parent_ref"])
+
     def test_resolve_backend_rejects_non_soloboard(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "Unsupported kanban backend"):
             kanban_cli.resolve_backend_kind("unsupported-backend")
