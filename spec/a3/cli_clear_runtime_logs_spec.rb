@@ -4,7 +4,18 @@ require "digest"
 require "tmpdir"
 
 RSpec.describe A3::CLI do
-  def write_run(storage_dir:, task_ref:, run_ref:, phase:, artifact_id:)
+  def upload_record(artifact_id:, role:, content:, retention_class: "analysis", media_type: "text/plain")
+    {
+      "artifact_id" => artifact_id,
+      "role" => role,
+      "digest" => "sha256:#{Digest::SHA256.hexdigest(content)}",
+      "byte_size" => content.bytesize,
+      "retention_class" => retention_class,
+      "media_type" => media_type
+    }
+  end
+
+  def write_run(storage_dir:, task_ref:, run_ref:, phase:, log_uploads:, artifact_uploads: [])
     task = A3::Domain::Task.new(
       ref: task_ref,
       kind: :single,
@@ -16,17 +27,8 @@ RSpec.describe A3::CLI do
       summary: "completed",
       diagnostics: {
         "agent_job_result" => {
-          "log_uploads" => [
-            {
-              "artifact_id" => artifact_id,
-              "role" => "combined-log",
-              "digest" => "sha256:#{Digest::SHA256.hexdigest('log body')}",
-              "byte_size" => "log body".bytesize,
-              "retention_class" => "analysis",
-              "media_type" => "text/plain"
-            }
-          ],
-          "artifact_uploads" => []
+          "log_uploads" => log_uploads,
+          "artifact_uploads" => artifact_uploads
         }
       }
     )
@@ -65,7 +67,13 @@ RSpec.describe A3::CLI do
         media_type: "text/plain"
       )
       store.put(upload, content)
-      write_run(storage_dir: dir, task_ref: "A2O#149", run_ref: "run-1", phase: :implementation, artifact_id: "run-1-combined-log")
+      write_run(
+        storage_dir: dir,
+        task_ref: "A2O#149",
+        run_ref: "run-1",
+        phase: :implementation,
+        log_uploads: [upload_record(artifact_id: "run-1-combined-log", role: "combined-log", content: content)]
+      )
 
       out = StringIO.new
       described_class.start(
@@ -92,7 +100,13 @@ RSpec.describe A3::CLI do
         media_type: "text/plain"
       )
       store.put(upload, content)
-      write_run(storage_dir: dir, task_ref: "A2O#148", run_ref: "run-2", phase: :verification, artifact_id: "run-2-combined-log")
+      write_run(
+        storage_dir: dir,
+        task_ref: "A2O#148",
+        run_ref: "run-2",
+        phase: :verification,
+        log_uploads: [upload_record(artifact_id: "run-2-combined-log", role: "combined-log", content: content)]
+      )
 
       out = StringIO.new
       described_class.start(
@@ -103,6 +117,51 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("runtime_log_clear=completed")
       expect(out.string).to include("deleted_count=1")
       expect { store.read("run-2-combined-log") }.to raise_error(A3::Domain::RecordNotFound)
+    end
+  end
+
+  it "clears ai raw and execution metadata artifacts through --all-analysis" do
+    Dir.mktmpdir do |dir|
+      store = A3::Infra::FileAgentArtifactStore.new(File.join(dir, "agent_artifacts"))
+      ai_raw_content = "assistant is thinking"
+      metadata_content = "{\"duration_seconds\": 12.5}\n"
+      ai_raw_upload = A3::Domain::AgentArtifactUpload.new(
+        artifact_id: "run-3-ai-raw-log",
+        role: "ai-raw-log",
+        digest: "sha256:#{Digest::SHA256.hexdigest(ai_raw_content)}",
+        byte_size: ai_raw_content.bytesize,
+        retention_class: :analysis,
+        media_type: "text/plain"
+      )
+      metadata_upload = A3::Domain::AgentArtifactUpload.new(
+        artifact_id: "run-3-execution-metadata",
+        role: "execution-metadata",
+        digest: "sha256:#{Digest::SHA256.hexdigest(metadata_content)}",
+        byte_size: metadata_content.bytesize,
+        retention_class: :analysis,
+        media_type: "application/json"
+      )
+      store.put(ai_raw_upload, ai_raw_content)
+      store.put(metadata_upload, metadata_content)
+      write_run(
+        storage_dir: dir,
+        task_ref: "A2O#149",
+        run_ref: "run-3",
+        phase: :implementation,
+        log_uploads: [upload_record(artifact_id: "run-3-ai-raw-log", role: "ai-raw-log", content: ai_raw_content)],
+        artifact_uploads: [upload_record(artifact_id: "run-3-execution-metadata", role: "execution-metadata", content: metadata_content, media_type: "application/json")]
+      )
+
+      out = StringIO.new
+      described_class.start(
+        ["clear-runtime-logs", "--storage-dir", dir, "--all-analysis", "--apply"],
+        out: out
+      )
+
+      expect(out.string).to include("runtime_log_clear=completed")
+      expect(out.string).to include("selected_count=2")
+      expect { store.read("run-3-ai-raw-log") }.to raise_error(A3::Domain::RecordNotFound)
+      expect { store.read("run-3-execution-metadata") }.to raise_error(A3::Domain::RecordNotFound)
     end
   end
 end

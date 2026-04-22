@@ -59,9 +59,11 @@ RSpec.describe A3::Agent::RunOnceWorker do
     ).call
 
     expect(result.status).to eq(:succeeded)
-    expect(client.uploaded.map(&:role)).to eq(["combined-log", "junit"])
+    expect(client.uploaded.map(&:role)).to eq(["combined-log", "execution-metadata", "junit"])
     expect(client.result.log_uploads.fetch(0).artifact_id).to eq("job-1-combined-log")
-    expect(client.result.artifact_uploads.fetch(0).role).to eq("junit")
+    expect(client.result.artifact_uploads.fetch(0).role).to eq("execution-metadata")
+    expect(client.result.artifact_uploads.fetch(1).role).to eq("junit")
+    expect(client.result.artifact_uploads.fetch(0).retention_class).to eq(:analysis)
     expect(client.result.workspace_descriptor.workspace_kind).to eq(:runtime_workspace)
   end
 
