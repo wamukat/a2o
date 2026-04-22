@@ -163,11 +163,10 @@ install flow が runtime image に全面依存しなくなった後で、runtime
 
 ## Follow-up Breakdown
 
-現在の follow-up ticket は次のように対応する。
+follow-up ticket は次のように分担する。
 
-- `A2O#155`: 構造改善
-  - package publication surface
-  - install-time resolution / fallback policy
-  - runtime-image compatibility boundary
-  - distribution separation の実装
+- `A2O#159`: host agent package publication surface の定義
+- `A2O#158`: install-time resolution / fallback policy の定義
+- `A2O#157`: runtime image と external package の compatibility contract 定義
+- `A2O#155`: `A2O#157`、`A2O#158`、`A2O#159` の後続として distribution separation を実装
 - `A2O#156`: 構造改善後の second-order Dockerfile / cache 最適化

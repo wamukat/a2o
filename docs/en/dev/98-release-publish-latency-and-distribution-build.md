@@ -162,11 +162,10 @@ A realistic target is to reduce publish from the current mid-to-high teens of mi
 
 ## Follow-up Breakdown
 
-The current follow-up tickets map to the work as follows:
+The follow-up tickets map to the work as follows:
 
-- `A2O#155`: structural change
-  - package publication surface
-  - install-time resolution and fallback policy
-  - runtime-image compatibility boundary
-  - implementation of distribution separation
+- `A2O#159`: define the host agent package publication surface
+- `A2O#158`: define install-time package resolution and fallback policy
+- `A2O#157`: define the runtime-image and external-package compatibility contract
+- `A2O#155`: implement distribution separation after `A2O#157`, `A2O#158`, and `A2O#159`
 - `A2O#156`: second-order Dockerfile/cache optimization after the structural boundary is improved
