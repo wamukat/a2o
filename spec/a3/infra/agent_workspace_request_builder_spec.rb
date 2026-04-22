@@ -17,7 +17,10 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       workspace_kind: :ticket_workspace,
       root_path: "/tmp/a3-local-workspace",
       source_descriptor: source_descriptor,
-      slot_paths: {}
+      slot_paths: {
+        repo_alpha: "/tmp/a3-local-workspace/repo_alpha",
+        repo_beta: "/tmp/a3-local-workspace/repo_beta"
+      }
     )
   end
 
@@ -184,7 +187,10 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
         task_ref: "Sample#173",
         ref: "refs/heads/a2o/runtime/user-runtime-check/parent/Sample-173"
       ),
-      slot_paths: {}
+      slot_paths: {
+        repo_alpha: "/tmp/a3-parent-runtime-workspace/repo_alpha",
+        repo_beta: "/tmp/a3-parent-runtime-workspace/repo_beta"
+      }
     )
     parent_task = A3::Domain::Task.new(
       ref: "Sample#173",
@@ -227,6 +233,16 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
   end
 
   it "uses slot-specific support refs when multiple support repositories are configured" do
+    workspace_with_gamma = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: :ticket_workspace,
+      root_path: "/tmp/a3-local-workspace",
+      source_descriptor: source_descriptor,
+      slot_paths: {
+        repo_alpha: "/tmp/a3-local-workspace/repo_alpha",
+        repo_beta: "/tmp/a3-local-workspace/repo_beta",
+        repo_gamma: "/tmp/a3-local-workspace/repo_gamma"
+      }
+    )
     multi_support_builder = described_class.new(
       source_aliases: {
         repo_alpha: "sample-alpha",
@@ -239,7 +255,7 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       }
     )
 
-    request = multi_support_builder.call(workspace: workspace, task: task, run: run(:implementation))
+    request = multi_support_builder.call(workspace: workspace_with_gamma, task: task, run: run(:implementation))
 
     expect(request.slots.fetch("repo_alpha")).to include("ref" => "refs/heads/a2o/work/Sample-42")
     expect(request.slots.fetch("repo_beta")).to include("ref" => "refs/heads/support/beta")
@@ -307,12 +323,12 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     )
   end
 
-  it "uses the configured source alias keys as the required slot universe" do
+  it "fails when the materialized verification workspace contains a slot without a source alias" do
     builder = described_class.new(source_aliases: { repo_alpha: "sample-alpha" })
 
-    request = builder.call(workspace: workspace, task: task, run: run(:verification))
-
-    expect(request.slots.keys).to eq(["repo_alpha"])
+    expect do
+      builder.call(workspace: workspace, task: task, run: run(:verification))
+    end.to raise_error(A3::Domain::ConfigurationError, /missing agent source alias for repo_beta/)
   end
 
   it "fails for unsupported merge phase" do
