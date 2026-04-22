@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "a3/domain/branch_namespace"
+
 module A3
   module Infra
   end
