@@ -113,6 +113,12 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
+	case "clear-logs":
+		if err := runRuntimeClearLogs(args[1:], runner, stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
 	case "run-once":
 		if err := runRuntimeRunOnce(args[1:], runner, stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)
@@ -982,6 +988,62 @@ func runRuntimeShowArtifact(args []string, runner commandRunner, stdout io.Write
 			return nil
 		}
 		fmt.Fprintln(stdout, output)
+		return nil
+	})
+}
+
+func runRuntimeClearLogs(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a2o runtime clear-logs", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	taskRef := flags.String("task-ref", "", "clear durable logs for one task")
+	runRef := flags.String("run-ref", "", "clear durable logs for one run")
+	phase := flags.String("phase", "", "limit clear to one phase")
+	role := flags.String("role", "", "limit clear to one role")
+	allAnalysis := flags.Bool("all-analysis", false, "clear all persisted analysis logs")
+	apply := flags.Bool("apply", false, "apply deletion; defaults to dry-run")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if *taskRef == "" && *runRef == "" && !*allAnalysis {
+		return fmt.Errorf("usage: a2o runtime clear-logs (--task-ref TASK_REF | --run-ref RUN_REF | --all-analysis) [--phase PHASE] [--role ROLE] [--apply]")
+	}
+
+	config, _, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	return withComposeEnv(effectiveConfig, func() error {
+		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
+		if err != nil {
+			return err
+		}
+		commandArgs := []string{"a3", "clear-runtime-logs", "--storage-backend", "json", "--storage-dir", plan.StorageDir}
+		if *taskRef != "" {
+			commandArgs = append(commandArgs, "--task-ref", *taskRef)
+		}
+		if *runRef != "" {
+			commandArgs = append(commandArgs, "--run-ref", *runRef)
+		}
+		if *phase != "" {
+			commandArgs = append(commandArgs, "--phase", *phase)
+		}
+		if *role != "" {
+			commandArgs = append(commandArgs, "--role", *role)
+		}
+		if *allAnalysis {
+			commandArgs = append(commandArgs, "--all-analysis")
+		}
+		if *apply {
+			commandArgs = append(commandArgs, "--apply")
+		}
+		output, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "runtime_log_clear", commandArgs...)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(output) != "" {
+			fmt.Fprintln(stdout, output)
+		}
 		return nil
 	})
 }

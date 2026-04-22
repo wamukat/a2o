@@ -113,13 +113,18 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 
 	execution := w.executor().Execute(runRequest)
 	finishedAt := w.now().Format(time.RFC3339)
-	logUpload, err := w.upload("combined-log", safeID(request.JobID+"-combined-log"), "diagnostic", "text/plain", execution.CombinedLog)
+	logUpload, err := w.upload("combined-log", safeID(request.JobID+"-combined-log"), "analysis", "text/plain", execution.CombinedLog)
 	if err != nil {
 		return nil, false, err
 	}
 	artifactUploads, workerProtocolResult, err := w.uploadArtifactsAndWorkerResult(runRequest)
 	if err != nil {
 		return nil, false, err
+	}
+	if metadataUpload, err := w.uploadExecutionMetadata(*request, execution, startedAt, finishedAt); err != nil {
+		return nil, false, err
+	} else if metadataUpload != nil {
+		artifactUploads = append(artifactUploads, *metadataUpload)
 	}
 	if rawLogUpload, err := w.uploadAIRawLog(runRequest); err != nil {
 		return nil, false, err
@@ -176,9 +181,15 @@ func (w Worker) runMergeJob(request JobRequest, startedAt string) (*JobResult, b
 	if descriptor.WorkspaceKind == "" {
 		descriptor.WorkspaceKind = request.SourceDescriptor.WorkspaceKind
 	}
-	logUpload, err := w.upload("combined-log", safeID(request.JobID+"-combined-log"), "diagnostic", "text/plain", execution.CombinedLog)
+	logUpload, err := w.upload("combined-log", safeID(request.JobID+"-combined-log"), "analysis", "text/plain", execution.CombinedLog)
 	if err != nil {
 		return nil, false, err
+	}
+	artifactUploads := []ArtifactUpload{}
+	if metadataUpload, err := w.uploadExecutionMetadata(request, execution, startedAt, finishedAt); err != nil {
+		return nil, false, err
+	} else if metadataUpload != nil {
+		artifactUploads = append(artifactUploads, *metadataUpload)
 	}
 	result := JobResult{
 		JobID:               request.JobID,
@@ -188,7 +199,7 @@ func (w Worker) runMergeJob(request JobRequest, startedAt string) (*JobResult, b
 		FinishedAt:          finishedAt,
 		Summary:             fmt.Sprintf("merge %s", execution.Status),
 		LogUploads:          []ArtifactUpload{logUpload},
-		ArtifactUploads:     []ArtifactUpload{},
+		ArtifactUploads:     artifactUploads,
 		WorkspaceDescriptor: descriptor,
 		Heartbeat:           finishedAt,
 	}
@@ -207,9 +218,15 @@ func (w Worker) runMergeRecoveryJob(request JobRequest, startedAt string) (*JobR
 	if descriptor.WorkspaceKind == "" {
 		descriptor.WorkspaceKind = request.SourceDescriptor.WorkspaceKind
 	}
-	logUpload, err := w.upload("combined-log", safeID(request.JobID+"-combined-log"), "diagnostic", "text/plain", execution.CombinedLog)
+	logUpload, err := w.upload("combined-log", safeID(request.JobID+"-combined-log"), "analysis", "text/plain", execution.CombinedLog)
 	if err != nil {
 		return nil, false, err
+	}
+	artifactUploads := []ArtifactUpload{}
+	if metadataUpload, err := w.uploadExecutionMetadata(request, execution, startedAt, finishedAt); err != nil {
+		return nil, false, err
+	} else if metadataUpload != nil {
+		artifactUploads = append(artifactUploads, *metadataUpload)
 	}
 	result := JobResult{
 		JobID:               request.JobID,
@@ -219,7 +236,7 @@ func (w Worker) runMergeRecoveryJob(request JobRequest, startedAt string) (*JobR
 		FinishedAt:          finishedAt,
 		Summary:             fmt.Sprintf("merge recovery %s", execution.Status),
 		LogUploads:          []ArtifactUpload{logUpload},
-		ArtifactUploads:     []ArtifactUpload{},
+		ArtifactUploads:     artifactUploads,
 		WorkspaceDescriptor: descriptor,
 		Heartbeat:           finishedAt,
 	}
@@ -382,7 +399,50 @@ func (w Worker) uploadAIRawLog(request JobRequest) (*ArtifactUpload, error) {
 	if err != nil {
 		return nil, err
 	}
-	upload, err := w.upload("ai-raw-log", safeID(request.JobID+"-ai-raw-log"), "diagnostic", "text/plain", content)
+	upload, err := w.upload("ai-raw-log", safeID(request.JobID+"-ai-raw-log"), "analysis", "text/plain", content)
+	if err != nil {
+		return nil, err
+	}
+	return &upload, nil
+}
+
+func (w Worker) uploadExecutionMetadata(request JobRequest, execution ExecutionResult, startedAt, finishedAt string) (*ArtifactUpload, error) {
+	started, err := time.Parse(time.RFC3339, startedAt)
+	if err != nil {
+		return nil, nil
+	}
+	finished, err := time.Parse(time.RFC3339, finishedAt)
+	if err != nil {
+		return nil, nil
+	}
+	payload := map[string]any{
+		"job_id":           request.JobID,
+		"task_ref":         request.TaskRef,
+		"run_ref":          request.RunRef,
+		"phase":            request.Phase,
+		"status":           execution.Status,
+		"summary":          fmt.Sprintf("%s %v %s", request.Command, request.Args, execution.Status),
+		"command":          request.Command,
+		"args":             request.Args,
+		"started_at":       startedAt,
+		"finished_at":      finishedAt,
+		"duration_seconds": finished.Sub(started).Seconds(),
+		"runtime_profile":  request.RuntimeProfile,
+		"source": map[string]any{
+			"workspace_kind": request.SourceDescriptor.WorkspaceKind,
+			"source_type":    request.SourceDescriptor.SourceType,
+			"ref":            request.SourceDescriptor.Ref,
+			"task_ref":       request.SourceDescriptor.TaskRef,
+		},
+	}
+	if execution.ExitCode != nil {
+		payload["exit_code"] = *execution.ExitCode
+	}
+	content, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	upload, err := w.upload("execution-metadata", safeID(request.JobID+"-execution-metadata"), "analysis", "application/json", append(content, '\n'))
 	if err != nil {
 		return nil, err
 	}

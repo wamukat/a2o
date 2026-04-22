@@ -37,11 +37,14 @@ func TestWorkerUploadsLogsArtifactsAndResult(t *testing.T) {
 	if result.Status != "succeeded" {
 		t.Fatalf("status = %s", result.Status)
 	}
-	if len(client.uploads) != 2 {
+	if len(client.uploads) != 3 {
 		t.Fatalf("uploads = %d", len(client.uploads))
 	}
-	if client.uploads[0].Role != "combined-log" || client.uploads[1].Role != "junit" {
+	if client.uploads[0].Role != "combined-log" || client.uploads[1].Role != "junit" || client.uploads[2].Role != "execution-metadata" {
 		t.Fatalf("unexpected upload roles: %#v", client.uploads)
+	}
+	if client.uploads[0].RetentionClass != "analysis" || client.uploads[2].RetentionClass != "analysis" {
+		t.Fatalf("expected analysis retention for persisted execution logs: %#v", client.uploads)
 	}
 	if client.result == nil || client.result.JobID != "job-1" {
 		t.Fatalf("missing submitted result: %#v", client.result)
@@ -76,7 +79,7 @@ func TestWorkerUploadsAIRawLogWhenPresent(t *testing.T) {
 	if result.Status != "succeeded" {
 		t.Fatalf("status = %s", result.Status)
 	}
-	if roles := uploadRoles(client.uploads); !bytes.Equal([]byte(roles), []byte("combined-log,ai-raw-log")) {
+	if roles := uploadRoles(client.uploads); !bytes.Equal([]byte(roles), []byte("combined-log,execution-metadata,ai-raw-log")) {
 		t.Fatalf("unexpected upload roles: %s", roles)
 	}
 }
@@ -148,7 +151,7 @@ func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T)
 	if head := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "a3/work/Sample-42")); head != slot["publish_after_head"] {
 		t.Fatalf("source branch was not advanced: head=%s slot=%#v", head, slot)
 	}
-	if roles := uploadRoles(client.uploads); !bytes.Equal([]byte(roles), []byte("combined-log,worker-result")) {
+	if roles := uploadRoles(client.uploads); !bytes.Equal([]byte(roles), []byte("combined-log,worker-result,execution-metadata")) {
 		t.Fatalf("unexpected upload roles: %s", roles)
 	}
 	if _, err := os.Stat(filepath.Join(tmp, "agent-workspaces", "Sample-42-ticket")); !os.IsNotExist(err) {

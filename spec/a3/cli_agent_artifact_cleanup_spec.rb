@@ -96,6 +96,42 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "retains analysis artifacts until an explicit analysis cleanup policy is configured" do
+    Dir.mktmpdir do |dir|
+      store = A3::Infra::FileAgentArtifactStore.new(File.join(dir, "agent_artifacts"))
+      content = "analysis log"
+      upload = A3::Domain::AgentArtifactUpload.new(
+        artifact_id: "analysis-log",
+        role: "ai-raw-log",
+        digest: "sha256:#{Digest::SHA256.hexdigest(content)}",
+        byte_size: content.bytesize,
+        retention_class: :analysis,
+        media_type: "text/plain"
+      )
+      store.put(upload, content)
+      old_time = Time.now - (30 * 24 * 60 * 60)
+      File.utime(
+        old_time,
+        old_time,
+        File.join(dir, "agent_artifacts", "artifacts", "analysis-log.json"),
+        File.join(dir, "agent_artifacts", "artifacts", "analysis-log.blob")
+      )
+
+      out = StringIO.new
+      described_class.start(
+        [
+          "agent-artifact-cleanup",
+          "--storage-dir", dir,
+          "--diagnostic-ttl-hours", "1"
+        ],
+        out: out
+      )
+
+      expect(out.string).to include("deleted_count=0")
+      expect(store.read("analysis-log")).to eq(content)
+    end
+  end
+
   def write_artifact(store, dir, artifact_id, content, timestamp)
     upload = A3::Domain::AgentArtifactUpload.new(
       artifact_id: artifact_id,

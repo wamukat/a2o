@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "time"
+
 module A3
   module CLI
     module ShowOutputFormatter
@@ -80,6 +82,7 @@ module A3
           return unless execution
 
           result << "latest_execution phase=#{execution.phase} summary=#{execution.summary}"
+          append_agent_job_timing_lines(result, execution.diagnostics)
           result << "verification_summary=#{execution.verification_summary}" if execution.verification_summary
           append_review_disposition_lines(result, execution.review_disposition)
           append_inherited_parent_lines(result, execution.diagnostics)
@@ -178,6 +181,26 @@ module A3
           return if inherited_ref.to_s.empty? && inherited_fingerprint.to_s.empty?
 
           result << "inherited_parent_state ref=#{FormattingHelpers.diagnostic_value(inherited_ref)} fingerprint=#{FormattingHelpers.diagnostic_value(inherited_fingerprint)}"
+        end
+
+        def append_agent_job_timing_lines(result, diagnostics)
+          return unless diagnostics.is_a?(Hash)
+
+          agent_job_result = diagnostics["agent_job_result"]
+          return unless agent_job_result.is_a?(Hash)
+
+          started_at = agent_job_result["started_at"]
+          finished_at = agent_job_result["finished_at"]
+          return if started_at.to_s.empty? || finished_at.to_s.empty?
+
+          result << "execution_started_at=#{started_at}"
+          result << "execution_finished_at=#{finished_at}"
+          duration = begin
+            Time.iso8601(finished_at) - Time.iso8601(started_at)
+          rescue ArgumentError
+            nil
+          end
+          result << format("execution_duration_seconds=%.3f", duration) if duration
         end
       end
     end

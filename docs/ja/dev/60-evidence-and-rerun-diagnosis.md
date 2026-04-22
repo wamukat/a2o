@@ -86,6 +86,8 @@ a2o runtime describe-task <task-ref>
 
 終了済みワークスペースのクリーンアップと証跡の保持は別である。A2O は使い捨てワークスペースを削除しても、実行を確認するために必要な証跡とブロック診断データを保持できる。
 
+prompt / skill / executor 改善のための分析用 artifact も、ワークスペース cleanup とは分離して扱う。`combined-log`、`ai-raw-log`、`execution-metadata` は durable な agent artifact として保持し、ワークスペース削除後も AI の挙動を追えるようにする。これらはデフォルト TTL cleanup では消さず、運用者が `a2o runtime clear-logs` で明示的に整理する。
+
 生成された状態は、内部ワークスペースメタデータを除き `.work/a2o/` 配下に置く。
 
 ## トレーサビリティ境界

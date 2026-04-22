@@ -44,9 +44,10 @@ Check state with:
 a2o runtime status
 a2o runtime watch-summary
 a2o runtime logs <task-ref> --follow
+a2o runtime clear-logs --task-ref <task-ref>
 ```
 
-`runtime status` shows scheduler state, runtime container state, kanban instance information, image digest, and the latest run. `runtime watch-summary` shows where board tasks currently are. `runtime logs` gathers per-phase logs for one task and prefers AI raw logs when they are available. With `--follow`, it follows the current phase AI raw live log first and falls back to the legacy live log when the worker does not expose AI raw output.
+`runtime status` shows scheduler state, runtime container state, kanban instance information, image digest, and the latest run. `runtime watch-summary` shows where board tasks currently are. `runtime logs` gathers per-phase logs for one task and prefers AI raw logs when they are available. With `--follow`, it follows the current phase AI raw live log first and falls back to the legacy live log when the worker does not expose AI raw output. `runtime clear-logs` is the explicit cleanup surface for persisted analysis logs; it is dry-run by default and only deletes when `--apply` is added.
 
 Use `describe-task` for one task.
 
@@ -55,6 +56,14 @@ a2o runtime describe-task <task-ref>
 ```
 
 `describe-task` gathers run state, phases, workspace details, evidence, kanban comments, log hints, and agent artifact commands.
+
+For prompt / skill / worker-command PDCA, A2O now persists:
+
+- `combined-log`
+- `ai-raw-log`
+- `execution-metadata` with start / finish / duration
+
+These persisted analysis artifacts are separate from terminal workspace cleanup.
 
 ## Scheduler And Manual Runs
 

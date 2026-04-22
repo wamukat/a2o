@@ -122,7 +122,7 @@ RSpec.describe A3::Infra::AgentHttpPullServer do
           "role" => "combined-log",
           "digest" => "sha256:abc",
           "byte_size" => 128,
-          "retention_class" => "diagnostic"
+          "retention_class" => "analysis"
         }
       ],
       artifact_uploads: [],

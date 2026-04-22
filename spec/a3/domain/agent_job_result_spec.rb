@@ -32,7 +32,7 @@ RSpec.describe A3::Domain::AgentJobResult do
       role: "combined-log",
       digest: "sha256:abc",
       byte_size: 128,
-      retention_class: :diagnostic,
+      retention_class: :analysis,
       media_type: "text/plain"
     )
     junit_upload = A3::Domain::AgentArtifactUpload.new(
@@ -82,7 +82,7 @@ RSpec.describe A3::Domain::AgentJobResult do
           "role" => "combined-log",
           "digest" => "sha256:abc",
           "byte_size" => 128,
-          "retention_class" => "diagnostic"
+          "retention_class" => "analysis"
         }
       ],
       artifact_uploads: [],
@@ -160,7 +160,7 @@ RSpec.describe A3::Domain::AgentJobResult do
         "role" => "combined-log",
         "digest" => "sha256:abc",
         "byte_size" => 128,
-        "retention_class" => "diagnostic",
+        "retention_class" => "analysis",
         "path" => "/tmp/combined.log"
       )
     end.to raise_error(A3::Domain::ConfigurationError, /not local paths/)

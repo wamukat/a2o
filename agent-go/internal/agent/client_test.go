@@ -27,7 +27,7 @@ func TestHTTPClientUsesAgentProtocol(t *testing.T) {
 				Role:           "combined-log",
 				Digest:         r.URL.Query().Get("digest"),
 				ByteSize:       3,
-				RetentionClass: "diagnostic",
+				RetentionClass: "analysis",
 			}})
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/agent/jobs/job-1/result":
 			submitted = true
@@ -52,7 +52,7 @@ func TestHTTPClientUsesAgentProtocol(t *testing.T) {
 		Role:           "combined-log",
 		Digest:         "sha256:abc",
 		ByteSize:       3,
-		RetentionClass: "diagnostic",
+		RetentionClass: "analysis",
 	}, []byte("log"))
 	if err != nil {
 		t.Fatal(err)

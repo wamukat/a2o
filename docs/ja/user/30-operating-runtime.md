@@ -44,9 +44,10 @@ a2o runtime resume --interval 60s --agent-poll-interval 5s
 a2o runtime status
 a2o runtime watch-summary
 a2o runtime logs <task-ref> --follow
+a2o runtime clear-logs --task-ref <task-ref>
 ```
 
-`runtime status` はスケジューラ、ランタイムコンテナ、カンバン、イメージダイジェスト、最新実行の状態を見る。`runtime watch-summary` はタスク一覧の現在位置を見る。`runtime logs` は 1 タスクのフェーズ別ログをまとめて読み、AI raw log があればそれを優先して表示する。`--follow` を付けると現在フェーズの AI raw live log を優先して追い、未対応 worker では従来の live log にフォールバックする。
+`runtime status` はスケジューラ、ランタイムコンテナ、カンバン、イメージダイジェスト、最新実行の状態を見る。`runtime watch-summary` はタスク一覧の現在位置を見る。`runtime logs` は 1 タスクのフェーズ別ログをまとめて読み、AI raw log があればそれを優先して表示する。`--follow` を付けると現在フェーズの AI raw live log を優先して追い、未対応 worker では従来の live log にフォールバックする。`runtime clear-logs` は永続化された分析用ログを明示的に整理するコマンドで、デフォルトは dry-run、実削除は `--apply` 指定時だけである。
 
 特定タスクを深く見る場合は `describe-task` を使う。
 
@@ -55,6 +56,14 @@ a2o runtime describe-task <task-ref>
 ```
 
 `describe-task` は実行、フェーズ、ワークスペース、証跡、カンバンコメント、ログの手がかり、エージェント成果物の読み方をまとめて表示する。
+
+prompt / skill / worker command の改善に使うため、A2O は次の分析用 artifact を永続化する。
+
+- `combined-log`
+- `ai-raw-log`
+- 開始時刻 / 終了時刻 / 所要時間を含む `execution-metadata`
+
+これらの分析用 artifact は、終了済みワークスペースの cleanup とは分離して扱う。
 
 ## スケジューラと手動実行
 

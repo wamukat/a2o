@@ -86,6 +86,8 @@ a2o runtime describe-task <task-ref>
 
 Terminal workspace cleanup is separate from evidence retention. A2O may remove disposable workspaces while keeping enough evidence and blocked diagnosis data to inspect the run.
 
+Analysis artifacts used for prompt / skill / executor PDCA are also separate from workspace cleanup. `combined-log`, `ai-raw-log`, and `execution-metadata` are persisted as durable agent artifacts so operators can inspect AI behavior after the workspace is gone. They are not removed by default TTL cleanup; operators clear them explicitly through `a2o runtime clear-logs`.
+
 Generated state belongs under `.work/a2o/` unless it is internal workspace metadata.
 
 ## Traceability Boundary

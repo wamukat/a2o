@@ -861,7 +861,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     artifact = {
       "artifact_id" => "worker-run-combined-log",
       "role" => "combined-log",
-      "retention_class" => "diagnostic",
+      "retention_class" => "analysis",
       "media_type" => "text/plain",
       "byte_size" => 42
     }
@@ -895,6 +895,10 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
         failing_command: nil,
         observed_state: nil,
         diagnostics: {
+          "agent_job_result" => {
+            "started_at" => "2026-04-11T08:00:00Z",
+            "finished_at" => "2026-04-11T08:00:42Z"
+          },
           "agent_artifacts" => [artifact],
           "control_plane_url" => "http://127.0.0.1:7393"
         },
@@ -910,7 +914,10 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
 
     result = described_class.run_lines(run_view)
 
-    expect(result).to include("agent_artifact role=combined-log id=worker-run-combined-log retention=diagnostic media_type=text/plain byte_size=42")
+    expect(result).to include("execution_started_at=2026-04-11T08:00:00Z")
+    expect(result).to include("execution_finished_at=2026-04-11T08:00:42Z")
+    expect(result).to include("execution_duration_seconds=42.000")
+    expect(result).to include("agent_artifact role=combined-log id=worker-run-combined-log retention=analysis media_type=text/plain byte_size=42")
     expect(result).to include("agent_artifact_read=a2o runtime show-artifact worker-run-combined-log")
     expect(result).not_to include(a_string_matching(/control_plane_url/))
   end

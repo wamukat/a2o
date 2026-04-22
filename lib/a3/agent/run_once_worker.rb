@@ -22,7 +22,7 @@ module A3
         execution = @command_executor.call(request)
         finished_at = timestamp
         log_upload = upload_combined_log(request: request, content: execution.combined_log)
-        artifact_uploads = upload_rule_artifacts(request)
+        artifact_uploads = [upload_execution_metadata(request: request, execution: execution, started_at: started_at, finished_at: finished_at)] + upload_rule_artifacts(request)
         result = A3::Domain::AgentJobResult.new(
           job_id: request.job_id,
           status: execution.status,
@@ -46,8 +46,44 @@ module A3
           artifact_id: safe_artifact_id("#{request.job_id}-combined-log"),
           role: "combined-log",
           content: content,
-          retention_class: "diagnostic",
+          retention_class: "analysis",
           media_type: "text/plain"
+        )
+        @control_plane_client.upload_artifact(upload, content)
+      end
+
+      def upload_execution_metadata(request:, execution:, started_at:, finished_at:)
+        started = Time.iso8601(started_at)
+        finished = Time.iso8601(finished_at)
+        content = JSON.pretty_generate(
+          {
+            "job_id" => request.job_id,
+            "task_ref" => request.task_ref,
+            "run_ref" => request.run_ref,
+            "phase" => request.phase,
+            "status" => execution.status.to_s,
+            "exit_code" => execution.exit_code,
+            "summary" => summary_for(request: request, execution: execution),
+            "command" => request.command,
+            "args" => request.args,
+            "started_at" => started_at,
+            "finished_at" => finished_at,
+            "duration_seconds" => finished - started,
+            "runtime_profile" => request.runtime_profile,
+            "source" => {
+              "workspace_kind" => request.source_descriptor.workspace_kind,
+              "source_type" => request.source_descriptor.source_type,
+              "ref" => request.source_descriptor.ref,
+              "task_ref" => request.source_descriptor.task_ref
+            }
+          }
+        ) + "\n"
+        upload = upload_metadata(
+          artifact_id: safe_artifact_id("#{request.job_id}-execution-metadata"),
+          role: "execution-metadata",
+          content: content,
+          retention_class: "analysis",
+          media_type: "application/json"
         )
         @control_plane_client.upload_artifact(upload, content)
       end

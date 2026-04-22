@@ -60,6 +60,7 @@ module A3
         "agent-server" => Definition.new(handler: :handle_agent_server, session_kind: :agent_control),
         "agent-artifact-read" => Definition.new(handler: :handle_agent_artifact_read, session_kind: :agent_control),
         "agent-artifact-cleanup" => Definition.new(handler: :handle_agent_artifact_cleanup, session_kind: :agent_control),
+        "clear-runtime-logs" => Definition.new(handler: :handle_clear_runtime_logs, session_kind: :storage),
         "run-verification" => Definition.new(handler: :handle_run_verification, needs_worker_gateway: true, session_kind: :runtime),
         "run-worker-phase" => Definition.new(handler: :handle_run_worker_phase, needs_worker_gateway: true, session_kind: :runtime),
         "run-merge" => Definition.new(handler: :handle_run_merge, needs_worker_gateway: true, session_kind: :runtime),

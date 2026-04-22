@@ -3,7 +3,7 @@
 module A3
   module Domain
     class AgentArtifactUpload
-      RETENTION_CLASSES = %i[diagnostic evidence temporary].freeze
+      RETENTION_CLASSES = %i[analysis diagnostic evidence temporary].freeze
 
       attr_reader :artifact_id, :role, :digest, :byte_size, :retention_class, :media_type
 

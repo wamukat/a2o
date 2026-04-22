@@ -60,6 +60,34 @@ module A3
         File.binread(path)
       end
 
+      def list_metadata
+        return [] unless Dir.exist?(storage_dir)
+
+        metadata_paths.filter_map do |path|
+          artifact_id = artifact_id_from_metadata_path(path)
+          fetch_metadata(artifact_id)
+        rescue A3::Domain::ConfigurationError, JSON::ParserError
+          nil
+        end
+      end
+
+      def delete_many(artifact_ids, dry_run: false)
+        deleted = []
+        missing = []
+        Array(artifact_ids).map(&:to_s).uniq.each do |artifact_id|
+          validate_artifact_id!(artifact_id)
+          metadata = metadata_path(artifact_id)
+          blob = blob_path(artifact_id)
+          if !File.exist?(metadata) && !File.exist?(blob)
+            missing << artifact_id
+            next
+          end
+          deleted << artifact_id
+          delete_artifact_files(metadata, blob) unless dry_run
+        end
+        { deleted_artifact_ids: deleted, missing_artifact_ids: missing, dry_run: dry_run }
+      end
+
       def cleanup(retention_seconds_by_class:, max_count_by_class: {}, max_bytes_by_class: {}, now: Time.now, dry_run: false)
         deleted = []
         retained = []
