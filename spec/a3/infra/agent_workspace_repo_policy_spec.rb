@@ -34,4 +34,17 @@ RSpec.describe A3::Infra::AgentWorkspaceRepoPolicy do
       policy.resolve_slots(workspace: partial_workspace)
     end.to raise_error(A3::Domain::ConfigurationError, /missing=repo_beta/)
   end
+
+  it "keeps an empty repo universe as an empty slot set" do
+    empty_workspace = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: :ticket_workspace,
+      root_path: "/tmp/a3-empty-workspace",
+      source_descriptor: A3::Domain::SourceDescriptor.implementation(task_ref: "Sample#42", ref: "refs/heads/a2o/work/Sample-42"),
+      slot_paths: {}
+    )
+    policy = described_class.new(available_slots: [])
+
+    expect(policy.required_slots).to eq([])
+    expect(policy.resolve_slots(workspace: empty_workspace)).to eq([])
+  end
 end

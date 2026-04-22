@@ -5,7 +5,7 @@ module A3
     class AgentWorkspaceRepoPolicy
       def initialize(available_slots:, required_slots: nil)
         @available_slots = normalize_slots(available_slots)
-        @required_slots = normalize_slots(required_slots)
+        @required_slots = required_slots.nil? ? nil : normalize_slots(required_slots)
       end
 
       def required_slots
@@ -29,8 +29,7 @@ module A3
       private
 
       def normalize_slots(slots)
-        normalized = Array(slots).map(&:to_sym).uniq.sort.freeze
-        normalized.empty? ? nil : normalized
+        Array(slots).map(&:to_sym).uniq.sort.freeze
       end
     end
   end
