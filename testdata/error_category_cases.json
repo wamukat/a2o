@@ -1,0 +1,85 @@
+{
+  "worker_cases": [
+    {
+      "name": "verification beats dirty words",
+      "summary": "verification failed because lint found an untracked generated file",
+      "observed_state": "exit 1 due to untracked generated file",
+      "phase": "verification",
+      "category": "verification_failed"
+    },
+    {
+      "name": "publish workspace changes stays dirty",
+      "summary": "slot app has changes but is not an edit target: [README.md]",
+      "observed_state": "slot app has changes but is not an edit target: [README.md]",
+      "phase": "verification",
+      "category": "workspace_dirty"
+    },
+    {
+      "name": "invalid executor config is configuration error",
+      "summary": "stdin worker executor config invalid",
+      "observed_state": "invalid_executor_config",
+      "phase": "implementation",
+      "category": "configuration_error"
+    },
+    {
+      "name": "merge conflict is classified",
+      "summary": "merge conflict detected while applying patch",
+      "observed_state": "unmerged paths remain",
+      "phase": "merge",
+      "category": "merge_conflict"
+    }
+  ],
+  "blocked_cases": [
+    {
+      "name": "verification command failure",
+      "diagnostic_summary": "commands/verify failed",
+      "observed_state": "exit 1",
+      "failing_command": "commands/verify",
+      "phase": "verification",
+      "infra_diagnostics": {},
+      "category": "verification_failed"
+    },
+    {
+      "name": "publish workspace changes strict dirty",
+      "diagnostic_summary": "slot app has changes but is not an edit target: [README.md]",
+      "observed_state": "slot app has changes but is not an edit target: [README.md]",
+      "failing_command": "publish_workspace_changes",
+      "phase": "verification",
+      "infra_diagnostics": {},
+      "category": "workspace_dirty"
+    },
+    {
+      "name": "review worker invalid json stays executor",
+      "diagnostic_summary": "worker result JSON invalid",
+      "observed_state": "worker blocked",
+      "failing_command": "review_worker",
+      "phase": "review",
+      "infra_diagnostics": {
+        "worker_response_bundle": {
+          "diagnostics": {
+            "remediation": "Check the worker result JSON."
+          }
+        }
+      },
+      "category": "executor_failed"
+    },
+    {
+      "name": "project schema issue is configuration error",
+      "diagnostic_summary": "project.yaml schema invalid",
+      "observed_state": "launcher config rejected",
+      "failing_command": "worker",
+      "phase": "implementation",
+      "infra_diagnostics": {},
+      "category": "configuration_error"
+    },
+    {
+      "name": "merge conflict blocked case",
+      "diagnostic_summary": "merge conflict marker found",
+      "observed_state": "would be overwritten",
+      "failing_command": "merge",
+      "phase": "merge",
+      "infra_diagnostics": {},
+      "category": "merge_conflict"
+    }
+  ]
+}

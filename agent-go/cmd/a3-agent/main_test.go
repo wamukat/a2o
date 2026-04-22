@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/wamukat/a3-engine/agent-go/internal/errorpolicy"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,7 +50,7 @@ func TestPublicAgentEnvironmentAliasesTakePrecedence(t *testing.T) {
 }
 
 func TestWorkerErrorCategoryPrioritizesVerificationFailuresOverDirtyWords(t *testing.T) {
-	if got := workerErrorCategory(
+	if got := errorpolicy.WorkerCategory(
 		"verification failed because lint found an untracked generated file",
 		"exit 1 due to untracked generated file",
 		"verification",
@@ -59,7 +60,7 @@ func TestWorkerErrorCategoryPrioritizesVerificationFailuresOverDirtyWords(t *tes
 }
 
 func TestWorkerErrorCategoryKeepsPublishWorkspaceDirtinessAsWorkspaceDirty(t *testing.T) {
-	if got := workerErrorCategory(
+	if got := errorpolicy.WorkerCategory(
 		"slot app has changes but is not an edit target: [README.md]",
 		"slot app has changes but is not an edit target: [README.md]",
 		"verification",

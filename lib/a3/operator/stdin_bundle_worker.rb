@@ -85,26 +85,11 @@ def failure(request, summary:, command:, observed_state:, diagnostics: {})
 end
 
 def error_category(summary:, observed_state:, phase:)
-  text = [summary, observed_state, phase].join(" ").downcase
-  return "configuration_error" if text.match?(/config|schema|project\.yaml|executor config|invalid_executor_config|launcher/)
-  return "workspace_dirty" if text.match?(/slot .* has changes|changed files|working tree is dirty/)
-  return "verification_failed" if phase.to_s == "verification"
-  return "workspace_dirty" if text.match?(/dirty|has changes|untracked|working tree/)
-  return "merge_conflict" if text.match?(/merge conflict|conflict marker|unmerged/)
-  return "merge_failed" if phase.to_s == "merge"
-
-  "executor_failed"
+  A3::Domain::ErrorCategoryPolicy.worker_error_category(summary: summary, observed_state: observed_state, phase: phase)
 end
 
 def remediation_for(category)
-  {
-    "configuration_error" => "Review project.yaml and executor settings. Do not edit generated launcher.json files.",
-    "workspace_dirty" => "Clean, commit, or stash the reported repo files before rerunning A2O.",
-    "verification_failed" => "Inspect the verification command output and fix product tests, lint, or dependencies.",
-    "merge_conflict" => "Resolve the merge conflict or update the base branch before rerunning A2O.",
-    "merge_failed" => "Check the merge target ref and branch policy before rerunning A2O.",
-    "executor_failed" => "Check that the executor binary, credentials, and worker result JSON are valid."
-  }.fetch(category, "Inspect failing_command, observed_state, and evidence, then remove the blocking cause.")
+  A3::Domain::ErrorCategoryPolicy.worker_remediation(category)
 end
 
 def bundle_for(request)
