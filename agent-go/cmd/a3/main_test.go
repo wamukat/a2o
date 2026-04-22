@@ -3912,7 +3912,7 @@ func TestRuntimeLoopPreservesHostAgentLogAcrossRunOnceCycles(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "loop", "--interval", "0s", "--max-cycles", "2", "--agent-attempts", "1"}, runner, &stdout, &stderr)
+		code := run([]string{"runtime", "loop", "--interval", "0s", "--max-cycles", "2", "--agent-attempts", "1", "--agent-poll-interval", "4s"}, runner, &stdout, &stderr)
 		if code != 0 {
 			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
@@ -3928,6 +3928,9 @@ func TestRuntimeLoopPreservesHostAgentLogAcrossRunOnceCycles(t *testing.T) {
 	}
 	if count := strings.Count(text, "===== host agent session start "); count != 2 {
 		t.Fatalf("expected two session headers across loop cycles, got %d in:\n%s", count, text)
+	}
+	if !strings.Contains(text, "poll_interval=4s") {
+		t.Fatalf("expected host agent log to include configured poll interval, got:\n%s", text)
 	}
 	if !strings.Contains(stdout.String(), "kanban_loop_finished cycles=2") {
 		t.Fatalf("runtime loop should finish two cycles, got %q", stdout.String())
