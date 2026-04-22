@@ -14,7 +14,7 @@ module A3
         @base_dir = Pathname(base_dir)
         @repo_sources = repo_sources.transform_keys(&:to_sym).transform_values { |value| Pathname(value) }.freeze
         @git_workspace_backend = git_workspace_backend
-        @branch_namespace = normalize_branch_namespace(branch_namespace)
+        @branch_namespace = A3::Domain::BranchNamespace.normalize(branch_namespace)
       end
 
       def call(task:, workspace_plan:, artifact_owner:, bootstrap_marker:)
@@ -384,12 +384,6 @@ module A3
 
       def parent_workspace_ref_for(parent_ref)
         "#{parent_ref}-parent"
-      end
-
-      def normalize_branch_namespace(value)
-        normalized = value.to_s.strip.gsub(%r{[^A-Za-z0-9._/-]}, "-").gsub(%r{/+}, "/").gsub(%r{\A/+|/+\z}, "")
-        normalized = normalized.split("/").map { |part| part.sub(/\Aa3(?:-|\z)/, "") }.reject(&:empty?).join("/")
-        normalized.empty? ? nil : normalized
       end
 
       def git_worktree_slots(source_root)

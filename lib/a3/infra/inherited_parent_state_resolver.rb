@@ -18,7 +18,7 @@ module A3
 
       def initialize(repo_sources:, branch_namespace: ENV.fetch("A2O_BRANCH_NAMESPACE", ENV.fetch("A3_BRANCH_NAMESPACE", nil)))
         @repo_sources = repo_sources.transform_keys(&:to_sym).transform_values { |value| Pathname(value) }.freeze
-        @branch_namespace = normalize_branch_namespace(branch_namespace)
+        @branch_namespace = A3::Domain::BranchNamespace.normalize(branch_namespace)
       end
 
       def snapshot_for(task:, phase:)
@@ -87,11 +87,6 @@ module A3
         stdout.strip
       end
 
-      def normalize_branch_namespace(value)
-        normalized = value.to_s.strip.gsub(%r{[^A-Za-z0-9._/-]}, "-").gsub(%r{/+}, "/").gsub(%r{\A/+|/+\z}, "")
-        normalized = normalized.split("/").map { |part| part.sub(/\Aa3(?:-|\z)/, "") }.reject(&:empty?).join("/")
-        normalized.empty? ? nil : normalized
-      end
     end
   end
 end

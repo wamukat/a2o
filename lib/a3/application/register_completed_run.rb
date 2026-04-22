@@ -11,7 +11,7 @@ module A3
         @plan_next_phase = plan_next_phase
         @publish_external_task_status = publish_external_task_status
         @publish_external_task_activity = publish_external_task_activity
-        @branch_namespace = normalize_branch_namespace(branch_namespace)
+        @branch_namespace = A3::Domain::BranchNamespace.normalize(branch_namespace)
         raise ArgumentError, "integration_ref_readiness_checker is required" unless integration_ref_readiness_checker
 
         @integration_ref_readiness_checker = integration_ref_readiness_checker
@@ -248,11 +248,6 @@ module A3
         text.to_s.split("\n").map(&:strip).reject(&:empty?).join(" ")
       end
 
-      def normalize_branch_namespace(value)
-        normalized = value.to_s.strip.gsub(%r{[^A-Za-z0-9._/-]}, "-").gsub(%r{/+}, "/").gsub(%r{\A/+|/+\z}, "")
-        normalized = normalized.split("/").map { |part| part.sub(/\Aa3(?:-|\z)/, "") }.reject(&:empty?).join("/")
-        normalized.empty? ? nil : normalized
-      end
     end
   end
 end
