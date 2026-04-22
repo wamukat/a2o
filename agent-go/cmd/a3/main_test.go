@@ -4140,6 +4140,50 @@ func TestRuntimeResumeOnRunningSchedulerUnpausesWithoutLaunchingDuplicate(t *tes
 	}
 }
 
+func TestRuntimeResumeRestoresPausedStateWhenBackgroundLaunchFails(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+	})
+	runner := &fakeRunner{
+		schedulerPaused:    true,
+		startBackgroundErr: errors.New("background launch failed"),
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "resume"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail when background launch fails")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "background launch failed") {
+		t.Fatalf("stderr should mention launch failure, got %q", stderr.String())
+	}
+	if !runner.schedulerPaused {
+		t.Fatalf("scheduler paused state should be restored after failed resume")
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(joined, "a3 resume-scheduler --storage-backend json --storage-dir /var/lib/a2o/a2o-runtime") {
+		t.Fatalf("resume should clear pause before launch attempt, got:\n%s", joined)
+	}
+	if !strings.Contains(joined, "a3 pause-scheduler --storage-backend json --storage-dir /var/lib/a2o/a2o-runtime") {
+		t.Fatalf("resume should restore pause on launch failure, got:\n%s", joined)
+	}
+}
+
 func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
 	t.Setenv("A3_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
 	tempDir := t.TempDir()
@@ -5250,6 +5294,7 @@ type fakeRunner struct {
 	schedulerPaused        bool
 	schedulerStopReason    string
 	schedulerExecutedCount int
+	startBackgroundErr     error
 	err                    error
 	lastEnv                map[string]string
 	nextPID                int
@@ -5410,6 +5455,9 @@ func (r *fakeRunner) StartBackground(name string, args []string, logPath string)
 	call = append(call, args...)
 	call = append(call, logPath)
 	r.calls = append(r.calls, call)
+	if r.startBackgroundErr != nil {
+		return 0, r.startBackgroundErr
+	}
 	if r.err != nil {
 		return 0, r.err
 	}

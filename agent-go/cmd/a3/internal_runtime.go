@@ -191,9 +191,6 @@ func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, std
 	if _, err := buildRuntimeRunOncePlan(effectiveConfig, *maxSteps, *agentAttempts, *agentPollInterval, ""); err != nil {
 		return err
 	}
-	if err := runtimeSchedulerStateCommand(effectiveConfig, runner, "resume-scheduler"); err != nil {
-		return err
-	}
 	paths := schedulerPaths(effectiveConfig)
 	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
 		return fmt.Errorf("create scheduler dir: %w", err)
@@ -201,10 +198,22 @@ func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, std
 	if pid, ok, err := readRunningScheduler(paths.PIDFile, runner); err != nil {
 		return err
 	} else if ok {
+		if err := runtimeSchedulerStateCommand(effectiveConfig, runner, "resume-scheduler"); err != nil {
+			return err
+		}
 		fmt.Fprintf(stdout, "runtime_scheduler_resumed pid=%d paused=false pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
 		fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
 		return nil
 	}
+	if err := runtimeSchedulerStateCommand(effectiveConfig, runner, "resume-scheduler"); err != nil {
+		return err
+	}
+	resumed := false
+	defer func() {
+		if !resumed {
+			_ = runtimeSchedulerStateCommand(effectiveConfig, runner, "pause-scheduler")
+		}
+	}()
 	executable, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("resolve executable: %w", err)
@@ -225,6 +234,7 @@ func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, std
 		_ = os.Remove(paths.CommandFile)
 		return fmt.Errorf("write scheduler pid file: %w", err)
 	}
+	resumed = true
 	fmt.Fprintf(stdout, "runtime_scheduler_resumed pid_file=%s log=%s paused=false\n", paths.PIDFile, paths.LogFile)
 	fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
 	return nil
