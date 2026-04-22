@@ -114,6 +114,7 @@ module A3
       end
 
       def reconcile_child_refs(existing_task:, imported_task:)
+        return imported_task.child_refs if existing_task.kind == :parent || imported_task.kind == :parent
         (existing_task.child_refs + imported_task.child_refs).uniq.sort.freeze
       end
 

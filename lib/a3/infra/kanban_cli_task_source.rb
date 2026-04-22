@@ -90,10 +90,9 @@ module A3
 
         until queue.empty?
           task_ref, task_id = queue.shift
-          topology_snapshot, parent_ref, child_refs, related_refs = fetch_topology_snapshot(task_ref: task_ref, task_id: task_id)
+          topology_snapshot, parent_ref, related_refs = fetch_topology_snapshot(task_ref: task_ref, task_id: task_id)
           snapshots_by_ref[topology_snapshot.fetch("ref")] = topology_snapshot if topology_snapshot
           child_refs_by_parent[parent_ref] << task_ref if parent_ref
-          child_refs.each { |child_ref| child_refs_by_parent[task_ref] << child_ref }
 
           related_refs.each do |related_ref, related_task_id|
             next if snapshots_by_ref.key?(related_ref) || queued_refs.include?(related_ref)
@@ -134,7 +133,6 @@ module A3
             parent_ref: parent_refs.first&.first
           ),
           parent_refs.first&.first,
-          child_refs.map(&:first),
           (parent_refs + child_refs).to_h
         ]
       end
@@ -159,7 +157,8 @@ module A3
           ref = String(item["ref"]).strip
           task_id = integer_or_nil(item["id"])
           status = String(item["status"]).strip
-          next if ref.empty? || task_id.nil? || closed_status?(status)
+          next if ref.empty? || task_id.nil?
+          next if !status.empty? && closed_status?(status)
 
           refs << [ref, task_id]
         end

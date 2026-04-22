@@ -299,6 +299,109 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
+  it "keeps topology when relation payload omits child status" do
+    client = Class.new do
+      def run_json_command(*args)
+        command = args.fetch(0)
+        case command
+        when "task-snapshot-list"
+          [
+            {
+              "id" => 5100,
+              "ref" => "Sample#5100",
+              "status" => "To do",
+              "labels" => ["repo:both", "trigger:auto-parent"],
+              "parent_ref" => nil
+            }
+          ]
+        when "task-relation-list"
+          task_id = Integer(args[args.index("--task-id") + 1])
+          case task_id
+          when 5100
+            {
+              "parenttask" => [],
+              "subtask" => [
+                {
+                  "id" => 5101,
+                  "ref" => "Sample#5101"
+                }
+              ]
+            }
+          when 5101
+            {
+              "parenttask" => [
+                {
+                  "id" => 5100,
+                  "ref" => "Sample#5100"
+                }
+              ],
+              "subtask" => []
+            }
+          else
+            raise "unexpected relation task id: #{task_id}"
+          end
+        else
+          raise "unexpected command: #{args.inspect}"
+        end
+      end
+
+      def fetch_task_by_id(task_id)
+        case Integer(task_id)
+        when 5100
+          {
+            "id" => 5100,
+            "ref" => "Sample#5100",
+            "status" => "To do",
+            "labels" => ["repo:both", "trigger:auto-parent"]
+          }
+        when 5101
+          {
+            "id" => 5101,
+            "ref" => "Sample#5101",
+            "status" => "To do",
+            "labels" => ["repo:ui-app", "trigger:auto-implement"],
+            "parent_ref" => "Sample#5100"
+          }
+        else
+          raise "unexpected task id: #{task_id}"
+        end
+      end
+
+      def fetch_task_by_ref(task_ref)
+        raise "unexpected task ref fetch: #{task_ref}"
+      end
+
+      def load_task_labels(task_id)
+        case Integer(task_id)
+        when 5100
+          [{ "title" => "repo:both" }, { "title" => "trigger:auto-parent" }]
+        when 5101
+          [{ "title" => "repo:ui-app" }, { "title" => "trigger:auto-implement" }]
+        else
+          []
+        end
+      end
+    end.new
+
+    source = described_class.new(
+      client: client,
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta],
+        "repo:both" => %i[repo_alpha repo_beta]
+      },
+      trigger_labels: ["trigger:auto-implement", "trigger:auto-parent"]
+    )
+
+    tasks = source.load
+    parent = tasks.find { |task| task.ref == "Sample#5100" }
+    child = tasks.find { |task| task.ref == "Sample#5101" }
+
+    expect(parent.kind).to eq(:parent)
+    expect(parent.child_refs).to eq(["Sample#5101"])
+    expect(child.parent_ref).to eq("Sample#5100")
+  end
+
   it "imports done children from kanban topology so parent gates use kanban as the master state" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,

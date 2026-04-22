@@ -80,7 +80,7 @@ RSpec.describe A3::Application::SyncExternalTasks do
     expect(result.preserved_active_task_refs).to eq(["Sample#3046"])
   end
 
-  it "preserves active parent-child topology when the filtered snapshot omits running children" do
+  it "preserves active parent-child topology when the imported task still reports hidden unresolved children" do
     local_task = A3::Domain::Task.new(
       ref: "Sample#3046",
       kind: :parent,
@@ -93,10 +93,11 @@ RSpec.describe A3::Application::SyncExternalTasks do
     )
     imported_task = A3::Domain::Task.new(
       ref: "Sample#3046",
-      kind: :single,
+      kind: :parent,
       edit_scope: %i[repo_alpha repo_beta],
       verification_scope: %i[repo_alpha repo_beta],
       status: :todo,
+      child_refs: %w[Sample#3047 Sample#3048],
       external_task_id: 4100
     )
     task_repository.save(local_task)
@@ -251,4 +252,5 @@ RSpec.describe A3::Application::SyncExternalTasks do
     expect(task_repository.fetch("Sample#3046")).to eq(refreshed_task)
     expect(result.pruned_task_refs).to eq([])
   end
+
 end
