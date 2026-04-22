@@ -79,6 +79,18 @@ runtime image には `/opt/a2o/agents/release-manifest.jsonl` と target 別 arc
 
 どちらの file も持たない legacy package directory は host launcher fixture 用として引き続き許容するが、公開する package set には compatibility contract を持たせる前提にする。
 
+## 実装済みの install resolution ベースライン
+
+`A2O#158` では、後続の distribution separation が従う install-time resolution / fallback policy を定義した。
+
+現在の policy は次のとおり。
+
+- `a2o agent install --package-source auto` は `--package-dir` または `A2O_AGENT_PACKAGE_DIR` / `A3_AGENT_PACKAGE_DIR` を優先する
+- auto mode が環境変数経由で package directory を見つけ、その validation に失敗した場合のみ runtime image へフォールバックする
+- auto mode でも `--package-dir` を明示した場合は operator の明示選択とみなし、フォールバックしない
+- `--package-source package-dir` は compatible な host package directory を必須とし、フォールバックしない
+- `--package-source runtime-image` は host package discovery を行わず、runtime image に埋め込まれた package store を使う
+
 ## 改善案
 
 ### Option A: 小さな最適化だけ行う

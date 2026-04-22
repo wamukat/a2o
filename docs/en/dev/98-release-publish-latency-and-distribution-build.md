@@ -79,6 +79,18 @@ The package-set contract is now:
 
 Legacy package directories without either file still work for host-launcher-only fixtures, but published package sets are expected to carry the compatibility contract.
 
+## Implemented Install Resolution Baseline
+
+`A2O#158` defines the install-time resolution and fallback baseline for later distribution separation.
+
+The current policy is:
+
+- `a2o agent install --package-source auto` prefers `--package-dir` or `A2O_AGENT_PACKAGE_DIR` / `A3_AGENT_PACKAGE_DIR`
+- if auto mode discovers a package directory only through the environment and validation fails, install falls back to the runtime image
+- `--package-dir` in auto mode is treated as an explicit operator choice and does not fall back
+- `--package-source package-dir` requires a compatible host package directory and never falls back
+- `--package-source runtime-image` skips host package discovery and uses the embedded runtime-image package store
+
 ## Improvement Options
 
 ### Option A: Small optimization only

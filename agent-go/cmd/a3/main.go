@@ -142,5 +142,5 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o runtime run-once [--max-steps N] [--agent-attempts N] [--agent-poll-interval DURATION] [--project-config project-test.yaml]")
 	fmt.Fprintln(w, "  a2o runtime loop [--interval DURATION] [--max-cycles N] [--agent-poll-interval DURATION]")
 	fmt.Fprintln(w, "  a2o agent target")
-	fmt.Fprintln(w, "  a2o agent install [--target auto] [--output PATH] [--build]")
+	fmt.Fprintln(w, "  a2o agent install [--target auto] [--output PATH] [--package-source auto|package-dir|runtime-image] [--package-dir DIR] [--build]")
 }

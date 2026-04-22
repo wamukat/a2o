@@ -98,6 +98,12 @@ a2o agent install \
 
 This command starts the runtime service if needed, verifies the matching agent package inside the runtime container, exports it to the requested host path, and marks it executable. Use `--build` when validating local source changes against a freshly built runtime image. Omit `--build` when using a prebuilt release image.
 
+Install-time package resolution uses this policy:
+
+- `--package-source auto` (default): prefer `--package-dir` or `A2O_AGENT_PACKAGE_DIR` / `A3_AGENT_PACKAGE_DIR`; if only an env-discovered package directory is present and validation fails, fall back to the runtime image
+- `--package-source package-dir`: require a compatible host package directory and do not fall back
+- `--package-source runtime-image`: ignore host package directories and export from the runtime image
+
 The standard compose file is an A2O distribution asset. Project packages provide bootstrap/config values; they do not provide the A2O runtime compose file. `--compose-file`, `--compose-project`, and `--runtime-service` remain available as development/diagnostic overrides, but they are not part of the normal user path.
 
 Start a new package from the template generator so the executor contract is not hand-written:

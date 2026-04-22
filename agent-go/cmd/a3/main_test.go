@@ -1,7 +1,10 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -129,6 +132,107 @@ func TestAgentInstallExportsAgentFromRuntimeImage(t *testing.T) {
 	assertCallContains(t, joined, "docker exec container-123 a3 agent package verify --target darwin-amd64")
 	assertCallContains(t, joined, "docker exec container-123 a3 agent package export --target darwin-amd64 --output /tmp/a2o-agent-export")
 	assertCallContains(t, joined, "docker cp container-123:/tmp/a2o-agent-export "+outputPath)
+}
+
+func TestAgentInstallExportsAgentFromPackageDir(t *testing.T) {
+	tempDir := t.TempDir()
+	outputPath := filepath.Join(tempDir, "bin", "a3-agent")
+	packageDir := writeAgentPackageDir(t, tempDir, map[string]string{"darwin-amd64": "#!/bin/sh\necho package-dir\n"})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"agent",
+		"install",
+		"--target",
+		"darwin-amd64",
+		"--output",
+		outputPath,
+		"--package-source",
+		"package-dir",
+		"--package-dir",
+		packageDir,
+	}, runner, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+	if got := strings.TrimSpace(string(mustReadTestFile(t, outputPath))); got != "#!/bin/sh\necho package-dir" {
+		t.Fatalf("exported agent=%q", got)
+	}
+	if !strings.Contains(stdout.String(), "source=package-dir") {
+		t.Fatalf("stdout should report package-dir source, got %q", stdout.String())
+	}
+	if len(runner.joinedCalls()) != 0 {
+		t.Fatalf("package-dir install should not call docker, calls:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+	}
+}
+
+func TestAgentInstallAutoFallsBackToRuntimeImageWhenEnvPackageDirIsInvalid(t *testing.T) {
+	tempDir := t.TempDir()
+	outputPath := filepath.Join(tempDir, "bin", "a3-agent")
+	invalidDir := filepath.Join(tempDir, "invalid-packages")
+	if err := os.MkdirAll(invalidDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("A2O_AGENT_PACKAGE_DIR", invalidDir)
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"agent",
+		"install",
+		"--target",
+		"darwin-amd64",
+		"--output",
+		outputPath,
+		"--compose-project",
+		"test-project",
+		"--compose-file",
+		"compose.yml",
+		"--runtime-service",
+		"a2o-runtime",
+	}, runner, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+	assertCallContains(t, runner.joinedCalls(), "docker exec container-123 a3 agent package verify --target darwin-amd64")
+	if !strings.Contains(stdout.String(), "source=runtime-image") {
+		t.Fatalf("stdout should report runtime-image fallback, got %q", stdout.String())
+	}
+}
+
+func TestAgentInstallFailsWithoutFallbackWhenExplicitPackageDirIsInvalid(t *testing.T) {
+	tempDir := t.TempDir()
+	outputPath := filepath.Join(tempDir, "bin", "a3-agent")
+	invalidDir := filepath.Join(tempDir, "invalid-packages")
+	if err := os.MkdirAll(invalidDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"agent",
+		"install",
+		"--target",
+		"darwin-amd64",
+		"--output",
+		outputPath,
+		"--package-dir",
+		invalidDir,
+	}, runner, &stdout, &stderr)
+	if code == 0 {
+		t.Fatal("run should fail for explicit invalid package-dir")
+	}
+	if !strings.Contains(stderr.String(), "agent package manifest not found") {
+		t.Fatalf("stderr should mention invalid package dir, got %q", stderr.String())
+	}
+	if len(runner.joinedCalls()) != 0 {
+		t.Fatalf("explicit invalid package-dir should fail before docker calls, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+	}
 }
 
 func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
@@ -5457,6 +5561,96 @@ func TestAgentInstallRequiresInstanceConfigOrExplicitCompose(t *testing.T) {
 	if !strings.Contains(stderr.String(), "A2O runtime instance config not found") {
 		t.Fatalf("stderr should mention missing instance config, got %q", stderr.String())
 	}
+}
+
+func writeAgentPackageDir(t *testing.T, root string, binaries map[string]string) string {
+	t.Helper()
+	packageDir := filepath.Join(root, "packages")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifestPath := filepath.Join(packageDir, "release-manifest.jsonl")
+	compatibilityPath := filepath.Join(packageDir, "package-compatibility.json")
+	manifestLines := make([]string, 0, len(binaries))
+	for target, body := range binaries {
+		targetDir := filepath.Join(packageDir, target)
+		if err := os.MkdirAll(targetDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		launcherPath := filepath.Join(targetDir, "a3")
+		if err := os.WriteFile(launcherPath, []byte(body), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		archiveName := fmt.Sprintf("a3-agent-%s-%s.tar.gz", version, target)
+		archivePath := filepath.Join(packageDir, archiveName)
+		writeAgentArchiveFile(t, archivePath, body)
+		sum := sha256.Sum256(mustReadTestFile(t, archivePath))
+		goos, goarch, _ := strings.Cut(target, "-")
+		entry := map[string]string{
+			"version": version,
+			"goos":    goos,
+			"goarch":  goarch,
+			"archive": archiveName,
+			"sha256":  fmt.Sprintf("%x", sum[:]),
+		}
+		entryJSON, err := json.Marshal(entry)
+		if err != nil {
+			t.Fatal(err)
+		}
+		manifestLines = append(manifestLines, string(entryJSON))
+	}
+	if err := os.WriteFile(manifestPath, []byte(strings.Join(manifestLines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	contract := map[string]any{
+		"schema":           "a2o-agent-package-compatibility/v1",
+		"package_version":  version,
+		"runtime_version":  version,
+		"archive_manifest": "release-manifest.jsonl",
+		"launcher_layout":  "platform-bin-dir-v1",
+	}
+	body, err := json.Marshal(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(compatibilityPath, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return packageDir
+}
+
+func writeAgentArchiveFile(t *testing.T, path, body string) {
+	t.Helper()
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	gzipWriter := gzip.NewWriter(file)
+	tarWriter := tar.NewWriter(gzipWriter)
+	content := []byte(body)
+	header := &tar.Header{Name: "a3-agent", Mode: 0o755, Size: int64(len(content))}
+	if err := tarWriter.WriteHeader(header); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tarWriter.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gzipWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mustReadTestFile(t *testing.T, path string) []byte {
+	t.Helper()
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return body
 }
 
 type fakeRunner struct {
