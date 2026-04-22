@@ -89,12 +89,14 @@ module A3
           current_run_ref: existing_task.current_run_ref,
           parent_ref: reconcile_parent_ref(existing_task: existing_task, imported_task: imported_task),
           child_refs: reconcile_child_refs(existing_task: existing_task, imported_task: imported_task),
+          blocking_task_refs: imported_task.blocking_task_refs,
+          priority: imported_task.priority,
           external_task_id: imported_task.external_task_id,
           verification_source_ref: existing_task.verification_source_ref
         )
       end
 
-      def build_reconciled_task(ref:, kind:, edit_scope:, verification_scope:, status:, current_run_ref:, parent_ref:, child_refs:, external_task_id:, verification_source_ref: nil)
+      def build_reconciled_task(ref:, kind:, edit_scope:, verification_scope:, status:, current_run_ref:, parent_ref:, child_refs:, blocking_task_refs:, priority:, external_task_id:, verification_source_ref: nil)
         A3::Domain::Task.new(
           ref: ref,
           kind: kind,
@@ -104,6 +106,8 @@ module A3
           current_run_ref: current_run_ref,
           parent_ref: parent_ref,
           child_refs: child_refs,
+          blocking_task_refs: blocking_task_refs,
+          priority: priority,
           external_task_id: external_task_id,
           verification_source_ref: verification_source_ref
         )
@@ -137,6 +141,8 @@ module A3
           current_run_ref: refreshed_task.current_run_ref,
           parent_ref: preserve_parent_ref(existing_task: existing_task, refreshed_task: refreshed_task),
           child_refs: preserve_child_refs(existing_task: existing_task, refreshed_task: refreshed_task),
+          blocking_task_refs: refreshed_task.blocking_task_refs,
+          priority: refreshed_task.priority,
           external_task_id: refreshed_task.external_task_id,
           verification_source_ref: existing_task.verification_source_ref
         )

@@ -19,6 +19,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
           "id" => 3046,
           "ref" => "Sample#3046",
           "status" => "To do",
+          "priority" => 4,
           "labels" => ["repo:ui-app", "trigger:auto-implement"],
           "parent_ref" => nil
         },
@@ -50,6 +51,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
       expect(tasks.fetch(0).kind).to eq(:single)
       expect(tasks.fetch(0).edit_scope).to eq([:repo_beta])
       expect(tasks.fetch(0).status).to eq(:todo)
+      expect(tasks.fetch(0).priority).to eq(4)
       expect(tasks.fetch(0).external_task_id).to eq(3046)
     end
   end

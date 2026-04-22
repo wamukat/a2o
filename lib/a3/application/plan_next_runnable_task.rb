@@ -16,7 +16,10 @@ module A3
         @sync_external_tasks&.call
         tasks = @task_repository.all
         assessments = tasks.map { |task| A3::Domain::RunnableTaskAssessment.evaluate(task: task, tasks: tasks) }.freeze
-        selected_assessment = assessments.find(&:runnable?)
+        selected_assessment = assessments
+          .select(&:runnable?)
+          .sort_by { |assessment| [-assessment.task.priority, assessment.task.ref] }
+          .first
 
         Result.new(
           task: selected_assessment&.task,

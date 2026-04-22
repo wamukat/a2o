@@ -33,6 +33,57 @@ RSpec.describe A3::Application::PlanNextRunnableTask do
     expect(sync_external_tasks).to have_received(:call)
   end
 
+  it "prefers the highest priority runnable task" do
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#3023",
+        kind: :single,
+        edit_scope: [:repo_alpha],
+        status: :todo,
+        priority: 2
+      )
+    )
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#3022",
+        kind: :single,
+        edit_scope: [:repo_beta],
+        status: :todo,
+        priority: 4
+      )
+    )
+
+    result = use_case.call
+
+    expect(result.task&.ref).to eq("A3-v2#3022")
+    expect(result.phase).to eq(:implementation)
+  end
+
+  it "keeps ref ordering as the tie-breaker for equal priority tasks" do
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#3023",
+        kind: :single,
+        edit_scope: [:repo_alpha],
+        status: :todo,
+        priority: 3
+      )
+    )
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#3022",
+        kind: :single,
+        edit_scope: [:repo_beta],
+        status: :todo,
+        priority: 3
+      )
+    )
+
+    result = use_case.call
+
+    expect(result.task&.ref).to eq("A3-v2#3022")
+  end
+
   it "continues scheduling an active task after reconciling external state" do
     task_repository.save(
       A3::Domain::Task.new(

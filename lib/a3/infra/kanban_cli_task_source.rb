@@ -130,6 +130,7 @@ module A3
             task_id: resolved_task_id,
             task_ref: task_ref,
             raw_status: payload.fetch("status", nil),
+            raw_priority: payload["priority"],
             labels: labels,
             parent_ref: parent_refs.first&.first,
             blocking_task_refs: blocking_refs.map(&:first)
@@ -140,7 +141,7 @@ module A3
         ]
       end
 
-      def normalize_topology_snapshot(task_id:, task_ref:, raw_status:, labels:, parent_ref:, blocking_task_refs:)
+      def normalize_topology_snapshot(task_id:, task_ref:, raw_status:, raw_priority:, labels:, parent_ref:, blocking_task_refs:)
         status = normalize_status(raw_status, labels: labels)
         return nil unless status
         edit_scope = resolve_topology_edit_scope(labels)
@@ -152,7 +153,8 @@ module A3
           "status" => status,
           "edit_scope" => edit_scope,
           "parent_ref" => parent_ref,
-          "blocking_task_refs" => normalize_blocking_refs(blocking_task_refs)
+          "blocking_task_refs" => normalize_blocking_refs(blocking_task_refs),
+          "priority" => normalize_priority(raw_priority)
         }
       end
 
@@ -254,6 +256,7 @@ module A3
           parent_ref: snapshot.fetch("parent_ref"),
           child_refs: child_refs,
           blocking_task_refs: snapshot.fetch("blocking_task_refs", []),
+          priority: snapshot.fetch("priority", 0),
           external_task_id: snapshot.fetch("task_id")
         )
       end
@@ -269,6 +272,7 @@ module A3
           parent_ref: snapshot.fetch("parent_ref"),
           child_refs: [],
           blocking_task_refs: snapshot.fetch("blocking_task_refs", []),
+          priority: snapshot.fetch("priority", 0),
           external_task_id: snapshot.fetch("task_id")
         )
       end
@@ -305,7 +309,8 @@ module A3
           "status" => status,
           "edit_scope" => edit_scope,
           "parent_ref" => normalize_parent_ref(raw_snapshot["parent_ref"]),
-          "blocking_task_refs" => normalize_blocking_refs(raw_snapshot["blocking_task_refs"])
+          "blocking_task_refs" => normalize_blocking_refs(raw_snapshot["blocking_task_refs"]),
+          "priority" => normalize_priority(raw_snapshot["priority"])
         }
       end
 
@@ -348,6 +353,12 @@ module A3
 
       def normalize_blocking_refs(values)
         Array(values).map { |value| String(value).strip }.reject(&:empty?).uniq.freeze
+      end
+
+      def normalize_priority(value)
+        Integer(value || 0)
+      rescue ArgumentError, TypeError
+        0
       end
 
       def normalize_repo_label_map(repo_label_map)

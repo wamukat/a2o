@@ -5,9 +5,9 @@ module A3
     class InvalidPhaseError < StandardError; end
 
     class Task
-      attr_reader :ref, :kind, :edit_scope, :verification_scope, :status, :current_run_ref, :parent_ref, :child_refs, :blocking_task_refs, :external_task_id, :verification_source_ref
+      attr_reader :ref, :kind, :edit_scope, :verification_scope, :status, :current_run_ref, :parent_ref, :child_refs, :blocking_task_refs, :priority, :external_task_id, :verification_source_ref
 
-      def initialize(ref:, kind:, edit_scope:, verification_scope: nil, status: :todo, current_run_ref: nil, parent_ref: nil, child_refs: [], blocking_task_refs: [], external_task_id: nil, verification_source_ref: nil)
+      def initialize(ref:, kind:, edit_scope:, verification_scope: nil, status: :todo, current_run_ref: nil, parent_ref: nil, child_refs: [], blocking_task_refs: [], priority: 0, external_task_id: nil, verification_source_ref: nil)
         @ref = ref
         @kind = kind.to_sym
         @edit_scope = Array(edit_scope).map(&:to_sym).freeze
@@ -17,6 +17,7 @@ module A3
         @parent_ref = parent_ref
         @child_refs = Array(child_refs).freeze
         @blocking_task_refs = Array(blocking_task_refs).map(&:to_s).reject(&:empty?).uniq.freeze
+        @priority = Integer(priority || 0)
         @external_task_id = external_task_id && Integer(external_task_id)
         @verification_source_ref = normalize_optional_ref(verification_source_ref)
         freeze
@@ -45,6 +46,7 @@ module A3
           parent_ref: parent_ref,
           child_refs: child_refs,
           blocking_task_refs: blocking_task_refs,
+          priority: priority,
           external_task_id: external_task_id,
           verification_source_ref: verification_source_ref
         )
@@ -68,6 +70,7 @@ module A3
           parent_ref: parent_ref,
           child_refs: child_refs,
           blocking_task_refs: blocking_task_refs,
+          priority: priority,
           external_task_id: external_task_id,
           verification_source_ref: verification_source_ref
         )
@@ -84,6 +87,7 @@ module A3
           parent_ref: parent_ref,
           child_refs: child_refs,
           blocking_task_refs: blocking_task_refs,
+          priority: priority,
           external_task_id: external_task_id,
           verification_source_ref: source_ref
         )
@@ -125,6 +129,7 @@ module A3
           other.parent_ref == parent_ref &&
           other.child_refs == child_refs &&
           other.blocking_task_refs == blocking_task_refs &&
+          other.priority == priority &&
           other.external_task_id == external_task_id &&
           other.verification_source_ref == verification_source_ref
       end
