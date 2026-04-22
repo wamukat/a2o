@@ -22,6 +22,7 @@
 | a2o-agent とのジョブ境界 | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
 | コアとプロジェクト拡張の境界 | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
 | 参照用プロダクトによる検証 | [90-reference-product-suite.md](90-reference-product-suite.md) |
+| release publish の遅延と distribution 境界 | [98-release-publish-latency-and-distribution-build.md](98-release-publish-latency-and-distribution-build.md) |
 | カンバンアダプターと Kanbalone 境界 | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
 
 ## A2O が実現するランタイムの流れ

@@ -22,6 +22,7 @@ Read this document first to understand runtime flow and responsibility boundarie
 | Job boundary with `a2o-agent` | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
 | Boundary between core and project extensions | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
 | Validation through reference products | [90-reference-product-suite.md](90-reference-product-suite.md) |
+| Release publish latency and distribution boundary | [98-release-publish-latency-and-distribution-build.md](98-release-publish-latency-and-distribution-build.md) |
 | Kanban adapter and Kanbalone boundary | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
 
 ## Runtime Flow
