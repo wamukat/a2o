@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
     paths:
       - .github/workflows/publish-a2o-engine.yml
       - Gemfile
@@ -42,9 +44,59 @@ env:
   A2O_RELEASE_VERSION: 0.5.16
 
 jobs:
+  packages:
+    name: Build and publish host packages
+    if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    outputs:
+      bundle_archive: ${{ steps.publication.outputs.bundle_archive }}
+      bundle_url: ${{ steps.publication.outputs.bundle_url }}
+      bundle_sha256: ${{ steps.publication.outputs.bundle_sha256 }}
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: agent-go/go.mod
+
+      - name: Build host package bundle
+        run: |
+          cd agent-go
+          DIST_DIR="$RUNNER_TEMP/a2o-agent-packages" VERSION="${A2O_RELEASE_VERSION}" ./scripts/build-release.sh
+          ls -la "$RUNNER_TEMP/a2o-agent-packages"
+
+      - name: Read publication descriptor
+        id: publication
+        run: |
+          ruby <<'RUBY' >> "$GITHUB_OUTPUT"
+          require "json"
+          descriptor = JSON.parse(File.read(File.join(ENV.fetch("RUNNER_TEMP"), "a2o-agent-packages", "package-publication.json")))
+          puts "bundle_archive=#{descriptor.fetch("bundle_archive")}"
+          puts "bundle_url=#{descriptor.fetch("bundle_url")}"
+          puts "bundle_sha256=#{descriptor.fetch("bundle_archive_sha256")}"
+          RUBY
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            ${{ runner.temp }}/a2o-agent-packages/a2o-agent-packages-${{ env.A2O_RELEASE_VERSION }}.tar.gz
+            ${{ runner.temp }}/a2o-agent-packages/package-publication.json
+            ${{ runner.temp }}/a2o-agent-packages/package-compatibility.json
+            ${{ runner.temp }}/a2o-agent-packages/release-manifest.jsonl
+            ${{ runner.temp }}/a2o-agent-packages/checksums.txt
+
   docker:
     name: Build and publish runtime image
     runs-on: ubuntu-latest
+    needs:
+      - packages
+    if: always() && (github.event_name == 'pull_request' || !startsWith(github.ref, 'refs/tags/v') || needs.packages.result == 'success')
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -71,7 +123,19 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=${{ env.A2O_RELEASE_VERSION }},enable={{is_default_branch}}
+            type=raw,value=${{ env.A2O_RELEASE_VERSION }},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=sha,prefix=sha-
+
+      - name: Determine runtime agent targets
+        id: agent_targets
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "targets=linux/amd64 linux/arm64" >> "$GITHUB_OUTPUT"
+            echo "package_archives=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "targets=" >> "$GITHUB_OUTPUT"
+            echo "package_archives=1" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build runtime image
         uses: docker/build-push-action@v7
@@ -85,5 +149,10 @@ jobs:
           build-args: |
             A3_AGENT_VERSION=${{ env.A2O_RELEASE_VERSION }}
             A3_IMAGE_VERSION=${{ env.A2O_RELEASE_VERSION }}
+            A3_AGENT_TARGETS=${{ steps.agent_targets.outputs.targets }}
+            PACKAGE_ARCHIVES=${{ steps.agent_targets.outputs.package_archives }}
+            PUBLICATION_BUNDLE_ARCHIVE=${{ needs.packages.outputs.bundle_archive }}
+            PUBLICATION_BUNDLE_URL=${{ needs.packages.outputs.bundle_url }}
+            PUBLICATION_BUNDLE_SHA256=${{ needs.packages.outputs.bundle_sha256 }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

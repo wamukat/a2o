@@ -82,6 +82,35 @@ RSpec.describe "A3 host install CLI" do
     end.to raise_error(A3::Domain::ConfigurationError, /manifest not found for compatibility contract/)
   end
 
+  it "installs host launchers from an external publication bundle when local packages expose only a publication descriptor" do
+    package_dir = File.join(@tmp_dir, "packages")
+    FileUtils.mkdir_p(package_dir)
+    bundle_path = write_publication_bundle(target: "darwin-amd64", launcher_body: "darwin external\n")
+    write_publication(package_dir, bundle_path: bundle_path)
+
+    output_dir = File.join(@tmp_dir, "out")
+    out = StringIO.new
+
+    A3::CLI.start(["host", "install", "--package-dir", package_dir, "--output-dir", output_dir], out: out)
+
+    expect(File.read(File.join(output_dir, "a3-darwin-amd64"))).to eq("darwin external\n")
+    expect(out.string).to include("host_launcher_installed")
+  end
+
+  it "fails host install when fallback publication bundle is incompatible with the current runtime" do
+    package_dir = File.join(@tmp_dir, "packages")
+    FileUtils.mkdir_p(package_dir)
+    write_host_launcher(package_dir, "linux-amd64", "linux launcher\n")
+    write_manifest(package_dir, target: "linux-amd64")
+    write_contract(package_dir, runtime_version: A3::VERSION, package_version: A3::VERSION)
+    bundle_path = write_publication_bundle(target: "darwin-amd64", launcher_body: "darwin external\n", runtime_version: "9.9.9")
+    write_publication(package_dir, bundle_path: bundle_path)
+
+    expect do
+      A3::CLI.start(["host", "install", "--package-dir", package_dir, "--output-dir", File.join(@tmp_dir, "out")])
+    end.to raise_error(A3::Domain::ConfigurationError, /runtime compatibility mismatch/)
+  end
+
   def write_host_launcher(package_dir, target, body)
     target_dir = File.join(package_dir, target)
     FileUtils.mkdir_p(target_dir)
@@ -118,6 +147,46 @@ RSpec.describe "A3 host install CLI" do
         "launcher_layout" => "platform-bin-dir-v1"
       )
     )
+  end
+
+  def write_publication(package_dir, bundle_path:)
+    File.write(
+      File.join(package_dir, "package-publication.json"),
+      JSON.pretty_generate(
+        "schema" => "a2o-agent-package-publication/v1",
+        "version" => A3::VERSION,
+        "bundle_archive" => File.basename(bundle_path),
+        "bundle_url" => "file://#{bundle_path}",
+        "bundle_archive_sha256" => Digest::SHA256.file(bundle_path).hexdigest,
+        "compatibility_contract" => "package-compatibility.json",
+        "archive_manifest" => "release-manifest.jsonl",
+        "checksums_file" => "checksums.txt",
+        "package_source_hint" => "github-release-assets"
+      )
+    )
+  end
+
+  def write_publication_bundle(target:, launcher_body:, runtime_version: A3::VERSION)
+    bundle_root = File.join(@tmp_dir, "bundle-root")
+    FileUtils.mkdir_p(bundle_root)
+    write_host_launcher(bundle_root, target, launcher_body)
+    write_manifest(bundle_root, target: target)
+    write_contract(bundle_root, runtime_version: runtime_version, package_version: A3::VERSION)
+    File.write(File.join(bundle_root, "checksums.txt"), "dummy  dummy\n")
+    archive = File.join(bundle_root, "a3-agent-#{A3::VERSION}-#{target}.tar.gz")
+    File.write(archive, "placeholder")
+    bundle_path = File.join(@tmp_dir, "a2o-agent-packages-#{A3::VERSION}.tar.gz")
+    tar_io = StringIO.new
+    Gem::Package::TarWriter.new(tar_io) do |tar|
+      %W[checksums.txt release-manifest.jsonl package-compatibility.json #{File.basename(archive)} #{target}/a3].each do |relative_path|
+        full_path = File.join(bundle_root, relative_path)
+        mode = File.stat(full_path).mode & 0o777
+        tar.add_file(relative_path, mode) { |entry| entry.write(File.binread(full_path)) }
+      end
+    end
+    tar_io.rewind
+    Zlib::GzipWriter.open(bundle_path) { |gzip| gzip.write(tar_io.string) }
+    bundle_path
   end
 
   def write_share_asset(root, relative_path, body)

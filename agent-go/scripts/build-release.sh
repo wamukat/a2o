@@ -5,6 +5,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${DIST_DIR:-"${ROOT_DIR}/dist"}"
 VERSION="${VERSION:-"dev"}"
 PACKAGE_ARCHIVES="${PACKAGE_ARCHIVES:-1}"
+PUBLICATION_BUNDLE_ARCHIVE="${PUBLICATION_BUNDLE_ARCHIVE:-}"
+PUBLICATION_BUNDLE_URL="${PUBLICATION_BUNDLE_URL:-}"
+PUBLICATION_BUNDLE_SHA256="${PUBLICATION_BUNDLE_SHA256:-}"
 
 if [[ -n "${TARGETS:-}" ]]; then
   read -r -a targets <<< "${TARGETS}"
@@ -66,23 +69,39 @@ for target in "${targets[@]}"; do
   fi
 done
 
+bundle_sha256=""
 if [[ "${PACKAGE_ARCHIVES}" == "1" ]]; then
+  bundle_items=(
+    "checksums.txt"
+    "release-manifest.jsonl"
+    "package-compatibility.json"
+  )
+  for target in "${targets[@]}"; do
+    bundle_items+=("${target/\//-}")
+    bundle_items+=("a3-agent-${VERSION}-${target/\//-}.tar.gz")
+  done
   (
     cd "${DIST_DIR}"
-    tar -czf "${bundle_name}" \
-      "checksums.txt" \
-      "release-manifest.jsonl" \
-      "package-compatibility.json" \
-      a3-agent-"${VERSION}"-*.tar.gz
+    tar -czf "${bundle_name}" "${bundle_items[@]}"
   )
   bundle_sha256="$(sha256sum_or_shasum "${DIST_DIR}/${bundle_name}")"
+fi
 
+if [[ "${PACKAGE_ARCHIVES}" == "1" || -n "${PUBLICATION_BUNDLE_URL}" ]]; then
+  publication_bundle_archive="${PUBLICATION_BUNDLE_ARCHIVE:-${bundle_name}}"
+  publication_bundle_url="${PUBLICATION_BUNDLE_URL:-https://github.com/wamukat/a2o/releases/download/v${VERSION}/${publication_bundle_archive}}"
+  publication_bundle_sha256="${PUBLICATION_BUNDLE_SHA256:-${bundle_sha256}}"
+  if [[ -z "${publication_bundle_sha256}" ]]; then
+    echo "PUBLICATION_BUNDLE_SHA256 is required when PACKAGE_ARCHIVES=0 and PUBLICATION_BUNDLE_URL is set" >&2
+    exit 1
+  fi
   cat > "${DIST_DIR}/package-publication.json" <<EOF
 {
   "schema": "a2o-agent-package-publication/v1",
   "version": "${VERSION}",
-  "bundle_archive": "${bundle_name}",
-  "bundle_archive_sha256": "${bundle_sha256}",
+  "bundle_archive": "${publication_bundle_archive}",
+  "bundle_url": "${publication_bundle_url}",
+  "bundle_archive_sha256": "${publication_bundle_sha256}",
   "compatibility_contract": "package-compatibility.json",
   "archive_manifest": "release-manifest.jsonl",
   "checksums_file": "checksums.txt",

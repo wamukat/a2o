@@ -3,6 +3,7 @@
 require "digest"
 require "fileutils"
 require "json"
+require "open-uri"
 require "rubygems/package"
 require "zlib"
 
@@ -19,6 +20,7 @@ module A3
       end
 
       Contract = Struct.new(:schema, :package_version, :runtime_version, :archive_manifest, :launcher_layout, keyword_init: true)
+      Publication = Struct.new(:schema, :version, :bundle_archive, :bundle_url, :bundle_archive_sha256, :compatibility_contract, :archive_manifest, :checksums_file, :package_source_hint, keyword_init: true)
 
       def initialize(package_dir: ENV.fetch("A2O_AGENT_PACKAGE_DIR", ENV.fetch("A3_AGENT_PACKAGE_DIR", DEFAULT_PACKAGE_DIR)))
         @package_dir = File.expand_path(package_dir)
@@ -27,6 +29,8 @@ module A3
       attr_reader :package_dir
 
       def list
+        return external_store.list if publication && !complete_host_launcher_set?
+
         manifest_packages
       end
 
@@ -46,10 +50,32 @@ module A3
         raise A3::Domain::ConfigurationError, "invalid agent package compatibility contract: #{path} (#{e.message})"
       end
 
+      def publication
+        path = File.join(package_dir, "package-publication.json")
+        return nil unless File.file?(path)
+
+        payload = JSON.parse(File.read(path))
+        Publication.new(
+          schema: payload.fetch("schema"),
+          version: payload.fetch("version"),
+          bundle_archive: payload.fetch("bundle_archive"),
+          bundle_url: payload.fetch("bundle_url"),
+          bundle_archive_sha256: payload.fetch("bundle_archive_sha256"),
+          compatibility_contract: payload.fetch("compatibility_contract"),
+          archive_manifest: payload.fetch("archive_manifest"),
+          checksums_file: payload.fetch("checksums_file"),
+          package_source_hint: payload.fetch("package_source_hint")
+        )
+      rescue JSON::ParserError, KeyError => e
+        raise A3::Domain::ConfigurationError, "invalid agent package publication descriptor: #{path} (#{e.message})"
+      end
+
       def verify(target: nil)
+        return external_store.verify(target: target) if publication && !manifest_present?
+
         validate_runtime_compatibility!(expected_runtime_version: A3::VERSION)
         selected_packages(target: target).map do |package|
-          actual = Digest::SHA256.file(package.archive_path(package_dir)).hexdigest
+          actual = Digest::SHA256.file(resolved_archive_path(package)).hexdigest
           {
             target: package.target,
             archive: package.archive,
@@ -67,7 +93,7 @@ module A3
         raise A3::Domain::ConfigurationError, "agent package checksum mismatch for #{target}" unless verification.fetch(:ok)
 
         FileUtils.mkdir_p(File.dirname(File.expand_path(output)))
-        extract_agent_binary(package.archive_path(package_dir), output)
+        extract_agent_binary(resolved_archive_path(package), output)
         FileUtils.chmod(0o755, output)
         {
           target: package.target,
@@ -79,9 +105,17 @@ module A3
         }
       end
 
+      def resolved_host_install_package_dir
+        return package_dir unless publication
+        return package_dir if complete_host_launcher_set?
+
+        external_store.package_dir
+      end
+
       def validate_runtime_compatibility!(expected_runtime_version:)
         expected = expected_runtime_version.to_s.strip
         return if expected.empty?
+        return external_store.validate_runtime_compatibility!(expected_runtime_version: expected) if publication && !manifest_present?
 
         actual =
           if (contract_payload = contract)
@@ -102,10 +136,14 @@ module A3
             inferred_runtime_version
           end
 
-        return if actual == expected
+        unless actual == expected
+          raise A3::Domain::ConfigurationError,
+                "agent package runtime compatibility mismatch: package_runtime_version=#{actual} expected_runtime_version=#{expected}"
+        end
 
-        raise A3::Domain::ConfigurationError,
-              "agent package runtime compatibility mismatch: package_runtime_version=#{actual} expected_runtime_version=#{expected}"
+        if publication && !complete_host_launcher_set?
+          external_store.validate_runtime_compatibility!(expected_runtime_version: expected)
+        end
       end
 
       private
@@ -157,12 +195,91 @@ module A3
       end
 
       def package_for(target)
+        return external_store.send(:package_for, target) if publication && !manifest_present?
+
         normalized = target.to_s.tr("/", "-")
         package = list.find { |item| item.target == normalized }
+        if package.nil? && publication
+          return external_store.send(:package_for, target)
+        end
         raise A3::Domain::ConfigurationError, "agent package target not found: #{target}" unless package
-        raise A3::Domain::ConfigurationError, "agent package archive not found: #{package.archive_path(package_dir)}" unless File.file?(package.archive_path(package_dir))
+        unless File.file?(package.archive_path(package_dir))
+          return external_store.send(:package_for, target) if publication
+
+          raise A3::Domain::ConfigurationError, "agent package archive not found: #{package.archive_path(package_dir)}"
+        end
 
         package
+      end
+
+      def external_store
+        publication_payload = publication
+        raise A3::Domain::ConfigurationError, "agent package publication descriptor not found" unless publication_payload
+
+        @external_store ||= self.class.new(package_dir: materialize_publication_bundle(publication_payload))
+      end
+
+      def materialize_publication_bundle(publication_payload)
+        unless publication_payload.schema == "a2o-agent-package-publication/v1"
+          raise A3::Domain::ConfigurationError, "unsupported agent package publication schema: #{publication_payload.schema}"
+        end
+
+        cache_root = ENV.fetch("A2O_AGENT_PACKAGE_CACHE_DIR", ENV.fetch("A3_AGENT_PACKAGE_CACHE_DIR", "/tmp/a2o-agent-package-cache"))
+        cache_key = "#{publication_payload.version}-#{publication_payload.bundle_archive_sha256}"
+        cache_dir = File.join(File.expand_path(cache_root), cache_key)
+        extracted_dir = File.join(cache_dir, "bundle")
+        ready_marker = File.join(extracted_dir, ".ready")
+        return extracted_dir if File.file?(ready_marker)
+
+        FileUtils.rm_rf(cache_dir)
+        FileUtils.mkdir_p(extracted_dir)
+        bundle_path = File.join(cache_dir, publication_payload.bundle_archive)
+        if publication_payload.bundle_url.start_with?("file://")
+          FileUtils.cp(URI(publication_payload.bundle_url).path, bundle_path)
+        else
+          URI.open(publication_payload.bundle_url, "rb") do |input|
+            File.open(bundle_path, "wb") { |output| IO.copy_stream(input, output) }
+          end
+        end
+        actual_sha256 = Digest::SHA256.file(bundle_path).hexdigest
+        if actual_sha256 != publication_payload.bundle_archive_sha256
+          raise A3::Domain::ConfigurationError, "agent package bundle checksum mismatch: #{publication_payload.bundle_archive}"
+        end
+        extract_bundle(bundle_path, extracted_dir)
+        File.write(ready_marker, "ready\n")
+        extracted_dir
+      rescue OpenURI::HTTPError, SocketError => e
+        raise A3::Domain::ConfigurationError, "failed to fetch agent package bundle: #{e.message}"
+      end
+
+      def extract_bundle(bundle_path, destination)
+        Zlib::GzipReader.open(bundle_path) do |gzip|
+          Gem::Package::TarReader.new(gzip) do |tar|
+            tar.each do |entry|
+              target_path = File.join(destination, entry.full_name)
+              if entry.directory?
+                FileUtils.mkdir_p(target_path)
+                next
+              end
+
+              FileUtils.mkdir_p(File.dirname(target_path))
+              File.open(target_path, "wb") { |file| file.write(entry.read) }
+              FileUtils.chmod(entry.header.mode, target_path) if entry.header.mode
+            end
+          end
+        end
+      end
+
+      def complete_host_launcher_set?
+        return false unless manifest_present?
+
+        required_targets = %w[darwin-amd64 darwin-arm64 linux-amd64 linux-arm64]
+        available_targets = manifest_packages.map(&:target)
+        required_targets.all? do |target|
+          available_targets.include?(target) && File.file?(File.join(package_dir, target, "a3"))
+        end
+      rescue A3::Domain::ConfigurationError
+        false
       end
 
       def extract_agent_binary(archive_path, output)
@@ -180,6 +297,15 @@ module A3
           end
         end
         raise A3::Domain::ConfigurationError, "agent package archive does not contain a3-agent: #{archive_path}" unless found
+      end
+
+      def resolved_archive_path(package)
+        local_path = package.archive_path(package_dir)
+        return local_path if File.file?(local_path)
+
+        return package.archive_path(external_store.package_dir) if publication
+
+        local_path
       end
     end
   end

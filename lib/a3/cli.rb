@@ -903,8 +903,9 @@ module A3
     end
 
     def install_host_launchers(package_dir:, output_dir:)
-      validate_host_package_dir!(package_dir)
-      targets = Dir.glob(File.join(package_dir, "*", "a3")).sort.map do |source|
+      package_store = validate_host_package_dir!(package_dir)
+      resolved_dir = package_store&.resolved_host_install_package_dir || package_dir
+      targets = Dir.glob(File.join(resolved_dir, "*", "a3")).sort.map do |source|
         target = File.basename(File.dirname(source))
         destination = File.join(output_dir, "a3-#{target}")
         FileUtils.cp(source, destination)
@@ -922,9 +923,16 @@ module A3
     def validate_host_package_dir!(package_dir)
       manifest_path = File.join(package_dir, "release-manifest.jsonl")
       contract_path = File.join(package_dir, A3::Infra::AgentPackageStore::CONTRACT_PATH)
-      return unless File.file?(manifest_path) || File.file?(contract_path)
+      publication_path = File.join(package_dir, "package-publication.json")
+      return nil unless File.file?(manifest_path) || File.file?(contract_path) || File.file?(publication_path)
 
-      A3::Infra::AgentPackageStore.new(package_dir: package_dir).validate_runtime_compatibility!(expected_runtime_version: A3::VERSION)
+      store = A3::Infra::AgentPackageStore.new(package_dir: package_dir)
+      store.validate_runtime_compatibility!(expected_runtime_version: A3::VERSION)
+      resolved_dir = store.resolved_host_install_package_dir
+      if resolved_dir != package_dir
+        A3::Infra::AgentPackageStore.new(package_dir: resolved_dir).validate_runtime_compatibility!(expected_runtime_version: A3::VERSION)
+      end
+      store
     end
 
     def install_host_share_assets(share_dir:)

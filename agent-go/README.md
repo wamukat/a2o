@@ -42,6 +42,7 @@ Windows native execution is not a standard target. Windows users run the Linux a
 `package-publication.json` defines the publication surface for external package distribution. It is emitted only when `PACKAGE_ARCHIVES=1`. The current publication contract uses:
 
 - one release bundle: `a2o-agent-packages-<version>.tar.gz`
+- one direct bundle URL in the publication descriptor
 - per-target archives referenced by `release-manifest.jsonl`
 - integrity data in `checksums.txt`
 - compatibility data in `package-compatibility.json`
