@@ -91,6 +91,21 @@ runtime image には `/opt/a2o/agents/release-manifest.jsonl` と target 別 arc
 - `--package-source package-dir` は compatible な host package directory を必須とし、フォールバックしない
 - `--package-source runtime-image` は host package discovery を行わず、runtime image に埋め込まれた package store を使う
 
+## 実装済みの publication surface ベースライン
+
+`A2O#159` では、後続の workflow separation が install contract を再変更せずに publish できる external package publication surface を定義した。
+
+現在の publication surface は次のとおり。
+
+- `a3-agent-<version>-darwin-arm64.tar.gz` のような target 別 archive
+- `release-manifest.jsonl`
+- `checksums.txt`
+- `package-compatibility.json`
+- 1 つの distribution bundle: `a2o-agent-packages-<version>.tar.gz`
+- archive packaging 有効時のみ 1 つの publication descriptor: `package-publication.json`
+
+`package-publication.json` は、将来の external package resolution における publication entrypoint とする。bundle archive、その checksum、付随する manifest / compatibility file を示す。初期の source hint は `github-release-assets` とし、後続の workflow separation では package-set layout を変えずに GitHub Release asset として publish できる前提にする。
+
 ## 改善案
 
 ### Option A: 小さな最適化だけ行う

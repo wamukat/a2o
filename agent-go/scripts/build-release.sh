@@ -20,6 +20,7 @@ fi
 mkdir -p "${DIST_DIR}"
 : > "${DIST_DIR}/checksums.txt"
 : > "${DIST_DIR}/release-manifest.jsonl"
+bundle_name="a2o-agent-packages-${VERSION}.tar.gz"
 cat > "${DIST_DIR}/package-compatibility.json" <<EOF
 {
   "schema": "a2o-agent-package-compatibility/v1",
@@ -64,5 +65,30 @@ for target in "${targets[@]}"; do
       "${VERSION}" "${goos}" "${goarch}" "$(basename "${archive_path}")" "${checksum}" >> "${DIST_DIR}/release-manifest.jsonl"
   fi
 done
+
+if [[ "${PACKAGE_ARCHIVES}" == "1" ]]; then
+  (
+    cd "${DIST_DIR}"
+    tar -czf "${bundle_name}" \
+      "checksums.txt" \
+      "release-manifest.jsonl" \
+      "package-compatibility.json" \
+      a3-agent-"${VERSION}"-*.tar.gz
+  )
+  bundle_sha256="$(sha256sum_or_shasum "${DIST_DIR}/${bundle_name}")"
+
+  cat > "${DIST_DIR}/package-publication.json" <<EOF
+{
+  "schema": "a2o-agent-package-publication/v1",
+  "version": "${VERSION}",
+  "bundle_archive": "${bundle_name}",
+  "bundle_archive_sha256": "${bundle_sha256}",
+  "compatibility_contract": "package-compatibility.json",
+  "archive_manifest": "release-manifest.jsonl",
+  "checksums_file": "checksums.txt",
+  "package_source_hint": "github-release-assets"
+}
+EOF
+fi
 
 echo "built artifacts in ${DIST_DIR}"

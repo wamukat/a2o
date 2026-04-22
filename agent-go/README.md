@@ -31,11 +31,20 @@ Release output includes:
 - `dist/checksums.txt`
 - `dist/release-manifest.jsonl`
 - `dist/package-compatibility.json`
+- `dist/a2o-agent-packages-0.5.16.tar.gz`
+- `dist/package-publication.json` when `PACKAGE_ARCHIVES=1`
 
 Use `TARGETS="linux/amd64 darwin/arm64"` to build a subset. Set `PACKAGE_ARCHIVES=0` to build binaries only.
 Windows native execution is not a standard target. Windows users run the Linux archive from WSL2 Ubuntu.
 
 `package-compatibility.json` is the package-set contract for both embedded runtime-image packages and future external package publication. The current contract is exact-version compatibility: the runtime consuming the package set and the package set itself must report the same A2O version.
+
+`package-publication.json` defines the publication surface for external package distribution. It is emitted only when `PACKAGE_ARCHIVES=1`. The current publication contract uses:
+
+- one release bundle: `a2o-agent-packages-<version>.tar.gz`
+- per-target archives referenced by `release-manifest.jsonl`
+- integrity data in `checksums.txt`
+- compatibility data in `package-compatibility.json`
 
 ## Local Install
 

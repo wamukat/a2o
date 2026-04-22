@@ -91,6 +91,21 @@ The current policy is:
 - `--package-source package-dir` requires a compatible host package directory and never falls back
 - `--package-source runtime-image` skips host package discovery and uses the embedded runtime-image package store
 
+## Implemented Publication Surface Baseline
+
+`A2O#159` defines the external package publication surface that later workflow separation can publish without changing the install contract again.
+
+The current publication surface is:
+
+- per-target archives such as `a3-agent-<version>-darwin-arm64.tar.gz`
+- `release-manifest.jsonl`
+- `checksums.txt`
+- `package-compatibility.json`
+- one distribution bundle: `a2o-agent-packages-<version>.tar.gz`
+- one publication descriptor: `package-publication.json` when archive packaging is enabled
+
+`package-publication.json` is the publication entrypoint for future external package resolution. It identifies the bundle archive, its checksum, and the companion manifest / compatibility files. The initial source hint is `github-release-assets`, which means later workflow separation can publish these files as GitHub Release assets without changing the package-set layout.
+
 ## Improvement Options
 
 ### Option A: Small optimization only
