@@ -62,16 +62,14 @@ RSpec.describe A3::CLI do
 
       expect(out.string).to include("Scheduler: running")
       expect(out.string).to include("Task Tree")
-      expect(out.string).to include("Next")
       expect(out.string).to include("Running")
       expect(out.string).to include("\e[36mScheduler: running\e[0m")
       expect(out.string).to include("[>] #3138")
-      expect(out.string).to include("[*] #3141")
+      expect(out.string).to include("[.] #3141")
       expect(out.string).to include("\e[33m[>] #3138")
-      expect(out.string).to include("\e[36m[*] #3141")
+      expect(out.string).to include("\e[2m[.] #3141")
       expect(out.string).to include("Merging -----------+")
       expect(out.string).to include("Implementation -----+")
-      expect(out.string).to include("- #3141")
       expect(out.string).to include("- #3138 implementation/implementation/running_command hb=?")
     end
   end
@@ -99,14 +97,14 @@ RSpec.describe A3::CLI do
             "ref" => "Sample#3138",
             "title" => "Kanban title",
             "status" => "To do",
-            "labels" => []
+            "labels" => ["repo:ui-app"]
           },
           {
             "id" => 4000,
             "ref" => "Sample#4000",
             "title" => "Unrelated task",
-            "status" => "To do",
-            "labels" => []
+            "status" => "Resolved",
+            "labels" => ["repo:ui-app"]
           }
         ]
       )
@@ -130,6 +128,64 @@ RSpec.describe A3::CLI do
 
       expect(out.string).to include("Kanban title [kanban=To do internal=Blocked]")
       expect(out.string).not_to include("Unrelated task")
+    end
+  end
+
+  it "shows current kanban tasks and hides resolved ones even when runtime storage is stale" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "Sample#3999",
+          kind: :child,
+          edit_scope: [:repo_alpha],
+          verification_scope: [:repo_alpha],
+          status: :blocked,
+          external_task_id: 3999
+        )
+      )
+
+      fake_cli = create_fake_kanban_cli(
+        dir,
+        snapshots: [
+          {
+            "id" => 3138,
+            "ref" => "Sample#3138",
+            "title" => "Current done task",
+            "status" => "Done",
+            "labels" => ["trigger:auto-implement", "repo:ui-app"]
+          },
+          {
+            "id" => 3999,
+            "ref" => "Sample#3999",
+            "title" => "Resolved stale task",
+            "status" => "Resolved",
+            "labels" => ["trigger:auto-implement", "repo:ui-app"]
+          }
+        ]
+      )
+
+      out = StringIO.new
+      with_env(fake_cli.fetch(:env)) do
+        described_class.start(
+          [
+            "watch-summary",
+            "--storage-backend", "json",
+            "--storage-dir", dir,
+            "--kanban-command", "ruby",
+            "--kanban-command-arg", fake_cli.fetch(:script_path),
+            "--kanban-project", "Sample",
+            "--kanban-working-dir", dir,
+            "--kanban-trigger-label", "trigger:auto-implement",
+            "--kanban-repo-label", "repo:ui-app=repo_alpha"
+          ],
+          out: out
+        )
+      end
+
+      expect(out.string).to include("Current done task")
+      expect(out.string).not_to include("Resolved stale task")
+      expect(out.string).not_to include("#3999")
     end
   end
 

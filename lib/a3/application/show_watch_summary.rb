@@ -43,26 +43,36 @@ module A3
         keyword_init: true
       )
 
-      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {}, upstream_line_guard: A3::Domain::UpstreamLineGuard.new)
+      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_tasks: nil, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {}, upstream_line_guard: A3::Domain::UpstreamLineGuard.new)
         @task_repository = task_repository
         @run_repository = run_repository
         @scheduler_state_repository = scheduler_state_repository
+        @kanban_tasks = kanban_tasks
         @kanban_snapshots_by_ref = kanban_snapshots_by_ref || {}
         @kanban_snapshots_by_id = kanban_snapshots_by_id || {}
         @upstream_line_guard = upstream_line_guard
       end
 
       def call
-        tasks = @task_repository.all
+        runtime_tasks = @task_repository.all
+        tasks = @kanban_tasks || runtime_tasks
         runs = @run_repository.all
         runs_by_task = runs.group_by(&:task_ref)
+        runtime_tasks_by_ref = runtime_tasks.each_with_object({}) { |task, memo| memo[task.ref] = task }
         assessments_by_ref = tasks.each_with_object({}) do |task, memo|
           memo[task.ref] = A3::Domain::RunnableTaskAssessment.evaluate(task: task, tasks: tasks)
         end
         state = @scheduler_state_repository.fetch
 
         task_entries = tasks.each_with_object([]) do |task, entries|
-          entries << build_task_entry(task, runs_by_task: runs_by_task, assessment: assessments_by_ref.fetch(task.ref), tasks: tasks, runs: runs)
+          entries << build_task_entry(
+            task,
+            runtime_task: runtime_tasks_by_ref[task.ref] || task,
+            runs_by_task: runs_by_task,
+            assessment: assessments_by_ref.fetch(task.ref),
+            tasks: tasks,
+            runs: runs
+          )
         end
 
         Summary.new(
@@ -76,22 +86,22 @@ module A3
 
       private
 
-      def build_task_entry(task, runs_by_task:, assessment:, tasks:, runs:)
+      def build_task_entry(task, runtime_task:, runs_by_task:, assessment:, tasks:, runs:)
         task_runs = runs_by_task.fetch(task.ref, [])
-        current_run = task.current_run_ref && task_runs.find { |candidate| candidate.ref == task.current_run_ref }
+        current_run = runtime_task.current_run_ref && task_runs.find { |candidate| candidate.ref == runtime_task.current_run_ref }
         latest_run = task_runs.last
-        canonical_status = canonical_status_for(task)
-        latest_phase = resolve_latest_phase(task: task, current_run: current_run, latest_run: latest_run)
-        running_entry = build_running_entry(task, run: current_run)
+        canonical_status = canonical_status_for(runtime_task)
+        latest_phase = resolve_latest_phase(task: runtime_task, current_run: current_run, latest_run: latest_run)
+        running_entry = build_running_entry(runtime_task, run: current_run)
         runnable_phase = task.runnable_phase
         upstream_assessment = @upstream_line_guard.evaluate(task: task, phase: runnable_phase, tasks: tasks, runs: runs)
-        blocked_lines = build_detail_lines(task, latest_run, assessment, upstream_assessment)
+        blocked_lines = build_detail_lines(runtime_task, latest_run, assessment, upstream_assessment)
         kanban_snapshot = resolve_kanban_snapshot(task)
         waiting = waiting_assessment?(assessment) || !upstream_assessment.healthy?
 
         TaskEntry.new(
           ref: task.ref,
-          title: display_title(task, kanban_snapshot: kanban_snapshot),
+          title: display_title(runtime_task, kanban_snapshot: kanban_snapshot),
           status: display_status(canonical_status),
           parent_ref: task.parent_ref,
           next_candidate: assessment.runnable? && upstream_assessment.healthy?,

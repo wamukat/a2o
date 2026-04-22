@@ -614,10 +614,16 @@ module A3
       options = parse_storage_options(argv)
       repositories = build_watch_summary_repositories(options: options)
       task_repository = repositories.fetch(:task_repository)
-      tasks = task_repository.all
+      bridge = build_external_task_bridge(options)
+      tasks =
+        if kanban_bridge_enabled?(options)
+          bridge.task_source.load
+        else
+          task_repository.all
+        end
       task_ids = tasks.map(&:external_task_id).compact
       task_refs = tasks.reject { |task| task.external_task_id }.map(&:ref)
-      kanban_snapshot_index = build_external_task_bridge(options).task_snapshot_reader.load(
+      kanban_snapshot_index = bridge.task_snapshot_reader.load(
         task_ids: task_ids,
         task_refs: task_refs
       )
@@ -625,6 +631,7 @@ module A3
         task_repository: task_repository,
         run_repository: repositories.fetch(:run_repository),
         scheduler_state_repository: repositories.fetch(:scheduler_state_repository),
+        kanban_tasks: tasks,
         kanban_snapshots_by_ref: kanban_snapshot_index.by_ref,
         kanban_snapshots_by_id: kanban_snapshot_index.by_id
       ).call

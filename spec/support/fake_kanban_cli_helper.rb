@@ -28,7 +28,14 @@ module FakeKanbanCliHelper
         case command
         when "task-snapshot-list"
           status = ARGV.each_cons(2).find { |flag, _value| flag == "--status" }&.last
+          include_closed = ARGV.include?("--include-closed")
           snapshots = JSON.parse(File.read(state_path))
+          unless include_closed
+            snapshots.select! do |item|
+              current_status = String(item["status"])
+              !["Resolved", "Archived"].include?(current_status)
+            end
+          end
           snapshots.select! { |item| item["status"] == status } if status
           print JSON.generate(snapshots)
         when "task-watch-summary-list"

@@ -161,6 +161,81 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(result.tasks.find { |item| item.ref == "Sample#2" }.title).to include("[kanban=To do internal=Blocked]")
   end
 
+  it "uses kanban current tasks as the watch-summary set while overlaying runtime state" do
+    stale_runtime_task = A3::Domain::Task.new(
+      ref: "Sample#stale",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :blocked
+    )
+    current_done_task = A3::Domain::Task.new(
+      ref: "Sample#done",
+      kind: :single,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :done,
+      external_task_id: 10
+    )
+    current_running_task = A3::Domain::Task.new(
+      ref: "Sample#live",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :in_progress,
+      current_run_ref: "run-live",
+      external_task_id: 11
+    )
+    task_repository.save(stale_runtime_task)
+    task_repository.save(current_running_task)
+
+    run_repository.save(
+      A3::Domain::Run.new(
+        ref: "run-live",
+        task_ref: "Sample#live",
+        phase: :implementation,
+        workspace_kind: :ticket_workspace,
+        source_descriptor: A3::Domain::SourceDescriptor.new(
+          workspace_kind: :ticket_workspace,
+          source_type: :branch_head,
+          ref: "refs/heads/a2o/work/Sample-live",
+          task_ref: "Sample#live"
+        ),
+        scope_snapshot: A3::Domain::ScopeSnapshot.new(
+          edit_scope: [:repo_beta],
+          verification_scope: [:repo_beta],
+          ownership_scope: :task
+        ),
+        artifact_owner: A3::Domain::ArtifactOwner.new(
+          owner_ref: "Sample#live",
+          owner_scope: :task,
+          snapshot_version: "refs/heads/a2o/work/Sample-live"
+        )
+      )
+    )
+
+    result = described_class.new(
+      task_repository: task_repository,
+      run_repository: run_repository,
+      scheduler_state_repository: scheduler_state_repository,
+      kanban_tasks: [current_done_task, current_running_task],
+      kanban_snapshots_by_ref: {
+        "Sample#done" => { "id" => 10, "ref" => "Sample#done", "title" => "Current done", "status" => "Done" },
+        "Sample#live" => { "id" => 11, "ref" => "Sample#live", "title" => "Current running", "status" => "In progress" }
+      },
+      kanban_snapshots_by_id: {
+        10 => { "id" => 10, "ref" => "Sample#done", "title" => "Current done", "status" => "Done" },
+        11 => { "id" => 11, "ref" => "Sample#live", "title" => "Current running", "status" => "In progress" }
+      },
+      upstream_line_guard: upstream_line_guard
+    ).call
+
+    expect(result.tasks.map(&:ref)).to eq(["Sample#done", "Sample#live"])
+    expect(result.tasks.find { |item| item.ref == "Sample#done" }.done).to be(true)
+    expect(result.tasks.find { |item| item.ref == "Sample#live" }.running).to be(true)
+    expect(result.running_entries.map(&:task_ref)).to eq(["Sample#live"])
+  end
+
   it "uses external_task_id canonical mapping and preserved run insertion order" do
     task = A3::Domain::Task.new(
       ref: "Sample#imported-7",
