@@ -110,7 +110,8 @@ RSpec.describe "A3 CLI worker gateway options" do
 
     expect(gateway).to be_a(A3::Infra::AgentWorkerGateway)
     builder = gateway.instance_variable_get(:@workspace_request_builder)
-    expect(builder.instance_variable_get(:@required_repo_slots)).to eq(%i[repo_alpha repo_beta])
+    repo_slot_policy = builder.instance_variable_get(:@repo_slot_policy)
+    expect(repo_slot_policy.required_slots).to eq(%i[repo_alpha repo_beta])
     expect(builder.instance_variable_get(:@support_refs)).to include(default: "refs/heads/feature/prototype")
   end
 

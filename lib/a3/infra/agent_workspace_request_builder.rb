@@ -3,15 +3,15 @@
 require "a3/domain/agent_workspace_request"
 require "a3/domain/branch_namespace"
 require "a3/domain/configuration_error"
+require "a3/infra/agent_workspace_repo_policy"
 
 module A3
   module Infra
     class AgentWorkspaceRequestBuilder
-      def initialize(source_aliases:, repo_slots: nil, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, support_ref: nil, support_refs: {}, branch_namespace: ENV.fetch("A2O_BRANCH_NAMESPACE", ENV.fetch("A3_BRANCH_NAMESPACE", nil)))
+      def initialize(source_aliases:, repo_slot_policy: nil, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, support_ref: nil, support_refs: {}, branch_namespace: ENV.fetch("A2O_BRANCH_NAMESPACE", ENV.fetch("A3_BRANCH_NAMESPACE", nil)))
         @source_aliases = source_aliases.transform_keys(&:to_sym).transform_values(&:to_s).freeze
         @branch_namespace = A3::Domain::BranchNamespace.normalize(branch_namespace)
-        @repo_slots = @source_aliases.keys.sort.freeze
-        @required_repo_slots = normalize_required_repo_slots(repo_slots)
+        @repo_slot_policy = repo_slot_policy || A3::Infra::AgentWorkspaceRepoPolicy.new(available_slots: @source_aliases.keys)
         @freshness_policy = freshness_policy.to_sym
         @cleanup_policy = cleanup_policy.to_sym
         @support_refs = normalize_support_refs(support_ref: support_ref, support_refs: support_refs)
@@ -22,7 +22,7 @@ module A3
       def call(workspace:, task:, run:, command_intent: nil)
         validate_phase!(run.phase)
         command_intent = normalize_command_intent(command_intent)
-        slots = repo_slots_for(workspace: workspace).each_with_object({}) do |slot_name, request_slots|
+        slots = @repo_slot_policy.resolve_slots(workspace: workspace).each_with_object({}) do |slot_name, request_slots|
           alias_name = @source_aliases[slot_name]
           raise A3::Domain::ConfigurationError, "missing agent source alias for #{slot_name}" if alias_name.to_s.empty?
 
@@ -55,22 +55,6 @@ module A3
       end
 
       private
-
-      def repo_slots_for(workspace:)
-        required_slots = @required_repo_slots || @repo_slots
-        materialized_slots = workspace.slot_paths.keys.map(&:to_sym).uniq.sort
-        return required_slots if materialized_slots.empty?
-
-        return required_slots if materialized_slots == required_slots
-
-        missing_slots = required_slots - materialized_slots
-        extra_slots = materialized_slots - required_slots
-        details = []
-        details << "missing=#{missing_slots.join(',')}" unless missing_slots.empty?
-        details << "extra=#{extra_slots.join(',')}" unless extra_slots.empty?
-        raise A3::Domain::ConfigurationError,
-          "materialized workspace slots must match the required agent repo set (#{details.join(' ')})"
-      end
 
       def validate_phase!(phase)
         return if %i[implementation review verification].include?(phase.to_sym)
@@ -149,11 +133,6 @@ module A3
         default_ref = support_ref.to_s.strip
         normalized[:default] = default_ref unless default_ref.empty?
         normalized.freeze
-      end
-
-      def normalize_required_repo_slots(repo_slots)
-        normalized = Array(repo_slots).map(&:to_sym).uniq.sort.freeze
-        normalized.empty? ? nil : normalized
       end
 
       def publish_policy_for(task:, run:, command_intent:)

@@ -349,7 +349,10 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
   it "fails when configured aliases are narrower than the required verification repo set" do
     builder = described_class.new(
       source_aliases: { repo_alpha: "sample-alpha" },
-      repo_slots: %i[repo_alpha repo_beta]
+      repo_slot_policy: A3::Infra::AgentWorkspaceRepoPolicy.new(
+        available_slots: %i[repo_alpha],
+        required_slots: %i[repo_alpha repo_beta]
+      )
     )
     partial_workspace = A3::Domain::PreparedWorkspace.new(
       workspace_kind: :ticket_workspace,

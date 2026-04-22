@@ -1814,7 +1814,10 @@ module A3
 
       A3::Infra::AgentWorkspaceRequestBuilder.new(
         source_aliases: source_aliases,
-        repo_slots: options.fetch(:repo_sources, {}).keys,
+        repo_slot_policy: A3::Infra::AgentWorkspaceRepoPolicy.new(
+          available_slots: source_aliases.keys,
+          required_slots: options.fetch(:repo_sources, {}).keys
+        ),
         freshness_policy: options.fetch(:agent_workspace_freshness_policy, :reuse_if_clean_and_ref_matches),
         cleanup_policy: options.fetch(:agent_workspace_cleanup_policy, :retain_until_a3_cleanup),
         support_ref: options[:agent_support_ref],
