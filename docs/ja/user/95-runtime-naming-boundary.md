@@ -41,4 +41,4 @@ A2O の正式名称は Agentic AI Orchestrator であり、公開プロダクト
 
 ## 利用者向けランタイム
 
-利用者向けのランタイム実行は `a2o runtime run-once`、`a2o runtime loop`、または `a2o runtime start` を使う。内部 Engine CLI の例は通常の利用者向けセットアップ文書から除外する。
+利用者向けのランタイム実行は `a2o runtime run-once`、`a2o runtime loop`、または `a2o runtime resume` を使う。内部 Engine CLI の例は通常の利用者向けセットアップ文書から除外する。

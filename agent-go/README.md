@@ -120,9 +120,9 @@ a2o kanban url
 a2o runtime doctor
 a2o runtime run-once
 a2o runtime loop --interval 60s
-a2o runtime start --interval 60s
+a2o runtime resume --interval 60s
 a2o runtime status
-a2o runtime stop
+a2o runtime pause
 ```
 
 Execution-loop commands live under `a2o runtime ...`, not `a2o kanban ...`. Branch refs created by internal runtime jobs remain namespaced by the compose project, for example `refs/heads/a2o/a2o-reference/work/A2OReference-1`, so isolated boards do not reuse existing live-repo branches with the same task number.

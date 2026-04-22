@@ -41,14 +41,26 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
+	case "resume":
+		if err := runRuntimeResume(args[1:], runner, stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
+	case "pause":
+		if err := runRuntimePause(args[1:], runner, stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
 	case "start":
-		if err := runRuntimeStart(args[1:], runner, stdout, stderr); err != nil {
+		if err := runRuntimeResume(args[1:], runner, stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)
 			return 1
 		}
 		return 0
 	case "stop":
-		if err := runRuntimeStop(args[1:], runner, stdout, stderr); err != nil {
+		if err := runRuntimePause(args[1:], runner, stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)
 			return 1
 		}
@@ -137,8 +149,8 @@ func schedulerPaths(config runtimeInstanceConfig) runtimeSchedulerPaths {
 	}
 }
 
-func runRuntimeStart(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
-	flags := flag.NewFlagSet("a2o runtime start", flag.ContinueOnError)
+func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a2o runtime resume", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	interval := flags.String("interval", "60s", "duration between scheduler cycles")
 	maxSteps := flags.String("max-steps", "", "maximum runtime steps for each cycle")
@@ -179,6 +191,9 @@ func runRuntimeStart(args []string, runner commandRunner, stdout io.Writer, stde
 	if _, err := buildRuntimeRunOncePlan(effectiveConfig, *maxSteps, *agentAttempts, *agentPollInterval, ""); err != nil {
 		return err
 	}
+	if err := runtimeSchedulerStateCommand(effectiveConfig, runner, "resume-scheduler"); err != nil {
+		return err
+	}
 	paths := schedulerPaths(effectiveConfig)
 	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
 		return fmt.Errorf("create scheduler dir: %w", err)
@@ -186,7 +201,9 @@ func runRuntimeStart(args []string, runner commandRunner, stdout io.Writer, stde
 	if pid, ok, err := readRunningScheduler(paths.PIDFile, runner); err != nil {
 		return err
 	} else if ok {
-		return fmt.Errorf("runtime scheduler already running pid=%d", pid)
+		fmt.Fprintf(stdout, "runtime_scheduler_resumed pid=%d paused=false pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
+		fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
+		return nil
 	}
 	executable, err := os.Executable()
 	if err != nil {
@@ -208,13 +225,13 @@ func runRuntimeStart(args []string, runner commandRunner, stdout io.Writer, stde
 		_ = os.Remove(paths.CommandFile)
 		return fmt.Errorf("write scheduler pid file: %w", err)
 	}
-	fmt.Fprintf(stdout, "runtime_scheduler_started pid_file=%s log=%s\n", paths.PIDFile, paths.LogFile)
+	fmt.Fprintf(stdout, "runtime_scheduler_resumed pid_file=%s log=%s paused=false\n", paths.PIDFile, paths.LogFile)
 	fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
 	return nil
 }
 
-func runRuntimeStop(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
-	flags := flag.NewFlagSet("a2o runtime stop", flag.ContinueOnError)
+func runRuntimePause(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	flags := flag.NewFlagSet("a2o runtime pause", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -227,32 +244,21 @@ func runRuntimeStop(args []string, runner commandRunner, stdout io.Writer, stder
 	if err != nil {
 		return err
 	}
-	paths := schedulerPaths(applyAgentInstallOverrides(*config, "", "", ""))
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	if err := runtimeSchedulerStateCommand(effectiveConfig, runner, "pause-scheduler"); err != nil {
+		return err
+	}
+	paths := schedulerPaths(effectiveConfig)
 	pid, err := readSchedulerPID(paths.PIDFile)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			fmt.Fprintf(stdout, "runtime_scheduler_status=stopped pid_file=%s log=%s\n", paths.PIDFile, paths.LogFile)
+			fmt.Fprintf(stdout, "runtime_scheduler_paused pid_file=%s log=%s running=false\n", paths.PIDFile, paths.LogFile)
 			return nil
 		}
 		return err
 	}
 	running := schedulerProcessRunning(pid, paths.CommandFile, runner)
-	plan, planErr := buildRuntimeRunOncePlan(pathsConfig(config), "", "", "", "")
-	if running {
-		if err := runner.TerminateProcessGroup(pid); err != nil {
-			return err
-		}
-	}
-	if planErr == nil {
-		_ = cleanupRuntimeProcesses(pathsConfig(config), plan, runner)
-	}
-	if err := os.Remove(paths.PIDFile); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("remove scheduler pid file: %w", err)
-	}
-	if err := os.Remove(paths.CommandFile); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("remove scheduler command file: %w", err)
-	}
-	fmt.Fprintf(stdout, "runtime_scheduler_stopped pid=%d pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
+	fmt.Fprintf(stdout, "runtime_scheduler_paused pid=%d pid_file=%s log=%s running=%t\n", pid, paths.PIDFile, paths.LogFile, running)
 	return nil
 }
 
@@ -289,11 +295,43 @@ func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, std
 		fmt.Fprintf(stdout, "runtime_scheduler_status=stale pid=%d pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
 	}
 	return withComposeEnv(effectiveConfig, func() error {
+		printRuntimeSchedulerPauseState(effectiveConfig, runner, stdout)
 		printRuntimeServiceStatus(effectiveConfig, runner, stdout)
 		printRuntimeImageStatus(&effectiveConfig, runner, stdout)
 		printLatestRuntimeSummary(effectiveConfig, runner, stdout)
 		return nil
 	})
+}
+
+func runtimeSchedulerStateCommand(config runtimeInstanceConfig, runner commandRunner, command string) error {
+	plan, err := buildRuntimeRunOncePlan(config, "", "", "", "")
+	if err != nil {
+		return err
+	}
+	_, err = dockerComposeExecOutput(config, plan, runner, "a3", command, "--storage-backend", "json", "--storage-dir", plan.StorageDir)
+	return err
+}
+
+func printRuntimeSchedulerPauseState(config runtimeInstanceConfig, runner commandRunner, stdout io.Writer) {
+	plan, err := buildRuntimeRunOncePlan(config, "", "", "", "")
+	if err != nil {
+		fmt.Fprintf(stdout, "runtime_scheduler_pause status=unavailable reason=%s\n", singleLine(err.Error()))
+		return
+	}
+	output, err := dockerComposeExecOutput(config, plan, runner, "a3", "show-scheduler-state", "--storage-backend", "json", "--storage-dir", plan.StorageDir)
+	if err != nil {
+		fmt.Fprintf(stdout, "runtime_scheduler_pause status=unavailable reason=%s\n", singleLine(err.Error()))
+		return
+	}
+	summary := strings.TrimSpace(string(output))
+	if summary == "" {
+		fmt.Fprintln(stdout, "runtime_scheduler_pause status=unavailable reason=empty")
+		return
+	}
+	if strings.HasPrefix(summary, "scheduler ") {
+		summary = "runtime_" + summary
+	}
+	fmt.Fprintln(stdout, sanitizePublicCommand(summary))
 }
 
 func runRuntimeImageDigest(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {

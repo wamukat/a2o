@@ -150,12 +150,12 @@ a2o runtime run-once
 常駐スケジューラとして動かす場合は次を使う。
 
 ```sh
-a2o runtime start --interval 60s --agent-poll-interval 5s
+a2o runtime resume --interval 60s --agent-poll-interval 5s
 a2o runtime status
-a2o runtime stop
+a2o runtime pause
 ```
 
-`runtime start` はタスク処理を自動開始する。コンテナの起動・停止だけを扱いたい場合は `a2o runtime up` / `a2o runtime down` を使う。
+`runtime resume` はタスク処理を自動開始する。`runtime pause` は現在の作業が終わったあとにスケジューラを止める予約である。コンテナの起動・停止だけを扱いたい場合は `a2o runtime up` / `a2o runtime down` を使う。
 
 ## 9. 結果を確認する
 

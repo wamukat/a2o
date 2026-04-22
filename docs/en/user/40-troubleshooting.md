@@ -21,7 +21,7 @@ a2o runtime describe-task <task-ref>
 
 | Symptom | First command | Common cause | Fix |
 |---|---|---|---|
-| Tasks do not move | `a2o runtime status` | Scheduler or runtime container is stopped | `a2o runtime up`, `a2o runtime start` |
+| Tasks do not move | `a2o runtime status` | Scheduler is paused or stopped, or the runtime container is stopped | `a2o runtime up`, `a2o runtime resume` |
 | Board looks empty | `a2o kanban doctor` | Compose project / Docker volume changed | Instance settings, Compose project, volume |
 | Task is blocked | `a2o runtime describe-task <task-ref>` | Configuration error, dirty repo, executor failure, verification failure, merge conflict | The target shown by the error category |
 | Docker credential helper blocks execution | `a2o doctor` | Docker config points to a missing credential helper | `credsStore` / `credHelpers`, or temporary `DOCKER_CONFIG` |

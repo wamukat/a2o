@@ -150,12 +150,12 @@ a2o runtime run-once
 For resident scheduling, use:
 
 ```sh
-a2o runtime start --interval 60s --agent-poll-interval 5s
+a2o runtime resume --interval 60s --agent-poll-interval 5s
 a2o runtime status
-a2o runtime stop
+a2o runtime pause
 ```
 
-`runtime start` begins task processing. If you only need container lifecycle, use `a2o runtime up` / `a2o runtime down`.
+`runtime resume` begins task processing. `runtime pause` reserves scheduler stop after current work finishes. If you only need container lifecycle, use `a2o runtime up` / `a2o runtime down`.
 
 ## 9. Inspect The Result
 

@@ -15,7 +15,7 @@ A2O 0.5.12 で現在利用できる公開機能と検証範囲を示す。
 - エージェント対象の判定とバイナリの書き出し: `a2o agent target`、`a2o agent install`
 - ランタイムコンテナの起動・停止: `a2o runtime up`、`down`
 - 手動でのランタイム実行: `a2o runtime run-once`、`a2o runtime loop`
-- 常駐スケジューラの起動・停止・状態確認: `a2o runtime start`、`stop`、`status`
+- 常駐スケジューラの再開・停止予約・状態確認: `a2o runtime resume`、`pause`、`status`
 - ランタイム診断・復旧: `a2o runtime image-digest`、`doctor`、`watch-summary`、`logs <task-ref>`、`describe-task <task-ref>`、`reset-task <task-ref>`、`show-artifact <artifact-id>`
 - アップグレード診断: `a2o upgrade check`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`

@@ -21,7 +21,7 @@ a2o runtime describe-task <task-ref>
 
 | 症状 | まず見るコマンド | よくある原因 | 直すもの |
 | --- | --- | --- | --- |
-| タスクが進まない | `a2o runtime status` | スケジューラまたはランタイムコンテナが止まっている | `a2o runtime up`、`a2o runtime start` |
+| タスクが進まない | `a2o runtime status` | スケジューラが pause 済み、または停止している。あるいはランタイムコンテナが止まっている | `a2o runtime up`、`a2o runtime resume` |
 | ボードが空に見える | `a2o kanban doctor` | Compose プロジェクト / Docker volume が変わった | インスタンス設定、Compose プロジェクト、volume |
 | タスクがブロックされた | `a2o runtime describe-task <task-ref>` | 設定不備、未整理のリポジトリ、実行コマンド失敗、検証失敗、マージ競合 | 表示されたエラー分類の対象 |
 | Docker credential helper で止まる | `a2o doctor` | Docker 設定が存在しない credential helper を指している | `credsStore` / `credHelpers`、または一時 `DOCKER_CONFIG` |

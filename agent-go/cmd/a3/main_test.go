@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -1208,8 +1209,8 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o kanban url",
 		"a2o runtime up [--build] [--pull]",
 		"a2o runtime down",
-		"a2o runtime start [--interval DURATION] [--agent-poll-interval DURATION]  # start scheduler",
-		"a2o runtime stop                         # stop scheduler",
+		"a2o runtime resume [--interval DURATION] [--agent-poll-interval DURATION] # resume scheduler",
+		"a2o runtime pause                        # pause scheduler after current work",
 		"a2o runtime status",
 		"a2o runtime image-digest",
 		"a2o runtime doctor",
@@ -1227,6 +1228,8 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		}
 	}
 	for _, hidden := range []string{
+		"a2o runtime start",
+		"a2o runtime stop",
 		"a2o runtime command-plan",
 		"a2o kanban run-once",
 		"a2o kanban loop",
@@ -1272,8 +1275,10 @@ func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
 		{name: "kanban url", args: []string{"kanban", "url", "-bad"}, want: "Usage of a2o kanban url:"},
 		{name: "runtime up", args: []string{"runtime", "up", "-bad"}, want: "Usage of a2o runtime up:"},
 		{name: "runtime down", args: []string{"runtime", "down", "-bad"}, want: "Usage of a2o runtime down:"},
-		{name: "runtime start", args: []string{"runtime", "start", "-bad"}, want: "Usage of a2o runtime start:"},
-		{name: "runtime stop", args: []string{"runtime", "stop", "-bad"}, want: "Usage of a2o runtime stop:"},
+		{name: "runtime resume", args: []string{"runtime", "resume", "-bad"}, want: "Usage of a2o runtime resume:"},
+		{name: "runtime pause", args: []string{"runtime", "pause", "-bad"}, want: "Usage of a2o runtime pause:"},
+		{name: "runtime start compatibility alias", args: []string{"runtime", "start", "-bad"}, want: "Usage of a2o runtime resume:"},
+		{name: "runtime stop compatibility alias", args: []string{"runtime", "stop", "-bad"}, want: "Usage of a2o runtime pause:"},
 		{name: "runtime status", args: []string{"runtime", "status", "-bad"}, want: "Usage of a2o runtime status:"},
 		{name: "runtime image-digest", args: []string{"runtime", "image-digest", "-bad"}, want: "Usage of a2o runtime image-digest:"},
 		{name: "runtime doctor", args: []string{"runtime", "doctor", "-bad"}, want: "Usage of a2o runtime doctor:"},
@@ -3353,7 +3358,7 @@ func TestRuntimeDownStopsContainersWithoutSchedulerMutation(t *testing.T) {
 	}
 }
 
-func TestRuntimeStartLaunchesForegroundLoopInBackground(t *testing.T) {
+func TestRuntimeResumeLaunchesForegroundLoopInBackground(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -3373,7 +3378,7 @@ func TestRuntimeStartLaunchesForegroundLoopInBackground(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "start", "--interval", "5s", "--max-steps", "2", "--agent-attempts", "3", "--agent-poll-interval", "7s"}, runner, &stdout, &stderr)
+		code := run([]string{"runtime", "resume", "--interval", "5s", "--max-steps", "2", "--agent-attempts", "3", "--agent-poll-interval", "7s"}, runner, &stdout, &stderr)
 		if code != 0 {
 			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
@@ -3386,11 +3391,11 @@ func TestRuntimeStartLaunchesForegroundLoopInBackground(t *testing.T) {
 		filepath.Join(tempDir, ".work", "a2o-runtime", "scheduler.log"),
 	} {
 		if !strings.Contains(joined, want) {
-			t.Fatalf("runtime start missing %q in:\n%s", want, joined)
+			t.Fatalf("runtime resume missing %q in:\n%s", want, joined)
 		}
 	}
-	if !strings.Contains(stdout.String(), "runtime_scheduler_started") {
-		t.Fatalf("stdout should report scheduler start, got %q", stdout.String())
+	if !strings.Contains(stdout.String(), "runtime_scheduler_resumed") {
+		t.Fatalf("stdout should report scheduler resume, got %q", stdout.String())
 	}
 	pidBody, err := os.ReadFile(filepath.Join(tempDir, ".work", "a2o-runtime", "scheduler.pid"))
 	if err != nil {
@@ -3407,7 +3412,7 @@ func TestRuntimeStartLaunchesForegroundLoopInBackground(t *testing.T) {
 		t.Fatalf("scheduler command file should contain launched command, got %q want %q", got, runner.processCommands[12345])
 	}
 	if !strings.Contains(stdout.String(), "describe_task=a2o runtime describe-task <task-ref>") {
-		t.Fatalf("runtime start should guide operator to describe-task, got %q", stdout.String())
+		t.Fatalf("runtime resume should guide operator to describe-task, got %q", stdout.String())
 	}
 }
 
@@ -3988,7 +3993,7 @@ func TestRuntimeDescribeTaskFindsLatestRunWhenTaskHasNoCurrentRun(t *testing.T) 
 	}
 }
 
-func TestRuntimeStartRejectsInvalidOptionsBeforeBackgroundLaunch(t *testing.T) {
+func TestRuntimeResumeRejectsInvalidOptionsBeforeBackgroundLaunch(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -4008,21 +4013,21 @@ func TestRuntimeStartRejectsInvalidOptionsBeforeBackgroundLaunch(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "start", "--interval", "not-a-duration"}, runner, &stdout, &stderr)
+		code := run([]string{"runtime", "resume", "--interval", "not-a-duration"}, runner, &stdout, &stderr)
 		if code == 0 {
 			t.Fatalf("run should fail for invalid interval")
 		}
 	})
 
 	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "start-background") {
-		t.Fatalf("runtime start should fail before background launch, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+		t.Fatalf("runtime resume should fail before background launch, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
 	}
 	if !strings.Contains(stderr.String(), "parse --interval") {
 		t.Fatalf("stderr should mention invalid interval, got %q", stderr.String())
 	}
 }
 
-func TestRuntimeStartRejectsNegativeIntervalBeforeBackgroundLaunch(t *testing.T) {
+func TestRuntimeResumeRejectsNegativeIntervalBeforeBackgroundLaunch(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -4042,21 +4047,21 @@ func TestRuntimeStartRejectsNegativeIntervalBeforeBackgroundLaunch(t *testing.T)
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "start", "--interval", "-1s"}, runner, &stdout, &stderr)
+		code := run([]string{"runtime", "resume", "--interval", "-1s"}, runner, &stdout, &stderr)
 		if code == 0 {
 			t.Fatalf("run should fail for negative interval")
 		}
 	})
 
 	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "start-background") {
-		t.Fatalf("runtime start should fail before background launch, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+		t.Fatalf("runtime resume should fail before background launch, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
 	}
 	if !strings.Contains(stderr.String(), "--interval must be >= 0") {
 		t.Fatalf("stderr should mention negative interval, got %q", stderr.String())
 	}
 }
 
-func TestRuntimeStartRequiresProjectConfigBeforeBackgroundLaunch(t *testing.T) {
+func TestRuntimeResumeRequiresProjectConfigBeforeBackgroundLaunch(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -4075,7 +4080,7 @@ func TestRuntimeStartRequiresProjectConfigBeforeBackgroundLaunch(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "start"}, runner, &stdout, &stderr)
+		code := run([]string{"runtime", "resume"}, runner, &stdout, &stderr)
 		if code == 0 {
 			t.Fatalf("run should fail without project.yaml")
 		}
@@ -4085,11 +4090,11 @@ func TestRuntimeStartRequiresProjectConfigBeforeBackgroundLaunch(t *testing.T) {
 		t.Fatalf("stderr should mention missing project.yaml, got %q", stderr.String())
 	}
 	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "start-background") {
-		t.Fatalf("runtime start should fail before background launch, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+		t.Fatalf("runtime resume should fail before background launch, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
 	}
 }
 
-func TestRuntimeStartRejectsAlreadyRunningScheduler(t *testing.T) {
+func TestRuntimeResumeOnRunningSchedulerUnpausesWithoutLaunchingDuplicate(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -4120,17 +4125,18 @@ func TestRuntimeStartRejectsAlreadyRunningScheduler(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "start"}, runner, &stdout, &stderr)
-		if code == 0 {
-			t.Fatalf("run should fail when scheduler is already running")
+		code := run([]string{"runtime", "resume"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run should succeed when scheduler is already running, stderr=%s", stderr.String())
 		}
 	})
 
-	if !strings.Contains(stderr.String(), "runtime scheduler already running pid=12345") {
-		t.Fatalf("stderr should mention running scheduler, got %q", stderr.String())
-	}
 	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "start-background") {
-		t.Fatalf("runtime start should not launch a duplicate scheduler, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+		t.Fatalf("runtime resume should not launch a duplicate scheduler, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+	}
+	assertCallContains(t, runner.joinedCalls(), "docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 resume-scheduler --storage-backend json --storage-dir /var/lib/a2o/a2o-runtime")
+	if !strings.Contains(stdout.String(), "runtime_scheduler_resumed pid=12345 paused=false") {
+		t.Fatalf("stdout should report resumed running scheduler, got %q", stdout.String())
 	}
 }
 
@@ -4176,6 +4182,7 @@ func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
 		t.Fatalf("stdout should report running scheduler, got %q", stdout.String())
 	}
 	for _, want := range []string{
+		"runtime_scheduler paused=false stop_reason=idle executed_count=0",
 		"runtime_package=" + packageDir,
 		"kanban_url=http://localhost:3470/",
 		"runtime_status_check name=runtime_container status=running container=runtime-container",
@@ -4637,7 +4644,7 @@ func TestRuntimeStatusRejectsInvalidPIDFile(t *testing.T) {
 	}
 }
 
-func TestRuntimeStopKillsSchedulerAndRemovesPID(t *testing.T) {
+func TestRuntimePauseMarksSchedulerPausedWithoutStoppingCurrentProcess(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -4668,7 +4675,7 @@ func TestRuntimeStopKillsSchedulerAndRemovesPID(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "stop"}, runner, &stdout, &stderr)
+		code := run([]string{"runtime", "pause"}, runner, &stdout, &stderr)
 		if code != 0 {
 			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
@@ -4676,19 +4683,22 @@ func TestRuntimeStopKillsSchedulerAndRemovesPID(t *testing.T) {
 
 	assertCallContains(t, runner.joinedCalls(), "process-running 12345")
 	assertCallContains(t, runner.joinedCalls(), "process-command 12345")
-	assertCallContains(t, runner.joinedCalls(), "terminate-process-group 12345")
-	if _, err := os.Stat(paths.PIDFile); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("pid file should be removed, stat err=%v", err)
+	assertCallContains(t, runner.joinedCalls(), "docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 pause-scheduler --storage-backend json --storage-dir /var/lib/a2o/a2o-runtime")
+	if runner.callCount("terminate-process-group 12345") != 0 {
+		t.Fatalf("runtime pause must not terminate the scheduler, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
 	}
-	if _, err := os.Stat(paths.CommandFile); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("command file should be removed, stat err=%v", err)
+	if _, err := os.Stat(paths.PIDFile); err != nil {
+		t.Fatalf("pid file should be preserved, stat err=%v", err)
 	}
-	if !strings.Contains(stdout.String(), "runtime_scheduler_stopped pid=12345") {
-		t.Fatalf("stdout should report scheduler stop, got %q", stdout.String())
+	if _, err := os.Stat(paths.CommandFile); err != nil {
+		t.Fatalf("command file should be preserved, stat err=%v", err)
+	}
+	if !strings.Contains(stdout.String(), "runtime_scheduler_paused pid=12345") {
+		t.Fatalf("stdout should report scheduler pause, got %q", stdout.String())
 	}
 }
 
-func TestRuntimeStopDoesNotTerminateUnrelatedReusedPID(t *testing.T) {
+func TestRuntimePauseDoesNotTerminateUnrelatedReusedPID(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -4719,22 +4729,21 @@ func TestRuntimeStopDoesNotTerminateUnrelatedReusedPID(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "stop"}, runner, &stdout, &stderr)
+		code := run([]string{"runtime", "pause"}, runner, &stdout, &stderr)
 		if code != 0 {
 			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
 	})
 
 	if runner.callCount("terminate-process-group 12345") != 0 {
-		t.Fatalf("runtime stop must not terminate unrelated process, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+		t.Fatalf("runtime pause must not terminate unrelated process, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
 	}
-	assertCallContains(t, runner.joinedCalls(), "docker compose -p a3-test -f compose.yml exec -T a2o-runtime pgrep -f a3 execute-until-idle")
-	assertCallContains(t, runner.joinedCalls(), "docker compose -p a3-test -f compose.yml exec -T a2o-runtime pgrep -f a3 agent-server")
-	if _, err := os.Stat(paths.PIDFile); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("pid file should be removed after stale stop, stat err=%v", err)
+	assertCallContains(t, runner.joinedCalls(), "docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 pause-scheduler --storage-backend json --storage-dir /var/lib/a2o/a2o-runtime")
+	if _, err := os.Stat(paths.PIDFile); err != nil {
+		t.Fatalf("pid file should remain after pause, stat err=%v", err)
 	}
-	if _, err := os.Stat(paths.CommandFile); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("command file should be removed after stale stop, stat err=%v", err)
+	if _, err := os.Stat(paths.CommandFile); err != nil {
+		t.Fatalf("command file should remain after pause, stat err=%v", err)
 	}
 }
 
@@ -5229,24 +5238,27 @@ func TestAgentInstallRequiresInstanceConfigOrExplicitCompose(t *testing.T) {
 }
 
 type fakeRunner struct {
-	calls                 [][]string
-	emptyContainer        bool
-	failShowTask          bool
-	taskWithoutCurrentRun bool
-	staleCurrentRun       bool
-	runtimeExitMissing    bool
-	legacyRuntimeOrphans  []string
-	failLegacyRuntimeRM   bool
-	missingRunHistory     bool
-	err                   error
-	lastEnv               map[string]string
-	nextPID               int
-	processCommands       map[int]string
-	errorOutput           string
-	imageInspectDigests   map[string]string
-	containerImageIDs     map[string]string
-	logManifestOutput     string
-	logManifestOutputs    []string
+	calls                  [][]string
+	emptyContainer         bool
+	failShowTask           bool
+	taskWithoutCurrentRun  bool
+	staleCurrentRun        bool
+	runtimeExitMissing     bool
+	legacyRuntimeOrphans   []string
+	failLegacyRuntimeRM    bool
+	missingRunHistory      bool
+	schedulerPaused        bool
+	schedulerStopReason    string
+	schedulerExecutedCount int
+	err                    error
+	lastEnv                map[string]string
+	nextPID                int
+	processCommands        map[int]string
+	errorOutput            string
+	imageInspectDigests    map[string]string
+	containerImageIDs      map[string]string
+	logManifestOutput      string
+	logManifestOutputs     []string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -5276,6 +5288,18 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	}
 	joined := strings.Join(call, " ")
 	switch {
+	case strings.Contains(joined, " a3 pause-scheduler "):
+		r.schedulerPaused = true
+		return []byte("scheduler paused=true\n"), nil
+	case strings.Contains(joined, " a3 resume-scheduler "):
+		r.schedulerPaused = false
+		return []byte("scheduler paused=false\n"), nil
+	case strings.Contains(joined, " a3 show-scheduler-state "):
+		stopReason := r.schedulerStopReason
+		if stopReason == "" {
+			stopReason = "idle"
+		}
+		return []byte(fmt.Sprintf("scheduler paused=%t stop_reason=%s executed_count=%d\n", r.schedulerPaused, stopReason, r.schedulerExecutedCount)), nil
 	case name == "docker" && len(args) >= 8 && args[0] == "ps" && containsArg(args, "label=com.docker.compose.service=a3-runtime"):
 		if len(r.legacyRuntimeOrphans) == 0 {
 			return []byte{}, nil

@@ -91,9 +91,9 @@ a2o runtime up
 a2o runtime run-once
 a2o runtime run-once --project-config project-test.yaml
 a2o runtime loop
-a2o runtime start
+a2o runtime resume
 a2o runtime status
-a2o runtime stop
+a2o runtime pause
 a2o runtime down
 a2o runtime image-digest
 a2o runtime doctor

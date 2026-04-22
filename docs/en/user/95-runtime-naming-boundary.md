@@ -43,6 +43,6 @@ User-facing runtime execution should use:
 
 - `a2o runtime run-once`
 - `a2o runtime loop`
-- `a2o runtime start`
+- `a2o runtime resume`
 
 Internal Engine CLI examples must stay out of normal user setup docs.

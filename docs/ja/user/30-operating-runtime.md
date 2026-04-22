@@ -11,7 +11,7 @@ A2O の通常運用は、次の 4 つで構成される。
 | 構成要素 | 役割 | 主なコマンド |
 | --- | --- | --- |
 | ホスト用ランチャー `a2o` | ホストからランタイムイメージとインスタンスを操作する | `a2o project bootstrap`, `a2o kanban ...`, `a2o runtime ...` |
-| A2O Engine | カンバンタスクを選び、フェーズジョブを作り、結果を記録する | `a2o runtime up`, `a2o runtime start`, `a2o runtime status` |
+| A2O Engine | カンバンタスクを選び、フェーズジョブを作り、結果を記録する | `a2o runtime up`, `a2o runtime resume`, `a2o runtime status` |
 | a2o-agent | プロダクト環境でジョブを実行し、Git リポジトリを変更・検証する | `a2o agent install` |
 | プロジェクトパッケージ | プロジェクト固有のリポジトリ、スキル、コマンド、フェーズを定義する | `a2o project lint` |
 
@@ -35,7 +35,7 @@ a2o project bootstrap --package ./path/to/project-package
 a2o kanban up
 a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 a2o runtime up
-a2o runtime start --interval 60s --agent-poll-interval 5s
+a2o runtime resume --interval 60s --agent-poll-interval 5s
 ```
 
 状態確認には次を使う。
@@ -61,12 +61,12 @@ a2o runtime describe-task <task-ref>
 通常運用では常駐スケジューラを使う。
 
 ```sh
-a2o runtime start --interval 60s --agent-poll-interval 5s
+a2o runtime resume --interval 60s --agent-poll-interval 5s
 a2o runtime status
-a2o runtime stop
+a2o runtime pause
 ```
 
-`runtime start` はタスク処理を常駐実行する。`runtime stop` はスケジューラを止める。`runtime status` はスケジューラが動いているか、ランタイムイメージが期待通りか、最新実行がどう終わったかを確認する。
+`runtime resume` はタスク処理を常駐実行する。`runtime pause` は現在の作業が終わったあとにスケジューラを止め、新しいタスクを拾わない。`runtime status` はスケジューラが動いているか、pause 済みか、ランタイムイメージが期待通りか、最新実行がどう終わったかを確認する。
 
 `runtime run-once` は手動確認や検証用である。スケジューラを使う前に 1 回だけ取り込みたいときや、問題を直した後に再同期したいときに使う。
 

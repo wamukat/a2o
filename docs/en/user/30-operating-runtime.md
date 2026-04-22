@@ -11,7 +11,7 @@ A normal A2O setup has four parts.
 | Part | Role | Main commands |
 |---|---|---|
 | Host launcher `a2o` | Controls the runtime image and instance from the host | `a2o project bootstrap`, `a2o kanban ...`, `a2o runtime ...` |
-| A2O Engine | Selects kanban tasks, creates phase jobs, records results | `a2o runtime up`, `a2o runtime start`, `a2o runtime status` |
+| A2O Engine | Selects kanban tasks, creates phase jobs, records results | `a2o runtime up`, `a2o runtime resume`, `a2o runtime status` |
 | `a2o-agent` | Runs jobs in the product environment and changes / verifies Git repositories | `a2o agent install` |
 | Project package | Defines product repositories, skills, commands, and phases | `a2o project lint` |
 
@@ -35,7 +35,7 @@ Normally, start kanban, install the agent, and start the scheduler.
 a2o kanban up
 a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 a2o runtime up
-a2o runtime start --interval 60s --agent-poll-interval 5s
+a2o runtime resume --interval 60s --agent-poll-interval 5s
 ```
 
 Check state with:
@@ -61,12 +61,12 @@ a2o runtime describe-task <task-ref>
 Use the resident scheduler for normal operation.
 
 ```sh
-a2o runtime start --interval 60s --agent-poll-interval 5s
+a2o runtime resume --interval 60s --agent-poll-interval 5s
 a2o runtime status
-a2o runtime stop
+a2o runtime pause
 ```
 
-`runtime start` runs task processing as a resident scheduler. `runtime stop` stops the scheduler. `runtime status` confirms whether the scheduler is running, whether the runtime image matches expectations, and how the latest run ended.
+`runtime resume` runs task processing as a resident scheduler. `runtime pause` reserves scheduler pause after current work finishes and prevents the next task from starting. `runtime status` confirms whether the scheduler is running, whether it is paused, whether the runtime image matches expectations, and how the latest run ended.
 
 Use `runtime run-once` for manual checks, test runs, or a retry after fixing a root cause.
 

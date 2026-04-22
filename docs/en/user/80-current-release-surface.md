@@ -15,7 +15,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Agent target detection and binary export: `a2o agent target`, `a2o agent install`
 - Runtime container lifecycle: `a2o runtime up`, `down`
 - Foreground runtime execution: `a2o runtime run-once`, `a2o runtime loop`
-- Resident scheduler lifecycle: `a2o runtime start`, `stop`, `status`
+- Resident scheduler lifecycle: `a2o runtime resume`, `pause`, `status`
 - Runtime diagnosis and recovery: `a2o runtime image-digest`, `doctor`, `watch-summary`, `logs <task-ref>`, `describe-task <task-ref>`, `reset-task <task-ref>`, `show-artifact <artifact-id>`
 - Upgrade diagnosis: `a2o upgrade check`
 - Single-file project package config: `project.yaml`
