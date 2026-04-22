@@ -3597,7 +3597,9 @@ func TestRuntimeLogsPrintsCompletedPhaseArtifacts(t *testing.T) {
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
-	runner := &fakeRunner{}
+	runner := &fakeRunner{
+		logManifestOutput: `{"run_ref":"run-16","current_run":"run-16","phase":"implementation","source_type":"detached_commit","source_ref":"abc","active":false,"artifacts":[{"phase":"implementation","artifact_id":"worker-run-16-implementation-ai-raw-log","mode":"ai-raw-log"},{"phase":"implementation","artifact_id":"worker-run-16-implementation-combined-log","mode":"combined-log"}]}`,
+	}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -3609,6 +3611,9 @@ func TestRuntimeLogsPrintsCompletedPhaseArtifacts(t *testing.T) {
 	})
 
 	output := stdout.String()
+	if !strings.Contains(output, "=== phase: implementation (ai-raw-log) artifact=worker-run-16-implementation-ai-raw-log ===") {
+		t.Fatalf("runtime logs missing ai-raw-log header, got:\n%s", output)
+	}
 	if !strings.Contains(output, "=== phase: implementation (combined-log) artifact=worker-run-16-implementation-combined-log ===") {
 		t.Fatalf("runtime logs missing combined-log header, got:\n%s", output)
 	}
@@ -3619,6 +3624,7 @@ func TestRuntimeLogsPrintsCompletedPhaseArtifacts(t *testing.T) {
 	for _, want := range []string{
 		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 show-task --storage-backend json --storage-dir /var/lib/a3/test-runtime A2O#16",
 		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime ruby -rjson -e",
+		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 agent-artifact-read --storage-dir /var/lib/a3/test-runtime worker-run-16-implementation-ai-raw-log",
 		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 agent-artifact-read --storage-dir /var/lib/a3/test-runtime worker-run-16-implementation-combined-log",
 	} {
 		if !strings.Contains(joined, want) {
@@ -3633,7 +3639,7 @@ func TestRuntimeLogsFollowsLatestActiveRunWhenTaskCurrentRunIsBlank(t *testing.T
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	liveLogRoot := filepath.Join(tempDir, "host-root", "live-logs")
+	liveLogRoot := filepath.Join(tempDir, "host-root", "ai-raw-logs")
 	liveLogPath := filepath.Join(liveLogRoot, "A2O-16", "implementation.log")
 	if err := os.MkdirAll(filepath.Dir(liveLogPath), 0o755); err != nil {
 		t.Fatal(err)
@@ -3672,7 +3678,7 @@ func TestRuntimeLogsFollowsLatestActiveRunWhenTaskCurrentRunIsBlank(t *testing.T
 	})
 
 	output := stdout.String()
-	if !strings.Contains(output, "=== phase: implementation (live) task=A2O#16 run=run-16 source=detached_commit:abc ===") {
+	if !strings.Contains(output, "=== phase: implementation (ai-raw-live) task=A2O#16 run=run-16 source=detached_commit:abc ===") {
 		t.Fatalf("expected live header, got %q", output)
 	}
 	if !strings.Contains(output, "live log line") {
@@ -3686,7 +3692,7 @@ func TestRuntimeLogsFollowsLatestActiveRunWhenTaskCurrentRunIsStale(t *testing.T
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	liveLogRoot := filepath.Join(tempDir, "host-root", "live-logs")
+	liveLogRoot := filepath.Join(tempDir, "host-root", "ai-raw-logs")
 	liveLogPath := filepath.Join(liveLogRoot, "A2O-16", "implementation.log")
 	if err := os.MkdirAll(filepath.Dir(liveLogPath), 0o755); err != nil {
 		t.Fatal(err)
@@ -3725,7 +3731,7 @@ func TestRuntimeLogsFollowsLatestActiveRunWhenTaskCurrentRunIsStale(t *testing.T
 	})
 
 	output := stdout.String()
-	if !strings.Contains(output, "=== phase: implementation (live) task=A2O#16 run=run-16 source=detached_commit:abc ===") {
+	if !strings.Contains(output, "=== phase: implementation (ai-raw-live) task=A2O#16 run=run-16 source=detached_commit:abc ===") {
 		t.Fatalf("expected live header, got %q", output)
 	}
 	if !strings.Contains(output, "stale current run fallback") {

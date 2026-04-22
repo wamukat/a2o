@@ -4,6 +4,7 @@ require "json"
 require "pathname"
 require "tempfile"
 require "open3"
+require "thread"
 
 ROOT_DIR = Pathname(ENV["A2O_ROOT_DIR"] || ENV.fetch("A3_ROOT_DIR", Dir.pwd)).expand_path.freeze
 def env_compat(public_name, legacy_name)
@@ -456,6 +457,59 @@ def load_payload(result_path)
   JSON.parse(raw)
 end
 
+def safe_log_component(value)
+  value.to_s.gsub(/[^A-Za-z0-9._:-]/, "-")
+end
+
+def ai_raw_log_writer(request)
+  root = env_compat("A2O_AGENT_AI_RAW_LOG_ROOT", "A3_AGENT_AI_RAW_LOG_ROOT").to_s
+  return nil if root.strip.empty?
+
+  task_ref = safe_log_component(request["task_ref"])
+  phase = safe_log_component(request["phase"])
+  return nil if task_ref.empty? || phase.empty?
+
+  path = Pathname(root).join(task_ref, "#{phase}.log")
+  path.dirname.mkpath
+  path.open("wb")
+rescue StandardError
+  nil
+end
+
+def capture_executor_output(command_env, command, stdin_bundle:, chdir:, request:)
+  stdout = +""
+  stderr = +""
+  writer = ai_raw_log_writer(request)
+  Open3.popen3(command_env, *command, chdir: chdir) do |stdin, out, err, wait_thr|
+    stdin.write(stdin_bundle)
+    stdin.close
+
+    mutex = Mutex.new
+    drain = lambda do |stream, buffer|
+      Thread.new do
+        loop do
+          chunk = stream.readpartial(4096)
+          mutex.synchronize do
+            buffer << chunk
+            writer&.write(chunk)
+            writer&.flush
+          end
+        end
+      rescue EOFError
+      end
+    end
+
+    stdout_thread = drain.call(out, stdout)
+    stderr_thread = drain.call(err, stderr)
+    status = wait_thr.value
+    stdout_thread.join
+    stderr_thread.join
+    [stdout, stderr, status]
+  ensure
+    writer&.close
+  end
+end
+
 def main
   request_path = Pathname(env_compat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH") || raise(KeyError, "A2O_WORKER_REQUEST_PATH is required"))
   result_path = Pathname(env_compat("A2O_WORKER_RESULT_PATH", "A3_WORKER_RESULT_PATH") || raise(KeyError, "A2O_WORKER_RESULT_PATH is required"))
@@ -483,11 +537,12 @@ def main
       )
       return 0
     end
-    stdout, stderr, status = Open3.capture3(
+    stdout, stderr, status = capture_executor_output(
       { "PWD" => (env_compat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT") || ROOT_DIR.to_s) }.merge(command_env),
-      *command,
-      stdin_data: stdin_bundle,
-      chdir: env_compat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT") || ROOT_DIR.to_s
+      command,
+      stdin_bundle: stdin_bundle,
+      chdir: env_compat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT") || ROOT_DIR.to_s,
+      request: request
     )
 
     unless status.success? || result_path.exist?

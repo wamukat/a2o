@@ -319,6 +319,89 @@ func TestRunWorkerStdinBundleRejectsMissingLauncherConfigEnv(t *testing.T) {
 	}
 }
 
+func TestRunWorkerStdinBundleWritesAIRawLogWhenConfigured(t *testing.T) {
+	tmp := t.TempDir()
+	requestPath := filepath.Join(tmp, "request.json")
+	resultPath := filepath.Join(tmp, "result.json")
+	launcherPath := filepath.Join(tmp, "launcher.json")
+	workspace := filepath.Join(tmp, "workspace")
+	rawLogRoot := filepath.Join(tmp, "ai-raw-logs")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(requestPath, []byte(`{
+  "task_ref": "A2O#7",
+  "run_ref": "run-1",
+  "phase": "implementation",
+  "phase_runtime": {},
+  "task_packet": {"title": "implement me"}
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scriptPath := filepath.Join(tmp, "fake-worker.sh")
+	if err := os.WriteFile(scriptPath, []byte(`#!/bin/sh
+set -eu
+printf 'ai is thinking\n'
+cat > "$1" <<'JSON'
+{
+  "task_ref": "A2O#7",
+  "run_ref": "run-1",
+  "phase": "implementation",
+  "success": true,
+  "summary": "implemented",
+  "failing_command": null,
+  "observed_state": null,
+  "rework_required": false,
+  "changed_files": {},
+  "review_disposition": {
+    "kind": "completed",
+    "repo_scope": "repo_alpha",
+    "summary": "clean",
+    "description": "clean",
+    "finding_key": "clean"
+  }
+}
+JSON
+`), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	launcher := `{
+  "executor": {
+    "kind": "command",
+    "prompt_transport": "stdin-bundle",
+    "result": {"mode": "file"},
+    "schema": {"mode": "file"},
+    "default_profile": {
+      "command": ["` + scriptPath + `", "{{result_path}}"],
+      "env": {}
+    },
+    "phase_profiles": {}
+  }
+}`
+	if err := os.WriteFile(launcherPath, []byte(launcher), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("A2O_WORKER_REQUEST_PATH", requestPath)
+	t.Setenv("A2O_WORKER_RESULT_PATH", resultPath)
+	t.Setenv("A2O_ROOT_DIR", tmp)
+	t.Setenv("A2O_WORKSPACE_ROOT", workspace)
+	t.Setenv("A2O_WORKER_LAUNCHER_CONFIG_PATH", launcherPath)
+	t.Setenv("A2O_AGENT_AI_RAW_LOG_ROOT", rawLogRoot)
+
+	if code := run([]string{"worker", "stdin-bundle"}); code != 0 {
+		t.Fatalf("worker exit code = %d", code)
+	}
+
+	body, err := os.ReadFile(filepath.Join(rawLogRoot, "A2O-7", "implementation.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "ai is thinking") {
+		t.Fatalf("ai raw log missing worker output: %q", string(body))
+	}
+}
+
 func TestWorkerEnvCompatFallsBackToLegacyNames(t *testing.T) {
 	t.Setenv("A3_WORKER_REQUEST_PATH", "/tmp/legacy-request.json")
 	if got := envCompat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH"); got != "/tmp/legacy-request.json" {

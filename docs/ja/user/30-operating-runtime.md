@@ -46,7 +46,7 @@ a2o runtime watch-summary
 a2o runtime logs <task-ref> --follow
 ```
 
-`runtime status` はスケジューラ、ランタイムコンテナ、カンバン、イメージダイジェスト、最新実行の状態を見る。`runtime watch-summary` はタスク一覧の現在位置を見る。`runtime logs` は 1 タスクのフェーズ別 combined-log をまとめて読み、`--follow` を付けると現在フェーズの live log を追う。
+`runtime status` はスケジューラ、ランタイムコンテナ、カンバン、イメージダイジェスト、最新実行の状態を見る。`runtime watch-summary` はタスク一覧の現在位置を見る。`runtime logs` は 1 タスクのフェーズ別ログをまとめて読み、AI raw log があればそれを優先して表示する。`--follow` を付けると現在フェーズの AI raw live log を優先して追い、未対応 worker では従来の live log にフォールバックする。
 
 特定タスクを深く見る場合は `describe-task` を使う。
 

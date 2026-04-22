@@ -46,7 +46,7 @@ a2o runtime watch-summary
 a2o runtime logs <task-ref> --follow
 ```
 
-`runtime status` shows scheduler state, runtime container state, kanban instance information, image digest, and the latest run. `runtime watch-summary` shows where board tasks currently are. `runtime logs` gathers combined logs for one task across phases, and `--follow` tails the current phase live log.
+`runtime status` shows scheduler state, runtime container state, kanban instance information, image digest, and the latest run. `runtime watch-summary` shows where board tasks currently are. `runtime logs` gathers per-phase logs for one task and prefers AI raw logs when they are available. With `--follow`, it follows the current phase AI raw live log first and falls back to the legacy live log when the worker does not expose AI raw output.
 
 Use `describe-task` for one task.
 

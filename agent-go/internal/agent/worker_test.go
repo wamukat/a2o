@@ -48,6 +48,39 @@ func TestWorkerUploadsLogsArtifactsAndResult(t *testing.T) {
 	}
 }
 
+func TestWorkerUploadsAIRawLogWhenPresent(t *testing.T) {
+	tmp := t.TempDir()
+	request := testRequest(tmp)
+	request.Env["A2O_AGENT_AI_RAW_LOG_ROOT"] = filepath.Join(tmp, "ai-raw-logs")
+	rawPath := filepath.Join(request.Env["A2O_AGENT_AI_RAW_LOG_ROOT"], "Sample-42", "verification.log")
+	if err := os.MkdirAll(filepath.Dir(rawPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rawPath, []byte("assistant is thinking\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	client := &fakeClient{request: &request}
+
+	result, idle, err := Worker{
+		AgentName: "host-local",
+		Client:    client,
+		Executor:  fakeExecutor{},
+		Now:       func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+	}.RunOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idle {
+		t.Fatal("expected job result, got idle")
+	}
+	if result.Status != "succeeded" {
+		t.Fatalf("status = %s", result.Status)
+	}
+	if roles := uploadRoles(client.uploads); !bytes.Equal([]byte(roles), []byte("combined-log,ai-raw-log")) {
+		t.Fatalf("unexpected upload roles: %s", roles)
+	}
+}
+
 func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T) {
 	tmp := t.TempDir()
 	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")

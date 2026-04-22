@@ -210,6 +210,67 @@ RSpec.describe "worker:stdin-bundle" do
     end
   end
 
+  it "writes AI raw log when configured" do
+    Dir.mktmpdir("a3-stdin-worker-ai-raw-") do |temp_dir_text|
+      temp_dir = Pathname(temp_dir_text)
+      fake_worker = temp_dir.join("fake-worker")
+      fake_worker.write(<<~RUBY)
+        #!/usr/bin/env ruby
+        require "json"
+        require "pathname"
+        warn "assistant is thinking"
+        puts "assistant streamed token"
+        output_path = Pathname(ARGV[ARGV.index("--result") + 1])
+        output_path.write(JSON.generate({
+          "task_ref" => "Sample#3112",
+          "run_ref" => "run-1",
+          "phase" => "implementation",
+          "success" => true,
+          "summary" => "implemented",
+          "failing_command" => nil,
+          "observed_state" => nil,
+          "rework_required" => false,
+          "changed_files" => { "repo_alpha" => [] },
+          "review_disposition" => {
+            "kind" => "completed",
+            "repo_scope" => "repo_alpha",
+            "summary" => "self review clean",
+            "description" => "No findings.",
+            "finding_key" => "self-review-clean"
+          }
+        }))
+      RUBY
+      File.chmod(0o755, fake_worker)
+
+      launcher_config = temp_dir.join("launcher.json")
+      request_path = temp_dir.join("request.json")
+      result_path = temp_dir.join("result.json")
+      workspace_root = temp_dir.join("workspace")
+      ai_raw_root = temp_dir.join("ai-raw-logs")
+      workspace_root.mkpath
+      request_path.write(JSON.generate(base_request))
+      write_launcher_config(
+        launcher_config,
+        command: [fake_worker.to_s, "--result", "{{result_path}}", "--schema", "{{schema_path}}"]
+      )
+
+      stdout, stderr, status = run_worker_process(
+        {
+          "A2O_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A2O_WORKER_RESULT_PATH" => result_path.to_s,
+          "A2O_WORKSPACE_ROOT" => workspace_root.to_s,
+          "A2O_WORKER_LAUNCHER_CONFIG_PATH" => launcher_config.to_s,
+          "A2O_AGENT_AI_RAW_LOG_ROOT" => ai_raw_root.to_s
+        }
+      )
+
+      expect(status.success?).to eq(true), "#{stdout}\n#{stderr}"
+      body = ai_raw_root.join("Sample-3112", "implementation.log").read
+      expect(body).to include("assistant streamed token")
+      expect(body).to include("assistant is thinking")
+    end
+  end
+
   it "does not fall back to root launcher.json when launcher config env is missing" do
     Dir.mktmpdir("a3-stdin-worker-missing-launcher-env-") do |temp_dir_text|
       temp_dir = Pathname(temp_dir_text)

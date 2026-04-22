@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/wamukat/a3-engine/agent-go/internal/errorpolicy"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -416,6 +417,20 @@ func workerRootDir() string {
 	return workerWorkspaceRoot()
 }
 
+type bestEffortBundleWriter struct {
+	writer io.Writer
+}
+
+func (w bestEffortBundleWriter) Write(p []byte) (int, error) {
+	if w.writer == nil {
+		return len(p), nil
+	}
+	if _, err := w.writer.Write(p); err != nil {
+		return len(p), nil
+	}
+	return len(p), nil
+}
+
 func runWorkerExecutor(command []string, commandEnv map[string]string, workspaceRoot string) (string, string, int, error) {
 	if len(command) == 0 {
 		return "", "", 1, fmt.Errorf("executor command is empty")
@@ -431,8 +446,15 @@ func runWorkerExecutor(command []string, commandEnv map[string]string, workspace
 	cmd.Stdin = strings.NewReader(workerBundle())
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	rawWriter, cleanup := workerAIRawLogWriter()
+	defer cleanup()
+	if rawWriter != nil {
+		cmd.Stdout = io.MultiWriter(&stdout, bestEffortBundleWriter{writer: rawWriter})
+		cmd.Stderr = io.MultiWriter(&stderr, bestEffortBundleWriter{writer: rawWriter})
+	} else {
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+	}
 	err := cmd.Run()
 	if err == nil {
 		return stdout.String(), stderr.String(), 0, nil
@@ -441,6 +463,27 @@ func runWorkerExecutor(command []string, commandEnv map[string]string, workspace
 		return stdout.String(), stderr.String(), exitErr.ExitCode(), err
 	}
 	return stdout.String(), stderr.String(), 1, err
+}
+
+func workerAIRawLogWriter() (io.Writer, func()) {
+	root := envCompat("A2O_AGENT_AI_RAW_LOG_ROOT", "A3_AGENT_AI_RAW_LOG_ROOT")
+	if root == "" {
+		return nil, func() {}
+	}
+	taskRef := safeID(stringValue(workerRequestValue("task_ref")))
+	phase := safeID(stringValue(workerRequestValue("phase")))
+	if taskRef == "" || phase == "" {
+		return nil, func() {}
+	}
+	target := filepath.Join(root, taskRef, phase+".log")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return nil, func() {}
+	}
+	file, err := os.Create(target)
+	if err != nil {
+		return nil, func() {}
+	}
+	return file, func() { _ = file.Close() }
 }
 
 func workerBundle() string {
@@ -476,6 +519,33 @@ func workerBundle() string {
 	}
 	body, _ := json.MarshalIndent(bundle, "", "  ")
 	return string(body)
+}
+
+func workerRequestValue(key string) any {
+	request := map[string]any{}
+	if err := readJSONFile(envCompat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH"), &request); err != nil {
+		return nil
+	}
+	return request[key]
+}
+
+func safeID(value string) string {
+	var builder strings.Builder
+	for _, ch := range value {
+		switch {
+		case ch >= 'A' && ch <= 'Z':
+			builder.WriteRune(ch)
+		case ch >= 'a' && ch <= 'z':
+			builder.WriteRune(ch)
+		case ch >= '0' && ch <= '9':
+			builder.WriteRune(ch)
+		case ch == '.', ch == '_', ch == '-', ch == ':':
+			builder.WriteRune(ch)
+		default:
+			builder.WriteByte('-')
+		}
+	}
+	return builder.String()
 }
 
 func workerInstruction(request map[string]any) string {

@@ -875,17 +875,17 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 				if printedArtifacts[item.ArtifactID] {
 					continue
 				}
-				if err := printRuntimeArtifactSection(effectiveConfig, plan, runner, stdout, item.Phase, item.ArtifactID, "combined-log"); err != nil {
+				if err := printRuntimeArtifactSection(effectiveConfig, plan, runner, stdout, item.Phase, item.ArtifactID, item.Mode); err != nil {
 					return err
 				}
 				printedArtifacts[item.ArtifactID] = true
 			}
 			if manifest.Active && manifest.CurrentRunRef != "" && manifest.CurrentPhase != "" {
-				livePath := plan.liveLogPath(taskRef, manifest.CurrentPhase)
-				liveKey := manifest.CurrentRunRef + "|" + manifest.CurrentPhase
+				livePath := plan.preferredLiveLogPath(taskRef, manifest.CurrentPhase)
+				liveKey := manifest.CurrentRunRef + "|" + manifest.CurrentPhase + "|" + manifest.LiveMode + "|" + livePath
 				if liveKey != lastLiveKey {
 					offsets[livePath] = 0
-					fmt.Fprintf(stdout, "=== phase: %s (live) task=%s run=%s source=%s:%s ===\n", manifest.CurrentPhase, taskRef, manifest.CurrentRunRef, valueOrUnavailable(manifest.SourceType), valueOrUnavailable(manifest.SourceRef))
+					fmt.Fprintf(stdout, "=== phase: %s (%s) task=%s run=%s source=%s:%s ===\n", manifest.CurrentPhase, manifest.LiveMode, taskRef, manifest.CurrentRunRef, valueOrUnavailable(manifest.SourceType), valueOrUnavailable(manifest.SourceRef))
 					lastLiveKey = liveKey
 				}
 				nextOffset, err := printFileDelta(stdout, livePath, offsets[livePath])
@@ -981,6 +981,7 @@ type runtimeRunOncePlan struct {
 	HostAgentTarget      string
 	HostAgentLog         string
 	LiveLogRoot          string
+	AIRawLogRoot         string
 	LauncherConfigPath   string
 	LauncherConfig       map[string]any
 	ServerLog            string
@@ -1168,6 +1169,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		HostAgentTarget:      target,
 		HostAgentLog:         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_AGENT_LOG", "A3_RUNTIME_RUN_ONCE_HOST_AGENT_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_AGENT_LOG", "A3_RUNTIME_SCHEDULER_HOST_AGENT_LOG", filepath.Join(hostRoot, "agent.log"))),
 		LiveLogRoot:          envDefaultCompat("A2O_AGENT_LIVE_LOG_ROOT", "A3_AGENT_LIVE_LOG_ROOT", filepath.Join(hostRoot, "live-logs")),
+		AIRawLogRoot:         envDefaultCompat("A2O_AGENT_AI_RAW_LOG_ROOT", "A3_AGENT_AI_RAW_LOG_ROOT", filepath.Join(hostRoot, "ai-raw-logs")),
 		LauncherConfigPath:   launcherConfigPath,
 		LauncherConfig:       packageConfig.Executor,
 		ServerLog:            envDefaultCompat("A2O_RUNTIME_RUN_ONCE_SERVER_LOG", "A3_RUNTIME_RUN_ONCE_SERVER_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_SERVER_LOG", "A3_RUNTIME_SCHEDULER_SERVER_LOG", "/tmp/a2o-runtime-run-once-agent-server.log")),
@@ -1183,6 +1185,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 			"A2O_ROOT_DIR=" + hostRootDir,
 			"A2O_WORKER_LAUNCHER_CONFIG_PATH=" + launcherConfigPath,
 			"A2O_AGENT_LIVE_LOG_ROOT=" + envDefaultCompat("A2O_AGENT_LIVE_LOG_ROOT", "A3_AGENT_LIVE_LOG_ROOT", filepath.Join(hostRoot, "live-logs")),
+			"A2O_AGENT_AI_RAW_LOG_ROOT=" + envDefaultCompat("A2O_AGENT_AI_RAW_LOG_ROOT", "A3_AGENT_AI_RAW_LOG_ROOT", filepath.Join(hostRoot, "ai-raw-logs")),
 			"A3_MAVEN_WORKSPACE_BOOTSTRAP_MODE=" + envDefaultCompat("A2O_RUNTIME_RUN_ONCE_MAVEN_WORKSPACE_BOOTSTRAP_MODE", "A3_RUNTIME_RUN_ONCE_MAVEN_WORKSPACE_BOOTSTRAP_MODE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_MAVEN_WORKSPACE_BOOTSTRAP_MODE", "A3_RUNTIME_SCHEDULER_MAVEN_WORKSPACE_BOOTSTRAP_MODE", "empty")),
 		},
 		AgentSourcePaths:   envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS", "A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS", "A2O_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS", agentSourcePaths),
@@ -1220,6 +1223,7 @@ func buildRuntimeDescribeTaskPlan(config runtimeInstanceConfig) (runtimeRunOnceP
 		StorageDir:           envDefaultCompat("A2O_BUNDLE_STORAGE_DIR", "A3_BUNDLE_STORAGE_DIR", envDefaultValue(config.StorageDir, "/var/lib/a2o/a2o-runtime")),
 		HostAgentLog:         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_AGENT_LOG", "A3_RUNTIME_RUN_ONCE_HOST_AGENT_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_AGENT_LOG", "A3_RUNTIME_SCHEDULER_HOST_AGENT_LOG", filepath.Join(hostRoot, "agent.log"))),
 		LiveLogRoot:          envDefaultCompat("A2O_AGENT_LIVE_LOG_ROOT", "A3_AGENT_LIVE_LOG_ROOT", filepath.Join(hostRoot, "live-logs")),
+		AIRawLogRoot:         envDefaultCompat("A2O_AGENT_AI_RAW_LOG_ROOT", "A3_AGENT_AI_RAW_LOG_ROOT", filepath.Join(hostRoot, "ai-raw-logs")),
 		ServerLog:            envDefaultCompat("A2O_RUNTIME_RUN_ONCE_SERVER_LOG", "A3_RUNTIME_RUN_ONCE_SERVER_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_SERVER_LOG", "A3_RUNTIME_SCHEDULER_SERVER_LOG", "/tmp/a2o-runtime-run-once-agent-server.log")),
 		RuntimeLog:           envDefaultCompat("A2O_RUNTIME_RUN_ONCE_LOG", "A3_RUNTIME_RUN_ONCE_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_LOG", "A3_RUNTIME_SCHEDULER_LOG", "/tmp/a2o-runtime-run-once.log")),
 		RuntimeExitFile:      envDefaultCompat("A2O_RUNTIME_RUN_ONCE_EXIT_FILE", "A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_EXIT_FILE", "A3_RUNTIME_SCHEDULER_EXIT_FILE", "/tmp/a2o-runtime-run-once.exit")),
@@ -1291,6 +1295,7 @@ func latestRuntimeRunRef(config runtimeInstanceConfig, plan runtimeRunOncePlan, 
 type runtimePhaseLogArtifact struct {
 	Phase      string `json:"phase"`
 	ArtifactID string `json:"artifact_id"`
+	Mode       string `json:"mode"`
 }
 
 type runtimeTaskLogManifestPayload struct {
@@ -1310,6 +1315,7 @@ type runtimeTaskLogSnapshot struct {
 	SourceType         string
 	SourceRef          string
 	Active             bool
+	LiveMode           string
 	CompletedArtifacts []runtimePhaseLogArtifact
 }
 
@@ -1331,9 +1337,11 @@ func runtimeTaskLogManifest(config runtimeInstanceConfig, plan runtimeRunOncePla
 		"phase_records = Array(run.dig('evidence', 'phase_records'))",
 		"artifacts = phase_records.each_with_object([]) do |phase_record, result|",
 		"  entries = Array(phase_record.dig('execution_record', 'diagnostics', 'agent_artifacts'))",
-		"  artifact = entries.find { |item| item['role'] == 'combined-log' && item['artifact_id'].to_s != '' }",
-		"  next unless artifact",
-		"  result << {'phase' => phase_record['phase'].to_s, 'artifact_id' => artifact['artifact_id'].to_s}",
+		"  [['ai-raw-log', 'ai-raw-log'], ['combined-log', 'combined-log']].each do |role, mode|",
+		"    artifact = entries.find { |item| item['role'] == role && item['artifact_id'].to_s != '' }",
+		"    next unless artifact",
+		"    result << {'phase' => phase_record['phase'].to_s, 'artifact_id' => artifact['artifact_id'].to_s, 'mode' => mode}",
+		"  end",
 		"end",
 		"payload = {'run_ref' => run['ref'].to_s, 'current_run' => effective_current_run, 'phase' => run['phase'].to_s, 'source_type' => run.dig('source_descriptor', 'source_type').to_s, 'source_ref' => run.dig('source_descriptor', 'ref').to_s, 'active' => run['terminal_outcome'].nil?, 'artifacts' => artifacts}",
 		"puts JSON.generate(payload)",
@@ -1353,6 +1361,7 @@ func runtimeTaskLogManifest(config runtimeInstanceConfig, plan runtimeRunOncePla
 		SourceType:         payload.SourceType,
 		SourceRef:          payload.SourceRef,
 		Active:             payload.Active,
+		LiveMode:           preferredLiveMode(plan, taskRef, payload.Phase),
 		CompletedArtifacts: payload.Artifacts,
 	}, nil
 }
@@ -1397,6 +1406,26 @@ func printFileDelta(stdout io.Writer, livePath string, offset int64) (int64, err
 
 func (plan runtimeRunOncePlan) liveLogPath(taskRef string, phase string) string {
 	return filepath.Join(plan.LiveLogRoot, safeRuntimeLogComponent(taskRef), safeRuntimeLogComponent(phase)+".log")
+}
+
+func (plan runtimeRunOncePlan) aiRawLogPath(taskRef string, phase string) string {
+	return filepath.Join(plan.AIRawLogRoot, safeRuntimeLogComponent(taskRef), safeRuntimeLogComponent(phase)+".log")
+}
+
+func (plan runtimeRunOncePlan) preferredLiveLogPath(taskRef string, phase string) string {
+	rawPath := plan.aiRawLogPath(taskRef, phase)
+	if _, err := os.Stat(rawPath); err == nil {
+		return rawPath
+	}
+	return plan.liveLogPath(taskRef, phase)
+}
+
+func preferredLiveMode(plan runtimeRunOncePlan, taskRef string, phase string) string {
+	rawPath := plan.aiRawLogPath(taskRef, phase)
+	if _, err := os.Stat(rawPath); err == nil {
+		return "ai-raw-live"
+	}
+	return "live"
 }
 
 func safeRuntimeLogComponent(value string) string {

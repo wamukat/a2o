@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -119,6 +120,11 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 	artifactUploads, workerProtocolResult, err := w.uploadArtifactsAndWorkerResult(runRequest)
 	if err != nil {
 		return nil, false, err
+	}
+	if rawLogUpload, err := w.uploadAIRawLog(runRequest); err != nil {
+		return nil, false, err
+	} else if rawLogUpload != nil {
+		artifactUploads = append(artifactUploads, *rawLogUpload)
 	}
 	if prepared != nil && request.WorkspaceRequest != nil {
 		if err := w.publishPrepared(*prepared, *request, workerProtocolResult, execution.Status == "succeeded"); err != nil {
@@ -364,6 +370,25 @@ func (w Worker) uploadArtifactsAndWorkerResult(request JobRequest) ([]ArtifactUp
 	return uploads, workerProtocolResult, nil
 }
 
+func (w Worker) uploadAIRawLog(request JobRequest) (*ArtifactUpload, error) {
+	path := aiRawLogPath(request)
+	if strings.TrimSpace(path) == "" {
+		return nil, nil
+	}
+	content, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	upload, err := w.upload("ai-raw-log", safeID(request.JobID+"-ai-raw-log"), "diagnostic", "text/plain", content)
+	if err != nil {
+		return nil, err
+	}
+	return &upload, nil
+}
+
 func (w Worker) uploadWorkerProtocolResult(request JobRequest) (*ArtifactUpload, map[string]any, error) {
 	if request.WorkspaceRequest == nil {
 		return nil, nil, nil
@@ -532,6 +557,23 @@ func workerProtocolEnv(base map[string]string, workspaceRoot string, hasWorkerPr
 		env["A2O_WORKER_REQUEST_PATH"] = workerRequestPath(workspaceRoot)
 	}
 	return env
+}
+
+func aiRawLogPath(request JobRequest) string {
+	root := strings.TrimSpace(request.Env["A2O_AGENT_AI_RAW_LOG_ROOT"])
+	if root == "" {
+		root = strings.TrimSpace(request.Env["A3_AGENT_AI_RAW_LOG_ROOT"])
+	}
+	if root == "" {
+		root = strings.TrimSpace(os.Getenv("A2O_AGENT_AI_RAW_LOG_ROOT"))
+	}
+	if root == "" {
+		root = strings.TrimSpace(os.Getenv("A3_AGENT_AI_RAW_LOG_ROOT"))
+	}
+	if root == "" {
+		return ""
+	}
+	return filepath.Join(root, safeID(request.TaskRef), safeID(request.Phase)+".log")
 }
 
 func workerRequestPath(workspaceRoot string) string {
