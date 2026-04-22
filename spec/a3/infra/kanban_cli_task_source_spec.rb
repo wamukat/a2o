@@ -256,6 +256,49 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
+  it "keeps parent child_refs when an unresolved backlog child is hidden from the execution-lane selection" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 5200,
+          "ref" => "Sample#5200",
+          "status" => "To do",
+          "labels" => ["repo:both", "trigger:auto-parent"],
+          "parent_ref" => nil
+        },
+        {
+          "id" => 5201,
+          "ref" => "Sample#5201",
+          "status" => "Backlog",
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => "Sample#5200"
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta],
+        "repo:both" => %i[repo_alpha repo_beta]
+      },
+      trigger_labels: ["trigger:auto-implement", "trigger:auto-parent"],
+      status: "To do",
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+      parent = tasks.find { |task| task.ref == "Sample#5200" }
+
+      expect(tasks.map(&:ref)).to eq(["Sample#5200"])
+      expect(parent.kind).to eq(:parent)
+      expect(parent.child_refs).to eq(["Sample#5201"])
+    end
+  end
+
   it "imports done children from kanban topology so parent gates use kanban as the master state" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,

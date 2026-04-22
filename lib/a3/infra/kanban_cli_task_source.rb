@@ -25,8 +25,12 @@ module A3
 
       def load
         selection_snapshots = load_selection_snapshots
-        topology_snapshots = load_topology_snapshots(selection_snapshots: selection_snapshots)
-        build_tasks(selection_snapshots, topology_snapshots: topology_snapshots)
+        topology = load_topology(selection_snapshots: selection_snapshots)
+        build_tasks(
+          selection_snapshots,
+          topology_snapshots: topology.fetch(:snapshots),
+          child_refs_by_parent: topology.fetch(:child_refs_by_parent)
+        )
       end
 
       def fetch_by_external_task_id(task_id)
@@ -73,10 +77,11 @@ module A3
         payload.map { |raw_snapshot| normalize_snapshot(raw_snapshot) }.compact.freeze
       end
 
-      def load_topology_snapshots(selection_snapshots:)
+      def load_topology(selection_snapshots:)
         snapshots_by_ref = selection_snapshots.each_with_object({}) do |snapshot, memo|
           memo[snapshot.fetch("ref")] = snapshot
         end
+        child_refs_by_parent = build_child_refs_by_parent(selection_snapshots)
         queued_refs = Set.new
         queue = selection_snapshots.map do |snapshot|
           queued_refs << snapshot.fetch("ref")
@@ -85,8 +90,10 @@ module A3
 
         until queue.empty?
           task_ref, task_id = queue.shift
-          topology_snapshot, related_refs = fetch_topology_snapshot(task_ref: task_ref, task_id: task_id)
+          topology_snapshot, parent_ref, child_refs, related_refs = fetch_topology_snapshot(task_ref: task_ref, task_id: task_id)
           snapshots_by_ref[topology_snapshot.fetch("ref")] = topology_snapshot if topology_snapshot
+          child_refs_by_parent[parent_ref] << task_ref if parent_ref
+          child_refs.each { |child_ref| child_refs_by_parent[task_ref] << child_ref }
 
           related_refs.each do |related_ref, related_task_id|
             next if snapshots_by_ref.key?(related_ref) || queued_refs.include?(related_ref)
@@ -96,7 +103,10 @@ module A3
           end
         end
 
-        snapshots_by_ref.values.freeze
+        {
+          snapshots: snapshots_by_ref.values.freeze,
+          child_refs_by_parent: normalize_child_refs_by_parent(child_refs_by_parent)
+        }.freeze
       end
 
       def fetch_topology_snapshot(task_ref:, task_id:)
@@ -123,6 +133,8 @@ module A3
             labels: labels,
             parent_ref: parent_refs.first&.first
           ),
+          parent_refs.first&.first,
+          child_refs.map(&:first),
           (parent_refs + child_refs).to_h
         ]
       end
@@ -147,15 +159,14 @@ module A3
           ref = String(item["ref"]).strip
           task_id = integer_or_nil(item["id"])
           status = String(item["status"]).strip
-          next if ref.empty? || task_id.nil? || !ACTIVE_STATUS_MAP.key?(status)
+          next if ref.empty? || task_id.nil? || closed_status?(status)
 
           refs << [ref, task_id]
         end
       end
 
-      def build_tasks(snapshots, topology_snapshots:)
+      def build_tasks(snapshots, topology_snapshots:, child_refs_by_parent:)
         relevant_snapshots = select_relevant_snapshots(selection_snapshots: snapshots, topology_snapshots: topology_snapshots)
-        child_refs_by_parent = build_child_refs_by_parent(relevant_snapshots)
         relevant_snapshots.map { |snapshot| build_task_from_snapshot(snapshot, child_refs_by_parent: child_refs_by_parent) }.freeze
       end
 
@@ -197,6 +208,12 @@ module A3
 
           refs[snapshot.fetch("parent_ref")] << snapshot.fetch("ref")
         end
+      end
+
+      def normalize_child_refs_by_parent(child_refs_by_parent)
+        child_refs_by_parent.each_with_object({}) do |(parent_ref, refs), normalized|
+          normalized[parent_ref] = refs.uniq.sort.freeze
+        end.freeze
       end
 
       def build_task_from_snapshot(snapshot, child_refs_by_parent:)
@@ -280,6 +297,10 @@ module A3
         return :blocked if labels.include?(@blocked_label)
 
         ACTIVE_STATUS_MAP[String(raw_status)]
+      end
+
+      def closed_status?(raw_status)
+        %w[Resolved Archived].include?(String(raw_status))
       end
 
       def normalize_parent_ref(value)
