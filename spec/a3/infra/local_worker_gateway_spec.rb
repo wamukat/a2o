@@ -100,14 +100,14 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       ["task implementation"],
       workspace: workspace,
       env: {
-        "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
-        "A2O_WORKER_RESULT_PATH" => workspace.root_path.join(".a3", "worker-result.json").to_s,
+        "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a2o", "worker-request.json").to_s,
+        "A2O_WORKER_RESULT_PATH" => workspace.root_path.join(".a2o", "worker-result.json").to_s,
         "A2O_WORKSPACE_ROOT" => workspace.root_path.to_s,
         "AUTOMATION_ISSUE_WORKSPACE" => workspace.root_path.to_s,
         "MAVEN_REPO_LOCAL" => workspace.root_path.join(".work", "m2", "repository").to_s
       }
     ) do
-      request_path = workspace.root_path.join(".a3", "worker-request.json")
+      request_path = workspace.root_path.join(".a2o", "worker-request.json")
       expect(request_path).to exist
 
       request = JSON.parse(request_path.read)
@@ -174,14 +174,14 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       ["ruby -I a3-engine/lib a3-engine/bin/a3 worker:stdin-bundle"],
       workspace: workspace,
       env: {
-        "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
-        "A2O_WORKER_RESULT_PATH" => workspace.root_path.join(".a3", "worker-result.json").to_s,
+        "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a2o", "worker-request.json").to_s,
+        "A2O_WORKER_RESULT_PATH" => workspace.root_path.join(".a2o", "worker-result.json").to_s,
         "A2O_WORKSPACE_ROOT" => workspace.root_path.to_s,
         "AUTOMATION_ISSUE_WORKSPACE" => workspace.root_path.to_s,
         "MAVEN_REPO_LOCAL" => workspace.root_path.join(".work", "m2", "repository").to_s
       }
     ) do
-      request = JSON.parse(workspace.root_path.join(".a3", "worker-request.json").read)
+      request = JSON.parse(workspace.root_path.join(".a2o", "worker-request.json").read)
       expect(request.fetch("skill")).to eq("task implementation")
       result
     end
@@ -209,9 +209,9 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     gateway = described_class.new(command_runner: command_runner)
 
     allow(command_runner).to receive(:run) do |_commands, workspace:, env:|
-      expect(workspace.root_path.join(".a3", "worker-request.json")).to exist
+      expect(workspace.root_path.join(".a2o", "worker-request.json")).to exist
       expect(env).to include(
-        "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
+        "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a2o", "worker-request.json").to_s,
         "A2O_WORKSPACE_ROOT" => workspace.root_path.to_s
       )
       result
@@ -230,7 +230,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "prefers a structured worker result bundle over the command runner exit result" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     bundle = {
       "success" => false,
       "summary" => "review blocked",
@@ -243,7 +243,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
 
     allow(command_runner).to receive(:run) do |_commands, workspace:, env:|
       expect(env).to include(
-        "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
+        "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a2o", "worker-request.json").to_s,
         "A2O_WORKER_RESULT_PATH" => result_path.to_s,
         "A2O_WORKSPACE_ROOT" => workspace.root_path.to_s
       )
@@ -271,7 +271,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "preserves review rework hints from the worker response bundle" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     bundle = {
       "task_ref" => task.ref,
       "run_ref" => run.ref,
@@ -303,7 +303,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "accepts review findings with nil failing_command when rework is required" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     bundle = {
       "task_ref" => task.ref,
       "run_ref" => run.ref,
@@ -336,7 +336,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "accepts changed_files in a successful worker result bundle" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     File.write(workspace.slot_paths.fetch(:repo_beta).join("src-main.rb"), "changed\n")
     bundle = {
       "task_ref" => task.ref,
@@ -410,7 +410,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     FileUtils.mkdir_p(slot_path.join("nested"))
     File.write(slot_path.join("nested", "actual.txt"), "changed\n")
 
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     bundle = {
       "task_ref" => task.ref,
       "run_ref" => run.ref,
@@ -451,7 +451,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "accepts a parent review result without changed_files when review_disposition is present" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     parent_workspace = A3::Domain::PreparedWorkspace.new(
       workspace_kind: workspace.workspace_kind,
       root_path: workspace.root_path,
@@ -544,7 +544,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "accepts a parent review result with changed_files null when review_disposition is present" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     parent_workspace = A3::Domain::PreparedWorkspace.new(
       workspace_kind: workspace.workspace_kind,
       root_path: workspace.root_path,
@@ -638,7 +638,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "accepts implementation review evidence alongside changed_files" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     bundle = {
       "task_ref" => task.ref,
       "run_ref" => run.ref,
@@ -686,7 +686,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "fails fast when parent review disposition uses a non-canonical kind" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     parent_task = A3::Domain::Task.new(
       ref: "Sample#3140",
       kind: :parent,
@@ -769,7 +769,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "fails fast when implementation review evidence is not canonical completed evidence" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     bundle = {
       "task_ref" => task.ref,
       "run_ref" => run.ref,
@@ -811,7 +811,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "fails fast when worker result identity fields do not match the worker request" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     invalid_bundle = {
       "task_ref" => task.ref,
       "run_ref" => "run-other",
@@ -856,7 +856,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "fails fast when a worker result bundle is present but violates the expected schema" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     invalid_bundle = {
       "success" => "false",
       "summary" => ["review blocked"],
@@ -898,7 +898,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "fails fast when changed_files has an invalid shape" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     invalid_bundle = {
       "task_ref" => task.ref,
       "run_ref" => run.ref,
@@ -939,7 +939,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "fails fast when a failed worker result omits a valid observed state" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     invalid_bundle = {
       "success" => false,
       "summary" => "review blocked",
@@ -978,7 +978,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "fails fast when a failed worker result omits failing_command" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     invalid_bundle = {
       "success" => false,
       "summary" => "review blocked",
@@ -1018,7 +1018,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "fails fast when a worker result bundle is valid JSON but not an object" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     gateway = described_class.new(command_runner: command_runner)
 
     allow(command_runner).to receive(:run) do
@@ -1049,7 +1049,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "fails fast when a worker result bundle is json null" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     gateway = described_class.new(command_runner: command_runner)
 
     allow(command_runner).to receive(:run) do
@@ -1080,7 +1080,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "fails fast when a worker result file is not valid json" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     gateway = described_class.new(command_runner: command_runner)
 
     allow(command_runner).to receive(:run) do
@@ -1118,7 +1118,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
   end
 
   it "fails fast when optional worker result fields have invalid types" do
-    result_path = workspace.root_path.join(".a3", "worker-result.json")
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
     invalid_bundle = {
       "success" => false,
       "summary" => "review blocked",

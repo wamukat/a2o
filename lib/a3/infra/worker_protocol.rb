@@ -12,14 +12,18 @@ module A3
         @review_disposition_repo_scopes = normalize_configured_review_disposition_repo_scopes(review_disposition_repo_scopes)
       end
 
+      def metadata_dir(workspace)
+        workspace.root_path.join(".a2o")
+      end
+
       def result_path(workspace)
-        workspace.root_path.join(".a3", "worker-result.json")
+        workspace.root_path.join(".a2o", "worker-result.json")
       end
 
       def env_for(workspace)
         workspace_root = workspace.root_path.to_s
         {
-          "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s,
+          "A2O_WORKER_REQUEST_PATH" => metadata_dir(workspace).join("worker-request.json").to_s,
           "A2O_WORKER_RESULT_PATH" => result_path(workspace).to_s,
           "A2O_WORKSPACE_ROOT" => workspace_root
         }.merge(workspace_automation_env(workspace_root))
@@ -64,9 +68,9 @@ module A3
       end
 
       def write_request(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, command_intent: nil)
-        metadata_dir = workspace.root_path.join(".a3")
-        FileUtils.mkdir_p(metadata_dir)
-        metadata_dir.join("worker-request.json").write(
+        request_dir = metadata_dir(workspace)
+        FileUtils.mkdir_p(request_dir)
+        request_dir.join("worker-request.json").write(
           JSON.pretty_generate(request_form(skill: skill, workspace: workspace, task: task, run: run, phase_runtime: phase_runtime, task_packet: task_packet, command_intent: command_intent))
         )
       end

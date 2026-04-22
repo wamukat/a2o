@@ -26,7 +26,7 @@ The project package owns:
 - support repo setup required by that product
 - the AI or deterministic executor command selected for implementation and review
 
-Project scripts must not depend on private runtime files such as `.a3/workspace.json`, `.a3/slot.json`, generated `launcher.json`, or internal A3 environment names.
+Project scripts must not depend on private runtime files such as `.a2o/workspace.json`, `.a3/slot.json`, generated `launcher.json`, or internal A3 environment names.
 
 ## Phase Command Contract
 

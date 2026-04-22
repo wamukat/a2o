@@ -325,7 +325,7 @@ module A3
       end
 
       def write_metadata(root_path, task_ref, workspace_plan)
-        metadata_dir = root_path.join(".a3")
+        metadata_dir = root_path.join(".a2o")
         FileUtils.mkdir_p(metadata_dir)
         metadata_dir.join("workspace.json").write(
           JSON.pretty_generate(

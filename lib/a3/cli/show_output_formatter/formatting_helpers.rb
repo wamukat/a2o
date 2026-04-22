@@ -27,6 +27,7 @@ module A3
             .gsub("/tmp/a3-engine", "<runtime-preset-dir>")
             .gsub("/usr/local/bin/a3", "<engine-entrypoint>")
             .gsub("lib/a3", "lib/a2o-internal")
+            .gsub(".a2o", "<agent-metadata>")
             .gsub(".a3", "<agent-metadata>")
         end
       end

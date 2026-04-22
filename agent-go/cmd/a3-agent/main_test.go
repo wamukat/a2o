@@ -420,7 +420,7 @@ func TestWorkerFailureSanitizesInternalDiagnostics(t *testing.T) {
 		[]string{"A3_WORKER_REQUEST_PATH=/tmp/request.json", "/usr/local/bin/a3"},
 		"executor_failed",
 		map[string]any{
-			"stderr": "A3_WORKER_REQUEST_PATH /tmp/a3-engine/lib/a3/bootstrap.rb /usr/local/bin/a3 .a3/workspace.json",
+			"stderr": "A3_WORKER_REQUEST_PATH /tmp/a3-engine/lib/a3/bootstrap.rb /usr/local/bin/a3 .a2o/workspace.json",
 		},
 	)
 	diagnostics := payload["diagnostics"].(map[string]any)
@@ -429,7 +429,7 @@ func TestWorkerFailureSanitizesInternalDiagnostics(t *testing.T) {
 		t.Fatalf("failing command was not sanitized: %s", failingCommand)
 	}
 	stderr := diagnostics["stderr"].(string)
-	for _, forbidden := range []string{"A3_WORKER_REQUEST_PATH", "/tmp/a3-engine", "/usr/local/bin/a3", ".a3"} {
+	for _, forbidden := range []string{"A3_WORKER_REQUEST_PATH", "/tmp/a3-engine", "/usr/local/bin/a3", ".a2o"} {
 		if strings.Contains(stderr, forbidden) {
 			t.Fatalf("diagnostic still contains %q: %s", forbidden, stderr)
 		}

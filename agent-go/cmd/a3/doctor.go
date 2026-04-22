@@ -310,6 +310,9 @@ func projectScriptContractViolations(text string) []string {
 		{".a3/workspace.json", func(value string) bool {
 			return strings.Contains(value, ".a3/workspace.json") || (strings.Contains(value, ".a3") && strings.Contains(value, "workspace.json"))
 		}},
+		{".a2o/workspace.json", func(value string) bool {
+			return strings.Contains(value, ".a2o/workspace.json") || (strings.Contains(value, ".a2o") && strings.Contains(value, "workspace.json"))
+		}},
 		{".a3/slot.json", func(value string) bool {
 			return strings.Contains(value, ".a3/slot.json") || (strings.Contains(value, ".a3") && strings.Contains(value, "slot.json"))
 		}},
@@ -330,8 +333,8 @@ func projectScriptContractAction(findings []string) string {
 	if findingsContain(findings, "A3_*") {
 		actions = append(actions, "replace A3_* names with A2O_* public env such as A2O_WORKER_REQUEST_PATH, A2O_WORKER_RESULT_PATH, A2O_WORKSPACE_ROOT, and A2O_ROOT_DIR")
 	}
-	if findingsContain(findings, ".a3/workspace.json") || findingsContain(findings, ".a3/slot.json") {
-		actions = append(actions, "replace private .a3 metadata reads with the JSON at A2O_WORKER_REQUEST_PATH; use slot_paths for repo paths, scope_snapshot.verification_scope for target slots, and phase_runtime for task_kind/repo_scope/phase policy")
+	if findingsContain(findings, ".a3/workspace.json") || findingsContain(findings, ".a2o/workspace.json") || findingsContain(findings, ".a3/slot.json") {
+		actions = append(actions, "replace private .a2o/.a3 metadata reads with the JSON at A2O_WORKER_REQUEST_PATH; use slot_paths for repo paths, scope_snapshot.verification_scope for target slots, and phase_runtime for task_kind/repo_scope/phase policy")
 	}
 	if findingsContain(findings, "launcher.json") {
 		actions = append(actions, "remove launcher.json dependencies; configure runtime.phases.*.executor.command in project.yaml and let A2O generate launcher config")

@@ -240,8 +240,8 @@ func projectUserFacingContractAction(findings []string) string {
 	if findingsContain(findings, "A3_*") {
 		actions = append(actions, "document A2O_* public env names instead of A3_* compatibility aliases")
 	}
-	if findingsContain(findings, ".a3/workspace.json") || findingsContain(findings, ".a3/slot.json") {
-		actions = append(actions, "document A2O_WORKER_REQUEST_PATH fields such as slot_paths, scope_snapshot, and phase_runtime instead of private .a3 metadata")
+	if findingsContain(findings, ".a3/workspace.json") || findingsContain(findings, ".a2o/workspace.json") || findingsContain(findings, ".a3/slot.json") {
+		actions = append(actions, "document A2O_WORKER_REQUEST_PATH fields such as slot_paths, scope_snapshot, and phase_runtime instead of private .a2o/.a3 metadata")
 	}
 	if findingsContain(findings, "launcher.json") {
 		actions = append(actions, "document project.yaml runtime.phases.*.executor.command instead of generated launcher.json")

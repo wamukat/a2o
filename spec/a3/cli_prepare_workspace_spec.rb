@@ -47,7 +47,7 @@ RSpec.describe A3::CLI do
       expect(workspace_root.join("repo_alpha")).to exist
       expect(workspace_root.join("repo_beta")).to exist
 
-      metadata = JSON.parse(workspace_root.join(".a3", "workspace.json").read)
+      metadata = JSON.parse(workspace_root.join(".a2o", "workspace.json").read)
       expect(metadata.fetch("workspace_kind")).to eq("runtime_workspace")
       slot_metadata = JSON.parse(workspace_root.join(".a2o", "slots", "repo_alpha", "slot.json").read)
       expect(slot_metadata.fetch("bootstrap_marker")).to eq("workspace-hook:v1")

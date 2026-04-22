@@ -67,7 +67,7 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     expect(workspace.slot_paths.fetch(:repo_alpha).join(".git", "HEAD").read).to eq("abc123\n")
     expect(workspace.slot_paths.fetch(:repo_beta).join(".git", "HEAD").read).to eq("abc123\n")
 
-    metadata_path = workspace.root_path.join(".a3", "workspace.json")
+    metadata_path = workspace.root_path.join(".a2o", "workspace.json")
     metadata = JSON.parse(metadata_path.read)
     expect(metadata).to include(
       "task_ref" => "A3-v2#3025",

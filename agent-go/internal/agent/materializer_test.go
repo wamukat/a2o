@@ -37,7 +37,7 @@ func TestWorkspaceMaterializerPreparesAndCleansWorktreeSlots(t *testing.T) {
 	if descriptor["dirty_before"] != false || descriptor["dirty_after"] != false {
 		t.Fatalf("unexpected dirty descriptor: %#v", descriptor)
 	}
-	workspaceMetadata := readJSON(t, filepath.Join(prepared.Root, ".a3", "workspace.json"))
+	workspaceMetadata := readJSON(t, filepath.Join(prepared.Root, ".a2o", "workspace.json"))
 	if workspaceMetadata["workspace_kind"] != "ticket_workspace" || workspaceMetadata["source_ref"] != "refs/heads/a3/work/Sample-42" {
 		t.Fatalf("unexpected workspace metadata: %#v", workspaceMetadata)
 	}
@@ -131,7 +131,7 @@ func TestWorkspaceMaterializerUsesParentChildTopologyRoot(t *testing.T) {
 	if prepared.Root != expectedRoot {
 		t.Fatalf("unexpected topology root: got=%s want=%s", prepared.Root, expectedRoot)
 	}
-	workspaceMetadata := readJSON(t, filepath.Join(prepared.Root, ".a3", "workspace.json"))
+	workspaceMetadata := readJSON(t, filepath.Join(prepared.Root, ".a2o", "workspace.json"))
 	topology, ok := workspaceMetadata["topology"].(map[string]any)
 	if !ok || topology["parent_workspace_id"] != "Sample-134-parent" || topology["relative_path"] != "children/Sample-135/ticket_workspace" {
 		t.Fatalf("unexpected topology metadata: %#v", workspaceMetadata)

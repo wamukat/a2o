@@ -212,10 +212,10 @@ RSpec.describe A3::CLI do
       )
 
       allow(command_runner).to receive(:run) do |_commands, workspace:, **_kwargs|
-        request = JSON.parse(workspace.root_path.join(".a3", "worker-request.json").read)
+        request = JSON.parse(workspace.root_path.join(".a2o", "worker-request.json").read)
         changed_files = { "repo_alpha" => ["src/main.rb"] }
         write_changed_files(workspace, changed_files)
-        workspace.root_path.join(".a3", "worker-result.json").write(
+        workspace.root_path.join(".a2o", "worker-result.json").write(
           JSON.generate(
             "task_ref" => request.fetch("task_ref"),
             "run_ref" => request.fetch("run_ref"),

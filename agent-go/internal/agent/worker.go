@@ -509,10 +509,10 @@ func writeWorkerProtocolRequest(workspaceRoot string, payload map[string]any) er
 	if payload == nil {
 		return nil
 	}
-	if err := os.MkdirAll(filepath.Join(workspaceRoot, ".a3"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(workspaceRoot, ".a2o"), 0o755); err != nil {
 		return err
 	}
-	content, err := json.Marshal(payload)
+	content, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -577,11 +577,11 @@ func aiRawLogPath(request JobRequest) string {
 }
 
 func workerRequestPath(workspaceRoot string) string {
-	return filepath.Join(workspaceRoot, ".a3", "worker-request.json")
+	return filepath.Join(workspaceRoot, ".a2o", "worker-request.json")
 }
 
 func workerResultPath(workspaceRoot string) string {
-	return filepath.Join(workspaceRoot, ".a3", "worker-result.json")
+	return filepath.Join(workspaceRoot, ".a2o", "worker-result.json")
 }
 
 func absPath(path string) string {

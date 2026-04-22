@@ -101,8 +101,10 @@ RSpec.describe A3::Infra::WorkerProtocol do
       task_packet: task_packet
     )
 
-    persisted = JSON.parse(workspace.root_path.join(".a3", "worker-request.json").read)
+    request_path = workspace.root_path.join(".a2o", "worker-request.json")
+    persisted = JSON.parse(request_path.read)
     expect(persisted).to eq(request_form)
+    expect(request_path.read).to include("\n  \"task_ref\":")
     expect(request_form).to include(
       "task_ref" => task.ref,
       "run_ref" => run.ref,

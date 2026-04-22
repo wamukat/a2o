@@ -102,7 +102,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
 
   it "returns the worker result after an agent job completes" do
     client.on_fetch = lambda do |job_id|
-      workspace.root_path.join(".a3", "worker-result.json").write(JSON.generate(worker_success))
+      workspace.root_path.join(".a2o", "worker-result.json").write(JSON.generate(worker_success))
       client.complete(job_id, agent_result(job_id, :succeeded, 0))
     end
     gateway = gateway_for(client)
@@ -113,7 +113,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     expect(request.command).to eq("ruby")
     expect(request.args).to eq(["worker.rb"])
     expect(request.env).to include(
-      "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a3", "worker-request.json").to_s
+      "A2O_WORKER_REQUEST_PATH" => workspace.root_path.join(".a2o", "worker-request.json").to_s
     )
     expect(execution).to have_attributes(
       success: true,
@@ -232,7 +232,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       "phase" => "review",
       "skill" => phase_runtime.review_skill
     )
-    expect(workspace.root_path.join(".a3", "worker-request.json")).not_to exist
+    expect(workspace.root_path.join(".a2o", "worker-request.json")).not_to exist
     expect(execution).to have_attributes(
       success: true,
       summary: "review completed"

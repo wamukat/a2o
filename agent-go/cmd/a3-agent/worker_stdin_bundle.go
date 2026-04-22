@@ -182,6 +182,7 @@ func sanitizeWorkerDiagnosticString(value string) string {
 		"/tmp/a3-engine", "<runtime-preset-dir>",
 		"/usr/local/bin/a3", "<engine-entrypoint>",
 		"lib/a3", "lib/a2o-internal",
+		".a2o", "<agent-metadata>",
 		".a3", "<agent-metadata>",
 	)
 	return replacer.Replace(value)

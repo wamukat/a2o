@@ -29,7 +29,7 @@ RSpec.describe "worker:stdin-bundle" do
 
   it "sanitizes internal diagnostic names before writing worker failure payloads" do
     sanitized = sanitize_diagnostic_value(
-      "A3_WORKER_REQUEST_PATH /tmp/a3-engine/lib/a3/bootstrap.rb /usr/local/bin/a3 .a3/workspace.json"
+      "A3_WORKER_REQUEST_PATH /tmp/a3-engine/lib/a3/bootstrap.rb /usr/local/bin/a3 .a2o/workspace.json"
     )
 
     expect(sanitized).to include("A2O_WORKER_REQUEST_PATH")

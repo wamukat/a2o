@@ -266,7 +266,7 @@ RSpec.describe A3::CLI do
         env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT")
       ) do |_commands, workspace:, env:|
         request_path = Pathname(env.fetch("A2O_WORKER_REQUEST_PATH"))
-        expect(request_path).to eq(workspace.root_path.join(".a3", "worker-request.json"))
+        expect(request_path).to eq(workspace.root_path.join(".a2o", "worker-request.json"))
         expect(request_path).to exist
 
         request = JSON.parse(request_path.read)

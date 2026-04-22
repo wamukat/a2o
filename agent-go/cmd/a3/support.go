@@ -32,6 +32,7 @@ func sanitizePublicCommand(command string) string {
 		"/usr/local/bin/a3", "<engine-entrypoint>",
 		"lib/a3", "lib/a2o-internal",
 		"/tmp/a3-runtime", "/tmp/a2o-runtime",
+		".a2o", "<agent-metadata>",
 		".a3", "<agent-metadata>",
 		"A3_", "A2O_INTERNAL_",
 		"'a3'", "'<engine-entrypoint>'",

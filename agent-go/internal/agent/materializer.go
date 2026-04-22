@@ -1406,7 +1406,7 @@ func slotDirectory(slotName string) string {
 }
 
 func writeWorkspaceMetadata(root string, request WorkspaceRequest) error {
-	metadataDir := filepath.Join(root, ".a3")
+	metadataDir := filepath.Join(root, ".a2o")
 	if err := os.MkdirAll(metadataDir, 0o755); err != nil {
 		return err
 	}

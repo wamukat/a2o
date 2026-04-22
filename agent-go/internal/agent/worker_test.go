@@ -94,11 +94,17 @@ func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T)
 		"phase":    "implementation",
 	}
 	client := &fakeClient{request: &request}
+	var capturedRequestPath string
+	var capturedRequestContent []byte
 
 	result, idle, err := Worker{
 		AgentName: "host-local",
 		Client:    client,
-		Executor:  workerProtocolExecutor{requireSlotPaths: true},
+		Executor: workerProtocolExecutor{
+			requireSlotPaths: true,
+			requestPath:      &capturedRequestPath,
+			requestContent:   &capturedRequestContent,
+		},
 		Materializer: WorkspaceMaterializer{
 			WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
 			SourceAliases: map[string]string{
@@ -118,6 +124,13 @@ func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T)
 	}
 	if result.WorkerProtocolResult["status"] != "succeeded" {
 		t.Fatalf("missing worker protocol result: %#v", result.WorkerProtocolResult)
+	}
+	expectedRequestPath := filepath.Join(tmp, "agent-workspaces", "Sample-42-ticket", ".a2o", "worker-request.json")
+	if capturedRequestPath != expectedRequestPath {
+		t.Fatalf("unexpected worker request path: %s", capturedRequestPath)
+	}
+	if !bytes.Contains(capturedRequestContent, []byte("\n  \"task_ref\":")) {
+		t.Fatalf("worker request should be pretty-printed JSON: %s", string(capturedRequestContent))
 	}
 	slot := result.WorkspaceDescriptor.SlotDescriptors["repo_alpha"]
 	if got := stringSlice(slot["changed_files"]); !bytes.Equal([]byte(join(got)), []byte("changed.txt")) {
@@ -381,6 +394,8 @@ func (fakeExecutor) Execute(JobRequest) ExecutionResult {
 type workerProtocolExecutor struct {
 	omitChangedFiles bool
 	requireSlotPaths bool
+	requestPath      *string
+	requestContent   *[]byte
 }
 
 type envAwareWorkerProtocolExecutor struct {
@@ -404,10 +419,16 @@ func (executor envAwareWorkerProtocolExecutor) Execute(request JobRequest) Execu
 }
 
 func (executor workerProtocolExecutor) Execute(request JobRequest) ExecutionResult {
+	if executor.requestPath != nil {
+		*executor.requestPath = request.Env["A2O_WORKER_REQUEST_PATH"]
+	}
 	content, err := os.ReadFile(request.Env["A2O_WORKER_REQUEST_PATH"])
 	if err != nil {
 		code := 1
 		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
+	}
+	if executor.requestContent != nil {
+		*executor.requestContent = append((*executor.requestContent)[:0], content...)
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(content, &payload); err != nil {
@@ -449,7 +470,11 @@ func (executor workerProtocolExecutor) Execute(request JobRequest) ExecutionResu
 		code := 1
 		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
 	}
-	if err := os.WriteFile(filepath.Join(request.WorkingDir, ".a3", "ignored.txt"), []byte("ignored\n"), 0o644); err != nil {
+	if err := os.MkdirAll(filepath.Join(request.WorkingDir, ".a2o"), 0o755); err != nil {
+		code := 1
+		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
+	}
+	if err := os.WriteFile(filepath.Join(request.WorkingDir, ".a2o", "ignored.txt"), []byte("ignored\n"), 0o644); err != nil {
 		code := 1
 		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte(err.Error())}
 	}

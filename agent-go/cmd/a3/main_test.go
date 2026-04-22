@@ -1409,7 +1409,7 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	readme := "Historical note: A3_WORKER_REQUEST_PATH and .a3/workspace.json are not public.\n"
+	readme := "Historical note: A3_WORKER_REQUEST_PATH and .a2o/workspace.json are not public.\n"
 	if err := os.WriteFile(filepath.Join(packageDir, "README.md"), []byte(readme), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -1689,7 +1689,7 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	readme := "Historical note: A3_WORKER_REQUEST_PATH and .a3/workspace.json are not public.\n"
+	readme := "Historical note: A3_WORKER_REQUEST_PATH and .a2o/workspace.json are not public.\n"
 	if err := os.WriteFile(filepath.Join(packageDir, "README.md"), []byte(readme), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -1713,7 +1713,7 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(packageDir, ".env.example"), []byte(envExample), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	privateScript := "echo $A3_WORKER_REQUEST_PATH && ruby -e 'puts File.join(\".a3\", \"workspace.json\")'\n"
+	privateScript := "echo $A3_WORKER_REQUEST_PATH && ruby -e 'puts File.join(\".a2o\", \"workspace.json\")'\n"
 	if err := os.WriteFile(filepath.Join(packageDir, "commands", "worker.sh"), []byte(privateScript), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -1751,10 +1751,10 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 		"Procfile:A3_*",
 		"Taskfile.yml:A3_*",
 		".env.example:A3_*",
-		"commands/worker.sh:.a3/workspace.json",
+		"commands/worker.sh:.a2o/workspace.json",
 		"commands/worker.sh:A3_*",
 		"action=replace A3_* names with A2O_* public env such as A2O_WORKER_REQUEST_PATH",
-		"replace private .a3 metadata reads with the JSON at A2O_WORKER_REQUEST_PATH; use slot_paths for repo paths",
+		"replace private .a2o/.a3 metadata reads with the JSON at A2O_WORKER_REQUEST_PATH; use slot_paths for repo paths",
 	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("doctor output missing %q in:\n%s", want, stdout.String())
@@ -1871,7 +1871,7 @@ func TestProjectLintFlagsFixtureAndLegacyLeaks(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(packageDir, "README.md"), []byte("Do not document $A3_WORKER_REQUEST_PATH, .a3/workspace.json, launcher.json, or tests/fixtures workers here.\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(packageDir, "README.md"), []byte("Do not document $A3_WORKER_REQUEST_PATH, .a2o/workspace.json, launcher.json, or tests/fixtures workers here.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(packageDir, "commands", "dummy-worker.sh"), []byte("echo $A3_WORKER_REQUEST_PATH\n"), 0o755); err != nil {
@@ -1890,11 +1890,11 @@ func TestProjectLintFlagsFixtureAndLegacyLeaks(t *testing.T) {
 		"commands/dummy-worker.sh:A3_*",
 		"action=replace A3_* names with A2O_* public env such as A2O_WORKER_REQUEST_PATH",
 		"lint_check name=user_facing_contract status=blocked",
-		"README.md:.a3/workspace.json",
+		"README.md:.a2o/workspace.json",
 		"README.md:A3_*",
 		"README.md:launcher.json",
 		"README.md:tests/fixtures",
-		"document A2O_WORKER_REQUEST_PATH fields such as slot_paths, scope_snapshot, and phase_runtime instead of private .a3 metadata",
+		"document A2O_WORKER_REQUEST_PATH fields such as slot_paths, scope_snapshot, and phase_runtime instead of private .a2o/.a3 metadata",
 		"document project.yaml runtime.phases.*.executor.command instead of generated launcher.json",
 		"lint_check name=fixture_reference status=blocked",
 		"project.yaml:tests/fixtures",
