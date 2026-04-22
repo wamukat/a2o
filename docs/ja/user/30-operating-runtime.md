@@ -43,9 +43,10 @@ a2o runtime start --interval 60s
 ```sh
 a2o runtime status
 a2o runtime watch-summary
+a2o runtime logs <task-ref> --follow
 ```
 
-`runtime status` はスケジューラ、ランタイムコンテナ、カンバン、イメージダイジェスト、最新実行の状態を見る。`runtime watch-summary` はタスク一覧の現在位置を見る。
+`runtime status` はスケジューラ、ランタイムコンテナ、カンバン、イメージダイジェスト、最新実行の状態を見る。`runtime watch-summary` はタスク一覧の現在位置を見る。`runtime logs` は 1 タスクのフェーズ別 combined-log をまとめて読み、`--follow` を付けると現在フェーズの live log を追う。
 
 特定タスクを深く見る場合は `describe-task` を使う。
 
@@ -139,6 +140,7 @@ a2o runtime status
 | ランタイム専用の診断を見る | `a2o runtime doctor` |
 | カンバンサービスとボードを見る | `a2o kanban doctor` |
 | タスク一覧の進行状況を見る | `a2o runtime watch-summary` |
+| 1 タスクのログをまとめて見る | `a2o runtime logs <task-ref>` |
 | 1 タスクの実行 / 証跡 / ログを見る | `a2o runtime describe-task <task-ref>` |
 
 ブロックされたタスク、未整理のリポジトリ、実行コマンドの失敗、検証失敗などの症状別対応は [40-troubleshooting.md](40-troubleshooting.md) を読む。

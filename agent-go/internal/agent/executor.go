@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -26,8 +29,16 @@ func (Executor) Execute(request JobRequest) ExecutionResult {
 	cmd.Dir = request.WorkingDir
 	cmd.Env = mergeEnv(request.Env)
 	var combined bytes.Buffer
-	cmd.Stdout = &combined
-	cmd.Stderr = &combined
+	writer, cleanup := liveLogWriterFor(request)
+	defer cleanup()
+	if writer != nil {
+		multiWriter := io.MultiWriter(&combined, writer)
+		cmd.Stdout = multiWriter
+		cmd.Stderr = multiWriter
+	} else {
+		cmd.Stdout = &combined
+		cmd.Stderr = &combined
+	}
 
 	err := cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
@@ -53,6 +64,25 @@ func (Executor) Execute(request JobRequest) ExecutionResult {
 	combined.WriteString(err.Error())
 	combined.WriteByte('\n')
 	return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: combined.Bytes()}
+}
+
+func liveLogWriterFor(request JobRequest) (io.Writer, func()) {
+	root := os.Getenv("A2O_AGENT_LIVE_LOG_ROOT")
+	if strings.TrimSpace(root) == "" {
+		root = os.Getenv("A3_AGENT_LIVE_LOG_ROOT")
+	}
+	if strings.TrimSpace(root) == "" {
+		return nil, func() {}
+	}
+	target := filepath.Join(root, safeID(request.TaskRef), safeID(request.Phase)+".log")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return nil, func() {}
+	}
+	file, err := os.Create(target)
+	if err != nil {
+		return nil, func() {}
+	}
+	return file, func() { _ = file.Close() }
 }
 
 func mergeEnv(overrides map[string]string) []string {

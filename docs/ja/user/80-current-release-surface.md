@@ -16,7 +16,7 @@ A2O 0.5.8 で現在利用できる公開機能と検証範囲を示す。
 - ランタイムコンテナの起動・停止: `a2o runtime up`、`down`
 - 手動でのランタイム実行: `a2o runtime run-once`、`a2o runtime loop`
 - 常駐スケジューラの起動・停止・状態確認: `a2o runtime start`、`stop`、`status`
-- ランタイム診断・復旧: `a2o runtime image-digest`、`doctor`、`watch-summary`、`describe-task <task-ref>`、`reset-task <task-ref>`、`show-artifact <artifact-id>`
+- ランタイム診断・復旧: `a2o runtime image-digest`、`doctor`、`watch-summary`、`logs <task-ref>`、`describe-task <task-ref>`、`reset-task <task-ref>`、`show-artifact <artifact-id>`
 - アップグレード診断: `a2o upgrade check`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
 - Kanbalone アダプターと初期化ツール。既定の Kanbalone イメージは `v0.9.16`

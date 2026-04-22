@@ -43,9 +43,10 @@ Check state with:
 ```sh
 a2o runtime status
 a2o runtime watch-summary
+a2o runtime logs <task-ref> --follow
 ```
 
-`runtime status` shows scheduler state, runtime container state, kanban instance information, image digest, and the latest run. `runtime watch-summary` shows where board tasks currently are.
+`runtime status` shows scheduler state, runtime container state, kanban instance information, image digest, and the latest run. `runtime watch-summary` shows where board tasks currently are. `runtime logs` gathers combined logs for one task across phases, and `--follow` tails the current phase live log.
 
 Use `describe-task` for one task.
 
@@ -139,6 +140,7 @@ Move from broad checks to narrow checks.
 | Runtime-specific diagnosis | `a2o runtime doctor` |
 | Kanban service and board state | `a2o kanban doctor` |
 | Progress across tasks | `a2o runtime watch-summary` |
+| Aggregated task logs | `a2o runtime logs <task-ref>` |
 | One task's run / evidence / logs | `a2o runtime describe-task <task-ref>` |
 
 For blocked tasks, dirty repositories, executor failures, verification failures, and merge issues, read [40-troubleshooting.md](40-troubleshooting.md).

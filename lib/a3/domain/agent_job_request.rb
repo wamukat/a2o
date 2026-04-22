@@ -9,9 +9,10 @@ module A3
       MAX_WORKER_PROTOCOL_PAYLOAD_BYTES = 1024 * 1024
 
       attr_reader :job_id, :task_ref, :phase, :runtime_profile, :source_descriptor, :workspace_request, :merge_request, :merge_recovery_request, :worker_protocol_request, :agent_environment,
+                  :run_ref,
                   :working_dir, :command, :args, :env, :timeout_seconds, :artifact_rules
 
-      def initialize(job_id:, task_ref:, phase:, runtime_profile:, source_descriptor:, working_dir:, command:, args:, env:, timeout_seconds:, artifact_rules:, workspace_request: nil, merge_request: nil, merge_recovery_request: nil, worker_protocol_request: nil, agent_environment: nil)
+      def initialize(job_id:, task_ref:, phase:, runtime_profile:, source_descriptor:, working_dir:, command:, args:, env:, timeout_seconds:, artifact_rules:, workspace_request: nil, merge_request: nil, merge_recovery_request: nil, worker_protocol_request: nil, agent_environment: nil, run_ref: nil)
         @job_id = required_string(job_id, "job_id")
         @task_ref = required_string(task_ref, "task_ref")
         @phase = normalize_phase(phase)
@@ -22,6 +23,7 @@ module A3
         @merge_recovery_request = normalize_optional_json_object(merge_recovery_request, "merge_recovery_request")
         @worker_protocol_request = normalize_optional_json_object(worker_protocol_request, "worker_protocol_request")
         @agent_environment = normalize_optional_json_object(agent_environment, "agent_environment")
+        @run_ref = optional_string(run_ref)
         @working_dir = required_string(working_dir, "working_dir")
         @command = required_string(command, "command")
         @args = Array(args).map(&:to_s).freeze
@@ -49,7 +51,8 @@ module A3
           merge_request: record["merge_request"],
           merge_recovery_request: record["merge_recovery_request"],
           worker_protocol_request: record["worker_protocol_request"],
-          agent_environment: record["agent_environment"]
+          agent_environment: record["agent_environment"],
+          run_ref: record["run_ref"]
         )
       end
 
@@ -65,6 +68,7 @@ module A3
           "merge_recovery_request" => merge_recovery_request,
           "worker_protocol_request" => worker_protocol_request,
           "agent_environment" => agent_environment,
+          "run_ref" => run_ref,
           "working_dir" => working_dir,
           "command" => command,
           "args" => args,
@@ -87,6 +91,11 @@ module A3
         raise ConfigurationError, "#{name} must be provided" if string.empty?
 
         string
+      end
+
+      def optional_string(value)
+        string = value.to_s
+        string.empty? ? nil : string
       end
 
       def normalize_phase(value)

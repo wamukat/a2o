@@ -1215,6 +1215,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime describe-task TASK_REF",
 		"a2o runtime reset-task TASK_REF",
 		"a2o runtime watch-summary",
+		"a2o runtime logs TASK_REF [--follow]",
 		"a2o runtime show-artifact ARTIFACT_ID",
 		"a2o runtime run-once [--max-steps N] [--agent-attempts N]",
 		"a2o runtime loop [--interval DURATION] [--max-cycles N]",
@@ -3577,6 +3578,54 @@ func TestRuntimeShowArtifactReadsContainerArtifact(t *testing.T) {
 	}
 }
 
+func TestRuntimeLogsPrintsCompletedPhaseArtifacts(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "logs", "A2O#16"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	if !strings.Contains(output, "=== phase: implementation (combined-log) artifact=worker-run-16-implementation-combined-log ===") {
+		t.Fatalf("runtime logs missing combined-log header, got:\n%s", output)
+	}
+	if !strings.Contains(output, "agent raw log line") {
+		t.Fatalf("runtime logs missing artifact content, got:\n%s", output)
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 show-task --storage-backend json --storage-dir /var/lib/a3/test-runtime A2O#16",
+		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime ruby -rjson -e",
+		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 agent-artifact-read --storage-dir /var/lib/a3/test-runtime worker-run-16-implementation-combined-log",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("runtime logs missing call %q in:\n%s", want, joined)
+		}
+	}
+}
+
 func TestRuntimeWatchSummaryRunsContainerSummaryWithKanbanContext(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -5078,6 +5127,7 @@ type fakeRunner struct {
 	errorOutput           string
 	imageInspectDigests   map[string]string
 	containerImageIDs     map[string]string
+	logManifestOutput     string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -5160,6 +5210,11 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		return []byte("task A2O#16 kind=single status=blocked current_run=run-16\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n"), nil
 	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "runtime_latest_run"):
 		return []byte("runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation state=terminal outcome=blocked\n"), nil
+	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "phase_records"):
+		if r.logManifestOutput != "" {
+			return []byte(r.logManifestOutput + "\n"), nil
+		}
+		return []byte(`{"run_ref":"run-16","current_run":"run-16","phase":"implementation","source_type":"detached_commit","source_ref":"abc","active":false,"artifacts":[{"phase":"implementation","artifact_id":"worker-run-16-implementation-combined-log"}]}` + "\n"), nil
 	case strings.Contains(joined, " ruby -rjson -e "):
 		return []byte("run-16\n"), nil
 	case strings.Contains(joined, "show-run"):

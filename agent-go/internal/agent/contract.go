@@ -10,6 +10,7 @@ type SourceDescriptor struct {
 type JobRequest struct {
 	JobID                 string                `json:"job_id"`
 	TaskRef               string                `json:"task_ref"`
+	RunRef                string                `json:"run_ref,omitempty"`
 	Phase                 string                `json:"phase"`
 	RuntimeProfile        string                `json:"runtime_profile"`
 	SourceDescriptor      SourceDescriptor      `json:"source_descriptor"`

@@ -144,6 +144,7 @@ module A3
         A3::Domain::AgentJobRequest.new(
           job_id: job_id_for(run),
           task_ref: task.ref,
+          run_ref: run.ref,
           phase: run.phase,
           runtime_profile: @runtime_profile,
           source_descriptor: run.source_descriptor,

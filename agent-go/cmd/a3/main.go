@@ -136,6 +136,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o runtime describe-task TASK_REF")
 	fmt.Fprintln(w, "  a2o runtime reset-task TASK_REF              # print blocked-task recovery plan")
 	fmt.Fprintln(w, "  a2o runtime watch-summary")
+	fmt.Fprintln(w, "  a2o runtime logs TASK_REF [--follow]")
 	fmt.Fprintln(w, "  a2o runtime show-artifact ARTIFACT_ID")
 	fmt.Fprintln(w, "  a2o runtime run-once [--max-steps N] [--agent-attempts N] [--project-config project-test.yaml]")
 	fmt.Fprintln(w, "  a2o runtime loop [--interval DURATION] [--max-cycles N]")
