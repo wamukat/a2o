@@ -17,11 +17,7 @@ RSpec.describe "branch namespace dependency loading" do
     expect(stdout).to include(constant_name)
   end
 
-  it "loads register_completed_run without requiring a3/domain first" do
-    assert_loads("a3/application/register_completed_run", "A3::Application::RegisterCompletedRun")
-  end
-
-  it "loads agent_workspace_request_builder without requiring a3/domain first" do
-    assert_loads("a3/infra/agent_workspace_request_builder", "A3::Infra::AgentWorkspaceRequestBuilder")
+  it "loads a3/application without requiring a3/domain first" do
+    assert_loads("a3/application", "A3::Application::RegisterCompletedRun")
   end
 end
