@@ -191,6 +191,7 @@ func buildProjectTemplate(options projectTemplateOptions) (string, error) {
 	builder.WriteString("runtime:\n")
 	builder.WriteString("  max_steps: 20\n")
 	builder.WriteString("  agent_attempts: 200\n")
+	builder.WriteString("  agent_poll_interval: 1s\n")
 	builder.WriteString("  phases:\n")
 	builder.WriteString("    implementation:\n")
 	writeYAMLScalar(&builder, 3, "skill", "skills/implementation/base.md")

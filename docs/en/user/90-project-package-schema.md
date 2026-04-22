@@ -43,6 +43,7 @@ agent:
 runtime:
   max_steps: 20
   agent_attempts: 200
+  agent_poll_interval: 1s
   phases:
     implementation:
       skill: skills/implementation/base.md

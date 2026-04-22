@@ -20,6 +20,7 @@ type projectPackageConfig struct {
 	LiveRef            string
 	MaxSteps           string
 	AgentAttempts      string
+	AgentPollInterval  string
 	AgentWorkspaceRoot string
 	AgentRequiredBins  []string
 	Executor           map[string]any
@@ -69,6 +70,7 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	config.KanbanStatus = payload.Kanban.Selection.Status
 	config.MaxSteps = scalarString(payload.Runtime.MaxSteps)
 	config.AgentAttempts = scalarString(payload.Runtime.AgentAttempts)
+	config.AgentPollInterval = scalarString(payload.Runtime.AgentPollInterval)
 	config.AgentWorkspaceRoot = payload.Agent.WorkspaceRoot
 	config.AgentRequiredBins = payload.Agent.RequiredBins
 	if strings.TrimSpace(config.SchemaVersion) == "" {
@@ -203,9 +205,10 @@ type projectPackageYAML struct {
 		RequiredBins  []string `yaml:"required_bins"`
 	} `yaml:"agent"`
 	Runtime struct {
-		MaxSteps      any                                `yaml:"max_steps"`
-		AgentAttempts any                                `yaml:"agent_attempts"`
-		Phases        map[string]projectPackagePhaseYAML `yaml:"phases"`
+		MaxSteps          any                                `yaml:"max_steps"`
+		AgentAttempts     any                                `yaml:"agent_attempts"`
+		AgentPollInterval any                                `yaml:"agent_poll_interval"`
+		Phases            map[string]projectPackagePhaseYAML `yaml:"phases"`
 	} `yaml:"runtime"`
 }
 

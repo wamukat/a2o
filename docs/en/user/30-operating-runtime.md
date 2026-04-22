@@ -35,7 +35,7 @@ Normally, start kanban, install the agent, and start the scheduler.
 a2o kanban up
 a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 a2o runtime up
-a2o runtime start --interval 60s
+a2o runtime start --interval 60s --agent-poll-interval 5s
 ```
 
 Check state with:
@@ -61,7 +61,7 @@ a2o runtime describe-task <task-ref>
 Use the resident scheduler for normal operation.
 
 ```sh
-a2o runtime start --interval 60s
+a2o runtime start --interval 60s --agent-poll-interval 5s
 a2o runtime status
 a2o runtime stop
 ```

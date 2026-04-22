@@ -35,7 +35,7 @@ a2o project bootstrap --package ./path/to/project-package
 a2o kanban up
 a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 a2o runtime up
-a2o runtime start --interval 60s
+a2o runtime start --interval 60s --agent-poll-interval 5s
 ```
 
 状態確認には次を使う。
@@ -61,7 +61,7 @@ a2o runtime describe-task <task-ref>
 通常運用では常駐スケジューラを使う。
 
 ```sh
-a2o runtime start --interval 60s
+a2o runtime start --interval 60s --agent-poll-interval 5s
 a2o runtime status
 a2o runtime stop
 ```

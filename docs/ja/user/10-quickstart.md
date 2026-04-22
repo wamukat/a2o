@@ -150,7 +150,7 @@ a2o runtime run-once
 常駐スケジューラとして動かす場合は次を使う。
 
 ```sh
-a2o runtime start --interval 60s
+a2o runtime start --interval 60s --agent-poll-interval 5s
 a2o runtime status
 a2o runtime stop
 ```

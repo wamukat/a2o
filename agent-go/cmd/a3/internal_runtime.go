@@ -143,6 +143,7 @@ func runRuntimeStart(args []string, runner commandRunner, stdout io.Writer, stde
 	interval := flags.String("interval", "60s", "duration between scheduler cycles")
 	maxSteps := flags.String("max-steps", "", "maximum runtime steps for each cycle")
 	agentAttempts := flags.String("agent-attempts", "", "maximum host agent attempts for each cycle")
+	agentPollInterval := flags.String("agent-poll-interval", "", "idle duration between host agent polls during each cycle")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -166,13 +167,16 @@ func runRuntimeStart(args []string, runner commandRunner, stdout io.Writer, stde
 			return err
 		}
 	}
+	if _, err := parseNonNegativeDuration(*agentPollInterval, "agent poll interval"); err != nil {
+		return err
+	}
 
 	config, _, err := loadInstanceConfigFromWorkingTree()
 	if err != nil {
 		return err
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
-	if _, err := buildRuntimeRunOncePlan(effectiveConfig, *maxSteps, *agentAttempts, ""); err != nil {
+	if _, err := buildRuntimeRunOncePlan(effectiveConfig, *maxSteps, *agentAttempts, *agentPollInterval, ""); err != nil {
 		return err
 	}
 	paths := schedulerPaths(effectiveConfig)
@@ -189,7 +193,7 @@ func runRuntimeStart(args []string, runner commandRunner, stdout io.Writer, stde
 		return fmt.Errorf("resolve executable: %w", err)
 	}
 	loopArgs := []string{"runtime", "loop", "--interval", *interval}
-	loopArgs = append(loopArgs, buildRunOnceArgs(*maxSteps, *agentAttempts)...)
+	loopArgs = append(loopArgs, buildRunOnceArgs(*maxSteps, *agentAttempts, *agentPollInterval)...)
 	expectedCommand := schedulerExpectedCommand(executable, loopArgs)
 	pid, err := runner.StartBackground(executable, loopArgs, paths.LogFile)
 	if err != nil {
@@ -233,7 +237,7 @@ func runRuntimeStop(args []string, runner commandRunner, stdout io.Writer, stder
 		return err
 	}
 	running := schedulerProcessRunning(pid, paths.CommandFile, runner)
-	plan, planErr := buildRuntimeRunOncePlan(pathsConfig(config), "", "", "")
+	plan, planErr := buildRuntimeRunOncePlan(pathsConfig(config), "", "", "", "")
 	if running {
 		if err := runner.TerminateProcessGroup(pid); err != nil {
 			return err
@@ -773,7 +777,7 @@ func runRuntimeResetTask(args []string, stdout io.Writer, stderr io.Writer) erro
 		return err
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
-	plan, err := buildRuntimeRunOncePlan(effectiveConfig, "", "", "")
+	plan, err := buildRuntimeRunOncePlan(effectiveConfig, "", "", "", "")
 	if err != nil {
 		return err
 	}
@@ -939,6 +943,7 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 	flags.SetOutput(stderr)
 	maxSteps := flags.String("max-steps", "", "maximum runtime steps for this cycle")
 	agentAttempts := flags.String("agent-attempts", "", "maximum host agent attempts for this cycle")
+	agentPollInterval := flags.String("agent-poll-interval", "", "idle duration between host agent polls for this cycle")
 	projectConfig := flags.String("project-config", "", "explicit project config file, for example project-test.yaml")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -956,7 +961,7 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
 	return withEnv(runtimeRunOnceEnv(effectiveConfig, *maxSteps, *agentAttempts), func() error {
-		return runGenericRuntimeRunOnce(effectiveConfig, *maxSteps, *agentAttempts, *projectConfig, runner, stdout)
+		return runGenericRuntimeRunOnce(effectiveConfig, *maxSteps, *agentAttempts, *agentPollInterval, *projectConfig, runner, stdout)
 	})
 }
 
@@ -964,6 +969,7 @@ type runtimeRunOncePlan struct {
 	ComposePrefix        []string
 	MaxSteps             string
 	AgentAttempts        int
+	AgentPollInterval    time.Duration
 	AgentPort            string
 	AgentInternalPort    string
 	StorageDir           string
@@ -1001,8 +1007,8 @@ type runtimeRunOncePlan struct {
 	BranchNamespace      string
 }
 
-func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, agentAttempts string, projectConfig string, runner commandRunner, stdout io.Writer) error {
-	plan, err := buildRuntimeRunOncePlan(config, maxSteps, agentAttempts, projectConfig)
+func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, agentAttempts string, agentPollInterval string, projectConfig string, runner commandRunner, stdout io.Writer) error {
+	plan, err := buildRuntimeRunOncePlan(config, maxSteps, agentAttempts, agentPollInterval, projectConfig)
 	if err != nil {
 		return err
 	}
@@ -1075,7 +1081,7 @@ func ensureRuntimeLauncherConfig(plan runtimeRunOncePlan, stdout io.Writer) erro
 	return nil
 }
 
-func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agentAttempts string, projectConfig string) (runtimeRunOncePlan, error) {
+func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agentAttempts string, agentPollInterval string, projectConfig string) (runtimeRunOncePlan, error) {
 	hostRootDir := envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_ROOT_DIR", "A3_RUNTIME_RUN_ONCE_HOST_ROOT_DIR", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_ROOT_DIR", "A3_RUNTIME_SCHEDULER_HOST_ROOT_DIR", config.WorkspaceRoot))
 	if strings.TrimSpace(hostRootDir) == "" {
 		hostRootDir = "."
@@ -1103,7 +1109,12 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 	workspaceRoot := envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_WORKSPACE_ROOT", "A3_RUNTIME_RUN_ONCE_AGENT_WORKSPACE_ROOT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_WORKSPACE_ROOT", "A3_RUNTIME_SCHEDULER_AGENT_WORKSPACE_ROOT", defaultWorkspaceRoot))
 	hostAgentBin := envDefaultCompat("A2O_HOST_AGENT_BIN", "A3_HOST_AGENT_BIN", resolveDefaultHostAgentBin(config, hostRootDir))
 	defaultAgentAttempts := envDefaultValue(packageConfig.AgentAttempts, "220")
+	defaultAgentPollInterval := envDefaultValue(packageConfig.AgentPollInterval, "1s")
 	agentAttemptCount, err := parsePositiveInt(envDefaultValue(agentAttempts, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS", "A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_ATTEMPTS", "A3_RUNTIME_SCHEDULER_AGENT_ATTEMPTS", defaultAgentAttempts))), "agent attempts")
+	if err != nil {
+		return runtimeRunOncePlan{}, err
+	}
+	agentPollDuration, err := parseNonNegativeDuration(envDefaultValue(agentPollInterval, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_POLL_INTERVAL", "A3_RUNTIME_RUN_ONCE_AGENT_POLL_INTERVAL", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_POLL_INTERVAL", "A3_RUNTIME_SCHEDULER_AGENT_POLL_INTERVAL", defaultAgentPollInterval))), "agent poll interval")
 	if err != nil {
 		return runtimeRunOncePlan{}, err
 	}
@@ -1145,6 +1156,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		ComposePrefix:        composeArgs(config),
 		MaxSteps:             envDefaultValue(maxSteps, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_MAX_STEPS", "A3_RUNTIME_RUN_ONCE_MAX_STEPS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_MAX_STEPS", "A3_RUNTIME_SCHEDULER_MAX_STEPS", defaultMaxSteps))),
 		AgentAttempts:        agentAttemptCount,
+		AgentPollInterval:    agentPollDuration,
 		AgentPort:            envDefaultCompat("A2O_BUNDLE_AGENT_PORT", "A3_BUNDLE_AGENT_PORT", envDefaultValue(config.AgentPort, "7393")),
 		AgentInternalPort:    envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_INTERNAL_PORT", "A3_RUNTIME_RUN_ONCE_AGENT_INTERNAL_PORT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_INTERNAL_PORT", "A3_RUNTIME_SCHEDULER_AGENT_INTERNAL_PORT", "7393")),
 		StorageDir:           envDefaultCompat("A2O_BUNDLE_STORAGE_DIR", "A3_BUNDLE_STORAGE_DIR", envDefaultValue(config.StorageDir, "/var/lib/a2o/a2o-runtime")),
@@ -1839,8 +1851,8 @@ func executeUntilIdleArgs(plan runtimeRunOncePlan) []string {
 }
 
 func runHostAgentLoop(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
-	fmt.Fprintf(stdout, "runtime_host_agent_loop attempts=%d\n", plan.AgentAttempts)
-	_ = appendFile(plan.HostAgentLog, []byte(fmt.Sprintf("\n===== host agent session start %s attempts=%d =====\n", time.Now().UTC().Format(time.RFC3339), plan.AgentAttempts)))
+	fmt.Fprintf(stdout, "runtime_host_agent_loop attempts=%d poll_interval=%s\n", plan.AgentAttempts, plan.AgentPollInterval)
+	_ = appendFile(plan.HostAgentLog, []byte(fmt.Sprintf("\n===== host agent session start %s attempts=%d poll_interval=%s =====\n", time.Now().UTC().Format(time.RFC3339), plan.AgentAttempts, plan.AgentPollInterval)))
 	var agentStatus error
 	for attempt := 1; attempt <= plan.AgentAttempts; attempt++ {
 		fmt.Fprintf(stdout, "runtime_host_agent_attempt=%d\n", attempt)
@@ -1859,7 +1871,9 @@ func runHostAgentLoop(config runtimeInstanceConfig, plan runtimeRunOncePlan, run
 		if runtimeExitExists(config, plan, runner) {
 			return agentStatus
 		}
-		time.Sleep(time.Second)
+		if plan.AgentPollInterval > 0 {
+			time.Sleep(plan.AgentPollInterval)
+		}
 	}
 	return fmt.Errorf("runtime run-once did not finish within %d agent attempts", plan.AgentAttempts)
 }
@@ -1902,6 +1916,7 @@ func runRuntimeLoop(args []string, runner commandRunner, stdout io.Writer, stder
 	maxCycles := flags.Int("max-cycles", 0, "maximum cycles to run; 0 means forever")
 	maxSteps := flags.String("max-steps", "", "maximum runtime steps for each cycle")
 	agentAttempts := flags.String("agent-attempts", "", "maximum host agent attempts for each cycle")
+	agentPollInterval := flags.String("agent-poll-interval", "", "idle duration between host agent polls during each cycle")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -1918,12 +1933,15 @@ func runRuntimeLoop(args []string, runner commandRunner, stdout io.Writer, stder
 	if sleepDuration < 0 {
 		return errors.New("--interval must be >= 0")
 	}
+	if _, err := parseNonNegativeDuration(*agentPollInterval, "agent poll interval"); err != nil {
+		return err
+	}
 
 	cycle := 0
 	for {
 		cycle++
 		fmt.Fprintf(stdout, "kanban_loop_cycle_start cycle=%d\n", cycle)
-		if err := runRuntimeRunOnce(buildRunOnceArgs(*maxSteps, *agentAttempts), runner, stdout, stderr); err != nil {
+		if err := runRuntimeRunOnce(buildRunOnceArgs(*maxSteps, *agentAttempts, *agentPollInterval), runner, stdout, stderr); err != nil {
 			return fmt.Errorf("runtime loop cycle %d failed: %w", cycle, err)
 		}
 		fmt.Fprintf(stdout, "kanban_loop_cycle_done cycle=%d\n", cycle)
@@ -1937,7 +1955,7 @@ func runRuntimeLoop(args []string, runner commandRunner, stdout io.Writer, stder
 	}
 }
 
-func buildRunOnceArgs(maxSteps string, agentAttempts string) []string {
+func buildRunOnceArgs(maxSteps string, agentAttempts string, agentPollInterval string) []string {
 	args := []string{}
 	if strings.TrimSpace(maxSteps) != "" {
 		args = append(args, "--max-steps", strings.TrimSpace(maxSteps))
@@ -1945,5 +1963,22 @@ func buildRunOnceArgs(maxSteps string, agentAttempts string) []string {
 	if strings.TrimSpace(agentAttempts) != "" {
 		args = append(args, "--agent-attempts", strings.TrimSpace(agentAttempts))
 	}
+	if strings.TrimSpace(agentPollInterval) != "" {
+		args = append(args, "--agent-poll-interval", strings.TrimSpace(agentPollInterval))
+	}
 	return args
+}
+
+func parseNonNegativeDuration(raw string, label string) (time.Duration, error) {
+	if strings.TrimSpace(raw) == "" {
+		return 0, nil
+	}
+	value, err := time.ParseDuration(strings.TrimSpace(raw))
+	if err != nil {
+		return 0, fmt.Errorf("parse %s: %w", label, err)
+	}
+	if value < 0 {
+		return 0, fmt.Errorf("%s must be >= 0", label)
+	}
+	return value, nil
 }

@@ -1218,7 +1218,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime watch-summary",
 		"a2o runtime logs TASK_REF [--follow]",
 		"a2o runtime show-artifact ARTIFACT_ID",
-		"a2o runtime run-once [--max-steps N] [--agent-attempts N]",
+		"a2o runtime run-once [--max-steps N] [--agent-attempts N] [--agent-poll-interval DURATION]",
 		"a2o runtime loop [--interval DURATION] [--max-cycles N]",
 		"a2o agent install [--target auto] [--output PATH] [--build]",
 	} {
@@ -3373,7 +3373,7 @@ func TestRuntimeStartLaunchesForegroundLoopInBackground(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "start", "--interval", "5s", "--max-steps", "2", "--agent-attempts", "3"}, runner, &stdout, &stderr)
+		code := run([]string{"runtime", "start", "--interval", "5s", "--max-steps", "2", "--agent-attempts", "3", "--agent-poll-interval", "7s"}, runner, &stdout, &stderr)
 		if code != 0 {
 			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
@@ -3382,7 +3382,7 @@ func TestRuntimeStartLaunchesForegroundLoopInBackground(t *testing.T) {
 	joined := strings.Join(runner.joinedCalls(), "\n")
 	for _, want := range []string{
 		"start-background",
-		"runtime loop --interval 5s --max-steps 2 --agent-attempts 3",
+		"runtime loop --interval 5s --max-steps 2 --agent-attempts 3 --agent-poll-interval 7s",
 		filepath.Join(tempDir, ".work", "a2o-runtime", "scheduler.log"),
 	} {
 		if !strings.Contains(joined, want) {
@@ -4852,6 +4852,7 @@ agent:
 runtime:
   max_steps: 7
   agent_attempts: 9
+  agent_poll_interval: 5s
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -4924,7 +4925,7 @@ runtime:
 	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] != "" {
 		t.Fatalf("agent attempts should come from package plan, not env override, got %q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"])
 	}
-	if !strings.Contains(stdout.String(), "runtime_host_agent_loop attempts=9") {
+	if !strings.Contains(stdout.String(), "runtime_host_agent_loop attempts=9 poll_interval=5s") {
 		t.Fatalf("stdout should use package agent_attempts, got %q", stdout.String())
 	}
 }
