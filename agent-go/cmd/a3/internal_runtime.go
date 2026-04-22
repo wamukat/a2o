@@ -873,6 +873,7 @@ func runRuntimeWatchSummary(args []string, runner commandRunner, stdout io.Write
 		return err
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	paths := schedulerPaths(effectiveConfig)
 	return withComposeEnv(effectiveConfig, func() error {
 		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
 		if err != nil {
@@ -885,9 +886,32 @@ func runRuntimeWatchSummary(args []string, runner commandRunner, stdout io.Write
 		if strings.TrimSpace(output) == "" {
 			return nil
 		}
-		fmt.Fprintln(stdout, output)
+		fmt.Fprintln(stdout, overlaySchedulerWatchSummaryState(output, paths, runner))
 		return nil
 	})
+}
+
+func overlaySchedulerWatchSummaryState(output string, paths runtimeSchedulerPaths, runner commandRunner) string {
+	lines := strings.Split(output, "\n")
+	if len(lines) == 0 {
+		return output
+	}
+	if !strings.HasPrefix(lines[0], "Scheduler: ") {
+		return output
+	}
+	pid, running, err := readRunningScheduler(paths.PIDFile, runner)
+	if err != nil {
+		return output
+	}
+	if pid == 0 {
+		lines[0] = "Scheduler: stopped"
+		return strings.Join(lines, "\n")
+	}
+	if !running {
+		lines[0] = "Scheduler: stale"
+		return strings.Join(lines, "\n")
+	}
+	return output
 }
 
 func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
