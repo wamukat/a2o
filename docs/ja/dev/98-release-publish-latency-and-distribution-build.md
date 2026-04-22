@@ -66,6 +66,19 @@ runtime image には `/opt/a2o/agents/release-manifest.jsonl` と target 別 arc
 
 この構成は user experience を単純にする一方で、release publish を遅くしている。
 
+## 実装済みの契約ベースライン
+
+`A2O#157` では、後続の distribution separation が守るべき compatibility baseline を定義した。
+
+現在の package-set contract は次のとおり。
+
+- `release-manifest.jsonl` は `a3 agent package list|verify|export` 用の archive inventory として残す
+- `package-compatibility.json` を package-set compatibility contract とする
+- package set を読む runtime version と、package set が持つ `runtime_version` は完全一致を要求する
+- `a3 host install` は、package directory に compatibility file または archive manifest がある場合、この contract を検証する
+
+どちらの file も持たない legacy package directory は host launcher fixture 用として引き続き許容するが、公開する package set には compatibility contract を持たせる前提にする。
+
 ## 改善案
 
 ### Option A: 小さな最適化だけ行う

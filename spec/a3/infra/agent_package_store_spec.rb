@@ -25,6 +25,18 @@ RSpec.describe A3::Infra::AgentPackageStore do
     expect(packages.fetch(0).archive).to eq(File.basename(archive))
   end
 
+  it "reads the package compatibility contract when present" do
+    archive = write_agent_archive(target: "linux-amd64")
+    write_manifest(target: "linux-amd64", archive: File.basename(archive))
+    write_contract(runtime_version: A3::VERSION, package_version: A3::VERSION)
+
+    contract = described_class.new(package_dir: @tmp_dir).contract
+
+    expect(contract.schema).to eq("a2o-agent-package-compatibility/v1")
+    expect(contract.runtime_version).to eq(A3::VERSION)
+    expect(contract.package_version).to eq(A3::VERSION)
+  end
+
   it "verifies release archive checksums" do
     archive = write_agent_archive(target: "darwin-arm64")
     write_manifest(target: "darwin-arm64", archive: File.basename(archive))
@@ -55,6 +67,36 @@ RSpec.describe A3::Infra::AgentPackageStore do
     end.to raise_error(A3::Domain::ConfigurationError, /checksum mismatch/)
   end
 
+  it "fails when the contract runtime version does not match the consuming runtime" do
+    archive = write_agent_archive(target: "linux-amd64")
+    write_manifest(target: "linux-amd64", archive: File.basename(archive))
+    write_contract(runtime_version: "9.9.9", package_version: A3::VERSION)
+
+    expect do
+      described_class.new(package_dir: @tmp_dir).verify(target: "linux-amd64")
+    end.to raise_error(A3::Domain::ConfigurationError, /runtime compatibility mismatch/)
+  end
+
+  it "fails when the contract package version disagrees with the manifest version" do
+    archive = write_agent_archive(target: "linux-amd64")
+    write_manifest(target: "linux-amd64", archive: File.basename(archive))
+    write_contract(runtime_version: A3::VERSION, package_version: "9.9.9")
+
+    expect do
+      described_class.new(package_dir: @tmp_dir).verify(target: "linux-amd64")
+    end.to raise_error(A3::Domain::ConfigurationError, /contract mismatch/)
+  end
+
+  it "honors a non-default archive manifest path from the contract" do
+    archive = write_agent_archive(target: "linux-amd64")
+    write_manifest(target: "linux-amd64", archive: File.basename(archive), manifest_name: "alternate-manifest.jsonl")
+    write_contract(runtime_version: A3::VERSION, package_version: A3::VERSION, archive_manifest: "alternate-manifest.jsonl")
+
+    packages = described_class.new(package_dir: @tmp_dir).list
+
+    expect(packages.map(&:target)).to eq(["linux-amd64"])
+  end
+
   def write_agent_archive(target:, body: "agent-binary\n")
     archive_path = File.join(@tmp_dir, "a3-agent-dev-#{target}.tar.gz")
     tar_io = StringIO.new
@@ -66,12 +108,25 @@ RSpec.describe A3::Infra::AgentPackageStore do
     archive_path
   end
 
-  def write_manifest(target:, archive:, sha256: nil)
+  def write_manifest(target:, archive:, sha256: nil, manifest_name: "release-manifest.jsonl")
     goos, goarch = target.split("-", 2)
     sha256 ||= Digest::SHA256.file(File.join(@tmp_dir, archive)).hexdigest
     File.write(
-      File.join(@tmp_dir, "release-manifest.jsonl"),
-      JSON.generate("version" => "dev", "goos" => goos, "goarch" => goarch, "archive" => archive, "sha256" => sha256) + "\n"
+      File.join(@tmp_dir, manifest_name),
+      JSON.generate("version" => A3::VERSION, "goos" => goos, "goarch" => goarch, "archive" => archive, "sha256" => sha256) + "\n"
+    )
+  end
+
+  def write_contract(runtime_version:, package_version:, archive_manifest: "release-manifest.jsonl")
+    File.write(
+      File.join(@tmp_dir, "package-compatibility.json"),
+      JSON.pretty_generate(
+        "schema" => "a2o-agent-package-compatibility/v1",
+        "package_version" => package_version,
+        "runtime_version" => runtime_version,
+        "archive_manifest" => archive_manifest,
+        "launcher_layout" => "platform-bin-dir-v1"
+      )
     )
   end
 end

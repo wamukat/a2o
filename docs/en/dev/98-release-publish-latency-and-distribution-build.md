@@ -66,6 +66,19 @@ are handled as one unit.
 
 This makes the current user experience simple, but it makes release publish slow.
 
+## Implemented Contract Baseline
+
+`A2O#157` defines the compatibility baseline that later distribution separation must preserve.
+
+The package-set contract is now:
+
+- `release-manifest.jsonl` remains the archive inventory for `a3 agent package list|verify|export`
+- `package-compatibility.json` is the package-set compatibility contract
+- the consuming runtime version and the package-set `runtime_version` must match exactly
+- `a3 host install` validates the contract when a package directory exposes either the compatibility file or the archive manifest
+
+Legacy package directories without either file still work for host-launcher-only fixtures, but published package sets are expected to carry the compatibility contract.
+
 ## Improvement Options
 
 ### Option A: Small optimization only

@@ -20,6 +20,15 @@ fi
 mkdir -p "${DIST_DIR}"
 : > "${DIST_DIR}/checksums.txt"
 : > "${DIST_DIR}/release-manifest.jsonl"
+cat > "${DIST_DIR}/package-compatibility.json" <<EOF
+{
+  "schema": "a2o-agent-package-compatibility/v1",
+  "package_version": "${VERSION}",
+  "runtime_version": "${VERSION}",
+  "archive_manifest": "release-manifest.jsonl",
+  "launcher_layout": "platform-bin-dir-v1"
+}
+EOF
 
 sha256sum_or_shasum() {
   local path="$1"

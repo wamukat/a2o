@@ -726,6 +726,11 @@ module A3
       when "list"
         packages = store.list
         out.puts("agent_package_dir=#{store.package_dir}")
+        if (contract = store.contract)
+          out.puts("agent_package_contract schema=#{contract.schema} package_version=#{contract.package_version} runtime_version=#{contract.runtime_version} archive_manifest=#{contract.archive_manifest} launcher_layout=#{contract.launcher_layout}")
+        else
+          out.puts("agent_package_contract schema=legacy-runtime-manifest runtime_version=#{store.send(:inferred_runtime_version)}")
+        end
         packages.each do |package|
           out.puts("target=#{package.target} version=#{package.version} archive=#{package.archive} sha256=#{package.sha256}")
         end
@@ -898,6 +903,7 @@ module A3
     end
 
     def install_host_launchers(package_dir:, output_dir:)
+      validate_host_package_dir!(package_dir)
       targets = Dir.glob(File.join(package_dir, "*", "a3")).sort.map do |source|
         target = File.basename(File.dirname(source))
         destination = File.join(output_dir, "a3-#{target}")
@@ -911,6 +917,14 @@ module A3
       raise A3::Domain::ConfigurationError, "host launcher binaries not found under #{package_dir}" if targets.empty?
 
       targets
+    end
+
+    def validate_host_package_dir!(package_dir)
+      manifest_path = File.join(package_dir, "release-manifest.jsonl")
+      contract_path = File.join(package_dir, A3::Infra::AgentPackageStore::CONTRACT_PATH)
+      return unless File.file?(manifest_path) || File.file?(contract_path)
+
+      A3::Infra::AgentPackageStore.new(package_dir: package_dir).validate_runtime_compatibility!(expected_runtime_version: A3::VERSION)
     end
 
     def install_host_share_assets(share_dir:)

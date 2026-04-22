@@ -30,9 +30,12 @@ Release output includes:
 - archives, for example `dist/a3-agent-0.5.16-linux-amd64.tar.gz`
 - `dist/checksums.txt`
 - `dist/release-manifest.jsonl`
+- `dist/package-compatibility.json`
 
 Use `TARGETS="linux/amd64 darwin/arm64"` to build a subset. Set `PACKAGE_ARCHIVES=0` to build binaries only.
 Windows native execution is not a standard target. Windows users run the Linux archive from WSL2 Ubuntu.
+
+`package-compatibility.json` is the package-set contract for both embedded runtime-image packages and future external package publication. The current contract is exact-version compatibility: the runtime consuming the package set and the package set itself must report the same A2O version.
 
 ## Local Install
 
