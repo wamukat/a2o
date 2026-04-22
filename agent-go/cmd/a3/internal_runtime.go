@@ -899,6 +899,9 @@ func overlaySchedulerWatchSummaryState(output string, paths runtimeSchedulerPath
 	if !strings.HasPrefix(lines[0], "Scheduler: ") {
 		return output
 	}
+	if strings.HasPrefix(lines[0], "Scheduler: paused") {
+		return output
+	}
 	pid, running, err := readRunningScheduler(paths.PIDFile, runner)
 	if err != nil {
 		return output

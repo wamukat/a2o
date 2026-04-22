@@ -3925,6 +3925,49 @@ func TestRuntimeWatchSummaryShowsStaleWhenSchedulerProcessIsNotRunning(t *testin
 	}
 }
 
+func TestRuntimeWatchSummaryPreservesPausedSummaryWithoutLiveSchedulerProcess(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
+	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{
+		watchSummaryOutput: "Scheduler: paused\nTask Tree\nNext\nRunning\n",
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "watch-summary"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "Scheduler: paused") {
+		t.Fatalf("watch-summary should preserve paused scheduler state, got:\n%s", stdout.String())
+	}
+	if strings.Contains(stdout.String(), "Scheduler: stopped") {
+		t.Fatalf("watch-summary should not rewrite paused scheduler state to stopped, got:\n%s", stdout.String())
+	}
+}
+
 func TestTopLevelWatchSummaryIsNotPublicAlias(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -5439,6 +5482,7 @@ type fakeRunner struct {
 	containerImageIDs      map[string]string
 	logManifestOutput      string
 	logManifestOutputs     []string
+	watchSummaryOutput     string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -5555,6 +5599,9 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	case strings.Contains(joined, "clear-runtime-logs"):
 		return []byte("runtime_log_clear=dry_run\nselected_count=1\ndeleted_count=1\nselected_artifact_ids=worker-run-16-implementation-combined-log\n"), nil
 	case strings.Contains(joined, " a3 watch-summary "):
+		if r.watchSummaryOutput != "" {
+			return []byte(r.watchSummaryOutput), nil
+		}
 		return []byte("Scheduler: running\nTask Tree\nNext\nRunning\n"), nil
 	case strings.Contains(joined, " task-get "):
 		return []byte(`{"task_ref":"A2O#16","status":"Blocked"}` + "\n"), nil
