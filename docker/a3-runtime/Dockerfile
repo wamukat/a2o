@@ -13,11 +13,15 @@ WORKDIR /src/agent-go
 
 COPY agent-go/go.mod ./go.mod
 COPY agent-go/go.sum ./go.sum
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 COPY agent-go/cmd ./cmd
 COPY agent-go/internal ./internal
 COPY agent-go/scripts ./scripts
 
-RUN DIST_DIR=/opt/a2o/agents VERSION="${A3_AGENT_VERSION}" TARGETS="${A3_AGENT_TARGETS}" PACKAGE_ARCHIVES="${PACKAGE_ARCHIVES}" PUBLICATION_BUNDLE_ARCHIVE="${PUBLICATION_BUNDLE_ARCHIVE}" PUBLICATION_BUNDLE_URL="${PUBLICATION_BUNDLE_URL}" PUBLICATION_BUNDLE_SHA256="${PUBLICATION_BUNDLE_SHA256}" ./scripts/build-release.sh
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    DIST_DIR=/opt/a2o/agents VERSION="${A3_AGENT_VERSION}" TARGETS="${A3_AGENT_TARGETS}" PACKAGE_ARCHIVES="${PACKAGE_ARCHIVES}" PUBLICATION_BUNDLE_ARCHIVE="${PUBLICATION_BUNDLE_ARCHIVE}" PUBLICATION_BUNDLE_URL="${PUBLICATION_BUNDLE_URL}" PUBLICATION_BUNDLE_SHA256="${PUBLICATION_BUNDLE_SHA256}" ./scripts/build-release.sh
 
 FROM ruby:3.1-slim
 
@@ -62,17 +66,19 @@ WORKDIR /workspace
 COPY Gemfile /tmp/a3-engine/Gemfile
 COPY Gemfile.lock /tmp/a3-engine/Gemfile.lock
 COPY a2o.gemspec /tmp/a3-engine/a2o.gemspec
-COPY config /tmp/a3-engine/config
 COPY lib /tmp/a3-engine/lib
 COPY bin /tmp/a3-engine/bin
+
+RUN --mount=type=cache,target=/usr/local/bundle/cache \
+    cd /tmp/a3-engine \
+    && bundle _${BUNDLER_VERSION}_ install \
+    && rm -rf /usr/local/bundle/cache/*.gem
+
+COPY config /tmp/a3-engine/config
 COPY tools /tmp/a3-engine/tools
 COPY tools /opt/a2o/share/tools
 COPY docker/compose /opt/a2o/share/docker/compose
 RUN cp /opt/a2o/share/docker/compose/a2o-soloboard.release.yml /opt/a2o/share/docker/compose/a2o-soloboard.yml
-
-RUN cd /tmp/a3-engine \
-    && bundle _${BUNDLER_VERSION}_ install \
-    && rm -rf /usr/local/bundle/cache/*.gem
 
 COPY --from=agent-builder /opt/a2o/agents /opt/a2o/agents
 

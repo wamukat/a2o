@@ -209,3 +209,10 @@ The follow-up tickets map to the work as follows:
 - `A2O#157`: define the runtime-image and external-package compatibility contract
 - `A2O#155`: implement distribution separation after `A2O#157`, `A2O#158`, and `A2O#159`
 - `A2O#156`: second-order Dockerfile/cache optimization after the structural boundary is improved
+
+Implemented cache cleanup in `A2O#156`:
+
+- add `go mod download` as a distinct cacheable layer
+- add BuildKit cache mounts for Go module / Go build caches
+- add a BuildKit cache mount for Bundler downloads
+- move non-Bundler runtime content copies after `bundle install` so tool/compose changes do not invalidate the gem-install layer

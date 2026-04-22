@@ -210,3 +210,10 @@ follow-up ticket は次のように分担する。
 - `A2O#157`: runtime image と external package の compatibility contract 定義
 - `A2O#155`: `A2O#157`、`A2O#158`、`A2O#159` の後続として distribution separation を実装
 - `A2O#156`: 構造改善後の second-order Dockerfile / cache 最適化
+
+`A2O#156` で入れた cache 小改善:
+
+- `go mod download` を独立した cacheable layer に分離
+- Go module / Go build cache に BuildKit cache mount を追加
+- Bundler download cache に BuildKit cache mount を追加
+- `bundle install` 後ろへ runtime content の copy を移し、tool / compose 変更で gem install layer が壊れにくいようにした
