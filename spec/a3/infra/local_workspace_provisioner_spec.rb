@@ -588,6 +588,25 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     expect(quarantine_path).to exist
   end
 
+  it "removes task root when only private .a2o metadata remains after cleanup" do
+    task_root = Pathname(tmpdir).join("workspaces", "A3-v2-3025")
+    runtime_path = task_root.join("runtime_workspace")
+    metadata_path = task_root.join(".a2o", "workspace.json")
+    FileUtils.mkdir_p(runtime_path)
+    FileUtils.mkdir_p(metadata_path.dirname)
+    metadata_path.write("{\"workspace_kind\":\"runtime_workspace\"}\n")
+
+    provisioner = described_class.new(base_dir: tmpdir, repo_sources: {})
+    cleaned_paths = provisioner.cleanup_task(
+      task_ref: "A3-v2#3025",
+      scopes: [:runtime_workspace],
+      dry_run: false
+    )
+
+    expect(cleaned_paths).to contain_exactly(runtime_path.to_s)
+    expect(task_root).not_to exist
+  end
+
   it "bootstraps a missing branch-head ref for runtime workspace git materialization" do
     repo_root = Pathname(File.join(tmpdir, "repo-beta"))
     create_git_repo_source(tmpdir, name: "repo-beta")

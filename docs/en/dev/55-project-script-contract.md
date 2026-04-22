@@ -26,7 +26,7 @@ The project package owns:
 - support repo setup required by that product
 - the AI or deterministic executor command selected for implementation and review
 
-Project scripts must not depend on private runtime files such as `.a2o/workspace.json`, `.a3/slot.json`, generated `launcher.json`, or internal A3 environment names.
+Project scripts must not depend on private runtime files such as `.a2o/workspace.json`, `.a2o/slot.json`, `.a2o/worker-request.json`, `.a2o/worker-result.json`, generated `launcher.json`, or internal A3 environment names.
 
 ## Phase Command Contract
 
@@ -81,7 +81,7 @@ The worker request JSON is the source of truth for project scripts. It includes:
 
 Scripts should read repo paths from `slot_paths` rather than assuming a workspace directory layout.
 For slot-local remediation, the command working directory may be a repo slot while `A2O_WORKSPACE_ROOT` and `slot_paths` still describe the full prepared workspace.
-Do not read private `.a3` metadata directly; use `A2O_WORKER_REQUEST_PATH`.
+Do not read private `.a2o/.a3` metadata directly; use `A2O_WORKER_REQUEST_PATH`.
 
 ## Result Contract
 
@@ -107,11 +107,11 @@ Task-local cache and artifact paths are A2O-managed workspace concerns. Project 
 `a2o doctor`, `a2o project lint`, and `a2o worker validate-result` should flag:
 
 - use of `A3_*` worker environment names in project packages
-- direct reads of private `.a3` metadata files
+- direct reads of private `.a2o/.a3` metadata files
 - missing required worker result keys
 - executor commands that do not use public placeholders
 - verification/remediation commands that require undeclared binaries
 
-Lint output should include the next remediation step. For example, `A3_*` names should point to the matching `A2O_*` variables, `.a3` metadata reads should point to `A2O_WORKER_REQUEST_PATH` fields such as `slot_paths`, `scope_snapshot`, and `phase_runtime`, and `launcher.json` references should point back to `project.yaml` phase executor settings.
+Lint output should include the next remediation step. For example, `A3_*` names should point to the matching `A2O_*` variables, `.a2o/.a3` metadata reads should point to `A2O_WORKER_REQUEST_PATH` fields such as `slot_paths`, `scope_snapshot`, and `phase_runtime`, and `launcher.json` references should point back to `project.yaml` phase executor settings.
 
 The goal is to keep project-specific automation possible while making the boundary stable across A2O releases.

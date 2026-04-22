@@ -457,7 +457,9 @@ module A3
         return if dry_run
         return unless task_root.exist?
 
-        removable_entries = task_root.children.reject { |entry| entry.basename.to_s == ".a3" }
+        removable_entries = task_root.children.reject do |entry|
+          %w[.a2o .a3].include?(entry.basename.to_s)
+        end
         return unless removable_entries.empty?
 
         FileUtils.rm_rf(task_root)
