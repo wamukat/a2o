@@ -145,6 +145,7 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("runnable_blocked_by=run-1")
       expect(out.string).to include("parent=A3-v2#parent status=in_review current_run=")
       expect(out.string).to include("run run-1 task=A3-v2#child phase=verification workspace=runtime_workspace source=detached_commit:head456 outcome=blocked")
+      expect(out.string).to include("workspace_model=runtime_workspace is a logical phase workspace kind; inspect runtime_package_materialization_model for physical isolation")
       expect(out.string).to include("review_target=base123..head456")
       expect(out.string).to include("latest_execution phase=verification summary=review launch could not resolve runtime workspace")
       expect(out.string).to include("failing_command=codex exec --json -")

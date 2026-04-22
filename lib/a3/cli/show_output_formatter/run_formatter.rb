@@ -9,6 +9,9 @@ module A3
         def lines(run)
           [].tap do |result|
             result << "run #{run.ref} task=#{run.task_ref} phase=#{run.phase} workspace=#{run.workspace_kind} source=#{run.source_type}:#{run.source_ref} outcome=#{run.terminal_outcome}"
+            if run.workspace_kind.to_sym == :runtime_workspace
+              result << "workspace_model=runtime_workspace is a logical phase workspace kind; inspect runtime_package_materialization_model for physical isolation"
+            end
             append_recovery_lines(result, run.recovery)
             append_evidence_lines(result, run.evidence_summary)
             append_latest_execution_lines(result, run.latest_execution)
@@ -79,6 +82,7 @@ module A3
           result << "latest_execution phase=#{execution.phase} summary=#{execution.summary}"
           result << "verification_summary=#{execution.verification_summary}" if execution.verification_summary
           append_review_disposition_lines(result, execution.review_disposition)
+          append_inherited_parent_lines(result, execution.diagnostics)
           result << "failing_command=#{FormattingHelpers.diagnostic_value(execution.failing_command)}" if execution.failing_command
           result << "observed_state=#{execution.observed_state}" if execution.observed_state
           result << "worker_response_bundle=#{FormattingHelpers.diagnostic_value(execution.worker_response_bundle)}" if execution.worker_response_bundle
@@ -91,7 +95,16 @@ module A3
         end
 
         def public_diagnostics(diagnostics)
-          diagnostics.reject { |key, _| %w[merge_recovery agent_job_result agent_artifacts control_plane_url].include?(key) }
+          diagnostics.reject do |key, _|
+            %w[
+              merge_recovery
+              agent_job_result
+              agent_artifacts
+              control_plane_url
+              inherited_parent_ref
+              inherited_parent_state_fingerprint
+            ].include?(key)
+          end
         end
 
         def append_agent_artifact_lines(result, artifacts)
@@ -146,6 +159,7 @@ module A3
           return unless diagnosis
 
           result << "latest_blocked phase=#{diagnosis.phase} summary=#{diagnosis.summary}"
+          append_inherited_parent_lines(result, diagnosis.infra_diagnostics)
           result << "blocked_error_category=#{diagnosis.error_category}"
           result << "blocked_remediation=#{diagnosis.remediation_summary}"
           result << "blocked_expected=#{diagnosis.expected_state}"
@@ -154,6 +168,16 @@ module A3
           public_diagnostics(diagnosis.infra_diagnostics).sort.each do |key, value|
             result << "blocked_diagnostic.#{key}=#{FormattingHelpers.diagnostic_value(value)}"
           end
+        end
+
+        def append_inherited_parent_lines(result, diagnostics)
+          return unless diagnostics.is_a?(Hash)
+
+          inherited_ref = diagnostics["inherited_parent_ref"]
+          inherited_fingerprint = diagnostics["inherited_parent_state_fingerprint"]
+          return if inherited_ref.to_s.empty? && inherited_fingerprint.to_s.empty?
+
+          result << "inherited_parent_state ref=#{FormattingHelpers.diagnostic_value(inherited_ref)} fingerprint=#{FormattingHelpers.diagnostic_value(inherited_fingerprint)}"
         end
       end
     end

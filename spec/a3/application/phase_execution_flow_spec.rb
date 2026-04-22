@@ -109,10 +109,10 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
       A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
     )
     allow(strategy).to receive(:execute).and_return(execution)
-    allow(strategy).to receive(:verification_summary).with(execution).and_return(nil)
+    allow(strategy).to receive(:verification_summary).with(have_attributes(summary: "completed", diagnostics: {})).and_return(nil)
     allow(strategy).to receive(:blocked_expected_state).and_return("phase succeeds")
     allow(strategy).to receive(:blocked_default_failing_command).and_return("adapter")
-    allow(strategy).to receive(:blocked_extra_diagnostics).with(execution).and_return(execution.diagnostics)
+    allow(strategy).to receive(:blocked_extra_diagnostics).with(have_attributes(summary: "completed", diagnostics: {})).and_return(execution.diagnostics)
 
     result = flow.call(
       task_ref: task.ref,
@@ -156,10 +156,10 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
       A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
     )
     allow(strategy).to receive(:execute).and_return(execution)
-    allow(strategy).to receive(:verification_summary).with(execution).and_return(nil)
+    allow(strategy).to receive(:verification_summary).with(have_attributes(summary: "completed")).and_return(nil)
     allow(strategy).to receive(:blocked_expected_state).and_return("phase succeeds")
     allow(strategy).to receive(:blocked_default_failing_command).and_return("adapter")
-    allow(strategy).to receive(:blocked_extra_diagnostics).with(execution).and_return(execution.diagnostics)
+    allow(strategy).to receive(:blocked_extra_diagnostics).with(have_attributes(summary: "completed")).and_return(execution.diagnostics)
 
     result = flow.call(
       task_ref: task.ref,
@@ -196,10 +196,10 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
       A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
     )
     allow(strategy).to receive(:execute).and_return(execution)
-    allow(strategy).to receive(:verification_summary).with(execution).and_return(nil)
+    allow(strategy).to receive(:verification_summary).with(have_attributes(summary: "failed", failing_command: "adapter", diagnostics: { "stderr" => "boom" })).and_return(nil)
     allow(strategy).to receive(:blocked_expected_state).and_return("phase succeeds")
     allow(strategy).to receive(:blocked_default_failing_command).and_return("adapter")
-    allow(strategy).to receive(:blocked_extra_diagnostics).with(execution).and_return(execution.diagnostics)
+    allow(strategy).to receive(:blocked_extra_diagnostics).with(have_attributes(summary: "failed", failing_command: "adapter", diagnostics: { "stderr" => "boom" })).and_return(execution.diagnostics)
 
     result = flow.call(
       task_ref: task.ref,
@@ -236,10 +236,10 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
       A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
     )
     allow(strategy).to receive(:execute).and_return(execution)
-    allow(strategy).to receive(:verification_summary).with(execution).and_return(nil)
+    allow(strategy).to receive(:verification_summary).with(have_attributes(summary: "completed")).and_return(nil)
     allow(strategy).to receive(:blocked_expected_state).and_return("phase succeeds")
     allow(strategy).to receive(:blocked_default_failing_command).and_return("adapter")
-    allow(strategy).to receive(:blocked_extra_diagnostics).with(execution).and_return(execution.diagnostics)
+    allow(strategy).to receive(:blocked_extra_diagnostics).with(have_attributes(summary: "completed")).and_return(execution.diagnostics)
 
     result = flow.call(
       task_ref: task.ref,
@@ -249,6 +249,52 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
     )
 
     expect(result.run.phase_records.last.execution_record.diagnostics).to include(
+      "inherited_parent_ref" => "refs/heads/a2o/parent/A3-v2-3022",
+      "inherited_parent_state_fingerprint" => "repo_alpha=parent-head-alpha-1|repo_beta=parent-head-beta-1"
+    )
+  end
+
+  it "persists inherited parent state in blocked diagnosis diagnostics when present" do
+    prepared_workspace = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: :ticket_workspace,
+      root_path: "/tmp/work",
+      source_descriptor: run.source_descriptor,
+      slot_paths: { repo_alpha: "/tmp/work/repo-alpha" }
+    )
+    execution = A3::Application::ExecutionResult.new(
+      success: false,
+      summary: "failed",
+      failing_command: "commands/verify-all",
+      observed_state: "exit 1"
+    )
+
+    allow(inherited_parent_state_resolver).to receive(:snapshot_for).with(task: task, phase: :implementation).and_return(
+      Struct.new(:ref, :heads_by_slot) do
+        def to_h
+          {
+            "inherited_parent_ref" => ref,
+            "inherited_parent_state_fingerprint" => heads_by_slot.sort_by { |slot, _head| slot.to_s }.map { |slot, head| "#{slot}=#{head}" }.join("|")
+          }
+        end
+      end.new("refs/heads/a2o/parent/A3-v2-3022", { "repo_alpha" => "parent-head-alpha-1", "repo_beta" => "parent-head-beta-1" })
+    )
+    allow(prepare_workspace).to receive(:call).and_return(
+      A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
+    )
+    allow(strategy).to receive(:execute).and_return(execution)
+    allow(strategy).to receive(:verification_summary).with(have_attributes(failing_command: "commands/verify-all")).and_return(nil)
+    allow(strategy).to receive(:blocked_expected_state).and_return("phase succeeds")
+    allow(strategy).to receive(:blocked_default_failing_command).and_return("adapter")
+    allow(strategy).to receive(:blocked_extra_diagnostics).with(have_attributes(failing_command: "commands/verify-all")).and_return({})
+
+    result = flow.call(
+      task_ref: task.ref,
+      run_ref: run.ref,
+      project_context: project_context,
+      strategy: strategy
+    )
+
+    expect(result.run.phase_records.last.blocked_diagnosis.infra_diagnostics).to include(
       "inherited_parent_ref" => "refs/heads/a2o/parent/A3-v2-3022",
       "inherited_parent_state_fingerprint" => "repo_alpha=parent-head-alpha-1|repo_beta=parent-head-beta-1"
     )

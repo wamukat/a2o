@@ -42,6 +42,7 @@ module A3
           runtime: runtime,
           workspace: prepared_workspace.workspace
         )
+        execution_with_context = merge_inherited_parent_diagnostics(task: task, run: run, execution: execution)
         A3::Infra::WorkspaceTraceLogger.log(
           workspace_root: prepared_workspace.workspace.root_path,
           event: "phase_execution.execute.finish",
@@ -49,10 +50,10 @@ module A3
             "task_ref" => task.ref,
             "run_ref" => run.ref,
             "phase" => run.phase.to_s,
-            "success" => execution.success,
-            "summary" => execution.summary,
-            "failing_command" => execution.failing_command,
-            "observed_state" => execution.observed_state
+            "success" => execution_with_context.success,
+            "summary" => execution_with_context.summary,
+            "failing_command" => execution_with_context.failing_command,
+            "observed_state" => execution_with_context.observed_state
           }
         )
         completion = @orchestrator.persist_and_complete(
@@ -61,17 +62,17 @@ module A3
           task: task,
           run: run,
           runtime: runtime,
-          execution: execution,
-          verification_summary: strategy.verification_summary(execution),
-          blocked_diagnosis: execution.success? ? nil : @blocked_diagnosis_factory.call(
+          execution: execution_with_context,
+          verification_summary: strategy.verification_summary(execution_with_context),
+          blocked_diagnosis: execution_with_context.success? ? nil : @blocked_diagnosis_factory.call(
             task: task,
             run: run,
-            execution: execution,
+            execution: execution_with_context,
             expected_state: strategy.blocked_expected_state,
             default_failing_command: strategy.blocked_default_failing_command,
-            extra_diagnostics: strategy.blocked_extra_diagnostics(execution)
+            extra_diagnostics: strategy.blocked_extra_diagnostics(execution_with_context)
           ),
-          execution_record: execution_record || default_execution_record(task: task, run: run, execution: execution, runtime: runtime)
+          execution_record: execution_record || default_execution_record(task: task, run: run, execution: execution_with_context, runtime: runtime)
         )
         A3::Infra::WorkspaceTraceLogger.log(
           workspace_root: prepared_workspace.workspace.root_path,
@@ -107,14 +108,17 @@ module A3
       end
 
       def default_execution_record(task:, run:, execution:, runtime:)
+        A3::Domain::PhaseExecutionRecord.from_execution_result(
+          execution,
+          runtime_snapshot: A3::Domain::PhaseRuntimeSnapshot.from_phase_runtime(runtime)
+        )
+      end
+
+      def merge_inherited_parent_diagnostics(task:, run:, execution:)
         diagnostics = execution.diagnostics.dup
         inherited_parent_snapshot = @inherited_parent_state_resolver&.snapshot_for(task: task, phase: run.phase)
         diagnostics.merge!(inherited_parent_snapshot.to_h) if inherited_parent_snapshot
-
-        A3::Domain::PhaseExecutionRecord.from_execution_result(
-          execution.with_diagnostics(diagnostics),
-          runtime_snapshot: A3::Domain::PhaseRuntimeSnapshot.from_phase_runtime(runtime)
-        )
+        execution.with_diagnostics(diagnostics)
       end
     end
   end

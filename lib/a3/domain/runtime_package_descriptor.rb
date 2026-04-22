@@ -340,6 +340,9 @@ module A3
           "review_workspace=runtime_workspace",
           "verification_workspace=runtime_workspace",
           "merge_workspace=runtime_workspace",
+          "runtime_workspace_kind=logical_phase_workspace",
+          "physical_workspace_layout=worker_gateway_mode_defined",
+          "agent_materialized_runtime_workspace=per_run_materialized",
           "missing_repo_rescue=forbidden",
           "source_descriptor_alignment=required_before_phase_start"
         ].join(" ")

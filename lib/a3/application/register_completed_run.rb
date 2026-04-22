@@ -210,12 +210,14 @@ module A3
 
         if blocked_diagnosis
           lines << "エラー分類: #{single_line(blocked_diagnosis.error_category)}"
-          lines << "ブロック要約: #{single_line(blocked_diagnosis.diagnostic_summary)}"
+          lines << "主要失敗要約: #{single_line(blocked_diagnosis.diagnostic_summary)}"
+          lines << "主要失敗コマンド: #{single_line(blocked_diagnosis.failing_command)}" if present?(blocked_diagnosis.failing_command)
+          append_inherited_parent_comment_lines(lines, execution_record&.diagnostics || blocked_diagnosis.infra_diagnostics)
           lines << "次の対応: #{single_line(blocked_diagnosis.remediation_summary)}"
-          lines << "失敗コマンド: #{single_line(blocked_diagnosis.failing_command)}" if present?(blocked_diagnosis.failing_command)
           lines << "観測状態: #{single_line(blocked_diagnosis.observed_state)}" if present?(blocked_diagnosis.observed_state)
         elsif execution_record&.failing_command
           lines << "失敗コマンド: #{single_line(execution_record.failing_command)}"
+          append_inherited_parent_comment_lines(lines, execution_record.diagnostics)
           lines << "観測状態: #{single_line(execution_record.observed_state)}" if present?(execution_record.observed_state)
         end
         Array(extra_lines).each { |line| lines << line }
@@ -236,6 +238,17 @@ module A3
         if present?(recovery["publish_before_head"]) || present?(recovery["publish_after_head"])
           lines << "merge_recovery_publish: #{single_line(recovery['publish_before_head'])}..#{single_line(recovery['publish_after_head'])}"
         end
+      end
+
+      def append_inherited_parent_comment_lines(lines, diagnostics)
+        return unless diagnostics.is_a?(Hash)
+
+        inherited_ref = diagnostics["inherited_parent_ref"]
+        inherited_fingerprint = diagnostics["inherited_parent_state_fingerprint"]
+        return unless present?(inherited_ref) || present?(inherited_fingerprint)
+
+        lines << "継承元親状態: #{single_line(inherited_ref)}" if present?(inherited_ref)
+        lines << "継承元親状態 fingerprint: #{single_line(inherited_fingerprint)}" if present?(inherited_fingerprint)
       end
 
       def latest_phase_record(run)

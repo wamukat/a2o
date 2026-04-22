@@ -154,7 +154,10 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       observed_state: "findings remain",
       failing_command: "review_worker",
       diagnostic_summary: "review found runner-layout gap in repo-alpha",
-      infra_diagnostics: {}
+      infra_diagnostics: {
+        "inherited_parent_ref" => "refs/heads/a2o/parent/A3-v2-3022",
+        "inherited_parent_state_fingerprint" => "repo_alpha=parent-head-alpha-1|repo_beta=parent-head-beta-1"
+      }
     )
     run_repository.save(review_run.append_blocked_diagnosis(blocked_diagnosis))
 
@@ -162,7 +165,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
-      body: a_string_matching(/A2O 実行完了: review.*エラー分類: executor_failed.*ブロック要約: review found runner-layout gap in repo-alpha.*次の対応: executor command.*失敗コマンド: review_worker.*観測状態: findings remain/m)
+      body: a_string_matching(/A2O 実行完了: review.*エラー分類: executor_failed.*主要失敗要約: review found runner-layout gap in repo-alpha.*主要失敗コマンド: review_worker.*継承元親状態: refs\/heads\/a2o\/parent\/A3-v2-3022.*次の対応: executor command.*観測状態: findings remain/m)
     )
     result = use_case.call(task_ref: task.ref, run_ref: review_run.ref, outcome: :blocked)
 
@@ -322,7 +325,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
-      body: a_string_matching(/ブロック要約: missing integration ref refs\/heads\/a2o\/parent\/A3-v2-3022 for slots repo_alpha/)
+      body: a_string_matching(/主要失敗要約: missing integration ref refs\/heads\/a2o\/parent\/A3-v2-3022 for slots repo_alpha/)
     )
 
     result = use_case.call(task_ref: task.ref, run_ref: merge_run.ref, outcome: :completed)

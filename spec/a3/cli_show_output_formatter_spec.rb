@@ -207,7 +207,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
       runtime_package_startup_blockers: "repo_sources",
       runtime_package_persistent_state_model: "scheduler_state_root=/tmp/runtime/state/scheduler task_repository_root=/tmp/runtime/state/tasks run_repository_root=/tmp/runtime/state/runs evidence_root=/tmp/runtime/state/evidence blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses artifact_owner_cache_root=/tmp/runtime/state/artifact_owner_cache logs_root=/tmp/runtime/state/logs workspace_root=/tmp/runtime/state/workspaces artifact_root=/tmp/runtime/state/artifacts",
       runtime_package_retention_policy: "terminal_workspace_cleanup=retention_policy_controlled blocked_evidence_retention=independent_from_scheduler_cleanup image_upgrade_cleanup_trigger=none",
-      runtime_package_materialization_model: "repo_slot_namespace=task_workspace_fixed implementation_workspace=ticket_workspace review_workspace=runtime_workspace verification_workspace=runtime_workspace merge_workspace=runtime_workspace missing_repo_rescue=forbidden source_descriptor_alignment=required_before_phase_start",
+      runtime_package_materialization_model: "repo_slot_namespace=task_workspace_fixed implementation_workspace=ticket_workspace review_workspace=runtime_workspace verification_workspace=runtime_workspace merge_workspace=runtime_workspace runtime_workspace_kind=logical_phase_workspace physical_workspace_layout=worker_gateway_mode_defined agent_materialized_runtime_workspace=per_run_materialized missing_repo_rescue=forbidden source_descriptor_alignment=required_before_phase_start",
       runtime_package_runtime_configuration_model: "project_config_path=required preset_dir=required storage_backend=required state_root=required workspace_root=required artifact_root=required repo_source_strategy=required repository_metadata=required authoritative_branch_resolution=required integration_target_resolution=required secret_reference=required",
       runtime_package_repository_metadata_model: "repository_metadata=runtime_package_scoped source_descriptor_ref_resolution=required review_target_resolution=evidence_driven",
       runtime_package_branch_resolution_model: "authoritative_branch_resolution=runtime_package_scoped integration_target_resolution=runtime_package_scoped branch_integration_inputs=required",
@@ -268,6 +268,9 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     result = described_class.blocked_diagnosis_lines(result)
 
     expect(result).to include("blocked diagnosis blocked for run-1 on A3-v2#child")
+    expect(result).to include("workspace_model=runtime_workspace is a logical phase workspace kind; inspect runtime_package_materialization_model for physical isolation")
+    expect(result).to include("primary_failure_command=codex exec --json -")
+    expect(result).to include("primary_failure_summary=review launch could not resolve runtime workspace")
     expect(result).to include("error_category=executor_failed")
     expect(result).to include("remediation=executor command が agent 環境で実行可能か、必要な binary と認証、出力 JSON を確認してください。")
     expect(result).to include("worker_response_bundle={\"success\"=>false, \"summary\"=>\"review blocked\", \"failing_command\"=>\"codex exec --json -\", \"observed_state\"=>\"repo-beta missing\"}")
@@ -290,7 +293,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     expect(result).to include("runtime_package_startup_blockers=repo_sources")
     expect(result).to include("runtime_package_persistent_state_model=scheduler_state_root=/tmp/runtime/state/scheduler task_repository_root=/tmp/runtime/state/tasks run_repository_root=/tmp/runtime/state/runs evidence_root=/tmp/runtime/state/evidence blocked_diagnosis_root=/tmp/runtime/state/blocked_diagnoses artifact_owner_cache_root=/tmp/runtime/state/artifact_owner_cache logs_root=/tmp/runtime/state/logs workspace_root=/tmp/runtime/state/workspaces artifact_root=/tmp/runtime/state/artifacts")
     expect(result).to include("runtime_package_retention_policy=terminal_workspace_cleanup=retention_policy_controlled blocked_evidence_retention=independent_from_scheduler_cleanup image_upgrade_cleanup_trigger=none")
-    expect(result).to include("runtime_package_materialization_model=repo_slot_namespace=task_workspace_fixed implementation_workspace=ticket_workspace review_workspace=runtime_workspace verification_workspace=runtime_workspace merge_workspace=runtime_workspace missing_repo_rescue=forbidden source_descriptor_alignment=required_before_phase_start")
+    expect(result).to include("runtime_package_materialization_model=repo_slot_namespace=task_workspace_fixed implementation_workspace=ticket_workspace review_workspace=runtime_workspace verification_workspace=runtime_workspace merge_workspace=runtime_workspace runtime_workspace_kind=logical_phase_workspace physical_workspace_layout=worker_gateway_mode_defined agent_materialized_runtime_workspace=per_run_materialized missing_repo_rescue=forbidden source_descriptor_alignment=required_before_phase_start")
     expect(result).to include("runtime_package_runtime_configuration_model=project_config_path=required preset_dir=required storage_backend=required state_root=required workspace_root=required artifact_root=required repo_source_strategy=required repository_metadata=required authoritative_branch_resolution=required integration_target_resolution=required secret_reference=required")
     expect(result).to include("runtime_package_deployment_shape=runtime_package=single_project writable_state=isolated scheduler_instance=single_project state_boundary=project secret_boundary=project")
     expect(result).to include("runtime_package_networking_boundary=outbound=git,issue_api,package_registry,llm_gateway,verification_service secret_source=secret_store token_scope=project")
@@ -698,6 +701,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     result = described_class.run_lines(run_view)
 
     expect(result).to include("run run-1 task=A3-v2#child phase=verification workspace=runtime_workspace source=detached_commit:head456 outcome=blocked")
+    expect(result).to include("workspace_model=runtime_workspace is a logical phase workspace kind; inspect runtime_package_materialization_model for physical isolation")
     expect(result).to include("latest_execution phase=verification summary=review launch could not resolve runtime workspace")
     expect(result).to include("worker_response_bundle={\"success\"=>false, \"summary\"=>\"review blocked\", \"failing_command\"=>\"codex exec --json -\", \"observed_state\"=>\"repo-beta missing\"}")
     expect(result).to include("runtime_package_action=inspect_runtime_package")

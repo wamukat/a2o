@@ -14,14 +14,24 @@ module A3
             recovery = result.recovery
             worker_response_bundle = result.worker_response_bundle
             phase = A3::Domain::TaskPhaseProjection.phase_for(task_kind: result.task.kind, phase: diagnosis.phase)
+            inherited_ref = diagnosis.infra_diagnostics["inherited_parent_ref"]
+            inherited_fingerprint = diagnosis.infra_diagnostics["inherited_parent_state_fingerprint"]
 
             output << "blocked diagnosis #{diagnosis.outcome} for #{result.run.ref} on #{result.task.ref}"
             output << "phase=#{phase} observed=#{diagnosis.observed_state}"
+            if diagnosis.source_descriptor&.runtime_workspace?
+              output << "workspace_model=runtime_workspace is a logical phase workspace kind; inspect runtime_package_materialization_model for physical isolation"
+            end
+            output << "primary_failure_command=#{FormattingHelpers.diagnostic_value(diagnosis.failing_command)}"
+            output << "primary_failure_summary=#{diagnosis.diagnostic_summary}"
             output << "expected=#{diagnosis.expected_state}"
             output << "failing_command=#{FormattingHelpers.diagnostic_value(diagnosis.failing_command)}"
             output << "summary=#{diagnosis.diagnostic_summary}"
             output << "error_category=#{diagnosis.error_category}"
             output << "remediation=#{diagnosis.remediation_summary}"
+            if inherited_ref || inherited_fingerprint
+              output << "inherited_parent_state ref=#{FormattingHelpers.diagnostic_value(inherited_ref)} fingerprint=#{FormattingHelpers.diagnostic_value(inherited_fingerprint)}"
+            end
             output << "worker_response_bundle=#{FormattingHelpers.diagnostic_value(worker_response_bundle)}" if worker_response_bundle
             output << "recovery decision=#{recovery.decision} next_action=#{recovery.next_action} operator_action_required=#{recovery.operator_action_required}"
             output << "runtime_package_action=#{recovery.package_expectation}"
@@ -76,6 +86,8 @@ module A3
               output << "phase_records=#{summary_snapshot.phase_records_count}"
             end
             diagnosis.infra_diagnostics.sort.each do |key, value|
+              next if %w[inherited_parent_ref inherited_parent_state_fingerprint].include?(key)
+
               output << "diagnostic.#{key}=#{FormattingHelpers.diagnostic_value(value)}"
             end
           end
