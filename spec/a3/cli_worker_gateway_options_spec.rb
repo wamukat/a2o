@@ -94,6 +94,10 @@ RSpec.describe "A3 CLI worker gateway options" do
         agent_control_plane_url: "http://127.0.0.1:4567",
         agent_runtime_profile: "host-local",
         agent_shared_workspace_mode: "agent-materialized",
+        repo_sources: {
+          repo_alpha: "/repos/repo_alpha",
+          repo_beta: "/repos/repo_beta"
+        },
         agent_source_aliases: {
           "repo_alpha" => "sample-alpha",
           "repo_beta" => "sample-beta"
@@ -106,6 +110,7 @@ RSpec.describe "A3 CLI worker gateway options" do
 
     expect(gateway).to be_a(A3::Infra::AgentWorkerGateway)
     builder = gateway.instance_variable_get(:@workspace_request_builder)
+    expect(builder.instance_variable_get(:@required_repo_slots)).to eq(%i[repo_alpha repo_beta])
     expect(builder.instance_variable_get(:@support_refs)).to include(default: "refs/heads/feature/prototype")
   end
 
