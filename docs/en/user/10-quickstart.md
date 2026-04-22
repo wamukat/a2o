@@ -31,11 +31,11 @@ mkdir -p "$HOME/.local/bin" "$HOME/.local/share"
 
 docker run --rm \
   -v "$HOME/.local:/install" \
-  ghcr.io/wamukat/a2o-engine:0.5.13 \
+  ghcr.io/wamukat/a2o-engine:0.5.14 \
   a2o host install \
     --output-dir /install/bin \
     --share-dir /install/share/a2o \
-    --runtime-image ghcr.io/wamukat/a2o-engine:0.5.13
+    --runtime-image ghcr.io/wamukat/a2o-engine:0.5.14
 
 export PATH="$HOME/.local/bin:$PATH"
 ```
