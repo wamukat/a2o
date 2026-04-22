@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+require "a3/domain/agent_workspace_request"
+require "a3/domain/branch_namespace"
+require "a3/domain/configuration_error"
+
 module A3
   module Infra
     class AgentWorkspaceRequestBuilder

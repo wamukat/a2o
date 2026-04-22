@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "a3/domain/branch_namespace"
 require "open3"
 require "pathname"
 

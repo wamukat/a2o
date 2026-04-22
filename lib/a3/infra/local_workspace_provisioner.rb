@@ -3,6 +3,8 @@
 require "fileutils"
 require "json"
 require "pathname"
+require "a3/domain/branch_namespace"
+require "a3/infra/local_git_workspace_backend"
 require "a3/infra/workspace_trace_logger"
 
 module A3
