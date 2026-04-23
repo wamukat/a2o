@@ -80,6 +80,48 @@ RSpec.describe A3::Application::SyncExternalTasks do
     expect(result.preserved_active_task_refs).to eq(["Sample#3046"])
   end
 
+  it "recovers automation_enabled for an active topology-imported task when direct fetch still matches trigger labels" do
+    local_task = A3::Domain::Task.new(
+      ref: "Sample#3046",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :in_progress,
+      current_run_ref: "run-1",
+      external_task_id: 3046,
+      automation_enabled: false
+    )
+    imported_task = A3::Domain::Task.new(
+      ref: "Sample#3046",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :verifying,
+      external_task_id: 3046,
+      automation_enabled: false
+    )
+    direct_task = A3::Domain::Task.new(
+      ref: "Sample#3046",
+      kind: :single,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :verifying,
+      external_task_id: 3046,
+      automation_enabled: true
+    )
+    task_repository.save(local_task)
+    allow(external_task_source).to receive(:load).and_return([imported_task])
+    allow(external_task_source).to receive(:fetch_by_external_task_id).with(3046).and_return(direct_task)
+
+    result = use_case.call
+
+    reconciled = task_repository.fetch("Sample#3046")
+    expect(reconciled.status).to eq(:in_progress)
+    expect(reconciled.current_run_ref).to eq("run-1")
+    expect(reconciled.automation_enabled).to eq(true)
+    expect(result.preserved_active_task_refs).to eq(["Sample#3046"])
+  end
+
   it "preserves active parent-child topology when the imported task still reports hidden unresolved children" do
     local_task = A3::Domain::Task.new(
       ref: "Sample#3046",

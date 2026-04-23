@@ -93,7 +93,7 @@ module A3
           priority: imported_task.priority,
           external_task_id: imported_task.external_task_id,
           verification_source_ref: existing_task.verification_source_ref,
-          automation_enabled: imported_task.automation_enabled
+          automation_enabled: reconcile_automation_enabled(existing_task, imported_task)
         )
       end
 
