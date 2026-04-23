@@ -26,8 +26,11 @@ RSpec.describe A3::Adapters::TaskRecord do
       "current_run_ref" => "run-1",
       "parent_ref" => "A3-v2#3022",
       "child_refs" => [],
+      "blocking_task_refs" => [],
+      "priority" => 0,
       "external_task_id" => 3025,
-      "verification_source_ref" => "refs/heads/a2o/recovered/A3-v2-3025"
+      "verification_source_ref" => "refs/heads/a2o/recovered/A3-v2-3025",
+      "automation_enabled" => true
     )
     expect(restored).to eq(task)
   end

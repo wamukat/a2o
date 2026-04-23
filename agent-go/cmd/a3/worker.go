@@ -44,7 +44,7 @@ func runWorkerScaffold(args []string, stdout io.Writer, stderr io.Writer) error 
 	flags := flag.NewFlagSet("a2o worker scaffold", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 
-	language := flags.String("language", "python", "worker language: bash, python, ruby, go")
+	language := flags.String("language", "python", "worker language: bash, python, ruby, go, copilot")
 	outputPath := flags.String("output", "", "worker file path to write")
 	force := flags.Bool("force", false, "overwrite an existing worker file")
 	if err := flags.Parse(args); err != nil {
@@ -156,8 +156,10 @@ func workerScaffoldTemplate(language string) (string, os.FileMode, error) {
 		return rubyWorkerScaffold, 0o755, nil
 	case "go":
 		return goWorkerScaffold, 0o644, nil
+	case "copilot":
+		return copilotWorkerScaffold, 0o755, nil
 	default:
-		return "", 0, fmt.Errorf("--language must be one of bash, python, ruby, go")
+		return "", 0, fmt.Errorf("--language must be one of bash, python, ruby, go, copilot")
 	}
 }
 
@@ -176,6 +178,8 @@ func normalizeWorkerLanguage(language string) string {
 		return "python"
 	case "golang":
 		return "go"
+	case "github-copilot", "gh-copilot":
+		return "copilot"
 	default:
 		return strings.ToLower(strings.TrimSpace(language))
 	}
@@ -253,11 +257,16 @@ func validatePublicWorkerPayload(payload map[string]any, request map[string]any,
 			errors = append(errors, validateChangedFiles(changedFilesMap)...)
 		}
 	}
-	if publicWorkerNeedsReviewDisposition(request) {
+	if publicWorkerNeedsReviewDisposition(request, success) {
 		rawDisposition, ok := payload["review_disposition"]
 		if !ok {
-			errors = append(errors, "review_disposition must be present")
+			if workerStringValue(request["phase"]) == "implementation" {
+				errors = append(errors, "review_disposition must be present for implementation success")
+			} else {
+				errors = append(errors, "review_disposition must be present for parent review")
+			}
 		} else if workerStringValue(request["phase"]) == "implementation" && rawDisposition == nil {
+			errors = append(errors, "review_disposition must be present for implementation success")
 			return errors
 		} else {
 			disposition, ok := rawDisposition.(map[string]any)
@@ -364,18 +373,15 @@ func validReviewDispositionRepoScopes(request map[string]any, includeUnresolved 
 func publicWorkerRequiredFields(request map[string]any) []string {
 	fields := []string{"task_ref", "run_ref", "phase", "success", "summary", "failing_command", "observed_state", "rework_required"}
 	phase := workerStringValue(request["phase"])
-	if phase == "implementation" {
-		fields = append(fields, "changed_files", "review_disposition")
-	}
 	if phase == "review" && workerNestedString(request, "phase_runtime", "task_kind") == "parent" {
 		fields = append(fields, "review_disposition")
 	}
 	return fields
 }
 
-func publicWorkerNeedsReviewDisposition(request map[string]any) bool {
+func publicWorkerNeedsReviewDisposition(request map[string]any, success bool) bool {
 	phase := workerStringValue(request["phase"])
-	return phase == "implementation" || (phase == "review" && workerNestedString(request, "phase_runtime", "task_kind") == "parent")
+	return (phase == "implementation" && success) || (phase == "review" && workerNestedString(request, "phase_runtime", "task_kind") == "parent")
 }
 
 func workerStringValue(value any) string {
@@ -440,6 +446,146 @@ def main():
     with open(args.result, "w", encoding="utf-8") as handle:
         json.dump(result, handle, indent=2)
         handle.write("\n")
+
+
+if __name__ == "__main__":
+    main()
+`
+
+const copilotWorkerScaffold = `#!/usr/bin/env python3
+"""A2O Copilot worker wrapper scaffold.
+
+Configure A2O_COPILOT_COMMAND to a command that reads the A2O stdin bundle
+from stdin and prints the final A2O worker result JSON to stdout.
+
+Example:
+  export A2O_COPILOT_COMMAND='your-copilot-wrapper --json'
+"""
+
+import argparse
+import json
+import os
+import shlex
+import subprocess
+import sys
+
+
+def load_bundle():
+    raw = sys.stdin.read()
+    try:
+        parsed = json.loads(raw) if raw.strip() else {}
+    except json.JSONDecodeError:
+        parsed = {}
+    request = parsed.get("request", parsed) if isinstance(parsed, dict) else {}
+    if not isinstance(request, dict):
+        request = {}
+    return raw, request
+
+
+def failure(request, summary, command, observed_state, diagnostics=None):
+    return {
+        "task_ref": request.get("task_ref", ""),
+        "run_ref": request.get("run_ref", ""),
+        "phase": request.get("phase", ""),
+        "success": False,
+        "summary": summary,
+        "failing_command": command,
+        "observed_state": observed_state,
+        "rework_required": False,
+        "diagnostics": diagnostics or {},
+    }
+
+
+def write_result(path, payload):
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2)
+        handle.write("\n")
+
+
+def validate_contract(request, payload):
+    if not isinstance(payload, dict):
+        return "copilot worker output must be a JSON object"
+    if payload.get("success") is True and request.get("phase") == "implementation":
+        if "review_disposition" not in payload or payload.get("review_disposition") is None:
+            return "review_disposition must be present for implementation success"
+    return None
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--schema", required=False)
+    parser.add_argument("--result", required=True)
+    args = parser.parse_args()
+
+    bundle_raw, request = load_bundle()
+    command_text = os.environ.get("A2O_COPILOT_COMMAND", "").strip()
+    if not command_text:
+        write_result(
+            args.result,
+            failure(
+                request,
+                "copilot worker command is not configured",
+                "A2O_COPILOT_COMMAND",
+                "missing_copilot_command",
+                {
+                    "expected": "Set A2O_COPILOT_COMMAND to a command that prints A2O worker result JSON.",
+                    "schema_path": args.schema,
+                },
+            ),
+        )
+        return
+
+    command = shlex.split(command_text)
+    completed = subprocess.run(
+        command,
+        input=bundle_raw,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        write_result(
+            args.result,
+            failure(
+                request,
+                "copilot worker command failed",
+                command[0],
+                f"exit {completed.returncode}",
+                {"stderr": completed.stderr[-4000:], "stdout": completed.stdout[-4000:]},
+            ),
+        )
+        return
+
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        write_result(
+            args.result,
+            failure(
+                request,
+                "copilot worker output was not valid JSON",
+                command[0],
+                "invalid_copilot_json",
+                {"stdout": completed.stdout[-4000:], "stderr": completed.stderr[-4000:]},
+            ),
+        )
+        return
+
+    contract_error = validate_contract(request, payload)
+    if contract_error:
+        write_result(
+            args.result,
+            failure(
+                request,
+                "copilot worker result contract invalid",
+                command[0],
+                "invalid_copilot_result",
+                {"validation_errors": [contract_error]},
+            ),
+        )
+        return
+
+    write_result(args.result, payload)
 
 
 if __name__ == "__main__":

@@ -121,7 +121,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o project lint [--package DIR] [--config project-test.yaml]")
 	fmt.Fprintln(w, "  a2o project validate [--package DIR] [--config project-test.yaml]")
 	fmt.Fprintln(w, "  a2o project template [--language node|go|python|ruby] [--with-skills] [--output project.yaml]")
-	fmt.Fprintln(w, "  a2o worker scaffold --language bash|python|ruby|go --output PATH")
+	fmt.Fprintln(w, "  a2o worker scaffold --language bash|python|ruby|go|copilot --output PATH")
 	fmt.Fprintln(w, "  a2o worker validate-result --request request.json --result result.json [--review-scope SCOPE] [--repo-scope-alias FROM=TO]")
 	fmt.Fprintln(w, "  a2o kanban up [--build]")
 	fmt.Fprintln(w, "  a2o kanban doctor")

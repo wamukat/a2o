@@ -951,6 +951,92 @@ func TestWorkerScaffoldGoPrintsGoRunCommandAndValidates(t *testing.T) {
 	}
 }
 
+func TestWorkerScaffoldCopilotWrapsConfiguredCommandAndValidates(t *testing.T) {
+	tempDir := t.TempDir()
+	workerPath := filepath.Join(tempDir, "copilot-a2o-worker")
+	fakeCopilotPath := filepath.Join(tempDir, "fake-copilot.py")
+	resultPath := filepath.Join(tempDir, "result.json")
+	requestPath := filepath.Join(tempDir, "request.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"worker",
+		"scaffold",
+		"--language",
+		"copilot",
+		"--output",
+		workerPath,
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "worker_scaffold_written path="+workerPath+" language=copilot") {
+		t.Fatalf("stdout should describe copilot scaffold, got %q", stdout.String())
+	}
+	if !strings.Contains(readFileString(t, workerPath), "A2O_COPILOT_COMMAND") {
+		t.Fatalf("copilot scaffold should document A2O_COPILOT_COMMAND:\n%s", readFileString(t, workerPath))
+	}
+
+	fakeCopilot := `#!/usr/bin/env python3
+import json
+import sys
+
+bundle = json.load(sys.stdin)
+request = bundle["request"]
+repo_scope = next(iter(request["slot_paths"]))
+json.dump({
+    "task_ref": request["task_ref"],
+    "run_ref": request["run_ref"],
+    "phase": request["phase"],
+    "success": True,
+    "summary": "copilot implemented",
+    "failing_command": None,
+    "observed_state": None,
+    "rework_required": False,
+    "changed_files": {},
+    "review_disposition": {
+        "kind": "completed",
+        "repo_scope": repo_scope,
+        "summary": "copilot self-review clean",
+        "description": "The Copilot wrapper preserved the A2O response contract.",
+        "finding_key": "completed-no-findings"
+    }
+}, sys.stdout)
+`
+	if err := os.WriteFile(fakeCopilotPath, []byte(fakeCopilot), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	request := map[string]any{
+		"task_ref":   "A2O#62",
+		"run_ref":    "run-copilot",
+		"phase":      "implementation",
+		"slot_paths": map[string]any{"app": filepath.Join(tempDir, "app")},
+	}
+	writeJSONFileForTest(t, requestPath, request)
+	bundleBody, err := json.Marshal(map[string]any{"request": request})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(workerPath, "--schema", filepath.Join(tempDir, "schema.json"), "--result", resultPath)
+	cmd.Env = append(os.Environ(), "A2O_COPILOT_COMMAND="+fakeCopilotPath)
+	cmd.Stdin = bytes.NewReader(bundleBody)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("generated copilot worker failed: %v\n%s", err, string(output))
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"worker", "validate-result", "--request", requestPath, "--result", resultPath}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("validate-result returned %d, stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "worker_protocol_status=ok") {
+		t.Fatalf("validate-result should report ok, got %q", stdout.String())
+	}
+}
+
 func TestWorkerValidateResultReportsConcreteProtocolErrors(t *testing.T) {
 	tempDir := t.TempDir()
 	requestPath := filepath.Join(tempDir, "request.json")
@@ -980,8 +1066,6 @@ func TestWorkerValidateResultReportsConcreteProtocolErrors(t *testing.T) {
 	for _, want := range []string{
 		"worker_protocol_check name=result_schema status=blocked",
 		"worker_protocol_error=summary must be present",
-		"worker_protocol_error=changed_files must be present",
-		"worker_protocol_error=review_disposition must be present",
 		"worker_protocol_error=phase must match the worker request",
 		"worker_protocol_error=success must be true or false",
 		"worker_protocol_status=blocked",
@@ -992,6 +1076,41 @@ func TestWorkerValidateResultReportsConcreteProtocolErrors(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "error_category=configuration_error") {
 		t.Fatalf("stderr should classify protocol error, got %q", stderr.String())
+	}
+}
+
+func TestWorkerValidateResultRequiresReviewDispositionForImplementationSuccess(t *testing.T) {
+	tempDir := t.TempDir()
+	requestPath := filepath.Join(tempDir, "request.json")
+	resultPath := filepath.Join(tempDir, "result.json")
+	request := map[string]any{
+		"task_ref":   "A2O#62",
+		"run_ref":    "run-1",
+		"phase":      "implementation",
+		"slot_paths": map[string]any{"app": filepath.Join(tempDir, "app")},
+	}
+	result := map[string]any{
+		"task_ref":        "A2O#62",
+		"run_ref":         "run-1",
+		"phase":           "implementation",
+		"success":         true,
+		"summary":         "implemented",
+		"failing_command": nil,
+		"observed_state":  nil,
+		"rework_required": false,
+		"changed_files":   map[string]any{},
+	}
+	writeJSONFileForTest(t, requestPath, request)
+	writeJSONFileForTest(t, resultPath, result)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"worker", "validate-result", "--request", requestPath, "--result", resultPath}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("validate-result should fail")
+	}
+	if !strings.Contains(stdout.String(), "worker_protocol_error=review_disposition must be present for implementation success") {
+		t.Fatalf("validate-result output missing review_disposition error in:\n%s", stdout.String())
 	}
 }
 
@@ -1047,7 +1166,7 @@ func TestWorkerValidateResultRejectsRuntimeProtocolShapeMismatches(t *testing.T)
 	}
 }
 
-func TestWorkerValidateResultAllowsNullableImplementationEvidence(t *testing.T) {
+func TestWorkerValidateResultRejectsNullableImplementationReviewEvidence(t *testing.T) {
 	tempDir := t.TempDir()
 	requestPath := filepath.Join(tempDir, "request.json")
 	resultPath := filepath.Join(tempDir, "result.json")
@@ -1075,11 +1194,11 @@ func TestWorkerValidateResultAllowsNullableImplementationEvidence(t *testing.T) 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	code := run([]string{"worker", "validate-result", "--request", requestPath, "--result", resultPath}, &fakeRunner{}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("validate-result returned %d, stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	if code == 0 {
+		t.Fatalf("validate-result should fail")
 	}
-	if !strings.Contains(stdout.String(), "worker_protocol_status=ok") {
-		t.Fatalf("validate-result should report ok, got %q", stdout.String())
+	if !strings.Contains(stdout.String(), "worker_protocol_error=review_disposition must be present for implementation success") {
+		t.Fatalf("validate-result output missing review_disposition error in:\n%s", stdout.String())
 	}
 }
 
@@ -1326,7 +1445,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime clear-logs (--task-ref TASK_REF | --run-ref RUN_REF | --all-analysis) [--phase PHASE] [--role ROLE] [--apply]",
 		"a2o runtime run-once [--max-steps N] [--agent-attempts N] [--agent-poll-interval DURATION]",
 		"a2o runtime loop [--interval DURATION] [--max-cycles N] [--agent-poll-interval DURATION]",
-		"a2o agent install [--target auto] [--output PATH] [--build]",
+		"a2o agent install [--target auto] [--output PATH] [--package-source auto|package-dir|runtime-image] [--package-dir DIR] [--build]",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("usage missing %q in %q", want, output)
