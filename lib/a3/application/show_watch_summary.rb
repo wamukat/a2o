@@ -100,7 +100,7 @@ module A3
         running_entry = build_running_entry(runtime_task, run: current_run)
         runnable_phase = task.runnable_phase
         upstream_assessment = @upstream_line_guard.evaluate(task: task, phase: runnable_phase, tasks: tasks, runs: runs)
-        blocked_lines = build_detail_lines(runtime_task, latest_run, assessment, upstream_assessment)
+        blocked_lines = build_detail_lines(runtime_task, task_runs, assessment, upstream_assessment)
         kanban_snapshot = resolve_kanban_snapshot(task)
         waiting = waiting_assessment?(assessment) || !upstream_assessment.healthy?
 
@@ -184,12 +184,13 @@ module A3
         %i[in_progress in_review verifying merging].include?(status)
       end
 
-      def build_detail_lines(task, run, assessment, upstream_assessment)
+      def build_detail_lines(task, task_runs, assessment, upstream_assessment)
         lines = []
+        latest_run = task_runs.last
         if task.verification_source_ref
           lines << "merge_recovery verification_source_ref=#{task.verification_source_ref}"
         end
-        append_review_disposition_lines(lines, run)
+        append_review_disposition_lines(lines, task_runs)
         unless upstream_assessment.healthy?
           lines << "waiting_reason=#{upstream_assessment.reason}"
           unless upstream_assessment.blocking_task_refs.empty?
@@ -202,8 +203,8 @@ module A3
             lines << "waiting_on=#{assessment.blocking_task_refs.join(',')}"
           end
         end
-        if run
-          phase_record = run.phase_records.reverse_each.find { |item| !item.blocked_diagnosis.nil? }
+        if latest_run
+          phase_record = latest_run.phase_records.reverse_each.find { |item| !item.blocked_diagnosis.nil? }
           diagnosis = phase_record&.blocked_diagnosis
           if diagnosis
             lines << "error_category=#{diagnosis.error_category}"
@@ -214,8 +215,8 @@ module A3
         lines.freeze
       end
 
-      def append_review_disposition_lines(lines, run)
-        disposition = latest_review_disposition(run)
+      def append_review_disposition_lines(lines, task_runs)
+        disposition = latest_review_disposition(task_runs)
         return unless disposition
 
         fields = []
@@ -226,12 +227,12 @@ module A3
         lines << "review_summary=#{single_line(disposition['summary'])}" if present?(disposition["summary"])
       end
 
-      def latest_review_disposition(run)
-        return nil unless run
-
-        run.phase_records.reverse_each do |record|
-          disposition = record.execution_record&.review_disposition
-          return disposition if disposition.is_a?(Hash)
+      def latest_review_disposition(task_runs)
+        task_runs.reverse_each do |run|
+          run.phase_records.reverse_each do |record|
+            disposition = record.execution_record&.review_disposition
+            return disposition if disposition.is_a?(Hash)
+          end
         end
         nil
       end
