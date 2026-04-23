@@ -187,8 +187,15 @@ module A3
       end
 
       def build_tasks(snapshots, topology_snapshots:, child_refs_by_parent:)
+        trigger_selected_refs = snapshots.map { |snapshot| snapshot.fetch("ref") }.to_set
         relevant_snapshots = select_relevant_snapshots(selection_snapshots: snapshots, topology_snapshots: topology_snapshots)
-        relevant_snapshots.map { |snapshot| build_task_from_snapshot(snapshot, child_refs_by_parent: child_refs_by_parent) }.freeze
+        relevant_snapshots.map do |snapshot|
+          build_task_from_snapshot(
+            snapshot,
+            child_refs_by_parent: child_refs_by_parent,
+            automation_enabled: trigger_selected_refs.include?(snapshot.fetch("ref"))
+          )
+        end.freeze
       end
 
       def select_relevant_snapshots(selection_snapshots:, topology_snapshots:)
@@ -244,7 +251,7 @@ module A3
         end.freeze
       end
 
-      def build_task_from_snapshot(snapshot, child_refs_by_parent:)
+      def build_task_from_snapshot(snapshot, child_refs_by_parent:, automation_enabled:)
         child_refs = child_refs_by_parent.fetch(snapshot.fetch("ref"), []).sort.freeze
         task_kind = task_kind_for(snapshot: snapshot, child_refs: child_refs)
         A3::Domain::Task.new(
@@ -257,7 +264,8 @@ module A3
           child_refs: child_refs,
           blocking_task_refs: snapshot.fetch("blocking_task_refs", []),
           priority: snapshot.fetch("priority", 0),
-          external_task_id: snapshot.fetch("task_id")
+          external_task_id: snapshot.fetch("task_id"),
+          automation_enabled: automation_enabled
         )
       end
 
@@ -273,7 +281,8 @@ module A3
           child_refs: [],
           blocking_task_refs: snapshot.fetch("blocking_task_refs", []),
           priority: snapshot.fetch("priority", 0),
-          external_task_id: snapshot.fetch("task_id")
+          external_task_id: snapshot.fetch("task_id"),
+          automation_enabled: true
         )
       end
 

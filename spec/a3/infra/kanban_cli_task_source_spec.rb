@@ -590,6 +590,8 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
       expect(tasks.map(&:ref)).to eq(["Sample#5300", "Sample#5301"])
       expect(parent.child_refs).to eq(["Sample#5301"])
       expect(child.status).to eq(:done)
+      expect(parent.automation_enabled).to eq(true)
+      expect(child.automation_enabled).to eq(false)
     end
   end
 

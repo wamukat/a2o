@@ -5,9 +5,9 @@ module A3
     class InvalidPhaseError < StandardError; end
 
     class Task
-      attr_reader :ref, :kind, :edit_scope, :verification_scope, :status, :current_run_ref, :parent_ref, :child_refs, :blocking_task_refs, :priority, :external_task_id, :verification_source_ref
+      attr_reader :ref, :kind, :edit_scope, :verification_scope, :status, :current_run_ref, :parent_ref, :child_refs, :blocking_task_refs, :priority, :external_task_id, :verification_source_ref, :automation_enabled
 
-      def initialize(ref:, kind:, edit_scope:, verification_scope: nil, status: :todo, current_run_ref: nil, parent_ref: nil, child_refs: [], blocking_task_refs: [], priority: 0, external_task_id: nil, verification_source_ref: nil)
+      def initialize(ref:, kind:, edit_scope:, verification_scope: nil, status: :todo, current_run_ref: nil, parent_ref: nil, child_refs: [], blocking_task_refs: [], priority: 0, external_task_id: nil, verification_source_ref: nil, automation_enabled: true)
         @ref = ref
         @kind = kind.to_sym
         @edit_scope = Array(edit_scope).map(&:to_sym).freeze
@@ -20,6 +20,7 @@ module A3
         @priority = Integer(priority || 0)
         @external_task_id = external_task_id && Integer(external_task_id)
         @verification_source_ref = normalize_optional_ref(verification_source_ref)
+        @automation_enabled = !!automation_enabled
         freeze
       end
 
@@ -48,7 +49,8 @@ module A3
           blocking_task_refs: blocking_task_refs,
           priority: priority,
           external_task_id: external_task_id,
-          verification_source_ref: verification_source_ref
+          verification_source_ref: verification_source_ref,
+          automation_enabled: automation_enabled
         )
       end
 
@@ -72,7 +74,8 @@ module A3
           blocking_task_refs: blocking_task_refs,
           priority: priority,
           external_task_id: external_task_id,
-          verification_source_ref: verification_source_ref
+          verification_source_ref: verification_source_ref,
+          automation_enabled: automation_enabled
         )
       end
 
@@ -89,7 +92,8 @@ module A3
           blocking_task_refs: blocking_task_refs,
           priority: priority,
           external_task_id: external_task_id,
-          verification_source_ref: source_ref
+          verification_source_ref: source_ref,
+          automation_enabled: automation_enabled
         )
       end
 
@@ -131,7 +135,8 @@ module A3
           other.blocking_task_refs == blocking_task_refs &&
           other.priority == priority &&
           other.external_task_id == external_task_id &&
-          other.verification_source_ref == verification_source_ref
+          other.verification_source_ref == verification_source_ref &&
+          other.automation_enabled == automation_enabled
       end
       alias eql? ==
 

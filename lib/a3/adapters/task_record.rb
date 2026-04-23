@@ -18,7 +18,8 @@ module A3
           "blocking_task_refs" => task.blocking_task_refs,
           "priority" => task.priority,
           "external_task_id" => task.external_task_id,
-          "verification_source_ref" => task.verification_source_ref
+          "verification_source_ref" => task.verification_source_ref,
+          "automation_enabled" => task.automation_enabled
         }
       end
 
@@ -35,7 +36,8 @@ module A3
           blocking_task_refs: record.fetch("blocking_task_refs", []),
           priority: record.fetch("priority", 0),
           external_task_id: record["external_task_id"],
-          verification_source_ref: record["verification_source_ref"]
+          verification_source_ref: record["verification_source_ref"],
+          automation_enabled: record.fetch("automation_enabled", true)
         )
       end
     end

@@ -59,6 +59,35 @@ RSpec.describe A3::Application::PlanNextRunnableTask do
     expect(result.phase).to eq(:implementation)
   end
 
+  it "does not select topology-only tasks even when they would otherwise be runnable" do
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#3022",
+        kind: :single,
+        edit_scope: [:repo_beta],
+        status: :todo,
+        priority: 4,
+        automation_enabled: false
+      )
+    )
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#3023",
+        kind: :single,
+        edit_scope: [:repo_alpha],
+        status: :todo,
+        priority: 2,
+        automation_enabled: true
+      )
+    )
+
+    result = use_case.call
+
+    expect(result.task&.ref).to eq("A3-v2#3023")
+    blocked_assessment = result.assessments.find { |assessment| assessment.task_ref == "A3-v2#3022" }
+    expect(blocked_assessment.reason).to eq(:not_trigger_selected)
+  end
+
   it "keeps ref ordering as the tie-breaker for equal priority tasks" do
     task_repository.save(
       A3::Domain::Task.new(

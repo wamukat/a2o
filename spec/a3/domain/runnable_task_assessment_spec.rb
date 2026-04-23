@@ -86,6 +86,22 @@ RSpec.describe A3::Domain::RunnableTaskAssessment do
     expect(assessment.blocking_task_refs).to eq([blocker.ref])
   end
 
+  it "does not mark topology-only tasks as runnable" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3043",
+      kind: :single,
+      edit_scope: [:repo_alpha],
+      status: :todo,
+      automation_enabled: false
+    )
+
+    assessment = described_class.evaluate(task: task, tasks: [task])
+
+    expect(assessment.runnable?).to eq(false)
+    expect(assessment.reason).to eq(:not_trigger_selected)
+    expect(assessment.phase).to eq(:implementation)
+  end
+
   it "treats a missing cached child as pending once parent topology is known" do
     parent = A3::Domain::Task.new(
       ref: "A3-v2#3040",

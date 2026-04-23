@@ -92,11 +92,12 @@ module A3
           blocking_task_refs: imported_task.blocking_task_refs,
           priority: imported_task.priority,
           external_task_id: imported_task.external_task_id,
-          verification_source_ref: existing_task.verification_source_ref
+          verification_source_ref: existing_task.verification_source_ref,
+          automation_enabled: imported_task.automation_enabled
         )
       end
 
-      def build_reconciled_task(ref:, kind:, edit_scope:, verification_scope:, status:, current_run_ref:, parent_ref:, child_refs:, blocking_task_refs:, priority:, external_task_id:, verification_source_ref: nil)
+      def build_reconciled_task(ref:, kind:, edit_scope:, verification_scope:, status:, current_run_ref:, parent_ref:, child_refs:, blocking_task_refs:, priority:, external_task_id:, verification_source_ref: nil, automation_enabled: true)
         A3::Domain::Task.new(
           ref: ref,
           kind: kind,
@@ -109,7 +110,8 @@ module A3
           blocking_task_refs: blocking_task_refs,
           priority: priority,
           external_task_id: external_task_id,
-          verification_source_ref: verification_source_ref
+          verification_source_ref: verification_source_ref,
+          automation_enabled: automation_enabled
         )
       end
 
@@ -144,7 +146,8 @@ module A3
           blocking_task_refs: refreshed_task.blocking_task_refs,
           priority: refreshed_task.priority,
           external_task_id: refreshed_task.external_task_id,
-          verification_source_ref: existing_task.verification_source_ref
+          verification_source_ref: existing_task.verification_source_ref,
+          automation_enabled: refreshed_task.automation_enabled
         )
       end
 
