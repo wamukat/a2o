@@ -66,7 +66,14 @@ RSpec.describe A3::Application::RegisterCompletedRun do
   let(:implementation_execution_record) do
     A3::Domain::PhaseExecutionRecord.new(
       summary: "implemented redirect handling and verified targeted tests",
-      diagnostics: {}
+      diagnostics: {},
+      review_disposition: {
+        "kind" => "completed",
+        "repo_scope" => "repo_alpha",
+        "summary" => "implementation self-review found no findings",
+        "description" => "checked the committed diff and targeted tests",
+        "finding_key" => "implementation-review-clean"
+      }
     )
   end
 
@@ -93,7 +100,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
-      body: a_string_matching(/A2O 実行完了: implementation.*要約: implemented redirect handling and verified targeted tests/m)
+      body: a_string_matching(/A2O 実行完了: implementation.*要約: implemented redirect handling and verified targeted tests.*レビュー結果: completed repo_scope=repo_alpha finding_key=implementation-review-clean.*レビュー要約: implementation self-review found no findings/m)
     )
     result = use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :completed)
 

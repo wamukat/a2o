@@ -206,6 +206,7 @@ module A3
           lines << "要約: #{single_line(execution_record.summary)}"
         end
 
+        append_review_disposition_comment_lines(lines, execution_record&.review_disposition)
         append_merge_recovery_comment_lines(lines, execution_record&.diagnostics || execution&.diagnostics)
 
         if blocked_diagnosis
@@ -223,6 +224,18 @@ module A3
         Array(extra_lines).each { |line| lines << line }
 
         lines.join("\n")
+      end
+
+      def append_review_disposition_comment_lines(lines, disposition)
+        return unless disposition.is_a?(Hash)
+
+        fields = []
+        fields << disposition["kind"] if present?(disposition["kind"])
+        fields << "repo_scope=#{single_line(disposition['repo_scope'])}" if present?(disposition["repo_scope"])
+        fields << "finding_key=#{single_line(disposition['finding_key'])}" if present?(disposition["finding_key"])
+        lines << "レビュー結果: #{fields.join(' ')}" unless fields.empty?
+        lines << "レビュー要約: #{single_line(disposition['summary'])}" if present?(disposition["summary"])
+        lines << "レビュー詳細: #{single_line(disposition['description'])}" if present?(disposition["description"])
       end
 
       def append_merge_recovery_comment_lines(lines, diagnostics)

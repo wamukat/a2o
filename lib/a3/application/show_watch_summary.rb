@@ -189,6 +189,7 @@ module A3
         if task.verification_source_ref
           lines << "merge_recovery verification_source_ref=#{task.verification_source_ref}"
         end
+        append_review_disposition_lines(lines, run)
         unless upstream_assessment.healthy?
           lines << "waiting_reason=#{upstream_assessment.reason}"
           unless upstream_assessment.blocking_task_refs.empty?
@@ -211,6 +212,36 @@ module A3
           end
         end
         lines.freeze
+      end
+
+      def append_review_disposition_lines(lines, run)
+        disposition = latest_review_disposition(run)
+        return unless disposition
+
+        fields = []
+        fields << disposition["kind"] if present?(disposition["kind"])
+        fields << "repo_scope=#{single_line(disposition['repo_scope'])}" if present?(disposition["repo_scope"])
+        fields << "finding_key=#{single_line(disposition['finding_key'])}" if present?(disposition["finding_key"])
+        lines << "review=#{fields.join(' ')}" unless fields.empty?
+        lines << "review_summary=#{single_line(disposition['summary'])}" if present?(disposition["summary"])
+      end
+
+      def latest_review_disposition(run)
+        return nil unless run
+
+        run.phase_records.reverse_each do |record|
+          disposition = record.execution_record&.review_disposition
+          return disposition if disposition.is_a?(Hash)
+        end
+        nil
+      end
+
+      def present?(value)
+        !value.nil? && !value.to_s.strip.empty?
+      end
+
+      def single_line(text)
+        text.to_s.split("\n").map(&:strip).reject(&:empty?).join(" ")
       end
 
       def waiting_assessment?(assessment)

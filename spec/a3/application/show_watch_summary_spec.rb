@@ -236,6 +236,64 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(result.running_entries.map(&:task_ref)).to eq(["Sample#live"])
   end
 
+  it "surfaces the latest implementation review disposition in task detail lines" do
+    task = A3::Domain::Task.new(
+      ref: "Sample#reviewed",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :verifying,
+      parent_ref: "Sample#parent"
+    )
+    source_descriptor = A3::Domain::SourceDescriptor.new(
+      workspace_kind: :ticket_workspace,
+      source_type: :branch_head,
+      ref: "refs/heads/a2o/work/Sample-reviewed",
+      task_ref: task.ref
+    )
+    scope_snapshot = A3::Domain::ScopeSnapshot.new(
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      ownership_scope: :task
+    )
+    task_repository.save(task)
+    run_repository.save(
+      A3::Domain::Run.new(
+        ref: "run-reviewed",
+        task_ref: task.ref,
+        phase: :implementation,
+        workspace_kind: :ticket_workspace,
+        source_descriptor: source_descriptor,
+        scope_snapshot: scope_snapshot,
+        artifact_owner: A3::Domain::ArtifactOwner.new(
+          owner_ref: task.ref,
+          owner_scope: :task,
+          snapshot_version: "refs/heads/a2o/work/Sample-reviewed"
+        )
+      ).append_phase_evidence(
+        phase: :implementation,
+        source_descriptor: source_descriptor,
+        scope_snapshot: scope_snapshot,
+        execution_record: A3::Domain::PhaseExecutionRecord.new(
+          summary: "implementation completed",
+          review_disposition: {
+            "kind" => "completed",
+            "repo_scope" => "repo_alpha",
+            "summary" => "self-review found no findings",
+            "description" => "reviewed diff and tests",
+            "finding_key" => "implementation-review-clean"
+          }
+        )
+      ).complete(outcome: :completed)
+    )
+
+    result = use_case.call
+
+    detail_lines = result.tasks.find { |item| item.ref == "Sample#reviewed" }.blocked_lines
+    expect(detail_lines).to include("review=completed repo_scope=repo_alpha finding_key=implementation-review-clean")
+    expect(detail_lines).to include("review_summary=self-review found no findings")
+  end
+
   it "marks only the selected highest-priority runnable task as next" do
     low_priority = A3::Domain::Task.new(
       ref: "Sample#100",
