@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 
 DEFAULT_PROJECT_TITLE = "A2O"
 DEFAULT_AUTOMATION_TRIGGER_LABEL = "trigger:auto-implement"
+DEFAULT_TASK_PRIORITY = 2
 DEFAULT_LOCK_RETRY_COUNT = 8
 DEFAULT_LOCK_RETRY_DELAY_SECONDS = 0.25
 RELATION_KIND_CHOICES = [
@@ -1392,6 +1393,7 @@ def cmd_task_create(args: argparse.Namespace) -> int:
             "laneId": int(lane["id"]),
             "title": args.title,
             "bodyMarkdown": description,
+            "priority": int(args.priority if args.priority is not None else DEFAULT_TASK_PRIORITY),
         },
     )
     if isinstance(created, dict) and not created.get("bodyMarkdown"):
@@ -1846,6 +1848,7 @@ def build_parser() -> argparse.ArgumentParser:
     task_create.add_argument("--description-file")
     task_create.add_argument("--reference")
     task_create.add_argument("--status")
+    task_create.add_argument("--priority", type=int)
     task_create.set_defaults(func=cmd_task_create)
 
     task_update = subparsers.add_parser("task-update", help="Update an existing task.")

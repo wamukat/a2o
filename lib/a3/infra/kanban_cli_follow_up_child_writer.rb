@@ -143,6 +143,7 @@ module A3
           "--project", @project,
           "--title", task_payload.fetch("title"),
           "--status", "To do",
+          "--priority", "2",
           option_name: "--description",
           text: task_payload.fetch("description"),
           tempfile_prefix: "a3-follow-up-child-description"

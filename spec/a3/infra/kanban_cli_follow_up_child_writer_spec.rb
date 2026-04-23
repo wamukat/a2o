@@ -66,6 +66,7 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
     expect(result.child_refs).to eq(["Sample#3200"])
     expect(result.child_fingerprints).to eq(["Sample#3140|run-parent-review-1|repo_beta|finding-1"])
     task_create_argv = captured_argv.find { |args| args.include?("task-create") }
+    expect(task_create_argv).to include("--priority", "2")
     expect(task_create_argv).to include("--description-file")
     expect(task_create_argv).not_to include("--description")
   end

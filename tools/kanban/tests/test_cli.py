@@ -196,6 +196,7 @@ class SoloBoardCliTest(unittest.TestCase):
                 return board_shell
             if method == "POST" and path == "/api/boards/42/tickets":
                 self.assertEqual(description, payload["bodyMarkdown"])
+                self.assertEqual(2, payload["priority"])
                 return {
                     "id": 101,
                     "boardId": 42,
@@ -222,6 +223,7 @@ class SoloBoardCliTest(unittest.TestCase):
                 description=None,
                 description_file=description_path,
                 status=None,
+                priority=None,
             )
             stdout = io.StringIO()
             with patch.object(kanban_cli, "rest_request", side_effect=fake_rest_request), contextlib.redirect_stdout(stdout):
@@ -234,6 +236,47 @@ class SoloBoardCliTest(unittest.TestCase):
         self.assertEqual("Sample#101", payload["ref"])
         self.assertEqual(description, payload["description"])
         self.assertEqual(("POST", "/api/boards/42/tickets"), calls[-1][:2])
+
+    def test_task_create_preserves_explicit_priority_override(self) -> None:
+        board_shell = {
+            "board": {"id": 42, "name": "Sample"},
+            "lanes": [{"id": 7, "name": "To do", "position": 0}],
+        }
+
+        def fake_rest_request(_base_url, _token, method, path, *, payload=None):
+            if method == "GET" and path == "/api/boards":
+                return {"boards": [{"id": 42, "name": "Sample"}]}
+            if method == "GET" and path == "/api/boards/42":
+                return board_shell
+            if method == "POST" and path == "/api/boards/42/tickets":
+                self.assertEqual(4, payload["priority"])
+                return {
+                    "id": 102,
+                    "boardId": 42,
+                    "laneId": 7,
+                    "title": payload["title"],
+                    "isResolved": False,
+                    "position": 0,
+                    "ref": "Sample#102",
+                    "shortRef": "#102",
+                }
+            raise AssertionError(f"unexpected request: {method} {path}")
+
+        args = SimpleNamespace(
+            backend="soloboard",
+            base_url="http://localhost:3460",
+            token="",
+            project_id=None,
+            project="Sample",
+            title="Explicit priority task",
+            description="body",
+            description_file=None,
+            status=None,
+            priority=4,
+        )
+        stdout = io.StringIO()
+        with patch.object(kanban_cli, "rest_request", side_effect=fake_rest_request), contextlib.redirect_stdout(stdout):
+            self.assertEqual(0, kanban_cli.cmd_task_create(args))
 
     def test_update_task_backfills_description_when_backend_omits_body_markdown(self) -> None:
         description = "## Updated\n\n- line 1\n- line 2\n"
