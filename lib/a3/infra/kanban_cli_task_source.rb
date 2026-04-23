@@ -125,6 +125,8 @@ module A3
         child_refs = normalize_relation_refs(relations.fetch("subtask", []))
         blocking_refs = normalize_blocking_relation_refs(relations.fetch("blocked", []))
 
+        resolved = task_resolved?(payload.fetch("status", nil), payload["done"])
+
         [
           normalize_topology_snapshot(
             task_id: resolved_task_id,
@@ -137,7 +139,7 @@ module A3
             blocking_task_refs: blocking_refs.map(&:first)
           ),
           parent_refs.first&.first,
-          !closed_status?(payload.fetch("status", nil)),
+          !resolved,
           (parent_refs + child_refs + blocking_refs).to_h
         ]
       end

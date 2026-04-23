@@ -96,6 +96,48 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
+  it "does not keep resolved done-lane children in parent topology" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 7100,
+          "ref" => "Sample#7100",
+          "status" => "To do",
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => nil
+        },
+        {
+          "id" => 7101,
+          "ref" => "Sample#7101",
+          "status" => "Done",
+          "done" => true,
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => "Sample#7100"
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-implement"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+      parent = tasks.find { |task| task.ref == "Sample#7100" }
+
+      expect(tasks.map(&:ref)).to eq(["Sample#7100"])
+      expect(parent.kind).to eq(:single)
+      expect(parent.child_refs).to eq([])
+    end
+  end
+
   it "builds parent tasks when imported snapshots reference them as children" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,
