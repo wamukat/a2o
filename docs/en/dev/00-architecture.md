@@ -30,7 +30,7 @@ Read this document first to understand runtime flow and responsibility boundarie
 A2O is a runtime that turns kanban tasks into AI-executable jobs and keeps the path through verification and merge traceable.
 
 1. A user prepares a project package and kanban task.
-2. The scheduler selects a runnable task from kanban current tasks, excludes `Resolved` / `Archived`, applies parent-child and blocker gating, then picks the highest-priority runnable candidate.
+2. The scheduler selects from kanban current tasks, excludes `Resolved` / `Archived`, applies parent-child and blocker gating, then chooses the highest-priority parent group first and selects a runnable task inside that group.
 3. Engine builds a phase job from the task, `project.yaml`, skills, and repo slots.
 4. `a2o-agent` runs execution commands on the host or in the development environment.
 5. The execution commands use Generative AI and the product toolchain to create changes.
