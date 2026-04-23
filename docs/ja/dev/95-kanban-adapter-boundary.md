@@ -49,7 +49,7 @@ A2O は自動処理の完了と人間の最終確認を分けて扱う。
 
 ## ランタイムの Python 依存
 
-A2O 0.5.16 は `docker/a3-runtime/Dockerfile` に `python3` を残すが、`python3-venv` はインストールしない。
+A2O 0.5.17 は `docker/a3-runtime/Dockerfile` に `python3` を残すが、`python3-venv` はインストールしない。
 
 現在のランタイムには、まだ Engine が所有する Python 依存がある。
 
