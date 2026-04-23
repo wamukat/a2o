@@ -257,7 +257,7 @@ func validatePublicWorkerPayload(payload map[string]any, request map[string]any,
 			errors = append(errors, validateChangedFiles(changedFilesMap)...)
 		}
 	}
-	if publicWorkerNeedsReviewDisposition(request, success) {
+	if publicWorkerNeedsReviewDisposition(request, success) || payload["review_disposition"] != nil {
 		rawDisposition, ok := payload["review_disposition"]
 		if !ok {
 			if workerStringValue(request["phase"]) == "implementation" {
@@ -535,14 +535,28 @@ def main():
         )
         return
 
-    command = shlex.split(command_text)
-    completed = subprocess.run(
-        command,
-        input=bundle_raw,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    command = []
+    try:
+        command = shlex.split(command_text)
+        completed = subprocess.run(
+            command,
+            input=bundle_raw,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except (OSError, ValueError) as exc:
+        write_result(
+            args.result,
+            failure(
+                request,
+                "copilot worker command could not be launched",
+                command[0] if command else "A2O_COPILOT_COMMAND",
+                "copilot_command_launch_failed",
+                {"error": f"{type(exc).__name__}: {exc}"},
+            ),
+        )
+        return
     if completed.returncode != 0:
         write_result(
             args.result,

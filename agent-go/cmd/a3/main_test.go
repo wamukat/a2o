@@ -1037,6 +1037,48 @@ json.dump({
 	}
 }
 
+func TestWorkerScaffoldCopilotWritesFailureWhenCommandCannotLaunch(t *testing.T) {
+	tempDir := t.TempDir()
+	workerPath := filepath.Join(tempDir, "copilot-a2o-worker")
+	resultPath := filepath.Join(tempDir, "result.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"worker",
+		"scaffold",
+		"--language",
+		"copilot",
+		"--output",
+		workerPath,
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+	request := map[string]any{
+		"task_ref":   "A2O#62",
+		"run_ref":    "run-copilot-missing",
+		"phase":      "implementation",
+		"slot_paths": map[string]any{"app": filepath.Join(tempDir, "app")},
+	}
+	bundleBody, err := json.Marshal(map[string]any{"request": request})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(workerPath, "--schema", filepath.Join(tempDir, "schema.json"), "--result", resultPath)
+	cmd.Env = append(os.Environ(), "A2O_COPILOT_COMMAND="+filepath.Join(tempDir, "missing-copilot"))
+	cmd.Stdin = bytes.NewReader(bundleBody)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("generated copilot worker should write structured failure and exit 0: %v\n%s", err, string(output))
+	}
+	result := map[string]any{}
+	readJSONFileForTest(t, resultPath, &result)
+	if result["success"] != false || result["observed_state"] != "copilot_command_launch_failed" {
+		t.Fatalf("unexpected structured failure: %#v", result)
+	}
+}
+
 func TestWorkerValidateResultReportsConcreteProtocolErrors(t *testing.T) {
 	tempDir := t.TempDir()
 	requestPath := filepath.Join(tempDir, "request.json")
@@ -1111,6 +1153,41 @@ func TestWorkerValidateResultRequiresReviewDispositionForImplementationSuccess(t
 	}
 	if !strings.Contains(stdout.String(), "worker_protocol_error=review_disposition must be present for implementation success") {
 		t.Fatalf("validate-result output missing review_disposition error in:\n%s", stdout.String())
+	}
+}
+
+func TestWorkerValidateResultRejectsMalformedReviewDispositionOnImplementationFailure(t *testing.T) {
+	tempDir := t.TempDir()
+	requestPath := filepath.Join(tempDir, "request.json")
+	resultPath := filepath.Join(tempDir, "result.json")
+	request := map[string]any{
+		"task_ref":   "A2O#62",
+		"run_ref":    "run-1",
+		"phase":      "implementation",
+		"slot_paths": map[string]any{"app": filepath.Join(tempDir, "app")},
+	}
+	result := map[string]any{
+		"task_ref":           "A2O#62",
+		"run_ref":            "run-1",
+		"phase":              "implementation",
+		"success":            false,
+		"summary":            "implementation failed",
+		"failing_command":    "copilot",
+		"observed_state":     "failed",
+		"rework_required":    false,
+		"review_disposition": "not-an-object",
+	}
+	writeJSONFileForTest(t, requestPath, request)
+	writeJSONFileForTest(t, resultPath, result)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"worker", "validate-result", "--request", requestPath, "--result", resultPath}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("validate-result should fail")
+	}
+	if !strings.Contains(stdout.String(), "worker_protocol_error=review_disposition must be an object") {
+		t.Fatalf("validate-result output missing review_disposition shape error in:\n%s", stdout.String())
 	}
 }
 
@@ -1306,6 +1383,17 @@ func writeJSONFileForTest(t *testing.T, path string, payload any) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, append(body, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func readJSONFileForTest(t *testing.T, path string, target any) {
+	t.Helper()
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(body, target); err != nil {
 		t.Fatal(err)
 	}
 }
