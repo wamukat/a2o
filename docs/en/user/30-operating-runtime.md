@@ -83,7 +83,12 @@ Scheduler selection follows the kanban board as the source of truth.
 - Tasks in `Done` remain visible and remain part of the current board view until a human resolves them.
 - An unresolved kanban blocker keeps the blocked task out of runnable selection.
 - Parent/child gating and sibling ordering still apply in addition to kanban blockers.
-- When multiple tasks are runnable, the scheduler chooses the highest kanban priority first.
+- When a parent ticket has child tasks, A2O treats that parent-child set as one selection group.
+- When multiple parent groups are present, A2O first chooses the group whose parent ticket has the highest priority.
+- Inside the selected parent group, A2O chooses the highest-priority child task that is currently runnable.
+- Unresolved blockers on the parent ticket are inherited by its child tasks. While a parent blocker remains unresolved, children in that parent group are not runnable.
+- If a parent appears blocked, child tasks in that group are also outside scheduler selection.
+- When runnable candidates are not part of parent groups, the scheduler chooses the highest kanban priority first.
 - If priorities are equal, the scheduler breaks ties by task ref.
 
 Use `runtime run-once` for manual checks, test runs, or a retry after fixing a root cause.

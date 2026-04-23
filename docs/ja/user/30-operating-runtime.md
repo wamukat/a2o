@@ -83,7 +83,12 @@ a2o runtime pause
 - `Done` は人間が resolve するまで current view に残し、`watch-summary` にも表示する。
 - 未解決の kanban blocker があるタスクは runnable にしない。
 - 親子関係による制約と sibling の順序制約は、kanban blocker に加えて適用する。
-- runnable な候補が複数ある場合は、kanban の priority が高いものを先に選ぶ。
+- 親チケットに子タスクがある場合は、親子を 1 つの選択グループとして扱う。
+- 複数の親グループがある場合は、まず親チケットの priority が高いグループを選ぶ。
+- 選ばれた親グループの中では、その時点で runnable な子タスクのうち priority が最も高いものを選ぶ。
+- 親チケットに付いた未解決 blocker は子タスクにも継承される。親 blocker が残っている間は、その親グループ配下の子タスクは runnable にしない。
+- 親が blocked と見える状態は、その親グループの子タスクも selection 対象外であることを意味する。
+- 親子グループに属さない runnable 候補が複数ある場合は、kanban の priority が高いものを先に選ぶ。
 - priority が同じ場合は task ref で順序を決める。
 
 `runtime run-once` は手動確認や検証用である。スケジューラを使う前に 1 回だけ取り込みたいときや、問題を直した後に再同期したいときに使う。

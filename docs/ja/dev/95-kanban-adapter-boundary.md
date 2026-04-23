@@ -35,6 +35,9 @@ A2O は自動処理の完了と人間の最終確認を分けて扱う。
 - `priority` はスケジューリング入力として取り込む。priority が高いものを先に選ぶ。
 - `blocking_task_refs` はスケジューリング blocker として取り込む。未解決 blocker があるタスクは runnable にしない。
 - 親子 relation は blocker relation とは別であり、親判定と sibling 進行制御を引き続き担う。
+- 親チケットは子タスクを束ねる selection group の基準になる。複数の親グループがある場合は、親 priority がグループ間の選択順を決める。
+- 子タスク priority は、選ばれた親グループの内部でだけ比較する。
+- 親チケットに付いた blocker relation は、子タスクの runnable 判定にも継承して扱う。親 blocker が未解決の間は、その親グループ配下の子タスクは runnable ではない。
 
 アダプター境界は、snapshot と relation を読むときにこれらの項目と意味論を維持しなければならない。将来の provider がこれらの項目を欠く場合、現在の runtime task selection 契約とは互換でなくなる。
 

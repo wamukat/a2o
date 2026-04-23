@@ -45,7 +45,10 @@ The scheduler contract is part of the architecture, not an incidental implementa
 - `Resolved` and `Archived` are outside scheduler selection and watch-summary.
 - Unresolved kanban blockers prevent runnable selection.
 - Parent/child gating and sibling ordering apply in addition to blocker gating.
-- Runnable candidates are ordered by kanban priority first and task ref second.
+- Parent-child sets are treated as parent groups, and parent priority orders selection between groups.
+- After a parent group is selected, runnable child tasks inside that group are ordered by child priority.
+- Parent blockers are inherited by child tasks, and groups with unresolved parent blockers are not selected.
+- Runnable candidates outside parent groups are ordered by kanban priority first and task ref second.
 
 ## System Overview
 

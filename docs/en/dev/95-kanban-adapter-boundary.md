@@ -35,6 +35,9 @@ The kanban adapter provides the inputs used by scheduler selection.
 - `priority` is imported as a scheduling input. Higher kanban priority wins.
 - `blocking_task_refs` are imported as scheduling blockers. An unresolved blocker prevents runnable selection.
 - parent/child relations remain separate from blocker relations and continue to gate parent and sibling progression.
+- Parent tickets also define selection groups. When multiple parent groups exist, parent priority decides which group the scheduler considers first.
+- Child priority is only compared inside the already selected parent group.
+- Blocker relations attached to a parent are inherited by child runnable checks. While a parent blocker remains unresolved, children in that parent group are not runnable.
 
 The adapter boundary must preserve these fields and semantics when reading snapshots or relations. If a future provider omits one of these fields, runtime task selection is no longer compatible with the current contract.
 

@@ -45,7 +45,10 @@ A2O は「カンバンタスクを AI 実行可能なジョブに変換し、検
 - `Resolved` / `Archived` は scheduler selection と watch-summary の対象外である。
 - 未解決の kanban blocker は runnable selection を止める。
 - 親子制約と sibling 順序制約は blocker 制約に加えて適用する。
-- runnable な候補は kanban priority を優先し、同順位のときは task ref で並べる。
+- 親子を持つタスクは parent group として扱い、グループ間では親 priority を優先する。
+- 親 group が選ばれたら、その group の中で runnable な子タスクの priority を比較する。
+- 親 blocker は子タスクへ継承し、親 blocker が残っている group では子タスクを選ばない。
+- 親子 group に属さない runnable 候補同士は kanban priority を優先し、同順位のときは task ref で並べる。
 
 ## システム概観
 
