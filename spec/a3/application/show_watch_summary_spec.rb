@@ -236,6 +236,33 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(result.running_entries.map(&:task_ref)).to eq(["Sample#live"])
   end
 
+  it "marks only the selected highest-priority runnable task as next" do
+    low_priority = A3::Domain::Task.new(
+      ref: "Sample#100",
+      kind: :single,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :todo,
+      priority: 2
+    )
+    high_priority = A3::Domain::Task.new(
+      ref: "Sample#200",
+      kind: :single,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :todo,
+      priority: 4
+    )
+    task_repository.save(low_priority)
+    task_repository.save(high_priority)
+
+    result = use_case.call
+
+    expect(result.next_candidates).to eq(["Sample#200"])
+    expect(result.tasks.find { |item| item.ref == "Sample#100" }.next_candidate).to be(false)
+    expect(result.tasks.find { |item| item.ref == "Sample#200" }.next_candidate).to be(true)
+  end
+
   it "uses external_task_id canonical mapping and preserved run insertion order" do
     task = A3::Domain::Task.new(
       ref: "Sample#imported-7",

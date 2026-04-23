@@ -54,7 +54,11 @@ module A3
         tasks = plan.assessments.map(&:task)
         runs = @run_repository.all
 
-        plan.assessments.each do |assessment|
+        runnable_assessments = plan.assessments
+          .select(&:runnable?)
+          .sort_by { |assessment| [-assessment.task.priority, assessment.task.ref] }
+
+        runnable_assessments.each do |assessment|
           next unless assessment.runnable?
           next unless upstream_healthy?(task: assessment.task, phase: assessment.phase, tasks: tasks, runs: runs)
 

@@ -918,12 +918,16 @@ func overlaySchedulerWatchSummaryState(output string, paths runtimeSchedulerPath
 }
 
 func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	normalizedArgs, err := normalizeRuntimeLogsArgs(args)
+	if err != nil {
+		return err
+	}
 	flags := flag.NewFlagSet("a2o runtime logs", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	follow := flags.Bool("follow", false, "follow the current phase live log while the task is running")
 	flags.BoolVar(follow, "f", false, "follow the current phase live log while the task is running")
 	pollInterval := flags.Duration("poll-interval", time.Second, "poll interval for --follow")
-	if err := flags.Parse(args); err != nil {
+	if err := flags.Parse(normalizedArgs); err != nil {
 		return err
 	}
 	if flags.NArg() != 1 {
@@ -981,6 +985,37 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 			time.Sleep(*pollInterval)
 		}
 	})
+}
+
+func normalizeRuntimeLogsArgs(args []string) ([]string, error) {
+	normalized := make([]string, 0, len(args))
+	taskRef := ""
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		switch {
+		case arg == "--follow" || arg == "-f":
+			normalized = append(normalized, arg)
+		case arg == "--poll-interval":
+			if index+1 >= len(args) {
+				return nil, fmt.Errorf("flag needs an argument: --poll-interval")
+			}
+			normalized = append(normalized, arg, args[index+1])
+			index++
+		case strings.HasPrefix(arg, "--poll-interval="):
+			normalized = append(normalized, arg)
+		case strings.HasPrefix(arg, "-"):
+			normalized = append(normalized, arg)
+		default:
+			if taskRef != "" {
+				return nil, fmt.Errorf("usage: a2o runtime logs TASK_REF [--follow]")
+			}
+			taskRef = arg
+		}
+	}
+	if taskRef != "" {
+		normalized = append(normalized, taskRef)
+	}
+	return normalized, nil
 }
 
 func runRuntimeShowArtifact(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {

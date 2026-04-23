@@ -3894,6 +3894,53 @@ func TestRuntimeLogsFollowsLatestActiveRunWhenTaskCurrentRunIsStale(t *testing.T
 	}
 }
 
+func TestRuntimeLogsAcceptsFollowAfterTaskRef(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		logManifestOutputs: []string{
+			`{"run_ref":"run-16","current_run":"run-16","phase":"implementation","source_type":"detached_commit","source_ref":"abc","active":true,"live_mode":"ai-raw-log","artifacts":[]}`,
+			`{"run_ref":"run-16","current_run":"run-16","phase":"implementation","source_type":"detached_commit","source_ref":"abc","active":false,"live_mode":"ai-raw-log","artifacts":[]}`,
+		},
+	}
+	liveRoot := filepath.Join(tempDir, runtimeHostAgentRelativePath, "ai-raw-logs", "Sample-42")
+	if err := os.MkdirAll(liveRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(liveRoot, "implementation.log"), []byte("live output\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "logs", "Sample#42", "--follow"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "=== phase: implementation (ai-raw-live) task=Sample#42 run=run-16") {
+		t.Fatalf("runtime logs should follow after task ref, got:\n%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "live output") {
+		t.Fatalf("runtime logs should print live output, got:\n%s", stdout.String())
+	}
+}
+
 func TestRuntimeWatchSummaryRunsContainerSummaryWithKanbanContext(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

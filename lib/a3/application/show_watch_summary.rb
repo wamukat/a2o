@@ -62,6 +62,7 @@ module A3
         assessments_by_ref = tasks.each_with_object({}) do |task, memo|
           memo[task.ref] = A3::Domain::RunnableTaskAssessment.evaluate(task: task, tasks: tasks)
         end
+        selected_next_ref = select_next_ref(tasks: tasks, runs: runs, assessments_by_ref: assessments_by_ref)
         state = @scheduler_state_repository.fetch
 
         task_entries = tasks.each_with_object([]) do |task, entries|
@@ -71,14 +72,15 @@ module A3
             runs_by_task: runs_by_task,
             assessment: assessments_by_ref.fetch(task.ref),
             tasks: tasks,
-            runs: runs
+            runs: runs,
+            selected_next_ref: selected_next_ref
           )
         end
 
         Summary.new(
           scheduler_paused: state.paused,
           scheduler_paused_at: nil,
-          next_candidates: task_entries.select(&:next_candidate).map(&:ref).sort.freeze,
+          next_candidates: selected_next_ref ? [selected_next_ref].freeze : [].freeze,
           running_entries: task_entries.map(&:running_entry).compact.sort_by(&:task_ref).freeze,
           tasks: sort_tasks_for_tree(task_entries).freeze
         )
@@ -86,7 +88,7 @@ module A3
 
       private
 
-      def build_task_entry(task, runtime_task:, runs_by_task:, assessment:, tasks:, runs:)
+      def build_task_entry(task, runtime_task:, runs_by_task:, assessment:, tasks:, runs:, selected_next_ref:)
         task_runs = runs_by_task.fetch(task.ref, [])
         current_run = runtime_task.current_run_ref && task_runs.find { |candidate| candidate.ref == runtime_task.current_run_ref }
         latest_run = task_runs.last
@@ -104,7 +106,7 @@ module A3
           title: display_title(runtime_task, kanban_snapshot: kanban_snapshot),
           status: display_status(canonical_status),
           parent_ref: task.parent_ref,
-          next_candidate: assessment.runnable? && upstream_assessment.healthy?,
+          next_candidate: task.ref == selected_next_ref,
           running: !running_entry.nil?,
           waiting: waiting,
           done: canonical_status == :done,
@@ -114,6 +116,22 @@ module A3
           phase_counts: phase_counts_for(task, task_runs),
           latest_phase: latest_phase
         )
+      end
+
+      def select_next_ref(tasks:, runs:, assessments_by_ref:)
+        tasks
+          .filter_map do |task|
+            assessment = assessments_by_ref.fetch(task.ref)
+            next unless assessment.runnable?
+            next unless @upstream_line_guard.evaluate(task: task, phase: assessment.phase, tasks: tasks, runs: runs).healthy?
+
+            task.ref
+          end
+          .sort_by do |ref|
+            task = tasks.find { |candidate| candidate.ref == ref }
+            [-task.priority, task.ref]
+          end
+          .first
       end
 
       def display_title(task, kanban_snapshot:)

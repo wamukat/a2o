@@ -97,6 +97,40 @@ RSpec.describe A3::Application::ScheduleNextRun do
     expect(result.phase).to eq(:implementation)
   end
 
+  it "starts the highest-priority runnable task first" do
+    low_priority_task = A3::Domain::Task.new(
+      ref: "A3-v2#3031",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: %i[repo_alpha repo_beta],
+      status: :todo,
+      parent_ref: "A3-v2#3022",
+      priority: 2
+    )
+    high_priority_task = A3::Domain::Task.new(
+      ref: "A3-v2#3032",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: %i[repo_alpha repo_beta],
+      status: :todo,
+      parent_ref: "A3-v2#3022",
+      priority: 4
+    )
+    task_repository.save(low_priority_task)
+    task_repository.save(high_priority_task)
+
+    expect(start_run).to receive(:call).with(
+      hash_including(task_ref: "A3-v2#3032", phase: :implementation)
+    ).and_return(
+      A3::Application::StartRun::Result.new(task: high_priority_task, run: instance_double(A3::Domain::Run), workspace: instance_double(A3::Domain::PreparedWorkspace))
+    )
+
+    result = use_case.call(project_context: project_context)
+
+    expect(result.task).to eq(high_priority_task)
+    expect(result.phase).to eq(:implementation)
+  end
+
   it "starts recovery verification against the task-scoped verification source ref" do
     recovered_task = build_child_task(
       ref: task.ref,
