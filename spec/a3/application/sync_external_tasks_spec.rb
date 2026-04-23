@@ -143,6 +143,71 @@ RSpec.describe A3::Application::SyncExternalTasks do
     expect(reconciled.automation_enabled).to eq(true)
   end
 
+  it "recovers automation_enabled for a progressed topology-imported task when direct fetch still matches trigger labels" do
+    local_task = A3::Domain::Task.new(
+      ref: "Sample#3046",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :verifying,
+      external_task_id: 3046,
+      automation_enabled: false
+    )
+    imported_task = A3::Domain::Task.new(
+      ref: "Sample#3046",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :verifying,
+      external_task_id: 3046,
+      automation_enabled: false
+    )
+    direct_task = A3::Domain::Task.new(
+      ref: "Sample#3046",
+      kind: :single,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :verifying,
+      external_task_id: 3046,
+      automation_enabled: true
+    )
+    task_repository.save(local_task)
+    allow(external_task_source).to receive(:load).and_return([imported_task])
+    allow(external_task_source).to receive(:fetch_by_external_task_id).with(3046).and_return(direct_task)
+
+    use_case.call
+
+    expect(task_repository.fetch("Sample#3046").automation_enabled).to eq(true)
+  end
+
+  it "keeps topology-imported tasks disabled when direct fetch does not match trigger labels" do
+    local_task = A3::Domain::Task.new(
+      ref: "Sample#3046",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :verifying,
+      external_task_id: 3046,
+      automation_enabled: false
+    )
+    imported_task = A3::Domain::Task.new(
+      ref: "Sample#3046",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :verifying,
+      external_task_id: 3046,
+      automation_enabled: false
+    )
+    task_repository.save(local_task)
+    allow(external_task_source).to receive(:load).and_return([imported_task])
+    allow(external_task_source).to receive(:fetch_by_external_task_id).with(3046).and_return(nil)
+
+    use_case.call
+
+    expect(task_repository.fetch("Sample#3046").automation_enabled).to eq(false)
+  end
+
   it "prunes non-terminal non-active tasks that are no longer present in Kanban" do
     stale_task = A3::Domain::Task.new(
       ref: "Sample#3046",

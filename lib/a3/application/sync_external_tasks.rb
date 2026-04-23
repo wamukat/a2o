@@ -98,7 +98,8 @@ module A3
       end
 
       def reconcile_imported_task(existing_task, imported_task)
-        return imported_task unless preserve_existing_automation_enabled?(existing_task, imported_task)
+        automation_enabled = reconcile_automation_enabled(existing_task, imported_task)
+        return imported_task if automation_enabled == imported_task.automation_enabled
 
         build_reconciled_task(
           ref: imported_task.ref,
@@ -113,7 +114,7 @@ module A3
           priority: imported_task.priority,
           external_task_id: imported_task.external_task_id,
           verification_source_ref: imported_task.verification_source_ref,
-          automation_enabled: existing_task.automation_enabled
+          automation_enabled: automation_enabled
         )
       end
 
@@ -199,6 +200,24 @@ module A3
           existing_task.automation_enabled &&
           managed_nonterminal_task?(existing_task) &&
           !imported_task.automation_enabled
+      end
+
+      def reconcile_automation_enabled(existing_task, imported_task)
+        return existing_task.automation_enabled if preserve_existing_automation_enabled?(existing_task, imported_task)
+        return true if recover_direct_trigger_selected_automation_enabled?(existing_task, imported_task)
+
+        imported_task.automation_enabled
+      end
+
+      def recover_direct_trigger_selected_automation_enabled?(existing_task, imported_task)
+        return false unless existing_task
+        return false unless managed_nonterminal_task?(existing_task)
+        return false if imported_task.automation_enabled
+        return false unless imported_task.external_task_id
+        return false unless @external_task_source.respond_to?(:fetch_by_external_task_id)
+
+        direct_task = @external_task_source.fetch_by_external_task_id(imported_task.external_task_id)
+        direct_task && direct_task.ref == imported_task.ref && direct_task.automation_enabled
       end
 
       def managed_nonterminal_task?(task)
