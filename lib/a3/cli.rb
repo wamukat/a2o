@@ -927,7 +927,7 @@ module A3
       return nil unless File.file?(manifest_path) || File.file?(contract_path) || File.file?(publication_path)
 
       store = A3::Infra::AgentPackageStore.new(package_dir: package_dir)
-      store.validate_runtime_compatibility!(expected_runtime_version: A3::VERSION)
+      store.validate_runtime_compatibility!(expected_runtime_version: A3::VERSION, require_complete_host_launcher_set: true)
       resolved_dir = store.resolved_host_install_package_dir
       if resolved_dir != package_dir
         A3::Infra::AgentPackageStore.new(package_dir: resolved_dir).validate_runtime_compatibility!(expected_runtime_version: A3::VERSION)

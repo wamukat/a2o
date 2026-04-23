@@ -183,6 +183,16 @@ install flow が runtime image に全面依存しなくなった後で、runtime
 
 - install path 分離前に実施すると高い
 
+## runtime の self-contained 制約
+
+`A2O#172` で、`runtime_agent_export` と `a2o agent install --package-source runtime-image` は self-contained を維持すべきだと確認した。
+
+つまり次を守る必要がある。
+
+- release 済み runtime image は、GitHub に接続せずに host agent package を verify/export できること
+- publication descriptor は host-install や bundle 配布の補助に使えても、runtime path の必須依存にしてはいけないこと
+- 今後の release 高速化は、この runtime self-contained を壊さずに境界改善すること
+
 ## 推奨順序
 
 1. package publication surface を決める

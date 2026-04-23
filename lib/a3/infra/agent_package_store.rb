@@ -112,7 +112,7 @@ module A3
         external_store.package_dir
       end
 
-      def validate_runtime_compatibility!(expected_runtime_version:)
+      def validate_runtime_compatibility!(expected_runtime_version:, require_complete_host_launcher_set: false)
         expected = expected_runtime_version.to_s.strip
         return if expected.empty?
         return external_store.validate_runtime_compatibility!(expected_runtime_version: expected) if publication && !manifest_present?
@@ -141,7 +141,7 @@ module A3
                 "agent package runtime compatibility mismatch: package_runtime_version=#{actual} expected_runtime_version=#{expected}"
         end
 
-        if publication && !complete_host_launcher_set?
+        if require_complete_host_launcher_set && publication && !complete_host_launcher_set?
           external_store.validate_runtime_compatibility!(expected_runtime_version: expected)
         end
       end
@@ -157,7 +157,8 @@ module A3
       end
 
       def inferred_runtime_version
-        versions = list.map(&:version).map(&:to_s).reject(&:empty?).uniq
+        packages = manifest_present? ? manifest_packages : list
+        versions = packages.map(&:version).map(&:to_s).reject(&:empty?).uniq
         return "" if versions.empty?
         return versions.first if versions.one?
 
@@ -188,16 +189,20 @@ module A3
       end
 
       def selected_packages(target:)
-        packages = list
-        return packages unless target
+        return [package_for(target)] if target
 
-        [package_for(target)]
+        list
       end
 
       def package_for(target)
         return external_store.send(:package_for, target) if publication && !manifest_present?
 
         normalized = target.to_s.tr("/", "-")
+        local_package = manifest_packages.find { |item| item.target == normalized } if manifest_present?
+        if local_package && File.file?(local_package.archive_path(package_dir))
+          return local_package
+        end
+
         package = list.find { |item| item.target == normalized }
         if package.nil? && publication
           return external_store.send(:package_for, target)

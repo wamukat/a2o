@@ -129,13 +129,8 @@ jobs:
       - name: Determine runtime agent targets
         id: agent_targets
         run: |
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            echo "targets=linux/amd64 linux/arm64" >> "$GITHUB_OUTPUT"
-            echo "package_archives=0" >> "$GITHUB_OUTPUT"
-          else
-            echo "targets=" >> "$GITHUB_OUTPUT"
-            echo "package_archives=1" >> "$GITHUB_OUTPUT"
-          fi
+          echo "targets=" >> "$GITHUB_OUTPUT"
+          echo "package_archives=1" >> "$GITHUB_OUTPUT"
 
       - name: Build runtime image
         uses: docker/build-push-action@v7

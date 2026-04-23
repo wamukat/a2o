@@ -138,18 +138,40 @@ RSpec.describe A3::Infra::AgentPackageStore do
     expect(results).to contain_exactly(include(target: "darwin-arm64", ok: true))
   end
 
-  it "fails verification when the external publication bundle is incompatible even if the local embedded manifest matches" do
+  it "keeps target verification local even if the external publication bundle is incompatible" do
     bundle_path = write_publication_bundle(target: "darwin-arm64", body: "#!/bin/sh\necho darwin external\n", runtime_version: "9.9.9")
     write_publication(bundle_path: bundle_path)
-    File.write(
-      File.join(@tmp_dir, "release-manifest.jsonl"),
-      JSON.generate("version" => A3::VERSION, "goos" => "linux", "goarch" => "amd64", "archive" => "a3-agent-dev-linux-amd64.tar.gz", "sha256" => "placeholder") + "\n"
-    )
+    archive = write_agent_archive(target: "linux-amd64", body: "#!/bin/sh\necho local linux\n")
+    write_manifest(target: "linux-amd64", archive: File.basename(archive))
     write_contract(runtime_version: A3::VERSION, package_version: A3::VERSION)
 
-    expect do
-      described_class.new(package_dir: @tmp_dir).verify
-    end.to raise_error(A3::Domain::ConfigurationError, /runtime compatibility mismatch/)
+    results = described_class.new(package_dir: @tmp_dir).verify(target: "linux-amd64")
+
+    expect(results).to contain_exactly(include(target: "linux-amd64", ok: true))
+  end
+
+  it "verifies a locally embedded target without touching external publication when publication metadata is present" do
+    archive = write_agent_archive(target: "darwin-arm64", body: "#!/bin/sh\necho local darwin\n")
+    write_manifest(target: "darwin-arm64", archive: File.basename(archive))
+    write_contract(runtime_version: A3::VERSION, package_version: A3::VERSION)
+    write_publication(bundle_path: "/definitely/missing/a2o-agent-packages.tar.gz")
+
+    results = described_class.new(package_dir: @tmp_dir).verify(target: "darwin-arm64")
+
+    expect(results).to contain_exactly(include(target: "darwin-arm64", ok: true))
+  end
+
+  it "exports a locally embedded target without touching external publication when publication metadata is present" do
+    archive = write_agent_archive(target: "darwin-arm64", body: "#!/bin/sh\necho local darwin\n")
+    write_manifest(target: "darwin-arm64", archive: File.basename(archive))
+    write_contract(runtime_version: A3::VERSION, package_version: A3::VERSION)
+    write_publication(bundle_path: "/definitely/missing/a2o-agent-packages.tar.gz")
+    output = File.join(@tmp_dir, "bin", "a3-agent")
+
+    result = described_class.new(package_dir: @tmp_dir).export(target: "darwin-arm64", output: output)
+
+    expect(result).to include(target: "darwin-arm64")
+    expect(File.read(output)).to eq("#!/bin/sh\necho local darwin\n")
   end
 
   def write_agent_archive(target:, body: "agent-binary\n")
@@ -186,6 +208,12 @@ RSpec.describe A3::Infra::AgentPackageStore do
   end
 
   def write_publication(bundle_path:)
+    sha256 =
+      if File.file?(bundle_path)
+        Digest::SHA256.file(bundle_path).hexdigest
+      else
+        "0" * 64
+      end
     File.write(
       File.join(@tmp_dir, "package-publication.json"),
       JSON.pretty_generate(
@@ -193,7 +221,7 @@ RSpec.describe A3::Infra::AgentPackageStore do
         "version" => A3::VERSION,
         "bundle_archive" => File.basename(bundle_path),
         "bundle_url" => "file://#{bundle_path}",
-        "bundle_archive_sha256" => Digest::SHA256.file(bundle_path).hexdigest,
+        "bundle_archive_sha256" => sha256,
         "compatibility_contract" => "package-compatibility.json",
         "archive_manifest" => "release-manifest.jsonl",
         "checksums_file" => "checksums.txt",

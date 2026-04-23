@@ -182,6 +182,16 @@ Risk:
 
 - high if attempted before install-path separation
 
+## Runtime Self-Containment Constraint
+
+`A2O#172` confirmed that `runtime_agent_export` and `a2o agent install --package-source runtime-image` must stay self-contained.
+
+That means:
+
+- a released runtime image must be able to verify and export host agent packages without GitHub access
+- publication descriptors may support host-install or offline bundle workflows, but they must not become a hard dependency for the runtime path
+- future release-latency work must preserve runtime self-containment while improving the build boundary
+
 ## Recommended Sequence
 
 1. Decide the package publication surface
