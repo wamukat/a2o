@@ -285,7 +285,7 @@ module A3
           elsif symbol == TASK_SYMBOLS.fetch(:next)
             colorize(line, :cyan)
           elsif symbol == TASK_SYMBOLS.fetch(:waiting)
-            colorize(line, :dim)
+            line
           elsif symbol == TASK_SYMBOLS.fetch(:done)
             colorize(line, :green)
           elsif line.start_with?("- #")

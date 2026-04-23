@@ -130,6 +130,7 @@ module A3
             task_id: resolved_task_id,
             task_ref: task_ref,
             raw_status: payload.fetch("status", nil),
+            raw_done: payload["done"],
             raw_priority: payload["priority"],
             labels: labels,
             parent_ref: parent_refs.first&.first,
@@ -141,7 +142,9 @@ module A3
         ]
       end
 
-      def normalize_topology_snapshot(task_id:, task_ref:, raw_status:, raw_priority:, labels:, parent_ref:, blocking_task_refs:)
+      def normalize_topology_snapshot(task_id:, task_ref:, raw_status:, raw_done:, raw_priority:, labels:, parent_ref:, blocking_task_refs:)
+        return nil if task_resolved?(raw_status, raw_done)
+
         status = normalize_status(raw_status, labels: labels)
         return nil unless status
         edit_scope = resolve_topology_edit_scope(labels)
@@ -305,6 +308,7 @@ module A3
         labels = Array(raw_snapshot["labels"]).map(&:to_s).reject(&:empty?).freeze
         task_ref = String(raw_snapshot.fetch("ref")).strip
         return nil unless ignore_trigger_filter || @trigger_labels.empty? || (labels & @trigger_labels).any?
+        return nil if task_resolved?(raw_snapshot.fetch("status", nil), raw_snapshot["done"])
 
         edit_scope = resolve_edit_scope(labels: labels, task_ref: task_ref)
 
@@ -349,6 +353,10 @@ module A3
 
       def closed_status?(raw_status)
         %w[Resolved Archived].include?(String(raw_status))
+      end
+
+      def task_resolved?(raw_status, raw_done)
+        closed_status?(raw_status) || raw_done == true
       end
 
       def blocking_status_resolved?(raw_status)

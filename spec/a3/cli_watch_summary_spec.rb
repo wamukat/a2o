@@ -67,7 +67,7 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("[>] #3138")
       expect(out.string).to include("[.] #3141")
       expect(out.string).to include("\e[33m[>] #3138")
-      expect(out.string).to include("\e[2m[.] #3141")
+      expect(out.string).to include("[.] #3141")
       expect(out.string).to include("Merging -----------+")
       expect(out.string).to include("Implementation -----+")
       expect(out.string).to include("- #3138 implementation/implementation/running_command hb=?")
@@ -235,6 +235,54 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("Current parent task")
       expect(out.string).not_to include("Resolved child task")
       expect(out.string).not_to include("#3999")
+    end
+  end
+
+  it "does not show resolved done-lane tasks that still have Done as their lane" do
+    Dir.mktmpdir do |dir|
+      fake_cli = create_fake_kanban_cli(
+        dir,
+        snapshots: [
+          {
+            "id" => 3138,
+            "ref" => "Sample#3138",
+            "title" => "Visible done task",
+            "status" => "Done",
+            "done" => false,
+            "labels" => ["trigger:auto-implement", "repo:ui-app"]
+          },
+          {
+            "id" => 4000,
+            "ref" => "Sample#4000",
+            "title" => "Resolved done-lane task",
+            "status" => "Done",
+            "done" => true,
+            "labels" => ["trigger:auto-implement", "repo:ui-app"]
+          }
+        ]
+      )
+
+      out = StringIO.new
+      with_env(fake_cli.fetch(:env)) do
+        described_class.start(
+          [
+            "watch-summary",
+            "--storage-backend", "json",
+            "--storage-dir", dir,
+            "--kanban-command", "ruby",
+            "--kanban-command-arg", fake_cli.fetch(:script_path),
+            "--kanban-project", "Sample",
+            "--kanban-working-dir", dir,
+            "--kanban-trigger-label", "trigger:auto-implement",
+            "--kanban-repo-label", "repo:ui-app=repo_alpha"
+          ],
+          out: out
+        )
+      end
+
+      expect(out.string).to include("Visible done task")
+      expect(out.string).not_to include("Resolved done-lane task")
+      expect(out.string).not_to include("#4000")
     end
   end
 

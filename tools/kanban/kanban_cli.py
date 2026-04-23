@@ -412,6 +412,7 @@ def normalize_task_watch_summary(
         "ref": canonical_human_task_ref_for_task(task, project_title=project_title),
         "title": task.get("title") or "",
         "status": task.get("status"),
+        "done": bool(task.get("done", False)),
         "parent_ref": parent_refs[0] if parent_refs else None,
     }
 
@@ -1323,7 +1324,10 @@ def cmd_task_watch_summary_list(args: argparse.Namespace) -> int:
     for task_ref in task_refs:
         resolve_task_for_summary(task_ref=task_ref)
 
-    items = sorted(normalized_by_id.values(), key=lambda item: item["ref"])
+    items = sorted(
+        [item for item in normalized_by_id.values() if not bool(item.get("done", False))],
+        key=lambda item: item["ref"],
+    )
     return print_json(items)
 
 

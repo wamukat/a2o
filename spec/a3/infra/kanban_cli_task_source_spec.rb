@@ -56,6 +56,46 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
+  it "excludes resolved done-lane tasks from the imported set" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 7001,
+          "ref" => "Sample#7001",
+          "status" => "Done",
+          "done" => true,
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => nil
+        },
+        {
+          "id" => 7002,
+          "ref" => "Sample#7002",
+          "status" => "Done",
+          "done" => false,
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-implement"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+
+      expect(tasks.map(&:ref)).to eq(["Sample#7002"])
+    end
+  end
+
   it "builds parent tasks when imported snapshots reference them as children" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,
