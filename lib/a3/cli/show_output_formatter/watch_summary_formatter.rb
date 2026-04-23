@@ -24,7 +24,8 @@ module A3
           pending: ".",
           done: "o",
           running: ">",
-          blocked: "!"
+          blocked: "!",
+          not_applicable: "-"
         }.freeze
         BOX = {
           horizontal: "-",
@@ -176,7 +177,9 @@ module A3
         def task_phase_bar(task)
           latest_phase = task.latest_phase
           PHASE_ORDER.map do |phase|
-            if task.running && latest_phase == phase
+            if task.task_kind == :parent && phase == "implementation"
+              PHASE_SYMBOLS.fetch(:not_applicable)
+            elsif task.running && latest_phase == phase
               PHASE_SYMBOLS.fetch(:running)
             elsif task.blocked && latest_phase == phase
               PHASE_SYMBOLS.fetch(:blocked)

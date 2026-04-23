@@ -30,6 +30,7 @@ module A3
       TaskEntry = Struct.new(
         :ref,
         :title,
+        :task_kind,
         :status,
         :parent_ref,
         :next_candidate,
@@ -106,6 +107,7 @@ module A3
         TaskEntry.new(
           ref: task.ref,
           title: display_title(runtime_task, kanban_snapshot: kanban_snapshot),
+          task_kind: task.kind,
           status: display_status(canonical_status),
           parent_ref: task.parent_ref,
           next_candidate: task.ref == selected_next_ref,

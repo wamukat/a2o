@@ -6,10 +6,11 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
       false,
       nil,
       [
-        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+        Struct.new(:ref, :parent_ref, :title, :task_kind, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
           "Sample#1",
           nil,
           "Parent task",
+          :parent,
           false,
           false,
           true,
@@ -19,10 +20,11 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
           {},
           []
         ),
-        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+        Struct.new(:ref, :parent_ref, :title, :task_kind, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
           "Sample#2",
           "Sample#1",
           "Blocked child",
+          :child,
           true,
           false,
           false,
@@ -47,6 +49,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
     expect(lines).to include("\e[36mTask Tree\e[0m")
     expect(lines).to include(a_string_including("\e[36m[*] #1"))
     expect(lines).to include(a_string_including("\e[31m[!]   #2"))
+    expect(lines).to include(a_string_including("-/././."))
   end
 
   it "indents child task refs when the parent is present" do
@@ -54,10 +57,11 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
       false,
       nil,
       [
-        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+        Struct.new(:ref, :parent_ref, :title, :task_kind, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
           "Sample#51",
           nil,
           "Parent task",
+          :parent,
           false,
           false,
           false,
@@ -67,10 +71,11 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
           {},
           []
         ),
-        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+        Struct.new(:ref, :parent_ref, :title, :task_kind, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
           "Sample#52",
           "Sample#51",
           "Child task",
+          :child,
           false,
           false,
           false,
@@ -103,10 +108,11 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
       false,
       nil,
       [
-        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+        Struct.new(:ref, :parent_ref, :title, :task_kind, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
           "Sample#3141",
           nil,
           "Review task",
+          :single,
           false,
           true,
           false,
@@ -132,10 +138,11 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
       false,
       nil,
       [
-        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+        Struct.new(:ref, :parent_ref, :title, :task_kind, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
           "Sample#3141",
           nil,
           "Review task",
+          :single,
           false,
           true,
           false,
@@ -182,10 +189,11 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
       false,
       nil,
       [
-        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+        Struct.new(:ref, :parent_ref, :title, :task_kind, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
           "Sample#3179",
           nil,
           "Parent task",
+          :single,
           false,
           true,
           false,
@@ -195,10 +203,11 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
           { "implementation" => 1, "review" => 1 },
           []
         ),
-        Struct.new(:ref, :parent_ref, :title, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+        Struct.new(:ref, :parent_ref, :title, :task_kind, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
           "Sample#3166",
           "Sample#3165",
           "Orphan child",
+          :child,
           false,
           false,
           false,
