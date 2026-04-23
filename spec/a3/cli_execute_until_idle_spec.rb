@@ -73,6 +73,61 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "preserves blocked task workspaces when execute-until-idle reaches idle" do
+    Dir.mktmpdir do |dir|
+      repo_sources = create_repo_sources(dir)
+      seed_context(dir)
+      write_project_yaml(File.join(dir, "project.yaml"))
+      task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "A3-v2#3031",
+          kind: :single,
+          edit_scope: [:repo_alpha],
+          verification_scope: [:repo_alpha],
+          status: :blocked
+        )
+      )
+
+      described_class.start(
+        [
+          "prepare-workspace",
+          "--storage-backend", "sqlite",
+          "--storage-dir", dir,
+          *repo_source_args(repo_sources),
+          "--source-type", "detached_commit",
+          "--source-ref", "abc123",
+          "--bootstrap-marker", "workspace-hook:v1",
+          "A3-v2#3031",
+          "review"
+        ],
+        out: StringIO.new
+      )
+
+      out = StringIO.new
+      described_class.start(
+        [
+          "execute-until-idle",
+          File.join(dir, "project.yaml"),
+          "--storage-backend", "sqlite",
+          "--storage-dir", dir,
+          *repo_source_args(repo_sources),
+          "--preset-dir", File.join(dir, "presets"),
+          "--max-steps", "1"
+        ],
+        out: out,
+        worker_gateway: worker_gateway,
+        command_runner: command_runner,
+        merge_runner: merge_runner
+      )
+
+      expect(out.string).to include("executed 0 task(s); idle=true stop_reason=idle")
+      expect(out.string).to include("quarantined=0")
+      expect(Pathname(dir).join("workspaces", "A3-v2-3031")).to exist
+      expect(Pathname(dir).join("quarantine", "A3-v2-3031")).not_to exist
+    end
+  end
+
   it "executes a parent task from review through merge after children are done" do
     Dir.mktmpdir do |dir|
       create_git_repo_source(dir, name: "repo-alpha-source", file_content: "repo_alpha source\n")
