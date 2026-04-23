@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    a2o (0.5.18)
+    a2o (0.5.19)
 
 GEM
   remote: https://rubygems.org/
