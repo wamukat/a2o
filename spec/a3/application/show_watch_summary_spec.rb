@@ -304,6 +304,25 @@ RSpec.describe A3::Application::ShowWatchSummary do
           owner_scope: :task,
           snapshot_version: "refs/heads/a2o/work/Sample-reviewed"
         )
+      ).append_phase_evidence(
+        phase: :verification,
+        source_descriptor: A3::Domain::SourceDescriptor.new(
+          workspace_kind: :runtime_workspace,
+          source_type: :detached_commit,
+          ref: "refs/heads/a2o/work/Sample-reviewed",
+          task_ref: task.ref
+        ),
+        scope_snapshot: scope_snapshot,
+        execution_record: A3::Domain::PhaseExecutionRecord.new(
+          summary: "verification completed",
+          review_disposition: {
+            "kind" => "completed",
+            "repo_scope" => "repo_alpha",
+            "summary" => "verification metadata should not override implementation review",
+            "description" => "future non-review phase metadata",
+            "finding_key" => "verification-metadata"
+          }
+        )
       )
     )
 

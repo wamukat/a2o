@@ -230,6 +230,8 @@ module A3
       def latest_review_disposition(task_runs)
         task_runs.reverse_each do |run|
           run.phase_records.reverse_each do |record|
+            next unless %i[implementation review].include?(record.phase)
+
             disposition = record.execution_record&.review_disposition
             return disposition if disposition.is_a?(Hash)
           end
