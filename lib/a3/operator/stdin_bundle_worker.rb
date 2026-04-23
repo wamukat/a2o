@@ -195,7 +195,6 @@ def response_schema(request)
       "required" => %w[kind repo_scope summary description finding_key],
       "additionalProperties" => false
     }
-    required_fields.concat(%w[changed_files review_disposition])
   end
   if parent_review
     properties["review_disposition"] = {
@@ -414,7 +413,10 @@ def validate_payload(payload, request:)
   end
   if payload.key?("review_disposition")
     disposition = payload["review_disposition"]
-    return errors if implementation_phase && disposition.nil?
+    if implementation_phase && disposition.nil?
+      errors << "review_disposition must be present for implementation success" if payload["success"] == true
+      return errors
+    end
 
     unless disposition.is_a?(Hash)
       errors << "review_disposition must be an object"
@@ -435,8 +437,8 @@ def validate_payload(payload, request:)
     end
   elsif parent_review
     errors << "review_disposition must be present for parent review"
-  elsif implementation_phase
-    errors << "review_disposition must be present for implementation"
+  elsif implementation_phase && payload["success"] == true
+    errors << "review_disposition must be present for implementation success"
   end
   errors
 end

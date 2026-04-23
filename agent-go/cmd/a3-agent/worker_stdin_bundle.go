@@ -269,9 +269,6 @@ func reviewDispositionSchema(schemaType any) map[string]any {
 func workerRequiredFields(request map[string]any) []string {
 	fields := []string{"task_ref", "run_ref", "phase", "success", "summary", "failing_command", "observed_state", "rework_required"}
 	phase := stringValue(request["phase"])
-	if phase == "implementation" {
-		fields = append(fields, "changed_files", "review_disposition")
-	}
 	if phase == "review" && nestedString(request, "phase_runtime", "task_kind") == "parent" {
 		fields = append(fields, "review_disposition")
 	}
@@ -604,10 +601,14 @@ func validateWorkerPayload(payload map[string]any, request map[string]any) []str
 			errors = append(errors, "changed_files must be present for implementation success")
 		}
 	}
-	if needsReviewDisposition(request) {
+	if needsReviewDisposition(request, success) {
 		disposition, ok := payload["review_disposition"].(map[string]any)
 		if !ok {
-			errors = append(errors, "review_disposition must be present")
+			if stringValue(request["phase"]) == "implementation" {
+				errors = append(errors, "review_disposition must be present for implementation success")
+			} else {
+				errors = append(errors, "review_disposition must be present for parent review")
+			}
 		} else {
 			for _, key := range []string{"kind", "repo_scope", "summary", "description", "finding_key"} {
 				if stringValue(disposition[key]) == "" {
@@ -619,9 +620,9 @@ func validateWorkerPayload(payload map[string]any, request map[string]any) []str
 	return errors
 }
 
-func needsReviewDisposition(request map[string]any) bool {
+func needsReviewDisposition(request map[string]any, success bool) bool {
 	phase := stringValue(request["phase"])
-	return phase == "implementation" || (phase == "review" && nestedString(request, "phase_runtime", "task_kind") == "parent")
+	return (phase == "implementation" && success) || (phase == "review" && nestedString(request, "phase_runtime", "task_kind") == "parent")
 }
 
 func normalizeReviewDisposition(payload map[string]any) {

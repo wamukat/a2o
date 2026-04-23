@@ -333,6 +333,39 @@ RSpec.describe "worker:stdin-bundle" do
     end
   end
 
+  it "does not require review_disposition for implementation failures" do
+    payload = {
+      "task_ref" => "Sample#3112",
+      "run_ref" => "run-1",
+      "phase" => "implementation",
+      "success" => false,
+      "summary" => "implementation failed",
+      "failing_command" => "bundle exec rspec",
+      "observed_state" => "spec failed",
+      "rework_required" => false
+    }
+
+    expect(validate_payload(payload, request: base_request)).to eq([])
+  end
+
+  it "requires review_disposition for implementation success" do
+    payload = {
+      "task_ref" => "Sample#3112",
+      "run_ref" => "run-1",
+      "phase" => "implementation",
+      "success" => true,
+      "summary" => "implemented",
+      "failing_command" => nil,
+      "observed_state" => nil,
+      "rework_required" => false,
+      "changed_files" => { "repo_alpha" => ["src/main.rb"] }
+    }
+
+    expect(validate_payload(payload, request: base_request)).to include(
+      "review_disposition must be present for implementation success"
+    )
+  end
+
   it "expands executor command placeholders from injected launcher config" do
     request = base_request
     Dir.mktmpdir("a3-stdin-worker-profile-") do |temp_dir_text|

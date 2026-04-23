@@ -446,6 +446,7 @@ func TestWorkerResponseSchemaIncludesPhaseSpecificProperties(t *testing.T) {
 		name       string
 		request    map[string]any
 		properties []string
+		required   []string
 	}{
 		{
 			name: "implementation",
@@ -453,6 +454,7 @@ func TestWorkerResponseSchemaIncludesPhaseSpecificProperties(t *testing.T) {
 				"phase": "implementation",
 			},
 			properties: []string{"changed_files", "review_disposition"},
+			required:   []string{},
 		},
 		{
 			name: "parent review",
@@ -463,6 +465,7 @@ func TestWorkerResponseSchemaIncludesPhaseSpecificProperties(t *testing.T) {
 				},
 			},
 			properties: []string{"review_disposition"},
+			required:   []string{"review_disposition"},
 		},
 	}
 	for _, tc := range tests {
@@ -489,11 +492,51 @@ func TestWorkerResponseSchemaIncludesPhaseSpecificProperties(t *testing.T) {
 				if _, ok := properties[property]; !ok {
 					t.Fatalf("schema missing property %q: %s", property, body)
 				}
+			}
+			for _, property := range tc.required {
 				if !required[property] {
 					t.Fatalf("schema should require %q: %s", property, body)
 				}
 			}
 		})
+	}
+}
+
+func TestWorkerPayloadRequiresReviewDispositionOnlyForImplementationSuccess(t *testing.T) {
+	request := map[string]any{
+		"task_ref":   "A2O#7",
+		"run_ref":    "run-1",
+		"phase":      "implementation",
+		"slot_paths": map[string]any{"repo_alpha": "/tmp/repo-alpha"},
+	}
+	failedPayload := map[string]any{
+		"task_ref":        "A2O#7",
+		"run_ref":         "run-1",
+		"phase":           "implementation",
+		"success":         false,
+		"summary":         "implementation failed",
+		"failing_command": "go test ./...",
+		"observed_state":  "tests failed",
+		"rework_required": false,
+	}
+	if errors := validateWorkerPayload(failedPayload, request); len(errors) != 0 {
+		t.Fatalf("implementation failure should not require review_disposition: %#v", errors)
+	}
+
+	successPayload := map[string]any{
+		"task_ref":        "A2O#7",
+		"run_ref":         "run-1",
+		"phase":           "implementation",
+		"success":         true,
+		"summary":         "implemented",
+		"failing_command": nil,
+		"observed_state":  nil,
+		"rework_required": false,
+		"changed_files":   map[string]any{"repo_alpha": []any{"main.go"}},
+	}
+	errors := validateWorkerPayload(successPayload, request)
+	if !containsString(errors, "review_disposition must be present for implementation success") {
+		t.Fatalf("implementation success should require review_disposition, got %#v", errors)
 	}
 }
 
