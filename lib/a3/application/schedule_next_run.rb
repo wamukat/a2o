@@ -1,13 +1,14 @@
 # frozen_string_literal: true
 
 require "a3/domain/upstream_line_guard"
+require "a3/domain/scheduler_selection_policy"
 
 module A3
   module Application
     class ScheduleNextRun
       Result = Struct.new(:task, :phase, :started_run, keyword_init: true)
 
-      def initialize(plan_next_runnable_task:, start_run:, build_scope_snapshot:, build_artifact_owner:, run_repository:, phase_source_policy: A3::Domain::PhaseSourcePolicy.new, integration_ref_readiness_checker:, upstream_line_guard: A3::Domain::UpstreamLineGuard.new)
+      def initialize(plan_next_runnable_task:, start_run:, build_scope_snapshot:, build_artifact_owner:, run_repository:, phase_source_policy: A3::Domain::PhaseSourcePolicy.new, integration_ref_readiness_checker:, upstream_line_guard: A3::Domain::UpstreamLineGuard.new, scheduler_selection_policy: A3::Domain::SchedulerSelectionPolicy.new)
         @plan_next_runnable_task = plan_next_runnable_task
         @start_run = start_run
         @build_scope_snapshot = build_scope_snapshot
@@ -15,6 +16,7 @@ module A3
         @run_repository = run_repository
         @phase_source_policy = phase_source_policy
         @upstream_line_guard = upstream_line_guard
+        @scheduler_selection_policy = scheduler_selection_policy
         raise ArgumentError, "integration_ref_readiness_checker is required" unless integration_ref_readiness_checker
 
         @integration_ref_readiness_checker = integration_ref_readiness_checker
@@ -56,7 +58,10 @@ module A3
 
         runnable_assessments = plan.assessments
           .select(&:runnable?)
-          .sort_by { |assessment| [-assessment.task.priority, assessment.task.ref] }
+        runnable_assessments = @scheduler_selection_policy.sort_assessments(
+          assessments: runnable_assessments,
+          tasks: tasks
+        )
 
         runnable_assessments.each do |assessment|
           next unless assessment.runnable?

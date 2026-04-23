@@ -263,6 +263,61 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(result.tasks.find { |item| item.ref == "Sample#200" }.next_candidate).to be(true)
   end
 
+  it "marks the highest-priority child inside the highest-priority parent group as next" do
+    parent_a = A3::Domain::Task.new(
+      ref: "Sample#5000",
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      verification_scope: %i[repo_alpha repo_beta],
+      status: :todo,
+      child_refs: %w[Sample#5001 Sample#5002],
+      priority: 4
+    )
+    child_a1 = A3::Domain::Task.new(
+      ref: "Sample#5001",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :todo,
+      parent_ref: parent_a.ref,
+      priority: 1
+    )
+    child_a2 = A3::Domain::Task.new(
+      ref: "Sample#5002",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :todo,
+      parent_ref: parent_a.ref,
+      priority: 3
+    )
+    parent_b = A3::Domain::Task.new(
+      ref: "Sample#5010",
+      kind: :parent,
+      edit_scope: %i[repo_gamma repo_delta],
+      verification_scope: %i[repo_gamma repo_delta],
+      status: :todo,
+      child_refs: %w[Sample#5011],
+      priority: 2
+    )
+    child_b1 = A3::Domain::Task.new(
+      ref: "Sample#5011",
+      kind: :child,
+      edit_scope: [:repo_gamma],
+      verification_scope: [:repo_gamma],
+      status: :todo,
+      parent_ref: parent_b.ref,
+      priority: 9
+    )
+    [parent_a, child_a1, child_a2, parent_b, child_b1].each { |task| task_repository.save(task) }
+
+    result = use_case.call
+
+    expect(result.next_candidates).to eq(["Sample#5002"])
+    expect(result.tasks.find { |item| item.ref == "Sample#5002" }.next_candidate).to be(true)
+    expect(result.tasks.find { |item| item.ref == "Sample#5011" }.next_candidate).to be(false)
+  end
+
   it "uses external_task_id canonical mapping and preserved run insertion order" do
     task = A3::Domain::Task.new(
       ref: "Sample#imported-7",

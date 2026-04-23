@@ -59,6 +59,64 @@ RSpec.describe A3::Application::PlanNextRunnableTask do
     expect(result.phase).to eq(:implementation)
   end
 
+  it "prefers the highest-priority parent group before child priority across groups" do
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#5000",
+        kind: :parent,
+        edit_scope: %i[repo_alpha repo_beta],
+        status: :todo,
+        child_refs: %w[A3-v2#5001 A3-v2#5002],
+        priority: 4
+      )
+    )
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#5001",
+        kind: :child,
+        edit_scope: [:repo_alpha],
+        status: :todo,
+        parent_ref: "A3-v2#5000",
+        priority: 1
+      )
+    )
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#5002",
+        kind: :child,
+        edit_scope: [:repo_beta],
+        status: :todo,
+        parent_ref: "A3-v2#5000",
+        priority: 3
+      )
+    )
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#5010",
+        kind: :parent,
+        edit_scope: %i[repo_gamma repo_delta],
+        status: :todo,
+        child_refs: %w[A3-v2#5011],
+        priority: 2
+      )
+    )
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#5011",
+        kind: :child,
+        edit_scope: [:repo_gamma],
+        status: :todo,
+        parent_ref: "A3-v2#5010",
+        priority: 9
+      )
+    )
+
+    result = use_case.call
+
+    expect(result.task&.ref).to eq("A3-v2#5002")
+    expect(result.phase).to eq(:implementation)
+  end
+
   it "does not select topology-only tasks even when they would otherwise be runnable" do
     task_repository.save(
       A3::Domain::Task.new(
@@ -220,6 +278,34 @@ RSpec.describe A3::Application::PlanNextRunnableTask do
     blocked_assessment = result.assessments.find { |assessment| assessment.task_ref == "A3-v2#4001" }
     expect(blocked_assessment.reason).to eq(:blocked_by_tasks)
     expect(blocked_assessment.blocking_task_refs).to eq(["A3-v2#4000"])
+  end
+
+  it "does not schedule child tasks while the parent task is blocked" do
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#4100",
+        kind: :parent,
+        edit_scope: %i[repo_alpha repo_beta],
+        status: :blocked,
+        child_refs: %w[A3-v2#4101]
+      )
+    )
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#4101",
+        kind: :child,
+        edit_scope: [:repo_beta],
+        status: :todo,
+        parent_ref: "A3-v2#4100"
+      )
+    )
+
+    result = use_case.call
+
+    expect(result.task).to be_nil
+    blocked_assessment = result.assessments.find { |assessment| assessment.task_ref == "A3-v2#4101" }
+    expect(blocked_assessment.reason).to eq(:blocked_by_tasks)
+    expect(blocked_assessment.blocking_task_refs).to eq(["A3-v2#4100"])
   end
 
   it "schedules the parent review when all children are done" do

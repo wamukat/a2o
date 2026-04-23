@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "set"
+
 module A3
   module Domain
     class RunnableTaskAssessment
@@ -80,10 +82,20 @@ module A3
         end
 
         def unresolved_blocker_refs(task, tasks)
-          task.blocking_task_refs.select do |blocker_ref|
+          refs = task.blocking_task_refs.select do |blocker_ref|
             blocker = find_task(tasks, blocker_ref)
             blocker.nil? || blocker.status != :done
-          end.freeze
+          end
+
+          ancestors_for(task, tasks).each do |ancestor|
+            ancestor.blocking_task_refs.each do |blocker_ref|
+              blocker = find_task(tasks, blocker_ref)
+              refs << blocker_ref if blocker.nil? || blocker.status != :done
+            end
+            refs << ancestor.ref if ancestor.status == :blocked
+          end
+
+          refs.uniq.freeze
         end
 
         def sibling_running_refs(task, tasks)
@@ -108,6 +120,23 @@ module A3
             candidate.ref != task.ref &&
               candidate.parent_ref == task.parent_ref
           end
+        end
+
+        def ancestors_for(task, tasks)
+          ancestors = []
+          seen_refs = Set.new
+          parent_ref = task.parent_ref
+
+          while parent_ref && !seen_refs.include?(parent_ref)
+            seen_refs << parent_ref
+            parent = find_task(tasks, parent_ref)
+            break unless parent
+
+            ancestors << parent
+            parent_ref = parent.parent_ref
+          end
+
+          ancestors
         end
 
         def find_task(tasks, ref)

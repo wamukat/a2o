@@ -86,6 +86,59 @@ RSpec.describe A3::Domain::RunnableTaskAssessment do
     expect(assessment.blocking_task_refs).to eq([blocker.ref])
   end
 
+  it "inherits unresolved parent blockers when evaluating a child task" do
+    parent_blocker = A3::Domain::Task.new(
+      ref: "A3-v2#3044",
+      kind: :single,
+      edit_scope: [:repo_alpha],
+      status: :todo
+    )
+    parent = A3::Domain::Task.new(
+      ref: "A3-v2#3045",
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      status: :todo,
+      child_refs: ["A3-v2#3046"],
+      blocking_task_refs: [parent_blocker.ref]
+    )
+    child = A3::Domain::Task.new(
+      ref: "A3-v2#3046",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      status: :todo,
+      parent_ref: parent.ref
+    )
+
+    assessment = described_class.evaluate(task: child, tasks: [parent_blocker, parent, child])
+
+    expect(assessment.runnable?).to eq(false)
+    expect(assessment.reason).to eq(:blocked_by_tasks)
+    expect(assessment.blocking_task_refs).to eq([parent_blocker.ref])
+  end
+
+  it "blocks a child task when its parent task is blocked" do
+    parent = A3::Domain::Task.new(
+      ref: "A3-v2#3047",
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      status: :blocked,
+      child_refs: ["A3-v2#3048"]
+    )
+    child = A3::Domain::Task.new(
+      ref: "A3-v2#3048",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      status: :todo,
+      parent_ref: parent.ref
+    )
+
+    assessment = described_class.evaluate(task: child, tasks: [parent, child])
+
+    expect(assessment.runnable?).to eq(false)
+    expect(assessment.reason).to eq(:blocked_by_tasks)
+    expect(assessment.blocking_task_refs).to eq([parent.ref])
+  end
+
   it "does not mark topology-only tasks as runnable" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3043",

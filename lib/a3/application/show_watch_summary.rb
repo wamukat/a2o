@@ -2,6 +2,7 @@
 
 require_relative "../domain/task_phase_projection"
 require_relative "../domain/runnable_task_assessment"
+require_relative "../domain/scheduler_selection_policy"
 require_relative "../domain/upstream_line_guard"
 
 module A3
@@ -43,7 +44,7 @@ module A3
         keyword_init: true
       )
 
-      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_tasks: nil, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {}, upstream_line_guard: A3::Domain::UpstreamLineGuard.new)
+      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_tasks: nil, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {}, upstream_line_guard: A3::Domain::UpstreamLineGuard.new, scheduler_selection_policy: A3::Domain::SchedulerSelectionPolicy.new)
         @task_repository = task_repository
         @run_repository = run_repository
         @scheduler_state_repository = scheduler_state_repository
@@ -51,6 +52,7 @@ module A3
         @kanban_snapshots_by_ref = kanban_snapshots_by_ref || {}
         @kanban_snapshots_by_id = kanban_snapshots_by_id || {}
         @upstream_line_guard = upstream_line_guard
+        @scheduler_selection_policy = scheduler_selection_policy
       end
 
       def call
@@ -119,19 +121,18 @@ module A3
       end
 
       def select_next_ref(tasks:, runs:, assessments_by_ref:)
-        tasks
-          .filter_map do |task|
-            assessment = assessments_by_ref.fetch(task.ref)
-            next unless assessment.runnable?
-            next unless @upstream_line_guard.evaluate(task: task, phase: assessment.phase, tasks: tasks, runs: runs).healthy?
+        runnable_assessments = tasks.filter_map do |task|
+          assessment = assessments_by_ref.fetch(task.ref)
+          next unless assessment.runnable?
+          next unless @upstream_line_guard.evaluate(task: task, phase: assessment.phase, tasks: tasks, runs: runs).healthy?
 
-            task.ref
-          end
-          .sort_by do |ref|
-            task = tasks.find { |candidate| candidate.ref == ref }
-            [-task.priority, task.ref]
-          end
+          assessment
+        end
+
+        @scheduler_selection_policy
+          .sort_assessments(assessments: runnable_assessments, tasks: tasks)
           .first
+          &.task_ref
       end
 
       def display_title(task, kanban_snapshot:)

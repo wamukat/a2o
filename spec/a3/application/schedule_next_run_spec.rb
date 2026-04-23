@@ -131,6 +131,58 @@ RSpec.describe A3::Application::ScheduleNextRun do
     expect(result.phase).to eq(:implementation)
   end
 
+  it "starts a child from the highest-priority parent group before a higher-priority child in a lower-priority group" do
+    high_group_child = build_child_task(
+      ref: "A3-v2#3041",
+      edit_scope: [:repo_alpha],
+      status: :todo,
+      parent_ref: "A3-v2#3040",
+      priority: 3
+    )
+    low_group_child = build_child_task(
+      ref: "A3-v2#3051",
+      edit_scope: [:repo_beta],
+      status: :todo,
+      parent_ref: "A3-v2#3050",
+      priority: 9
+    )
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#3040",
+        kind: :parent,
+        edit_scope: %i[repo_alpha repo_beta],
+        verification_scope: %i[repo_alpha repo_beta],
+        status: :todo,
+        child_refs: [high_group_child.ref],
+        priority: 4
+      )
+    )
+    task_repository.save(high_group_child)
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#3050",
+        kind: :parent,
+        edit_scope: %i[repo_alpha repo_beta],
+        verification_scope: %i[repo_alpha repo_beta],
+        status: :todo,
+        child_refs: [low_group_child.ref],
+        priority: 2
+      )
+    )
+    task_repository.save(low_group_child)
+
+    expect(start_run).to receive(:call).with(
+      hash_including(task_ref: "A3-v2#3041", phase: :implementation)
+    ).and_return(
+      A3::Application::StartRun::Result.new(task: high_group_child, run: instance_double(A3::Domain::Run), workspace: instance_double(A3::Domain::PreparedWorkspace))
+    )
+
+    result = use_case.call(project_context: project_context)
+
+    expect(result.task).to eq(high_group_child)
+    expect(result.phase).to eq(:implementation)
+  end
+
   it "starts recovery verification against the task-scoped verification source ref" do
     recovered_task = build_child_task(
       ref: task.ref,
