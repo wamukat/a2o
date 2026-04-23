@@ -325,6 +325,26 @@ RSpec.describe A3::Application::ShowWatchSummary do
         )
       )
     )
+    run_repository.save(
+      A3::Domain::Run.new(
+        ref: "run-merge",
+        task_ref: task.ref,
+        phase: :merge,
+        workspace_kind: :runtime_workspace,
+        source_descriptor: A3::Domain::SourceDescriptor.new(
+          workspace_kind: :runtime_workspace,
+          source_type: :detached_commit,
+          ref: "refs/heads/a2o/work/Sample-reviewed",
+          task_ref: task.ref
+        ),
+        scope_snapshot: scope_snapshot,
+        artifact_owner: A3::Domain::ArtifactOwner.new(
+          owner_ref: task.ref,
+          owner_scope: :task,
+          snapshot_version: "refs/heads/a2o/work/Sample-reviewed"
+        )
+      )
+    )
 
     result = use_case.call
 
