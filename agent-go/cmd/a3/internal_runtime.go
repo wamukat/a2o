@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -162,6 +163,10 @@ func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, std
 	maxSteps := flags.String("max-steps", "", "maximum runtime steps for each cycle")
 	agentAttempts := flags.String("agent-attempts", "", "maximum host agent attempts for each cycle")
 	agentPollInterval := flags.String("agent-poll-interval", "", "idle duration between host agent polls during each cycle")
+	agentControlPlaneConnectTimeout := flags.String("agent-control-plane-connect-timeout", "", "TCP connect timeout for host agent control plane requests during each cycle")
+	agentControlPlaneRequestTimeout := flags.String("agent-control-plane-request-timeout", "", "per-request timeout for host agent control plane requests during each cycle")
+	agentControlPlaneRetries := flags.String("agent-control-plane-retries", "", "retry count for transient host agent control plane request failures during each cycle")
+	agentControlPlaneRetryDelay := flags.String("agent-control-plane-retry-delay", "", "delay between transient host agent control plane retries during each cycle")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -188,13 +193,35 @@ func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, std
 	if _, err := parseNonNegativeDuration(*agentPollInterval, "agent poll interval"); err != nil {
 		return err
 	}
+	if _, err := parseOptionalPositiveDuration(*agentControlPlaneConnectTimeout, "agent control plane connect timeout"); err != nil {
+		return err
+	}
+	if _, err := parseOptionalPositiveDuration(*agentControlPlaneRequestTimeout, "agent control plane request timeout"); err != nil {
+		return err
+	}
+	if strings.TrimSpace(*agentControlPlaneRetries) != "" {
+		if _, err := parseNonNegativeInt(*agentControlPlaneRetries, "agent control plane retries"); err != nil {
+			return err
+		}
+	}
+	if _, err := parseNonNegativeDuration(*agentControlPlaneRetryDelay, "agent control plane retry delay"); err != nil {
+		return err
+	}
 
 	config, _, err := loadInstanceConfigFromWorkingTree()
 	if err != nil {
 		return err
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
-	if _, err := buildRuntimeRunOncePlan(effectiveConfig, *maxSteps, *agentAttempts, *agentPollInterval, ""); err != nil {
+	if _, err := buildRuntimeRunOncePlan(effectiveConfig, runtimeRunOnceOverrides{
+		MaxSteps:                        *maxSteps,
+		AgentAttempts:                   *agentAttempts,
+		AgentPollInterval:               *agentPollInterval,
+		AgentControlPlaneConnectTimeout: *agentControlPlaneConnectTimeout,
+		AgentControlPlaneRequestTimeout: *agentControlPlaneRequestTimeout,
+		AgentControlPlaneRetries:        *agentControlPlaneRetries,
+		AgentControlPlaneRetryDelay:     *agentControlPlaneRetryDelay,
+	}, ""); err != nil {
 		return err
 	}
 	paths := schedulerPaths(effectiveConfig)
@@ -225,7 +252,15 @@ func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, std
 		return fmt.Errorf("resolve executable: %w", err)
 	}
 	loopArgs := []string{"runtime", "loop", "--interval", *interval}
-	loopArgs = append(loopArgs, buildRunOnceArgs(*maxSteps, *agentAttempts, *agentPollInterval)...)
+	loopArgs = append(loopArgs, buildRunOnceArgs(runtimeRunOnceOverrides{
+		MaxSteps:                        *maxSteps,
+		AgentAttempts:                   *agentAttempts,
+		AgentPollInterval:               *agentPollInterval,
+		AgentControlPlaneConnectTimeout: *agentControlPlaneConnectTimeout,
+		AgentControlPlaneRequestTimeout: *agentControlPlaneRequestTimeout,
+		AgentControlPlaneRetries:        *agentControlPlaneRetries,
+		AgentControlPlaneRetryDelay:     *agentControlPlaneRetryDelay,
+	})...)
 	expectedCommand := schedulerExpectedCommand(executable, loopArgs)
 	pid, err := runner.StartBackground(executable, loopArgs, paths.LogFile)
 	if err != nil {
@@ -320,7 +355,7 @@ func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, std
 }
 
 func runtimeSchedulerStateCommand(config runtimeInstanceConfig, runner commandRunner, command string) error {
-	plan, err := buildRuntimeRunOncePlan(config, "", "", "", "")
+	plan, err := buildRuntimeRunOncePlan(config, runtimeRunOnceOverrides{}, "")
 	if err != nil {
 		return err
 	}
@@ -329,7 +364,7 @@ func runtimeSchedulerStateCommand(config runtimeInstanceConfig, runner commandRu
 }
 
 func printRuntimeSchedulerPauseState(config runtimeInstanceConfig, runner commandRunner, stdout io.Writer) {
-	plan, err := buildRuntimeRunOncePlan(config, "", "", "", "")
+	plan, err := buildRuntimeRunOncePlan(config, runtimeRunOnceOverrides{}, "")
 	if err != nil {
 		fmt.Fprintf(stdout, "runtime_scheduler_pause status=unavailable reason=%s\n", singleLine(err.Error()))
 		return
@@ -831,7 +866,7 @@ func runRuntimeResetTask(args []string, stdout io.Writer, stderr io.Writer) erro
 		return err
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
-	plan, err := buildRuntimeRunOncePlan(effectiveConfig, "", "", "", "")
+	plan, err := buildRuntimeRunOncePlan(effectiveConfig, runtimeRunOnceOverrides{}, "")
 	if err != nil {
 		return err
 	}
@@ -1116,6 +1151,10 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 	maxSteps := flags.String("max-steps", "", "maximum runtime steps for this cycle")
 	agentAttempts := flags.String("agent-attempts", "", "maximum host agent attempts for this cycle")
 	agentPollInterval := flags.String("agent-poll-interval", "", "idle duration between host agent polls for this cycle")
+	agentControlPlaneConnectTimeout := flags.String("agent-control-plane-connect-timeout", "", "TCP connect timeout for host agent control plane requests for this cycle")
+	agentControlPlaneRequestTimeout := flags.String("agent-control-plane-request-timeout", "", "per-request timeout for host agent control plane requests for this cycle")
+	agentControlPlaneRetries := flags.String("agent-control-plane-retries", "", "retry count for transient host agent control plane request failures for this cycle")
+	agentControlPlaneRetryDelay := flags.String("agent-control-plane-retry-delay", "", "delay between transient host agent control plane retries for this cycle")
 	projectConfig := flags.String("project-config", "", "explicit project config file, for example project-test.yaml")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -1129,59 +1168,82 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 		return err
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	overrides := runtimeRunOnceOverrides{
+		MaxSteps:                        *maxSteps,
+		AgentAttempts:                   *agentAttempts,
+		AgentPollInterval:               *agentPollInterval,
+		AgentControlPlaneConnectTimeout: *agentControlPlaneConnectTimeout,
+		AgentControlPlaneRequestTimeout: *agentControlPlaneRequestTimeout,
+		AgentControlPlaneRetries:        *agentControlPlaneRetries,
+		AgentControlPlaneRetryDelay:     *agentControlPlaneRetryDelay,
+	}
 
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
-	return withEnv(runtimeRunOnceEnv(effectiveConfig, *maxSteps, *agentAttempts), func() error {
-		return runGenericRuntimeRunOnce(effectiveConfig, *maxSteps, *agentAttempts, *agentPollInterval, *projectConfig, runner, stdout)
+	return withEnv(runtimeRunOnceEnv(effectiveConfig, overrides.MaxSteps, overrides.AgentAttempts), func() error {
+		return runGenericRuntimeRunOnce(effectiveConfig, overrides, *projectConfig, runner, stdout)
 	})
 }
 
 type runtimeRunOncePlan struct {
-	ComposePrefix        []string
-	MaxSteps             string
-	AgentAttempts        int
-	AgentPollInterval    time.Duration
-	AgentPort            string
-	AgentInternalPort    string
-	StorageDir           string
-	HostRootDir          string
-	HostRoot             string
-	WorkspaceRoot        string
-	HostAgentBin         string
-	HostAgentSource      string
-	HostAgentTarget      string
-	HostAgentLog         string
-	LiveLogRoot          string
-	AIRawLogRoot         string
-	LauncherConfigPath   string
-	LauncherConfig       map[string]any
-	ServerLog            string
-	RuntimeLog           string
-	RuntimeExitFile      string
-	RuntimePIDFile       string
-	ServerPIDFile        string
-	PresetDir            string
-	ManifestPath         string
-	SoloBoardInternalURL string
-	LiveRef              string
-	AgentEnv             []string
-	AgentSourcePaths     []string
-	AgentRequiredBins    []string
-	AgentSourceAliases   []string
-	KanbanProject        string
-	KanbanStatus         string
-	KanbanRepoLabels     []string
-	RepoSources          []string
-	LocalSourceAliases   []string
-	WorkerCommand        string
-	WorkerArgs           []string
-	JobTimeoutSeconds    string
-	BranchNamespace      string
+	ComposePrefix                   []string
+	MaxSteps                        string
+	AgentAttempts                   int
+	AgentPollInterval               time.Duration
+	AgentControlPlaneConnectTimeout time.Duration
+	AgentControlPlaneRequestTimeout time.Duration
+	AgentControlPlaneRetryCount     int
+	AgentControlPlaneRetryDelay     time.Duration
+	AgentPort                       string
+	AgentInternalPort               string
+	StorageDir                      string
+	HostRootDir                     string
+	HostRoot                        string
+	WorkspaceRoot                   string
+	HostAgentBin                    string
+	HostAgentSource                 string
+	HostAgentTarget                 string
+	HostAgentLog                    string
+	LiveLogRoot                     string
+	AIRawLogRoot                    string
+	LauncherConfigPath              string
+	LauncherConfig                  map[string]any
+	ServerLog                       string
+	RuntimeLog                      string
+	RuntimeExitFile                 string
+	RuntimePIDFile                  string
+	ServerPIDFile                   string
+	PresetDir                       string
+	ManifestPath                    string
+	SoloBoardInternalURL            string
+	LiveRef                         string
+	AgentEnv                        []string
+	AgentSourcePaths                []string
+	AgentRequiredBins               []string
+	AgentSourceAliases              []string
+	KanbanProject                   string
+	KanbanStatus                    string
+	KanbanRepoLabels                []string
+	RepoSources                     []string
+	LocalSourceAliases              []string
+	WorkerCommand                   string
+	WorkerArgs                      []string
+	JobTimeoutSeconds               string
+	BranchNamespace                 string
 }
 
-func runGenericRuntimeRunOnce(config runtimeInstanceConfig, maxSteps string, agentAttempts string, agentPollInterval string, projectConfig string, runner commandRunner, stdout io.Writer) error {
-	plan, err := buildRuntimeRunOncePlan(config, maxSteps, agentAttempts, agentPollInterval, projectConfig)
+type runtimeRunOnceOverrides struct {
+	MaxSteps                        string
+	AgentAttempts                   string
+	AgentPollInterval               string
+	AgentControlPlaneConnectTimeout string
+	AgentControlPlaneRequestTimeout string
+	AgentControlPlaneRetries        string
+	AgentControlPlaneRetryDelay     string
+}
+
+func runGenericRuntimeRunOnce(config runtimeInstanceConfig, overrides runtimeRunOnceOverrides, projectConfig string, runner commandRunner, stdout io.Writer) error {
+	plan, err := buildRuntimeRunOncePlan(config, overrides, projectConfig)
 	if err != nil {
 		return err
 	}
@@ -1254,7 +1316,7 @@ func ensureRuntimeLauncherConfig(plan runtimeRunOncePlan, stdout io.Writer) erro
 	return nil
 }
 
-func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agentAttempts string, agentPollInterval string, projectConfig string) (runtimeRunOncePlan, error) {
+func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunOnceOverrides, projectConfig string) (runtimeRunOncePlan, error) {
 	hostRootDir := envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_ROOT_DIR", "A3_RUNTIME_RUN_ONCE_HOST_ROOT_DIR", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_ROOT_DIR", "A3_RUNTIME_SCHEDULER_HOST_ROOT_DIR", config.WorkspaceRoot))
 	if strings.TrimSpace(hostRootDir) == "" {
 		hostRootDir = "."
@@ -1283,11 +1345,31 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 	hostAgentBin := envDefaultCompat("A2O_HOST_AGENT_BIN", "A3_HOST_AGENT_BIN", resolveDefaultHostAgentBin(config, hostRootDir))
 	defaultAgentAttempts := envDefaultValue(packageConfig.AgentAttempts, "220")
 	defaultAgentPollInterval := envDefaultValue(packageConfig.AgentPollInterval, "1s")
-	agentAttemptCount, err := parsePositiveInt(envDefaultValue(agentAttempts, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS", "A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_ATTEMPTS", "A3_RUNTIME_SCHEDULER_AGENT_ATTEMPTS", defaultAgentAttempts))), "agent attempts")
+	defaultAgentControlPlaneConnectTimeout := envDefaultValue(packageConfig.AgentControlPlaneConnectTimeout, "")
+	defaultAgentControlPlaneRequestTimeout := envDefaultValue(packageConfig.AgentControlPlaneRequestTimeout, "")
+	defaultAgentControlPlaneRetryCount := envDefaultValue(packageConfig.AgentControlPlaneRetryCount, "0")
+	defaultAgentControlPlaneRetryDelay := envDefaultValue(packageConfig.AgentControlPlaneRetryDelay, "0s")
+	agentAttemptCount, err := parsePositiveInt(envDefaultValue(overrides.AgentAttempts, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS", "A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_ATTEMPTS", "A3_RUNTIME_SCHEDULER_AGENT_ATTEMPTS", defaultAgentAttempts))), "agent attempts")
 	if err != nil {
 		return runtimeRunOncePlan{}, err
 	}
-	agentPollDuration, err := parseNonNegativeDuration(envDefaultValue(agentPollInterval, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_POLL_INTERVAL", "A3_RUNTIME_RUN_ONCE_AGENT_POLL_INTERVAL", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_POLL_INTERVAL", "A3_RUNTIME_SCHEDULER_AGENT_POLL_INTERVAL", defaultAgentPollInterval))), "agent poll interval")
+	agentPollDuration, err := parseNonNegativeDuration(envDefaultValue(overrides.AgentPollInterval, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_POLL_INTERVAL", "A3_RUNTIME_RUN_ONCE_AGENT_POLL_INTERVAL", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_POLL_INTERVAL", "A3_RUNTIME_SCHEDULER_AGENT_POLL_INTERVAL", defaultAgentPollInterval))), "agent poll interval")
+	if err != nil {
+		return runtimeRunOncePlan{}, err
+	}
+	agentControlPlaneConnectTimeout, err := parseOptionalPositiveDuration(envDefaultValue(overrides.AgentControlPlaneConnectTimeout, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_CONTROL_PLANE_CONNECT_TIMEOUT", "A3_RUNTIME_RUN_ONCE_AGENT_CONTROL_PLANE_CONNECT_TIMEOUT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_CONTROL_PLANE_CONNECT_TIMEOUT", "A3_RUNTIME_SCHEDULER_AGENT_CONTROL_PLANE_CONNECT_TIMEOUT", defaultAgentControlPlaneConnectTimeout))), "agent control plane connect timeout")
+	if err != nil {
+		return runtimeRunOncePlan{}, err
+	}
+	agentControlPlaneRequestTimeout, err := parseOptionalPositiveDuration(envDefaultValue(overrides.AgentControlPlaneRequestTimeout, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_CONTROL_PLANE_REQUEST_TIMEOUT", "A3_RUNTIME_RUN_ONCE_AGENT_CONTROL_PLANE_REQUEST_TIMEOUT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_CONTROL_PLANE_REQUEST_TIMEOUT", "A3_RUNTIME_SCHEDULER_AGENT_CONTROL_PLANE_REQUEST_TIMEOUT", defaultAgentControlPlaneRequestTimeout))), "agent control plane request timeout")
+	if err != nil {
+		return runtimeRunOncePlan{}, err
+	}
+	agentControlPlaneRetryCount, err := parseNonNegativeInt(envDefaultValue(overrides.AgentControlPlaneRetries, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_CONTROL_PLANE_RETRIES", "A3_RUNTIME_RUN_ONCE_AGENT_CONTROL_PLANE_RETRIES", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_CONTROL_PLANE_RETRIES", "A3_RUNTIME_SCHEDULER_AGENT_CONTROL_PLANE_RETRIES", defaultAgentControlPlaneRetryCount))), "agent control plane retries")
+	if err != nil {
+		return runtimeRunOncePlan{}, err
+	}
+	agentControlPlaneRetryDelay, err := parseNonNegativeDuration(envDefaultValue(overrides.AgentControlPlaneRetryDelay, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_CONTROL_PLANE_RETRY_DELAY", "A3_RUNTIME_RUN_ONCE_AGENT_CONTROL_PLANE_RETRY_DELAY", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_CONTROL_PLANE_RETRY_DELAY", "A3_RUNTIME_SCHEDULER_AGENT_CONTROL_PLANE_RETRY_DELAY", defaultAgentControlPlaneRetryDelay))), "agent control plane retry delay")
 	if err != nil {
 		return runtimeRunOncePlan{}, err
 	}
@@ -1326,33 +1408,37 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, maxSteps string, agen
 		return runtimeRunOncePlan{}, fmt.Errorf("project.yaml runtime.phases.implementation.executor.command is required for packaged a2o-agent worker execution")
 	}
 	return runtimeRunOncePlan{
-		ComposePrefix:        composeArgs(config),
-		MaxSteps:             envDefaultValue(maxSteps, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_MAX_STEPS", "A3_RUNTIME_RUN_ONCE_MAX_STEPS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_MAX_STEPS", "A3_RUNTIME_SCHEDULER_MAX_STEPS", defaultMaxSteps))),
-		AgentAttempts:        agentAttemptCount,
-		AgentPollInterval:    agentPollDuration,
-		AgentPort:            envDefaultCompat("A2O_BUNDLE_AGENT_PORT", "A3_BUNDLE_AGENT_PORT", envDefaultValue(config.AgentPort, "7393")),
-		AgentInternalPort:    envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_INTERNAL_PORT", "A3_RUNTIME_RUN_ONCE_AGENT_INTERNAL_PORT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_INTERNAL_PORT", "A3_RUNTIME_SCHEDULER_AGENT_INTERNAL_PORT", "7393")),
-		StorageDir:           envDefaultCompat("A2O_BUNDLE_STORAGE_DIR", "A3_BUNDLE_STORAGE_DIR", envDefaultValue(config.StorageDir, "/var/lib/a2o/a2o-runtime")),
-		HostRootDir:          hostRootDir,
-		HostRoot:             hostRoot,
-		WorkspaceRoot:        workspaceRoot,
-		HostAgentBin:         hostAgentBin,
-		HostAgentSource:      envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_SOURCE", "A3_RUNTIME_RUN_ONCE_AGENT_SOURCE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_SOURCE", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE", "runtime-image")),
-		HostAgentTarget:      target,
-		HostAgentLog:         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_AGENT_LOG", "A3_RUNTIME_RUN_ONCE_HOST_AGENT_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_AGENT_LOG", "A3_RUNTIME_SCHEDULER_HOST_AGENT_LOG", filepath.Join(hostRoot, "agent.log"))),
-		LiveLogRoot:          envDefaultCompat("A2O_AGENT_LIVE_LOG_ROOT", "A3_AGENT_LIVE_LOG_ROOT", filepath.Join(hostRoot, "live-logs")),
-		AIRawLogRoot:         envDefaultCompat("A2O_AGENT_AI_RAW_LOG_ROOT", "A3_AGENT_AI_RAW_LOG_ROOT", filepath.Join(hostRoot, "ai-raw-logs")),
-		LauncherConfigPath:   launcherConfigPath,
-		LauncherConfig:       packageConfig.Executor,
-		ServerLog:            envDefaultCompat("A2O_RUNTIME_RUN_ONCE_SERVER_LOG", "A3_RUNTIME_RUN_ONCE_SERVER_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_SERVER_LOG", "A3_RUNTIME_SCHEDULER_SERVER_LOG", "/tmp/a2o-runtime-run-once-agent-server.log")),
-		RuntimeLog:           envDefaultCompat("A2O_RUNTIME_RUN_ONCE_LOG", "A3_RUNTIME_RUN_ONCE_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_LOG", "A3_RUNTIME_SCHEDULER_LOG", "/tmp/a2o-runtime-run-once.log")),
-		RuntimeExitFile:      envDefaultCompat("A2O_RUNTIME_RUN_ONCE_EXIT_FILE", "A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_EXIT_FILE", "A3_RUNTIME_SCHEDULER_EXIT_FILE", "/tmp/a2o-runtime-run-once.exit")),
-		RuntimePIDFile:       envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PID_FILE", "A3_RUNTIME_RUN_ONCE_PID_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PID_FILE", "A3_RUNTIME_SCHEDULER_PID_FILE", "/tmp/a2o-runtime-run-once.pid")),
-		ServerPIDFile:        envDefaultCompat("A2O_RUNTIME_RUN_ONCE_SERVER_PID_FILE", "A3_RUNTIME_RUN_ONCE_SERVER_PID_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_SERVER_PID_FILE", "A3_RUNTIME_SCHEDULER_SERVER_PID_FILE", "/tmp/a2o-runtime-run-once-agent-server.pid")),
-		PresetDir:            envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PRESET_DIR", "A3_RUNTIME_RUN_ONCE_PRESET_DIR", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PRESET_DIR", "A3_RUNTIME_SCHEDULER_PRESET_DIR", "/tmp/a3-engine/config/presets")),
-		ManifestPath:         projectConfigPath,
-		SoloBoardInternalURL: kanbanInternalURL(),
-		LiveRef:              envDefaultCompat("A2O_RUNTIME_RUN_ONCE_LIVE_REF", "A3_RUNTIME_RUN_ONCE_LIVE_REF", envDefaultCompat("A2O_RUNTIME_SCHEDULER_LIVE_REF", "A3_RUNTIME_SCHEDULER_LIVE_REF", defaultLiveRef)),
+		ComposePrefix:                   composeArgs(config),
+		MaxSteps:                        envDefaultValue(overrides.MaxSteps, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_MAX_STEPS", "A3_RUNTIME_RUN_ONCE_MAX_STEPS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_MAX_STEPS", "A3_RUNTIME_SCHEDULER_MAX_STEPS", defaultMaxSteps))),
+		AgentAttempts:                   agentAttemptCount,
+		AgentPollInterval:               agentPollDuration,
+		AgentControlPlaneConnectTimeout: agentControlPlaneConnectTimeout,
+		AgentControlPlaneRequestTimeout: agentControlPlaneRequestTimeout,
+		AgentControlPlaneRetryCount:     agentControlPlaneRetryCount,
+		AgentControlPlaneRetryDelay:     agentControlPlaneRetryDelay,
+		AgentPort:                       envDefaultCompat("A2O_BUNDLE_AGENT_PORT", "A3_BUNDLE_AGENT_PORT", envDefaultValue(config.AgentPort, "7393")),
+		AgentInternalPort:               envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_INTERNAL_PORT", "A3_RUNTIME_RUN_ONCE_AGENT_INTERNAL_PORT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_INTERNAL_PORT", "A3_RUNTIME_SCHEDULER_AGENT_INTERNAL_PORT", "7393")),
+		StorageDir:                      envDefaultCompat("A2O_BUNDLE_STORAGE_DIR", "A3_BUNDLE_STORAGE_DIR", envDefaultValue(config.StorageDir, "/var/lib/a2o/a2o-runtime")),
+		HostRootDir:                     hostRootDir,
+		HostRoot:                        hostRoot,
+		WorkspaceRoot:                   workspaceRoot,
+		HostAgentBin:                    hostAgentBin,
+		HostAgentSource:                 envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_SOURCE", "A3_RUNTIME_RUN_ONCE_AGENT_SOURCE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_SOURCE", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE", "runtime-image")),
+		HostAgentTarget:                 target,
+		HostAgentLog:                    envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_AGENT_LOG", "A3_RUNTIME_RUN_ONCE_HOST_AGENT_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_AGENT_LOG", "A3_RUNTIME_SCHEDULER_HOST_AGENT_LOG", filepath.Join(hostRoot, "agent.log"))),
+		LiveLogRoot:                     envDefaultCompat("A2O_AGENT_LIVE_LOG_ROOT", "A3_AGENT_LIVE_LOG_ROOT", filepath.Join(hostRoot, "live-logs")),
+		AIRawLogRoot:                    envDefaultCompat("A2O_AGENT_AI_RAW_LOG_ROOT", "A3_AGENT_AI_RAW_LOG_ROOT", filepath.Join(hostRoot, "ai-raw-logs")),
+		LauncherConfigPath:              launcherConfigPath,
+		LauncherConfig:                  packageConfig.Executor,
+		ServerLog:                       envDefaultCompat("A2O_RUNTIME_RUN_ONCE_SERVER_LOG", "A3_RUNTIME_RUN_ONCE_SERVER_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_SERVER_LOG", "A3_RUNTIME_SCHEDULER_SERVER_LOG", "/tmp/a2o-runtime-run-once-agent-server.log")),
+		RuntimeLog:                      envDefaultCompat("A2O_RUNTIME_RUN_ONCE_LOG", "A3_RUNTIME_RUN_ONCE_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_LOG", "A3_RUNTIME_SCHEDULER_LOG", "/tmp/a2o-runtime-run-once.log")),
+		RuntimeExitFile:                 envDefaultCompat("A2O_RUNTIME_RUN_ONCE_EXIT_FILE", "A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_EXIT_FILE", "A3_RUNTIME_SCHEDULER_EXIT_FILE", "/tmp/a2o-runtime-run-once.exit")),
+		RuntimePIDFile:                  envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PID_FILE", "A3_RUNTIME_RUN_ONCE_PID_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PID_FILE", "A3_RUNTIME_SCHEDULER_PID_FILE", "/tmp/a2o-runtime-run-once.pid")),
+		ServerPIDFile:                   envDefaultCompat("A2O_RUNTIME_RUN_ONCE_SERVER_PID_FILE", "A3_RUNTIME_RUN_ONCE_SERVER_PID_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_SERVER_PID_FILE", "A3_RUNTIME_SCHEDULER_SERVER_PID_FILE", "/tmp/a2o-runtime-run-once-agent-server.pid")),
+		PresetDir:                       envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PRESET_DIR", "A3_RUNTIME_RUN_ONCE_PRESET_DIR", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PRESET_DIR", "A3_RUNTIME_SCHEDULER_PRESET_DIR", "/tmp/a3-engine/config/presets")),
+		ManifestPath:                    projectConfigPath,
+		SoloBoardInternalURL:            kanbanInternalURL(),
+		LiveRef:                         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_LIVE_REF", "A3_RUNTIME_RUN_ONCE_LIVE_REF", envDefaultCompat("A2O_RUNTIME_SCHEDULER_LIVE_REF", "A3_RUNTIME_SCHEDULER_LIVE_REF", defaultLiveRef)),
 		AgentEnv: []string{
 			"A2O_ROOT_DIR=" + hostRootDir,
 			"A2O_WORKER_LAUNCHER_CONFIG_PATH=" + launcherConfigPath,
@@ -2052,12 +2138,38 @@ func executeUntilIdleArgs(plan runtimeRunOncePlan) []string {
 }
 
 func runHostAgentLoop(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
-	fmt.Fprintf(stdout, "runtime_host_agent_loop attempts=%d poll_interval=%s\n", plan.AgentAttempts, plan.AgentPollInterval)
-	_ = appendFile(plan.HostAgentLog, []byte(fmt.Sprintf("\n===== host agent session start %s attempts=%d poll_interval=%s =====\n", time.Now().UTC().Format(time.RFC3339), plan.AgentAttempts, plan.AgentPollInterval)))
+	fmt.Fprintf(stdout, "runtime_host_agent_loop attempts=%d poll_interval=%s connect_timeout=%s request_timeout=%s retries=%d retry_delay=%s\n",
+		plan.AgentAttempts,
+		plan.AgentPollInterval,
+		formatOptionalDuration(plan.AgentControlPlaneConnectTimeout),
+		formatOptionalDuration(plan.AgentControlPlaneRequestTimeout),
+		plan.AgentControlPlaneRetryCount,
+		plan.AgentControlPlaneRetryDelay,
+	)
+	_ = appendFile(plan.HostAgentLog, []byte(fmt.Sprintf(
+		"\n===== host agent session start %s attempts=%d poll_interval=%s connect_timeout=%s request_timeout=%s retries=%d retry_delay=%s =====\n",
+		time.Now().UTC().Format(time.RFC3339),
+		plan.AgentAttempts,
+		plan.AgentPollInterval,
+		formatOptionalDuration(plan.AgentControlPlaneConnectTimeout),
+		formatOptionalDuration(plan.AgentControlPlaneRequestTimeout),
+		plan.AgentControlPlaneRetryCount,
+		plan.AgentControlPlaneRetryDelay,
+	)))
 	var agentStatus error
 	for attempt := 1; attempt <= plan.AgentAttempts; attempt++ {
 		fmt.Fprintf(stdout, "runtime_host_agent_attempt=%d\n", attempt)
 		args := []string{"-agent", "host-local", "-control-plane-url", "http://127.0.0.1:" + plan.AgentPort}
+		if plan.AgentControlPlaneConnectTimeout > 0 {
+			args = append(args, "-control-plane-connect-timeout", plan.AgentControlPlaneConnectTimeout.String())
+		}
+		if plan.AgentControlPlaneRequestTimeout > 0 {
+			args = append(args, "-control-plane-request-timeout", plan.AgentControlPlaneRequestTimeout.String())
+		}
+		args = append(args, "-control-plane-retries", strconv.Itoa(plan.AgentControlPlaneRetryCount))
+		if plan.AgentControlPlaneRetryDelay > 0 {
+			args = append(args, "-control-plane-retry-delay", plan.AgentControlPlaneRetryDelay.String())
+		}
 		if envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_LOCAL_MATERIALIZER_ARGS", "A3_RUNTIME_RUN_ONCE_AGENT_LOCAL_MATERIALIZER_ARGS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_LOCAL_MATERIALIZER_ARGS", "A3_RUNTIME_SCHEDULER_AGENT_LOCAL_MATERIALIZER_ARGS", "0")) == "1" {
 			args = append(args, "-workspace-root", plan.WorkspaceRoot)
 			for _, sourceAlias := range plan.LocalSourceAliases {
@@ -2118,6 +2230,10 @@ func runRuntimeLoop(args []string, runner commandRunner, stdout io.Writer, stder
 	maxSteps := flags.String("max-steps", "", "maximum runtime steps for each cycle")
 	agentAttempts := flags.String("agent-attempts", "", "maximum host agent attempts for each cycle")
 	agentPollInterval := flags.String("agent-poll-interval", "", "idle duration between host agent polls during each cycle")
+	agentControlPlaneConnectTimeout := flags.String("agent-control-plane-connect-timeout", "", "TCP connect timeout for host agent control plane requests during each cycle")
+	agentControlPlaneRequestTimeout := flags.String("agent-control-plane-request-timeout", "", "per-request timeout for host agent control plane requests during each cycle")
+	agentControlPlaneRetries := flags.String("agent-control-plane-retries", "", "retry count for transient host agent control plane request failures during each cycle")
+	agentControlPlaneRetryDelay := flags.String("agent-control-plane-retry-delay", "", "delay between transient host agent control plane retries during each cycle")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -2137,12 +2253,34 @@ func runRuntimeLoop(args []string, runner commandRunner, stdout io.Writer, stder
 	if _, err := parseNonNegativeDuration(*agentPollInterval, "agent poll interval"); err != nil {
 		return err
 	}
+	if _, err := parseOptionalPositiveDuration(*agentControlPlaneConnectTimeout, "agent control plane connect timeout"); err != nil {
+		return err
+	}
+	if _, err := parseOptionalPositiveDuration(*agentControlPlaneRequestTimeout, "agent control plane request timeout"); err != nil {
+		return err
+	}
+	if strings.TrimSpace(*agentControlPlaneRetries) != "" {
+		if _, err := parseNonNegativeInt(*agentControlPlaneRetries, "agent control plane retries"); err != nil {
+			return err
+		}
+	}
+	if _, err := parseNonNegativeDuration(*agentControlPlaneRetryDelay, "agent control plane retry delay"); err != nil {
+		return err
+	}
 
 	cycle := 0
 	for {
 		cycle++
 		fmt.Fprintf(stdout, "kanban_loop_cycle_start cycle=%d\n", cycle)
-		if err := runRuntimeRunOnce(buildRunOnceArgs(*maxSteps, *agentAttempts, *agentPollInterval), runner, stdout, stderr); err != nil {
+		if err := runRuntimeRunOnce(buildRunOnceArgs(runtimeRunOnceOverrides{
+			MaxSteps:                        *maxSteps,
+			AgentAttempts:                   *agentAttempts,
+			AgentPollInterval:               *agentPollInterval,
+			AgentControlPlaneConnectTimeout: *agentControlPlaneConnectTimeout,
+			AgentControlPlaneRequestTimeout: *agentControlPlaneRequestTimeout,
+			AgentControlPlaneRetries:        *agentControlPlaneRetries,
+			AgentControlPlaneRetryDelay:     *agentControlPlaneRetryDelay,
+		}), runner, stdout, stderr); err != nil {
 			return fmt.Errorf("runtime loop cycle %d failed: %w", cycle, err)
 		}
 		fmt.Fprintf(stdout, "kanban_loop_cycle_done cycle=%d\n", cycle)
@@ -2156,16 +2294,28 @@ func runRuntimeLoop(args []string, runner commandRunner, stdout io.Writer, stder
 	}
 }
 
-func buildRunOnceArgs(maxSteps string, agentAttempts string, agentPollInterval string) []string {
+func buildRunOnceArgs(overrides runtimeRunOnceOverrides) []string {
 	args := []string{}
-	if strings.TrimSpace(maxSteps) != "" {
-		args = append(args, "--max-steps", strings.TrimSpace(maxSteps))
+	if strings.TrimSpace(overrides.MaxSteps) != "" {
+		args = append(args, "--max-steps", strings.TrimSpace(overrides.MaxSteps))
 	}
-	if strings.TrimSpace(agentAttempts) != "" {
-		args = append(args, "--agent-attempts", strings.TrimSpace(agentAttempts))
+	if strings.TrimSpace(overrides.AgentAttempts) != "" {
+		args = append(args, "--agent-attempts", strings.TrimSpace(overrides.AgentAttempts))
 	}
-	if strings.TrimSpace(agentPollInterval) != "" {
-		args = append(args, "--agent-poll-interval", strings.TrimSpace(agentPollInterval))
+	if strings.TrimSpace(overrides.AgentPollInterval) != "" {
+		args = append(args, "--agent-poll-interval", strings.TrimSpace(overrides.AgentPollInterval))
+	}
+	if strings.TrimSpace(overrides.AgentControlPlaneConnectTimeout) != "" {
+		args = append(args, "--agent-control-plane-connect-timeout", strings.TrimSpace(overrides.AgentControlPlaneConnectTimeout))
+	}
+	if strings.TrimSpace(overrides.AgentControlPlaneRequestTimeout) != "" {
+		args = append(args, "--agent-control-plane-request-timeout", strings.TrimSpace(overrides.AgentControlPlaneRequestTimeout))
+	}
+	if strings.TrimSpace(overrides.AgentControlPlaneRetries) != "" {
+		args = append(args, "--agent-control-plane-retries", strings.TrimSpace(overrides.AgentControlPlaneRetries))
+	}
+	if strings.TrimSpace(overrides.AgentControlPlaneRetryDelay) != "" {
+		args = append(args, "--agent-control-plane-retry-delay", strings.TrimSpace(overrides.AgentControlPlaneRetryDelay))
 	}
 	return args
 }
@@ -2182,4 +2332,36 @@ func parseNonNegativeDuration(raw string, label string) (time.Duration, error) {
 		return 0, fmt.Errorf("%s must be >= 0", label)
 	}
 	return value, nil
+}
+
+func parseOptionalPositiveDuration(raw string, label string) (time.Duration, error) {
+	if strings.TrimSpace(raw) == "" {
+		return 0, nil
+	}
+	value, err := time.ParseDuration(strings.TrimSpace(raw))
+	if err != nil {
+		return 0, fmt.Errorf("parse %s: %w", label, err)
+	}
+	if value <= 0 {
+		return 0, fmt.Errorf("%s must be > 0", label)
+	}
+	return value, nil
+}
+
+func parseNonNegativeInt(raw string, label string) (int, error) {
+	value, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil {
+		return 0, fmt.Errorf("parse %s: %w", label, err)
+	}
+	if value < 0 {
+		return 0, fmt.Errorf("%s must be >= 0", label)
+	}
+	return value, nil
+}
+
+func formatOptionalDuration(value time.Duration) string {
+	if value <= 0 {
+		return "default"
+	}
+	return value.String()
 }

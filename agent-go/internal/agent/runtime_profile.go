@@ -7,17 +7,22 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 type RuntimeProfileConfig struct {
-	AgentName           string            `json:"agent"`
-	ControlPlaneURL     string            `json:"control_plane_url"`
-	AgentToken          string            `json:"agent_token"`
-	AgentTokenFile      string            `json:"agent_token_file"`
-	AllowInsecureRemote bool              `json:"allow_insecure_remote"`
-	WorkspaceRoot       string            `json:"workspace_root"`
-	SourceAliases       map[string]string `json:"source_aliases"`
-	RequiredBins        []string          `json:"required_bins"`
+	AgentName                  string            `json:"agent"`
+	ControlPlaneURL            string            `json:"control_plane_url"`
+	AgentToken                 string            `json:"agent_token"`
+	AgentTokenFile             string            `json:"agent_token_file"`
+	ControlPlaneConnectTimeout string            `json:"control_plane_connect_timeout"`
+	ControlPlaneRequestTimeout string            `json:"control_plane_request_timeout"`
+	ControlPlaneRetryCount     int               `json:"control_plane_retry_count"`
+	ControlPlaneRetryDelay     string            `json:"control_plane_retry_delay"`
+	AllowInsecureRemote        bool              `json:"allow_insecure_remote"`
+	WorkspaceRoot              string            `json:"workspace_root"`
+	SourceAliases              map[string]string `json:"source_aliases"`
+	RequiredBins               []string          `json:"required_bins"`
 }
 
 func LoadRuntimeProfileConfig(path string) (RuntimeProfileConfig, error) {
@@ -48,6 +53,18 @@ func (c RuntimeProfileConfig) Validate() error {
 	if c.WorkspaceRoot == "" && len(c.SourceAliases) > 0 {
 		return fmt.Errorf("workspace_root is required when source_aliases are configured")
 	}
+	if _, err := c.ControlPlaneConnectTimeoutDuration(); err != nil {
+		return err
+	}
+	if _, err := c.ControlPlaneRequestTimeoutDuration(); err != nil {
+		return err
+	}
+	if c.ControlPlaneRetryCount < 0 {
+		return fmt.Errorf("control_plane_retry_count must be >= 0")
+	}
+	if _, err := c.ControlPlaneRetryDelayDuration(); err != nil {
+		return err
+	}
 	for alias, path := range c.SourceAliases {
 		if alias == "" {
 			return fmt.Errorf("source alias name must not be empty")
@@ -57,6 +74,18 @@ func (c RuntimeProfileConfig) Validate() error {
 		}
 	}
 	return nil
+}
+
+func (c RuntimeProfileConfig) ControlPlaneConnectTimeoutDuration() (time.Duration, error) {
+	return parseOptionalPositiveDuration(c.ControlPlaneConnectTimeout, "control_plane_connect_timeout")
+}
+
+func (c RuntimeProfileConfig) ControlPlaneRequestTimeoutDuration() (time.Duration, error) {
+	return parseOptionalPositiveDuration(c.ControlPlaneRequestTimeout, "control_plane_request_timeout")
+}
+
+func (c RuntimeProfileConfig) ControlPlaneRetryDelayDuration() (time.Duration, error) {
+	return parseOptionalNonNegativeDuration(c.ControlPlaneRetryDelay, "control_plane_retry_delay")
 }
 
 func validateControlPlaneURL(rawURL string, allowInsecureRemote bool) error {
@@ -86,4 +115,32 @@ func isLocalHTTPHost(host string) bool {
 		return ip.IsLoopback()
 	}
 	return !strings.Contains(normalized, ".")
+}
+
+func parseOptionalPositiveDuration(raw string, label string) (time.Duration, error) {
+	if strings.TrimSpace(raw) == "" {
+		return 0, nil
+	}
+	value, err := time.ParseDuration(strings.TrimSpace(raw))
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", label, err)
+	}
+	if value <= 0 {
+		return 0, fmt.Errorf("%s must be > 0", label)
+	}
+	return value, nil
+}
+
+func parseOptionalNonNegativeDuration(raw string, label string) (time.Duration, error) {
+	if strings.TrimSpace(raw) == "" {
+		return 0, nil
+	}
+	value, err := time.ParseDuration(strings.TrimSpace(raw))
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", label, err)
+	}
+	if value < 0 {
+		return 0, fmt.Errorf("%s must be >= 0", label)
+	}
+	return value, nil
 }

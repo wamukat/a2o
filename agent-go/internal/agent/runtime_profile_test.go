@@ -13,6 +13,10 @@ func TestLoadRuntimeProfileConfig(t *testing.T) {
   "control_plane_url": "http://a3-runtime:7393",
   "agent_token": "secret-token",
   "agent_token_file": "/run/secrets/a3-agent-token",
+  "control_plane_connect_timeout": "3s",
+  "control_plane_request_timeout": "20s",
+  "control_plane_retry_count": 4,
+  "control_plane_retry_delay": "750ms",
 		"workspace_root": "/work/a3-agent",
 		"source_aliases": {
 			"sample-catalog-service": "/src/sample-catalog-service"
@@ -38,6 +42,18 @@ func TestLoadRuntimeProfileConfig(t *testing.T) {
 	}
 	if config.AgentTokenFile != "/run/secrets/a3-agent-token" {
 		t.Fatalf("agent token file = %s", config.AgentTokenFile)
+	}
+	if config.ControlPlaneConnectTimeout != "3s" {
+		t.Fatalf("connect timeout = %s", config.ControlPlaneConnectTimeout)
+	}
+	if config.ControlPlaneRequestTimeout != "20s" {
+		t.Fatalf("request timeout = %s", config.ControlPlaneRequestTimeout)
+	}
+	if config.ControlPlaneRetryCount != 4 {
+		t.Fatalf("retry count = %d", config.ControlPlaneRetryCount)
+	}
+	if config.ControlPlaneRetryDelay != "750ms" {
+		t.Fatalf("retry delay = %s", config.ControlPlaneRetryDelay)
 	}
 	if config.WorkspaceRoot != "/work/a3-agent" {
 		t.Fatalf("workspace root = %s", config.WorkspaceRoot)
@@ -89,5 +105,24 @@ func TestRuntimeProfileConfigAllowsLocalAndDockerHTTP(t *testing.T) {
 		if err := config.Validate(); err != nil {
 			t.Fatalf("Validate(%s) failed: %v", controlPlaneURL, err)
 		}
+	}
+}
+
+func TestRuntimeProfileConfigRejectsInvalidControlPlaneTiming(t *testing.T) {
+	config := RuntimeProfileConfig{
+		ControlPlaneURL:            "http://127.0.0.1:7393",
+		ControlPlaneConnectTimeout: "0s",
+	}
+	if err := config.Validate(); err == nil {
+		t.Fatal("expected invalid connect timeout failure")
+	}
+	config = RuntimeProfileConfig{
+		ControlPlaneURL:            "http://127.0.0.1:7393",
+		ControlPlaneRetryCount:     -1,
+		ControlPlaneRetryDelay:     "1s",
+		ControlPlaneRequestTimeout: "5s",
+	}
+	if err := config.Validate(); err == nil {
+		t.Fatal("expected invalid retry count failure")
 	}
 }

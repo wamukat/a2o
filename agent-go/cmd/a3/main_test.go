@@ -5451,6 +5451,10 @@ runtime:
   max_steps: 7
   agent_attempts: 9
   agent_poll_interval: 5s
+  agent_control_plane_connect_timeout: 3s
+  agent_control_plane_request_timeout: 25s
+  agent_control_plane_retry_count: 4
+  agent_control_plane_retry_delay: 1500ms
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -5522,6 +5526,16 @@ runtime:
 	}
 	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] != "" {
 		t.Fatalf("agent attempts should come from package plan, not env override, got %q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"])
+	}
+	for _, want := range []string{
+		"-control-plane-connect-timeout 3s",
+		"-control-plane-request-timeout 25s",
+		"-control-plane-retries 4",
+		"-control-plane-retry-delay 1.5s",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("run-once should pass host agent control plane setting %q, got:\n%s", want, joined)
+		}
 	}
 	if !strings.Contains(stdout.String(), "runtime_host_agent_loop attempts=9 poll_interval=5s") {
 		t.Fatalf("stdout should use package agent_attempts, got %q", stdout.String())

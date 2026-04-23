@@ -50,6 +50,10 @@ func run(args []string) int {
 	controlPlaneURL := defaultStringCompat("A2O_CONTROL_PLANE_URL", "A3_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393")
 	flags.StringVar(&controlPlaneURL, "control-plane-url", controlPlaneURL, "A2O control plane base URL")
 	flags.StringVar(&controlPlaneURL, "engine", controlPlaneURL, "alias for --control-plane-url")
+	controlPlaneConnectTimeout := flags.Duration("control-plane-connect-timeout", envDurationCompat("A2O_AGENT_CONTROL_PLANE_CONNECT_TIMEOUT", "A3_AGENT_CONTROL_PLANE_CONNECT_TIMEOUT", durationFromConfig(config.ControlPlaneConnectTimeout)), "TCP connect timeout for the A2O control plane")
+	controlPlaneRequestTimeout := flags.Duration("control-plane-request-timeout", envDurationCompat("A2O_AGENT_CONTROL_PLANE_REQUEST_TIMEOUT", "A3_AGENT_CONTROL_PLANE_REQUEST_TIMEOUT", durationFromConfig(config.ControlPlaneRequestTimeout)), "per-request timeout for the A2O control plane")
+	controlPlaneRetryCount := flags.Int("control-plane-retries", envIntCompat("A2O_AGENT_CONTROL_PLANE_RETRIES", "A3_AGENT_CONTROL_PLANE_RETRIES", config.ControlPlaneRetryCount), "retry count for transient control plane request failures")
+	controlPlaneRetryDelay := flags.Duration("control-plane-retry-delay", envDurationCompat("A2O_AGENT_CONTROL_PLANE_RETRY_DELAY", "A3_AGENT_CONTROL_PLANE_RETRY_DELAY", durationFromConfig(config.ControlPlaneRetryDelay)), "delay between transient control plane retries")
 	agentToken := flags.String("agent-token", envDefaultCompat("A2O_AGENT_TOKEN", "A3_AGENT_TOKEN", ""), "bearer token for the A2O control plane")
 	agentTokenFile := flags.String("agent-token-file", defaultStringCompat("A2O_AGENT_TOKEN_FILE", "A3_AGENT_TOKEN_FILE", config.AgentTokenFile, ""), "file containing bearer token for the A2O control plane")
 	workspaceRoot := flags.String("workspace-root", defaultStringCompat("A2O_AGENT_WORKSPACE_ROOT", "A3_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root for materialized jobs")
@@ -64,10 +68,14 @@ func run(args []string) int {
 	_ = configFlag
 
 	client := agent.HTTPClient{
-		BaseURL:       controlPlaneURL,
-		Token:         *agentToken,
-		TokenFile:     *agentTokenFile,
-		FallbackToken: config.AgentToken,
+		BaseURL:        controlPlaneURL,
+		Token:          *agentToken,
+		TokenFile:      *agentTokenFile,
+		FallbackToken:  config.AgentToken,
+		ConnectTimeout: *controlPlaneConnectTimeout,
+		RequestTimeout: *controlPlaneRequestTimeout,
+		RetryCount:     *controlPlaneRetryCount,
+		RetryDelay:     *controlPlaneRetryDelay,
 	}
 	worker := agent.Worker{
 		AgentName: *agentName,
@@ -152,6 +160,17 @@ func runDoctor(args []string) int {
 		sourceAliases.String(),
 	)
 	return 0
+}
+
+func durationFromConfig(raw string) time.Duration {
+	if strings.TrimSpace(raw) == "" {
+		return 0
+	}
+	value, err := time.ParseDuration(strings.TrimSpace(raw))
+	if err != nil {
+		return 0
+	}
+	return value
 }
 
 func runCleanupWorkspace(args []string) int {

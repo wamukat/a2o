@@ -44,6 +44,10 @@ runtime:
   max_steps: 20
   agent_attempts: 200
   agent_poll_interval: 1s
+  agent_control_plane_connect_timeout: 5s
+  agent_control_plane_request_timeout: 30s
+  agent_control_plane_retry_count: 2
+  agent_control_plane_retry_delay: 1s
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -73,6 +77,12 @@ runtime:
 `kanban.project` is the board/project name. A2O provisions required lanes and internal labels through `a2o kanban up`.
 
 `kanban.selection.status` selects runnable tasks. The default is `To do`.
+
+## Runtime
+
+`runtime.agent_attempts` and `runtime.agent_poll_interval` control the outer host-agent loop.
+
+`runtime.agent_control_plane_connect_timeout`, `runtime.agent_control_plane_request_timeout`, `runtime.agent_control_plane_retry_count`, and `runtime.agent_control_plane_retry_delay` control the host agent's HTTP client when it talks to the local agent server. Use these when TCP connect timeouts or transient control-plane failures need project-specific tuning.
 
 Project-specific human labels can be declared in `kanban.labels`. A2O-owned trigger and internal coordination labels are not user-authored.
 

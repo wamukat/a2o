@@ -100,6 +100,10 @@ runtime:
   max_steps: 20
   agent_attempts: 200
   agent_poll_interval: 1s
+  agent_control_plane_connect_timeout: 5s
+  agent_control_plane_request_timeout: 30s
+  agent_control_plane_retry_count: 2
+  agent_control_plane_retry_delay: 1s
   phases:
     implementation:
       skill: skills/implementation/base.md

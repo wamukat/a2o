@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type ControlPlane interface {
@@ -19,28 +21,19 @@ type ControlPlane interface {
 }
 
 type HTTPClient struct {
-	BaseURL       string
-	Token         string
-	TokenFile     string
-	FallbackToken string
-	HTTPClient    *http.Client
+	BaseURL        string
+	Token          string
+	TokenFile      string
+	FallbackToken  string
+	HTTPClient     *http.Client
+	RequestTimeout time.Duration
+	ConnectTimeout time.Duration
+	RetryCount     int
+	RetryDelay     time.Duration
 }
 
 func (c HTTPClient) ClaimNext(agentName string) (*JobRequest, error) {
-	u, err := url.Parse(c.BaseURL)
-	if err != nil {
-		return nil, err
-	}
-	u.Path = "/v1/agent/jobs/next"
-	u.RawQuery = url.Values{"agent": []string{agentName}}.Encode()
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	if err := c.authorize(req); err != nil {
-		return nil, err
-	}
-	resp, err := c.client().Do(req)
+	resp, err := c.do(http.MethodGet, "/v1/agent/jobs/next", url.Values{"agent": []string{agentName}}, nil, "")
 	if err != nil {
 		return nil, err
 	}
@@ -61,11 +54,6 @@ func (c HTTPClient) ClaimNext(agentName string) (*JobRequest, error) {
 }
 
 func (c HTTPClient) UploadArtifact(upload ArtifactUpload, content []byte) (ArtifactUpload, error) {
-	u, err := url.Parse(c.BaseURL)
-	if err != nil {
-		return ArtifactUpload{}, err
-	}
-	u.Path = "/v1/agent/artifacts/" + url.PathEscape(upload.ArtifactID)
 	query := url.Values{
 		"role":            []string{upload.Role},
 		"digest":          []string{upload.Digest},
@@ -75,15 +63,7 @@ func (c HTTPClient) UploadArtifact(upload ArtifactUpload, content []byte) (Artif
 	if upload.MediaType != "" {
 		query.Set("media_type", upload.MediaType)
 	}
-	u.RawQuery = query.Encode()
-	req, err := http.NewRequest(http.MethodPut, u.String(), bytes.NewReader(content))
-	if err != nil {
-		return ArtifactUpload{}, err
-	}
-	if err := c.authorize(req); err != nil {
-		return ArtifactUpload{}, err
-	}
-	resp, err := c.client().Do(req)
+	resp, err := c.do(http.MethodPut, "/v1/agent/artifacts/"+url.PathEscape(upload.ArtifactID), query, content, "")
 	if err != nil {
 		return ArtifactUpload{}, err
 	}
@@ -101,24 +81,11 @@ func (c HTTPClient) UploadArtifact(upload ArtifactUpload, content []byte) (Artif
 }
 
 func (c HTTPClient) SubmitResult(result JobResult) error {
-	u, err := url.Parse(c.BaseURL)
-	if err != nil {
-		return err
-	}
-	u.Path = "/v1/agent/jobs/" + url.PathEscape(result.JobID) + "/result"
 	payload, err := json.Marshal(result)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewReader(payload))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("content-type", "application/json")
-	if err := c.authorize(req); err != nil {
-		return err
-	}
-	resp, err := c.client().Do(req)
+	resp, err := c.do(http.MethodPost, "/v1/agent/jobs/"+url.PathEscape(result.JobID)+"/result", nil, payload, "application/json")
 	if err != nil {
 		return err
 	}
@@ -162,7 +129,79 @@ func (c HTTPClient) client() *http.Client {
 	if c.HTTPClient != nil {
 		return c.HTTPClient
 	}
-	return http.DefaultClient
+	if c.RequestTimeout <= 0 && c.ConnectTimeout <= 0 {
+		return http.DefaultClient
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if c.ConnectTimeout > 0 {
+		dialer := &net.Dialer{Timeout: c.ConnectTimeout}
+		transport.DialContext = dialer.DialContext
+	}
+	client := &http.Client{Transport: transport}
+	if c.RequestTimeout > 0 {
+		client.Timeout = c.RequestTimeout
+	}
+	return client
+}
+
+func (c HTTPClient) do(method string, path string, query url.Values, body []byte, contentType string) (*http.Response, error) {
+	var lastErr error
+	attempts := c.RetryCount + 1
+	if attempts < 1 {
+		attempts = 1
+	}
+	for attempt := 1; attempt <= attempts; attempt++ {
+		req, err := c.newRequest(method, path, query, body, contentType)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := c.client().Do(req)
+		if err == nil {
+			if !shouldRetryStatus(resp.StatusCode) || attempt == attempts {
+				return resp, nil
+			}
+			lastErr = responseError(method+" "+path, resp)
+			resp.Body.Close()
+		} else {
+			lastErr = err
+			if attempt == attempts {
+				return nil, err
+			}
+		}
+		if c.RetryDelay > 0 {
+			time.Sleep(c.RetryDelay)
+		}
+	}
+	return nil, lastErr
+}
+
+func (c HTTPClient) newRequest(method string, path string, query url.Values, body []byte, contentType string) (*http.Request, error) {
+	u, err := url.Parse(c.BaseURL)
+	if err != nil {
+		return nil, err
+	}
+	u.Path = path
+	if len(query) > 0 {
+		u.RawQuery = query.Encode()
+	}
+	req, err := http.NewRequest(method, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	if contentType != "" {
+		req.Header.Set("content-type", contentType)
+	}
+	if err := c.authorize(req); err != nil {
+		return nil, err
+	}
+	return req, nil
+}
+
+func shouldRetryStatus(statusCode int) bool {
+	return statusCode == http.StatusTooManyRequests ||
+		statusCode == http.StatusBadGateway ||
+		statusCode == http.StatusServiceUnavailable ||
+		statusCode == http.StatusGatewayTimeout
 }
 
 func responseError(operation string, resp *http.Response) error {

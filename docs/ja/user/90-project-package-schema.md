@@ -50,6 +50,10 @@ runtime:
   max_steps: 20
   agent_attempts: 200
   agent_poll_interval: 1s
+  agent_control_plane_connect_timeout: 5s
+  agent_control_plane_request_timeout: 30s
+  agent_control_plane_retry_count: 2
+  agent_control_plane_retry_delay: 1s
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -90,6 +94,10 @@ task_templates:
 `schema_version` は必須である。Version `1` は最初の単一ファイルスキーマを表す。未対応 version は、分かりやすいエラーで拒否する。
 
 `package` はプロダクトのリポジトリではなく、パッケージを識別する。`package.name` は安定したパッケージ識別子であり、ファイルシステムとブランチ参照で安全に使える名前にする。
+
+`runtime.agent_attempts` と `runtime.agent_poll_interval` は host agent の外側ループを制御する。
+
+`runtime.agent_control_plane_connect_timeout`、`runtime.agent_control_plane_request_timeout`、`runtime.agent_control_plane_retry_count`、`runtime.agent_control_plane_retry_delay` は、host agent が local agent server へ HTTP 接続するときの connect timeout / request timeout / retry を制御する。TCP 接続 timeout や一時的な control-plane failure を project ごとに調整したいときはここを使う。
 
 `kanban` はボード名、プロジェクトが所有するラベル、タスク選択条件を持つ。カンバンのバックエンドは A2O ランタイム配布物によって固定されており、作成者向けの `project.yaml` 設定ではない。A2O が管理するレーンと内部調整ラベルはランタイム実装の詳細であり、通常のパッケージスキーマには書かせない。
 

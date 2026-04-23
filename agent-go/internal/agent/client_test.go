@@ -2,12 +2,14 @@ package agent
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestHTTPClientUsesAgentProtocol(t *testing.T) {
@@ -146,6 +148,61 @@ func TestHTTPClientRedactsErrorResponseBody(t *testing.T) {
 	if !strings.Contains(err.Error(), "HTTP 401") {
 		t.Fatalf("error = %s", err)
 	}
+}
+
+func TestHTTPClientRetriesTransientTransportErrors(t *testing.T) {
+	attempts := 0
+	client := HTTPClient{
+		BaseURL:    "http://example.test",
+		RetryCount: 2,
+		HTTPClient: &http.Client{
+			Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				attempts++
+				if attempts < 3 {
+					return nil, errors.New("dial tcp 127.0.0.1:7393: i/o timeout")
+				}
+				return &http.Response{
+					StatusCode: http.StatusNoContent,
+					Body:       http.NoBody,
+					Header:     make(http.Header),
+					Request:    req,
+				}, nil
+			}),
+		},
+	}
+	if _, err := client.ClaimNext("host-local"); err != nil {
+		t.Fatal(err)
+	}
+	if attempts != 3 {
+		t.Fatalf("attempts=%d, want 3", attempts)
+	}
+}
+
+func TestHTTPClientRetriesTransientHTTPStatus(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts < 3 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := HTTPClient{BaseURL: server.URL, RetryCount: 2, RetryDelay: time.Millisecond}
+	if _, err := client.ClaimNext("host-local"); err != nil {
+		t.Fatal(err)
+	}
+	if attempts != 3 {
+		t.Fatalf("attempts=%d, want 3", attempts)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

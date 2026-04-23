@@ -19,6 +19,9 @@ A2O 0.5.25 で現在利用できる公開機能と検証範囲を示す。
 - ランタイム診断・復旧: `a2o runtime image-digest`、`doctor`、`watch-summary`、`logs <task-ref>`、`describe-task <task-ref>`、`reset-task <task-ref>`、`show-artifact <artifact-id>`
 - アップグレード診断: `a2o upgrade check`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
+- agent server 接続向けの project runtime 調整項目: `runtime.agent_control_plane_connect_timeout`、`runtime.agent_control_plane_request_timeout`、`runtime.agent_control_plane_retry_count`、`runtime.agent_control_plane_retry_delay`
+- agent server 接続向けの runtime CLI 上書き: `--agent-control-plane-connect-timeout`、`--agent-control-plane-request-timeout`、`--agent-control-plane-retries`、`--agent-control-plane-retry-delay`
+- agent server 接続向けの host agent CLI / runtime profile 項目: `--control-plane-connect-timeout`、`--control-plane-request-timeout`、`--control-plane-retries`、`--control-plane-retry-delay`、`control_plane_connect_timeout`、`control_plane_request_timeout`、`control_plane_retry_count`、`control_plane_retry_delay`
 - Kanbalone アダプターと初期化ツール。既定の Kanbalone イメージは `v0.9.17`
 - エージェント HTTP ワーカー境界
 - エージェントが具体化するワークスペース方式

@@ -12,19 +12,23 @@ import (
 )
 
 type projectPackageConfig struct {
-	SchemaVersion      string
-	PackageName        string
-	KanbanProject      string
-	KanbanLabels       []string
-	KanbanStatus       string
-	LiveRef            string
-	MaxSteps           string
-	AgentAttempts      string
-	AgentPollInterval  string
-	AgentWorkspaceRoot string
-	AgentRequiredBins  []string
-	Executor           map[string]any
-	Repos              map[string]projectPackageRepo
+	SchemaVersion                   string
+	PackageName                     string
+	KanbanProject                   string
+	KanbanLabels                    []string
+	KanbanStatus                    string
+	LiveRef                         string
+	MaxSteps                        string
+	AgentAttempts                   string
+	AgentPollInterval               string
+	AgentControlPlaneConnectTimeout string
+	AgentControlPlaneRequestTimeout string
+	AgentControlPlaneRetryCount     string
+	AgentControlPlaneRetryDelay     string
+	AgentWorkspaceRoot              string
+	AgentRequiredBins               []string
+	Executor                        map[string]any
+	Repos                           map[string]projectPackageRepo
 }
 
 type projectPackageRepo struct {
@@ -71,6 +75,10 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	config.MaxSteps = scalarString(payload.Runtime.MaxSteps)
 	config.AgentAttempts = scalarString(payload.Runtime.AgentAttempts)
 	config.AgentPollInterval = scalarString(payload.Runtime.AgentPollInterval)
+	config.AgentControlPlaneConnectTimeout = scalarString(payload.Runtime.AgentControlPlaneConnectTimeout)
+	config.AgentControlPlaneRequestTimeout = scalarString(payload.Runtime.AgentControlPlaneRequestTimeout)
+	config.AgentControlPlaneRetryCount = scalarString(payload.Runtime.AgentControlPlaneRetryCount)
+	config.AgentControlPlaneRetryDelay = scalarString(payload.Runtime.AgentControlPlaneRetryDelay)
 	config.AgentWorkspaceRoot = payload.Agent.WorkspaceRoot
 	config.AgentRequiredBins = payload.Agent.RequiredBins
 	if strings.TrimSpace(config.SchemaVersion) == "" {
@@ -205,10 +213,14 @@ type projectPackageYAML struct {
 		RequiredBins  []string `yaml:"required_bins"`
 	} `yaml:"agent"`
 	Runtime struct {
-		MaxSteps          any                                `yaml:"max_steps"`
-		AgentAttempts     any                                `yaml:"agent_attempts"`
-		AgentPollInterval any                                `yaml:"agent_poll_interval"`
-		Phases            map[string]projectPackagePhaseYAML `yaml:"phases"`
+		MaxSteps                        any                                `yaml:"max_steps"`
+		AgentAttempts                   any                                `yaml:"agent_attempts"`
+		AgentPollInterval               any                                `yaml:"agent_poll_interval"`
+		AgentControlPlaneConnectTimeout any                                `yaml:"agent_control_plane_connect_timeout"`
+		AgentControlPlaneRequestTimeout any                                `yaml:"agent_control_plane_request_timeout"`
+		AgentControlPlaneRetryCount     any                                `yaml:"agent_control_plane_retry_count"`
+		AgentControlPlaneRetryDelay     any                                `yaml:"agent_control_plane_retry_delay"`
+		Phases                          map[string]projectPackagePhaseYAML `yaml:"phases"`
 	} `yaml:"runtime"`
 }
 
