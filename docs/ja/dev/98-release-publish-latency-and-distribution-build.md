@@ -106,6 +106,8 @@ runtime image には `/opt/a2o/agents/release-manifest.jsonl` と target 別 arc
 
 `package-publication.json` は、将来の external package resolution における publication entrypoint とする。bundle archive、その checksum、付随する manifest / compatibility file を示す。初期の source hint は `github-release-assets` とし、後続の workflow separation では package-set layout を変えずに GitHub Release asset として publish できる前提にする。
 
+タグリリースでは `latest` も publish する。release workflow 完了後は、version tag と `latest` のどちらで確認しても同じ公開ランタイムイメージを指す前提で扱う。
+
 ## 改善案
 
 ### Option A: 小さな最適化だけ行う

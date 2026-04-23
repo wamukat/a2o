@@ -24,6 +24,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates
 - GHCR runtime image tags: `latest`, `0.5.17`, and `sha-*`
+- Tag releases also publish `latest`, so the released version tag and `latest` are expected to point to the same runtime image after release publication finishes.
 - Local release gate: full RSpec suite
 
 ## Validation Scope

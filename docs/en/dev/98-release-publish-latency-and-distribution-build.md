@@ -106,6 +106,8 @@ The current publication surface is:
 
 `package-publication.json` is the publication entrypoint for future external package resolution. It identifies the bundle archive, its checksum, and the companion manifest / compatibility files. The initial source hint is `github-release-assets`, which means later workflow separation can publish these files as GitHub Release assets without changing the package-set layout.
 
+Tag releases also publish `latest`. After the release workflow completes, operators should be able to validate either the released version tag or `latest` against the same published runtime image.
+
 ## Improvement Options
 
 ### Option A: Small optimization only
