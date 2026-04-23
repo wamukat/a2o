@@ -11,7 +11,7 @@ RSpec.describe A3::Application::QuarantineTerminalTaskWorkspaces do
     )
   end
 
-  it "quarantines terminal tasks that have no active run" do
+  it "quarantines done tasks that have no active run while preserving blocked workspaces" do
     done_task = A3::Domain::Task.new(
       ref: "A3-v2#3025",
       kind: :child,
@@ -36,14 +36,13 @@ RSpec.describe A3::Application::QuarantineTerminalTaskWorkspaces do
     task_repository.save(running_task)
 
     expect(provisioner).to receive(:quarantine_task).with(task_ref: "A3-v2#3025").and_return("/tmp/quarantine/A3-v2-3025")
-    expect(provisioner).to receive(:quarantine_task).with(task_ref: "A3-v2#3026").and_return("/tmp/quarantine/A3-v2-3026")
+    expect(provisioner).not_to receive(:quarantine_task).with(task_ref: "A3-v2#3026")
     expect(provisioner).not_to receive(:quarantine_task).with(task_ref: "A3-v2#3027")
 
     result = use_case.call
 
     expect(result.quarantined).to contain_exactly(
-      an_object_having_attributes(task_ref: "A3-v2#3025", quarantine_path: "/tmp/quarantine/A3-v2-3025"),
-      an_object_having_attributes(task_ref: "A3-v2#3026", quarantine_path: "/tmp/quarantine/A3-v2-3026")
+      an_object_having_attributes(task_ref: "A3-v2#3025", quarantine_path: "/tmp/quarantine/A3-v2-3025")
     )
   end
 end

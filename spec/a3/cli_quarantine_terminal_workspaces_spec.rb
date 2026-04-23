@@ -96,4 +96,48 @@ RSpec.describe A3::CLI do
       expect(Pathname(dir).join("workspaces", "A3-v2-3025")).not_to exist
     end
   end
+
+  it "preserves blocked task workspaces during quarantine through sqlite backend" do
+    Dir.mktmpdir do |dir|
+      repo_sources = create_repo_sources(dir)
+      task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "A3-v2#3026",
+          kind: :child,
+          edit_scope: [:repo_alpha],
+          status: :blocked
+        )
+      )
+
+      described_class.start(
+        [
+          "prepare-workspace",
+          "--storage-backend", "sqlite",
+          "--storage-dir", dir,
+          *repo_source_args(repo_sources),
+          "--source-type", "detached_commit",
+          "--source-ref", "abc123",
+          "--bootstrap-marker", "workspace-hook:v1",
+          "A3-v2#3026",
+          "review"
+        ],
+        out: StringIO.new
+      )
+
+      out = StringIO.new
+      described_class.start(
+        [
+          "quarantine-terminal-workspaces",
+          "--storage-backend", "sqlite",
+          "--storage-dir", dir
+        ],
+        out: out
+      )
+
+      expect(out.string).to include("quarantined 0 workspace(s)")
+      expect(Pathname(dir).join("quarantine", "A3-v2-3026")).not_to exist
+      expect(Pathname(dir).join("workspaces", "A3-v2-3026")).to exist
+    end
+  end
 end

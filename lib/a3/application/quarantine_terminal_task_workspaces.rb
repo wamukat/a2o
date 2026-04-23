@@ -28,7 +28,7 @@ module A3
       private
 
       def terminal_status?(task)
-        %i[done blocked].include?(task.status)
+        task.status == :done
       end
     end
   end
