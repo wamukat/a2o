@@ -198,6 +198,31 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(result.diagnostics.fetch("validation_errors")).to include("review_disposition.repo_scope must be one of repo_beta")
   end
 
+  it "requires review_disposition for implementation success" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => true,
+        "summary" => "worker completed",
+        "task_ref" => task.ref,
+        "run_ref" => implementation_run.ref,
+        "phase" => "implementation",
+        "rework_required" => false,
+        "changed_files" => { "repo_beta" => ["marker.txt"] }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: implementation_run.ref,
+      expected_phase: :implementation,
+      canonical_changed_files: { "repo_beta" => ["marker.txt"] }
+    )
+
+    expect(result).to have_attributes(success?: false)
+    expect(result.summary).to eq("worker result schema invalid")
+    expect(result.diagnostics.fetch("validation_errors")).to include(
+      "review_disposition must be present for implementation success"
+    )
+  end
+
   def implementation_run
     A3::Domain::Run.new(
       ref: "run-implementation-1",

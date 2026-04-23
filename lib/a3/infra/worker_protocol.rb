@@ -279,6 +279,9 @@ module A3
         elsif implementation_phase && worker_response.fetch("success", nil) == true
           errors << "changed_files must be present for implementation success"
         end
+        if implementation_phase && worker_response.fetch("success", nil) == true && !worker_response.key?("review_disposition")
+          errors << "review_disposition must be present for implementation success"
+        end
         errors
       end
 

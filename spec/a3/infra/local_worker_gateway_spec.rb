@@ -347,7 +347,14 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       "failing_command" => nil,
       "observed_state" => nil,
       "rework_required" => false,
-      "changed_files" => { "repo_beta" => ["src/main.rb"] }
+      "changed_files" => { "repo_beta" => ["src/main.rb"] },
+      "review_disposition" => {
+        "kind" => "completed",
+        "repo_scope" => "repo_beta",
+        "summary" => "self-review clean",
+        "description" => "Implementation self-review found no outstanding issues.",
+        "finding_key" => "completed-no-findings"
+      }
     }
     gateway = described_class.new(command_runner: command_runner)
 
@@ -373,6 +380,45 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     expected_without_changed_files.delete("changed_files")
     expect(execution.response_bundle).to include(expected_without_changed_files)
     expect(execution.response_bundle.fetch("changed_files")).to eq({})
+  end
+
+  it "fails fast when implementation success omits review evidence" do
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
+    bundle = {
+      "task_ref" => task.ref,
+      "run_ref" => run.ref,
+      "phase" => "implementation",
+      "success" => true,
+      "summary" => "implemented",
+      "failing_command" => nil,
+      "observed_state" => nil,
+      "rework_required" => false,
+      "changed_files" => { "repo_beta" => ["src/main.rb"] }
+    }
+    gateway = described_class.new(command_runner: command_runner)
+
+    allow(command_runner).to receive(:run) do
+      result_path.write(JSON.pretty_generate(bundle))
+      A3::Application::ExecutionResult.new(
+        success: true,
+        summary: "command runner succeeded"
+      )
+    end
+
+    execution = gateway.run(
+      skill: phase_runtime.implementation_skill,
+      workspace: workspace,
+      task: task,
+      run: run,
+      phase_runtime: phase_runtime,
+      task_packet: task_packet
+    )
+
+    expect(execution.success?).to be(false)
+    expect(execution.summary).to eq("worker result schema invalid")
+    expect(execution.diagnostics.fetch("validation_errors")).to include(
+      "review_disposition must be present for implementation success"
+    )
   end
 
   it "canonicalizes implementation changed_files from the actual workspace diff" do
@@ -420,7 +466,14 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       "failing_command" => nil,
       "observed_state" => nil,
       "rework_required" => false,
-      "changed_files" => { "repo_beta" => ["declared.txt"] }
+      "changed_files" => { "repo_beta" => ["declared.txt"] },
+      "review_disposition" => {
+        "kind" => "completed",
+        "repo_scope" => "repo_beta",
+        "summary" => "self-review clean",
+        "description" => "Implementation self-review found no outstanding issues.",
+        "finding_key" => "completed-no-findings"
+      }
     }
     gateway = described_class.new(command_runner: command_runner)
 
@@ -908,7 +961,14 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       "failing_command" => nil,
       "observed_state" => nil,
       "rework_required" => false,
-      "changed_files" => { "repo_beta" => [1, 2] }
+      "changed_files" => { "repo_beta" => [1, 2] },
+      "review_disposition" => {
+        "kind" => "completed",
+        "repo_scope" => "repo_beta",
+        "summary" => "self-review clean",
+        "description" => "Implementation self-review found no outstanding issues.",
+        "finding_key" => "completed-no-findings"
+      }
     }
     gateway = described_class.new(command_runner: command_runner)
 
