@@ -212,7 +212,7 @@ module A3
       end
 
       def waiting_assessment?(assessment)
-        %i[sibling_running parent_waiting_for_children upstream_unhealthy].include?(assessment.reason)
+        %i[blocked_by_tasks sibling_running parent_waiting_for_children upstream_unhealthy].include?(assessment.reason)
       end
 
       def phase_counts_for(task, task_runs)

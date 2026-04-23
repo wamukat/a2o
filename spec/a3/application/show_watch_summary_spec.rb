@@ -318,6 +318,41 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(result.tasks.find { |item| item.ref == "Sample#5011" }.next_candidate).to be(false)
   end
 
+  it "shows a child waiting on inherited parent blockers" do
+    parent_blocker = A3::Domain::Task.new(
+      ref: "Sample#6000",
+      kind: :single,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :todo
+    )
+    parent = A3::Domain::Task.new(
+      ref: "Sample#6001",
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      verification_scope: %i[repo_alpha repo_beta],
+      status: :todo,
+      child_refs: %w[Sample#6002],
+      blocking_task_refs: [parent_blocker.ref]
+    )
+    child = A3::Domain::Task.new(
+      ref: "Sample#6002",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :todo,
+      parent_ref: parent.ref
+    )
+    [parent_blocker, parent, child].each { |task| task_repository.save(task) }
+
+    result = use_case.call
+    child_entry = result.tasks.find { |item| item.ref == child.ref }
+
+    expect(child_entry.waiting).to be(true)
+    expect(child_entry.blocked).to be(false)
+    expect(child_entry.blocked_lines).to include("waiting_reason=blocked_by_tasks", "waiting_on=Sample#6000")
+  end
+
   it "uses external_task_id canonical mapping and preserved run insertion order" do
     task = A3::Domain::Task.new(
       ref: "Sample#imported-7",
