@@ -3,7 +3,7 @@
 module A3
   module Application
     class SchedulerCleanupRunner
-      DEFAULT_STATUSES = %i[done blocked].freeze
+      DEFAULT_STATUSES = %i[done].freeze
       DEFAULT_SCOPES = %i[ticket_workspace runtime_workspace].freeze
 
       def initialize(cleanup_terminal_task_workspaces:)

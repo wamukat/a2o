@@ -29,7 +29,7 @@ RSpec.describe A3::Application::SchedulerQuarantineRunner do
 end
 
 RSpec.describe A3::Application::SchedulerCleanupRunner do
-  it "runs terminal cleanup for done and blocked task workspaces" do
+  it "runs automatic terminal workspace cleanup only for done tasks" do
     cleanup_terminal_task_workspaces = instance_double(A3::Application::CleanupTerminalTaskWorkspaces)
     allow(cleanup_terminal_task_workspaces).to receive(:call).and_return(
       A3::Application::CleanupTerminalTaskWorkspaces::Result.new(
@@ -41,7 +41,7 @@ RSpec.describe A3::Application::SchedulerCleanupRunner do
           )
         ],
         dry_run: false,
-        statuses: %i[done blocked],
+        statuses: %i[done],
         scopes: %i[ticket_workspace runtime_workspace]
       )
     )
@@ -50,7 +50,7 @@ RSpec.describe A3::Application::SchedulerCleanupRunner do
 
     expect(runner.call).to eq(1)
     expect(cleanup_terminal_task_workspaces).to have_received(:call).with(
-      statuses: %i[done blocked],
+      statuses: %i[done],
       scopes: %i[ticket_workspace runtime_workspace],
       dry_run: false
     )

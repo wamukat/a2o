@@ -161,4 +161,22 @@ RSpec.describe A3::Application::CleanupTerminalTaskWorkspaces do
     )
     expect(result.dry_run).to be(true)
   end
+
+  it "does not clean blocked task workspaces even when blocked status is explicitly requested" do
+    blocked_task = A3::Domain::Task.new(
+      ref: "A3-v2#3026",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :blocked
+    )
+    task_repository.save(blocked_task)
+
+    expect(provisioner).not_to receive(:cleanup_task)
+
+    result = use_case.call(statuses: [:blocked], scopes: %i[ticket_workspace runtime_workspace])
+
+    expect(result.cleaned).to eq([])
+    expect(result.statuses).to eq([:blocked])
+    expect(result.scopes).to eq(%i[ticket_workspace runtime_workspace])
+  end
 end

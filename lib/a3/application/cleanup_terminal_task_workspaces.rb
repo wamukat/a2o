@@ -22,9 +22,9 @@ module A3
         tasks_by_ref = tasks.to_h { |task| [task.ref, task] }
         cleaned_refs = {}
         cleaned = tasks
-          .select { |task| cleanup_candidate?(task, selected_statuses) }
+          .select { |task| cleanup_candidate?(task, selected_statuses, selected_scopes) }
           .flat_map do |task|
-            cleanup_targets_for(task, tasks_by_ref, selected_statuses).map do |target|
+            cleanup_targets_for(task, tasks_by_ref, selected_statuses, selected_scopes).map do |target|
               next if cleaned_refs[target.ref]
 
               cleaned_refs[target.ref] = true
@@ -72,25 +72,32 @@ module A3
         "#{parent_ref}-parent"
       end
 
-      def cleanup_targets_for(task, tasks_by_ref, statuses)
+      def cleanup_targets_for(task, tasks_by_ref, statuses, scopes)
         targets = [task]
         if task.kind.to_sym == :parent
           terminal_children = task.child_refs.map { |child_ref| tasks_by_ref[child_ref] }.compact
             .select { |child| child.parent_ref == task.ref }
-            .select { |child| cleanup_candidate?(child, statuses) }
+            .select { |child| cleanup_candidate?(child, statuses, scopes) }
           targets.concat(terminal_children)
         end
         targets
       end
 
-      def cleanup_candidate?(task, statuses)
+      def cleanup_candidate?(task, statuses, scopes)
         task.current_run_ref.nil? &&
           terminal_status?(task) &&
+          cleanup_safe_status?(task, scopes) &&
           statuses.include?(task.status)
       end
 
       def terminal_status?(task)
         %i[done blocked].include?(task.status)
+      end
+
+      def cleanup_safe_status?(task, scopes)
+        return true if task.status == :done
+
+        task.status == :blocked && scopes == [:quarantine]
       end
     end
   end

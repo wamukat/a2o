@@ -46,7 +46,7 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
       A3::Application::CleanupTerminalTaskWorkspaces::Result.new(
         cleaned: [],
         dry_run: false,
-        statuses: %i[done blocked],
+        statuses: %i[done],
         scopes: %i[ticket_workspace runtime_workspace]
       )
     )
@@ -109,7 +109,7 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
     expect(result.quarantined_count).to eq(1)
     expect(quarantine_terminal_task_workspaces).to have_received(:call)
     expect(cleanup_terminal_task_workspaces).to have_received(:call).with(
-      statuses: %i[done blocked],
+      statuses: %i[done],
       scopes: %i[ticket_workspace runtime_workspace],
       dry_run: false
     )
