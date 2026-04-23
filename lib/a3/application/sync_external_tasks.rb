@@ -27,7 +27,7 @@ module A3
             next
           end
 
-          @task_repository.save(task)
+          @task_repository.save(reconcile_imported_task(existing_task, task))
         end
 
         pruned_task_refs = prune_non_active_tasks_missing_from(imported_refs)
@@ -97,6 +97,26 @@ module A3
         )
       end
 
+      def reconcile_imported_task(existing_task, imported_task)
+        return imported_task unless preserve_existing_automation_enabled?(existing_task, imported_task)
+
+        build_reconciled_task(
+          ref: imported_task.ref,
+          kind: imported_task.kind,
+          edit_scope: imported_task.edit_scope,
+          verification_scope: imported_task.verification_scope,
+          status: imported_task.status,
+          current_run_ref: imported_task.current_run_ref,
+          parent_ref: imported_task.parent_ref,
+          child_refs: imported_task.child_refs,
+          blocking_task_refs: imported_task.blocking_task_refs,
+          priority: imported_task.priority,
+          external_task_id: imported_task.external_task_id,
+          verification_source_ref: imported_task.verification_source_ref,
+          automation_enabled: existing_task.automation_enabled
+        )
+      end
+
       def build_reconciled_task(ref:, kind:, edit_scope:, verification_scope:, status:, current_run_ref:, parent_ref:, child_refs:, blocking_task_refs:, priority:, external_task_id:, verification_source_ref: nil, automation_enabled: true)
         A3::Domain::Task.new(
           ref: ref,
@@ -147,7 +167,7 @@ module A3
           priority: refreshed_task.priority,
           external_task_id: refreshed_task.external_task_id,
           verification_source_ref: existing_task.verification_source_ref,
-          automation_enabled: refreshed_task.automation_enabled
+          automation_enabled: preserve_existing_automation_enabled?(existing_task, refreshed_task) ? existing_task.automation_enabled : refreshed_task.automation_enabled
         )
       end
 
@@ -172,6 +192,17 @@ module A3
 
       def active_task?(task)
         task && !task.current_run_ref.nil?
+      end
+
+      def preserve_existing_automation_enabled?(existing_task, imported_task)
+        existing_task &&
+          existing_task.automation_enabled &&
+          managed_nonterminal_task?(existing_task) &&
+          !imported_task.automation_enabled
+      end
+
+      def managed_nonterminal_task?(task)
+        !%i[todo done].include?(task.status)
       end
 
       def terminal_task?(task)

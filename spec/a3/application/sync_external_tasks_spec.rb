@@ -114,6 +114,35 @@ RSpec.describe A3::Application::SyncExternalTasks do
     expect(result.preserved_active_task_refs).to eq(["Sample#3046"])
   end
 
+  it "preserves automation_enabled for a progressed task imported as topology-only" do
+    local_task = A3::Domain::Task.new(
+      ref: "Sample#3046",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :verifying,
+      external_task_id: 3046,
+      automation_enabled: true
+    )
+    imported_task = A3::Domain::Task.new(
+      ref: "Sample#3046",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :verifying,
+      external_task_id: 3046,
+      automation_enabled: false
+    )
+    task_repository.save(local_task)
+    allow(external_task_source).to receive(:load).and_return([imported_task])
+
+    use_case.call
+
+    reconciled = task_repository.fetch("Sample#3046")
+    expect(reconciled.status).to eq(:verifying)
+    expect(reconciled.automation_enabled).to eq(true)
+  end
+
   it "prunes non-terminal non-active tasks that are no longer present in Kanban" do
     stale_task = A3::Domain::Task.new(
       ref: "Sample#3046",
@@ -196,6 +225,34 @@ RSpec.describe A3::Application::SyncExternalTasks do
     expect(preserved.child_refs).to eq(["Sample#3047"])
     expect(preserved.status).to eq(:in_review)
     expect(result.pruned_task_refs).to eq([])
+  end
+
+  it "preserves automation_enabled during single-task refresh for a progressed task outside the filtered source status" do
+    progressed_task = A3::Domain::Task.new(
+      ref: "Sample#3046",
+      kind: :single,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :verifying,
+      external_task_id: 3046,
+      automation_enabled: true
+    )
+    refreshed_task = A3::Domain::Task.new(
+      ref: "Sample#3046",
+      kind: :single,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :verifying,
+      external_task_id: 3046,
+      automation_enabled: false
+    )
+    task_repository.save(progressed_task)
+    allow(external_task_source).to receive(:load).and_return([])
+    allow(external_task_source).to receive(:fetch_by_external_task_id).with(3046).and_return(refreshed_task)
+
+    use_case.call
+
+    expect(task_repository.fetch("Sample#3046").automation_enabled).to eq(true)
   end
 
   it "canonicalizes imported child in_review to verifying during refresh" do
