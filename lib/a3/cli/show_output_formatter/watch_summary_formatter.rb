@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "a3/version"
+
 module A3
   module CLI
     module ShowOutputFormatter
@@ -59,14 +61,15 @@ module A3
         end
 
         def render_scheduler_state(summary)
+          version_suffix = " version=#{A3::VERSION}"
           if summary.scheduler_paused && summary.scheduler_paused_at
-            "Scheduler: paused (paused_at=#{summary.scheduler_paused_at})"
+            "Scheduler: paused (paused_at=#{summary.scheduler_paused_at})#{version_suffix}"
           elsif summary.scheduler_paused
-            "Scheduler: paused"
+            "Scheduler: paused#{version_suffix}"
           elsif summary.running_entries.any?
-            "Scheduler: running"
+            "Scheduler: running#{version_suffix}"
           else
-            "Scheduler: idle"
+            "Scheduler: idle#{version_suffix}"
           end
         end
 

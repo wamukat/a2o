@@ -41,7 +41,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
 
     lines = described_class.lines(summary)
 
-    expect(lines[0]).to include("\e[36mScheduler: idle\e[0m")
+    expect(lines[0]).to include("\e[36mScheduler: idle version=#{A3::VERSION}\e[0m")
     expect(lines).to include("[_] idle     [.] waiting  |  . : none     |                  Merging -----------+")
     expect(lines).to include("[*] next     [>] running  |  > : running  |               Inspecting ---------+ |")
     expect(lines).to include("[o] done     [!] blocked  |  o : done     |                   Review -------+ | |")
@@ -181,7 +181,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
       [running_entry]
     )
 
-    expect(described_class.lines(summary).first).to include("\e[36mScheduler: running\e[0m")
+    expect(described_class.lines(summary).first).to include("\e[36mScheduler: running version=#{A3::VERSION}\e[0m")
   end
 
   it "does not indent orphan tasks whose parent is not present in the summary" do

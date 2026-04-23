@@ -60,10 +60,10 @@ RSpec.describe A3::CLI do
         out: out
       )
 
-      expect(out.string).to include("Scheduler: running")
+      expect(out.string).to include("Scheduler: running version=#{A3::VERSION}")
       expect(out.string).to include("Task Tree")
       expect(out.string).to include("Running")
-      expect(out.string).to include("\e[36mScheduler: running\e[0m")
+      expect(out.string).to include("\e[36mScheduler: running version=#{A3::VERSION}\e[0m")
       expect(out.string).to include("[>] #3138")
       expect(out.string).to include("[.] #3141")
       expect(out.string).to include("\e[33m[>] #3138")
