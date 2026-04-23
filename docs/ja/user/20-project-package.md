@@ -171,13 +171,13 @@ A2O が管理するレーンや内部ラベルは書かない。`a2o kanban up` 
 a2o worker scaffold --language python --output ./project-package/commands/a2o-worker.py
 ```
 
-Copilot を使うプロジェクトでは、`project.yaml` から Copilot を直接呼ばず、A2O の標準入力バンドル契約を保つラッパー雛形を生成する。
+外部 AI や任意の worker command へ実装を委譲するプロジェクトでは、`project.yaml` から直接呼ばず、A2O の標準入力バンドル契約を保つラッパー雛形を生成する。
 
 ```sh
-a2o worker scaffold --language copilot --output ./project-package/commands/copilot-a2o-worker
+a2o worker scaffold --language command --output ./project-package/commands/a2o-command-worker
 ```
 
-生成されたラッパーは `A2O_COPILOT_COMMAND` に設定したコマンドへ A2O stdin bundle を渡す。そのコマンドは最終的な A2O worker result JSON を stdout に出す必要がある。ラッパーは A2O の結果契約を維持し、implementation 成功時に `review_disposition` がない結果を拒否する。
+生成されたラッパーは `A2O_WORKER_COMMAND` に設定したコマンドへ A2O stdin bundle を渡す。そのコマンドは最終的な A2O worker result JSON を stdout に出す必要がある。ラッパーは A2O の結果契約を維持し、implementation 成功時に `review_disposition` がない結果を拒否する。
 
 ```yaml
 runtime:

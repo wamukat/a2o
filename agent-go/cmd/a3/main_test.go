@@ -951,10 +951,10 @@ func TestWorkerScaffoldGoPrintsGoRunCommandAndValidates(t *testing.T) {
 	}
 }
 
-func TestWorkerScaffoldCopilotWrapsConfiguredCommandAndValidates(t *testing.T) {
+func TestWorkerScaffoldCommandWrapsConfiguredCommandAndValidates(t *testing.T) {
 	tempDir := t.TempDir()
-	workerPath := filepath.Join(tempDir, "copilot-a2o-worker")
-	fakeCopilotPath := filepath.Join(tempDir, "fake-copilot.py")
+	workerPath := filepath.Join(tempDir, "a2o-command-worker")
+	fakeWorkerPath := filepath.Join(tempDir, "fake-worker.py")
 	resultPath := filepath.Join(tempDir, "result.json")
 	requestPath := filepath.Join(tempDir, "request.json")
 	var stdout bytes.Buffer
@@ -964,21 +964,21 @@ func TestWorkerScaffoldCopilotWrapsConfiguredCommandAndValidates(t *testing.T) {
 		"worker",
 		"scaffold",
 		"--language",
-		"copilot",
+		"command",
 		"--output",
 		workerPath,
 	}, &fakeRunner{}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "worker_scaffold_written path="+workerPath+" language=copilot") {
-		t.Fatalf("stdout should describe copilot scaffold, got %q", stdout.String())
+	if !strings.Contains(stdout.String(), "worker_scaffold_written path="+workerPath+" language=command") {
+		t.Fatalf("stdout should describe command scaffold, got %q", stdout.String())
 	}
-	if !strings.Contains(readFileString(t, workerPath), "A2O_COPILOT_COMMAND") {
-		t.Fatalf("copilot scaffold should document A2O_COPILOT_COMMAND:\n%s", readFileString(t, workerPath))
+	if !strings.Contains(readFileString(t, workerPath), "A2O_WORKER_COMMAND") {
+		t.Fatalf("command scaffold should document A2O_WORKER_COMMAND:\n%s", readFileString(t, workerPath))
 	}
 
-	fakeCopilot := `#!/usr/bin/env python3
+	fakeWorker := `#!/usr/bin/env python3
 import json
 import sys
 
@@ -990,7 +990,7 @@ json.dump({
     "run_ref": request["run_ref"],
     "phase": request["phase"],
     "success": True,
-    "summary": "copilot implemented",
+    "summary": "worker implemented",
     "failing_command": None,
     "observed_state": None,
     "rework_required": False,
@@ -998,18 +998,18 @@ json.dump({
     "review_disposition": {
         "kind": "completed",
         "repo_scope": repo_scope,
-        "summary": "copilot self-review clean",
-        "description": "The Copilot wrapper preserved the A2O response contract.",
+        "summary": "worker self-review clean",
+        "description": "The command wrapper preserved the A2O response contract.",
         "finding_key": "completed-no-findings"
     }
 }, sys.stdout)
 `
-	if err := os.WriteFile(fakeCopilotPath, []byte(fakeCopilot), 0o755); err != nil {
+	if err := os.WriteFile(fakeWorkerPath, []byte(fakeWorker), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	request := map[string]any{
 		"task_ref":   "A2O#62",
-		"run_ref":    "run-copilot",
+		"run_ref":    "run-command",
 		"phase":      "implementation",
 		"slot_paths": map[string]any{"app": filepath.Join(tempDir, "app")},
 	}
@@ -1019,11 +1019,11 @@ json.dump({
 		t.Fatal(err)
 	}
 	cmd := exec.Command(workerPath, "--schema", filepath.Join(tempDir, "schema.json"), "--result", resultPath)
-	cmd.Env = append(os.Environ(), "A2O_COPILOT_COMMAND="+fakeCopilotPath)
+	cmd.Env = append(os.Environ(), "A2O_WORKER_COMMAND="+fakeWorkerPath)
 	cmd.Stdin = bytes.NewReader(bundleBody)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("generated copilot worker failed: %v\n%s", err, string(output))
+		t.Fatalf("generated command worker failed: %v\n%s", err, string(output))
 	}
 
 	stdout.Reset()
@@ -1037,9 +1037,9 @@ json.dump({
 	}
 }
 
-func TestWorkerScaffoldCopilotWritesFailureWhenCommandCannotLaunch(t *testing.T) {
+func TestWorkerScaffoldCommandWritesFailureWhenCommandCannotLaunch(t *testing.T) {
 	tempDir := t.TempDir()
-	workerPath := filepath.Join(tempDir, "copilot-a2o-worker")
+	workerPath := filepath.Join(tempDir, "a2o-command-worker")
 	resultPath := filepath.Join(tempDir, "result.json")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -1048,7 +1048,7 @@ func TestWorkerScaffoldCopilotWritesFailureWhenCommandCannotLaunch(t *testing.T)
 		"worker",
 		"scaffold",
 		"--language",
-		"copilot",
+		"command",
 		"--output",
 		workerPath,
 	}, &fakeRunner{}, &stdout, &stderr)
@@ -1057,7 +1057,7 @@ func TestWorkerScaffoldCopilotWritesFailureWhenCommandCannotLaunch(t *testing.T)
 	}
 	request := map[string]any{
 		"task_ref":   "A2O#62",
-		"run_ref":    "run-copilot-missing",
+		"run_ref":    "run-command-missing",
 		"phase":      "implementation",
 		"slot_paths": map[string]any{"app": filepath.Join(tempDir, "app")},
 	}
@@ -1066,15 +1066,15 @@ func TestWorkerScaffoldCopilotWritesFailureWhenCommandCannotLaunch(t *testing.T)
 		t.Fatal(err)
 	}
 	cmd := exec.Command(workerPath, "--schema", filepath.Join(tempDir, "schema.json"), "--result", resultPath)
-	cmd.Env = append(os.Environ(), "A2O_COPILOT_COMMAND="+filepath.Join(tempDir, "missing-copilot"))
+	cmd.Env = append(os.Environ(), "A2O_WORKER_COMMAND="+filepath.Join(tempDir, "missing-worker"))
 	cmd.Stdin = bytes.NewReader(bundleBody)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("generated copilot worker should write structured failure and exit 0: %v\n%s", err, string(output))
+		t.Fatalf("generated command worker should write structured failure and exit 0: %v\n%s", err, string(output))
 	}
 	result := map[string]any{}
 	readJSONFileForTest(t, resultPath, &result)
-	if result["success"] != false || result["observed_state"] != "copilot_command_launch_failed" {
+	if result["success"] != false || result["observed_state"] != "worker_command_launch_failed" {
 		t.Fatalf("unexpected structured failure: %#v", result)
 	}
 }
@@ -1172,7 +1172,7 @@ func TestWorkerValidateResultRejectsMalformedReviewDispositionOnImplementationFa
 		"phase":              "implementation",
 		"success":            false,
 		"summary":            "implementation failed",
-		"failing_command":    "copilot",
+		"failing_command":    "worker",
 		"observed_state":     "failed",
 		"rework_required":    false,
 		"review_disposition": "not-an-object",

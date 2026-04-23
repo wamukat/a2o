@@ -78,7 +78,7 @@ a2o doctor
 a2o upgrade check
 a2o project template --with-skills --output ./project-package/project.yaml
 a2o worker scaffold --language python --output ./project-package/commands/a2o-worker.py
-a2o worker scaffold --language copilot --output ./project-package/commands/copilot-a2o-worker
+a2o worker scaffold --language command --output ./project-package/commands/a2o-command-worker
 a2o worker validate-result --request request.json --result result.json
 a2o project bootstrap --package ./reference-products/typescript-api-web/project-package
 a2o project lint --package ./reference-products/typescript-api-web/project-package

@@ -44,7 +44,7 @@ func runWorkerScaffold(args []string, stdout io.Writer, stderr io.Writer) error 
 	flags := flag.NewFlagSet("a2o worker scaffold", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 
-	language := flags.String("language", "python", "worker language: bash, python, ruby, go, copilot")
+	language := flags.String("language", "python", "worker language: bash, python, ruby, go, command")
 	outputPath := flags.String("output", "", "worker file path to write")
 	force := flags.Bool("force", false, "overwrite an existing worker file")
 	if err := flags.Parse(args); err != nil {
@@ -156,10 +156,10 @@ func workerScaffoldTemplate(language string) (string, os.FileMode, error) {
 		return rubyWorkerScaffold, 0o755, nil
 	case "go":
 		return goWorkerScaffold, 0o644, nil
-	case "copilot":
-		return copilotWorkerScaffold, 0o755, nil
+	case "command":
+		return commandWorkerScaffold, 0o755, nil
 	default:
-		return "", 0, fmt.Errorf("--language must be one of bash, python, ruby, go, copilot")
+		return "", 0, fmt.Errorf("--language must be one of bash, python, ruby, go, command")
 	}
 }
 
@@ -178,8 +178,8 @@ func normalizeWorkerLanguage(language string) string {
 		return "python"
 	case "golang":
 		return "go"
-	case "github-copilot", "gh-copilot":
-		return "copilot"
+	case "external", "external-json", "json-command", "worker-command":
+		return "command"
 	default:
 		return strings.ToLower(strings.TrimSpace(language))
 	}
@@ -452,14 +452,14 @@ if __name__ == "__main__":
     main()
 `
 
-const copilotWorkerScaffold = `#!/usr/bin/env python3
-"""A2O Copilot worker wrapper scaffold.
+const commandWorkerScaffold = `#!/usr/bin/env python3
+"""A2O command worker wrapper scaffold.
 
-Configure A2O_COPILOT_COMMAND to a command that reads the A2O stdin bundle
+Configure A2O_WORKER_COMMAND to a command that reads the A2O stdin bundle
 from stdin and prints the final A2O worker result JSON to stdout.
 
 Example:
-  export A2O_COPILOT_COMMAND='your-copilot-wrapper --json'
+  export A2O_WORKER_COMMAND='your-worker-command --json'
 """
 
 import argparse
@@ -504,7 +504,7 @@ def write_result(path, payload):
 
 def validate_contract(request, payload):
     if not isinstance(payload, dict):
-        return "copilot worker output must be a JSON object"
+        return "worker command output must be a JSON object"
     if payload.get("success") is True and request.get("phase") == "implementation":
         if "review_disposition" not in payload or payload.get("review_disposition") is None:
             return "review_disposition must be present for implementation success"
@@ -518,17 +518,17 @@ def main():
     args = parser.parse_args()
 
     bundle_raw, request = load_bundle()
-    command_text = os.environ.get("A2O_COPILOT_COMMAND", "").strip()
+    command_text = os.environ.get("A2O_WORKER_COMMAND", "").strip()
     if not command_text:
         write_result(
             args.result,
             failure(
                 request,
-                "copilot worker command is not configured",
-                "A2O_COPILOT_COMMAND",
-                "missing_copilot_command",
+                "worker command is not configured",
+                "A2O_WORKER_COMMAND",
+                "missing_worker_command",
                 {
-                    "expected": "Set A2O_COPILOT_COMMAND to a command that prints A2O worker result JSON.",
+                    "expected": "Set A2O_WORKER_COMMAND to a command that prints A2O worker result JSON.",
                     "schema_path": args.schema,
                 },
             ),
@@ -550,9 +550,9 @@ def main():
             args.result,
             failure(
                 request,
-                "copilot worker command could not be launched",
-                command[0] if command else "A2O_COPILOT_COMMAND",
-                "copilot_command_launch_failed",
+                "worker command could not be launched",
+                command[0] if command else "A2O_WORKER_COMMAND",
+                "worker_command_launch_failed",
                 {"error": f"{type(exc).__name__}: {exc}"},
             ),
         )
@@ -562,7 +562,7 @@ def main():
             args.result,
             failure(
                 request,
-                "copilot worker command failed",
+                "worker command failed",
                 command[0],
                 f"exit {completed.returncode}",
                 {"stderr": completed.stderr[-4000:], "stdout": completed.stdout[-4000:]},
@@ -577,9 +577,9 @@ def main():
             args.result,
             failure(
                 request,
-                "copilot worker output was not valid JSON",
+                "worker command output was not valid JSON",
                 command[0],
-                "invalid_copilot_json",
+                "invalid_worker_json",
                 {"stdout": completed.stdout[-4000:], "stderr": completed.stderr[-4000:]},
             ),
         )
@@ -591,9 +591,9 @@ def main():
             args.result,
             failure(
                 request,
-                "copilot worker result contract invalid",
+                "worker command result contract invalid",
                 command[0],
-                "invalid_copilot_result",
+                "invalid_worker_result",
                 {"validation_errors": [contract_error]},
             ),
         )

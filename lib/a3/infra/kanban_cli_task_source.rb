@@ -159,7 +159,8 @@ module A3
           "edit_scope" => edit_scope,
           "parent_ref" => parent_ref,
           "blocking_task_refs" => normalize_blocking_refs(blocking_task_refs),
-          "priority" => normalize_priority(raw_priority)
+          "priority" => normalize_priority(raw_priority),
+          "automation_enabled" => trigger_selected?(labels)
         }
       end
 
@@ -198,7 +199,7 @@ module A3
           build_task_from_snapshot(
             snapshot,
             child_refs_by_parent: child_refs_by_parent,
-            automation_enabled: trigger_selected_refs.include?(snapshot.fetch("ref"))
+            automation_enabled: trigger_selected_refs.include?(snapshot.fetch("ref")) || snapshot.fetch("automation_enabled", false)
           )
         end.freeze
       end
@@ -325,8 +326,13 @@ module A3
           "edit_scope" => edit_scope,
           "parent_ref" => normalize_parent_ref(raw_snapshot["parent_ref"]),
           "blocking_task_refs" => normalize_blocking_refs(raw_snapshot["blocking_task_refs"]),
-          "priority" => normalize_priority(raw_snapshot["priority"])
+          "priority" => normalize_priority(raw_snapshot["priority"]),
+          "automation_enabled" => trigger_selected?(labels)
         }
+      end
+
+      def trigger_selected?(labels)
+        @trigger_labels.empty? || !(labels & @trigger_labels).empty?
       end
 
       def resolve_edit_scope(labels:, task_ref:)

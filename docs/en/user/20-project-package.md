@@ -138,13 +138,13 @@ Generate a minimal worker with:
 a2o worker scaffold --language python --output ./project-package/commands/a2o-worker.py
 ```
 
-For Copilot-based projects, generate a wrapper scaffold instead of calling Copilot directly from `project.yaml`:
+For projects that delegate implementation to an external AI or worker command, generate a wrapper scaffold instead of calling that command directly from `project.yaml`:
 
 ```sh
-a2o worker scaffold --language copilot --output ./project-package/commands/copilot-a2o-worker
+a2o worker scaffold --language command --output ./project-package/commands/a2o-command-worker
 ```
 
-The generated wrapper forwards the A2O stdin bundle to the command configured in `A2O_COPILOT_COMMAND`. That command must print the final A2O worker result JSON to stdout. The wrapper preserves the A2O result contract and rejects implementation success that omits `review_disposition`.
+The generated wrapper forwards the A2O stdin bundle to the command configured in `A2O_WORKER_COMMAND`. That command must print the final A2O worker result JSON to stdout. The wrapper preserves the A2O result contract and rejects implementation success that omits `review_disposition`.
 
 Then reference it from `runtime.phases.<phase>.executor.command`:
 

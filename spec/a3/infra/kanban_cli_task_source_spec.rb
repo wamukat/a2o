@@ -677,6 +677,51 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
+  it "enables automation for topology-imported related tasks when they match trigger labels" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 5400,
+          "ref" => "Sample#5400",
+          "status" => "To do",
+          "labels" => ["repo:both", "trigger:auto-parent"],
+          "parent_ref" => nil
+        },
+        {
+          "id" => 5401,
+          "ref" => "Sample#5401",
+          "status" => "Inspection",
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => "Sample#5400"
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta],
+        "repo:both" => %i[repo_alpha repo_beta]
+      },
+      trigger_labels: ["trigger:auto-implement", "trigger:auto-parent"],
+      status: "To do",
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+      parent = tasks.find { |task| task.ref == "Sample#5400" }
+      child = tasks.find { |task| task.ref == "Sample#5401" }
+
+      expect(tasks.map(&:ref)).to eq(["Sample#5400", "Sample#5401"])
+      expect(parent.automation_enabled).to eq(true)
+      expect(child.status).to eq(:verifying)
+      expect(child.automation_enabled).to eq(true)
+    end
+  end
+
   it "can fetch a single task by external id without applying the status filter" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,
