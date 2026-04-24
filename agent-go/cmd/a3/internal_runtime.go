@@ -902,6 +902,7 @@ func runRuntimeResetTask(args []string, stdout io.Writer, stderr io.Writer) erro
 func runRuntimeWatchSummary(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
 	flags := flag.NewFlagSet("a2o runtime watch-summary", flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	details := flags.Bool("details", false, "show per-task waiting and review detail lines")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -920,7 +921,7 @@ func runRuntimeWatchSummary(args []string, runner commandRunner, stdout io.Write
 		if err != nil {
 			return err
 		}
-		output, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "watch_summary", runtimeWatchSummaryArgs(plan)...)
+		output, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "watch_summary", runtimeWatchSummaryArgs(plan, *details)...)
 		if err != nil {
 			return err
 		}
@@ -1586,8 +1587,11 @@ func runtimeInspectionArgs(argv ...string) []string {
 	return []string{"bash", "-lc", script}
 }
 
-func runtimeWatchSummaryArgs(plan runtimeRunOncePlan) []string {
+func runtimeWatchSummaryArgs(plan runtimeRunOncePlan, details bool) []string {
 	args := []string{"a3", "watch-summary", "--storage-backend", "json", "--storage-dir", plan.StorageDir}
+	if details {
+		args = append(args, "--details")
+	}
 	if strings.TrimSpace(plan.KanbanProject) == "" || len(plan.KanbanRepoLabels) == 0 {
 		return args
 	}

@@ -135,7 +135,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o runtime doctor")
 	fmt.Fprintln(w, "  a2o runtime describe-task TASK_REF")
 	fmt.Fprintln(w, "  a2o runtime reset-task TASK_REF              # print blocked-task recovery plan")
-	fmt.Fprintln(w, "  a2o runtime watch-summary")
+	fmt.Fprintln(w, "  a2o runtime watch-summary [--details]")
 	fmt.Fprintln(w, "  a2o runtime skill-feedback list [--state STATE] [--target TARGET] [--group]")
 	fmt.Fprintln(w, "  a2o runtime skill-feedback propose [--state STATE] [--target TARGET] [--format ticket|patch]")
 	fmt.Fprintln(w, "  a2o runtime logs TASK_REF [--follow]")

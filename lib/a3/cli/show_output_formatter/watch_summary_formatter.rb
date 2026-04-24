@@ -48,10 +48,10 @@ module A3
 
         module_function
 
-        def lines(summary)
+        def lines(summary, details: false)
           [
             render_scheduler_state(summary),
-            render_task_tree(summary),
+            render_task_tree(summary, details: details),
             render_next_section(summary),
             render_running_section(summary)
           ].reject(&:empty?).flat_map.with_index do |section, index|
@@ -73,7 +73,7 @@ module A3
           end
         end
 
-        def render_task_tree(summary)
+        def render_task_tree(summary, details: false)
           depth_by_ref = build_depths(summary.tasks)
           tree_ref_width = [TREE_REF_MIN_WIDTH, *summary.tasks.map { |task| display_width(tree_ref_label(task.ref, depth_by_ref[task.ref])) }].max
           lines = task_tree_header(tree_ref_width)
@@ -84,8 +84,10 @@ module A3
 
           summary.tasks.each do |task|
             lines << "#{task_badge(task)} #{pad_right(tree_ref_label(task.ref, depth_by_ref[task.ref]), tree_ref_width)} #{pad_right(truncate(task.title, TREE_TITLE_WIDTH), TREE_TITLE_WIDTH)} #{task_phase_bar(task)}"
-            task.blocked_lines.each do |line|
-              lines << "#{' ' * (4 + tree_ref_width + 1)}#{truncate(single_line(line), TREE_TITLE_WIDTH + 24)}"
+            if details
+              task.blocked_lines.each do |line|
+                lines << "#{' ' * (4 + tree_ref_width + 1)}#{truncate(single_line(line), TREE_TITLE_WIDTH + 24)}"
+              end
             end
           end
           lines.join("\n")

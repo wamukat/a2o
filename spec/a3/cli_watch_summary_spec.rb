@@ -87,6 +87,50 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "hides per-task detail lines unless details are requested" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "Sample#4200",
+          kind: :parent,
+          edit_scope: [:repo_alpha],
+          verification_scope: [:repo_alpha],
+          status: :todo,
+          child_refs: ["Sample#4201"]
+        )
+      )
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "Sample#4201",
+          kind: :child,
+          edit_scope: [:repo_alpha],
+          verification_scope: [:repo_alpha],
+          status: :in_progress,
+          parent_ref: "Sample#4200"
+        )
+      )
+
+      default_out = StringIO.new
+      described_class.start(
+        ["watch-summary", "--storage-backend", "json", "--storage-dir", dir],
+        out: default_out
+      )
+
+      detailed_out = StringIO.new
+      described_class.start(
+        ["watch-summary", "--storage-backend", "json", "--storage-dir", dir, "--details"],
+        out: detailed_out
+      )
+
+      expect(default_out.string).to include("[.] #4200")
+      expect(default_out.string).not_to include("waiting_reason=parent_waiting_for_children")
+      expect(default_out.string).not_to include("waiting_on=Sample#4201")
+      expect(detailed_out.string).to include("waiting_reason=parent_waiting_for_children")
+      expect(detailed_out.string).to include("waiting_on=Sample#4201")
+    end
+  end
+
   it "loads kanban titles through the watch-summary-specific command" do
     Dir.mktmpdir do |dir|
       task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))

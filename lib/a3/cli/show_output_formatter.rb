@@ -31,8 +31,8 @@ module A3
         SchedulerOutput.history_lines(history)
       end
 
-      def watch_summary_lines(summary)
-        WatchSummaryFormatter.lines(summary)
+      def watch_summary_lines(summary, details: false)
+        WatchSummaryFormatter.lines(summary, details: details)
       end
 
       def format_diagnostic_value(value)

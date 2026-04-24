@@ -661,7 +661,7 @@ module A3
     end
 
     def handle_watch_summary(argv, out:, run_id_generator:, command_runner:, merge_runner:)
-      options = parse_storage_options(argv)
+      options = parse_watch_summary_options(argv)
       repositories = build_watch_summary_repositories(options: options)
       task_repository = repositories.fetch(:task_repository)
       bridge = build_external_task_bridge(options)
@@ -687,7 +687,7 @@ module A3
         worker_runs_by_task_ref: load_watch_summary_worker_runs(options.fetch(:storage_dir))
       ).call
 
-      ShowOutputFormatter.watch_summary_lines(summary).each { |line| out.puts(line) }
+      ShowOutputFormatter.watch_summary_lines(summary, details: options.fetch(:details)).each { |line| out.puts(line) }
     end
 
     def handle_run_verification(argv, out:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:)
@@ -1291,6 +1291,27 @@ module A3
       parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
       parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
       parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      add_kanban_bridge_options(parser, options)
+      parser.parse(argv)
+
+      options
+    end
+
+    def parse_watch_summary_options(argv)
+      options = {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        repo_sources: {},
+        kanban_repo_label_map: {},
+        kanban_trigger_labels: [],
+        details: false
+      }
+
+      parser = OptionParser.new
+      parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      parser.on("--details") { options[:details] = true }
       add_kanban_bridge_options(parser, options)
       parser.parse(argv)
 

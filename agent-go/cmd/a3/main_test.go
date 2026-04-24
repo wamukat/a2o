@@ -1527,7 +1527,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime doctor",
 		"a2o runtime describe-task TASK_REF",
 		"a2o runtime reset-task TASK_REF",
-		"a2o runtime watch-summary",
+		"a2o runtime watch-summary [--details]",
 		"a2o runtime skill-feedback list",
 		"a2o runtime skill-feedback propose",
 		"a2o runtime logs TASK_REF [--follow]",
@@ -4209,6 +4209,44 @@ func TestRuntimeWatchSummaryRunsContainerSummaryWithKanbanContext(t *testing.T) 
 	}
 	if strings.Contains(joined, "--kanban-status") {
 		t.Fatalf("watch-summary must not constrain the watch set to the scheduler selection status, got:\n%s", joined)
+	}
+	if strings.Contains(joined, "--details") {
+		t.Fatalf("watch-summary should not request detail lines by default, got:\n%s", joined)
+	}
+}
+
+func TestRuntimeWatchSummaryPassesDetailsFlag(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "watch-summary", "--details"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(joined, "a3 watch-summary --storage-backend json --storage-dir /var/lib/a3/test-runtime --details") {
+		t.Fatalf("watch-summary should pass --details to the runtime command, got:\n%s", joined)
 	}
 }
 

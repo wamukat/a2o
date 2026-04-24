@@ -50,6 +50,37 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
     expect(lines).to include(a_string_including("\e[36m[*] #1"))
     expect(lines).to include(a_string_including("\e[31m[!]   #2"))
     expect(lines).to include(a_string_including("-/././."))
+    expect(lines.join("\n")).not_to include("review blocked")
+  end
+
+  it "renders per-task detail lines only when details are requested" do
+    task = Struct.new(:ref, :parent_ref, :title, :task_kind, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :blocked_lines).new(
+      "Sample#2",
+      nil,
+      "Blocked task",
+      :single,
+      true,
+      false,
+      false,
+      false,
+      false,
+      "review",
+      { "implementation" => 1, "review" => 1 },
+      ["review blocked"]
+    )
+    summary = Struct.new(:scheduler_paused, :scheduler_paused_at, :tasks, :next_candidates, :running_entries).new(
+      false,
+      nil,
+      [task],
+      [],
+      []
+    )
+
+    default_lines = described_class.lines(summary).join("\n")
+    detailed_lines = described_class.lines(summary, details: true).join("\n")
+
+    expect(default_lines).not_to include("review blocked")
+    expect(detailed_lines).to include("review blocked")
   end
 
   it "indents child task refs when the parent is present" do
