@@ -29,7 +29,9 @@ An A2O release is not complete until all of the following are true:
    - Run focused release verification first.
    - Run broader verification when the blast radius warrants it.
    - For release-reference-only changes, verify with targeted commands such as version specs, CLI specs, `git diff --check`, and stale-version searches; do not rerun the full suite after every small follow-up unless behavior changed or the previous full-suite result is stale.
-   - Run the full suite once before tagging when the release candidate includes behavior changes or accumulated unreleased work warrants it. If a later review fix only touches release metadata, workflow constants, docs, or CLI help text, repeat only the focused checks that cover that fix.
+   - Run the full suite once before tagging when the release candidate includes behavior changes or accumulated unreleased work warrants it. If a later review fix only touches release metadata, release bookkeeping constants that do not affect build/publish/runtime behavior, docs, or CLI help text, repeat only the focused checks that cover that fix.
+   - Re-run the full suite after a follow-up fix when it touches runtime behavior, dependencies, build/package logic, a CLI execution path beyond help text, or when the previous full-suite result no longer corresponds to the candidate being tagged.
+   - For release metadata or release bookkeeping constant fixes, include a lightweight confirmation that the intended constant/package descriptor changed in addition to stale-version search and focused specs.
    - Do not tag or publish until the release candidate is locally sound.
 
 3. Commit and review.
