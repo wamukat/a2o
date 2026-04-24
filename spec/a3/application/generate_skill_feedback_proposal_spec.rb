@@ -66,4 +66,23 @@ RSpec.describe A3::Application::GenerateSkillFeedbackProposal do
     expect(result).to include("## skills/implementation/base.md")
     expect(result).to include("Add review checklist before Done.")
   end
+
+  it "makes an empty draft patch explicit when feedback has no suggested patch" do
+    list = instance_double(A3::Application::ListSkillFeedback)
+    allow(list).to receive(:call).with(state: "accepted", target: nil).and_return([
+      Entry.new(
+        task_ref: "A2O#210",
+        run_ref: "run-1",
+        phase: :implementation,
+        summary: "Capture review checklist.",
+        target: "project_skill",
+        state: "accepted",
+        group_key: "empty"
+      )
+    ])
+
+    result = described_class.new(list_skill_feedback: list).call(state: "accepted", format: :patch)
+
+    expect(result).to include("No suggested_patch values were present")
+  end
 end

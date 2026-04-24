@@ -72,6 +72,7 @@ module A3
           lines << "```"
           lines << ""
         end
+        lines << "No suggested_patch values were present in the selected feedback." if lines.size == 4
         lines.join("\n")
       end
 

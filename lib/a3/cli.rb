@@ -618,7 +618,7 @@ module A3
         run_id_generator: run_id_generator,
         command_runner: command_runner,
         merge_runner: merge_runner
-      ) do |_options, container|
+      ) do |options, container|
         entries = container.fetch(:list_skill_feedback).call(
           state: session_filter(options[:state]),
           target: session_filter(options[:target]),

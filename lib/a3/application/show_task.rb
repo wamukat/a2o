@@ -23,8 +23,9 @@ module A3
         return [] unless @run_repository && task.current_run_ref
 
         run = @run_repository.fetch(task.current_run_ref)
-        latest_record = run.phase_records.reverse_each.find { |record| record.execution_record }
-        latest_record&.execution_record&.skill_feedback || []
+        run.phase_records.flat_map do |record|
+          Array(record.execution_record&.skill_feedback)
+        end
       rescue A3::Domain::RecordNotFound
         []
       end

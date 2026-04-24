@@ -128,4 +128,48 @@ RSpec.describe A3::Application::ShowTask do
       }
     ])
   end
+
+  it "includes pending feedback from earlier phase records in the current run" do
+    source = A3::Domain::SourceDescriptor.ticket_branch_head(task_ref: "A3-v2#child", ref: "refs/heads/a2o/work/A3-v2-child")
+    scope = A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], ownership_scope: :task)
+    run = A3::Domain::Run.new(
+      ref: "run-1",
+      task_ref: "A3-v2#child",
+      phase: :review,
+      workspace_kind: :ticket_workspace,
+      source_descriptor: source,
+      scope_snapshot: scope,
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: "A3-v2#child",
+        owner_scope: :task,
+        snapshot_version: "refs/heads/a2o/work/A3-v2-child"
+      )
+    ).append_phase_evidence(
+      phase: :implementation,
+      source_descriptor: source,
+      scope_snapshot: scope,
+      execution_record: A3::Domain::PhaseExecutionRecord.new(
+        summary: "implemented",
+        skill_feedback: [
+          {
+            "category" => "missing_context",
+            "summary" => "Do not lose this pending feedback.",
+            "proposal" => { "target" => "project_skill" }
+          }
+        ]
+      )
+    ).append_phase_evidence(
+      phase: :review,
+      source_descriptor: source,
+      scope_snapshot: scope,
+      execution_record: A3::Domain::PhaseExecutionRecord.new(summary: "review passed")
+    )
+    run_repository.save(run)
+
+    result = use_case.call(task_ref: "A3-v2#child")
+
+    expect(result.skill_feedback).to include(
+      hash_including("summary" => "Do not lose this pending feedback.")
+    )
+  end
 end

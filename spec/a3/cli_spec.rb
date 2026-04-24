@@ -51,6 +51,35 @@ RSpec.describe A3::CLI do
     )
   end
 
+  it "passes parsed skill feedback list filters to the application service" do
+    out = StringIO.new
+    service = instance_double(A3::Application::ListSkillFeedback)
+    entry = A3::Application::ListSkillFeedback::Entry.new(
+      task_ref: "A2O#204",
+      run_ref: "run-1",
+      phase: :implementation,
+      category: "missing_context",
+      summary: "Add setup guidance.",
+      target: "project_skill",
+      state: "new"
+    )
+    allow(service).to receive(:call).with(state: "new", target: "project_skill", group: false).and_return([entry])
+    allow(described_class).to receive(:with_storage_container).and_yield(
+      { state: "new", target: "project_skill", group: false },
+      { list_skill_feedback: service }
+    )
+
+    described_class.handle_skill_feedback_list(
+      ["--state", "new", "--target", "project_skill"],
+      out: out,
+      run_id_generator: -> { "run-1" },
+      command_runner: A3::Infra::LocalCommandRunner.new,
+      merge_runner: A3::Infra::DisabledMergeRunner.new
+    )
+
+    expect(out.string).to include("skill_feedback task=A2O#204 run=run-1 phase=implementation category=missing_context target=project_skill state=new")
+  end
+
   it "routes manifest-driven runtime commands through the shared runtime session helper" do
     out = StringIO.new
     session = Struct.new(:options, :container, :project_context, :project_surface, keyword_init: true).new(

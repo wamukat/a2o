@@ -941,8 +941,14 @@ func runRuntimeSkillFeedback(args []string, runner commandRunner, stdout io.Writ
 	flags.SetOutput(stderr)
 	state := flags.String("state", "", "filter by feedback lifecycle state")
 	target := flags.String("target", "", "filter by feedback target")
-	group := flags.Bool("group", false, "group duplicate feedback entries")
-	format := flags.String("format", "ticket", "proposal format: ticket or patch")
+	group := false
+	format := "ticket"
+	if subcommand == "list" {
+		flags.BoolVar(&group, "group", false, "group duplicate feedback entries")
+	}
+	if subcommand == "propose" {
+		flags.StringVar(&format, "format", "ticket", "proposal format: ticket or patch")
+	}
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -967,11 +973,11 @@ func runRuntimeSkillFeedback(args []string, runner commandRunner, stdout io.Writ
 		if *target != "" {
 			runtimeArgs = append(runtimeArgs, "--target", *target)
 		}
-		if subcommand == "list" && *group {
+		if subcommand == "list" && group {
 			runtimeArgs = append(runtimeArgs, "--group")
 		}
 		if subcommand == "propose" {
-			runtimeArgs = append(runtimeArgs, "--format", *format)
+			runtimeArgs = append(runtimeArgs, "--format", format)
 		}
 		output, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "skill_feedback", runtimeArgs...)
 		if err != nil {
