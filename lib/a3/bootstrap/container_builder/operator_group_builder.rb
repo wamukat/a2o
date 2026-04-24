@@ -36,8 +36,11 @@ module A3
             show_scheduler_history: A3::Application::ShowSchedulerHistory.new(
               scheduler_cycle_repository: context.scheduler_cycle_repository
             ),
-            list_skill_feedback: A3::Application::ListSkillFeedback.new(
+            list_skill_feedback: (list_skill_feedback = A3::Application::ListSkillFeedback.new(
               run_repository: context.run_repository
+            )),
+            generate_skill_feedback_proposal: A3::Application::GenerateSkillFeedbackProposal.new(
+              list_skill_feedback: list_skill_feedback
             ),
             reconcile_manual_merge_recovery: context.reconcile_manual_merge_recovery
           }

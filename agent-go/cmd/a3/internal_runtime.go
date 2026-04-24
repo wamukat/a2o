@@ -933,11 +933,16 @@ func runRuntimeWatchSummary(args []string, runner commandRunner, stdout io.Write
 }
 
 func runRuntimeSkillFeedback(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
-	if len(args) == 0 || args[0] != "list" {
-		return fmt.Errorf("usage: a2o runtime skill-feedback list")
+	if len(args) == 0 || (args[0] != "list" && args[0] != "propose") {
+		return fmt.Errorf("usage: a2o runtime skill-feedback (list|propose)")
 	}
-	flags := flag.NewFlagSet("a2o runtime skill-feedback list", flag.ContinueOnError)
+	subcommand := args[0]
+	flags := flag.NewFlagSet("a2o runtime skill-feedback "+subcommand, flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	state := flags.String("state", "", "filter by feedback lifecycle state")
+	target := flags.String("target", "", "filter by feedback target")
+	group := flags.Bool("group", false, "group duplicate feedback entries")
+	format := flags.String("format", "ticket", "proposal format: ticket or patch")
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -955,7 +960,20 @@ func runRuntimeSkillFeedback(args []string, runner commandRunner, stdout io.Writ
 		if err != nil {
 			return err
 		}
-		output, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "skill_feedback", "a3", "skill-feedback-list", "--storage-backend", "json", "--storage-dir", plan.StorageDir)
+		runtimeArgs := []string{"a3", "skill-feedback-" + subcommand, "--storage-backend", "json", "--storage-dir", plan.StorageDir}
+		if *state != "" {
+			runtimeArgs = append(runtimeArgs, "--state", *state)
+		}
+		if *target != "" {
+			runtimeArgs = append(runtimeArgs, "--target", *target)
+		}
+		if subcommand == "list" && *group {
+			runtimeArgs = append(runtimeArgs, "--group")
+		}
+		if subcommand == "propose" {
+			runtimeArgs = append(runtimeArgs, "--format", *format)
+		}
+		output, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "skill_feedback", runtimeArgs...)
 		if err != nil {
 			return err
 		}

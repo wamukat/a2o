@@ -46,9 +46,10 @@ a2o runtime watch-summary
 a2o runtime logs <task-ref> --follow
 a2o runtime clear-logs --task-ref <task-ref>
 a2o runtime skill-feedback list
+a2o runtime skill-feedback propose --format ticket
 ```
 
-`runtime status` shows scheduler state, runtime container state, kanban instance information, image digest, and the latest run. `runtime watch-summary` shows where board tasks currently are. `runtime logs` gathers per-phase logs for one task and prefers AI raw logs when they are available. With `--follow`, it follows the current phase AI raw live log first and falls back to the legacy live log when the worker does not expose AI raw output. `runtime skill-feedback list` lists reusable skill improvement candidates reported by workers. `runtime clear-logs` is the explicit cleanup surface for persisted analysis logs; it is dry-run by default and only deletes when `--apply` is added.
+`runtime status` shows scheduler state, runtime container state, kanban instance information, image digest, and the latest run. `runtime watch-summary` shows where board tasks currently are. `runtime logs` gathers per-phase logs for one task and prefers AI raw logs when they are available. With `--follow`, it follows the current phase AI raw live log first and falls back to the legacy live log when the worker does not expose AI raw output. `runtime skill-feedback list` lists reusable skill improvement candidates reported by workers, with `--state`, `--target`, and `--group` for filtering and duplicate grouping. `runtime skill-feedback propose` converts candidates into a ticket body or draft patch, but it does not modify skill files automatically. `runtime clear-logs` is the explicit cleanup surface for persisted analysis logs; it is dry-run by default and only deletes when `--apply` is added.
 
 Use `describe-task` for one task.
 
@@ -167,5 +168,6 @@ Move from broad checks to narrow checks.
 | Aggregated task logs | `a2o runtime logs <task-ref>` |
 | One task's run / evidence / logs | `a2o runtime describe-task <task-ref>` |
 | Reusable skill improvement candidates | `a2o runtime skill-feedback list` |
+| Draft a skill improvement proposal | `a2o runtime skill-feedback propose --format ticket` |
 
 For blocked tasks, dirty repositories, executor failures, verification failures, and merge issues, read [40-troubleshooting.md](40-troubleshooting.md).

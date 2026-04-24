@@ -5,6 +5,7 @@ require "pathname"
 require "tempfile"
 require "open3"
 require "thread"
+require_relative "../domain/skill_feedback"
 
 ROOT_DIR = Pathname(ENV["A2O_ROOT_DIR"] || ENV.fetch("A3_ROOT_DIR", Dir.pwd)).expand_path.freeze
 def env_compat(public_name, legacy_name)
@@ -232,6 +233,7 @@ def skill_feedback_schema
       "category" => { "type" => "string" },
       "summary" => { "type" => "string" },
       "evidence" => { "type" => "object" },
+      "state" => { "type" => "string", "enum" => A3::Domain::SkillFeedback.states },
       "proposal" => {
         "type" => "object",
         "properties" => {
@@ -545,6 +547,9 @@ def validate_skill_feedback_entry(entry, index)
   elsif entry["proposal"].is_a?(Hash) && !valid_skill_feedback_targets.include?(entry.dig("proposal", "target"))
     errors << "#{prefix}.proposal.target must be one of #{valid_skill_feedback_targets.join(', ')}"
   end
+  if entry.key?("state") && !A3::Domain::SkillFeedback.states.include?(entry["state"])
+    errors << "#{prefix}.state must be one of #{A3::Domain::SkillFeedback.states.join(', ')}"
+  end
   %w[schema phase repo_scope skill_path confidence].each do |field|
     errors << "#{prefix}.#{field} must be a string when present" if entry.key?(field) && !entry[field].is_a?(String)
   end
@@ -553,7 +558,7 @@ def validate_skill_feedback_entry(entry, index)
 end
 
 def valid_skill_feedback_targets
-  %w[project_skill a2o_preset unknown]
+  A3::Domain::SkillFeedback.targets
 end
 
 def load_payload(result_path)

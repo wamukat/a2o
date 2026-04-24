@@ -256,7 +256,7 @@ module A3
         run_id_generator: run_id_generator,
         command_runner: command_runner,
         merge_runner: merge_runner
-      ) do |_options, container|
+      ) do |options, container|
         result = container.fetch(:plan_next_runnable_task).call
 
         if result.task
@@ -619,25 +619,44 @@ module A3
         command_runner: command_runner,
         merge_runner: merge_runner
       ) do |_options, container|
-        entries = container.fetch(:list_skill_feedback).call
+        entries = container.fetch(:list_skill_feedback).call(
+          state: session_filter(options[:state]),
+          target: session_filter(options[:target]),
+          group: options.fetch(:group)
+        )
         if entries.empty?
           out.puts("skill_feedback=none")
         else
           entries.each do |entry|
-            parts = [
-              "task=#{entry.task_ref}",
-              "run=#{entry.run_ref}",
-              "phase=#{entry.phase}",
-              "category=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.category)}",
-              "target=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.target)}"
-            ]
-            parts << "repo_scope=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.repo_scope)}" if entry.repo_scope
-            parts << "skill_path=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.skill_path)}" if entry.skill_path
-            parts << "confidence=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.confidence)}" if entry.confidence
-            out.puts("skill_feedback #{parts.join(' ')}")
-            out.puts("skill_feedback_summary=#{entry.summary}") if entry.summary
+            if entry.respond_to?(:representative)
+              representative = entry.representative
+              out.puts("skill_feedback_group count=#{entry.count} #{skill_feedback_entry_parts(representative).join(' ')}")
+              out.puts("skill_feedback_summary=#{representative.summary}") if representative.summary
+            else
+              out.puts("skill_feedback #{skill_feedback_entry_parts(entry).join(' ')}")
+              out.puts("skill_feedback_summary=#{entry.summary}") if entry.summary
+              out.puts("skill_feedback_suggested_patch=#{entry.suggested_patch}") if entry.suggested_patch
+            end
           end
         end
+      end
+    end
+
+    def handle_skill_feedback_propose(argv, out:, run_id_generator:, command_runner:, merge_runner:)
+      with_storage_container(
+        argv: argv,
+        parse_with: :parse_skill_feedback_propose_options,
+        run_id_generator: run_id_generator,
+        command_runner: command_runner,
+        merge_runner: merge_runner
+      ) do |options, container|
+        out.print(
+          container.fetch(:generate_skill_feedback_proposal).call(
+            state: session_filter(options[:state]) || "new",
+            target: session_filter(options[:target]),
+            format: options.fetch(:format)
+          )
+        )
       end
     end
 
@@ -1557,14 +1576,59 @@ module A3
       options = {
         storage_backend: :json,
         storage_dir: default_storage_dir,
-        repo_sources: {}
+        repo_sources: {},
+        state: nil,
+        target: nil,
+        group: false
       }
       parser = OptionParser.new
       parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
       parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
       parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      parser.on("--state STATE") { |value| options[:state] = value }
+      parser.on("--target TARGET") { |value| options[:target] = value }
+      parser.on("--group") { options[:group] = true }
       parser.parse(argv)
       options
+    end
+
+    def parse_skill_feedback_propose_options(argv)
+      options = {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        repo_sources: {},
+        state: "new",
+        target: nil,
+        format: :ticket
+      }
+      parser = OptionParser.new
+      parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      parser.on("--state STATE") { |value| options[:state] = value }
+      parser.on("--target TARGET") { |value| options[:target] = value }
+      parser.on("--format FORMAT") { |value| options[:format] = value.to_sym }
+      parser.parse(argv)
+      options
+    end
+
+    def session_filter(value)
+      value.to_s.empty? ? nil : value
+    end
+
+    def skill_feedback_entry_parts(entry)
+      parts = [
+        "task=#{entry.task_ref}",
+        "run=#{entry.run_ref}",
+        "phase=#{entry.phase}",
+        "category=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.category)}",
+        "target=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.target)}",
+        "state=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.state)}"
+      ]
+      parts << "repo_scope=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.repo_scope)}" if entry.repo_scope
+      parts << "skill_path=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.skill_path)}" if entry.skill_path
+      parts << "confidence=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.confidence)}" if entry.confidence
+      parts
     end
 
     def build_storage_container(options:, run_id_generator:, command_runner:, merge_runner:, worker_gateway: nil)

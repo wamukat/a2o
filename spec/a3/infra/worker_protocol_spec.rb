@@ -332,6 +332,37 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(result.skill_feedback).to eq([])
   end
 
+  it "rejects unknown skill feedback lifecycle states" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => false,
+        "summary" => "worker failed",
+        "task_ref" => task.ref,
+        "run_ref" => run.ref,
+        "phase" => "review",
+        "rework_required" => false,
+        "failing_command" => "review_worker",
+        "observed_state" => "invalid feedback",
+        "skill_feedback" => {
+          "category" => "missing_context",
+          "summary" => "state has a typo",
+          "state" => "converted",
+          "proposal" => { "target" => "project_skill" }
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: run.ref,
+      expected_phase: :review
+    )
+
+    expect(result).to have_attributes(success?: false)
+    expect(result.diagnostics.fetch("validation_errors")).to include(
+      "skill_feedback[0].state must be one of new, accepted, rejected, converted_to_ticket, applied"
+    )
+    expect(result.skill_feedback).to eq([])
+  end
+
   def implementation_run
     A3::Domain::Run.new(
       ref: "run-implementation-1",

@@ -27,13 +27,26 @@ module A3
         end
 
         def append_skill_feedback_lines(result, feedback_entries)
-          Array(feedback_entries).each do |feedback|
+          entries = Array(feedback_entries).select { |feedback| feedback.is_a?(Hash) }
+          return if entries.empty?
+
+          result << "skill_feedback_count=#{entries.size}"
+          A3::Domain::SkillFeedback.facet_counts(entries).each do |facet, counts|
+            result << "skill_feedback_#{facet_label(facet)}=#{format_counts(counts)}" unless counts.empty?
+          end
+          pending_count = entries.count { |feedback| A3::Domain::SkillFeedback.pending_review?(feedback) }
+          if pending_count.positive?
+            result << "skill_feedback_pending_review=#{pending_count} action=review_or_convert_to_ticket"
+          end
+
+          entries.each do |feedback|
             next unless feedback.is_a?(Hash)
 
-            proposal = feedback["proposal"].is_a?(Hash) ? feedback["proposal"] : {}
+            proposal = A3::Domain::SkillFeedback.proposal_for(feedback)
             parts = [
               "category=#{FormattingHelpers.diagnostic_value(feedback['category'])}",
-              "target=#{FormattingHelpers.diagnostic_value(proposal['target'])}"
+              "target=#{FormattingHelpers.diagnostic_value(proposal['target'])}",
+              "state=#{FormattingHelpers.diagnostic_value(A3::Domain::SkillFeedback.state_for(feedback))}"
             ]
             parts << "repo_scope=#{FormattingHelpers.diagnostic_value(feedback['repo_scope'])}" if feedback["repo_scope"]
             parts << "skill_path=#{FormattingHelpers.diagnostic_value(feedback['skill_path'])}" if feedback["skill_path"]
@@ -41,6 +54,16 @@ module A3
             result << "skill_feedback #{parts.join(' ')}"
             result << "skill_feedback_summary=#{feedback['summary']}" if feedback["summary"]
           end
+        end
+
+        def format_counts(counts)
+          counts.map { |key, value| "#{key}:#{value}" }.join(",")
+        end
+
+        def facet_label(facet)
+          return "categories" if facet == "category"
+
+          "#{facet}s"
         end
       end
     end

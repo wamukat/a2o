@@ -102,6 +102,7 @@ a2o runtime watch-summary
 a2o runtime describe-task A2O#1
 a2o runtime reset-task A2O#1
 a2o runtime skill-feedback list
+a2o runtime skill-feedback propose --format ticket
 a2o runtime show-artifact worker-run-1-implementation-combined-log
 ```
 

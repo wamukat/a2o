@@ -1529,6 +1529,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime reset-task TASK_REF",
 		"a2o runtime watch-summary",
 		"a2o runtime skill-feedback list",
+		"a2o runtime skill-feedback propose",
 		"a2o runtime logs TASK_REF [--follow]",
 		"a2o runtime show-artifact ARTIFACT_ID",
 		"a2o runtime clear-logs (--task-ref TASK_REF | --run-ref RUN_REF | --all-analysis) [--phase PHASE] [--role ROLE] [--apply]",
@@ -1598,6 +1599,7 @@ func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
 		{name: "runtime run-once", args: []string{"runtime", "run-once", "-bad"}, want: "Usage of a2o runtime run-once:"},
 		{name: "runtime watch-summary", args: []string{"runtime", "watch-summary", "-bad"}, want: "Usage of a2o runtime watch-summary:"},
 		{name: "runtime skill-feedback list", args: []string{"runtime", "skill-feedback", "list", "-bad"}, want: "Usage of a2o runtime skill-feedback list:"},
+		{name: "runtime skill-feedback propose", args: []string{"runtime", "skill-feedback", "propose", "-bad"}, want: "Usage of a2o runtime skill-feedback propose:"},
 		{name: "runtime loop", args: []string{"runtime", "loop", "-bad"}, want: "Usage of a2o runtime loop:"},
 		{name: "agent install", args: []string{"agent", "install", "-bad"}, want: "Usage of a2o agent install:"},
 	} {
@@ -4246,6 +4248,45 @@ func TestRuntimeSkillFeedbackListUsesRuntimeStorage(t *testing.T) {
 	}
 }
 
+func TestRuntimeSkillFeedbackProposeUsesRuntimeStorage(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "skill-feedback", "propose", "--state", "accepted", "--target", "project_skill", "--format", "patch"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "skill_feedback task=A2O#16 run=run-16 phase=implementation category=missing_context target=project_skill") {
+		t.Fatalf("skill feedback propose should print runtime output, got:\n%s", stdout.String())
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	want := "docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 skill-feedback-propose --storage-backend json --storage-dir /var/lib/a3/test-runtime --state accepted --target project_skill --format patch"
+	if !strings.Contains(joined, want) {
+		t.Fatalf("skill feedback propose missing call %q in:\n%s", want, joined)
+	}
+}
+
 func TestRuntimeWatchSummaryShowsStoppedWhenSchedulerPIDFileIsMissing(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -6106,7 +6147,7 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 			return []byte(r.watchSummaryOutput), nil
 		}
 		return []byte("Scheduler: running\nTask Tree\nNext\nRunning\n"), nil
-	case strings.Contains(joined, "skill-feedback-list"):
+	case strings.Contains(joined, "skill-feedback-list") || strings.Contains(joined, "skill-feedback-propose"):
 		return []byte("skill_feedback task=A2O#16 run=run-16 phase=implementation category=missing_context target=project_skill\nskill_feedback_summary=Add fixture update guidance.\n"), nil
 	case strings.Contains(joined, " task-get "):
 		return []byte(`{"task_ref":"A2O#16","status":"Blocked"}` + "\n"), nil

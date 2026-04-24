@@ -16,7 +16,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Runtime container lifecycle: `a2o runtime up`, `down`
 - Foreground runtime execution: `a2o runtime run-once`, `a2o runtime loop`
 - Resident scheduler lifecycle: `a2o runtime resume`, `pause`, `status`
-- Runtime diagnosis and recovery: `a2o runtime image-digest`, `doctor`, `watch-summary`, `logs <task-ref>`, `describe-task <task-ref>`, `skill-feedback list`, `reset-task <task-ref>`, `show-artifact <artifact-id>`
+- Runtime diagnosis and recovery: `a2o runtime image-digest`, `doctor`, `watch-summary`, `logs <task-ref>`, `describe-task <task-ref>`, `skill-feedback list`, `skill-feedback propose`, `reset-task <task-ref>`, `show-artifact <artifact-id>`
 - Upgrade diagnosis: `a2o upgrade check`
 - Single-file project package config: `project.yaml`
 - Project runtime tuning fields for agent server connectivity: `runtime.agent_control_plane_connect_timeout`, `runtime.agent_control_plane_request_timeout`, `runtime.agent_control_plane_retry_count`, `runtime.agent_control_plane_retry_delay`

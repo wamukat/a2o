@@ -3,6 +3,7 @@
 require "json"
 require "fileutils"
 require "open3"
+require "a3/domain/skill_feedback"
 
 module A3
   module Infra
@@ -344,6 +345,9 @@ module A3
         elsif entry["proposal"].is_a?(Hash) && !valid_skill_feedback_targets.include?(entry.dig("proposal", "target"))
           errors << "#{prefix}.proposal.target must be one of #{valid_skill_feedback_targets.join(', ')}"
         end
+        if entry.key?("state") && !A3::Domain::SkillFeedback.states.include?(entry["state"])
+          errors << "#{prefix}.state must be one of #{A3::Domain::SkillFeedback.states.join(', ')}"
+        end
         %w[schema phase repo_scope skill_path confidence].each do |field|
           errors << "#{prefix}.#{field} must be a string when present" if entry.key?(field) && !entry[field].is_a?(String)
         end
@@ -364,7 +368,7 @@ module A3
       end
 
       def valid_skill_feedback_targets
-        %w[project_skill a2o_preset unknown]
+        A3::Domain::SkillFeedback.targets
       end
 
       def normalize_configured_review_disposition_repo_scopes(scopes)

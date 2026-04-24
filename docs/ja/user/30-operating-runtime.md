@@ -46,9 +46,10 @@ a2o runtime watch-summary
 a2o runtime logs <task-ref> --follow
 a2o runtime clear-logs --task-ref <task-ref>
 a2o runtime skill-feedback list
+a2o runtime skill-feedback propose --format ticket
 ```
 
-`runtime status` はスケジューラ、ランタイムコンテナ、カンバン、イメージダイジェスト、最新実行の状態を見る。`runtime watch-summary` はタスク一覧の現在位置を見る。`runtime logs` は 1 タスクのフェーズ別ログをまとめて読み、AI raw log があればそれを優先して表示する。`--follow` を付けると現在フェーズの AI raw live log を優先して追い、未対応 worker では従来の live log にフォールバックする。`runtime skill-feedback list` は worker が報告した再利用可能な skill 改善候補を一覧表示する。`runtime clear-logs` は永続化された分析用ログを明示的に整理するコマンドで、デフォルトは dry-run、実削除は `--apply` 指定時だけである。
+`runtime status` はスケジューラ、ランタイムコンテナ、カンバン、イメージダイジェスト、最新実行の状態を見る。`runtime watch-summary` はタスク一覧の現在位置を見る。`runtime logs` は 1 タスクのフェーズ別ログをまとめて読み、AI raw log があればそれを優先して表示する。`--follow` を付けると現在フェーズの AI raw live log を優先して追い、未対応 worker では従来の live log にフォールバックする。`runtime skill-feedback list` は worker が報告した再利用可能な skill 改善候補を一覧表示し、`--state` / `--target` / `--group` で絞り込みや重複集約ができる。`runtime skill-feedback propose` は候補をチケット本文または draft patch に変換するが、skill ファイルは自動変更しない。`runtime clear-logs` は永続化された分析用ログを明示的に整理するコマンドで、デフォルトは dry-run、実削除は `--apply` 指定時だけである。
 
 特定タスクを深く見る場合は `describe-task` を使う。
 
@@ -167,5 +168,6 @@ a2o runtime status
 | 1 タスクのログをまとめて見る | `a2o runtime logs <task-ref>` |
 | 1 タスクの実行 / 証跡 / ログを見る | `a2o runtime describe-task <task-ref>` |
 | 再利用可能な skill 改善候補を見る | `a2o runtime skill-feedback list` |
+| skill 改善候補を提案本文にする | `a2o runtime skill-feedback propose --format ticket` |
 
 ブロックされたタスク、未整理のリポジトリ、実行コマンドの失敗、検証失敗などの症状別対応は [40-troubleshooting.md](40-troubleshooting.md) を読む。

@@ -96,7 +96,9 @@ When an agent finds reusable implementation or review knowledge, it may include 
 - `proposal.target=a2o_preset`: candidate for an A2O preset after the pattern proves useful across projects.
 - `proposal.target=unknown`: candidate whose destination is not yet clear.
 
-A2O does not update skill files automatically. The feedback should become a ticket body, reviewed draft patch, or operator decision. Runtime log cleanup may clear `combined-log`, `ai-raw-log`, and `execution-metadata`, but the `skill_feedback` summary stored in evidence remains part of execution diagnosis.
+Feedback without `state` is treated as `new`. Once triaged, use `accepted`, `rejected`, `converted_to_ticket`, or `applied`. `describe-task` highlights pending feedback, and `a2o runtime skill-feedback list --state new --group` groups repeated candidates for cross-run review.
+
+A2O does not update skill files automatically. Operators can turn candidates into a ticket-body draft with `a2o runtime skill-feedback propose --format ticket`, or a reviewed draft patch with `--format patch`. Runtime log cleanup may clear `combined-log`, `ai-raw-log`, and `execution-metadata`, but the `skill_feedback` summary stored in evidence remains part of execution diagnosis.
 
 Generated state belongs under `.work/a2o/` unless it is internal workspace metadata.
 
