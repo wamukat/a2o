@@ -110,4 +110,24 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
     ])
     expect(described_class.from_persisted_form(record.persisted_form)).to eq(record)
   end
+
+  it "does not persist skill feedback from invalid worker results" do
+    execution = A3::Application::ExecutionResult.new(
+      success: false,
+      summary: "worker result schema invalid",
+      failing_command: "worker_result_schema",
+      observed_state: "invalid_worker_result",
+      response_bundle: {
+        "skill_feedback" => {
+          "category" => "missing_context",
+          "summary" => "This rejected payload should not become evidence.",
+          "proposal" => { "target" => "project_skill" }
+        }
+      }
+    )
+
+    record = described_class.from_execution_result(execution)
+
+    expect(record.skill_feedback).to eq([])
+  end
 end

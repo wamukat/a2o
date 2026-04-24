@@ -299,6 +299,37 @@ RSpec.describe A3::Infra::WorkerProtocol do
       "skill_feedback[0].summary must be a string",
       "skill_feedback[0].proposal.target must be a string"
     )
+    expect(result.skill_feedback).to eq([])
+  end
+
+  it "rejects unknown skill feedback targets" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => false,
+        "summary" => "worker failed",
+        "task_ref" => task.ref,
+        "run_ref" => run.ref,
+        "phase" => "review",
+        "rework_required" => false,
+        "failing_command" => "review_worker",
+        "observed_state" => "invalid feedback",
+        "skill_feedback" => {
+          "category" => "missing_context",
+          "summary" => "target has a typo",
+          "proposal" => { "target" => "project_skll" }
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: run.ref,
+      expected_phase: :review
+    )
+
+    expect(result).to have_attributes(success?: false)
+    expect(result.diagnostics.fetch("validation_errors")).to include(
+      "skill_feedback[0].proposal.target must be one of project_skill, a2o_preset, unknown"
+    )
+    expect(result.skill_feedback).to eq([])
   end
 
   def implementation_run

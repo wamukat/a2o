@@ -396,6 +396,29 @@ RSpec.describe "worker:stdin-bundle" do
     )
   end
 
+  it "rejects unknown skill feedback targets in worker helper validation" do
+    payload = {
+      "task_ref" => "Sample#3112",
+      "run_ref" => "run-1",
+      "phase" => "review",
+      "success" => false,
+      "summary" => "review failed",
+      "failing_command" => "review_worker",
+      "observed_state" => "invalid feedback",
+      "rework_required" => false,
+      "skill_feedback" => {
+        "category" => "missing_context",
+        "summary" => "target has a typo",
+        "proposal" => { "target" => "project_skll" }
+      }
+    }
+    request = base_request.merge("phase" => "review")
+
+    expect(validate_payload(payload, request: request)).to include(
+      "skill_feedback[0].proposal.target must be one of project_skill, a2o_preset, unknown"
+    )
+  end
+
   it "requires review_disposition for implementation success" do
     payload = {
       "task_ref" => "Sample#3112",

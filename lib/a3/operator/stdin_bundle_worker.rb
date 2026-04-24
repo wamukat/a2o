@@ -235,7 +235,7 @@ def skill_feedback_schema
       "proposal" => {
         "type" => "object",
         "properties" => {
-          "target" => { "type" => "string" },
+          "target" => { "type" => "string", "enum" => valid_skill_feedback_targets },
           "suggested_patch" => { "type" => "string" }
         },
         "required" => ["target"],
@@ -542,12 +542,18 @@ def validate_skill_feedback_entry(entry, index)
   errors << "#{prefix}.proposal must be an object" unless entry["proposal"].is_a?(Hash)
   if entry["proposal"].is_a?(Hash) && !entry.dig("proposal", "target").is_a?(String)
     errors << "#{prefix}.proposal.target must be a string"
+  elsif entry["proposal"].is_a?(Hash) && !valid_skill_feedback_targets.include?(entry.dig("proposal", "target"))
+    errors << "#{prefix}.proposal.target must be one of #{valid_skill_feedback_targets.join(', ')}"
   end
   %w[schema phase repo_scope skill_path confidence].each do |field|
     errors << "#{prefix}.#{field} must be a string when present" if entry.key?(field) && !entry[field].is_a?(String)
   end
   errors << "#{prefix}.evidence must be an object when present" if entry.key?("evidence") && !entry["evidence"].is_a?(Hash)
   errors
+end
+
+def valid_skill_feedback_targets
+  %w[project_skill a2o_preset unknown]
 end
 
 def load_payload(result_path)

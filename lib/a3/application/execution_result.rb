@@ -48,6 +48,7 @@ module A3
       end
 
       def skill_feedback
+        return [] if invalid_worker_result?
         return [] unless response_bundle.is_a?(Hash)
 
         value = response_bundle["skill_feedback"]
@@ -59,6 +60,12 @@ module A3
         else
           []
         end
+      end
+
+      def invalid_worker_result?
+        failing_command == "worker_result_schema" ||
+          failing_command == "worker_result_json" ||
+          observed_state == "invalid_worker_result"
       end
 
       def with_diagnostics(value)

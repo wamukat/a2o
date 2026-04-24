@@ -341,6 +341,8 @@ module A3
         errors << "#{prefix}.proposal must be an object" unless entry["proposal"].is_a?(Hash)
         if entry["proposal"].is_a?(Hash) && !entry.dig("proposal", "target").is_a?(String)
           errors << "#{prefix}.proposal.target must be a string"
+        elsif entry["proposal"].is_a?(Hash) && !valid_skill_feedback_targets.include?(entry.dig("proposal", "target"))
+          errors << "#{prefix}.proposal.target must be one of #{valid_skill_feedback_targets.join(', ')}"
         end
         %w[schema phase repo_scope skill_path confidence].each do |field|
           errors << "#{prefix}.#{field} must be a string when present" if entry.key?(field) && !entry[field].is_a?(String)
@@ -359,6 +361,10 @@ module A3
 
           normalized[from] = to
         end
+      end
+
+      def valid_skill_feedback_targets
+        %w[project_skill a2o_preset unknown]
       end
 
       def normalize_configured_review_disposition_repo_scopes(scopes)
