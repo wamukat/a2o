@@ -108,6 +108,50 @@ runtime image には `/opt/a2o/agents/release-manifest.jsonl` と target 別 arc
 
 タグリリースでは `latest` も publish する。release workflow 完了後は、version tag と `latest` のどちらで確認しても同じ公開ランタイムイメージを指す前提で扱う。
 
+## release 後のローカル cleanup
+
+ローカルで release 作業を繰り返すと、Docker state がかなり残る。
+
+- 古い `ghcr.io/wamukat/a2o-engine` image
+- local build / publish 検証で生じた dangling image
+- BuildKit builder cache
+- repository 配下の一時的な release artifact
+
+これを放置すると、数回の release でローカルディスク容量が逼迫し、次回以降の release 検証に支障が出る。
+
+そのため、release 手順には release 完了後の明示的なローカル cleanup を含めるべきである。
+
+推奨順序は次のとおり。
+
+1. まず release 完了を確認する
+   - publish workflow が成功している
+   - version tag image が存在する
+   - release flow 上 `latest` を揃える前提なら、`latest` も同じ digest を指している
+2. 次に、いま使っている container を確認する
+   - `docker ps` を確認する
+   - 起動中 runtime / kanban container が使っている image は消さない
+3. repository 内の再生成可能な生成物を消す
+   - `.work/...` の smoke / preflight 出力
+   - `agent-go/dist` のような release bundle 出力
+4. その後、不要な Docker state を消す
+   - release 検証で残った exited container
+   - 一時的な release / smoke 環境が作った未使用 volume
+   - active container が使っていない古い A2O runtime image
+   - dangling image
+   - 未使用 builder cache
+
+active container を確認した後の cleanup command 例:
+
+```sh
+docker ps
+docker image prune -f
+docker builder prune -a -f
+docker system prune -f
+rm -rf .work/agent-go .work/*smoke* agent-go/dist
+```
+
+ただし、この command 群はそのまま盲目的に実行する前提ではない。実際の cleanup では、起動中の runtime / kanban 環境と、まだ調査が必要な log / artifact を保全した上で削除対象を絞ること。
+
 ## 改善案
 
 ### Option A: 小さな最適化だけ行う

@@ -108,6 +108,50 @@ The current publication surface is:
 
 Tag releases also publish `latest`. After the release workflow completes, operators should be able to validate either the released version tag or `latest` against the same published runtime image.
 
+## Post-release Local Cleanup
+
+Local release work can leave behind substantial Docker state:
+
+- older `ghcr.io/wamukat/a2o-engine` images
+- dangling images from repeated local build / publish validation
+- BuildKit builder cache
+- temporary release artifacts under the repository work area
+
+If these are left in place across multiple releases, local disk pressure can grow enough to interfere with later release verification.
+
+The release procedure should therefore include an explicit local cleanup step after the release has been confirmed.
+
+Recommended local cleanup order:
+
+1. Confirm the release is complete:
+   - publish workflow succeeded
+   - the versioned image tag exists
+   - `latest` resolves to the same published digest when that is expected for the release flow
+2. Confirm which containers are still running:
+   - inspect `docker ps`
+   - do not remove images that are backing an active runtime or kanban container
+3. Remove local release leftovers that are safe to regenerate:
+   - temporary repository work directories such as `.work/...` smoke / preflight outputs
+   - release bundle output such as `agent-go/dist`
+4. Remove Docker state that is no longer needed locally:
+   - exited containers from release validation
+   - unused volumes created by temporary release / smoke environments
+   - old A2O runtime images that are not used by active containers
+   - dangling images
+   - unused builder cache
+
+Example cleanup commands after confirming active containers:
+
+```sh
+docker ps
+docker image prune -f
+docker builder prune -a -f
+docker system prune -f
+rm -rf .work/agent-go .work/*smoke* agent-go/dist
+```
+
+Operators should treat these commands as examples, not a blind copy-paste block. The actual cleanup must preserve any currently running runtime / kanban environment and any logs or artifacts that still need inspection.
+
 ## Improvement Options
 
 ### Option A: Small optimization only
