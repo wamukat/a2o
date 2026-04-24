@@ -1599,7 +1599,6 @@ func runtimeWatchSummaryArgs(plan runtimeRunOncePlan) []string {
 		"--kanban-command-arg", "--base-url",
 		"--kanban-command-arg", plan.SoloBoardInternalURL,
 		"--kanban-project", plan.KanbanProject,
-		"--kanban-status", plan.KanbanStatus,
 		"--kanban-working-dir", "/workspace",
 	)
 	for _, repoLabel := range plan.KanbanRepoLabels {

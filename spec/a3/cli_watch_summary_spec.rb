@@ -299,6 +299,54 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "keeps parent review tasks visible when all children are done" do
+    Dir.mktmpdir do |dir|
+      fake_cli = create_fake_kanban_cli(
+        dir,
+        snapshots: [
+          {
+            "id" => 5000,
+            "ref" => "Sample#5000",
+            "title" => "Parent review task",
+            "status" => "In review",
+            "labels" => ["trigger:auto-implement", "repo:ui-app"]
+          },
+          {
+            "id" => 5001,
+            "ref" => "Sample#5001",
+            "title" => "Completed child",
+            "status" => "Done",
+            "done" => false,
+            "parent_ref" => "Sample#5000",
+            "labels" => ["trigger:auto-implement", "repo:ui-app"]
+          }
+        ]
+      )
+
+      out = StringIO.new
+      with_env(fake_cli.fetch(:env)) do
+        described_class.start(
+          [
+            "watch-summary",
+            "--storage-backend", "json",
+            "--storage-dir", dir,
+            "--kanban-command", "ruby",
+            "--kanban-command-arg", fake_cli.fetch(:script_path),
+            "--kanban-project", "Sample",
+            "--kanban-working-dir", dir,
+            "--kanban-trigger-label", "trigger:auto-implement",
+            "--kanban-repo-label", "repo:ui-app=repo_alpha"
+          ],
+          out: out
+        )
+      end
+
+      expect(out.string).to include("Parent review task")
+      expect(out.string).to include("Completed child")
+      expect(out.string).not_to include("(no tasks to watch)")
+    end
+  end
+
   it "uses ASCII symbols by default" do
     Dir.mktmpdir do |dir|
       task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))

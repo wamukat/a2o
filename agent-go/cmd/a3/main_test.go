@@ -4199,13 +4199,16 @@ func TestRuntimeWatchSummaryRunsContainerSummaryWithKanbanContext(t *testing.T) 
 	for _, want := range []string{
 		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 watch-summary --storage-backend json --storage-dir /var/lib/a3/test-runtime",
 		"--kanban-command python3 --kanban-command-arg /opt/a2o/share/tools/kanban/cli.py --kanban-command-arg --backend --kanban-command-arg soloboard --kanban-command-arg --base-url --kanban-command-arg http://soloboard:3000",
-		"--kanban-project A2OReferenceMultiRepo --kanban-status To do --kanban-working-dir /workspace",
+		"--kanban-project A2OReferenceMultiRepo --kanban-working-dir /workspace",
 		"--kanban-repo-label repo:catalog=repo_alpha",
 		"--kanban-repo-label repo:storefront=repo_beta",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("watch-summary missing call fragment %q in:\n%s", want, joined)
 		}
+	}
+	if strings.Contains(joined, "--kanban-status") {
+		t.Fatalf("watch-summary must not constrain the watch set to the scheduler selection status, got:\n%s", joined)
 	}
 }
 
