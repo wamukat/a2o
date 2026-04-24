@@ -4152,6 +4152,92 @@ func TestRuntimeLogsAcceptsFollowAfterTaskRef(t *testing.T) {
 	}
 }
 
+func TestRuntimeLogsFollowWaitsAcrossPhaseTransition(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		taskStatus: "Merging",
+		logManifestOutputs: []string{
+			`{"run_ref":"run-review","current_run":"run-review","phase":"parent_review","source_type":"detached_commit","source_ref":"abc","task_status":"Merging","active":false,"artifacts":[{"phase":"parent_review","artifact_id":"worker-run-review-parent-review-combined-log","mode":"combined-log"}]}`,
+			`{"run_ref":"run-merge","current_run":"run-merge","phase":"merge","source_type":"branch_head","source_ref":"refs/heads/a2o/work/Sample-42","task_status":"Merging","active":true,"artifacts":[{"phase":"parent_review","artifact_id":"worker-run-review-parent-review-combined-log","mode":"combined-log"}]}`,
+			`{"run_ref":"run-merge","current_run":"run-merge","phase":"merge","source_type":"branch_head","source_ref":"refs/heads/a2o/work/Sample-42","task_status":"Done","active":false,"artifacts":[{"phase":"parent_review","artifact_id":"worker-run-review-parent-review-combined-log","mode":"combined-log"},{"phase":"merge","artifact_id":"worker-run-merge-merge-combined-log","mode":"combined-log"}]}`,
+		},
+	}
+	var stdout bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		if err := runRuntimeLogs([]string{"--follow", "--poll-interval", "1ms", "A2O#16"}, runner, &stdout, io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	output := stdout.String()
+	if !strings.Contains(output, "=== waiting: task=A2O#16 status=Merging next phase/run ===") {
+		t.Fatalf("runtime logs should wait between runs, got:\n%s", output)
+	}
+	if !strings.Contains(output, "=== phase: merge (live) task=A2O#16 run=run-merge source=branch_head:refs/heads/a2o/work/Sample-42 ===") {
+		t.Fatalf("runtime logs should attach to the merge phase after waiting, got:\n%s", output)
+	}
+	if !strings.Contains(output, "=== phase: merge (combined-log) artifact=worker-run-merge-merge-combined-log ===") {
+		t.Fatalf("runtime logs should print merge artifact after the phase completes, got:\n%s", output)
+	}
+	if count := strings.Count(output, "artifact=worker-run-review-parent-review-combined-log"); count != 1 {
+		t.Fatalf("runtime logs should de-duplicate artifacts across polls, count=%d output:\n%s", count, output)
+	}
+}
+
+func TestRuntimeLogsFollowReturnsForQueuedTaskWithoutRun(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		taskStatus:            "todo",
+		taskWithoutCurrentRun: true,
+		logManifestOutputs: []string{
+			`{"run_ref":"","current_run":"","phase":"","source_type":"","source_ref":"","task_status":"todo","active":false,"artifacts":[]}`,
+		},
+	}
+	var stdout bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		if err := runRuntimeLogs([]string{"--follow", "--poll-interval", "1ms", "A2O#16"}, runner, &stdout, io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	if strings.Contains(stdout.String(), "=== waiting:") {
+		t.Fatalf("queued task without a run should return instead of waiting, got:\n%s", stdout.String())
+	}
+	if len(runner.logManifestOutputs) != 0 {
+		t.Fatalf("runtime logs should not poll again for queued task, remaining manifests=%d", len(runner.logManifestOutputs))
+	}
+}
+
 func TestRuntimeWatchSummaryRunsContainerSummaryWithKanbanContext(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -6068,6 +6154,7 @@ type fakeRunner struct {
 	logManifestOutput      string
 	logManifestOutputs     []string
 	watchSummaryOutput     string
+	taskStatus             string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -6156,13 +6243,17 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		if r.failShowTask {
 			return []byte("task not found\n"), errors.New("task not found")
 		}
+		taskStatus := r.taskStatus
+		if taskStatus == "" {
+			taskStatus = "blocked"
+		}
 		if r.taskWithoutCurrentRun {
-			return []byte("task A2O#16 kind=single status=blocked current_run=\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n"), nil
+			return []byte(fmt.Sprintf("task A2O#16 kind=single status=%s current_run=\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n", taskStatus)), nil
 		}
 		if r.staleCurrentRun {
-			return []byte("task A2O#16 kind=single status=blocked current_run=run-stale\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n"), nil
+			return []byte(fmt.Sprintf("task A2O#16 kind=single status=%s current_run=run-stale\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n", taskStatus)), nil
 		}
-		return []byte("task A2O#16 kind=single status=blocked current_run=run-16\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n"), nil
+		return []byte(fmt.Sprintf("task A2O#16 kind=single status=%s current_run=run-16\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n", taskStatus)), nil
 	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "runtime_latest_run"):
 		return []byte("runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation state=terminal outcome=blocked\n"), nil
 	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "phase_records"):

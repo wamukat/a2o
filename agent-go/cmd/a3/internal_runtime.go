@@ -1054,6 +1054,7 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 		printedArtifacts := map[string]bool{}
 		offsets := map[string]int64{}
 		lastLiveKey := ""
+		lastWaitingKey := ""
 		for {
 			manifest, err := runtimeTaskLogManifest(effectiveConfig, plan, runner, taskRef)
 			if err != nil {
@@ -1082,8 +1083,18 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 				}
 				offsets[livePath] = nextOffset
 			}
-			if !*follow || !manifest.Active || manifest.CurrentRunRef == "" || manifest.CurrentPhase == "" {
+			if !*follow {
 				return nil
+			}
+			if !manifest.Active || manifest.CurrentRunRef == "" || manifest.CurrentPhase == "" {
+				if !runtimeLogsShouldKeepFollowing(manifest.TaskStatus) {
+					return nil
+				}
+				waitingKey := manifest.TaskStatus + "|" + manifest.CurrentRunRef + "|" + manifest.CurrentPhase
+				if waitingKey != lastWaitingKey {
+					fmt.Fprintf(stdout, "=== waiting: task=%s status=%s next phase/run ===\n", taskRef, valueOrUnavailable(manifest.TaskStatus))
+					lastWaitingKey = waitingKey
+				}
 			}
 			time.Sleep(*pollInterval)
 		}
@@ -1632,6 +1643,7 @@ type runtimeTaskLogManifestPayload struct {
 	Phase      string                    `json:"phase"`
 	SourceType string                    `json:"source_type"`
 	SourceRef  string                    `json:"source_ref"`
+	TaskStatus string                    `json:"task_status"`
 	Active     bool                      `json:"active"`
 	Artifacts  []runtimePhaseLogArtifact `json:"artifacts"`
 }
@@ -1642,6 +1654,7 @@ type runtimeTaskLogSnapshot struct {
 	CurrentPhase       string
 	SourceType         string
 	SourceRef          string
+	TaskStatus         string
 	Active             bool
 	LiveMode           string
 	CompletedArtifacts []runtimePhaseLogArtifact
@@ -1653,16 +1666,20 @@ func runtimeTaskLogManifest(config runtimeInstanceConfig, plan runtimeRunOncePla
 		return runtimeTaskLogSnapshot{}, err
 	}
 	currentRunRef := parseOutputValue(taskOutput, "current_run")
+	taskStatus := parseOutputValue(taskOutput, "status")
 	script := strings.Join([]string{
 		"records = JSON.parse(File.read(ARGV.fetch(0)))",
 		"task_ref = ARGV.fetch(1)",
 		"current_run = ARGV.fetch(2)",
+		"task_status = ARGV.fetch(3)",
+		"task_runs = records.values.select { |record| record['task_ref'] == task_ref }",
 		"run = records[current_run] unless current_run.empty?",
-		"run ||= records.values.select { |record| record['task_ref'] == task_ref }.last",
+		"run = nil unless run.nil? || run['task_ref'] == task_ref",
+		"run ||= task_runs.last",
 		"effective_current_run = current_run",
-		"if run.nil? then puts JSON.generate({'run_ref' => '', 'current_run' => effective_current_run, 'phase' => '', 'source_type' => '', 'source_ref' => '', 'active' => false, 'artifacts' => []}); exit 0 end",
+		"if run.nil? then puts JSON.generate({'run_ref' => '', 'current_run' => effective_current_run, 'phase' => '', 'source_type' => '', 'source_ref' => '', 'task_status' => task_status, 'active' => false, 'artifacts' => []}); exit 0 end",
 		"effective_current_run = run['ref'].to_s if effective_current_run.empty? || effective_current_run != run['ref'].to_s",
-		"phase_records = Array(run.dig('evidence', 'phase_records'))",
+		"phase_records = task_runs.flat_map { |record| Array(record.dig('evidence', 'phase_records')) }",
 		"artifacts = phase_records.each_with_object([]) do |phase_record, result|",
 		"  entries = Array(phase_record.dig('execution_record', 'diagnostics', 'agent_artifacts'))",
 		"  [['ai-raw-log', 'ai-raw-log'], ['combined-log', 'combined-log']].each do |role, mode|",
@@ -1671,10 +1688,10 @@ func runtimeTaskLogManifest(config runtimeInstanceConfig, plan runtimeRunOncePla
 		"    result << {'phase' => phase_record['phase'].to_s, 'artifact_id' => artifact['artifact_id'].to_s, 'mode' => mode}",
 		"  end",
 		"end",
-		"payload = {'run_ref' => run['ref'].to_s, 'current_run' => effective_current_run, 'phase' => run['phase'].to_s, 'source_type' => run.dig('source_descriptor', 'source_type').to_s, 'source_ref' => run.dig('source_descriptor', 'ref').to_s, 'active' => run['terminal_outcome'].nil?, 'artifacts' => artifacts}",
+		"payload = {'run_ref' => run['ref'].to_s, 'current_run' => effective_current_run, 'phase' => run['phase'].to_s, 'source_type' => run.dig('source_descriptor', 'source_type').to_s, 'source_ref' => run.dig('source_descriptor', 'ref').to_s, 'task_status' => task_status, 'active' => run['terminal_outcome'].nil?, 'artifacts' => artifacts}",
 		"puts JSON.generate(payload)",
 	}, "; ")
-	output, err := dockerComposeExecOutput(config, plan, runner, "ruby", "-rjson", "-e", script, path.Join(plan.StorageDir, "runs.json"), taskRef, currentRunRef)
+	output, err := dockerComposeExecOutput(config, plan, runner, "ruby", "-rjson", "-e", script, path.Join(plan.StorageDir, "runs.json"), taskRef, currentRunRef, taskStatus)
 	if err != nil {
 		return runtimeTaskLogSnapshot{}, err
 	}
@@ -1688,10 +1705,20 @@ func runtimeTaskLogManifest(config runtimeInstanceConfig, plan runtimeRunOncePla
 		CurrentPhase:       payload.Phase,
 		SourceType:         payload.SourceType,
 		SourceRef:          payload.SourceRef,
+		TaskStatus:         firstNonEmpty(payload.TaskStatus, taskStatus),
 		Active:             payload.Active,
 		LiveMode:           preferredLiveMode(plan, taskRef, payload.Phase),
 		CompletedArtifacts: payload.Artifacts,
 	}, nil
+}
+
+func runtimeLogsShouldKeepFollowing(taskStatus string) bool {
+	switch strings.ToLower(strings.TrimSpace(taskStatus)) {
+	case "in_progress", "in review", "in_review", "verifying", "merging":
+		return true
+	default:
+		return false
+	}
 }
 
 func printRuntimeArtifactSection(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, phase string, artifactID string, mode string) error {

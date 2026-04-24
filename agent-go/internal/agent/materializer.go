@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -164,7 +165,7 @@ func (m WorkspaceMaterializer) Merge(request MergeRequest) (WorkspaceDescriptor,
 	if err := executeMergePlans(plans, request.Policy); err != nil {
 		return descriptor, failedMergeExecution(err)
 	}
-	return descriptor, ExecutionResult{Status: "succeeded", ExitCode: intPtr(0), CombinedLog: []byte("A2O agent merge completed\n")}
+	return descriptor, successfulMergeExecution(request, descriptor)
 }
 
 func (m WorkspaceMaterializer) RecoverMerge(request MergeRecoveryRequest) (WorkspaceDescriptor, ExecutionResult) {
@@ -674,6 +675,39 @@ func branchNameMust(ref string) string {
 
 func failedMergeExecution(err error) ExecutionResult {
 	return ExecutionResult{Status: "failed", ExitCode: intPtr(1), CombinedLog: []byte("A2O agent merge failed: " + err.Error() + "\n")}
+}
+
+func successfulMergeExecution(request MergeRequest, descriptor WorkspaceDescriptor) ExecutionResult {
+	var log bytes.Buffer
+	fmt.Fprintf(&log, "A2O agent merge completed\n")
+	fmt.Fprintf(&log, "workspace_id=%s policy=%s slots=%d\n", request.WorkspaceID, request.Policy, len(descriptor.SlotDescriptors))
+	slotNames := make([]string, 0, len(descriptor.SlotDescriptors))
+	for slotName := range descriptor.SlotDescriptors {
+		slotNames = append(slotNames, slotName)
+	}
+	sort.Strings(slotNames)
+	for _, slotName := range slotNames {
+		slot := descriptor.SlotDescriptors[slotName]
+		fmt.Fprintf(
+			&log,
+			"slot=%s status=%s source=%s target=%s before=%s after=%s\n",
+			slotName,
+			logValue(slot["merge_status"]),
+			logValue(slot["merge_source_ref"]),
+			logValue(slot["merge_target_ref"]),
+			logValue(slot["merge_before_head"]),
+			logValue(slot["merge_after_head"]),
+		)
+	}
+	return ExecutionResult{Status: "succeeded", ExitCode: intPtr(0), CombinedLog: log.Bytes()}
+}
+
+func logValue(value any) string {
+	text := strings.TrimSpace(fmt.Sprint(value))
+	if text == "" || text == "<nil>" {
+		return "unavailable"
+	}
+	return text
 }
 
 func intPtr(value int) *int {

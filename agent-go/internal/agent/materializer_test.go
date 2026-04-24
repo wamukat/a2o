@@ -698,6 +698,16 @@ func TestWorkspaceMaterializerMergesBranchRefs(t *testing.T) {
 	if slot["merge_status"] != "merged" || slot["project_repo_mutator"] != "a2o-agent" {
 		t.Fatalf("missing agent merge evidence: %#v", slot)
 	}
+	mergeLog := string(execution.CombinedLog)
+	for _, want := range []string{
+		"A2O agent merge completed",
+		"workspace_id=merge-Sample-42 policy=ff_only slots=1",
+		"slot=repo_alpha status=merged source=refs/heads/a3/work/Sample-42 target=refs/heads/a3/live",
+	} {
+		if !strings.Contains(mergeLog, want) {
+			t.Fatalf("merge log missing %q in:\n%s", want, mergeLog)
+		}
+	}
 	if out := git(t, sourceRoot, "worktree", "list", "--porcelain"); strings.Contains(out, "merge-Sample-42") {
 		t.Fatalf("merge worktree leaked: %s", out)
 	}
