@@ -16,7 +16,7 @@ A2O 0.5.28 で現在利用できる公開機能と検証範囲を示す。
 - ランタイムコンテナの起動・停止: `a2o runtime up`、`down`
 - 手動でのランタイム実行: `a2o runtime run-once`、`a2o runtime loop`
 - 常駐スケジューラの再開・停止予約・状態確認: `a2o runtime resume`、`pause`、`status`
-- ランタイム診断・復旧: `a2o runtime image-digest`、`doctor`、`watch-summary`、`logs <task-ref>`、`describe-task <task-ref>`、`reset-task <task-ref>`、`show-artifact <artifact-id>`
+- ランタイム診断・復旧: `a2o runtime image-digest`、`doctor`、`watch-summary`、`logs <task-ref>`、`describe-task <task-ref>`、`skill-feedback list`、`reset-task <task-ref>`、`show-artifact <artifact-id>`
 - アップグレード診断: `a2o upgrade check`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
 - agent server 接続向けの project runtime 調整項目: `runtime.agent_control_plane_connect_timeout`、`runtime.agent_control_plane_request_timeout`、`runtime.agent_control_plane_retry_count`、`runtime.agent_control_plane_retry_delay`

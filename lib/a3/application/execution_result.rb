@@ -47,6 +47,20 @@ module A3
         nil
       end
 
+      def skill_feedback
+        return [] unless response_bundle.is_a?(Hash)
+
+        value = response_bundle["skill_feedback"]
+        case value
+        when Hash
+          [value]
+        when Array
+          value.select { |entry| entry.is_a?(Hash) }
+        else
+          []
+        end
+      end
+
       def with_diagnostics(value)
         self.class.new(
           success: success?,

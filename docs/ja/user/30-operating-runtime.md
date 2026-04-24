@@ -45,9 +45,10 @@ a2o runtime status
 a2o runtime watch-summary
 a2o runtime logs <task-ref> --follow
 a2o runtime clear-logs --task-ref <task-ref>
+a2o runtime skill-feedback list
 ```
 
-`runtime status` はスケジューラ、ランタイムコンテナ、カンバン、イメージダイジェスト、最新実行の状態を見る。`runtime watch-summary` はタスク一覧の現在位置を見る。`runtime logs` は 1 タスクのフェーズ別ログをまとめて読み、AI raw log があればそれを優先して表示する。`--follow` を付けると現在フェーズの AI raw live log を優先して追い、未対応 worker では従来の live log にフォールバックする。`runtime clear-logs` は永続化された分析用ログを明示的に整理するコマンドで、デフォルトは dry-run、実削除は `--apply` 指定時だけである。
+`runtime status` はスケジューラ、ランタイムコンテナ、カンバン、イメージダイジェスト、最新実行の状態を見る。`runtime watch-summary` はタスク一覧の現在位置を見る。`runtime logs` は 1 タスクのフェーズ別ログをまとめて読み、AI raw log があればそれを優先して表示する。`--follow` を付けると現在フェーズの AI raw live log を優先して追い、未対応 worker では従来の live log にフォールバックする。`runtime skill-feedback list` は worker が報告した再利用可能な skill 改善候補を一覧表示する。`runtime clear-logs` は永続化された分析用ログを明示的に整理するコマンドで、デフォルトは dry-run、実削除は `--apply` 指定時だけである。
 
 特定タスクを深く見る場合は `describe-task` を使う。
 
@@ -55,7 +56,7 @@ a2o runtime clear-logs --task-ref <task-ref>
 a2o runtime describe-task <task-ref>
 ```
 
-`describe-task` は実行、フェーズ、ワークスペース、証跡、カンバンコメント、ログの手がかり、エージェント成果物の読み方をまとめて表示する。
+`describe-task` は実行、フェーズ、ワークスペース、証跡、カンバンコメント、ログの手がかり、skill feedback 要約、エージェント成果物の読み方をまとめて表示する。
 
 prompt / skill / worker command の改善に使うため、A2O は次の分析用 artifact を永続化する。
 
@@ -165,5 +166,6 @@ a2o runtime status
 | タスク一覧の進行状況を見る | `a2o runtime watch-summary` |
 | 1 タスクのログをまとめて見る | `a2o runtime logs <task-ref>` |
 | 1 タスクの実行 / 証跡 / ログを見る | `a2o runtime describe-task <task-ref>` |
+| 再利用可能な skill 改善候補を見る | `a2o runtime skill-feedback list` |
 
 ブロックされたタスク、未整理のリポジトリ、実行コマンドの失敗、検証失敗などの症状別対応は [40-troubleshooting.md](40-troubleshooting.md) を読む。

@@ -223,6 +223,84 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
+  it "accepts and normalizes structured skill feedback without changing successful worker flow" do
+    result = described_class.new(
+      repo_scope_aliases: { "repo:both" => "both" },
+      review_disposition_repo_scopes: %w[repo_alpha repo_beta both]
+    ).build_execution_result(
+      {
+        "success" => true,
+        "summary" => "worker completed",
+        "task_ref" => task.ref,
+        "run_ref" => implementation_run.ref,
+        "phase" => "implementation",
+        "rework_required" => false,
+        "changed_files" => { "repo_beta" => ["marker.txt"] },
+        "review_disposition" => {
+          "kind" => "completed",
+          "repo_scope" => "repo_beta",
+          "summary" => "self-review clean",
+          "description" => "No findings.",
+          "finding_key" => "none"
+        },
+        "skill_feedback" => {
+          "schema" => "a2o-skill-feedback/v1",
+          "category" => "missing_context",
+          "summary" => "Add fixture update guidance before verification.",
+          "repo_scope" => "repo:both",
+          "skill_path" => "skills/implementation/base.md",
+          "proposal" => {
+            "target" => "project_skill",
+            "suggested_patch" => "Check fixture update command before running verification."
+          },
+          "confidence" => "medium"
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: implementation_run.ref,
+      expected_phase: :implementation,
+      canonical_changed_files: { "repo_beta" => ["marker.txt"] }
+    )
+
+    expect(result).to have_attributes(success?: true)
+    expect(result.skill_feedback.first).to include(
+      "category" => "missing_context",
+      "repo_scope" => "both",
+      "summary" => "Add fixture update guidance before verification."
+    )
+  end
+
+  it "rejects malformed skill feedback when present" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => false,
+        "summary" => "worker failed",
+        "task_ref" => task.ref,
+        "run_ref" => run.ref,
+        "phase" => "review",
+        "rework_required" => false,
+        "failing_command" => "review_worker",
+        "observed_state" => "invalid feedback",
+        "skill_feedback" => {
+          "category" => "missing_context",
+          "proposal" => {}
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: run.ref,
+      expected_phase: :review
+    )
+
+    expect(result).to have_attributes(success?: false)
+    expect(result.summary).to eq("worker result schema invalid")
+    expect(result.diagnostics.fetch("validation_errors")).to include(
+      "skill_feedback[0].summary must be a string",
+      "skill_feedback[0].proposal.target must be a string"
+    )
+  end
+
   def implementation_run
     A3::Domain::Run.new(
       ref: "run-implementation-1",

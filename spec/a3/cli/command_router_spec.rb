@@ -25,6 +25,7 @@ RSpec.describe A3::CLI::CommandRouter do
       expect(described_class.session_kind_for("reconcile-merge-recovery")).to eq(:storage)
       expect(described_class.session_kind_for("show-blocked-diagnosis")).to eq(:storage_runtime_package)
       expect(described_class.session_kind_for("show-run")).to eq(:storage_runtime_package)
+      expect(described_class.session_kind_for("skill-feedback-list")).to eq(:storage)
       expect(described_class.session_kind_for("watch-summary")).to eq(:storage)
       expect(described_class.session_kind_for("clear-runtime-logs")).to eq(:storage)
       expect(described_class.session_kind_for("show-project-context")).to eq(:manifest)

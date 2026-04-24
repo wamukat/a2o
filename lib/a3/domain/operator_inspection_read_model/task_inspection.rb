@@ -6,8 +6,8 @@ module A3
       module TaskInspection
         module_function
 
-        def from_task(task:, tasks:)
-          TaskView.from_task(task: task, tasks: tasks)
+        def from_task(task:, tasks:, skill_feedback: [])
+          TaskView.from_task(task: task, tasks: tasks, skill_feedback: skill_feedback)
         end
       end
     end

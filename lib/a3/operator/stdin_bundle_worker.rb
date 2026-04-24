@@ -135,7 +135,8 @@ def bundle_for(request)
           "For implementation success, include changed_files as an object like {\"repo_alpha\": [\"src/main.rb\"]} using only relative paths under each slot.",
           "For implementation success, you may include review_disposition when the final self-review is clean.",
           "For review failures caused by findings, include rework_required=true.",
-          "For parent review, include review_disposition with kind, repo_scope, summary, description, and finding_key."
+          "For parent review, include review_disposition with kind, repo_scope, summary, description, and finding_key.",
+          "Optionally include skill_feedback when this run revealed reusable project or A2O skill guidance. Use category, summary, proposal.target, and optional repo_scope, skill_path, confidence, evidence, and proposal.suggested_patch. Do not edit skill files directly from this field."
         ]
       },
       "operating_contract" => {
@@ -163,7 +164,8 @@ def response_schema(request)
     "summary" => { "type" => "string" },
     "failing_command" => { "type" => ["string", "null"] },
     "observed_state" => { "type" => ["string", "null"] },
-    "rework_required" => { "type" => "boolean" }
+    "rework_required" => { "type" => "boolean" },
+    "skill_feedback" => skill_feedback_schema
   }
   required_fields = [
     "task_ref",
@@ -216,6 +218,43 @@ def response_schema(request)
     "properties" => properties,
     "required" => required_fields,
     "additionalProperties" => false
+  }
+end
+
+def skill_feedback_schema
+  feedback_entry = {
+    "type" => "object",
+    "properties" => {
+      "schema" => { "type" => "string" },
+      "phase" => { "type" => "string" },
+      "repo_scope" => { "type" => "string" },
+      "skill_path" => { "type" => "string" },
+      "category" => { "type" => "string" },
+      "summary" => { "type" => "string" },
+      "evidence" => { "type" => "object" },
+      "proposal" => {
+        "type" => "object",
+        "properties" => {
+          "target" => { "type" => "string" },
+          "suggested_patch" => { "type" => "string" }
+        },
+        "required" => ["target"],
+        "additionalProperties" => true
+      },
+      "confidence" => { "type" => "string" }
+    },
+    "required" => %w[category summary proposal],
+    "additionalProperties" => true
+  }
+  {
+    "anyOf" => [
+      feedback_entry,
+      {
+        "type" => "array",
+        "items" => feedback_entry
+      },
+      { "type" => "null" }
+    ]
   }
 end
 
@@ -391,6 +430,7 @@ def validate_payload(payload, request:)
   end
 
   errors << "diagnostics must be an object" if payload.key?("diagnostics") && !payload["diagnostics"].is_a?(Hash)
+  validate_skill_feedback(payload["skill_feedback"]).each { |error| errors << error } if payload.key?("skill_feedback")
   if payload.key?("changed_files")
     changed_files = payload["changed_files"]
     unless changed_files.nil? || changed_files.is_a?(Hash)
@@ -445,10 +485,69 @@ end
 
 def normalize_payload!(payload)
   disposition = payload["review_disposition"]
-  return unless disposition.is_a?(Hash)
+  needs_aliases = disposition.is_a?(Hash) || skill_feedback_entries(payload["skill_feedback"]).any? { |entry| entry.is_a?(Hash) && entry["repo_scope"].is_a?(String) }
+  return unless needs_aliases
 
   aliases = review_disposition_repo_scope_aliases
+  normalize_skill_feedback!(payload, aliases: aliases)
+  return unless disposition.is_a?(Hash)
+
   disposition["repo_scope"] = aliases.fetch(disposition["repo_scope"], disposition["repo_scope"])
+end
+
+def normalize_skill_feedback!(payload, aliases:)
+  skill_feedback_entries(payload["skill_feedback"]).each do |entry|
+    next unless entry.is_a?(Hash) && entry["repo_scope"].is_a?(String)
+
+    entry["repo_scope"] = aliases.fetch(entry["repo_scope"], entry["repo_scope"])
+  end
+end
+
+def skill_feedback_entries(value)
+  case value
+  when Hash
+    [value]
+  when Array
+    value
+  else
+    []
+  end
+end
+
+def validate_skill_feedback(value)
+  return [] if value.nil?
+
+  entries =
+    case value
+    when Hash
+      [value]
+    when Array
+      value
+    else
+      return ["skill_feedback must be an object, array of objects, or null when present"]
+    end
+
+  entries.each_with_index.flat_map do |entry, index|
+    validate_skill_feedback_entry(entry, index)
+  end
+end
+
+def validate_skill_feedback_entry(entry, index)
+  prefix = "skill_feedback[#{index}]"
+  return ["#{prefix} must be an object"] unless entry.is_a?(Hash)
+
+  errors = []
+  errors << "#{prefix}.category must be a string" unless entry["category"].is_a?(String)
+  errors << "#{prefix}.summary must be a string" unless entry["summary"].is_a?(String)
+  errors << "#{prefix}.proposal must be an object" unless entry["proposal"].is_a?(Hash)
+  if entry["proposal"].is_a?(Hash) && !entry.dig("proposal", "target").is_a?(String)
+    errors << "#{prefix}.proposal.target must be a string"
+  end
+  %w[schema phase repo_scope skill_path confidence].each do |field|
+    errors << "#{prefix}.#{field} must be a string when present" if entry.key?(field) && !entry[field].is_a?(String)
+  end
+  errors << "#{prefix}.evidence must be an object when present" if entry.key?("evidence") && !entry["evidence"].is_a?(Hash)
+  errors
 end
 
 def load_payload(result_path)

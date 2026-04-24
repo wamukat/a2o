@@ -259,6 +259,7 @@ module A3
         if worker_response.key?("diagnostics") && !diagnostics.is_a?(Hash)
           errors << "diagnostics must be an object"
         end
+        validate_skill_feedback(worker_response["skill_feedback"]).each { |error| errors << error } if worker_response.key?("skill_feedback")
         unless [true, false].include?(worker_response["rework_required"])
           errors << "rework_required must be true or false"
         end
@@ -287,9 +288,65 @@ module A3
 
       def normalize_worker_response!(worker_response)
         disposition = worker_response["review_disposition"]
+        normalize_skill_feedback!(worker_response)
         return unless disposition.is_a?(Hash)
 
         disposition["repo_scope"] = @repo_scope_aliases.fetch(disposition["repo_scope"], disposition["repo_scope"])
+      end
+
+      def normalize_skill_feedback!(worker_response)
+        value = worker_response["skill_feedback"]
+        entries =
+          case value
+          when Hash
+            [value]
+          when Array
+            value
+          else
+            return
+          end
+
+        entries.each do |entry|
+          next unless entry.is_a?(Hash)
+
+          entry["repo_scope"] = @repo_scope_aliases.fetch(entry["repo_scope"], entry["repo_scope"]) if entry["repo_scope"].is_a?(String)
+        end
+      end
+
+      def validate_skill_feedback(value)
+        return [] if value.nil?
+
+        entries =
+          case value
+          when Hash
+            [value]
+          when Array
+            value
+          else
+            return ["skill_feedback must be an object, array of objects, or null when present"]
+          end
+
+        entries.each_with_index.flat_map do |entry, index|
+          validate_skill_feedback_entry(entry, index)
+        end
+      end
+
+      def validate_skill_feedback_entry(entry, index)
+        prefix = "skill_feedback[#{index}]"
+        return ["#{prefix} must be an object"] unless entry.is_a?(Hash)
+
+        errors = []
+        errors << "#{prefix}.category must be a string" unless entry["category"].is_a?(String)
+        errors << "#{prefix}.summary must be a string" unless entry["summary"].is_a?(String)
+        errors << "#{prefix}.proposal must be an object" unless entry["proposal"].is_a?(Hash)
+        if entry["proposal"].is_a?(Hash) && !entry.dig("proposal", "target").is_a?(String)
+          errors << "#{prefix}.proposal.target must be a string"
+        end
+        %w[schema phase repo_scope skill_path confidence].each do |field|
+          errors << "#{prefix}.#{field} must be a string when present" if entry.key?(field) && !entry[field].is_a?(String)
+        end
+        errors << "#{prefix}.evidence must be an object when present" if entry.key?("evidence") && !entry["evidence"].is_a?(Hash)
+        errors
       end
 
       def normalize_repo_scope_aliases(repo_scope_aliases)

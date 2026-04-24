@@ -22,6 +22,24 @@ module A3
             task.topology.children.each do |child|
               result << "child=#{child.ref} status=#{child.status} current_run=#{child.current_run_ref}"
             end
+            append_skill_feedback_lines(result, task.skill_feedback)
+          end
+        end
+
+        def append_skill_feedback_lines(result, feedback_entries)
+          Array(feedback_entries).each do |feedback|
+            next unless feedback.is_a?(Hash)
+
+            proposal = feedback["proposal"].is_a?(Hash) ? feedback["proposal"] : {}
+            parts = [
+              "category=#{FormattingHelpers.diagnostic_value(feedback['category'])}",
+              "target=#{FormattingHelpers.diagnostic_value(proposal['target'])}"
+            ]
+            parts << "repo_scope=#{FormattingHelpers.diagnostic_value(feedback['repo_scope'])}" if feedback["repo_scope"]
+            parts << "skill_path=#{FormattingHelpers.diagnostic_value(feedback['skill_path'])}" if feedback["skill_path"]
+            parts << "confidence=#{FormattingHelpers.diagnostic_value(feedback['confidence'])}" if feedback["confidence"]
+            result << "skill_feedback #{parts.join(' ')}"
+            result << "skill_feedback_summary=#{feedback['summary']}" if feedback["summary"]
           end
         end
       end

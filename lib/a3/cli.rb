@@ -611,6 +611,36 @@ module A3
       end
     end
 
+    def handle_skill_feedback_list(argv, out:, run_id_generator:, command_runner:, merge_runner:)
+      with_storage_container(
+        argv: argv,
+        parse_with: :parse_skill_feedback_list_options,
+        run_id_generator: run_id_generator,
+        command_runner: command_runner,
+        merge_runner: merge_runner
+      ) do |_options, container|
+        entries = container.fetch(:list_skill_feedback).call
+        if entries.empty?
+          out.puts("skill_feedback=none")
+        else
+          entries.each do |entry|
+            parts = [
+              "task=#{entry.task_ref}",
+              "run=#{entry.run_ref}",
+              "phase=#{entry.phase}",
+              "category=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.category)}",
+              "target=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.target)}"
+            ]
+            parts << "repo_scope=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.repo_scope)}" if entry.repo_scope
+            parts << "skill_path=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.skill_path)}" if entry.skill_path
+            parts << "confidence=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.confidence)}" if entry.confidence
+            out.puts("skill_feedback #{parts.join(' ')}")
+            out.puts("skill_feedback_summary=#{entry.summary}") if entry.summary
+          end
+        end
+      end
+    end
+
     def handle_watch_summary(argv, out:, run_id_generator:, command_runner:, merge_runner:)
       options = parse_storage_options(argv)
       repositories = build_watch_summary_repositories(options: options)
@@ -1520,6 +1550,20 @@ module A3
       remaining = parser.parse(argv)
       options[:run_ref] = remaining.fetch(0)
       options[:manifest_path] = File.expand_path(remaining.fetch(1))
+      options
+    end
+
+    def parse_skill_feedback_list_options(argv)
+      options = {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        repo_sources: {}
+      }
+      parser = OptionParser.new
+      parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      parser.parse(argv)
       options
     end
 

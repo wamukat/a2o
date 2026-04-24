@@ -88,6 +88,16 @@ Terminal workspace cleanup is separate from evidence retention. A2O may remove d
 
 Analysis artifacts used for prompt / skill / executor PDCA are also separate from workspace cleanup. `combined-log`, `ai-raw-log`, and `execution-metadata` are persisted as durable agent artifacts so operators can inspect AI behavior after the workspace is gone. They are not removed by default TTL cleanup; operators clear them explicitly through `a2o runtime clear-logs`.
 
+When an agent finds reusable implementation or review knowledge, it may include optional `skill_feedback` in the worker result. This is not an instruction to rewrite skill files automatically. It is a structured improvement candidate for later adoption. A2O keeps `skill_feedback` attached to the task, run, phase, and evidence so operators can inspect it through `a2o runtime describe-task <task-ref>` and cross-run listings.
+
+`skill_feedback` must make the target boundary explicit.
+
+- `proposal.target=project_skill`: candidate for a skill in the project package.
+- `proposal.target=a2o_preset`: candidate for an A2O preset after the pattern proves useful across projects.
+- `proposal.target=unknown`: candidate whose destination is not yet clear.
+
+A2O does not update skill files automatically. The feedback should become a ticket body, reviewed draft patch, or operator decision. Runtime log cleanup may clear `combined-log`, `ai-raw-log`, and `execution-metadata`, but the `skill_feedback` summary stored in evidence remains part of execution diagnosis.
+
 Generated state belongs under `.work/a2o/` unless it is internal workspace metadata.
 
 ## Traceability Boundary
@@ -98,6 +108,7 @@ For operator diagnosis, A2O treats these layers differently:
   - run and phase state
   - blocked diagnosis
   - the evidence summary shown by `describe-task`
+  - skill feedback summaries
   - agent artifacts such as `combined-log` and worker results
   - kanban comments
 - supporting logs kept for diagnosis:

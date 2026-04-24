@@ -605,13 +605,28 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
       current_run_ref: "run-1",
       parent_ref: parent.ref
     )
-    task_view = A3::Domain::OperatorInspectionReadModel::TaskView.from_task(task: child, tasks: [parent, child])
+    task_view = A3::Domain::OperatorInspectionReadModel::TaskView.from_task(
+      task: child,
+      tasks: [parent, child],
+      skill_feedback: [
+        {
+          "category" => "missing_context",
+          "summary" => "Add fixture update workflow.",
+          "repo_scope" => "repo_alpha",
+          "skill_path" => "skills/implementation/base.md",
+          "proposal" => { "target" => "project_skill" },
+          "confidence" => "medium"
+        }
+      ]
+    )
 
     result = described_class.task_lines(task_view)
 
     expect(result).to include("task A3-v2#child kind=child status=blocked current_run=run-1")
     expect(result).to include("runnable_reason=already_running")
     expect(result).to include("parent=A3-v2#parent status=in_review current_run=")
+    expect(result).to include("skill_feedback category=missing_context target=project_skill repo_scope=repo_alpha skill_path=skills/implementation/base.md confidence=medium")
+    expect(result).to include("skill_feedback_summary=Add fixture update workflow.")
   end
 
   it "formats run lines through the run formatter" do
@@ -690,7 +705,20 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
           workspace_hook: "sample-bootstrap",
           merge_target: :merge_to_parent,
           merge_policy: :ff_only
-        )
+        ),
+          skill_feedback: [
+            {
+              "category" => "review_gap",
+              "summary" => "Add repo-beta materialization check to review skill.",
+              "repo_scope" => "repo_alpha",
+              "skill_path" => "skills/review/default.md",
+              "proposal" => {
+                "target" => "project_skill",
+                "suggested_patch" => "Check slot materialization before review."
+              },
+              "confidence" => "high"
+            }
+          ]
       )
     )
     run_view = A3::Domain::OperatorInspectionReadModel::RunView.from_run(
@@ -704,6 +732,9 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     expect(result).to include("workspace_model=runtime_workspace is a logical phase workspace kind; inspect runtime_package_materialization_model for physical isolation")
     expect(result).to include("latest_execution phase=verification summary=review launch could not resolve runtime workspace")
     expect(result).to include("worker_response_bundle={\"success\"=>false, \"summary\"=>\"review blocked\", \"failing_command\"=>\"codex exec --json -\", \"observed_state\"=>\"repo-beta missing\"}")
+    expect(result).to include("skill_feedback category=review_gap target=project_skill repo_scope=repo_alpha skill_path=skills/review/default.md confidence=high")
+    expect(result).to include("skill_feedback_summary=Add repo-beta materialization check to review skill.")
+    expect(result).to include("skill_feedback_suggested_patch=Check slot materialization before review.")
     expect(result).to include("runtime_package_action=inspect_runtime_package")
     expect(result).to include("runtime_package_guidance=run doctor-runtime and inspect repo sources, secret delivery, and scheduler store migration before rerun")
     expect(result).to include("runtime merge_target=merge_to_parent merge_policy=ff_only")

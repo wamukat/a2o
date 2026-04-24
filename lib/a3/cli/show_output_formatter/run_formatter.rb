@@ -85,6 +85,7 @@ module A3
           append_agent_job_timing_lines(result, execution.diagnostics)
           result << "verification_summary=#{execution.verification_summary}" if execution.verification_summary
           append_review_disposition_lines(result, execution.review_disposition)
+          append_skill_feedback_lines(result, execution.skill_feedback)
           append_inherited_parent_lines(result, execution.diagnostics)
           result << "failing_command=#{FormattingHelpers.diagnostic_value(execution.failing_command)}" if execution.failing_command
           result << "observed_state=#{execution.observed_state}" if execution.observed_state
@@ -156,6 +157,24 @@ module A3
           result << "review_disposition kind=#{review_disposition['kind']} repo_scope=#{review_disposition['repo_scope']} finding_key=#{review_disposition['finding_key']}"
           result << "review_disposition_summary=#{review_disposition['summary']}" if review_disposition["summary"]
           result << "review_disposition_description=#{review_disposition['description']}" if review_disposition["description"]
+        end
+
+        def append_skill_feedback_lines(result, feedback_entries)
+          Array(feedback_entries).each do |feedback|
+            next unless feedback.is_a?(Hash)
+
+            proposal = feedback["proposal"].is_a?(Hash) ? feedback["proposal"] : {}
+            parts = [
+              "category=#{FormattingHelpers.diagnostic_value(feedback['category'])}",
+              "target=#{FormattingHelpers.diagnostic_value(proposal['target'])}"
+            ]
+            parts << "repo_scope=#{FormattingHelpers.diagnostic_value(feedback['repo_scope'])}" if feedback["repo_scope"]
+            parts << "skill_path=#{FormattingHelpers.diagnostic_value(feedback['skill_path'])}" if feedback["skill_path"]
+            parts << "confidence=#{FormattingHelpers.diagnostic_value(feedback['confidence'])}" if feedback["confidence"]
+            result << "skill_feedback #{parts.join(' ')}"
+            result << "skill_feedback_summary=#{feedback['summary']}" if feedback["summary"]
+            result << "skill_feedback_suggested_patch=#{proposal['suggested_patch']}" if proposal["suggested_patch"]
+          end
         end
 
         def append_latest_blocked_lines(result, diagnosis)

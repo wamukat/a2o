@@ -102,6 +102,12 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
+	case "skill-feedback":
+		if err := runRuntimeSkillFeedback(args[1:], runner, stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
 	case "logs":
 		if err := runRuntimeLogs(args[1:], runner, stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)
@@ -922,6 +928,43 @@ func runRuntimeWatchSummary(args []string, runner commandRunner, stdout io.Write
 			return nil
 		}
 		fmt.Fprintln(stdout, overlaySchedulerWatchSummaryState(output, paths, runner))
+		return nil
+	})
+}
+
+func runRuntimeSkillFeedback(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	if len(args) == 0 || args[0] != "list" {
+		return fmt.Errorf("usage: a2o runtime skill-feedback list")
+	}
+	flags := flag.NewFlagSet("a2o runtime skill-feedback list", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	if err := flags.Parse(args[1:]); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+
+	config, _, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	return withComposeEnv(effectiveConfig, func() error {
+		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
+		if err != nil {
+			return err
+		}
+		output, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "skill_feedback", "a3", "skill-feedback-list", "--storage-backend", "json", "--storage-dir", plan.StorageDir)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(output) != "" {
+			fmt.Fprint(stdout, output)
+			if !strings.HasSuffix(output, "\n") {
+				fmt.Fprintln(stdout)
+			}
+		}
 		return nil
 	})
 }

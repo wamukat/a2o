@@ -348,6 +348,54 @@ RSpec.describe "worker:stdin-bundle" do
     expect(validate_payload(payload, request: base_request)).to eq([])
   end
 
+  it "accepts structured skill feedback in worker helper validation" do
+    payload = {
+      "task_ref" => "Sample#3112",
+      "run_ref" => "run-1",
+      "phase" => "review",
+      "success" => true,
+      "summary" => "review clean",
+      "failing_command" => nil,
+      "observed_state" => nil,
+      "rework_required" => false,
+      "skill_feedback" => {
+        "category" => "missing_context",
+        "summary" => "Add setup guidance to the project skill.",
+        "proposal" => {
+          "target" => "project_skill",
+          "suggested_patch" => "Check setup before verification."
+        },
+        "confidence" => "medium"
+      }
+    }
+    request = base_request.merge("phase" => "review")
+
+    expect(validate_payload(payload, request: request)).to eq([])
+  end
+
+  it "rejects malformed skill feedback in worker helper validation" do
+    payload = {
+      "task_ref" => "Sample#3112",
+      "run_ref" => "run-1",
+      "phase" => "review",
+      "success" => false,
+      "summary" => "review failed",
+      "failing_command" => "review_worker",
+      "observed_state" => "invalid feedback",
+      "rework_required" => false,
+      "skill_feedback" => {
+        "summary" => "missing category",
+        "proposal" => {}
+      }
+    }
+    request = base_request.merge("phase" => "review")
+
+    expect(validate_payload(payload, request: request)).to include(
+      "skill_feedback[0].category must be a string",
+      "skill_feedback[0].proposal.target must be a string"
+    )
+  end
+
   it "requires review_disposition for implementation success" do
     payload = {
       "task_ref" => "Sample#3112",

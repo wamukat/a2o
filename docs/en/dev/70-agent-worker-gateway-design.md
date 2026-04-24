@@ -58,6 +58,7 @@ Command execution records:
 - changed files when the phase publishes edits
 - declared evidence artifacts
 - structured failure reason for blocked tasks
+- optional `skill_feedback` for collecting skill improvement candidates. This is not a contract for workers to edit skill files directly.
 
 Verification commands are the project package's responsibility. The Engine only interprets success, failure, blocked reason, and evidence metadata.
 
