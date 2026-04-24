@@ -28,6 +28,8 @@ An A2O release is not complete until all of the following are true:
 2. Verify locally.
    - Run focused release verification first.
    - Run broader verification when the blast radius warrants it.
+   - For release-reference-only changes, verify with targeted commands such as version specs, CLI specs, `git diff --check`, and stale-version searches; do not rerun the full suite after every small follow-up unless behavior changed or the previous full-suite result is stale.
+   - Run the full suite once before tagging when the release candidate includes behavior changes or accumulated unreleased work warrants it. If a later review fix only touches release metadata, workflow constants, docs, or CLI help text, repeat only the focused checks that cover that fix.
    - Do not tag or publish until the release candidate is locally sound.
 
 3. Commit and review.
@@ -42,6 +44,7 @@ An A2O release is not complete until all of the following are true:
 
 5. Confirm runtime publish.
    - Wait for the publish workflow to complete.
+   - Prefer concise polling with `gh run view <run-id> --json status,conclusion,url,headSha` at reasonable intervals. Use `gh run watch` only when step-level live output is needed for diagnosis, because it can flood the transcript without making the release faster.
    - Verify the GHCR image exists.
    - Confirm at least:
      - workflow URL
