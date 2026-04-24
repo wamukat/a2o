@@ -4,6 +4,7 @@ require_relative "../domain/task_phase_projection"
 require_relative "../domain/runnable_task_assessment"
 require_relative "../domain/scheduler_selection_policy"
 require_relative "../domain/upstream_line_guard"
+require "time"
 
 module A3
   module Application
@@ -45,15 +46,17 @@ module A3
         keyword_init: true
       )
 
-      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_tasks: nil, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {}, upstream_line_guard: A3::Domain::UpstreamLineGuard.new, scheduler_selection_policy: A3::Domain::SchedulerSelectionPolicy.new)
+      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_tasks: nil, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {}, worker_runs_by_task_ref: {}, upstream_line_guard: A3::Domain::UpstreamLineGuard.new, scheduler_selection_policy: A3::Domain::SchedulerSelectionPolicy.new, clock: -> { Time.now.utc })
         @task_repository = task_repository
         @run_repository = run_repository
         @scheduler_state_repository = scheduler_state_repository
         @kanban_tasks = kanban_tasks
         @kanban_snapshots_by_ref = kanban_snapshots_by_ref || {}
         @kanban_snapshots_by_id = kanban_snapshots_by_id || {}
+        @worker_runs_by_task_ref = worker_runs_by_task_ref || {}
         @upstream_line_guard = upstream_line_guard
         @scheduler_selection_policy = scheduler_selection_policy
+        @clock = clock
       end
 
       def call
@@ -175,9 +178,29 @@ module A3
           phase: phase,
           internal_phase: phase,
           state: "running_command",
-          heartbeat_age_seconds: nil,
+          heartbeat_age_seconds: heartbeat_age_seconds_for(task.ref),
           detail: run.source_descriptor.ref
         )
+      end
+
+      def heartbeat_age_seconds_for(task_ref)
+        record = @worker_runs_by_task_ref[task_ref]
+        return nil unless record.is_a?(Hash)
+
+        heartbeat_at = parse_heartbeat_time(record["heartbeat_at"])
+        return nil unless heartbeat_at
+
+        age = (@clock.call - heartbeat_at).to_i
+        age.negative? ? 0 : age
+      end
+
+      def parse_heartbeat_time(raw_value)
+        value = raw_value.to_s.strip
+        return nil if value.empty?
+
+        Time.iso8601(value).utc
+      rescue ArgumentError
+        nil
       end
 
       def running_status?(status)

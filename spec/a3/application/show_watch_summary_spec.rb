@@ -3,6 +3,8 @@
 RSpec.describe A3::Application::ShowWatchSummary do
   let(:inherited_parent_state_resolver) { instance_double("InheritedParentStateResolver") }
   let(:upstream_line_guard) { A3::Domain::UpstreamLineGuard.new(inherited_parent_state_resolver: inherited_parent_state_resolver) }
+  let(:worker_runs_by_task_ref) { {} }
+  let(:clock) { -> { Time.utc(2026, 4, 24, 1, 0, 0) } }
   subject(:use_case) do
     described_class.new(
       task_repository: task_repository,
@@ -13,7 +15,9 @@ RSpec.describe A3::Application::ShowWatchSummary do
         "Sample#2" => { "title" => "Blocked task", "status" => "To do" },
         "Sample#3" => { "title" => "Parent task", "status" => "To do" }
       },
-      upstream_line_guard: upstream_line_guard
+      worker_runs_by_task_ref: worker_runs_by_task_ref,
+      upstream_line_guard: upstream_line_guard,
+      clock: clock
     )
   end
 
@@ -147,6 +151,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(result.running_entries.first.phase).to eq("implementation")
     expect(result.running_entries.first.internal_phase).to eq("implementation")
     expect(result.running_entries.first.state).to eq("running_command")
+    expect(result.running_entries.first.heartbeat_age_seconds).to be_nil
     expect(result.running_entries.first.detail).to eq("refs/heads/a2o/work/Sample-1")
     expect(result.tasks.map(&:ref)).to eq(["Sample#3", "Sample#1", "Sample#2"])
     expect(result.tasks.find { |item| item.ref == "Sample#1" }.phase_counts).to eq("implementation" => 1)
@@ -159,6 +164,52 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(result.tasks.find { |item| item.ref == "Sample#3" }.blocked_lines).to include("waiting_reason=parent_waiting_for_children")
     expect(result.tasks.find { |item| item.ref == "Sample#3" }.blocked_lines).to include("waiting_on=Sample#1,Sample#2")
     expect(result.tasks.find { |item| item.ref == "Sample#2" }.title).to include("[kanban=To do internal=Blocked]")
+  end
+
+  it "uses worker run heartbeat data for running entries when available" do
+    task = A3::Domain::Task.new(
+      ref: "Sample#1",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :in_progress,
+      current_run_ref: "run-1"
+    )
+    task_repository.save(task)
+    run_repository.save(
+      A3::Domain::Run.new(
+        ref: "run-1",
+        task_ref: "Sample#1",
+        phase: :implementation,
+        workspace_kind: :ticket_workspace,
+        source_descriptor: A3::Domain::SourceDescriptor.new(
+          workspace_kind: :ticket_workspace,
+          source_type: :branch_head,
+          ref: "refs/heads/a2o/work/Sample-1",
+          task_ref: "Sample#1"
+        ),
+        scope_snapshot: A3::Domain::ScopeSnapshot.new(
+          edit_scope: [:repo_alpha],
+          verification_scope: [:repo_alpha],
+          ownership_scope: :task
+        ),
+        artifact_owner: A3::Domain::ArtifactOwner.new(
+          owner_ref: "Sample#1",
+          owner_scope: :task,
+          snapshot_version: "refs/heads/a2o/work/Sample-1"
+        )
+      )
+    )
+
+    worker_runs_by_task_ref["Sample#1"] = {
+      "task_ref" => "Sample#1",
+      "heartbeat_at" => "2026-04-24T00:59:30Z",
+      "updated_at_epoch_ms" => 1
+    }
+
+    result = use_case.call
+
+    expect(result.running_entries.first.heartbeat_age_seconds).to eq(30)
   end
 
   it "uses kanban current tasks as the watch-summary set while overlaying runtime state" do

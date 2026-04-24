@@ -53,6 +53,19 @@ RSpec.describe A3::CLI do
           )
         )
       )
+      File.write(
+        File.join(dir, "worker-runs.json"),
+        JSON.pretty_generate(
+          "runs" => {
+            "Sample#3138" => {
+              "task_ref" => "Sample#3138",
+              "state" => "running_command",
+              "heartbeat_at" => Time.now.utc.iso8601,
+              "updated_at_epoch_ms" => 1
+            }
+          }
+        )
+      )
 
       out = StringIO.new
       described_class.start(
@@ -70,7 +83,7 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("[.] #3141")
       expect(out.string).to include("Merging -----------+")
       expect(out.string).to include("Implementation -----+")
-      expect(out.string).to include("- #3138 implementation/implementation/running_command hb=?")
+      expect(out.string).to match(/- #3138 implementation\/implementation\/running_command hb=\d+s/)
     end
   end
 

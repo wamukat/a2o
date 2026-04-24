@@ -3,6 +3,7 @@
 require "optparse"
 require "pathname"
 require "shellwords"
+require "json"
 require "a3/domain/phase_source_policy"
 require "a3/cli/command_router"
 require "a3/cli/handler_support"
@@ -633,7 +634,8 @@ module A3
         scheduler_state_repository: repositories.fetch(:scheduler_state_repository),
         kanban_tasks: tasks,
         kanban_snapshots_by_ref: kanban_snapshot_index.by_ref,
-        kanban_snapshots_by_id: kanban_snapshot_index.by_id
+        kanban_snapshots_by_id: kanban_snapshot_index.by_id,
+        worker_runs_by_task_ref: load_watch_summary_worker_runs(options.fetch(:storage_dir))
       ).call
 
       ShowOutputFormatter.watch_summary_lines(summary).each { |line| out.puts(line) }
@@ -1559,6 +1561,30 @@ module A3
       else
         raise ArgumentError, "Unsupported storage backend: #{options.fetch(:storage_backend)}"
       end
+    end
+
+    def load_watch_summary_worker_runs(storage_dir)
+      path = File.join(storage_dir, "worker-runs.json")
+      return {} unless File.exist?(path)
+
+      payload = JSON.parse(File.read(path))
+      runs = payload.fetch("runs", {})
+      return {} unless runs.is_a?(Hash)
+
+      runs.each_with_object({}) do |(_key, record), memo|
+        next unless record.is_a?(Hash)
+
+        task_ref = String(record["task_ref"]).strip
+        next if task_ref.empty?
+
+        updated_at = Integer(record["updated_at_epoch_ms"] || 0)
+        existing = memo[task_ref]
+        next if existing && Integer(existing["updated_at_epoch_ms"] || 0) >= updated_at
+
+        memo[task_ref] = record
+      end
+    rescue JSON::ParserError, TypeError, ArgumentError
+      {}
     end
 
     def build_bootstrap_session(options:, run_id_generator:, command_runner:, merge_runner:, worker_gateway: nil)
