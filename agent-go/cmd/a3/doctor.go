@@ -46,7 +46,10 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
-	fmt.Fprintf(stdout, "kanban_volume=%s\n", kanbanDataVolumeName(effectiveConfig.ComposeProject))
+	fmt.Fprintf(stdout, "kanban_mode=%s\n", kanbanMode(effectiveConfig))
+	if !isExternalKanban(effectiveConfig) {
+		fmt.Fprintf(stdout, "kanban_volume=%s\n", kanbanDataVolumeName(effectiveConfig.ComposeProject))
+	}
 
 	checkDockerCredentialHelpers(report)
 
@@ -74,20 +77,28 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 		report("agent_install", true, agentPath, "none")
 	}
 
-	if exists, err := dockerVolumeExists(runner, kanbanDataVolumeName(effectiveConfig.ComposeProject)); err != nil {
-		report("kanban_volume", false, err.Error(), "check Docker daemon and compose project")
-	} else if exists {
-		report("kanban_volume", true, "reuse_existing volume="+kanbanDataVolumeName(effectiveConfig.ComposeProject)+" note=healthy_board_reuse", "none")
+	if isExternalKanban(effectiveConfig) {
+		if err := checkExternalKanbanHealth(kanbanPublicURL(effectiveConfig)); err != nil {
+			report("kanban_external", false, err.Error(), "check external Kanbalone URL and credentials")
+		} else {
+			report("kanban_external", true, kanbanPublicURL(effectiveConfig), "none")
+		}
 	} else {
-		report("kanban_volume", true, "create_new "+kanbanDataVolumeName(effectiveConfig.ComposeProject), "none")
-	}
+		if exists, err := dockerVolumeExists(runner, kanbanDataVolumeName(effectiveConfig.ComposeProject)); err != nil {
+			report("kanban_volume", false, err.Error(), "check Docker daemon and compose project")
+		} else if exists {
+			report("kanban_volume", true, "reuse_existing volume="+kanbanDataVolumeName(effectiveConfig.ComposeProject)+" note=healthy_board_reuse", "none")
+		} else {
+			report("kanban_volume", true, "create_new "+kanbanDataVolumeName(effectiveConfig.ComposeProject), "none")
+		}
 
-	if output, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "ps", "--status", "running", "-q", "soloboard")...); err != nil {
-		report("kanban_service", false, err.Error(), "run a2o kanban up")
-	} else if strings.TrimSpace(string(output)) == "" {
-		report("kanban_service", false, "soloboard is not running", "run a2o kanban up")
-	} else {
-		report("kanban_service", true, kanbanPublicURL(effectiveConfig), "none")
+		if output, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "ps", "--status", "running", "-q", "soloboard")...); err != nil {
+			report("kanban_service", false, err.Error(), "run a2o kanban up")
+		} else if strings.TrimSpace(string(output)) == "" {
+			report("kanban_service", false, "soloboard is not running", "run a2o kanban up")
+		} else {
+			report("kanban_service", true, kanbanPublicURL(effectiveConfig), "none")
+		}
 	}
 
 	if output, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "ps", "--status", "running", "-q", effectiveConfig.RuntimeService)...); err != nil {

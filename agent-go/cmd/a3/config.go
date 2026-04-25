@@ -9,16 +9,19 @@ import (
 )
 
 type runtimeInstanceConfig struct {
-	SchemaVersion  int    `json:"schema_version"`
-	PackagePath    string `json:"package_path"`
-	WorkspaceRoot  string `json:"workspace_root"`
-	ComposeFile    string `json:"compose_file"`
-	ComposeProject string `json:"compose_project"`
-	RuntimeService string `json:"runtime_service"`
-	SoloBoardPort  string `json:"soloboard_port"`
-	AgentPort      string `json:"agent_port"`
-	StorageDir     string `json:"storage_dir"`
-	RuntimeImage   string `json:"runtime_image,omitempty"`
+	SchemaVersion    int    `json:"schema_version"`
+	PackagePath      string `json:"package_path"`
+	WorkspaceRoot    string `json:"workspace_root"`
+	ComposeFile      string `json:"compose_file"`
+	ComposeProject   string `json:"compose_project"`
+	RuntimeService   string `json:"runtime_service"`
+	SoloBoardPort    string `json:"soloboard_port"`
+	KanbanMode       string `json:"kanban_mode,omitempty"`
+	KanbanURL        string `json:"kanban_url,omitempty"`
+	KanbanRuntimeURL string `json:"kanban_runtime_url,omitempty"`
+	AgentPort        string `json:"agent_port"`
+	StorageDir       string `json:"storage_dir"`
+	RuntimeImage     string `json:"runtime_image,omitempty"`
 }
 
 func defaultComposeFile() string {
@@ -268,6 +271,11 @@ func composeEnv(config runtimeInstanceConfig) map[string]string {
 	if runtimeImage := runtimeImageReference(&config); runtimeImage != "" {
 		overrides["A2O_RUNTIME_IMAGE"] = runtimeImage
 		overrides["A3_RUNTIME_IMAGE"] = runtimeImage
+	}
+	if runtimeURL := kanbanRuntimeURL(config); isExternalKanban(config) && runtimeURL != "" {
+		overrides["A2O_KANBALONE_INTERNAL_URL"] = runtimeURL
+		overrides["A2O_SOLOBOARD_INTERNAL_URL"] = runtimeURL
+		overrides["A3_SOLOBOARD_INTERNAL_URL"] = runtimeURL
 	}
 	return overrides
 }

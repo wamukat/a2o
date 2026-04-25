@@ -498,6 +498,9 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 	runtimeService := flags.String("runtime-service", "a2o-runtime", "docker compose runtime service name")
 	kanbalonePort := flags.String("kanbalone-port", "", "host kanban service port")
 	soloBoardPort := flags.String("soloboard-port", "", "host kanban service port (compatibility alias for --kanbalone-port)")
+	kanbanModeFlag := flags.String("kanban-mode", kanbanModeBundled, "kanban mode: bundled or external")
+	kanbanURL := flags.String("kanban-url", "", "external Kanbalone base URL")
+	kanbanRuntimeURL := flags.String("kanban-runtime-url", "", "external Kanbalone URL reachable from the runtime container")
 	agentPort := flags.String("agent-port", "7393", "host A2O agent control-plane port")
 	storageDir := flags.String("storage-dir", "/var/lib/a2o/a2o-runtime", "runtime storage dir inside the A2O runtime container")
 
@@ -510,6 +513,20 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 	resolvedKanbanPort, err := resolveKanbanPort(*kanbalonePort, *soloBoardPort)
 	if err != nil {
 		return err
+	}
+	resolvedKanbanMode, err := resolveKanbanMode(*kanbanModeFlag)
+	if err != nil {
+		return err
+	}
+	resolvedKanbanURL := normalizeKanbanBaseURL(*kanbanURL)
+	resolvedKanbanRuntimeURL := normalizeKanbanBaseURL(*kanbanRuntimeURL)
+	if resolvedKanbanMode == kanbanModeExternal {
+		if resolvedKanbanURL == "" {
+			return fmt.Errorf("--kanban-url is required when --kanban-mode=external")
+		}
+		if resolvedKanbanRuntimeURL == "" {
+			resolvedKanbanRuntimeURL = dockerReachableKanbanURL(resolvedKanbanURL)
+		}
 	}
 	absWorkspaceRoot, err := filepath.Abs(*workspaceRoot)
 	if err != nil {
@@ -544,16 +561,19 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 	}
 
 	config := runtimeInstanceConfig{
-		SchemaVersion:  1,
-		PackagePath:    absPackagePath,
-		WorkspaceRoot:  absWorkspaceRoot,
-		ComposeFile:    resolvedComposeFile,
-		ComposeProject: projectName,
-		RuntimeService: strings.TrimSpace(*runtimeService),
-		SoloBoardPort:  resolvedKanbanPort,
-		AgentPort:      strings.TrimSpace(*agentPort),
-		StorageDir:     strings.TrimSpace(*storageDir),
-		RuntimeImage:   defaultRuntimeImage(),
+		SchemaVersion:    1,
+		PackagePath:      absPackagePath,
+		WorkspaceRoot:    absWorkspaceRoot,
+		ComposeFile:      resolvedComposeFile,
+		ComposeProject:   projectName,
+		RuntimeService:   strings.TrimSpace(*runtimeService),
+		SoloBoardPort:    resolvedKanbanPort,
+		KanbanMode:       resolvedKanbanMode,
+		KanbanURL:        resolvedKanbanURL,
+		KanbanRuntimeURL: resolvedKanbanRuntimeURL,
+		AgentPort:        strings.TrimSpace(*agentPort),
+		StorageDir:       strings.TrimSpace(*storageDir),
+		RuntimeImage:     defaultRuntimeImage(),
 	}
 	if err := writeInstanceConfig(absWorkspaceRoot, config); err != nil {
 		return err
@@ -561,6 +581,19 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 
 	fmt.Fprintf(stdout, "project_bootstrapped package=%s instance_config=%s\n", config.PackagePath, filepath.Join(absWorkspaceRoot, instanceConfigRelativePath))
 	return nil
+}
+
+func resolveKanbanMode(value string) (string, error) {
+	mode := strings.ToLower(strings.TrimSpace(value))
+	if mode == "" {
+		return kanbanModeBundled, nil
+	}
+	switch mode {
+	case kanbanModeBundled, kanbanModeExternal:
+		return mode, nil
+	default:
+		return "", fmt.Errorf("--kanban-mode must be %q or %q", kanbanModeBundled, kanbanModeExternal)
+	}
 }
 
 func resolveKanbanPort(kanbalonePort string, soloBoardPort string) (string, error) {

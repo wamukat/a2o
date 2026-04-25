@@ -5,9 +5,16 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
+)
+
+const (
+	kanbanModeBundled  = "bundled"
+	kanbanModeExternal = "external"
 )
 
 func runKanban(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) int {
@@ -66,6 +73,27 @@ func runKanbanUp(args []string, runner commandRunner, stdout io.Writer, stderr i
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
 	composePrefix := composeArgs(effectiveConfig)
 	return withComposeEnv(effectiveConfig, func() error {
+		if isExternalKanban(effectiveConfig) {
+			if err := checkExternalKanbanHealth(kanbanPublicURL(effectiveConfig)); err != nil {
+				return err
+			}
+			if *build {
+				if _, err := runExternal(runner, "docker", append(composePrefix, "build", effectiveConfig.RuntimeService)...); err != nil {
+					return err
+				}
+			}
+			if err := cleanupLegacyRuntimeServiceOrphans(effectiveConfig, runner, stdout); err != nil {
+				return err
+			}
+			if _, err := runExternal(runner, "docker", append(composePrefix, "up", "-d", effectiveConfig.RuntimeService)...); err != nil {
+				return err
+			}
+			if err := runKanbanBootstrap(effectiveConfig, runner, stdout); err != nil {
+				return err
+			}
+			fmt.Fprintf(stdout, "kanban_up mode=external compose_project=%s url=%s runtime_url=%s\n", effectiveConfig.ComposeProject, kanbanPublicURL(effectiveConfig), kanbanRuntimeURL(effectiveConfig))
+			return nil
+		}
 		volumeName := kanbanDataVolumeName(effectiveConfig.ComposeProject)
 		volumeExists, err := dockerVolumeExists(runner, volumeName)
 		if err != nil {
@@ -143,7 +171,7 @@ func runKanbanBootstrap(config runtimeInstanceConfig, runner commandRunner, stdo
 	if err != nil {
 		return err
 	}
-	args := append(composeArgs(config), "exec", "-T", config.RuntimeService, "python3", packagedKanbanBootstrapPath, "--config-json", configJSON, "--base-url", "http://soloboard:3000", "--board", packageConfig.KanbanProject)
+	args := append(composeArgs(config), "exec", "-T", config.RuntimeService, "python3", packagedKanbanBootstrapPath, "--config-json", configJSON, "--base-url", kanbanRuntimeURL(config), "--board", packageConfig.KanbanProject)
 	if err := runKanbanBootstrapWithRetry(runner, args); err != nil {
 		return err
 	}
@@ -236,7 +264,15 @@ func runKanbanDoctor(args []string, runner commandRunner, stdout io.Writer, stde
 	}
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
+	fmt.Fprintf(stdout, "kanban_mode=%s\n", kanbanMode(effectiveConfig))
 	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(effectiveConfig))
+	if isExternalKanban(effectiveConfig) {
+		if err := checkExternalKanbanHealth(kanbanPublicURL(effectiveConfig)); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "kanban_external_health status=ok url=%s\n", kanbanPublicURL(effectiveConfig))
+		return nil
+	}
 	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
 	output, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "ps", "soloboard")...)
 	if err != nil {
@@ -260,11 +296,14 @@ func runKanbanURL(args []string, stdout io.Writer, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(stdout, kanbanPublicURL(*config))
+	fmt.Fprintln(stdout, kanbanPublicURL(applyAgentInstallOverrides(*config, "", "", "")))
 	return nil
 }
 
 func kanbanPublicURL(config runtimeInstanceConfig) string {
+	if isExternalKanban(config) {
+		return normalizeKanbanBaseURL(config.KanbanURL) + "/"
+	}
 	return "http://localhost:" + publicKanbanPort(config) + "/"
 }
 
@@ -273,4 +312,68 @@ func publicKanbanPort(config runtimeInstanceConfig) string {
 		return value
 	}
 	return envDefaultCompat("A2O_BUNDLE_SOLOBOARD_PORT", "A3_BUNDLE_SOLOBOARD_PORT", envDefaultValue(config.SoloBoardPort, "3470"))
+}
+
+func kanbanMode(config runtimeInstanceConfig) string {
+	mode := strings.ToLower(strings.TrimSpace(config.KanbanMode))
+	if mode == "" {
+		return kanbanModeBundled
+	}
+	return mode
+}
+
+func isExternalKanban(config runtimeInstanceConfig) bool {
+	return kanbanMode(config) == kanbanModeExternal
+}
+
+func normalizeKanbanBaseURL(value string) string {
+	return strings.TrimRight(strings.TrimSpace(value), "/")
+}
+
+func kanbanRuntimeURL(config runtimeInstanceConfig) string {
+	if value := envDefaultCompat("A2O_KANBALONE_INTERNAL_URL", "A2O_SOLOBOARD_INTERNAL_URL", ""); strings.TrimSpace(value) != "" {
+		return normalizeKanbanBaseURL(value)
+	}
+	if isExternalKanban(config) {
+		if value := normalizeKanbanBaseURL(config.KanbanRuntimeURL); value != "" {
+			return value
+		}
+		return dockerReachableKanbanURL(config.KanbanURL)
+	}
+	return envDefaultCompat("A2O_SOLOBOARD_INTERNAL_URL", "A3_SOLOBOARD_INTERNAL_URL", "http://soloboard:3000")
+}
+
+func dockerReachableKanbanURL(value string) string {
+	base := normalizeKanbanBaseURL(value)
+	parsed, err := url.Parse(base)
+	if err != nil || parsed.Host == "" {
+		return base
+	}
+	hostname := parsed.Hostname()
+	if hostname != "localhost" && hostname != "127.0.0.1" && hostname != "::1" {
+		return base
+	}
+	if port := parsed.Port(); port != "" {
+		parsed.Host = "host.docker.internal:" + port
+	} else {
+		parsed.Host = "host.docker.internal"
+	}
+	return strings.TrimRight(parsed.String(), "/")
+}
+
+func checkExternalKanbanHealth(baseURL string) error {
+	base := normalizeKanbanBaseURL(baseURL)
+	if base == "" {
+		return fmt.Errorf("external kanban url is required")
+	}
+	client := http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(base + "/api/health")
+	if err != nil {
+		return fmt.Errorf("external kanban health check failed url=%s: %w", base, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("external kanban health check failed url=%s status=%s", base, resp.Status)
+	}
+	return nil
 }

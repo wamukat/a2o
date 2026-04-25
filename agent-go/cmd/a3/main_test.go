@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -324,6 +326,51 @@ func TestProjectBootstrapAcceptsKanbalonePort(t *testing.T) {
 	}
 	if config.SoloBoardPort != "3481" {
 		t.Fatalf("SoloBoardPort=%q", config.SoloBoardPort)
+	}
+}
+
+func TestProjectBootstrapAcceptsExternalKanban(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "a2o-project")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{
+		"project",
+		"bootstrap",
+		"--package",
+		packageDir,
+		"--workspace",
+		tempDir,
+		"--kanban-mode",
+		"external",
+		"--kanban-url",
+		"http://127.0.0.1:3470/",
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+
+	configPath := filepath.Join(tempDir, ".work", "a2o", "runtime-instance.json")
+	body, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("instance config missing: %v", err)
+	}
+	var config runtimeInstanceConfig
+	if err := json.Unmarshal(body, &config); err != nil {
+		t.Fatalf("invalid instance config: %v", err)
+	}
+	if config.KanbanMode != "external" {
+		t.Fatalf("KanbanMode=%q", config.KanbanMode)
+	}
+	if config.KanbanURL != "http://127.0.0.1:3470" {
+		t.Fatalf("KanbanURL=%q", config.KanbanURL)
+	}
+	if config.KanbanRuntimeURL != "http://host.docker.internal:3470" {
+		t.Fatalf("KanbanRuntimeURL=%q", config.KanbanRuntimeURL)
 	}
 }
 
@@ -1771,6 +1818,57 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 	}
 }
 
+func TestKanbanUpExternalUsesRuntimeOnlyAndExternalURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/health" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "reference", "project-package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:    1,
+		PackagePath:      packageDir,
+		WorkspaceRoot:    tempDir,
+		ComposeFile:      "compose.yml",
+		ComposeProject:   "a3-test",
+		RuntimeService:   "a2o-runtime",
+		KanbanMode:       "external",
+		KanbanURL:        server.URL,
+		KanbanRuntimeURL: "http://kanban.example.internal:3470",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"kanban", "up"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := runner.joinedCalls()
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime")
+	if !strings.Contains(strings.Join(joined, "\n"), "--base-url http://kanban.example.internal:3470") {
+		t.Fatalf("external kanban bootstrap should use runtime URL, calls:\n%s", strings.Join(joined, "\n"))
+	}
+	if strings.Contains(strings.Join(joined, "\n"), " up -d a2o-runtime soloboard") {
+		t.Fatalf("external kanban up must not start bundled soloboard, calls:\n%s", strings.Join(joined, "\n"))
+	}
+	if !strings.Contains(stdout.String(), "kanban_up mode=external compose_project=a3-test url="+server.URL+"/ runtime_url=http://kanban.example.internal:3470") {
+		t.Fatalf("stdout should describe external kanban, got %q", stdout.String())
+	}
+}
+
 func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 	tempDir := t.TempDir()
 	setEmptyDockerConfig(t)
@@ -1854,6 +1952,97 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("doctor output missing %q in:\n%s", want, stdout.String())
 		}
+	}
+}
+
+func TestDoctorExternalKanbanSkipsBundledServiceChecks(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/health" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+
+	tempDir := t.TempDir()
+	setEmptyDockerConfig(t)
+	packageDir := filepath.Join(tempDir, "package")
+	repoDir := filepath.Join(tempDir, "repo")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(repoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectYaml := strings.Join([]string{
+		"schema_version: 1",
+		"package:",
+		"  name: sample",
+		"kanban:",
+		"  project: Sample",
+		"repos:",
+		"  app:",
+		"    path: ../repo",
+		"agent:",
+		"  required_bins: [\"sh\"]",
+		"runtime:",
+		"  phases:",
+		"    implementation:",
+		"      skill: skills/implementation/base.md",
+		"      executor:",
+		"        command: [\"sh\", \"-c\", \"echo ok\"]",
+		"    review:",
+		"      skill: skills/review/default.md",
+		"    merge:",
+		"      policy: ff_only",
+		"      target_ref: refs/heads/main",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:    1,
+		PackagePath:      packageDir,
+		WorkspaceRoot:    tempDir,
+		ComposeFile:      "compose.yml",
+		ComposeProject:   "a2o-sample",
+		RuntimeService:   "a2o-runtime",
+		KanbanMode:       "external",
+		KanbanURL:        server.URL,
+		KanbanRuntimeURL: "http://kanban.example.internal:3470",
+	})
+	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
+	if err := os.MkdirAll(filepath.Dir(agentPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(agentPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"doctor"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s stdout=%s", code, stderr.String(), stdout.String())
+		}
+	})
+
+	output := stdout.String()
+	if !strings.Contains(output, "doctor_check name=kanban_external status=ok detail="+server.URL+"/ action=none") {
+		t.Fatalf("doctor should report external kanban health, got:\n%s", output)
+	}
+	for _, forbidden := range []string{"doctor_check name=kanban_volume", "doctor_check name=kanban_service"} {
+		if strings.Contains(output, forbidden) {
+			t.Fatalf("external doctor should not report bundled check %q in:\n%s", forbidden, output)
+		}
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if strings.Contains(joined, "volume inspect") || strings.Contains(joined, " -q soloboard") {
+		t.Fatalf("external doctor should not inspect bundled kanban resources, calls:\n%s", joined)
 	}
 }
 
@@ -2747,6 +2936,52 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	}
 	if runner.lastEnv["A3_HOST_AGENT_BIN"] != filepath.Join(tempDir, ".work", "a2o", "agent", "bin", "a2o-agent") {
 		t.Fatalf("agent bin env=%q", runner.lastEnv["A3_HOST_AGENT_BIN"])
+	}
+}
+
+func TestRuntimeRunOnceExternalKanbanDoesNotStartSoloboard(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:    1,
+		PackagePath:      packageDir,
+		WorkspaceRoot:    tempDir,
+		ComposeFile:      "compose.yml",
+		ComposeProject:   "a3-test",
+		RuntimeService:   "a2o-runtime",
+		KanbanMode:       "external",
+		KanbanURL:        "http://127.0.0.1:3470",
+		KanbanRuntimeURL: "http://kanban.example.internal:3470",
+		AgentPort:        "7394",
+		StorageDir:       "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once", "--max-steps", "1", "--agent-attempts", "2"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(joined+"\n", "docker compose -p a3-test -f compose.yml up -d a2o-runtime\n") {
+		t.Fatalf("external run-once should start runtime service, calls:\n%s", joined)
+	}
+	if strings.Contains(joined, " up -d a2o-runtime soloboard") {
+		t.Fatalf("external run-once must not start bundled soloboard, calls:\n%s", joined)
+	}
+	if !strings.Contains(joined, "'--kanban-command-arg' 'http://kanban.example.internal:3470'") {
+		t.Fatalf("external run-once should pass external runtime kanban URL, calls:\n%s", joined)
+	}
+	if runner.lastEnv["A2O_KANBALONE_INTERNAL_URL"] != "http://kanban.example.internal:3470" {
+		t.Fatalf("external run-once should export runtime kanban URL, env=%#v", runner.lastEnv)
 	}
 }
 
@@ -6172,8 +6407,11 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		"A3_RUNTIME_RUN_ONCE_MAX_STEPS":       os.Getenv("A3_RUNTIME_RUN_ONCE_MAX_STEPS"),
 		"A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS":  os.Getenv("A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"),
 		"A2O_BRANCH_NAMESPACE":                os.Getenv("A2O_BRANCH_NAMESPACE"),
+		"A2O_KANBALONE_INTERNAL_URL":          os.Getenv("A2O_KANBALONE_INTERNAL_URL"),
+		"A2O_SOLOBOARD_INTERNAL_URL":          os.Getenv("A2O_SOLOBOARD_INTERNAL_URL"),
 		"A3_HOST_AGENT_BIN":                   os.Getenv("A3_HOST_AGENT_BIN"),
 		"A3_RUNTIME_IMAGE":                    os.Getenv("A3_RUNTIME_IMAGE"),
+		"A3_SOLOBOARD_INTERNAL_URL":           os.Getenv("A3_SOLOBOARD_INTERNAL_URL"),
 	}
 	if r.err != nil {
 		output := r.errorOutput

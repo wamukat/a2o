@@ -338,6 +338,7 @@ func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, std
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintf(stdout, "runtime_package=%s\n", effectiveConfig.PackagePath)
 	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
+	fmt.Fprintf(stdout, "kanban_mode=%s\n", kanbanMode(effectiveConfig))
 	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(effectiveConfig))
 	pid, err := readSchedulerPID(paths.PIDFile)
 	if err != nil {
@@ -420,6 +421,14 @@ func printRuntimeServiceStatus(config runtimeInstanceConfig, runner commandRunne
 		{name: "runtime_container", service: config.RuntimeService},
 		{name: "kanban_service", service: "soloboard"},
 	} {
+		if check.name == "kanban_service" && isExternalKanban(config) {
+			if err := checkExternalKanbanHealth(kanbanPublicURL(config)); err != nil {
+				fmt.Fprintf(stdout, "runtime_status_check name=kanban_external status=blocked detail=%s\n", singleLine(err.Error()))
+				continue
+			}
+			fmt.Fprintf(stdout, "runtime_status_check name=kanban_external status=ok url=%s runtime_url=%s\n", kanbanPublicURL(config), kanbanRuntimeURL(config))
+			continue
+		}
 		output, err := runExternal(runner, "docker", append(composeArgs(config), "ps", "--status", "running", "-q", check.service)...)
 		if err != nil {
 			fmt.Fprintf(stdout, "runtime_status_check name=%s status=blocked detail=%s\n", check.name, singleLine(err.Error()))
@@ -656,10 +665,14 @@ func runRuntimeUp(args []string, runner commandRunner, stdout io.Writer, stderr 
 		if err := cleanupLegacyRuntimeServiceOrphans(effectiveConfig, runner, stdout); err != nil {
 			return err
 		}
-		if _, err := runExternal(runner, "docker", append(composePrefix, "up", "-d", effectiveConfig.RuntimeService, "soloboard")...); err != nil {
+		services := []string{effectiveConfig.RuntimeService}
+		if !isExternalKanban(effectiveConfig) {
+			services = append(services, "soloboard")
+		}
+		if _, err := runExternal(runner, "docker", append(composePrefix, append([]string{"up", "-d"}, services...)...)...); err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "runtime_up compose_project=%s package=%s\n", effectiveConfig.ComposeProject, effectiveConfig.PackagePath)
+		fmt.Fprintf(stdout, "runtime_up compose_project=%s package=%s kanban_mode=%s\n", effectiveConfig.ComposeProject, effectiveConfig.PackagePath, kanbanMode(effectiveConfig))
 		return nil
 	})
 }
@@ -717,6 +730,7 @@ func runRuntimeDoctor(args []string, runner commandRunner, stdout io.Writer, std
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintf(stdout, "package=%s\n", effectiveConfig.PackagePath)
 	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
+	fmt.Fprintf(stdout, "kanban_mode=%s\n", kanbanMode(effectiveConfig))
 	for _, check := range []struct {
 		name    string
 		service string
@@ -724,6 +738,13 @@ func runRuntimeDoctor(args []string, runner commandRunner, stdout io.Writer, std
 		{name: "runtime_container", service: effectiveConfig.RuntimeService},
 		{name: "kanban_service", service: "soloboard"},
 	} {
+		if check.name == "kanban_service" && isExternalKanban(effectiveConfig) {
+			if err := checkExternalKanbanHealth(kanbanPublicURL(effectiveConfig)); err != nil {
+				return err
+			}
+			fmt.Fprintf(stdout, "runtime_doctor_check name=kanban_external status=ok url=%s runtime_url=%s\n", kanbanPublicURL(effectiveConfig), kanbanRuntimeURL(effectiveConfig))
+			continue
+		}
 		output, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "ps", "--status", "running", "-q", check.service)...)
 		if err != nil {
 			return err
@@ -1331,7 +1352,11 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, overrides runtimeRun
 		if err := cleanupLegacyRuntimeServiceOrphans(config, runner, stdout); err != nil {
 			return err
 		}
-		if _, err := runExternal(runner, "docker", append(plan.ComposePrefix, "up", "-d", config.RuntimeService, "soloboard")...); err != nil {
+		services := []string{config.RuntimeService}
+		if !isExternalKanban(config) {
+			services = append(services, "soloboard")
+		}
+		if _, err := runExternal(runner, "docker", append(plan.ComposePrefix, append([]string{"up", "-d"}, services...)...)...); err != nil {
 			return err
 		}
 		if err := repairRuntimeRuns(config, plan, runner, stdout, "startup"); err != nil {
@@ -1516,7 +1541,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 		ServerPIDFile:                   envDefaultCompat("A2O_RUNTIME_RUN_ONCE_SERVER_PID_FILE", "A3_RUNTIME_RUN_ONCE_SERVER_PID_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_SERVER_PID_FILE", "A3_RUNTIME_SCHEDULER_SERVER_PID_FILE", "/tmp/a2o-runtime-run-once-agent-server.pid")),
 		PresetDir:                       envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PRESET_DIR", "A3_RUNTIME_RUN_ONCE_PRESET_DIR", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PRESET_DIR", "A3_RUNTIME_SCHEDULER_PRESET_DIR", "/tmp/a3-engine/config/presets")),
 		ManifestPath:                    projectConfigPath,
-		SoloBoardInternalURL:            kanbanInternalURL(),
+		SoloBoardInternalURL:            kanbanInternalURL(config),
 		LiveRef:                         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_LIVE_REF", "A3_RUNTIME_RUN_ONCE_LIVE_REF", envDefaultCompat("A2O_RUNTIME_SCHEDULER_LIVE_REF", "A3_RUNTIME_SCHEDULER_LIVE_REF", defaultLiveRef)),
 		AgentEnv: []string{
 			"A2O_ROOT_DIR=" + hostRootDir,
@@ -1566,18 +1591,15 @@ func buildRuntimeDescribeTaskPlan(config runtimeInstanceConfig) (runtimeRunOnceP
 		RuntimeExitFile:      envDefaultCompat("A2O_RUNTIME_RUN_ONCE_EXIT_FILE", "A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_EXIT_FILE", "A3_RUNTIME_SCHEDULER_EXIT_FILE", "/tmp/a2o-runtime-run-once.exit")),
 		PresetDir:            envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PRESET_DIR", "A3_RUNTIME_RUN_ONCE_PRESET_DIR", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PRESET_DIR", "A3_RUNTIME_SCHEDULER_PRESET_DIR", "/tmp/a3-engine/config/presets")),
 		ManifestPath:         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PROJECT_CONFIG", "A3_RUNTIME_RUN_ONCE_PROJECT_CONFIG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PROJECT_CONFIG", "A3_RUNTIME_SCHEDULER_PROJECT_CONFIG", filepath.Join(referencePackagePath, "project.yaml"))),
-		SoloBoardInternalURL: kanbanInternalURL(),
+		SoloBoardInternalURL: kanbanInternalURL(config),
 		KanbanProject:        envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_PROJECT", "A3_RUNTIME_RUN_ONCE_KANBAN_PROJECT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_PROJECT", "A3_RUNTIME_SCHEDULER_KANBAN_PROJECT", packageConfig.KanbanProject)),
 		KanbanStatus:         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_STATUS", "A3_RUNTIME_RUN_ONCE_KANBAN_STATUS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_STATUS", "A3_RUNTIME_SCHEDULER_KANBAN_STATUS", envDefaultValue(packageConfig.KanbanStatus, "To do"))),
 		KanbanRepoLabels:     envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A3_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A2O_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", "A3_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", repoLabels),
 	}, nil
 }
 
-func kanbanInternalURL() string {
-	if value := envDefaultCompat("A2O_KANBALONE_INTERNAL_URL", "A2O_SOLOBOARD_INTERNAL_URL", ""); strings.TrimSpace(value) != "" {
-		return value
-	}
-	return envDefaultCompat("A2O_SOLOBOARD_INTERNAL_URL", "A3_SOLOBOARD_INTERNAL_URL", "http://soloboard:3000")
+func kanbanInternalURL(config runtimeInstanceConfig) string {
+	return kanbanRuntimeURL(config)
 }
 
 func runtimeDescribeSectionOutput(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, section string, argv ...string) (string, error) {
