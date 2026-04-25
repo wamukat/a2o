@@ -118,6 +118,14 @@ a2o kanban url
 
 `kanban up` は同梱されたカンバンサービスを起動し、A2O が必要とするレーンと内部ラベルを用意する。利用者は A2O が管理するレーンや内部ラベルをプロジェクトパッケージに手書きしない。
 
+既定は同梱 Kanbalone である。複数の A2O プロジェクトから独立した 1 つの Kanbalone インスタンスへ接続し、プロジェクトごとに別ボードを使いたい場合は、外部モードでランタイムインスタンスを作る。
+
+```sh
+a2o project bootstrap --kanban-mode external --kanban-url http://127.0.0.1:3470
+```
+
+外部モードでは、利用者が開くボード URL と、必要に応じて Docker コンテナ内のランタイムから到達する URL をランタイムインスタンスへ保存する。コンテナからホスト URL に直接到達できない場合は `--kanban-runtime-url` を指定する。ホスト URL が loopback の場合、明示指定がなければ A2O は `host.docker.internal` を使うランタイム URL を導出する。このモードでは `kanban up`、`kanban doctor`、`runtime status`、`runtime doctor`、`doctor` が外部 endpoint を確認する。`runtime up` は同梱 Kanbalone コンテナを管理せず、A2O ランタイムコンテナだけを起動する。
+
 同じ Compose プロジェクトなら既存ボードを再利用する。Compose プロジェクトや Docker volume が変わると、同じプロダクトでも別ボードに見える。ボードが空に見える場合は、まず `a2o runtime status` と `a2o kanban doctor` でインスタンス設定、Compose プロジェクト、volume を確認する。
 
 ## エージェント運用

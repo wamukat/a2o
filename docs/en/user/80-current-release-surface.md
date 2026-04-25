@@ -11,7 +11,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Host diagnosis: `a2o doctor`
 - Project authoring and validation: `a2o project template`, `lint`, `validate`, `bootstrap`
 - Worker helper commands: `a2o worker scaffold`, `a2o worker validate-result`
-- Kanban service lifecycle: `a2o kanban up`, `doctor`, `url`
+- Kanban service lifecycle and external Kanbalone checks: `a2o kanban up`, `doctor`, `url`
 - Agent target detection and binary export: `a2o agent target`, `a2o agent install`
 - Runtime container lifecycle: `a2o runtime up`, `down`
 - Foreground runtime execution: `a2o runtime run-once`, `a2o runtime loop`
@@ -20,10 +20,12 @@ Use it to confirm which features can be documented for users and what can be tre
 - Upgrade diagnosis: `a2o upgrade check`
 - Single-file project package config: `project.yaml`
 - Project runtime tuning fields for agent server connectivity: `runtime.agent_control_plane_connect_timeout`, `runtime.agent_control_plane_request_timeout`, `runtime.agent_control_plane_retry_count`, `runtime.agent_control_plane_retry_delay`
+- Optional child/single review gate fields: `runtime.review_gate.child`, `runtime.review_gate.single`
+- External Kanbalone bootstrap fields: `--kanban-mode external`, `--kanban-url`, `--kanban-runtime-url`
 - Runtime CLI overrides for agent server connectivity: `--agent-control-plane-connect-timeout`, `--agent-control-plane-request-timeout`, `--agent-control-plane-retries`, `--agent-control-plane-retry-delay`
 - Host agent CLI and runtime profile fields for agent server connectivity: `--control-plane-connect-timeout`, `--control-plane-request-timeout`, `--control-plane-retries`, `--control-plane-retry-delay`, `control_plane_connect_timeout`, `control_plane_request_timeout`, `control_plane_retry_count`, `control_plane_retry_delay`
 - Kanbalone adapter and bootstrap tooling, defaulting to Kanbalone `v0.9.19`
-- Agent HTTP worker gateway
+- Agent HTTP worker gateway, including claimed-job heartbeats
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates
 - GHCR runtime image tags: `latest`, `0.5.29`, and `sha-*`

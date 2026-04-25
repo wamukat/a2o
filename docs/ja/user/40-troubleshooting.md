@@ -128,16 +128,18 @@ a2o runtime reset-task <task-ref>
 
 ## カンバンが空に見える
 
-`a2o kanban up` は Compose プロジェクトと Docker volume を使う。Compose プロジェクトが変わると別 volume になり、同じプロダクトでも別ボードに見える。
+同梱モードでは、`a2o kanban up` は Compose プロジェクトと Docker volume を使う。Compose プロジェクトが変わると別 volume になり、同じプロダクトでも別ボードに見える。外部モードでは、ランタイムインスタンスの `kanban_url`、`kanban_runtime_url`、または `kanban.project` が想定と違う endpoint / ボードを指している可能性が高い。
 
 確認するもの:
 
 - `.work/a2o/runtime-instance.json` の Compose プロジェクト
+- `.work/a2o/runtime-instance.json` の Kanban モード、公開 URL、ランタイム URL
+- `project.yaml` の `kanban.project` にあるボード / プロジェクト名
 - `a2o runtime status` のカンバン / ランタイムインスタンス情報
 - `a2o kanban doctor` のサービス / ボード情報
 - Docker volume 名
 
-既存ボードを使うか、新しいボードを作るか、バックアップ / リセットするかを決めてから `a2o kanban up` を実行する。
+既存ボードを使うか、別の外部 endpoint へ向けるか、新しいボードを作るか、バックアップ / リセットするかを決めてから `a2o kanban up` を実行する。
 
 ## どのコマンドから戻るか
 

@@ -128,16 +128,18 @@ A2O updates block labels and blocked state when the next runtime attempt moves t
 
 ## Board Looks Empty
 
-`a2o kanban up` uses a Compose project and Docker volume. When the Compose project changes, the same product can appear as a different board.
+In bundled mode, `a2o kanban up` uses a Compose project and Docker volume. When the Compose project changes, the same product can appear as a different board. In external mode, an empty board usually means the runtime instance points at a different `kanban_url`, `kanban_runtime_url`, or `kanban.project` than expected.
 
 Check:
 
 - Compose project in `.work/a2o/runtime-instance.json`
+- Kanban mode, public URL, and runtime URL in `.work/a2o/runtime-instance.json`
+- Board/project name in `project.yaml` under `kanban.project`
 - Kanban / runtime instance information in `a2o runtime status`
 - Service / board information in `a2o kanban doctor`
 - Docker volume name
 
-Decide whether to reuse the existing board, create a new board, back up data, or reset data before running `a2o kanban up`.
+Decide whether to reuse the existing board, point the runtime instance at another external endpoint, create a new board, back up data, or reset data before running `a2o kanban up`.
 
 ## Returning To Normal Operation
 

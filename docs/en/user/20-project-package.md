@@ -125,6 +125,9 @@ runtime:
   agent_control_plane_request_timeout: 30s
   agent_control_plane_retry_count: 2
   agent_control_plane_retry_delay: 1s
+  review_gate:
+    child: false
+    single: false
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -138,6 +141,8 @@ Use these rules:
 - Treat the worker request JSON and `A2O_*` environment variables as the stable runtime contract.
 - Do not read private `.a3` metadata or generated launcher files from project scripts.
 - Make worker failures actionable: explain which command failed, which repo/workspace was involved, and what the user should fix.
+
+`runtime.review_gate.child` and `runtime.review_gate.single` are optional. The default is `false`, which keeps the historical flow where child and single tasks move from implementation to verification. When set to `true`, implementation success moves that task kind into the review phase first; review approval then continues to verification, and review findings can send the task back to implementation.
 
 Generate a minimal worker with:
 

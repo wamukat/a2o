@@ -184,7 +184,7 @@ Covers internal evidence that supports reproducible review, merge, rerun, and bl
 - [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md)
 - [../user/95-runtime-naming-boundary.md](../user/95-runtime-naming-boundary.md)
 
-Covers the Docker runtime image, host launcher, bundled kanban service, agent boundary, and internal compatibility names.
+Covers the Docker runtime image, host launcher, bundled or external Kanbalone boundary, agent boundary, and internal compatibility names.
 
 ### 8. Reference Validation
 

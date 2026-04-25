@@ -48,6 +48,9 @@ runtime:
   agent_control_plane_request_timeout: 30s
   agent_control_plane_retry_count: 2
   agent_control_plane_retry_delay: 1s
+  review_gate:
+    child: false
+    single: false
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -83,6 +86,8 @@ runtime:
 `runtime.agent_attempts` and `runtime.agent_poll_interval` control the outer host-agent loop.
 
 `runtime.agent_control_plane_connect_timeout`, `runtime.agent_control_plane_request_timeout`, `runtime.agent_control_plane_retry_count`, and `runtime.agent_control_plane_retry_delay` control the host agent's HTTP client when it talks to the local agent server. Use these when TCP connect timeouts or transient control-plane failures need project-specific tuning.
+
+`runtime.review_gate.child` and `runtime.review_gate.single` are optional booleans. They default to `false`. When enabled for a task kind, successful implementation transitions to `review` before verification. Review approval continues to verification; review findings can require rework and return the task to implementation.
 
 Project-specific human labels can be declared in `kanban.labels`. A2O-owned trigger and internal coordination labels are not user-authored.
 

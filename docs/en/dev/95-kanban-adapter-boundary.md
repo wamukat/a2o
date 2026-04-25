@@ -14,6 +14,15 @@ The A2O engine talks to kanban through a command contract compatible with `tools
 
 The command contract is the external tooling surface. Internally, Ruby code reaches kanban through an operation client boundary instead of scattering subprocess calls across orchestration code.
 
+## Runtime Kanbalone Modes
+
+A2O supports two runtime instance modes:
+
+- `bundled`: A2O starts and manages the bundled Kanbalone service for the project instance.
+- `external`: A2O connects to an existing Kanbalone endpoint and only provisions/checks the configured board.
+
+External mode stores both a user-facing `kanban_url` and an optional `kanban_runtime_url`. The host launcher uses the public URL for operator commands such as `a2o kanban url`; runtime container commands use the runtime URL so Docker networking can target `host.docker.internal` or another reachable service name. The adapter contract remains the subprocess CLI contract above; only the endpoint and lifecycle ownership change.
+
 ## Done And Resolved
 
 A2O distinguishes automation completion from human confirmation.

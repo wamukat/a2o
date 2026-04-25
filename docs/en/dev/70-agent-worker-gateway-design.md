@@ -20,8 +20,9 @@ This document covers the boundary where the Engine publishes a prepared phase jo
 1. The Engine creates or refreshes the workspace for a task phase.
 2. The Engine publishes an agent job through the control plane.
 3. `a2o-agent` accepts the job, materializes the requested repo slots, and runs the declared command.
-4. The agent uploads structured result metadata and declared artifacts.
-5. The Engine parses the result, records evidence, transitions the task, and publishes or merges refs when the phase allows it.
+4. While the command is running, the agent sends job heartbeats to the control plane.
+5. The agent uploads structured result metadata and declared artifacts.
+6. The Engine parses the result, records evidence, transitions the task, and publishes or merges refs when the phase allows it.
 
 The host launcher installs the agent with:
 
@@ -85,6 +86,14 @@ The agent returns:
 - uploaded artifact refs
 - workspace descriptor
 - publication refs
+
+While a claimed job is running, the agent posts progress to:
+
+```text
+POST /v1/agent/jobs/:id/heartbeat
+```
+
+The control plane persists `heartbeat_at` on the job record and exposes it from `GET /v1/agent/jobs/:id`. The host agent sends an immediate heartbeat after claim and periodic heartbeats until the command finishes. The final result may still include a terminal heartbeat value, but in-progress liveness must not depend on waiting for that final result.
 
 ## Worker Protocol Environment
 

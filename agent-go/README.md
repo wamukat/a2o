@@ -133,6 +133,7 @@ When `--output` points to a file, the generator writes `project.yaml` only. A2O 
 After `a2o project bootstrap`, runtime commands discover `.work/a2o/runtime-instance.json` from the current directory upward. If the package is not in `./a2o-project` or `./project-package`, pass `--package DIR`:
 
 ```sh
+a2o project bootstrap --package ./project-package
 a2o kanban up
 a2o kanban doctor
 a2o kanban url
@@ -143,6 +144,17 @@ a2o runtime resume --interval 60s
 a2o runtime status
 a2o runtime pause
 ```
+
+Bundled Kanbalone remains the default. To attach the runtime instance to an existing Kanbalone board, bootstrap in external mode:
+
+```sh
+a2o project bootstrap \
+  --package ./project-package \
+  --kanban-mode external \
+  --kanban-url http://127.0.0.1:3470
+```
+
+In external mode, `a2o kanban up` validates and bootstraps the configured board instead of starting the bundled service. If the runtime container cannot reach the host URL directly, set `--kanban-runtime-url`; loopback `--kanban-url` values derive a `host.docker.internal` runtime URL by default.
 
 Execution-loop commands live under `a2o runtime ...`, not `a2o kanban ...`. Branch refs created by internal runtime jobs remain namespaced by the compose project, for example `refs/heads/a2o/a2o-reference/work/A2OReference-1`, so isolated boards do not reuse existing live-repo branches with the same task number.
 

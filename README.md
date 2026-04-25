@@ -34,7 +34,7 @@ Start with [docs/en/user/00-overview.md](docs/en/user/00-overview.md) to underst
 
 ## Principles
 
-- A2O is a local-first runtime built around the bundled kanban service and `a2o-agent`.
+- A2O is a local-first runtime that ships with bundled Kanbalone by default and can also connect to an external Kanbalone board.
 - The Engine owns orchestration, state, the kanban adapter, the agent control plane, and evidence.
 - Product-specific toolchains are not baked into the runtime image. They run through `a2o-agent` on the host or in a project dev environment.
 - Product-specific knowledge belongs in the project package, not in Engine core.

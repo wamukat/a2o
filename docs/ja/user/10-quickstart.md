@@ -97,10 +97,14 @@ a2o project bootstrap
 
 `project bootstrap` は `.work/a2o/runtime-instance.json` を作る。以後の `kanban`、`agent`、`runtime` コマンドは、このインスタンス設定を見つけて同じランタイムインスタンスを使う。
 
-ポートや Compose プロジェクト名を変えたい場合だけオプションを指定する。
+ポート、Compose プロジェクト名、外部 Kanbalone ボードを使いたい場合だけオプションを指定する。
 
 ```sh
 a2o project bootstrap --compose-project my-product --kanbalone-port 3471 --agent-port 7394
+```
+
+```sh
+a2o project bootstrap --kanban-mode external --kanban-url http://127.0.0.1:3470
 ```
 
 ## 5. カンバンを起動する
@@ -110,7 +114,7 @@ a2o kanban up
 a2o kanban url
 ```
 
-`kanban up` は同梱されたカンバンサービスを起動し、A2O が必要とするレーンと内部ラベルを用意する。`kanban url` はボード URL を表示する。
+`kanban up` は同梱されたカンバンサービスを起動し、A2O が必要とするレーンと内部ラベルを用意する。外部モードでは同梱サービスを起動せず、設定済み Kanbalone endpoint を検証してそのボードを初期化する。`kanban url` はボード URL を表示する。
 
 同じ Compose プロジェクトなら既存ボードを再利用する。ボードが空に見える場合は、Compose プロジェクトや Docker volume が変わっていないか確認する。運用の詳細は [30-operating-runtime.md](30-operating-runtime.md) を読む。
 

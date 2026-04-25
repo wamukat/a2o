@@ -97,10 +97,14 @@ a2o project bootstrap
 
 `project bootstrap` writes `.work/a2o/runtime-instance.json`. Later `kanban`, `agent`, and `runtime` commands discover that file and use the same runtime instance.
 
-Specify options only when you need different ports or a different Compose project name.
+Specify options only when you need different ports, a different Compose project name, or an external Kanbalone board.
 
 ```sh
 a2o project bootstrap --compose-project my-product --kanbalone-port 3471 --agent-port 7394
+```
+
+```sh
+a2o project bootstrap --kanban-mode external --kanban-url http://127.0.0.1:3470
 ```
 
 ## 5. Start Kanban
@@ -110,7 +114,7 @@ a2o kanban up
 a2o kanban url
 ```
 
-`kanban up` starts the bundled kanban service and provisions the lanes and internal labels A2O needs. `kanban url` prints the board URL.
+`kanban up` starts the bundled kanban service and provisions the lanes and internal labels A2O needs. In external mode, it validates the configured Kanbalone endpoint and provisions that board without starting the bundled service. `kanban url` prints the board URL.
 
 The same Compose project reuses the existing board. If the board looks empty, check whether the Compose project or Docker volume changed. Runtime operations are covered in [30-operating-runtime.md](30-operating-runtime.md).
 

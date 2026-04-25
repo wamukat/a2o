@@ -118,6 +118,14 @@ a2o kanban url
 
 `kanban up` starts the bundled kanban service and provisions the lanes and internal labels A2O needs. Users should not hand-author A2O-managed lanes or internal labels in the project package.
 
+Bundled Kanbalone is the default. If multiple A2O projects should share one independent Kanbalone instance while keeping separate boards per project, create the runtime instance in external mode:
+
+```sh
+a2o project bootstrap --kanban-mode external --kanban-url http://127.0.0.1:3470
+```
+
+External mode stores the public board URL in the runtime instance and, when needed, a separate runtime URL for the Docker container. Use `--kanban-runtime-url` when the runtime container cannot reach the host URL directly. For loopback host URLs, A2O derives a `host.docker.internal` runtime URL unless one is explicitly provided. In this mode, `kanban up`, `kanban doctor`, `runtime status`, `runtime doctor`, and `doctor` check the external endpoint; `runtime up` starts the A2O runtime container without managing the bundled Kanbalone container.
+
 The same Compose project reuses the existing board. If the Compose project or Docker volume changes, the same product can appear to have a different empty board. When that happens, first check instance settings, Compose project, and volume through `a2o runtime status` and `a2o kanban doctor`.
 
 ## Agent Operation

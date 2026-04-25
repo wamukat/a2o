@@ -184,7 +184,7 @@ A2O の全体像と導入手順を扱う。
 - [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md)
 - [../user/95-runtime-naming-boundary.md](../user/95-runtime-naming-boundary.md)
 
-Docker ランタイムイメージ、ホスト用ランチャー、同梱カンバンサービス、エージェント境界、内部互換名の境界を扱う。
+Docker ランタイムイメージ、ホスト用ランチャー、同梱または外部 Kanbalone 境界、エージェント境界、内部互換名の境界を扱う。
 
 ### 8. 参照用検証
 
