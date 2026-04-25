@@ -51,7 +51,8 @@ module A3
           task_ref: task_ref,
           run_ref: run_ref,
           outcome: completion_outcome_for(task: task, run: run, execution: execution),
-          execution: execution
+          execution: execution,
+          phase_runtime: runtime
         )
         Result.new(task: completion.task, run: completion.run)
       end

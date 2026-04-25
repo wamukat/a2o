@@ -20,7 +20,7 @@ module A3
         @handle_parent_review_disposition = handle_parent_review_disposition
       end
 
-      def call(task_ref:, run_ref:, outcome:, execution: nil)
+      def call(task_ref:, run_ref:, outcome:, execution: nil, phase_runtime: nil)
         task = @task_repository.fetch(task_ref)
         run = @run_repository.fetch(run_ref)
         disposition_result = resolve_parent_review_disposition(task: task, run: run, execution: execution, outcome: outcome)
@@ -28,7 +28,7 @@ module A3
 
         artifact_violation = artifact_contract_violation?(task: task, run: run, outcome: outcome)
         terminal_outcome = artifact_violation ? :blocked : outcome
-        phase_result = @plan_next_phase.call(task: task, run: run, outcome: terminal_outcome)
+        phase_result = @plan_next_phase.call(task: task, run: run, outcome: terminal_outcome, phase_runtime: phase_runtime)
         completed_run = completed_run_for(task: task, run: run, outcome: terminal_outcome, artifact_violation: artifact_violation)
         completed_task = task.complete_run(
           next_phase: phase_result.next_phase,

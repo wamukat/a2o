@@ -48,6 +48,37 @@ RSpec.describe A3::Application::PlanNextPhase do
     expect(result.next_phase).to eq(:verification)
   end
 
+  it "moves a child task from implementation to review when review gate is required" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha]
+    )
+    run = A3::Domain::Run.new(
+      ref: "run-1",
+      task_ref: task.ref,
+      phase: :implementation,
+      workspace_kind: :ticket_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :ticket_workspace,
+        source_type: :branch_head,
+        ref: "refs/heads/a2o/work/3025",
+        task_ref: task.ref
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        ownership_scope: :task
+      ),
+      artifact_owner: artifact_owner
+    )
+    phase_runtime = instance_double(A3::Domain::PhaseRuntimeConfig, review_gate_required: true)
+
+    result = use_case.call(task: task, run: run, outcome: :completed, phase_runtime: phase_runtime)
+
+    expect(result.next_phase).to eq(:review)
+  end
+
   it "moves a parent task from review to verification" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3022",

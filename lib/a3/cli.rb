@@ -514,6 +514,7 @@ module A3
 
         out.puts("implementation_skill=#{runtime.implementation_skill}")
         out.puts("review_skill=#{runtime.review_skill}") if session.options.fetch(:task_kind) == :parent && session.options.fetch(:phase) == :review
+        out.puts("review_gate_required=#{runtime.review_gate_required}")
         out.puts("merge_target=#{runtime.merge_target}")
         out.puts("merge_policy=#{runtime.merge_policy}")
       end

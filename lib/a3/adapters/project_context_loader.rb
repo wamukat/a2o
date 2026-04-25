@@ -58,11 +58,29 @@ module A3
         A3::Domain::ProjectContext.new(
           surface: surface,
           merge_config: merge_config_resolver.default_merge_config,
-          merge_config_resolver: merge_config_resolver
+          merge_config_resolver: merge_config_resolver,
+          review_gate: review_gate_config(runtime)
         )
       end
 
       private
+
+      def review_gate_config(runtime)
+        gate = runtime.fetch("review_gate", {})
+        unless gate.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.review_gate must be a mapping"
+        end
+        {
+          child: boolean_gate_value(gate.fetch("child", false), "child"),
+          single: boolean_gate_value(gate.fetch("single", false), "single")
+        }
+      end
+
+      def boolean_gate_value(value, key)
+        return value if value == true || value == false
+
+        raise A3::Domain::ConfigurationError, "project.yaml runtime.review_gate.#{key} must be true or false"
+      end
 
       def load_project_config(path)
         if File.basename(path) == "manifest.yml"

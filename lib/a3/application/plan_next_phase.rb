@@ -5,13 +5,17 @@ module A3
     class PlanNextPhase
       Result = Struct.new(:next_phase, :terminal_status, keyword_init: true)
 
-      def call(task:, run:, outcome:)
+      def call(task:, run:, outcome:, phase_runtime: nil)
         outcome_name = outcome.to_sym
         return Result.new(next_phase: :verification, terminal_status: nil) if outcome_name == :verification_required
         return Result.new(next_phase: nil, terminal_status: task.terminal_status_for(phase: run.phase, outcome: outcome_name)) if outcome_name == :rework
 
         if %i[blocked retryable terminal_noop].include?(outcome_name)
           return Result.new(next_phase: nil, terminal_status: task.terminal_status_for(phase: run.phase, outcome: outcome_name))
+        end
+
+        if outcome_name == :completed && run.phase.to_sym == :implementation && phase_runtime&.review_gate_required
+          return Result.new(next_phase: :review, terminal_status: nil)
         end
 
         next_phase = task.next_phase_for(run.phase)

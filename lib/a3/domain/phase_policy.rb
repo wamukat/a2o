@@ -4,18 +4,20 @@ module A3
   module Domain
     class PhasePolicy
       SUPPORTED_PHASES = {
-        single: %i[implementation verification merge].freeze,
-        child: %i[implementation verification merge].freeze,
+        single: %i[implementation review verification merge].freeze,
+        child: %i[implementation review verification merge].freeze,
         parent: %i[review verification merge].freeze
       }.freeze
 
       NEXT_PHASE_BY_KIND = {
         single: {
           implementation: :verification,
+          review: :verification,
           verification: :merge
         }.freeze,
         child: {
           implementation: :verification,
+          review: :verification,
           verification: :merge
         }.freeze,
         parent: {

@@ -37,6 +37,32 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
     expect(context.merge_config.target_ref).to eq("refs/heads/feature/prototype")
   end
 
+  it "loads optional review gate policy for child and single tasks" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "review_gate" => {
+          "child" => true,
+          "single" => false
+        },
+        "phases" => base_phases.merge(
+          "merge" => {
+            "policy" => "ff_only",
+            "target_ref" => "refs/heads/feature/prototype"
+          }
+        )
+      }
+    )
+    child_task = A3::Domain::Task.new(ref: "A3-v2#3037", kind: :child, edit_scope: [:repo_beta])
+    single_task = A3::Domain::Task.new(ref: "A3-v2#3038", kind: :single, edit_scope: [:repo_beta])
+
+    context = loader.load(project_config_path)
+
+    expect(context.review_gate_required?(:child)).to be(true)
+    expect(context.review_gate_required?(:single)).to be(false)
+    expect(context.resolve_phase_runtime(task: child_task, phase: :implementation).review_gate_required).to be(true)
+    expect(context.resolve_phase_runtime(task: single_task, phase: :implementation).review_gate_required).to be(false)
+  end
+
   it "resolves verification and remediation command variants per task" do
     phases = base_phases.merge(
       "verification" => {

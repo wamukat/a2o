@@ -54,10 +54,11 @@ module EnvFixtureHelper
 end
 
 module ProjectYamlFixtureHelper
-  def project_yaml_payload(merge_policy: "ff_only", merge_target_ref: "refs/heads/main")
+  def project_yaml_payload(merge_policy: "ff_only", merge_target_ref: "refs/heads/main", review_gate: nil)
     {
       "schema_version" => 1,
       "runtime" => {
+        **(review_gate ? { "review_gate" => review_gate } : {}),
         "phases" => {
           "implementation" => {
             "skill" => "skills/implementation/base.md"

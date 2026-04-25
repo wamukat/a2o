@@ -4,10 +4,12 @@ module A3
   module Domain
     class PhaseRuntimeConfig
       attr_reader :task_kind, :repo_scope, :phase, :implementation_skill, :review_skill,
-                  :verification_commands, :remediation_commands, :workspace_hook, :merge_target, :merge_policy, :merge_target_ref
+                  :verification_commands, :remediation_commands, :workspace_hook, :merge_target, :merge_policy,
+                  :merge_target_ref, :review_gate_required
 
       def initialize(task_kind:, repo_scope:, phase:, implementation_skill:, review_skill:, verification_commands:,
-                     remediation_commands:, workspace_hook:, merge_target:, merge_policy:, merge_target_ref: nil)
+                     remediation_commands:, workspace_hook:, merge_target:, merge_policy:, merge_target_ref: nil,
+                     review_gate_required: false)
         @task_kind = task_kind.to_sym
         @repo_scope = repo_scope.to_sym
         @phase = phase.to_sym
@@ -19,6 +21,7 @@ module A3
         @merge_target = merge_target.to_sym
         @merge_policy = merge_policy.to_sym
         @merge_target_ref = merge_target_ref
+        @review_gate_required = !!review_gate_required
         freeze
       end
 
@@ -34,7 +37,8 @@ module A3
           other.workspace_hook == workspace_hook &&
           other.merge_target == merge_target &&
           other.merge_policy == merge_policy &&
-          other.merge_target_ref == merge_target_ref
+          other.merge_target_ref == merge_target_ref &&
+          other.review_gate_required == review_gate_required
       end
       alias eql? ==
 
@@ -50,7 +54,8 @@ module A3
           "remediation_commands" => remediation_commands,
           "merge_target" => merge_target.to_s,
           "merge_policy" => merge_policy.to_s,
-          "merge_target_ref" => merge_target_ref
+          "merge_target_ref" => merge_target_ref,
+          "review_gate_required" => review_gate_required
         }
       end
     end

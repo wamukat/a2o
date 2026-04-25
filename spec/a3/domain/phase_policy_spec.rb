@@ -8,8 +8,8 @@ RSpec.describe A3::Domain::PhasePolicy do
       expect(policy.supports_phase?(:implementation)).to be(true)
     end
 
-    it "does not treat child review as a canonical phase for fresh tasks" do
-      expect(policy.supports_phase?(:review)).to be(false)
+    it "supports child review when a review gate advances the task there" do
+      expect(policy.supports_phase?(:review)).to be(true)
     end
 
     it "does not support implementation for parent tasks" do

@@ -73,6 +73,62 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "executes a single task review gate when enabled" do
+    Dir.mktmpdir do |dir|
+      repo_sources = create_repo_sources(dir)
+      seed_context(dir)
+      write_project_yaml(File.join(dir, "project.yaml"), review_gate: { "single" => true })
+      task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "A3-v2#3030",
+          kind: :single,
+          edit_scope: [:repo_alpha],
+          verification_scope: [:repo_alpha],
+          status: :todo
+        )
+      )
+      allow(worker_gateway).to receive(:run).and_return(
+        A3::Application::ExecutionResult.new(
+          success: true,
+          summary: "worker phase completed"
+        )
+      )
+      allow(command_runner).to receive(:run).and_return(
+        A3::Application::ExecutionResult.new(
+          success: true,
+          summary: "verification completed"
+        )
+      )
+      allow(merge_runner).to receive(:run).and_return(
+        A3::Application::ExecutionResult.new(
+          success: true,
+          summary: "merge completed"
+        )
+      )
+
+      out = StringIO.new
+      described_class.start(
+        [
+          "execute-until-idle",
+          File.join(dir, "project.yaml"),
+          "--storage-backend", "sqlite",
+          "--storage-dir", dir,
+          *repo_source_args(repo_sources),
+          "--preset-dir", File.join(dir, "presets"),
+          "--max-steps", "5"
+        ],
+        out: out,
+        worker_gateway: worker_gateway,
+        command_runner: command_runner,
+        merge_runner: merge_runner
+      )
+
+      expect(out.string).to include("steps=A3-v2#3030:implementation,A3-v2#3030:review,A3-v2#3030:verification,A3-v2#3030:merge")
+      expect(task_repository.fetch("A3-v2#3030").status).to eq(:done)
+    end
+  end
+
   it "preserves blocked task workspaces when execute-until-idle reaches idle" do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)

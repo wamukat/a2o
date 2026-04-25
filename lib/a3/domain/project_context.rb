@@ -3,12 +3,13 @@
 module A3
   module Domain
     class ProjectContext
-      attr_reader :surface, :merge_config
+      attr_reader :surface, :merge_config, :review_gate
 
-      def initialize(surface:, merge_config:, merge_config_resolver: nil)
+      def initialize(surface:, merge_config:, merge_config_resolver: nil, review_gate: {})
         @surface = surface
         @merge_config = merge_config
         @merge_config_resolver = merge_config_resolver
+        @review_gate = normalize_review_gate(review_gate)
         freeze
       end
 
@@ -25,14 +26,29 @@ module A3
           workspace_hook: surface.workspace_hook,
           merge_target: resolved_merge_config.target,
           merge_policy: resolved_merge_config.policy,
-          merge_target_ref: resolved_merge_config.target_ref
+          merge_target_ref: resolved_merge_config.target_ref,
+          review_gate_required: review_gate_required?(task.kind)
         )
+      end
+
+      def review_gate_required?(task_kind)
+        !!review_gate[task_kind.to_sym]
       end
 
       def merge_config_for(task:, phase:)
         return merge_config unless @merge_config_resolver
 
         @merge_config_resolver.resolve(task: task, phase: phase)
+      end
+
+      private
+
+      def normalize_review_gate(value)
+        mapping = value || {}
+        {
+          child: !!mapping.fetch(:child, mapping.fetch("child", false)),
+          single: !!mapping.fetch(:single, mapping.fetch("single", false))
+        }.freeze
       end
     end
   end
