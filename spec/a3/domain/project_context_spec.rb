@@ -85,6 +85,28 @@ RSpec.describe A3::Domain::ProjectContext do
     )
   end
 
+  it "uses task labels to override review gate policy" do
+    context = described_class.new(
+      surface: surface,
+      merge_config: A3::Domain::MergeConfig.new(
+        target: :merge_to_parent,
+        policy: :ff_only,
+        target_ref: "refs/heads/live"
+      ),
+      review_gate: {
+        child: true,
+        single: false,
+        skip_labels: ["review:light"],
+        require_labels: ["review:formal"]
+      }
+    )
+    light_child = A3::Domain::Task.new(ref: "A3-v2#3030", kind: :child, edit_scope: [:repo_alpha], labels: ["review:light"])
+    formal_single = A3::Domain::Task.new(ref: "A3-v2#3031", kind: :single, edit_scope: [:repo_alpha], labels: ["review:formal"])
+
+    expect(context.resolve_phase_runtime(task: light_child, phase: :implementation).review_gate_required).to be(false)
+    expect(context.resolve_phase_runtime(task: formal_single, phase: :implementation).review_gate_required).to be(true)
+  end
+
   it "uses a task-kind-specific merge config resolver when present" do
     resolver = A3::Domain::MergeConfigResolver.new(
       policy_spec: "ff_only",

@@ -63,6 +63,54 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
     expect(context.resolve_phase_runtime(task: single_task, phase: :implementation).review_gate_required).to be(false)
   end
 
+  it "applies review gate label overrides" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "review_gate" => {
+          "child" => true,
+          "single" => false,
+          "skip_labels" => ["review:light"],
+          "require_labels" => ["review:formal"]
+        },
+        "phases" => base_phases.merge(
+          "merge" => {
+            "policy" => "ff_only",
+            "target_ref" => "refs/heads/feature/prototype"
+          }
+        )
+      }
+    )
+    light_child = A3::Domain::Task.new(ref: "A3-v2#3037", kind: :child, edit_scope: [:repo_beta], labels: ["review:light"])
+    formal_single = A3::Domain::Task.new(ref: "A3-v2#3038", kind: :single, edit_scope: [:repo_beta], labels: ["review:formal"])
+    conflicting_child = A3::Domain::Task.new(ref: "A3-v2#3039", kind: :child, edit_scope: [:repo_beta], labels: ["review:formal", "review:light"])
+
+    context = loader.load(project_config_path)
+
+    expect(context.review_gate_required?(:child, labels: ["review:light"])).to be(false)
+    expect(context.resolve_phase_runtime(task: light_child, phase: :implementation).review_gate_required).to be(false)
+    expect(context.resolve_phase_runtime(task: formal_single, phase: :implementation).review_gate_required).to be(true)
+    expect(context.resolve_phase_runtime(task: conflicting_child, phase: :implementation).review_gate_required).to be(false)
+  end
+
+  it "rejects non-string review gate label overrides" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "review_gate" => {
+          "skip_labels" => ["review:light", 12]
+        },
+        "phases" => base_phases.merge(
+          "merge" => {
+            "policy" => "ff_only",
+            "target_ref" => "refs/heads/feature/prototype"
+          }
+        )
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.review_gate.skip_labels[1] must be a non-empty string")
+  end
+
   it "resolves verification and remediation command variants per task" do
     phases = base_phases.merge(
       "verification" => {

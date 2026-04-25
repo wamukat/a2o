@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "set"
+
 module A3
   module Domain
     class ProjectContext
@@ -27,12 +29,16 @@ module A3
           merge_target: resolved_merge_config.target,
           merge_policy: resolved_merge_config.policy,
           merge_target_ref: resolved_merge_config.target_ref,
-          review_gate_required: review_gate_required?(task.kind)
+          review_gate_required: review_gate_required?(task.kind, labels: task.labels)
         )
       end
 
-      def review_gate_required?(task_kind)
-        !!review_gate[task_kind.to_sym]
+      def review_gate_required?(task_kind, labels: [])
+        task_labels = Array(labels).map(&:to_s).to_set
+        required = !!review_gate.fetch(:required_by_kind).fetch(task_kind.to_sym, false)
+        required = true if review_gate.fetch(:require_labels).any? { |label| task_labels.include?(label) }
+        required = false if review_gate.fetch(:skip_labels).any? { |label| task_labels.include?(label) }
+        required
       end
 
       def merge_config_for(task:, phase:)
@@ -46,9 +52,17 @@ module A3
       def normalize_review_gate(value)
         mapping = value || {}
         {
-          child: !!mapping.fetch(:child, mapping.fetch("child", false)),
-          single: !!mapping.fetch(:single, mapping.fetch("single", false))
+          required_by_kind: {
+            child: !!mapping.fetch(:child, mapping.fetch("child", false)),
+            single: !!mapping.fetch(:single, mapping.fetch("single", false))
+          }.freeze,
+          skip_labels: normalize_label_list(mapping.fetch(:skip_labels, mapping.fetch("skip_labels", []))),
+          require_labels: normalize_label_list(mapping.fetch(:require_labels, mapping.fetch("require_labels", [])))
         }.freeze
+      end
+
+      def normalize_label_list(value)
+        Array(value).map(&:to_s).map(&:strip).reject(&:empty?).uniq.freeze
       end
     end
   end

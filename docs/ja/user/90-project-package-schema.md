@@ -57,6 +57,8 @@ runtime:
   review_gate:
     child: false
     single: false
+    skip_labels: []
+    require_labels: []
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -103,6 +105,8 @@ task_templates:
 `runtime.agent_control_plane_connect_timeout`、`runtime.agent_control_plane_request_timeout`、`runtime.agent_control_plane_retry_count`、`runtime.agent_control_plane_retry_delay` は、host agent が local agent server へ HTTP 接続するときの connect timeout / request timeout / retry を制御する。TCP 接続 timeout や一時的な control-plane failure を project ごとに調整したいときはここを使う。
 
 `runtime.review_gate.child` と `runtime.review_gate.single` は任意の boolean であり、既定は `false` である。有効にした task kind は implementation 成功後に verification へ直行せず、先に `review` へ遷移する。レビュー承認後は verification へ進み、レビュー指摘がある場合は implementation へ戻せる。
+
+`runtime.review_gate.skip_labels` と `runtime.review_gate.require_labels` は任意のカンバンラベル名配列である。`require_labels` は task kind の既定値が `false` でも一致タスクの review gate を有効にする。`skip_labels` は task kind の既定値が `true` でも一致タスクの review gate を無効にする。両方に一致した場合は `skip_labels` を優先する。
 
 `kanban` はボード名、プロジェクトが所有するラベル、タスク選択条件を持つ。カンバンの接続先は `a2o project bootstrap` で作るランタイムインスタンス側の設定であり、作成者向けの `project.yaml` 設定ではない。A2O が管理するレーンと内部調整ラベルはランタイム実装の詳細であり、通常のパッケージスキーマには書かせない。
 

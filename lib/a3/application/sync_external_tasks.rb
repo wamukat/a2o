@@ -93,7 +93,8 @@ module A3
           priority: imported_task.priority,
           external_task_id: imported_task.external_task_id,
           verification_source_ref: existing_task.verification_source_ref,
-          automation_enabled: reconcile_automation_enabled(existing_task, imported_task)
+          automation_enabled: reconcile_automation_enabled(existing_task, imported_task),
+          labels: imported_task.labels
         )
       end
 
@@ -114,11 +115,12 @@ module A3
           priority: imported_task.priority,
           external_task_id: imported_task.external_task_id,
           verification_source_ref: imported_task.verification_source_ref,
-          automation_enabled: automation_enabled
+          automation_enabled: automation_enabled,
+          labels: imported_task.labels
         )
       end
 
-      def build_reconciled_task(ref:, kind:, edit_scope:, verification_scope:, status:, current_run_ref:, parent_ref:, child_refs:, blocking_task_refs:, priority:, external_task_id:, verification_source_ref: nil, automation_enabled: true)
+      def build_reconciled_task(ref:, kind:, edit_scope:, verification_scope:, status:, current_run_ref:, parent_ref:, child_refs:, blocking_task_refs:, priority:, external_task_id:, verification_source_ref: nil, automation_enabled: true, labels: [])
         A3::Domain::Task.new(
           ref: ref,
           kind: kind,
@@ -132,7 +134,8 @@ module A3
           priority: priority,
           external_task_id: external_task_id,
           verification_source_ref: verification_source_ref,
-          automation_enabled: automation_enabled
+          automation_enabled: automation_enabled,
+          labels: labels
         )
       end
 
@@ -168,7 +171,8 @@ module A3
           priority: refreshed_task.priority,
           external_task_id: refreshed_task.external_task_id,
           verification_source_ref: existing_task.verification_source_ref,
-          automation_enabled: preserve_existing_automation_enabled?(existing_task, refreshed_task) ? existing_task.automation_enabled : refreshed_task.automation_enabled
+          automation_enabled: preserve_existing_automation_enabled?(existing_task, refreshed_task) ? existing_task.automation_enabled : refreshed_task.automation_enabled,
+          labels: refreshed_task.labels
         )
       end
 

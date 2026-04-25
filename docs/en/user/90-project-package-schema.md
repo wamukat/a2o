@@ -51,6 +51,8 @@ runtime:
   review_gate:
     child: false
     single: false
+    skip_labels: []
+    require_labels: []
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -88,6 +90,8 @@ runtime:
 `runtime.agent_control_plane_connect_timeout`, `runtime.agent_control_plane_request_timeout`, `runtime.agent_control_plane_retry_count`, and `runtime.agent_control_plane_retry_delay` control the host agent's HTTP client when it talks to the local agent server. Use these when TCP connect timeouts or transient control-plane failures need project-specific tuning.
 
 `runtime.review_gate.child` and `runtime.review_gate.single` are optional booleans. They default to `false`. When enabled for a task kind, successful implementation transitions to `review` before verification. Review approval continues to verification; review findings can require rework and return the task to implementation.
+
+`runtime.review_gate.skip_labels` and `runtime.review_gate.require_labels` are optional arrays of kanban label names. `require_labels` forces the review gate on for matching tasks even when the task-kind default is `false`; `skip_labels` forces it off for matching tasks even when the task-kind default is `true`. If both lists match the same task, `skip_labels` takes precedence.
 
 Project-specific human labels can be declared in `kanban.labels`. A2O-owned trigger and internal coordination labels are not user-authored.
 

@@ -72,7 +72,9 @@ module A3
         end
         {
           child: boolean_gate_value(gate.fetch("child", false), "child"),
-          single: boolean_gate_value(gate.fetch("single", false), "single")
+          single: boolean_gate_value(gate.fetch("single", false), "single"),
+          skip_labels: label_list_gate_value(gate.fetch("skip_labels", []), "skip_labels"),
+          require_labels: label_list_gate_value(gate.fetch("require_labels", []), "require_labels")
         }
       end
 
@@ -80,6 +82,20 @@ module A3
         return value if value == true || value == false
 
         raise A3::Domain::ConfigurationError, "project.yaml runtime.review_gate.#{key} must be true or false"
+      end
+
+      def label_list_gate_value(value, key)
+        unless value.is_a?(Array)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.review_gate.#{key} must be an array of strings"
+        end
+
+        value.map.with_index do |item, index|
+          label = item.to_s.strip
+          if label.empty? || !item.is_a?(String)
+            raise A3::Domain::ConfigurationError, "project.yaml runtime.review_gate.#{key}[#{index}] must be a non-empty string"
+          end
+          label
+        end.uniq.freeze
       end
 
       def load_project_config(path)

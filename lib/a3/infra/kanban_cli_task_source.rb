@@ -157,6 +157,7 @@ module A3
           "ref" => task_ref,
           "status" => status,
           "edit_scope" => edit_scope,
+          "labels" => labels,
           "parent_ref" => parent_ref,
           "blocking_task_refs" => normalize_blocking_refs(blocking_task_refs),
           "priority" => normalize_priority(raw_priority),
@@ -271,7 +272,8 @@ module A3
           blocking_task_refs: snapshot.fetch("blocking_task_refs", []),
           priority: snapshot.fetch("priority", 0),
           external_task_id: snapshot.fetch("task_id"),
-          automation_enabled: automation_enabled
+          automation_enabled: automation_enabled,
+          labels: snapshot.fetch("labels", [])
         )
       end
 
@@ -288,7 +290,8 @@ module A3
           blocking_task_refs: snapshot.fetch("blocking_task_refs", []),
           priority: snapshot.fetch("priority", 0),
           external_task_id: snapshot.fetch("task_id"),
-          automation_enabled: true
+          automation_enabled: true,
+          labels: snapshot.fetch("labels", [])
         )
       end
 
@@ -322,6 +325,7 @@ module A3
           "ref" => task_ref,
           "status" => status,
           "edit_scope" => edit_scope,
+          "labels" => labels,
           "parent_ref" => normalize_parent_ref(raw_snapshot["parent_ref"]),
           "blocking_task_refs" => normalize_blocking_refs(raw_snapshot["blocking_task_refs"]),
           "priority" => normalize_priority(raw_snapshot["priority"]),

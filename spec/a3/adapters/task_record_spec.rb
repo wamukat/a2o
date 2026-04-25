@@ -11,7 +11,8 @@ RSpec.describe A3::Adapters::TaskRecord do
       current_run_ref: "run-1",
       parent_ref: "A3-v2#3022",
       external_task_id: 3025,
-      verification_source_ref: "refs/heads/a2o/recovered/A3-v2-3025"
+      verification_source_ref: "refs/heads/a2o/recovered/A3-v2-3025",
+      labels: ["repo:alpha", "review:light"]
     )
 
     record = described_class.dump(task)
@@ -30,7 +31,8 @@ RSpec.describe A3::Adapters::TaskRecord do
       "priority" => 0,
       "external_task_id" => 3025,
       "verification_source_ref" => "refs/heads/a2o/recovered/A3-v2-3025",
-      "automation_enabled" => true
+      "automation_enabled" => true,
+      "labels" => ["repo:alpha", "review:light"]
     )
     expect(restored).to eq(task)
   end

@@ -53,6 +53,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
       expect(tasks.fetch(0).status).to eq(:todo)
       expect(tasks.fetch(0).priority).to eq(4)
       expect(tasks.fetch(0).external_task_id).to eq(3046)
+      expect(tasks.fetch(0).labels).to eq(["repo:ui-app", "trigger:auto-implement"])
     end
   end
 

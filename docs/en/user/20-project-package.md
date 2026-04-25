@@ -128,6 +128,8 @@ runtime:
   review_gate:
     child: false
     single: false
+    skip_labels: []
+    require_labels: []
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -143,6 +145,8 @@ Use these rules:
 - Make worker failures actionable: explain which command failed, which repo/workspace was involved, and what the user should fix.
 
 `runtime.review_gate.child` and `runtime.review_gate.single` are optional. The default is `false`, which keeps the historical flow where child and single tasks move from implementation to verification. When set to `true`, implementation success moves that task kind into the review phase first; review approval then continues to verification, and review findings can send the task back to implementation.
+
+`runtime.review_gate.skip_labels` and `runtime.review_gate.require_labels` optionally override the task-kind default per kanban task. `require_labels` turns the review gate on when a task has a matching label, and `skip_labels` turns it off when a task has a matching label. If both match, `skip_labels` wins.
 
 Generate a minimal worker with:
 

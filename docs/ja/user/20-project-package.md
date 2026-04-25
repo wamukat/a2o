@@ -107,6 +107,8 @@ runtime:
   review_gate:
     child: false
     single: false
+    skip_labels: []
+    require_labels: []
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -187,6 +189,8 @@ a2o worker scaffold --language command --output ./project-package/commands/a2o-c
 生成されたラッパーは `A2O_WORKER_COMMAND` に設定したコマンドへ A2O stdin bundle を渡す。そのコマンドは最終的な A2O worker result JSON を stdout に出す必要がある。ラッパーは A2O の結果契約を維持し、implementation 成功時に `review_disposition` がない結果を拒否する。
 
 `runtime.review_gate.child` と `runtime.review_gate.single` は任意設定であり、既定は `false` である。既定では従来通り child / single タスクは implementation から verification へ進む。`true` にすると、その task kind の implementation 成功後に review フェーズを必ず通し、レビュー承認後に verification へ進む。レビュー指摘がある場合は implementation へ戻せる。
+
+`runtime.review_gate.skip_labels` と `runtime.review_gate.require_labels` は、カンバンタスクのラベルで task kind の既定値を上書きする任意設定である。`require_labels` に一致するラベルがあれば review gate を有効にし、`skip_labels` に一致するラベルがあれば review gate を無効にする。両方に一致した場合は `skip_labels` を優先する。
 
 ```yaml
 runtime:

@@ -19,7 +19,8 @@ module A3
           "priority" => task.priority,
           "external_task_id" => task.external_task_id,
           "verification_source_ref" => task.verification_source_ref,
-          "automation_enabled" => task.automation_enabled
+          "automation_enabled" => task.automation_enabled,
+          "labels" => task.labels
         }
       end
 
@@ -37,7 +38,8 @@ module A3
           priority: record.fetch("priority", 0),
           external_task_id: record["external_task_id"],
           verification_source_ref: record["verification_source_ref"],
-          automation_enabled: record.fetch("automation_enabled", true)
+          automation_enabled: record.fetch("automation_enabled", true),
+          labels: record.fetch("labels", [])
         )
       end
     end

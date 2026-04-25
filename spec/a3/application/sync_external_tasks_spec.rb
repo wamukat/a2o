@@ -37,7 +37,8 @@ RSpec.describe A3::Application::SyncExternalTasks do
       kind: :child,
       edit_scope: [:repo_beta],
       status: :todo,
-      external_task_id: 3046
+      external_task_id: 3046,
+      labels: ["repo:beta", "review:light"]
     )
     allow(external_task_source).to receive(:load).and_return([task])
 
@@ -64,7 +65,8 @@ RSpec.describe A3::Application::SyncExternalTasks do
       verification_scope: %i[repo_alpha repo_beta],
       status: :todo,
       child_refs: ["Sample#3047"],
-      external_task_id: 4100
+      external_task_id: 4100,
+      labels: ["repo:both", "review:formal"]
     )
     task_repository.save(local_task)
     allow(external_task_source).to receive(:load).and_return([imported_task])
@@ -77,6 +79,7 @@ RSpec.describe A3::Application::SyncExternalTasks do
     expect(reconciled.kind).to eq(:parent)
     expect(reconciled.child_refs).to eq(["Sample#3047"])
     expect(reconciled.external_task_id).to eq(4100)
+    expect(reconciled.labels).to eq(["repo:both", "review:formal"])
     expect(result.preserved_active_task_refs).to eq(["Sample#3046"])
   end
 
