@@ -29,6 +29,11 @@ Do not delegate the ticket to A2O runtime automation such as `a2o runtime run-on
 4. Commit at self-complete.
    - Create a git commit when you believe the implementation is complete.
    - Include the ticket ref in the commit message, for example `A2O#248 Hide SoloBoard behind kanban abstraction`.
+   - If the Kanbalone ticket is linked to an external GitHub issue, add a commit-message footer so GitHub can link the commit back to the issue:
+     - Same repository: `Refs: #123`
+     - Different repository: `Refs: owner/repo#123`
+     - Use `Refs`, not `Fixes`, `Closes`, or `Resolves`, unless the user explicitly wants the external issue closed by the commit/merge.
+     - If one commit covers multiple linked external issues, include one `Refs:` footer per issue.
    - Move the ticket to `In review`.
    - Add a kanban comment with the commit SHA and verification performed.
 
