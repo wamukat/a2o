@@ -433,7 +433,7 @@ RSpec.describe A3::Application::RunWorkerPhase do
     expect(result.run.phase_records.last.execution_record&.summary).to eq("review completed")
   end
 
-  it "rejects an unsupported child review rerun before invoking the worker gateway" do
+  it "runs a child review rerun through the worker gateway" do
     child_review_task = A3::Domain::Task.new(
       ref: "A3-v2#3099",
       kind: :child,
@@ -473,12 +473,25 @@ RSpec.describe A3::Application::RunWorkerPhase do
     )
     task_repository.save(child_review_task)
     run_repository.save(child_review_run)
-    allow(worker_gateway).to receive(:run)
+    child_review_workspace = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: :runtime_workspace,
+      root_path: "/tmp/a3-v2/workspaces/A3-v2-3099/runtime_workspace",
+      source_descriptor: child_review_run.source_descriptor,
+      slot_paths: {
+        repo_alpha: "/tmp/a3-v2/workspaces/A3-v2-3099/runtime_workspace/repo-alpha",
+        repo_beta: "/tmp/a3-v2/workspaces/A3-v2-3099/runtime_workspace/repo-beta"
+      }
+    )
+    allow(prepare_workspace).to receive(:call).and_return(
+      A3::Application::PrepareWorkspace::Result.new(workspace: child_review_workspace)
+    )
+    allow(worker_gateway).to receive(:run).and_return(
+      A3::Application::ExecutionResult.new(success: true, summary: "child review completed")
+    )
 
-    expect do
-      use_case.call(task_ref: child_review_task.ref, run_ref: child_review_run.ref, project_context: project_context)
-    end.to raise_error(A3::Domain::InvalidPhaseError, "Unsupported phase review for child")
+    result = use_case.call(task_ref: child_review_task.ref, run_ref: child_review_run.ref, project_context: project_context)
 
-    expect(worker_gateway).not_to have_received(:run)
+    expect(result.task.status).to eq(:verifying)
+    expect(worker_gateway).to have_received(:run)
   end
 end

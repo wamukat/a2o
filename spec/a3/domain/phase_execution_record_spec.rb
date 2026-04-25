@@ -39,7 +39,8 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
         "remediation_commands" => ["commands/apply-remediation"],
         "workspace_hook" => "sample-bootstrap",
         "merge_target" => "merge_to_parent",
-        "merge_policy" => "ff_only"
+        "merge_policy" => "ff_only",
+        "review_gate_required" => false
       }
     )
     expect(described_class.from_persisted_form(record.persisted_form)).to eq(record)

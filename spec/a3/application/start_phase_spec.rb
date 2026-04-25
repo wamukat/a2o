@@ -136,30 +136,31 @@ RSpec.describe A3::Application::StartPhase do
     )
   end
 
-  it "rejects child review entirely" do
+  it "starts child review on the runtime workspace from the task branch" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",
       kind: :child,
       edit_scope: [:repo_alpha],
       status: :in_review
     )
-    runtime_source_descriptor = A3::Domain::SourceDescriptor.new(
+    review_source_descriptor = A3::Domain::SourceDescriptor.new(
       workspace_kind: :runtime_workspace,
       source_type: :branch_head,
       ref: "refs/heads/a2o/work/A3-v2-3025",
       task_ref: task.ref
     )
 
-    expect do
-      described_class.new(run_id_generator: run_id_generator).call(
-        task: task,
-        phase: :review,
-        source_descriptor: runtime_source_descriptor,
-        scope_snapshot: scope_snapshot,
-        review_target: review_target,
-        artifact_owner: artifact_owner
-      )
-    end.to raise_error(A3::Domain::InvalidPhaseError, /Unsupported phase review for child/)
+    result = described_class.new(run_id_generator: run_id_generator).call(
+      task: task,
+      phase: :review,
+      source_descriptor: review_source_descriptor,
+      scope_snapshot: scope_snapshot,
+      review_target: review_target,
+      artifact_owner: artifact_owner
+    )
+
+    expect(result.run.phase).to eq(:review)
+    expect(result.run.workspace_kind).to eq(:runtime_workspace)
   end
 
   it "rejects unsupported phases" do

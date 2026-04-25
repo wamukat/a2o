@@ -48,7 +48,7 @@ RSpec.describe A3::Domain::RunnableTaskAssessment do
     expect(assessment.blocking_task_refs).to eq(%w[A3-v2#3020 A3-v2#3021])
   end
 
-  it "marks legacy child review tasks as not runnable" do
+  it "marks child or single review tasks as runnable" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3030",
       kind: :single,
@@ -58,9 +58,9 @@ RSpec.describe A3::Domain::RunnableTaskAssessment do
 
     assessment = described_class.evaluate(task: task, tasks: [task])
 
-    expect(assessment.runnable?).to eq(false)
-    expect(assessment.reason).to eq(:not_runnable_status)
-    expect(assessment.phase).to be_nil
+    expect(assessment.runnable?).to eq(true)
+    expect(assessment.reason).to eq(:runnable)
+    expect(assessment.phase).to eq(:review)
   end
 
   it "blocks a task when kanban blockers are still unresolved" do

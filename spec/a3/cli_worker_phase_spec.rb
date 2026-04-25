@@ -105,7 +105,7 @@ RSpec.describe A3::CLI do
     end
   end
 
-  it "rejects child review worker through sqlite backend" do
+  it "runs child review worker through sqlite backend" do
     Dir.mktmpdir do |dir|
       repo_sources = create_repo_sources(dir)
       seed_context(dir)
@@ -167,34 +167,34 @@ RSpec.describe A3::CLI do
         )
       )
       out = StringIO.new
-      allow(worker_gateway).to receive(:run)
-      expect do
-        with_env(fake_cli.fetch(:env)) do
-          described_class.start(
-            [
-              "run-worker-phase",
-              "A3-v2#3026",
-              "run-review-1",
-              File.join(dir, "project.yaml"),
-              "--storage-backend", "sqlite",
-              "--storage-dir", dir,
-              *repo_source_args(repo_sources),
-              "--preset-dir", File.join(dir, "presets"),
-              "--kanban-command", "ruby",
-              "--kanban-command-arg", fake_cli.fetch(:script_path),
-              "--kanban-project", "A3-v2",
-              "--kanban-repo-label", "repo:alpha=repo_alpha",
-              "--kanban-working-dir", dir
-            ],
-            out: out,
-            worker_gateway: worker_gateway
-          )
-        end
-      end.to raise_error(A3::Domain::InvalidPhaseError, "Unsupported phase review for child")
+      allow(worker_gateway).to receive(:run).and_return(
+        A3::Application::ExecutionResult.new(success: true, summary: "child review completed")
+      )
+      with_env(fake_cli.fetch(:env)) do
+        described_class.start(
+          [
+            "run-worker-phase",
+            "A3-v2#3026",
+            "run-review-1",
+            File.join(dir, "project.yaml"),
+            "--storage-backend", "sqlite",
+            "--storage-dir", dir,
+            *repo_source_args(repo_sources),
+            "--preset-dir", File.join(dir, "presets"),
+            "--kanban-command", "ruby",
+            "--kanban-command-arg", fake_cli.fetch(:script_path),
+            "--kanban-project", "A3-v2",
+            "--kanban-repo-label", "repo:alpha=repo_alpha",
+            "--kanban-working-dir", dir
+          ],
+          out: out,
+          worker_gateway: worker_gateway
+        )
+      end
 
-      expect(out.string).to eq("")
-      expect(task_repository.fetch("A3-v2#3026").status).to eq(:in_review)
-      expect(worker_gateway).not_to have_received(:run)
+      expect(out.string).to include("worker phase completed run-review-1")
+      expect(task_repository.fetch("A3-v2#3026").status).to eq(:verifying)
+      expect(worker_gateway).to have_received(:run)
     end
   end
 

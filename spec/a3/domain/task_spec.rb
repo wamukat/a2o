@@ -13,7 +13,7 @@ RSpec.describe A3::Domain::Task do
       expect(task.supports_phase?(:review)).to be(true)
     end
 
-    it "allows implementation for child tasks" do
+    it "allows implementation and review for child tasks" do
       task = described_class.new(
         ref: "A3-v2#3025",
         kind: :child,
@@ -21,7 +21,7 @@ RSpec.describe A3::Domain::Task do
       )
 
       expect(task.supports_phase?(:implementation)).to be(true)
-      expect(task.supports_phase?(:review)).to be(false)
+      expect(task.supports_phase?(:review)).to be(true)
     end
   end
 
@@ -36,14 +36,14 @@ RSpec.describe A3::Domain::Task do
       expect(task.next_phase_for(:implementation)).to eq(:verification)
     end
 
-    it "does not keep a legacy child review transition" do
+    it "returns verification after child review" do
       task = described_class.new(
         ref: "A3-v2#3025",
         kind: :child,
         edit_scope: [:repo_alpha]
       )
 
-      expect(task.next_phase_for(:review)).to be_nil
+      expect(task.next_phase_for(:review)).to eq(:verification)
     end
 
     it "returns verification after parent review" do
@@ -166,7 +166,7 @@ RSpec.describe A3::Domain::Task do
       expect(task.runnable_phase).to be_nil
     end
 
-    it "does not resume child review from in_review anymore" do
+    it "resumes child review from in_review" do
       task = described_class.new(
         ref: "Sample#3141",
         kind: :child,
@@ -174,7 +174,7 @@ RSpec.describe A3::Domain::Task do
         status: :in_review
       )
 
-      expect(task.runnable_phase).to be_nil
+      expect(task.runnable_phase).to eq(:review)
     end
   end
 

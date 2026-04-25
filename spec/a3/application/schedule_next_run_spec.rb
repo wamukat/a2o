@@ -436,7 +436,7 @@ RSpec.describe A3::Application::ScheduleNextRun do
     expect(result.started_run).to be_nil
   end
 
-  it "does not schedule legacy child review tasks" do
+  it "schedules child review tasks that are already in review" do
     task_repository.save(
       build_child_task(
         ref: task.ref,
@@ -453,12 +453,16 @@ RSpec.describe A3::Application::ScheduleNextRun do
     )
     task_repository.save(review_task)
 
-    expect(start_run).not_to receive(:call)
+    expect(start_run).to receive(:call).with(
+      hash_including(task_ref: "A3-v2#3032", phase: :review)
+    ).and_return(
+      A3::Application::StartRun::Result.new(task: review_task, run: instance_double(A3::Domain::Run), workspace: instance_double(A3::Domain::PreparedWorkspace))
+    )
 
     result = use_case.call(project_context: project_context)
 
-    expect(result.task).to be_nil
-    expect(result.phase).to be_nil
+    expect(result.task).to eq(review_task)
+    expect(result.phase).to eq(:review)
   end
 
   it "starts the next runnable parent review run against the parent integration branch" do

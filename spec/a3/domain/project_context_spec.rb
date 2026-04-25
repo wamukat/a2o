@@ -80,7 +80,8 @@ RSpec.describe A3::Domain::ProjectContext do
       "remediation_commands" => ["commands/apply-remediation"],
       "merge_target" => "merge_to_parent",
       "merge_policy" => "ff_only",
-      "merge_target_ref" => "refs/heads/live"
+      "merge_target_ref" => "refs/heads/live",
+      "review_gate_required" => false
     )
   end
 
