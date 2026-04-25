@@ -47,6 +47,19 @@ module A3
         completed
       end
 
+      def heartbeat(job_id:, heartbeat_at:)
+        records = load_records
+        record_payload = records.fetch(job_id) do
+          raise A3::Domain::RecordNotFound, "Agent job not found: #{job_id}"
+        end
+        updated = A3::Domain::AgentJobRecord.from_persisted_form(record_payload).heartbeat(
+          heartbeat_at: heartbeat_at
+        )
+        records[job_id] = updated.persisted_form
+        write_records(records)
+        updated
+      end
+
       def fetch(job_id)
         A3::Domain::AgentJobRecord.from_persisted_form(load_records.fetch(job_id))
       rescue KeyError

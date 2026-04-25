@@ -5,13 +5,14 @@ module A3
     class AgentJobRecord
       STATES = %i[queued claimed completed].freeze
 
-      attr_reader :request, :state, :claimed_by, :claimed_at, :result
+      attr_reader :request, :state, :claimed_by, :claimed_at, :heartbeat_at, :result
 
-      def initialize(request:, state:, claimed_by: nil, claimed_at: nil, result: nil)
+      def initialize(request:, state:, claimed_by: nil, claimed_at: nil, heartbeat_at: nil, result: nil)
         @request = request
         @state = normalize_state(state)
         @claimed_by = claimed_by&.to_s
         @claimed_at = claimed_at&.to_s
+        @heartbeat_at = heartbeat_at&.to_s
         @result = result
         validate_claim!
         validate_result!
@@ -24,6 +25,7 @@ module A3
           state: record.fetch("state"),
           claimed_by: record["claimed_by"],
           claimed_at: record["claimed_at"],
+          heartbeat_at: record["heartbeat_at"],
           result: record["result"] && AgentJobResult.from_result_form(record["result"])
         )
       end
@@ -34,6 +36,7 @@ module A3
           "state" => state.to_s,
           "claimed_by" => claimed_by,
           "claimed_at" => claimed_at,
+          "heartbeat_at" => heartbeat_at,
           "result" => result&.result_form
         }.compact
       end
@@ -57,6 +60,18 @@ module A3
         )
       end
 
+      def heartbeat(heartbeat_at:)
+        raise ConfigurationError, "agent job #{job_id} is not claimed" unless state == :claimed
+
+        self.class.new(
+          request: request,
+          state: state,
+          claimed_by: claimed_by,
+          claimed_at: claimed_at,
+          heartbeat_at: heartbeat_at
+        )
+      end
+
       def complete(result)
         raise ConfigurationError, "agent job #{job_id} is already completed" if state == :completed
         raise ConfigurationError, "agent result job_id #{result.job_id} does not match #{job_id}" unless result.job_id == job_id
@@ -66,6 +81,7 @@ module A3
           state: :completed,
           claimed_by: claimed_by,
           claimed_at: claimed_at,
+          heartbeat_at: result.heartbeat || heartbeat_at,
           result: result
         )
       end

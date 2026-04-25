@@ -35,13 +35,15 @@ type MergeRecoveryFinalizer interface {
 }
 
 const maxWorkerProtocolPayloadBytes = 1024 * 1024
+const defaultJobHeartbeatInterval = 30 * time.Second
 
 type Worker struct {
-	AgentName    string
-	Client       ControlPlane
-	Executor     CommandExecutor
-	Materializer WorkspacePreparer
-	Now          func() time.Time
+	AgentName         string
+	Client            ControlPlane
+	Executor          CommandExecutor
+	Materializer      WorkspacePreparer
+	Now               func() time.Time
+	HeartbeatInterval time.Duration
 }
 
 type LoopOptions struct {
@@ -95,6 +97,8 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 
 	now := w.now()
 	startedAt := now.Format(time.RFC3339)
+	stopHeartbeat := w.startHeartbeat(request.JobID)
+	defer stopHeartbeat()
 	if request.MergeRequest != nil {
 		return w.runMergeJob(*request, startedAt)
 	}
@@ -171,6 +175,38 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 		return &result, false, submitErr
 	}
 	return &result, false, cleanupErr
+}
+
+func (w Worker) startHeartbeat(jobID string) func() {
+	interval := w.HeartbeatInterval
+	if interval <= 0 {
+		interval = defaultJobHeartbeatInterval
+	}
+	done := make(chan struct{})
+	send := func() {
+		_ = w.Client.Heartbeat(jobID, w.now().Format(time.RFC3339))
+	}
+	send()
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				send()
+			case <-done:
+				return
+			}
+		}
+	}()
+	var stopped bool
+	return func() {
+		if stopped {
+			return
+		}
+		stopped = true
+		close(done)
+	}
 }
 
 func (w Worker) runMergeJob(request JobRequest, startedAt string) (*JobResult, bool, error) {

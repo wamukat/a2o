@@ -32,6 +32,17 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
     expect(claim_response.status).to eq(200)
     expect(claimed_payload.fetch("job").fetch("job_id")).to eq("job-1")
 
+    heartbeat_response = handler.handle(
+      method: "POST",
+      path: "/v1/agent/jobs/job-1/heartbeat",
+      body: JSON.generate("heartbeat" => "2026-04-11T08:00:30Z")
+    )
+    expect(heartbeat_response.status).to eq(200)
+    expect(JSON.parse(heartbeat_response.body).fetch("job")).to include(
+      "state" => "claimed",
+      "heartbeat_at" => "2026-04-11T08:00:30Z"
+    )
+
     idle_response = handler.handle(
       method: "GET",
       path: "/v1/agent/jobs/next",

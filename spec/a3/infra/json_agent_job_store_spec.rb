@@ -20,12 +20,17 @@ RSpec.describe A3::Infra::JsonAgentJobStore do
     expect(claimed.state).to eq(:claimed)
     expect(claimed.claimed_by).to eq("host-local-agent")
     expect(store.claim_next(agent_name: "host-local-agent", claimed_at: "2026-04-11T08:00:01Z")).to be_nil
+    heartbeated = store.heartbeat(job_id: "job-1", heartbeat_at: "2026-04-11T08:00:30Z")
+
+    expect(heartbeated.state).to eq(:claimed)
+    expect(heartbeated.heartbeat_at).to eq("2026-04-11T08:00:30Z")
 
     result = agent_job_result("job-1")
     completed = store.complete(result)
 
     expect(completed.state).to eq(:completed)
     expect(completed.result).to eq(result)
+    expect(completed.heartbeat_at).to eq("2026-04-11T08:00:30Z")
     expect(described_class.new(File.join(tmpdir, "agent-jobs.json")).fetch("job-1")).to eq(completed)
   end
 

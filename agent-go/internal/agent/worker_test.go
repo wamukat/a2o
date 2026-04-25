@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -48,6 +49,35 @@ func TestWorkerUploadsLogsArtifactsAndResult(t *testing.T) {
 	}
 	if client.result == nil || client.result.JobID != "job-1" {
 		t.Fatalf("missing submitted result: %#v", client.result)
+	}
+}
+
+func TestWorkerEmitsInProgressHeartbeats(t *testing.T) {
+	tmp := t.TempDir()
+	request := testRequest(tmp)
+	client := &fakeClient{request: &request}
+
+	result, idle, err := Worker{
+		AgentName:         "host-local",
+		Client:            client,
+		Executor:          sleepingExecutor{duration: 20 * time.Millisecond},
+		Now:               func() time.Time { return time.Now().UTC() },
+		HeartbeatInterval: 5 * time.Millisecond,
+	}.RunOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idle {
+		t.Fatal("expected job result, got idle")
+	}
+	client.mu.Lock()
+	heartbeatCount := len(client.heartbeats)
+	client.mu.Unlock()
+	if heartbeatCount < 2 {
+		t.Fatalf("expected periodic in-progress heartbeats, got %d", heartbeatCount)
+	}
+	if result.Heartbeat == "" {
+		t.Fatalf("final result should preserve heartbeat: %#v", result)
 	}
 }
 
@@ -394,6 +424,15 @@ func (fakeExecutor) Execute(JobRequest) ExecutionResult {
 	}
 }
 
+type sleepingExecutor struct {
+	duration time.Duration
+}
+
+func (executor sleepingExecutor) Execute(JobRequest) ExecutionResult {
+	time.Sleep(executor.duration)
+	return fakeExecutor{}.Execute(JobRequest{})
+}
+
 type workerProtocolExecutor struct {
 	omitChangedFiles bool
 	requireSlotPaths bool
@@ -492,10 +531,12 @@ func (failingExecutor) Execute(JobRequest) ExecutionResult {
 }
 
 type fakeClient struct {
-	request  *JobRequest
-	requests []*JobRequest
-	uploads  []ArtifactUpload
-	result   *JobResult
+	mu         sync.Mutex
+	request    *JobRequest
+	requests   []*JobRequest
+	uploads    []ArtifactUpload
+	heartbeats []string
+	result     *JobResult
 }
 
 func (f *fakeClient) ClaimNext(string) (*JobRequest, error) {
@@ -515,6 +556,13 @@ func (f *fakeClient) UploadArtifact(upload ArtifactUpload, content []byte) (Arti
 	}
 	f.uploads = append(f.uploads, upload)
 	return upload, nil
+}
+
+func (f *fakeClient) Heartbeat(jobID string, heartbeat string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.heartbeats = append(f.heartbeats, jobID+"="+heartbeat)
+	return nil
 }
 
 func (f *fakeClient) SubmitResult(result JobResult) error {

@@ -14,6 +14,7 @@ import (
 
 func TestHTTPClientUsesAgentProtocol(t *testing.T) {
 	var uploaded bool
+	var heartbeated bool
 	var submitted bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -31,6 +32,16 @@ func TestHTTPClientUsesAgentProtocol(t *testing.T) {
 				ByteSize:       3,
 				RetentionClass: "analysis",
 			}})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/agent/jobs/job-1/heartbeat":
+			heartbeated = true
+			var payload map[string]string
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Fatal(err)
+			}
+			if payload["heartbeat"] != "2026-04-11T08:00:00Z" {
+				t.Fatalf("heartbeat payload = %#v", payload)
+			}
+			w.WriteHeader(http.StatusOK)
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/agent/jobs/job-1/result":
 			submitted = true
 			w.WriteHeader(http.StatusOK)
@@ -59,11 +70,14 @@ func TestHTTPClientUsesAgentProtocol(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := client.Heartbeat("job-1", "2026-04-11T08:00:00Z"); err != nil {
+		t.Fatal(err)
+	}
 	if err := client.SubmitResult(JobResult{JobID: "job-1"}); err != nil {
 		t.Fatal(err)
 	}
-	if !uploaded || !submitted {
-		t.Fatalf("uploaded=%v submitted=%v", uploaded, submitted)
+	if !uploaded || !heartbeated || !submitted {
+		t.Fatalf("uploaded=%v heartbeated=%v submitted=%v", uploaded, heartbeated, submitted)
 	}
 }
 
@@ -79,6 +93,8 @@ func TestHTTPClientSendsBearerToken(t *testing.T) {
 			w.WriteHeader(http.StatusNoContent)
 		case r.Method == http.MethodPut && r.URL.Path == "/v1/agent/artifacts/art-log-1":
 			writeJSON(w, http.StatusCreated, map[string]any{"artifact": ArtifactUpload{ArtifactID: "art-log-1"}})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/agent/jobs/job-1/heartbeat":
+			w.WriteHeader(http.StatusOK)
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/agent/jobs/job-1/result":
 			w.WriteHeader(http.StatusOK)
 		default:
@@ -94,11 +110,14 @@ func TestHTTPClientSendsBearerToken(t *testing.T) {
 	if _, err := client.UploadArtifact(ArtifactUpload{ArtifactID: "art-log-1"}, nil); err != nil {
 		t.Fatal(err)
 	}
+	if err := client.Heartbeat("job-1", "2026-04-11T08:00:00Z"); err != nil {
+		t.Fatal(err)
+	}
 	if err := client.SubmitResult(JobResult{JobID: "job-1"}); err != nil {
 		t.Fatal(err)
 	}
-	if authorizedRequests != 3 {
-		t.Fatalf("authorized requests = %d, want 3", authorizedRequests)
+	if authorizedRequests != 4 {
+		t.Fatalf("authorized requests = %d, want 4", authorizedRequests)
 	}
 }
 

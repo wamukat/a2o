@@ -16,6 +16,7 @@ import (
 
 type ControlPlane interface {
 	ClaimNext(agentName string) (*JobRequest, error)
+	Heartbeat(jobID string, heartbeat string) error
 	UploadArtifact(upload ArtifactUpload, content []byte) (ArtifactUpload, error)
 	SubmitResult(result JobResult) error
 }
@@ -78,6 +79,22 @@ func (c HTTPClient) UploadArtifact(upload ArtifactUpload, content []byte) (Artif
 		return ArtifactUpload{}, err
 	}
 	return body.Artifact, nil
+}
+
+func (c HTTPClient) Heartbeat(jobID string, heartbeat string) error {
+	payload, err := json.Marshal(map[string]string{"heartbeat": heartbeat})
+	if err != nil {
+		return err
+	}
+	resp, err := c.do(http.MethodPost, "/v1/agent/jobs/"+url.PathEscape(jobID)+"/heartbeat", nil, payload, "application/json")
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return responseError("heartbeat", resp)
+	}
+	return nil
 }
 
 func (c HTTPClient) SubmitResult(result JobResult) error {

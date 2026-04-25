@@ -40,6 +40,10 @@ module A3
             return unauthorized_response unless authorized?(headers, :agent)
 
             record_result(path, body)
+          elsif method.to_s.upcase == "POST" && path.match?(%r{\A/v1/agent/jobs/[^/]+/heartbeat\z})
+            return unauthorized_response unless authorized?(headers, :agent)
+
+            record_heartbeat(path, body)
           else
             json_response(404, "error" => "not_found")
           end
@@ -110,6 +114,16 @@ module A3
         raise A3::Domain::ConfigurationError, "result path job_id #{job_id} does not match payload #{result.job_id}" unless result.job_id == job_id
 
         record = @job_store.complete(result)
+        json_response(200, "job" => record.persisted_form)
+      end
+
+      def record_heartbeat(path, body)
+        job_id = path.split("/")[-2]
+        payload = parse_body(body)
+        heartbeat = payload.fetch("heartbeat").to_s
+        raise A3::Domain::ConfigurationError, "heartbeat must not be blank" if heartbeat.empty?
+
+        record = @job_store.heartbeat(job_id: job_id, heartbeat_at: heartbeat)
         json_response(200, "job" => record.persisted_form)
       end
 
