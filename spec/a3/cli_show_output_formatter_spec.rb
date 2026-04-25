@@ -733,9 +733,9 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
 
     result = described_class.run_lines(run_view)
 
-    expect(result).to include("run run-1 task=A3-v2#child phase=verification workspace=runtime_workspace source=detached_commit:head456 outcome=blocked")
+    expect(result).to include("run run-1 task=A3-v2#child phase=review workspace=runtime_workspace source=detached_commit:head456 outcome=blocked")
     expect(result).to include("workspace_model=runtime_workspace is a logical phase workspace kind; inspect runtime_package_materialization_model for physical isolation")
-    expect(result).to include("latest_execution phase=verification summary=review launch could not resolve runtime workspace")
+    expect(result).to include("latest_execution phase=review summary=review launch could not resolve runtime workspace")
     expect(result).to include("worker_response_bundle={\"success\"=>false, \"summary\"=>\"review blocked\", \"failing_command\"=>\"codex exec --json -\", \"observed_state\"=>\"repo-beta missing\"}")
     expect(result).to include("skill_feedback_count=1")
     expect(result).to include("skill_feedback_pending_review=1 action=review_or_convert_to_ticket")

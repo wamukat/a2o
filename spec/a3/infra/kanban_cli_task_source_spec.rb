@@ -335,7 +335,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
       expect(tasks.map(&:ref)).to eq(["Sample#5100", "Sample#5101"])
       expect(parent.kind).to eq(:parent)
       expect(parent.child_refs).to eq(["Sample#5101"])
-      expect(child.status).to eq(:verifying)
+      expect(child.status).to eq(:in_review)
       expect(child.parent_ref).to eq("Sample#5100")
     end
   end
@@ -751,7 +751,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
       task = source.fetch_by_external_task_id(5001)
 
       expect(task.ref).to eq("Sample#5001")
-      expect(task.status).to eq(:verifying)
+      expect(task.status).to eq(:in_review)
       expect(task.edit_scope).to eq([:repo_beta])
       expect(task.child_refs).to eq([])
       expect(task.external_task_id).to eq(5001)

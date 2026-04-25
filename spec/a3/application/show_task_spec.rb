@@ -44,7 +44,7 @@ RSpec.describe A3::Application::ShowTask do
     expect(result.topology.parent.status).to eq(:in_review)
   end
 
-  it "canonicalizes historical child in_review relations to verifying" do
+  it "keeps child in_review relations visible as review" do
     child = A3::Domain::Task.new(
       ref: "A3-v2#legacy-child",
       kind: :child,
@@ -58,7 +58,7 @@ RSpec.describe A3::Application::ShowTask do
     result = use_case.call(task_ref: "A3-v2#parent")
 
     expect(result.topology.children).to include(
-      have_attributes(ref: "A3-v2#legacy-child", status: :verifying, current_run_ref: nil)
+      have_attributes(ref: "A3-v2#legacy-child", status: :in_review, current_run_ref: nil)
     )
   end
 

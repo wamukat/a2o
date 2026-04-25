@@ -628,13 +628,13 @@ RSpec.describe A3::Application::ShowWatchSummary do
     task_entry = result.tasks.find { |item| item.ref == "Sample#imported-7" }
     expect(task_entry.title).to include("Imported task")
     expect(task_entry.title).to include("[kanban=To do internal=Blocked]")
-    expect(task_entry.latest_phase).to eq("inspection")
+    expect(task_entry.latest_phase).to eq("review")
       expect(task_entry.blocked_lines).to eq([
         "error_category=executor_failed",
         "remediation=executor command が agent 環境で実行可能か、必要な binary と認証、出力 JSON を確認してください。",
         "review blocked"
       ])
-    expect(task_entry.phase_counts).to eq("implementation" => 1, "inspection" => 1)
+    expect(task_entry.phase_counts).to eq("implementation" => 1, "review" => 1)
   end
 
   it "does not infer latest phase for run-less terminal tasks" do
@@ -714,9 +714,9 @@ RSpec.describe A3::Application::ShowWatchSummary do
 
     task_entry = result.tasks.find { |item| item.ref == "Sample#3141" }
     expect(task_entry.running).to be(true)
-    expect(task_entry.latest_phase).to eq("inspection")
+    expect(task_entry.latest_phase).to eq("review")
     expect(result.running_entries.map(&:task_ref)).to eq(["Sample#3141"])
-    expect(result.running_entries.first.phase).to eq("verification")
+    expect(result.running_entries.first.phase).to eq("review")
   end
 
   it "marks todo children as waiting when a sibling under the same parent is blocked" do

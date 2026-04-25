@@ -44,7 +44,7 @@ RSpec.describe A3::Application::BuildWorkerTaskPacket do
     )
   end
 
-  it "canonicalizes external In review to Inspection for child packets" do
+  it "keeps external In review status for child packets" do
     child_task = A3::Domain::Task.new(
       ref: "Sample#3154",
       kind: :child,
@@ -66,7 +66,7 @@ RSpec.describe A3::Application::BuildWorkerTaskPacket do
 
     packet = described_class.new(external_task_source: external_task_source).call(task: child_task)
 
-    expect(packet.request_form.fetch("status")).to eq("Inspection")
+    expect(packet.request_form.fetch("status")).to eq("In review")
   end
 
   it "fails closed when an external task exists but the task packet is unavailable" do

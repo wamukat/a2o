@@ -300,8 +300,6 @@ module A3
       end
 
       def canonicalize_status_for_kind(status, task_kind)
-        return :verifying if status == :in_review && task_kind != :parent
-
         status
       end
 

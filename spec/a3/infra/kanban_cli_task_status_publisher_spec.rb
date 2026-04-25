@@ -127,7 +127,7 @@ RSpec.describe A3::Infra::KanbanCliTaskStatusPublisher do
     expect(transitions.fetch(1).fetch("argv")).to include("task-transition", "--task-id", "5002", "--status", "In progress")
   end
 
-  it "canonicalizes child in_review publishes to Inspection" do
+  it "publishes child in_review as In review" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,
       snapshots: [
@@ -152,7 +152,7 @@ RSpec.describe A3::Infra::KanbanCliTaskStatusPublisher do
     end
 
     transitions = read_fake_kanban_transitions(fake_cli.fetch(:transitions_path))
-    expect(transitions.fetch(0).fetch("argv")).to include("task-transition", "--task-id", "5003", "--status", "Inspection")
+    expect(transitions.fetch(0).fetch("argv")).to include("task-transition", "--task-id", "5003", "--status", "In review")
   end
 
   it "derives the task id from a canonical task ref when available" do

@@ -284,7 +284,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
       expect(result.ref).to eq("run-1")
       expect(result.evidence_summary.review_base).to eq("base123")
       expect(result.evidence_summary.phase_records_count).to eq(2)
-      expect(result.latest_execution.phase).to eq(:verification)
+      expect(result.latest_execution.phase).to eq(:review)
       expect(result.latest_execution.summary).to eq("review launch could not resolve runtime workspace")
       expect(result.latest_execution.verification_summary).to be_nil
       expect(result.latest_execution.diagnostics).to eq(
@@ -309,7 +309,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
         merge_target: :merge_to_parent
       )
       expect(result.latest_blocked_diagnosis).to have_attributes(
-        phase: :verification,
+        phase: :review,
         summary: "review launch could not resolve runtime workspace",
         expected_state: "runtime workspace available",
         observed_state: "repo-beta missing",

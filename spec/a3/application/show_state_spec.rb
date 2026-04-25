@@ -185,7 +185,7 @@ RSpec.describe A3::Application::ShowState do
     end
   end
 
-  it "canonicalizes historical child review runs to verification in operator state" do
+  it "keeps historical child review runs visible as review in operator state" do
     Dir.mktmpdir do |dir|
       task_repository = A3::Infra::InMemoryTaskRepository.new
       run_repository = A3::Infra::InMemoryRunRepository.new
@@ -223,7 +223,7 @@ RSpec.describe A3::Application::ShowState do
       ).call
 
       expect(result.active_runs.map(&:task_ref)).to eq(["Sample#9"])
-      expect(result.active_runs.first.phase).to eq(:verification)
+      expect(result.active_runs.first.phase).to eq(:review)
       expect(result.active_runs.first.status).to eq(:active)
     end
   end

@@ -168,7 +168,7 @@ RSpec.describe A3::Application::ShowRun do
 
     expect(result.ref).to eq("run-1")
     expect(result.task_ref).to eq("A3-v2#child")
-    expect(result.phase).to eq(:verification)
+    expect(result.phase).to eq(:review)
     expect(result.workspace_kind).to eq(:runtime_workspace)
     expect(result.source_type).to eq(:detached_commit)
     expect(result.source_ref).to eq("head456")
@@ -177,7 +177,7 @@ RSpec.describe A3::Application::ShowRun do
     expect(result.evidence_summary.review_base).to eq("base123")
     expect(result.evidence_summary.review_head).to eq("head456")
     expect(result.evidence_summary.phase_records_count).to eq(2)
-    expect(result.latest_execution.phase).to eq(:verification)
+    expect(result.latest_execution.phase).to eq(:review)
     expect(result.latest_execution.summary).to eq("review launch could not resolve runtime workspace")
     expect(result.latest_execution.verification_summary).to be_nil
     expect(result.latest_execution.failing_command).to eq("codex exec --json -")
@@ -206,7 +206,7 @@ RSpec.describe A3::Application::ShowRun do
       merge_target: :merge_to_parent
     )
     expect(result.latest_blocked_diagnosis).to have_attributes(
-      phase: :verification,
+      phase: :review,
       summary: "review launch could not resolve runtime workspace",
       expected_state: "runtime workspace available",
       observed_state: "repo-beta missing",
@@ -298,7 +298,7 @@ RSpec.describe A3::Application::ShowRun do
       A3::Domain::Run.new(
         ref: "run-2",
         task_ref: "A3-v2#child",
-        phase: :verification,
+        phase: :review,
         workspace_kind: :runtime_workspace,
         source_descriptor: A3::Domain::SourceDescriptor.new(
           workspace_kind: :runtime_workspace,
@@ -449,7 +449,7 @@ RSpec.describe A3::Application::ShowRun do
       "summary" => "later phase bundle"
     )
       expect(result.latest_blocked_diagnosis).to have_attributes(
-        phase: :verification,
+        phase: :review,
         observed_state: "repo-beta missing",
         worker_response_bundle: {
           "success" => false,

@@ -1051,7 +1051,7 @@ RSpec.describe A3::CLI do
       )
 
       expect(out.string).to include("blocked diagnosis blocked for run-blocked-2 on A3-v2#3025")
-      expect(out.string).to include("phase=verification observed=repo-beta missing")
+      expect(out.string).to include("phase=review observed=repo-beta missing")
       expect(out.string).to include("recovery decision=requires_operator_action next_action=diagnose_blocked operator_action_required=true")
       expect(out.string).to include("rerun_hint=diagnose blocked state and choose a fresh rerun source")
       expect(out.string).to include("review_target=base123..head456")
