@@ -1,6 +1,6 @@
-# A2O 0.5.30 Current Release Surface
+# A2O 0.5.31 Current Release Surface
 
-This document describes the currently supported A2O 0.5.30 user surface and validation boundary.
+This document describes the currently supported A2O 0.5.31 user surface and validation boundary.
 
 Use it to confirm which features can be documented for users and what can be treated as validated at this release. For setup steps, read [10-quickstart.md](10-quickstart.md). For configuration fields, read [90-project-package-schema.md](90-project-package-schema.md).
 
@@ -28,7 +28,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Agent HTTP worker gateway, including claimed-job heartbeats
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates
-- GHCR runtime image tags: `latest`, `0.5.30`, and `sha-*`
+- GHCR runtime image tags: `latest`, `0.5.31`, and `sha-*`
 - Tag releases also publish `latest`, so the released version tag and `latest` are expected to point to the same runtime image after release publication finishes.
 - Local release gate: full RSpec suite
 
