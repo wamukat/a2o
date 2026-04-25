@@ -4431,6 +4431,9 @@ func TestRuntimeLogsFollowAutoSelectsOnlyRunningTask(t *testing.T) {
 	if !strings.Contains(stdout.String(), "auto selected live output") {
 		t.Fatalf("runtime logs should print auto-selected live output, got:\n%s", stdout.String())
 	}
+	if !strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "current_run_ref") {
+		t.Fatalf("runtime logs follow target query should filter candidates through task current_run_ref")
+	}
 }
 
 func TestRuntimeLogsFollowRequiresIndexForMultipleRunningTasks(t *testing.T) {
