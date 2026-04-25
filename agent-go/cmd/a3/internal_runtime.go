@@ -1050,16 +1050,22 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 	flags.SetOutput(stderr)
 	follow := flags.Bool("follow", false, "follow the current phase live log while the task is running")
 	flags.BoolVar(follow, "f", false, "follow the current phase live log while the task is running")
+	index := flags.Int("index", -1, "select a running task by index when --follow has multiple candidates")
+	flags.IntVar(index, "i", -1, "select a running task by index when --follow has multiple candidates")
+	noChildren := flags.Bool("no-children", false, "when following a parent task, follow the parent itself instead of active children")
 	pollInterval := flags.Duration("poll-interval", time.Second, "poll interval for --follow")
 	if err := flags.Parse(normalizedArgs); err != nil {
 		return err
 	}
-	if flags.NArg() != 1 {
-		return fmt.Errorf("usage: a2o runtime logs TASK_REF [--follow]")
+	if flags.NArg() > 1 || (flags.NArg() == 0 && !*follow) {
+		return fmt.Errorf("usage: a2o runtime logs [TASK_REF] [--follow] [--index N] [--no-children]")
 	}
-	taskRef := strings.TrimSpace(flags.Arg(0))
-	if taskRef == "" {
-		return fmt.Errorf("task ref is required")
+	taskRef := ""
+	if flags.NArg() == 1 {
+		taskRef = strings.TrimSpace(flags.Arg(0))
+		if taskRef == "" {
+			return fmt.Errorf("task ref is required")
+		}
 	}
 
 	config, _, err := loadInstanceConfigFromWorkingTree()
@@ -1071,6 +1077,13 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
 		if err != nil {
 			return err
+		}
+		if *follow {
+			resolvedTaskRef, err := resolveRuntimeLogsFollowTaskRef(effectiveConfig, plan, runner, stderr, taskRef, *index, *noChildren)
+			if err != nil {
+				return err
+			}
+			taskRef = resolvedTaskRef
 		}
 		printedArtifacts := map[string]bool{}
 		offsets := map[string]int64{}
@@ -1138,11 +1151,21 @@ func normalizeRuntimeLogsArgs(args []string) ([]string, error) {
 			index++
 		case strings.HasPrefix(arg, "--poll-interval="):
 			normalized = append(normalized, arg)
+		case arg == "--index" || arg == "-i":
+			if index+1 >= len(args) {
+				return nil, fmt.Errorf("flag needs an argument: %s", arg)
+			}
+			normalized = append(normalized, arg, args[index+1])
+			index++
+		case strings.HasPrefix(arg, "--index=") || strings.HasPrefix(arg, "-i="):
+			normalized = append(normalized, arg)
+		case arg == "--no-children":
+			normalized = append(normalized, arg)
 		case strings.HasPrefix(arg, "-"):
 			normalized = append(normalized, arg)
 		default:
 			if taskRef != "" {
-				return nil, fmt.Errorf("usage: a2o runtime logs TASK_REF [--follow]")
+				return nil, fmt.Errorf("usage: a2o runtime logs [TASK_REF] [--follow] [--index N] [--no-children]")
 			}
 			taskRef = arg
 		}
@@ -1151,6 +1174,111 @@ func normalizeRuntimeLogsArgs(args []string) ([]string, error) {
 		normalized = append(normalized, taskRef)
 	}
 	return normalized, nil
+}
+
+type runtimeLogFollowTarget struct {
+	TaskRef   string `json:"task_ref"`
+	RunRef    string `json:"run_ref"`
+	Phase     string `json:"phase"`
+	Kind      string `json:"kind"`
+	ParentRef string `json:"parent_ref"`
+}
+
+type runtimeLogFollowTargetPayload struct {
+	RequestedTaskRef string                   `json:"requested_task_ref"`
+	SelectedTaskRef  string                   `json:"selected_task_ref"`
+	Candidates       []runtimeLogFollowTarget `json:"candidates"`
+}
+
+func resolveRuntimeLogsFollowTaskRef(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stderr io.Writer, requestedTaskRef string, index int, noChildren bool) (string, error) {
+	payload, err := runtimeLogsFollowTargets(config, plan, runner, requestedTaskRef, noChildren)
+	if err != nil {
+		return "", err
+	}
+	selected := strings.TrimSpace(payload.SelectedTaskRef)
+	if index >= 0 {
+		if len(payload.Candidates) == 0 && selected != "" {
+			return selected, nil
+		}
+		if index >= len(payload.Candidates) {
+			printRuntimeLogsFollowCandidates(stderr, payload.Candidates)
+			return "", fmt.Errorf("--index %d is out of range for %d running task(s)", index, len(payload.Candidates))
+		}
+		selected := strings.TrimSpace(payload.Candidates[index].TaskRef)
+		if selected == "" {
+			return "", fmt.Errorf("selected running task has empty task ref")
+		}
+		return selected, nil
+	}
+	if selected != "" {
+		return selected, nil
+	}
+	if len(payload.Candidates) == 1 {
+		selected = strings.TrimSpace(payload.Candidates[0].TaskRef)
+		if selected != "" {
+			return selected, nil
+		}
+	}
+	if len(payload.Candidates) > 1 {
+		printRuntimeLogsFollowCandidates(stderr, payload.Candidates)
+		return "", fmt.Errorf("multiple running tasks match; pass --index N to select one")
+	}
+	if strings.TrimSpace(requestedTaskRef) != "" {
+		return strings.TrimSpace(requestedTaskRef), nil
+	}
+	return "", fmt.Errorf("no running task found for --follow")
+}
+
+func printRuntimeLogsFollowCandidates(stderr io.Writer, candidates []runtimeLogFollowTarget) {
+	if stderr == nil || len(candidates) == 0 {
+		return
+	}
+	fmt.Fprintln(stderr, "running task candidates:")
+	for index, candidate := range candidates {
+		parent := ""
+		if strings.TrimSpace(candidate.ParentRef) != "" {
+			parent = " parent=" + candidate.ParentRef
+		}
+		fmt.Fprintf(stderr, "  [%d] task=%s run=%s phase=%s kind=%s%s\n", index, valueOrUnavailable(candidate.TaskRef), valueOrUnavailable(candidate.RunRef), valueOrUnavailable(candidate.Phase), valueOrUnavailable(candidate.Kind), parent)
+	}
+}
+
+func runtimeLogsFollowTargets(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, requestedTaskRef string, noChildren bool) (runtimeLogFollowTargetPayload, error) {
+	script := strings.Join([]string{
+		"tasks_path = ARGV.fetch(0)",
+		"runs_path = ARGV.fetch(1)",
+		"requested = ARGV.fetch(2).to_s",
+		"no_children = ARGV.fetch(3) == 'true'",
+		"tasks = File.exist?(tasks_path) ? JSON.parse(File.read(tasks_path)) : {}",
+		"runs = File.exist?(runs_path) ? JSON.parse(File.read(runs_path)) : {}",
+		"active_runs = runs.values.select { |record| record['task_ref'].to_s != '' && record['terminal_outcome'].nil? }",
+		"targets = active_runs.map do |run|",
+		"  task_ref = run['task_ref'].to_s",
+		"  task = tasks[task_ref] || {}",
+		"  {'task_ref' => task_ref, 'run_ref' => run['ref'].to_s, 'phase' => run['phase'].to_s, 'kind' => task['kind'].to_s, 'parent_ref' => task['parent_ref'].to_s}",
+		"end.sort_by { |item| [item['task_ref'], item['run_ref']] }",
+		"selected = ''",
+		"candidates = []",
+		"if requested.empty?",
+		"  candidates = targets",
+		"elsif (task = tasks[requested]) && task['kind'].to_s == 'parent' && !no_children",
+		"  child_refs = Array(task['child_refs']).map(&:to_s)",
+		"  candidates = targets.select { |item| child_refs.include?(item['task_ref']) || item['parent_ref'] == requested }",
+		"  selected = requested if candidates.empty?",
+		"else",
+		"  selected = requested",
+		"end",
+		"puts JSON.generate({'requested_task_ref' => requested, 'selected_task_ref' => selected, 'candidates' => candidates})",
+	}, "; ")
+	output, err := dockerComposeExecOutput(config, plan, runner, "ruby", "-rjson", "-e", script, path.Join(plan.StorageDir, "tasks.json"), path.Join(plan.StorageDir, "runs.json"), requestedTaskRef, fmt.Sprintf("%t", noChildren))
+	if err != nil {
+		return runtimeLogFollowTargetPayload{}, err
+	}
+	var payload runtimeLogFollowTargetPayload
+	if err := json.Unmarshal(output, &payload); err != nil {
+		return runtimeLogFollowTargetPayload{}, err
+	}
+	return payload, nil
 }
 
 func runRuntimeShowArtifact(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {

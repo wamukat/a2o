@@ -1577,7 +1577,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime watch-summary [--details]",
 		"a2o runtime skill-feedback list",
 		"a2o runtime skill-feedback propose",
-		"a2o runtime logs TASK_REF [--follow]",
+		"a2o runtime logs [TASK_REF] [--follow] [--index N] [--no-children]",
 		"a2o runtime show-artifact ARTIFACT_ID",
 		"a2o runtime clear-logs (--task-ref TASK_REF | --run-ref RUN_REF | --all-analysis) [--phase PHASE] [--role ROLE] [--apply]",
 		"a2o runtime run-once [--max-steps N] [--agent-attempts N] [--agent-poll-interval DURATION]",
@@ -4387,6 +4387,199 @@ func TestRuntimeLogsAcceptsFollowAfterTaskRef(t *testing.T) {
 	}
 }
 
+func TestRuntimeLogsFollowAutoSelectsOnlyRunningTask(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		runtimeLogTargetsOutput: `{"requested_task_ref":"","selected_task_ref":"","candidates":[{"task_ref":"A2O#16","run_ref":"run-16","phase":"implementation","kind":"single","parent_ref":""}]}`,
+		logManifestOutputs: []string{
+			`{"run_ref":"run-16","current_run":"run-16","phase":"implementation","source_type":"detached_commit","source_ref":"abc","active":true,"live_mode":"ai-raw-log","artifacts":[]}`,
+			`{"run_ref":"run-16","current_run":"run-16","phase":"implementation","source_type":"detached_commit","source_ref":"abc","active":false,"live_mode":"ai-raw-log","artifacts":[]}`,
+		},
+	}
+	liveRoot := filepath.Join(tempDir, runtimeHostAgentRelativePath, "ai-raw-logs", "A2O-16")
+	if err := os.MkdirAll(liveRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(liveRoot, "implementation.log"), []byte("auto selected live output\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		if err := runRuntimeLogs([]string{"--follow", "--poll-interval", "1ms"}, runner, &stdout, io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "=== phase: implementation (ai-raw-live) task=A2O#16 run=run-16") {
+		t.Fatalf("runtime logs should auto-select the only running task, got:\n%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "auto selected live output") {
+		t.Fatalf("runtime logs should print auto-selected live output, got:\n%s", stdout.String())
+	}
+}
+
+func TestRuntimeLogsFollowRequiresIndexForMultipleRunningTasks(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		runtimeLogTargetsOutput: `{"requested_task_ref":"","selected_task_ref":"","candidates":[{"task_ref":"A2O#16","run_ref":"run-16","phase":"implementation","kind":"single","parent_ref":""},{"task_ref":"A2O#17","run_ref":"run-17","phase":"review","kind":"child","parent_ref":"A2O#15"}]}`,
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "logs", "--follow"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("runtime logs should fail when multiple tasks match")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "multiple running tasks match") || !strings.Contains(stderr.String(), "[1] task=A2O#17") {
+		t.Fatalf("runtime logs should print indexed candidates, got stderr:\n%s", stderr.String())
+	}
+}
+
+func TestRuntimeLogsFollowIndexSelectsRunningTask(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		runtimeLogTargetsOutput: `{"requested_task_ref":"","selected_task_ref":"","candidates":[{"task_ref":"A2O#16","run_ref":"run-16","phase":"implementation","kind":"single","parent_ref":""},{"task_ref":"Sample#42","run_ref":"run-42","phase":"implementation","kind":"child","parent_ref":"Sample#41"}]}`,
+		logManifestOutputs: []string{
+			`{"run_ref":"run-42","current_run":"run-42","phase":"implementation","source_type":"detached_commit","source_ref":"abc","active":true,"live_mode":"ai-raw-log","artifacts":[]}`,
+			`{"run_ref":"run-42","current_run":"run-42","phase":"implementation","source_type":"detached_commit","source_ref":"abc","active":false,"live_mode":"ai-raw-log","artifacts":[]}`,
+		},
+	}
+	liveRoot := filepath.Join(tempDir, runtimeHostAgentRelativePath, "ai-raw-logs", "Sample-42")
+	if err := os.MkdirAll(liveRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(liveRoot, "implementation.log"), []byte("indexed live output\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		if err := runRuntimeLogs([]string{"--follow", "--index", "1", "--poll-interval", "1ms"}, runner, &stdout, io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "=== phase: implementation (ai-raw-live) task=Sample#42 run=run-42") {
+		t.Fatalf("runtime logs should follow indexed task, got:\n%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "indexed live output") {
+		t.Fatalf("runtime logs should print indexed task output, got:\n%s", stdout.String())
+	}
+}
+
+func TestRuntimeLogsFollowParentSelectsActiveChildUnlessNoChildren(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		runtimeLogTargetsOutput: `{"requested_task_ref":"Sample#41","selected_task_ref":"","candidates":[{"task_ref":"Sample#42","run_ref":"run-42","phase":"implementation","kind":"child","parent_ref":"Sample#41"}]}`,
+		logManifestOutputs: []string{
+			`{"run_ref":"run-42","current_run":"run-42","phase":"implementation","source_type":"detached_commit","source_ref":"abc","active":true,"live_mode":"ai-raw-log","artifacts":[]}`,
+			`{"run_ref":"run-42","current_run":"run-42","phase":"implementation","source_type":"detached_commit","source_ref":"abc","active":false,"live_mode":"ai-raw-log","artifacts":[]}`,
+		},
+	}
+	liveRoot := filepath.Join(tempDir, runtimeHostAgentRelativePath, "ai-raw-logs", "Sample-42")
+	if err := os.MkdirAll(liveRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(liveRoot, "implementation.log"), []byte("child live output\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		if err := runRuntimeLogs([]string{"--follow", "--poll-interval", "1ms", "Sample#41"}, runner, &stdout, io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "task=Sample#42") {
+		t.Fatalf("runtime logs should follow active child for parent ref, got:\n%s", stdout.String())
+	}
+
+	runner.runtimeLogTargetsOutput = `{"requested_task_ref":"Sample#41","selected_task_ref":"Sample#41","candidates":[]}`
+	runner.logManifestOutputs = []string{
+		`{"run_ref":"run-41","current_run":"run-41","phase":"review","source_type":"detached_commit","source_ref":"abc","active":true,"live_mode":"ai-raw-log","artifacts":[]}`,
+		`{"run_ref":"run-41","current_run":"run-41","phase":"review","source_type":"detached_commit","source_ref":"abc","active":false,"live_mode":"ai-raw-log","artifacts":[]}`,
+	}
+	parentLiveRoot := filepath.Join(tempDir, runtimeHostAgentRelativePath, "ai-raw-logs", "Sample-41")
+	if err := os.MkdirAll(parentLiveRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(parentLiveRoot, "review.log"), []byte("parent live output\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+
+	withChdir(t, tempDir, func() {
+		if err := runRuntimeLogs([]string{"--follow", "--no-children", "--poll-interval", "1ms", "Sample#41"}, runner, &stdout, io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "task=Sample#41") || !strings.Contains(stdout.String(), "parent live output") {
+		t.Fatalf("runtime logs --no-children should follow parent itself, got:\n%s", stdout.String())
+	}
+}
+
 func TestRuntimeLogsFollowWaitsAcrossPhaseTransition(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -6366,30 +6559,31 @@ func mustReadTestFile(t *testing.T, path string) []byte {
 }
 
 type fakeRunner struct {
-	calls                  [][]string
-	emptyContainer         bool
-	failShowTask           bool
-	taskWithoutCurrentRun  bool
-	staleCurrentRun        bool
-	runtimeExitMissing     bool
-	legacyRuntimeOrphans   []string
-	failLegacyRuntimeRM    bool
-	missingRunHistory      bool
-	schedulerPaused        bool
-	schedulerStopReason    string
-	schedulerExecutedCount int
-	startBackgroundErr     error
-	err                    error
-	lastEnv                map[string]string
-	nextPID                int
-	processCommands        map[int]string
-	errorOutput            string
-	imageInspectDigests    map[string]string
-	containerImageIDs      map[string]string
-	logManifestOutput      string
-	logManifestOutputs     []string
-	watchSummaryOutput     string
-	taskStatus             string
+	calls                   [][]string
+	emptyContainer          bool
+	failShowTask            bool
+	taskWithoutCurrentRun   bool
+	staleCurrentRun         bool
+	runtimeExitMissing      bool
+	legacyRuntimeOrphans    []string
+	failLegacyRuntimeRM     bool
+	missingRunHistory       bool
+	schedulerPaused         bool
+	schedulerStopReason     string
+	schedulerExecutedCount  int
+	startBackgroundErr      error
+	err                     error
+	lastEnv                 map[string]string
+	nextPID                 int
+	processCommands         map[int]string
+	errorOutput             string
+	imageInspectDigests     map[string]string
+	containerImageIDs       map[string]string
+	logManifestOutput       string
+	logManifestOutputs      []string
+	runtimeLogTargetsOutput string
+	watchSummaryOutput      string
+	taskStatus              string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -6494,6 +6688,18 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		return []byte(fmt.Sprintf("task A2O#16 kind=single status=%s current_run=run-16\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n", taskStatus)), nil
 	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "runtime_latest_run"):
 		return []byte("runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation state=terminal outcome=blocked\n"), nil
+	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "requested_task_ref"):
+		if r.runtimeLogTargetsOutput != "" {
+			return []byte(r.runtimeLogTargetsOutput + "\n"), nil
+		}
+		requestedTaskRef := ""
+		if len(args) >= 2 {
+			requestedTaskRef = args[len(args)-2]
+		}
+		if requestedTaskRef == "" {
+			return []byte(`{"requested_task_ref":"","selected_task_ref":"","candidates":[]}` + "\n"), nil
+		}
+		return []byte(fmt.Sprintf(`{"requested_task_ref":%q,"selected_task_ref":%q,"candidates":[]}`+"\n", requestedTaskRef, requestedTaskRef)), nil
 	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "phase_records"):
 		if len(r.logManifestOutputs) > 0 {
 			output := r.logManifestOutputs[0]

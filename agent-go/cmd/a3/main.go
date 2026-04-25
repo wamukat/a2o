@@ -138,7 +138,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o runtime watch-summary [--details]")
 	fmt.Fprintln(w, "  a2o runtime skill-feedback list [--state STATE] [--target TARGET] [--group]")
 	fmt.Fprintln(w, "  a2o runtime skill-feedback propose [--state STATE] [--target TARGET] [--format ticket|patch]")
-	fmt.Fprintln(w, "  a2o runtime logs TASK_REF [--follow]")
+	fmt.Fprintln(w, "  a2o runtime logs [TASK_REF] [--follow] [--index N] [--no-children]")
 	fmt.Fprintln(w, "  a2o runtime show-artifact ARTIFACT_ID")
 	fmt.Fprintln(w, "  a2o runtime clear-logs (--task-ref TASK_REF | --run-ref RUN_REF | --all-analysis) [--phase PHASE] [--role ROLE] [--apply]")
 	fmt.Fprintln(w, "  a2o runtime run-once [--max-steps N] [--agent-attempts N] [--agent-poll-interval DURATION] [--project-config project-test.yaml]")
