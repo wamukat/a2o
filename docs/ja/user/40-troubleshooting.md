@@ -83,6 +83,23 @@ a2o runtime show-artifact <artifact-id>
 
 生成されたランタイムファイルがプロダクトのリポジトリルートに出ている場合は、プロジェクトパッケージやエージェント配置先を確認する。A2O の生成データは `.work/a2o/` 配下に閉じるのが基本である。
 
+### AI CLI が workspace 外を書いた場合
+
+`source alias <repo> is dirty before merge` が出ていて、AI agent のログに `ticket_workspace` ではなくメイン working tree のパスが出ている場合、AI CLI が作業用 worktree の外に書いた可能性がある。
+
+確認するもの:
+
+- `a2o runtime describe-task <task-ref>` の `agent_artifact_read`
+- AI CLI の raw log / transcript
+- 変更されたメイン working tree の `git status --porcelain`
+- `project.yaml` の executor command
+
+Codex CLI を使う executor では、`codex exec --cd "{{workspace_root}}" --sandbox workspace-write` の形にする。`--dangerously-bypass-approvals-and-sandbox` は使わない。追加の書き込み先が必要な場合だけ `--add-dir` を使い、メイン working tree は追加しない。
+
+Copilot CLI を使う executor では、`--add-dir "{{workspace_root}}"` で許可パスを作業用 workspace に寄せる。`--allow-all-paths`、`--allow-all`、`--yolo` は避ける。Copilot CLI 単体で Codex の `workspace-write` 相当の sandbox は確認できないため、強い隔離が必要な場合はコンテナ、VM、Docker sandbox など外側の実行環境で閉じ込める。
+
+既にメイン working tree が汚れている場合は、必要な変更を commit、退避、または破棄し、`a2o doctor` で整理済みになったことを確認してから再実行する。
+
 ## Docker credential helper の直し方
 
 `a2o doctor` が `docker_credential_helpers status=blocked` を出す場合、Docker 設定の `credsStore` または `credHelpers` が、現在のホストに存在しない `docker-credential-*` バイナリを指している。

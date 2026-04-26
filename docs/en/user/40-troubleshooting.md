@@ -83,6 +83,23 @@ A2O stops on dirty repositories so it does not overwrite user changes.
 
 If generated runtime files appear in the product repository root, check the project package and agent install paths. A2O-generated data should stay under `.work/a2o/`.
 
+### AI CLI Wrote Outside The Workspace
+
+When `source alias <repo> is dirty before merge` appears and the AI agent log references the main working tree instead of `ticket_workspace`, the AI CLI may have written outside the generated worktree.
+
+Check:
+
+- `agent_artifact_read` from `a2o runtime describe-task <task-ref>`
+- AI CLI raw log / transcript
+- `git status --porcelain` in the changed main working tree
+- executor command in `project.yaml`
+
+For Codex CLI executors, use `codex exec --cd "{{workspace_root}}" --sandbox workspace-write`. Do not use `--dangerously-bypass-approvals-and-sandbox`. Use `--add-dir` only for extra write locations that are truly required, and do not add the main working tree.
+
+For GitHub Copilot CLI executors, use `--add-dir "{{workspace_root}}"` to keep the allowed path list focused on the generated workspace. Avoid `--allow-all-paths`, `--allow-all`, and `--yolo`. Copilot CLI does not currently expose a sandbox mode equivalent to Codex `workspace-write`, so use an outer isolation layer such as a container, VM, or Docker sandbox when strong write isolation is required.
+
+If the main working tree is already dirty, stash, commit, or discard the changes intentionally, then run `a2o doctor` before retrying.
+
 ## Fix Docker Credential Helper Errors
 
 When `a2o doctor` reports `docker_credential_helpers status=blocked`, Docker `credsStore` or `credHelpers` points to a `docker-credential-*` binary that is not available on the current host.

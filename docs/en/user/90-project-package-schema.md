@@ -279,6 +279,57 @@ a2o project template \
   --output ./project-package/project.yaml
 ```
 
+### AI CLI Workspace Restrictions
+
+When A2O uses agent-materialized workspaces, the implementation phase must work in the generated `ticket_workspace`. Configure the AI CLI executor to use that workspace as its working root and avoid editing the main working tree directly.
+
+For Codex CLI, set `{{workspace_root}}` as the working directory and keep writes inside the workspace.
+
+```yaml
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - codex
+          - exec
+          - --cd
+          - "{{workspace_root}}"
+          - --sandbox
+          - workspace-write
+          - --output-last-message
+          - "{{result_path}}"
+```
+
+Use `--add-dir` only for additional write locations that are truly required. Do not add the main working tree. Do not use `--dangerously-bypass-approvals-and-sandbox` for production A2O executors, because it disables the sandbox boundary that prevents writes outside the workspace.
+
+For GitHub Copilot CLI, keep the allowed path list focused on the `ticket_workspace`. Do not call Copilot directly from `project.yaml` unless that command still reads the A2O stdin bundle and prints the final worker result JSON to stdout. Prefer the generated command-worker wrapper and put the Copilot invocation behind it.
+
+```sh
+a2o worker scaffold --language command --output ./project-package/commands/a2o-command-worker
+```
+
+```yaml
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - ./project-package/commands/a2o-command-worker
+          - --schema
+          - "{{schema_path}}"
+          - --result
+          - "{{result_path}}"
+```
+
+Configure the delegated command so it reads the stdin bundle forwarded by `a2o-command-worker`, passes that request to Copilot, and prints the final A2O worker result JSON to stdout. Include `--add-dir "$A2O_WORKSPACE_ROOT"` in that delegated Copilot invocation and do not add the main working tree.
+
+Copilot CLI does not currently expose a sandbox mode equivalent to Codex `workspace-write`. Avoid `--allow-all-paths`, `--allow-all`, and `--yolo` in A2O executors because they weaken path restrictions. If Copilot CLI must be prevented from writing outside the workspace, run it inside an outer isolation layer such as a container, VM, or Docker sandbox rather than relying only on CLI path permissions.
+
+For any AI CLI, the `source alias` main working tree is input for worktree creation and merge. It is not a place for the agent to edit directly.
+
 `--output` writes `project.yaml`. `--with-skills` also writes starter implementation, review, and parent review skills and adds a `parent_review` phase that references the generated parent skill. Kanban bootstrap data is derived from `kanban.project`, `kanban.labels`, and `repos.<slot>.label`. A2O-owned lanes and internal coordination labels are provisioned by `a2o kanban up`.
 
 `project.yaml` is the normal production profile. Focused test profiles may use a separate file such as `project-test.yaml`, but they must be selected explicitly with `a2o project validate --config project-test.yaml` or `a2o runtime run-once --project-config project-test.yaml`.

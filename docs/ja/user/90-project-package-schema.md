@@ -289,6 +289,57 @@ a2o project template \
 
 テンプレートはフェーズ単位の実行コマンド形式を使う。`--language` は `agent.required_bins` を制御する。`--executor-bin` と繰り返し指定できる `--executor-arg` は、実装フェーズとレビューフェーズの実行コマンドを生成する。
 
+### AI CLI のワークスペース制限
+
+A2O が agent-materialized workspace を使う場合、実装フェーズの作業場所は A2O が作成した `ticket_workspace` である。AI CLI の実行コマンドは、このワークスペースを作業ルートとして使い、メインの working tree を直接編集しないように設定する。
+
+Codex CLI を使う場合は、`{{workspace_root}}` を作業ルートにし、workspace 内だけを書き込み可能にする。
+
+```yaml
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - codex
+          - exec
+          - --cd
+          - "{{workspace_root}}"
+          - --sandbox
+          - workspace-write
+          - --output-last-message
+          - "{{result_path}}"
+```
+
+追加の書き込み先が本当に必要な場合だけ `--add-dir` で明示する。メイン working tree を `--add-dir` に含めない。`--dangerously-bypass-approvals-and-sandbox` は workspace 外書き込みを防げなくなるため、本番の A2O executor では使わない。
+
+GitHub Copilot CLI を使う場合は、Copilot CLI の許可パスを `ticket_workspace` に寄せる。A2O stdin bundle を読み、最終的な worker result JSON を stdout に出す契約を保てないなら、`project.yaml` から Copilot を直接呼ばない。生成された command-worker ラッパーの後ろで Copilot を呼ぶ。
+
+```sh
+a2o worker scaffold --language command --output ./project-package/commands/a2o-command-worker
+```
+
+```yaml
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - ./project-package/commands/a2o-command-worker
+          - --schema
+          - "{{schema_path}}"
+          - --result
+          - "{{result_path}}"
+```
+
+委譲先のコマンドは、`a2o-command-worker` が渡す stdin bundle を読み、その依頼内容を Copilot に渡し、最終的な A2O worker result JSON を stdout に出す。委譲先の Copilot 呼び出しには `--add-dir "$A2O_WORKSPACE_ROOT"` を含め、メイン working tree は追加しない。
+
+Copilot CLI では Codex の `workspace-write` と同等の sandbox mode は確認できない。`--allow-all-paths`、`--allow-all`、`--yolo` はパス制限を弱めるため、A2O executor では避ける。Copilot CLI で workspace 外書き込みを強く防ぎたい場合は、CLI 単体の許可設定だけに頼らず、コンテナ、VM、Docker sandbox など外側の隔離環境で実行する。
+
+どの AI CLI を使う場合でも、`source alias` のメイン working tree は worktree 作成と merge の入力であり、agent が直接編集する場所ではない。
+
 `--output` がファイルを指す場合、生成器は `project.yaml` を書く。`--with-skills` を付けると、実装、レビュー、親タスクレビューの初期スキルも書き、生成した親タスク用スキルを参照する `parent_review` フェーズを追加する。カンバン初期化データは `kanban.project`、`kanban.labels`、`repos.<slot>.label` から導出される。A2O が管理するレーンと内部調整ラベルは `a2o kanban up` が用意する。
 
 `project.yaml` は通常の本番運用プロファイルである。検証用プロファイルは `project-test.yaml` のような別ファイルにしてよいが、利用時は `a2o project validate --config project-test.yaml` または `a2o runtime run-once --project-config project-test.yaml` で明示的に選択する。
