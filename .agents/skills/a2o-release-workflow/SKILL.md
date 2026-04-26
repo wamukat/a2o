@@ -58,6 +58,7 @@ An A2O release is not complete until all of the following are true:
    - If it already exists, update it.
    - Write user-facing release notes in English unless the user asks otherwise.
    - Summarize what changed for operators and users, not just internal ticket numbers.
+   - Do not include local Kanbalone/A2O ticket URLs in release notes. Link only to public GitHub issues or pull requests when referencing tickets.
    - Mark only the newest release as `latest` unless the user asks otherwise.
 
 7. Clean up local release leftovers.
