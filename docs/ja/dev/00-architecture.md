@@ -20,6 +20,7 @@
 | プロジェクトコマンド / ワーカー契約 | [55-project-script-contract.md](55-project-script-contract.md) |
 | 証跡、ブロック診断、再実行 | [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md) |
 | a2o-agent とのジョブ境界 | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
+| 自動チケット分解 MVP | [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md) |
 | コアとプロジェクト拡張の境界 | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
 | 参照用プロダクトによる検証 | [90-reference-product-suite.md](90-reference-product-suite.md) |
 | release publish の遅延と distribution 境界 | [98-release-publish-latency-and-distribution-build.md](98-release-publish-latency-and-distribution-build.md) |
@@ -186,19 +187,25 @@ A2O の全体像と導入手順を扱う。
 
 Docker ランタイムイメージ、ホスト用ランチャー、同梱または外部 Kanbalone 境界、エージェント境界、内部互換名の境界を扱う。
 
-### 8. 参照用検証
+### 8. チケット分解
+
+- [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md)
+
+`trigger:investigate` によるチケット分解 MVP、独立した scheduler domain、調査コマンド契約、proposal review、gated child-ticket creation を扱う。
+
+### 9. 参照用検証
 
 - [90-reference-product-suite.md](90-reference-product-suite.md)
 
 コア検証で使うサンプルプロダクトと検証境界を扱う。
 
-### 9. 現在の公開機能
+### 10. 現在の公開機能
 
 - [../user/80-current-release-surface.md](../user/80-current-release-surface.md)
 
 A2O 0.5.32 の対応済み公開機能と検証境界を扱う。
 
-### 10. カンバンアダプター境界
+### 11. カンバンアダプター境界
 
 - [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md)
 
@@ -213,5 +220,6 @@ A2O 0.5.32 の対応済み公開機能と検証境界を扱う。
 | プロジェクトパッケージから何を読めるか | [50-project-surface.md](50-project-surface.md) |
 | プロジェクトスクリプトの契約 | [55-project-script-contract.md](55-project-script-contract.md) |
 | エージェントジョブの受け渡し | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
+| 大きな要求チケットを実装前にどう分解するか | [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md) |
 | ブロック時の証跡 | [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md) |
 | カンバンアダプターの責務境界 | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |

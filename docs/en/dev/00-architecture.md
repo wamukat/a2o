@@ -20,6 +20,7 @@ Read this document first to understand runtime flow and responsibility boundarie
 | Project command and worker contract | [55-project-script-contract.md](55-project-script-contract.md) |
 | Evidence, blocked diagnosis, and reruns | [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md) |
 | Job boundary with `a2o-agent` | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
+| Automated ticket decomposition MVP | [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md) |
 | Boundary between core and project extensions | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
 | Validation through reference products | [90-reference-product-suite.md](90-reference-product-suite.md) |
 | Release publish latency and distribution boundary | [98-release-publish-latency-and-distribution-build.md](98-release-publish-latency-and-distribution-build.md) |
@@ -186,19 +187,25 @@ Covers internal evidence that supports reproducible review, merge, rerun, and bl
 
 Covers the Docker runtime image, host launcher, bundled or external Kanbalone boundary, agent boundary, and internal compatibility names.
 
-### 8. Reference Validation
+### 8. Ticket Decomposition
+
+- [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md)
+
+Covers the MVP for `trigger:investigate` ticket decomposition, including the independent scheduler domain, investigation command contract, proposal review, and gated child-ticket creation.
+
+### 9. Reference Validation
 
 - [90-reference-product-suite.md](90-reference-product-suite.md)
 
 Covers sample products and validation boundaries used by core verification.
 
-### 9. Current Release Surface
+### 10. Current Release Surface
 
 - [../user/80-current-release-surface.md](../user/80-current-release-surface.md)
 
 Summarizes the supported public surface and validation boundary for A2O 0.5.32.
 
-### 10. Kanban Adapter Boundary
+### 11. Kanban Adapter Boundary
 
 - [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md)
 
@@ -213,5 +220,6 @@ Covers the kanban command contract and adapter boundary.
 | What can Engine read from a project package? | [50-project-surface.md](50-project-surface.md) |
 | What contract do project scripts follow? | [55-project-script-contract.md](55-project-script-contract.md) |
 | How are agent jobs handed off? | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
+| How should high-level tickets be decomposed before implementation? | [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md) |
 | What evidence exists when a task is blocked? | [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md) |
 | What is the kanban adapter responsible for? | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
