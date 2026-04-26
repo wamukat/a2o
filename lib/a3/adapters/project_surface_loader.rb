@@ -44,7 +44,8 @@ module A3
           verification_commands: payload.fetch("verification_commands", []),
           remediation_commands: payload.fetch("remediation_commands", []),
           workspace_hook: nil,
-          decomposition_investigate_command: decomposition_investigate_command(runtime)
+          decomposition_investigate_command: decomposition_command(runtime, "investigate"),
+          decomposition_author_command: decomposition_command(runtime, "author")
         )
       end
 
@@ -134,30 +135,29 @@ module A3
         end
       end
 
-      def decomposition_investigate_command(runtime)
+      def decomposition_command(runtime, name)
         decomposition = runtime.fetch("decomposition", nil)
         return nil unless decomposition
         unless decomposition.is_a?(Hash)
           raise A3::Domain::ConfigurationError, "project.yaml runtime.decomposition must be a mapping"
         end
 
-        investigate = decomposition.fetch("investigate", nil)
-        return nil unless investigate
-        unless investigate.is_a?(Hash)
-          raise A3::Domain::ConfigurationError, "project.yaml runtime.decomposition.investigate must be a mapping"
+        step = decomposition.fetch(name, nil)
+        return nil unless step
+        unless step.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.decomposition.#{name} must be a mapping"
         end
 
-        command = investigate.fetch("command") do
-          raise A3::Domain::ConfigurationError, "project.yaml runtime.decomposition.investigate.command must be provided"
+        command = step.fetch("command") do
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.decomposition.#{name}.command must be provided"
         end
         unless command.is_a?(Array) && command.any? && command.all? { |entry| entry.is_a?(String) && !entry.empty? }
           raise A3::Domain::ConfigurationError,
-                "project.yaml runtime.decomposition.investigate.command must be a non-empty array of non-empty strings"
+                "project.yaml runtime.decomposition.#{name}.command must be a non-empty array of non-empty strings"
         end
 
         command
       end
-
     end
   end
 end

@@ -15,7 +15,8 @@ RSpec.describe A3::Bootstrap::ContainerBuilder::BaseContainerBuilder do
     runtime_services = {
       build_scope_snapshot: instance_double(A3::Application::BuildScopeSnapshot),
       build_artifact_owner: instance_double(A3::Application::BuildArtifactOwner),
-      plan_next_decomposition_task: instance_double(A3::Application::PlanNextDecompositionTask)
+      plan_next_decomposition_task: instance_double(A3::Application::PlanNextDecompositionTask),
+      external_task_activity_publisher: instance_double(A3::Infra::NullExternalTaskActivityPublisher)
     }
     context = A3::Bootstrap::ContainerBuilder::AssemblyContext.new(
       repositories: repositories,
@@ -32,7 +33,8 @@ RSpec.describe A3::Bootstrap::ContainerBuilder::BaseContainerBuilder do
       scheduler_cycle_repository: context.scheduler_cycle_repository,
       build_scope_snapshot: context.build_scope_snapshot,
       build_artifact_owner: context.build_artifact_owner,
-      plan_next_decomposition_task: context.plan_next_decomposition_task
+      plan_next_decomposition_task: context.plan_next_decomposition_task,
+      external_task_activity_publisher: context.external_task_activity_publisher
     )
   end
 end

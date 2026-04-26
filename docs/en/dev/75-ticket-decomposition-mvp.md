@@ -88,6 +88,8 @@ runtime:
   decomposition:
     investigate:
       command: ["./commands/investigate.sh"]
+    author:
+      command: ["./commands/author-proposal.sh"]
 ```
 
 The exact schema can evolve, but the public contract should follow the existing project-script style:
@@ -121,6 +123,8 @@ The result should include:
 ## Author Proposal Contract
 
 The author step converts investigation evidence into a normalized proposal. It should not create tickets directly.
+
+The author step follows the same project-script style as investigation: A2O writes an author request JSON path to `A2O_DECOMPOSITION_AUTHOR_REQUEST_PATH`, expects one proposal JSON object at `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH`, runs in a disposable decomposition workspace, and records proposal evidence even when the author output is invalid.
 
 The proposal should contain:
 

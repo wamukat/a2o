@@ -88,6 +88,8 @@ runtime:
   decomposition:
     investigate:
       command: ["./commands/investigate.sh"]
+    author:
+      command: ["./commands/author-proposal.sh"]
 ```
 
 正確な schema は今後詰めるが、公開契約は既存の project script contract と同じ考え方に寄せる。
@@ -121,6 +123,8 @@ result には次を含める。
 ## Author Proposal 契約
 
 author step は、調査証跡を正規化された proposal に変換する。ここでは直接チケットを作らない。
+
+author step は investigation と同じ project-script style に従う。A2O は author request JSON のパスを `A2O_DECOMPOSITION_AUTHOR_REQUEST_PATH` に渡し、`A2O_DECOMPOSITION_AUTHOR_RESULT_PATH` に proposal JSON object が 1 つ書かれることを期待する。実行は disposable decomposition workspace で行い、author output が不正な場合も proposal evidence を記録する。
 
 proposal には次を含める。
 

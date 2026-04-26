@@ -62,6 +62,8 @@ runtime:
   decomposition:
     investigate:
       command: [app/project-package/commands/investigate.sh]
+    author:
+      command: [app/project-package/commands/author-proposal.sh]
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -123,9 +125,9 @@ task_templates:
 
 ## Runtime Decomposition
 
-`runtime.decomposition.investigate.command` は、`trigger:investigate` チケット分解で使うプロジェクト所有の調査コマンドである。プロジェクトが decomposition investigation pipeline を使う場合に指定する。
+`runtime.decomposition.investigate.command` は、`trigger:investigate` チケット分解で使うプロジェクト所有の調査コマンドである。`runtime.decomposition.author.command` は、調査証跡を正規化された child-ticket proposal に変換するプロジェクト所有コマンドである。プロジェクトが該当する decomposition pipeline step を使う場合に指定する。
 
-コマンドは空でない文字列配列でなければならない。
+各コマンドは空でない文字列配列でなければならない。
 
 ```yaml
 runtime:
@@ -135,15 +137,36 @@ runtime:
         - app/project-package/commands/investigate.sh
         - "--format"
         - json
+    author:
+      command:
+        - app/project-package/commands/author-proposal.sh
+        - "--format"
+        - json
 ```
 
-A2O は隔離された disposable decomposition workspace でこのコマンドを実行する。コマンドには次の公開 `A2O_*` パスを渡す。
+A2O は隔離された disposable decomposition workspace で decomposition command を実行する。investigation command には次の公開 `A2O_*` パスを渡す。
 
 - `A2O_DECOMPOSITION_REQUEST_PATH`
 - `A2O_DECOMPOSITION_RESULT_PATH`
 - `A2O_WORKSPACE_ROOT`
 
 コマンドは `A2O_DECOMPOSITION_RESULT_PATH` に単一の JSON object を書く。MVP では `summary` を空でない文字列として必須にする。非ゼロ終了、JSON 未作成、不正 JSON、`summary` 欠落は、証跡付きで decomposition run を block する。
+
+author command には次を渡す。
+
+- `A2O_DECOMPOSITION_AUTHOR_REQUEST_PATH`
+- `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH`
+- `A2O_WORKSPACE_ROOT`
+
+author command は `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH` に proposal JSON object を 1 つ書く。A2O は draft を正規化し、`proposal_fingerprint` と child ごとの `child_key` を導出し、Kanban child ticket は作成せずに proposal evidence を保存する。proposal には 1 件以上の child draft が必要である。各 child draft は `title`、`body`、`acceptance_criteria`、`labels`、`depends_on`、`rationale` を持つ。`unresolved_questions` は配列でなければならない。
+
+investigation evidence が存在する状態で proposal step を実行するには次を使う。
+
+```bash
+a2o run-decomposition-proposal-author A2O#123 project.yaml --storage-dir .work/a2o/state
+```
+
+既定では storage directory 配下の `decomposition-evidence/<task>/investigation.json` を読む。別の evidence file を使う場合は `--investigation-evidence-path` を指定する。task が外部 Kanban ticket と紐づいている場合、A2O は proposal summary を source ticket に投稿する。
 
 ## Runtime Phases
 

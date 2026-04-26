@@ -37,6 +37,26 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     end
   end
 
+  it "loads decomposition author command from project.yaml" do
+    Dir.mktmpdir do |dir|
+      path = write_project_yaml(
+        dir,
+        {
+          "phases" => base_phases,
+          "decomposition" => {
+            "author" => {
+              "command" => ["commands/author-proposal.sh", "--format", "json"]
+            }
+          }
+        }
+      )
+
+      surface = described_class.new(preset_dir: File.join(dir, "presets")).load(path)
+
+      expect(surface.decomposition_author_command).to eq(["commands/author-proposal.sh", "--format", "json"])
+    end
+  end
+
   it "rejects invalid decomposition investigate command declarations" do
     Dir.mktmpdir do |dir|
       path = write_project_yaml(
@@ -56,6 +76,29 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
       end.to raise_error(
         A3::Domain::ConfigurationError,
         /runtime.decomposition.investigate.command must be a non-empty array/
+      )
+    end
+  end
+
+  it "rejects invalid decomposition author command declarations" do
+    Dir.mktmpdir do |dir|
+      path = write_project_yaml(
+        dir,
+        {
+          "phases" => base_phases,
+          "decomposition" => {
+            "author" => {
+              "command" => []
+            }
+          }
+        }
+      )
+
+      expect do
+        described_class.new(preset_dir: File.join(dir, "presets")).load(path)
+      end.to raise_error(
+        A3::Domain::ConfigurationError,
+        /runtime.decomposition.author.command must be a non-empty array/
       )
     end
   end

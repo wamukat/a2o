@@ -56,6 +56,8 @@ runtime:
   decomposition:
     investigate:
       command: [app/project-package/commands/investigate.sh]
+    author:
+      command: [app/project-package/commands/author-proposal.sh]
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -118,9 +120,9 @@ Repo slots are stable aliases used in runtime state and agent job payloads.
 
 ## Runtime Decomposition
 
-`runtime.decomposition.investigate.command` is the project-owned command for `trigger:investigate` ticket decomposition. It is optional unless the project wants A2O to run the decomposition investigation pipeline.
+`runtime.decomposition.investigate.command` is the project-owned command for `trigger:investigate` ticket decomposition. `runtime.decomposition.author.command` is the project-owned command that turns investigation evidence into a normalized child-ticket proposal. They are optional unless the project wants A2O to run the matching decomposition pipeline step.
 
-The command must be a non-empty array of non-empty strings:
+Each command must be a non-empty array of non-empty strings:
 
 ```yaml
 runtime:
@@ -130,15 +132,36 @@ runtime:
         - app/project-package/commands/investigate.sh
         - "--format"
         - json
+    author:
+      command:
+        - app/project-package/commands/author-proposal.sh
+        - "--format"
+        - json
 ```
 
-A2O runs the command in an isolated disposable decomposition workspace. The command receives public `A2O_*` paths:
+A2O runs decomposition commands in an isolated disposable decomposition workspace. The investigation command receives public `A2O_*` paths:
 
 - `A2O_DECOMPOSITION_REQUEST_PATH`
 - `A2O_DECOMPOSITION_RESULT_PATH`
 - `A2O_WORKSPACE_ROOT`
 
 The command writes one JSON object to `A2O_DECOMPOSITION_RESULT_PATH`. The MVP requires `summary` as a non-empty string. Non-zero exit, missing JSON, invalid JSON, or missing `summary` blocks the decomposition run with evidence.
+
+The author command receives:
+
+- `A2O_DECOMPOSITION_AUTHOR_REQUEST_PATH`
+- `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH`
+- `A2O_WORKSPACE_ROOT`
+
+The author command writes one proposal JSON object to `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH`. A2O normalizes the draft, derives `proposal_fingerprint` and per-child `child_key` values, and stores proposal evidence without creating Kanban child tickets. The proposal must include at least one child draft. Each child draft requires `title`, `body`, `acceptance_criteria`, `labels`, `depends_on`, and `rationale`. `unresolved_questions` must be an array.
+
+To run the proposal step after investigation evidence exists:
+
+```bash
+a2o run-decomposition-proposal-author A2O#123 project.yaml --storage-dir .work/a2o/state
+```
+
+By default A2O reads investigation evidence from `decomposition-evidence/<task>/investigation.json` under the storage directory. Use `--investigation-evidence-path` to provide another evidence file. When the task is backed by an external Kanban ticket, A2O posts the proposal summary back to that source ticket.
 
 ## Runtime Phases
 

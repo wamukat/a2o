@@ -26,6 +26,7 @@ RSpec.describe A3::CLI::CommandRouter do
       expect(described_class.session_kind_for("show-blocked-diagnosis")).to eq(:storage_runtime_package)
       expect(described_class.session_kind_for("show-run")).to eq(:storage_runtime_package)
       expect(described_class.session_kind_for("plan-next-decomposition-task")).to eq(:storage)
+      expect(described_class.session_kind_for("run-decomposition-proposal-author")).to eq(:runtime)
       expect(described_class.session_kind_for("skill-feedback-list")).to eq(:storage)
       expect(described_class.session_kind_for("skill-feedback-propose")).to eq(:storage)
       expect(described_class.session_kind_for("watch-summary")).to eq(:storage)

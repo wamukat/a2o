@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "tmpdir"
+require "rbconfig"
 
 RSpec.describe A3::CLI do
   def with_env(values)
@@ -114,6 +115,87 @@ RSpec.describe A3::CLI do
 
     expect(described_class).to have_received(:with_runtime_session)
     expect(out.string).to include("merge_source=refs/heads/a2o/work/A3-v2-3025")
+  end
+
+  it "runs decomposition proposal author from a stored task and project manifest" do
+    Dir.mktmpdir do |dir|
+      commands_dir = File.join(dir, "commands")
+      FileUtils.mkdir_p(commands_dir)
+      author_path = File.join(commands_dir, "author-proposal.rb")
+      File.write(
+        author_path,
+        <<~RUBY
+          #!#{RbConfig.ruby}
+          require "json"
+          File.write(
+            ENV.fetch("A2O_DECOMPOSITION_AUTHOR_RESULT_PATH"),
+            JSON.generate(
+              "children" => [
+                {
+                  "title" => "Add routing",
+                  "body" => "Route investigate tasks.",
+                  "acceptance_criteria" => ["routing is tested"],
+                  "labels" => [],
+                  "depends_on" => [],
+                  "rationale" => "Scheduler routing is the first boundary."
+                }
+              ],
+              "unresolved_questions" => []
+            )
+          )
+        RUBY
+      )
+      FileUtils.chmod(0o755, author_path)
+      manifest_path = File.join(dir, "project.yaml")
+      File.write(
+        manifest_path,
+        <<~YAML
+          schema_version: 1
+          runtime:
+            decomposition:
+              author:
+                command: ["commands/author-proposal.rb"]
+            phases:
+              implementation:
+                skill: skills/implementation/base.md
+              review:
+                skill: skills/review/default.md
+              merge:
+                policy: ff_only
+                target_ref: refs/heads/main
+        YAML
+      )
+      task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "A3-v2#5300",
+          kind: :single,
+          edit_scope: [:repo_alpha],
+          status: :todo,
+          labels: ["trigger:investigate"]
+        )
+      )
+      investigation_dir = File.join(dir, "decomposition-evidence", "A3-v2-5300")
+      FileUtils.mkdir_p(investigation_dir)
+      File.write(File.join(investigation_dir, "investigation.json"), JSON.generate("summary" => "investigated"))
+
+      out = StringIO.new
+      described_class.start(
+        [
+          "run-decomposition-proposal-author",
+          "A3-v2#5300",
+          manifest_path,
+          "--storage-dir", dir
+        ],
+        out: out
+      )
+
+      expect(out.string).to include("decomposition proposal A3-v2#5300 success=true")
+      expect(out.string).to include("proposal_fingerprint=")
+      evidence = JSON.parse(File.read(File.join(dir, "decomposition-evidence", "A3-v2-5300", "proposal.json")))
+      expect(evidence.fetch("success")).to be(true)
+      expect(evidence.fetch("proposal").fetch("children").first.fetch("title")).to eq("Add routing")
+    end
   end
 
   it "uses a shared default storage dir for start-run parsing" do

@@ -48,7 +48,6 @@ module A3
             workspace_plan_builder: workspace_plan_builder,
             provisioner: workspace_provisioner
           )
-
           {
             start_phase: start_phase,
             register_started_run: register_started_run,

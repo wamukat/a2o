@@ -54,6 +54,10 @@ module A3
           @runtime_services.fetch(:plan_next_decomposition_task)
         end
 
+        def external_task_activity_publisher
+          @runtime_services.fetch(:external_task_activity_publisher)
+        end
+
         def schedule_next_run
           @runtime_services.fetch(:schedule_next_run)
         end

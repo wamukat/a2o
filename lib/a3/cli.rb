@@ -302,6 +302,34 @@ module A3
       end
     end
 
+    def handle_run_decomposition_proposal_author(argv, out:, run_id_generator:, command_runner:, merge_runner:)
+      with_runtime_session(
+        argv: argv,
+        parse_with: :parse_run_decomposition_proposal_author_options,
+        run_id_generator: run_id_generator,
+        command_runner: command_runner,
+        merge_runner: merge_runner
+      ) do |session|
+        task = session.container.fetch(:task_repository).fetch(session.options.fetch(:task_ref))
+        runner = A3::Application::RunDecompositionProposalAuthor.new(
+          storage_dir: session.options.fetch(:storage_dir),
+          project_root: File.dirname(session.options.fetch(:manifest_path)),
+          publish_external_task_activity: session.container.fetch(:external_task_activity_publisher)
+        )
+        result = runner.call(
+          task: task,
+          project_surface: session.project_surface,
+          investigation_evidence_path: session.options.fetch(:investigation_evidence_path)
+        )
+
+        out.puts("decomposition proposal #{task.ref} success=#{result.success}")
+        out.puts("summary=#{result.summary}")
+        out.puts("proposal_fingerprint=#{result.proposal_fingerprint}") if result.proposal_fingerprint
+        out.puts("evidence_path=#{result.evidence_path}")
+        out.puts("source_ticket_summary_published=#{result.source_ticket_summary_published}")
+      end
+    end
+
     def handle_execute_next_runnable_task(argv, out:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:)
       with_runtime_session(
         argv: argv,
@@ -1273,6 +1301,41 @@ module A3
       options
     end
 
+    def parse_run_decomposition_proposal_author_options(argv)
+      options = {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        preset_dir: File.expand_path("config/presets", Dir.pwd),
+        repo_sources: {},
+        kanban_repo_label_map: {},
+        kanban_trigger_labels: [],
+        verification_command_runner: nil,
+        merge_runner: nil,
+        worker_gateway: nil,
+        worker_command_args: []
+      }
+
+      parser = OptionParser.new
+      parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      parser.on("--preset-dir DIR") { |value| options[:preset_dir] = File.expand_path(value) }
+      parser.on("--investigation-evidence-path PATH") { |value| options[:investigation_evidence_path] = File.expand_path(value) }
+      add_kanban_bridge_options(parser, options)
+      add_verification_command_runner_options(parser, options)
+      add_merge_runner_options(parser, options)
+      add_worker_gateway_options(parser, options)
+      remaining = parser.parse(argv)
+
+      options[:task_ref] = remaining.fetch(0)
+      options[:manifest_path] = File.expand_path(remaining.fetch(1))
+      options[:investigation_evidence_path] ||= default_decomposition_investigation_evidence_path(
+        storage_dir: options.fetch(:storage_dir),
+        task_ref: options.fetch(:task_ref)
+      )
+      options
+    end
+
     def parse_execute_until_idle_options(argv)
       options = {
         storage_backend: :json,
@@ -1660,6 +1723,10 @@ module A3
 
     def session_filter(value)
       value.to_s.empty? ? nil : value
+    end
+
+    def default_decomposition_investigation_evidence_path(storage_dir:, task_ref:)
+      File.join(storage_dir, "decomposition-evidence", task_ref.to_s.gsub(/[^A-Za-z0-9._-]+/, "-"), "investigation.json")
     end
 
     def skill_feedback_entry_parts(entry)
