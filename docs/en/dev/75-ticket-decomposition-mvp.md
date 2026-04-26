@@ -45,6 +45,8 @@ The important invariant is:
 
 > An active implementation task must not prevent a `trigger:investigate` ticket from advancing, and an active decomposition pipeline must not prevent ordinary implementation tasks from advancing.
 
+Domain routing is exclusive. A source ticket with `trigger:investigate` is owned by the decomposition domain and must be excluded from ordinary implementation runnable selection until the decomposition gate explicitly changes its labels or state. Only child tickets created or approved for implementation, such as tickets marked with `trigger:auto-implement`, may enter the implementation scheduler domain.
+
 The two domains may share the kanban adapter, project package, repo slots, and evidence store, but they need separate runnable queues and separate active-run locks. Implementation `max_steps`, phase state, and worker occupancy must not be reused as the gate for decomposition. Decomposition `max_steps` or proposal review state must likewise not gate implementation selection.
 
 Ticket creation itself does not need parallel execution in the MVP. Keeping a single decomposition pipeline avoids duplicate child tickets, lowers review cost, and makes idempotency simpler while still allowing implementation work to continue.
@@ -93,6 +95,8 @@ The exact schema can evolve, but the public contract should follow the existing 
 - A2O passes a JSON request path through an `A2O_*` environment variable.
 - The command writes one JSON result to an `A2O_*` result path.
 - Scripts read repo paths from declared slot paths instead of private runtime files.
+- Investigation runs against an isolated read-only snapshot or disposable workspace, not the active implementation workspace.
+- Investigation commands must not mutate repo slots, create implementation branches, or take locks that would block implementation runs.
 - Non-zero exit or invalid JSON blocks the decomposition pipeline with evidence.
 
 The request should include:
@@ -132,6 +136,8 @@ The proposal should contain:
 
 The proposal fingerprint is required for idempotency. It should be derived from the source ticket ref, source revision fields, investigation result digest, and ordered child draft content.
 
+Each child draft also needs a stable child idempotency key derived from the source ticket ref and the child boundary, not from volatile title text alone. Creation uses the proposal fingerprint to identify the proposal version and child keys to reconcile individual tickets.
+
 ## Review Panel
 
 The MVP review panel may run reviewers sequentially. The key design point is independent reviewer responsibility, not parallel execution.
@@ -153,7 +159,9 @@ When enabled, creation must use the kanban adapter boundary rather than provider
 Creation must be idempotent:
 
 - store the proposal fingerprint on the source ticket evidence or comment
-- detect already-created child tickets for that fingerprint
+- store a stable child idempotency key on each created child ticket, relation comment, or evidence record
+- detect already-created child tickets by child key even when a rerun changes the proposal fingerprint
+- reconcile partial creation by completing missing children and relations before creating anything new
 - avoid creating duplicates on rerun
 - record created ticket refs, relation results, and failed writes
 
