@@ -61,7 +61,13 @@ An A2O release is not complete until all of the following are true:
    - Do not include local Kanbalone/A2O ticket URLs in release notes. Link only to public GitHub issues or pull requests when referencing tickets.
    - Mark only the newest release as `latest` unless the user asks otherwise.
 
-7. Clean up local release leftovers.
+7. Close completed public issues.
+   - Review every public GitHub issue or pull request linked from the release notes.
+   - Close an issue only when the released scope satisfies the issue. If the release intentionally ships an MVP or partial scope, confirm that the remaining scope is explicitly future work or is tracked separately before closing.
+   - Add a closing comment that links the GitHub Release and states the released behavior.
+   - Do not close issues merely because they were mentioned in release notes.
+
+8. Clean up local release leftovers.
    - This cleanup is mandatory. Do not treat old local release images as harmless cache.
    - Inspect `docker ps` before deleting Docker images so you do not remove images backing active runtime or kanban containers.
    - Remove repository-local generated release artifacts that are safe to regenerate, such as temporary `.work/...` smoke outputs and `agent-go/dist`.
@@ -69,13 +75,14 @@ An A2O release is not complete until all of the following are true:
    - Remove older local A2O release images once the new release has been confirmed, unless they are still backing active runtime or kanban containers.
    - If disk pressure is a concern, prefer aggressively removing superseded local `ghcr.io/wamukat/a2o-engine:*` tags after confirming the active runtime image in use.
 
-8. Finish.
+9. Finish.
    - Add a final kanban comment with:
      - commit SHA(s)
      - local verification
      - workflow URL
      - image reference
      - image digest
+     - completed public issues closed, or the reason each linked issue remains open
      - cleanup summary
      - GitHub Release URL
      - review result
