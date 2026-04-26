@@ -184,6 +184,14 @@ a2o run-decomposition-proposal-review A2O#123 project.yaml --storage-dir .work/a
 a2o show-decomposition-status A2O#123 --storage-dir .work/a2o/state
 ```
 
+Child ticket creation is behind an explicit gate and requires a Kanban command boundary:
+
+```bash
+a2o run-decomposition-child-creation A2O#123 --storage-dir .work/a2o/state --gate --kanban-command task --kanban-project Project
+```
+
+The command refuses to create children without `--gate`, requires an eligible proposal review for the same proposal fingerprint, reuses existing children by child key, and only then applies `trigger:auto-implement`.
+
 ## Runtime Phases
 
 `runtime.phases.<phase>.skill` points to a package skill file.

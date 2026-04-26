@@ -356,6 +356,32 @@ module A3
       end
     end
 
+    def handle_run_decomposition_child_creation(argv, out:, run_id_generator:, command_runner:, merge_runner:)
+      options = parse_run_decomposition_child_creation_options(argv)
+      repositories = build_watch_summary_repositories(options: options)
+      task = repositories.fetch(:task_repository).fetch(options.fetch(:task_ref))
+      writer =
+        if options.fetch(:gate)
+          A3::Infra::KanbanCliProposalChildWriter.new(
+            command_argv: kanban_command_argv(options),
+            project: options.fetch(:kanban_project),
+            working_dir: options[:kanban_working_dir]
+          )
+        else
+          Object.new
+        end
+      result = A3::Application::RunDecompositionChildCreation.new(
+        storage_dir: options.fetch(:storage_dir),
+        child_writer: writer
+      ).call(task: task, gate: options.fetch(:gate))
+
+      out.puts("decomposition child creation #{task.ref} success=#{result.success}")
+      out.puts("summary=#{result.summary}")
+      out.puts("child_refs=#{result.child_refs.join(',')}")
+      out.puts("child_keys=#{result.child_keys.join(',')}")
+      out.puts("evidence_path=#{result.evidence_path}")
+    end
+
     def handle_show_decomposition_status(argv, out:, run_id_generator:, command_runner:, merge_runner:)
       with_storage_container(
         argv: argv,
@@ -1427,6 +1453,33 @@ module A3
       parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
       remaining = parser.parse(argv)
       options[:task_ref] = remaining.fetch(0)
+      options
+    end
+
+    def parse_run_decomposition_child_creation_options(argv)
+      options = {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        repo_sources: {},
+        gate: false
+      }
+      parser = OptionParser.new
+      parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      parser.on("--gate") { options[:gate] = true }
+      parser.on("--kanban-command VALUE") { |value| options[:kanban_command] = value }
+      parser.on("--kanban-command-arg VALUE") do |value|
+        options[:kanban_command_args] ||= []
+        options[:kanban_command_args] << value
+      end
+      parser.on("--kanban-project VALUE") { |value| options[:kanban_project] = value }
+      parser.on("--kanban-working-dir DIR") { |value| options[:kanban_working_dir] = File.expand_path(value) }
+      remaining = parser.parse(argv)
+      options[:task_ref] = remaining.fetch(0)
+      if options.fetch(:gate) && (!options[:kanban_command] || !options[:kanban_project])
+        raise ArgumentError, "child creation requires --kanban-command and --kanban-project when --gate is set"
+      end
       options
     end
 

@@ -189,6 +189,14 @@ a2o run-decomposition-proposal-review A2O#123 project.yaml --storage-dir .work/a
 a2o show-decomposition-status A2O#123 --storage-dir .work/a2o/state
 ```
 
+child ticket creation は明示 gate の後ろに置き、Kanban command boundary を必須にする。
+
+```bash
+a2o run-decomposition-child-creation A2O#123 --storage-dir .work/a2o/state --gate --kanban-command task --kanban-project Project
+```
+
+`--gate` がない場合は child を作成しない。同じ proposal fingerprint に対する eligible proposal review が必要であり、既存 child は child key で再利用する。その後に限って `trigger:auto-implement` を付ける。
+
 ## Runtime Phases
 
 `runtime.phases` はフェーズごとのスキル、実行コマンド、検証 / 修復コマンド、マージ方針を持つ。A2O はフェーズごとの実行コマンドを内部の標準入力バンドル用ランチャー設定へ変換する。利用者は別途 `launcher.json` を作らない。
