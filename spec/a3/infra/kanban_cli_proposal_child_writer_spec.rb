@@ -3,7 +3,7 @@
 RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
   class FakeProposalClient
     attr_reader :created, :labels, :relations
-    attr_accessor :fail_after_first_create, :fail_dependency_relation
+    attr_accessor :fail_after_first_create
 
     def initialize(existing: [])
       @existing = existing
@@ -12,7 +12,6 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
       @relations = []
       @comments = []
       @fail_after_first_create = false
-      @fail_dependency_relation = false
     end
 
     def run_json_command(*args)
@@ -36,7 +35,6 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
 
     def run_command(*args)
       raise A3::Domain::ConfigurationError, "simulated label failure" if @fail_after_first_create && args.first == "task-label-add"
-      raise A3::Domain::ConfigurationError, "simulated dependency failure" if @fail_dependency_relation && args.first == "task-relation-create" && args.include?("blocked_by")
 
       @labels << args if args.first == "task-label-add"
       @relations << args if args.first == "task-relation-create"
@@ -129,29 +127,5 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     expect(result.child_refs).to eq(["A3-v2#5301"])
     expect(result.child_keys).to eq(["child-key-1"])
     expect(result.diagnostics.fetch("failed_write")).to include("child_key" => "child-key-1")
-  end
-
-  it "records dependency write failures with child and dependency context" do
-    client = FakeProposalClient.new
-    client.fail_dependency_relation = true
-    writer = described_class.new(project: "A3-v2", client: client)
-    payload = proposal_evidence
-    payload["proposal"]["children"] << payload["proposal"]["children"].first.merge(
-      "child_key" => "child-key-2",
-      "title" => "Add review",
-      "depends_on" => ["child-key-1"]
-    )
-
-    result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: payload)
-
-    expect(result.success?).to be(false)
-    expect(result.child_refs).to eq(["A3-v2#5301", "A3-v2#5302"])
-    expect(result.diagnostics.fetch("failed_write")).to include(
-      "type" => "dependency",
-      "child_key" => "child-key-2",
-      "dependency_key" => "child-key-1",
-      "child_ref" => "A3-v2#5302",
-      "dependency_ref" => "A3-v2#5301"
-    )
   end
 end

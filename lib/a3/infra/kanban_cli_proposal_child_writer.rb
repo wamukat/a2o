@@ -48,12 +48,7 @@ module A3
             raise
           end
         end
-        begin
-          reconcile_dependencies(parent_task_ref: parent_task_ref, children: children, child_refs_by_key: child_refs_by_key)
-        rescue StandardError => e
-          failed_write = dependency_failed_write(e)
-          raise
-        end
+        reconcile_dependencies(parent_task_ref: parent_task_ref, children: children, child_refs_by_key: child_refs_by_key)
         Result.new(success?: true, child_refs: refs, child_keys: keys)
       rescue StandardError => e
         Result.new(
@@ -114,42 +109,12 @@ module A3
             child_ref = child_refs_by_key[child.fetch("child_key")]
             next unless dependency_ref && child_ref
 
-            begin
-              dependency = @client.fetch_task_by_ref(dependency_ref)
-              dependent = @client.fetch_task_by_ref(child_ref)
-              ensure_blocker_relation(dependency.fetch("id"), dependent.fetch("id"))
-              ensure_comment(dependent.fetch("id"), "Blocked by decomposition dependency #{dependency_ref} from #{parent_task_ref}.")
-            rescue StandardError => e
-              raise DependencyWriteError.new(child_key: child.fetch("child_key"), dependency_key: dependency_key, child_ref: child_ref, dependency_ref: dependency_ref, original_error: e)
-            end
+            dependency = @client.fetch_task_by_ref(dependency_ref)
+            dependent = @client.fetch_task_by_ref(child_ref)
+            ensure_blocker_relation(dependency.fetch("id"), dependent.fetch("id"))
+            ensure_comment(dependent.fetch("id"), "Blocked by decomposition dependency #{dependency_ref} from #{parent_task_ref}.")
           end
         end
-      end
-
-      class DependencyWriteError < StandardError
-        attr_reader :child_key, :dependency_key, :child_ref, :dependency_ref, :original_error
-
-        def initialize(child_key:, dependency_key:, child_ref:, dependency_ref:, original_error:)
-          @child_key = child_key
-          @dependency_key = dependency_key
-          @child_ref = child_ref
-          @dependency_ref = dependency_ref
-          @original_error = original_error
-          super(original_error.message)
-        end
-      end
-
-      def dependency_failed_write(error)
-        return nil unless error.is_a?(DependencyWriteError)
-
-        {
-          "type" => "dependency",
-          "child_key" => error.child_key,
-          "dependency_key" => error.dependency_key,
-          "child_ref" => error.child_ref,
-          "dependency_ref" => error.dependency_ref,
-          "error" => error.message
-        }
       end
 
       def find_existing_child(child_key)
