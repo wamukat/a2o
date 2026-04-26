@@ -129,6 +129,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder do
       :resume_scheduler,
       :plan_next_runnable_task,
       :plan_next_decomposition_task,
+      :external_task_activity_publisher,
       :schedule_next_run,
       :build_merge_plan,
       :run_verification,
