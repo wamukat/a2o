@@ -95,7 +95,7 @@ module A3
         preset_schema_versions: preset_schema_versions(manifest_path, preset_dir),
         required_preset_schema_version: required_preset_schema_version,
         secret_delivery_mode: ENV.fetch("A3_SECRET_DELIVERY_MODE", "environment_variable"),
-        secret_reference: ENV.fetch("A3_SECRET_REFERENCE"),
+        secret_reference: ENV.fetch("A3_SECRET_REFERENCE", "A3_SECRET"),
         scheduler_store_migration_state: ENV.fetch("A3_SCHEDULER_STORE_MIGRATION", "not_required"),
         migration_entrypoint: ENV.fetch("A3_MIGRATION_ENTRYPOINT", "bin/a3 migrate-scheduler-store"),
         agent_runtime_profile: ENV.fetch("A3_AGENT_RUNTIME_PROFILE", "host-local"),

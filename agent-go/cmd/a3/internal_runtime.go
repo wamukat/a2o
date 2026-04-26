@@ -102,6 +102,12 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
+	case "decomposition":
+		if err := runRuntimeDecomposition(args[1:], runner, stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
 	case "skill-feedback":
 		if err := runRuntimeSkillFeedback(args[1:], runner, stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)
@@ -143,6 +149,196 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 		printUsage(stderr)
 		return 2
 	}
+}
+
+func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	if len(args) == 0 || isHelpArg(args[0]) {
+		fmt.Fprintln(stdout, "usage: a2o runtime decomposition investigate|propose|review|create-children|status TASK_REF [--project-config project-test.yaml] [--repo-source SLOT=PATH] [--gate]")
+		return nil
+	}
+	action := args[0]
+	flags := flag.NewFlagSet("a2o runtime decomposition "+action, flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	projectConfig := flags.String("project-config", "", "explicit project config file, for example project-test.yaml")
+	gate := flags.Bool("gate", false, "allow create-children to write child tickets")
+	investigationEvidencePath := flags.String("investigation-evidence-path", "", "proposal input evidence path")
+	proposalEvidencePath := flags.String("proposal-evidence-path", "", "proposal evidence path")
+	reviewEvidencePath := flags.String("review-evidence-path", "", "proposal review evidence path")
+	var repoSources stringListFlag
+	flags.Var(&repoSources, "repo-source", "repo source mapping SLOT=PATH; may be repeated")
+	flagArgs, positionals, err := splitRuntimeDecompositionArgs(args[1:])
+	if err != nil {
+		return err
+	}
+	if err := flags.Parse(flagArgs); err != nil {
+		return err
+	}
+	if len(positionals) != 1 {
+		return fmt.Errorf("usage: a2o runtime decomposition %s TASK_REF", action)
+	}
+	taskRef := positionals[0]
+
+	config, configPath, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	plan, err := buildRuntimeRunOncePlan(effectiveConfig, runtimeRunOnceOverrides{}, *projectConfig)
+	if err != nil {
+		return err
+	}
+	command, err := runtimeDecompositionCommand(action, taskRef, plan, normalizeRuntimeDecompositionRepoSources(plan, repoSources), runtimeDecompositionOverrides{
+		Gate:                      *gate,
+		InvestigationEvidencePath: *investigationEvidencePath,
+		ProposalEvidencePath:      *proposalEvidencePath,
+		ReviewEvidencePath:        *reviewEvidencePath,
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
+	fmt.Fprintf(stdout, "runtime_storage=internal-managed project_config=%s surface_source=project-package\n", plan.ManifestPath)
+	output, err := dockerComposeExecOutput(effectiveConfig, plan, runner, runtimeInspectionArgs(command...)...)
+	if err != nil {
+		return fmt.Errorf("runtime decomposition %s failed: %w", action, err)
+	}
+	fmt.Fprint(stdout, string(output))
+	if len(output) == 0 || output[len(output)-1] != '\n' {
+		fmt.Fprintln(stdout)
+	}
+	return nil
+}
+
+func splitRuntimeDecompositionArgs(args []string) ([]string, []string, error) {
+	var flagArgs []string
+	var positionals []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--gate":
+			flagArgs = append(flagArgs, arg)
+		case arg == "--project-config" || arg == "--repo-source" || arg == "--investigation-evidence-path" || arg == "--proposal-evidence-path" || arg == "--review-evidence-path":
+			if i+1 >= len(args) {
+				return nil, nil, fmt.Errorf("%s requires a value", arg)
+			}
+			flagArgs = append(flagArgs, arg, args[i+1])
+			i++
+		case strings.HasPrefix(arg, "--project-config=") || strings.HasPrefix(arg, "--repo-source=") || strings.HasPrefix(arg, "--investigation-evidence-path=") || strings.HasPrefix(arg, "--proposal-evidence-path=") || strings.HasPrefix(arg, "--review-evidence-path="):
+			flagArgs = append(flagArgs, arg)
+		case strings.HasPrefix(arg, "-"):
+			return nil, nil, fmt.Errorf("unknown runtime decomposition option: %s", arg)
+		default:
+			positionals = append(positionals, arg)
+		}
+	}
+	return flagArgs, positionals, nil
+}
+
+type runtimeDecompositionOverrides struct {
+	Gate                      bool
+	InvestigationEvidencePath string
+	ProposalEvidencePath      string
+	ReviewEvidencePath        string
+}
+
+func runtimeDecompositionCommand(action string, taskRef string, plan runtimeRunOncePlan, repoSources []string, overrides runtimeDecompositionOverrides) ([]string, error) {
+	args := []string{"a3"}
+	switch action {
+	case "investigate":
+		args = append(args, "run-decomposition-investigation", taskRef, plan.ManifestPath)
+		args = append(args, runtimeDecompositionRuntimeOptions(plan)...)
+		args = append(args, runtimeDecompositionKanbanOptions(plan)...)
+		args = append(args, runtimeDecompositionRepoSourceOptions(repoSources, plan.RepoSources)...)
+	case "propose":
+		args = append(args, "run-decomposition-proposal-author", taskRef, plan.ManifestPath)
+		args = append(args, runtimeDecompositionRuntimeOptions(plan)...)
+		if strings.TrimSpace(overrides.InvestigationEvidencePath) != "" {
+			args = append(args, "--investigation-evidence-path", workspaceContainerPath(plan.HostRootDir, overrides.InvestigationEvidencePath))
+		}
+		args = append(args, runtimeDecompositionKanbanOptions(plan)...)
+		args = append(args, runtimeDecompositionRepoSourceOptions(repoSources, plan.RepoSources)...)
+	case "review":
+		args = append(args, "run-decomposition-proposal-review", taskRef, plan.ManifestPath)
+		args = append(args, runtimeDecompositionRuntimeOptions(plan)...)
+		if strings.TrimSpace(overrides.ProposalEvidencePath) != "" {
+			args = append(args, "--proposal-evidence-path", workspaceContainerPath(plan.HostRootDir, overrides.ProposalEvidencePath))
+		}
+		args = append(args, runtimeDecompositionKanbanOptions(plan)...)
+		args = append(args, runtimeDecompositionRepoSourceOptions(repoSources, plan.RepoSources)...)
+	case "create-children":
+		args = append(args, "run-decomposition-child-creation", taskRef)
+		args = append(args, "--storage-backend", "json", "--storage-dir", plan.StorageDir)
+		if strings.TrimSpace(overrides.ProposalEvidencePath) != "" {
+			args = append(args, "--proposal-evidence-path", workspaceContainerPath(plan.HostRootDir, overrides.ProposalEvidencePath))
+		}
+		if strings.TrimSpace(overrides.ReviewEvidencePath) != "" {
+			args = append(args, "--review-evidence-path", workspaceContainerPath(plan.HostRootDir, overrides.ReviewEvidencePath))
+		}
+		if overrides.Gate {
+			args = append(args, "--gate")
+			args = append(args, runtimeDecompositionKanbanWriteOptions(plan)...)
+		}
+	case "status":
+		args = append(args, "show-decomposition-status", taskRef, "--storage-backend", "json", "--storage-dir", plan.StorageDir)
+	default:
+		return nil, fmt.Errorf("unknown runtime decomposition subcommand: %s", action)
+	}
+	return args, nil
+}
+
+func runtimeDecompositionRuntimeOptions(plan runtimeRunOncePlan) []string {
+	return []string{"--storage-backend", "json", "--storage-dir", plan.StorageDir, "--preset-dir", plan.PresetDir}
+}
+
+func runtimeDecompositionKanbanOptions(plan runtimeRunOncePlan) []string {
+	args := runtimeDecompositionKanbanWriteOptions(plan)
+	args = append(args, "--kanban-status", plan.KanbanStatus)
+	for _, repoLabel := range plan.KanbanRepoLabels {
+		args = append(args, "--kanban-repo-label", repoLabel)
+	}
+	return args
+}
+
+func runtimeDecompositionKanbanWriteOptions(plan runtimeRunOncePlan) []string {
+	return []string{
+		"--kanban-command", "python3",
+		"--kanban-command-arg", packagedKanbanCLIPath,
+		"--kanban-command-arg", "--backend",
+		"--kanban-command-arg", "soloboard",
+		"--kanban-command-arg", "--base-url",
+		"--kanban-command-arg", plan.SoloBoardInternalURL,
+		"--kanban-project", plan.KanbanProject,
+		"--kanban-working-dir", "/workspace",
+	}
+}
+
+func runtimeDecompositionRepoSourceOptions(explicit []string, defaults []string) []string {
+	sources := explicit
+	if len(sources) == 0 {
+		sources = defaults
+	}
+	args := make([]string, 0, len(sources)*2)
+	for _, repoSource := range sources {
+		args = append(args, "--repo-source", repoSource)
+	}
+	return args
+}
+
+func normalizeRuntimeDecompositionRepoSources(plan runtimeRunOncePlan, repoSources []string) []string {
+	if len(repoSources) == 0 {
+		return nil
+	}
+	normalized := make([]string, 0, len(repoSources))
+	for _, repoSource := range repoSources {
+		slot, sourcePath, ok := strings.Cut(repoSource, "=")
+		if !ok {
+			normalized = append(normalized, repoSource)
+			continue
+		}
+		normalized = append(normalized, slot+"="+workspaceContainerPath(plan.HostRootDir, sourcePath))
+	}
+	return normalized
 }
 
 type runtimeSchedulerPaths struct {

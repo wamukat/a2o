@@ -22,7 +22,7 @@ module A3
         child_creation = load_json(child_creation_path)
         disposition = review && review["disposition"]
         state =
-          if child_creation && child_creation["success"] == false
+          if failed_child_creation?(child_creation)
             "blocked"
           elsif child_creation && child_creation["success"] == true
             "done"
@@ -56,9 +56,13 @@ module A3
       private
 
       def blocked_reason_for(review:, child_creation:)
-        return child_creation["summary"] if child_creation && child_creation["success"] == false
+        return child_creation["summary"] if failed_child_creation?(child_creation)
 
         review && review["summary"]
+      end
+
+      def failed_child_creation?(child_creation)
+        child_creation && child_creation["success"] == false && child_creation["status"] != "gate_closed"
       end
 
       def load_json(path)

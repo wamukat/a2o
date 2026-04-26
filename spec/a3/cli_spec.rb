@@ -199,6 +199,43 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "passes custom child creation evidence paths to the application service" do
+    out = StringIO.new
+    service = instance_double(A3::Application::RunDecompositionChildCreation)
+    result = A3::Application::RunDecompositionChildCreation::Result.new(
+      success: nil,
+      status: "gate_closed",
+      summary: "decomposition child creation gate is closed",
+      child_refs: [],
+      child_keys: [],
+      evidence_path: "/tmp/child-creation.json"
+    )
+    task = A3::Domain::Task.new(ref: "A3-v2#5300", kind: :single, edit_scope: [:repo_alpha])
+    repository = instance_double(A3::Infra::JsonTaskRepository, fetch: task)
+    allow(described_class).to receive(:build_watch_summary_repositories).and_return(task_repository: repository)
+    allow(A3::Application::RunDecompositionChildCreation).to receive(:new).and_return(service)
+    allow(service).to receive(:call).and_return(result)
+
+    described_class.start(
+      [
+        "run-decomposition-child-creation",
+        "A3-v2#5300",
+        "--storage-dir", "/tmp/a2o-state",
+        "--proposal-evidence-path", "/tmp/custom-proposal.json",
+        "--review-evidence-path", "/tmp/custom-review.json"
+      ],
+      out: out
+    )
+
+    expect(service).to have_received(:call).with(
+      task: task,
+      gate: false,
+      proposal_evidence_path: "/tmp/custom-proposal.json",
+      review_evidence_path: "/tmp/custom-review.json"
+    )
+    expect(out.string).to include("status=gate_closed")
+  end
+
   it "runs decomposition investigation from a stored task, project manifest, and repo sources" do
     Dir.mktmpdir do |dir|
       begin

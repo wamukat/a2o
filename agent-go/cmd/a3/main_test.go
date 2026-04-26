@@ -4045,6 +4045,138 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 	}
 }
 
+func TestRuntimeDecompositionInvestigationRunsThroughHostLauncher(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		SoloBoardPort:  "3480",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	hostRepoSource := filepath.Join(tempDir, "repo-alpha")
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "decomposition", "investigate", "A2O#245", "--repo-source", "repo_alpha=" + hostRepoSource}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	if !strings.Contains(output, "runtime_storage=internal-managed project_config="+filepath.Join(packageDir, "project.yaml")) {
+		t.Fatalf("stdout should describe runtime project config, got:\n%s", output)
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime bash -lc",
+		"export A3_SECRET_REFERENCE=\"${A3_SECRET_REFERENCE:-A3_SECRET}\"",
+		"run-decomposition-investigation",
+		"A2O#245",
+		filepath.Join(packageDir, "project.yaml"),
+		"'--storage-dir' '/var/lib/a3/test-runtime'",
+		"'--repo-source' 'repo_alpha=/workspace/repo-alpha'",
+		"'--kanban-command' 'python3'",
+		"'--kanban-project' 'A2OReferenceMultiRepo'",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("runtime decomposition missing call %q in:\n%s", want, joined)
+		}
+	}
+}
+
+func TestRuntimeDecompositionStatusUsesStorageOnlyCommand(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "decomposition", "status", "A2O#245"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"show-decomposition-status",
+		"A2O#245",
+		"'--storage-dir' '/var/lib/a3/test-runtime'",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("runtime decomposition status missing call %q in:\n%s", want, joined)
+		}
+	}
+	if strings.Contains(joined, " --kanban-command ") {
+		t.Fatalf("status should not require kanban bridge args, got:\n%s", joined)
+	}
+}
+
+func TestRuntimeDecompositionForwardsEvidencePathOverrides(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	hostEvidencePath := filepath.Join(tempDir, ".work", "a2o", "custom", "investigation.json")
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "decomposition", "propose", "A2O#245", "--investigation-evidence-path", hostEvidencePath}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"run-decomposition-proposal-author",
+		"'--investigation-evidence-path' '/workspace/.work/a2o/custom/investigation.json'",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("runtime decomposition propose missing call %q in:\n%s", want, joined)
+		}
+	}
+}
+
 func TestRuntimeResetTaskPrintsBlockedRecoveryPlan(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

@@ -10,12 +10,24 @@ module A3
   module Application
     class RunDecompositionInvestigation
       Result = Struct.new(:success, :summary, :result, :request_path, :result_path, :workspace_root, :evidence_path, :failing_command, :observed_state, keyword_init: true)
+      DEFAULT_SLOT_EXCLUDES = %w[
+        .git
+        node_modules
+        target
+        build
+        dist
+        .gradle
+        .m2
+        tmp
+        vendor/bundle
+      ].freeze
 
-      def initialize(storage_dir:, project_root: Dir.pwd, process_runner: nil, clock: -> { Time.now.utc })
+      def initialize(storage_dir:, project_root: Dir.pwd, process_runner: nil, clock: -> { Time.now.utc }, progress_io: nil)
         @storage_dir = storage_dir
         @project_root = project_root
         @process_runner = process_runner || method(:run_process)
         @clock = clock
+        @progress_io = progress_io
       end
 
       def call(task:, project_surface:, slot_paths: {}, task_snapshot: nil, previous_evidence_path: nil)
@@ -113,8 +125,11 @@ module A3
         FileUtils.mkdir_p(slots_root)
         stringify_hash(slot_paths).each_with_object({}) do |(slot, source_path), memo|
           destination = File.join(slots_root, slugify(slot))
+          progress("decomposition materialize slot=#{slot} source=#{source_path} destination=#{destination} status=start")
+          started_at = @clock.call
           copy_slot(source_path: source_path, destination: destination)
           make_read_only(destination)
+          progress("decomposition materialize slot=#{slot} destination=#{destination} status=done elapsed_seconds=#{format('%.3f', @clock.call - started_at)}")
           memo[slot] = destination
         end
       end
@@ -124,12 +139,32 @@ module A3
 
         if File.directory?(source_path)
           FileUtils.mkdir_p(destination)
-          entries = Dir.children(source_path)
-          FileUtils.cp_r(entries.map { |entry| File.join(source_path, entry) }, destination) unless entries.empty?
+          copy_directory_entries(source_path: source_path, destination: destination, relative_path: "")
         else
           FileUtils.mkdir_p(File.dirname(destination))
           FileUtils.cp(source_path, destination)
         end
+      end
+
+      def copy_directory_entries(source_path:, destination:, relative_path:)
+        Dir.children(source_path).each do |entry|
+          entry_relative_path = relative_path.empty? ? entry : File.join(relative_path, entry)
+          next if excluded_slot_entry?(entry, entry_relative_path)
+
+          source_entry = File.join(source_path, entry)
+          destination_entry = File.join(destination, entry)
+          if File.directory?(source_entry) && !File.symlink?(source_entry)
+            FileUtils.mkdir_p(destination_entry)
+            copy_directory_entries(source_path: source_entry, destination: destination_entry, relative_path: entry_relative_path)
+          else
+            FileUtils.cp_r(source_entry, destination_entry)
+          end
+        end
+      end
+
+      def excluded_slot_entry?(entry, relative_path)
+        normalized_relative_path = relative_path.split(File::SEPARATOR).join("/")
+        DEFAULT_SLOT_EXCLUDES.include?(entry) || DEFAULT_SLOT_EXCLUDES.include?(normalized_relative_path)
       end
 
       def make_read_only(path)
@@ -264,6 +299,12 @@ module A3
 
       def write_json(path, payload)
         File.write(path, "#{JSON.pretty_generate(payload)}\n")
+      end
+
+      def progress(message)
+        return unless @progress_io
+
+        @progress_io.puts(message)
       end
 
       def slugify(value)

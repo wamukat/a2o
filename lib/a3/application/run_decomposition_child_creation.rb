@@ -6,7 +6,7 @@ require "json"
 module A3
   module Application
     class RunDecompositionChildCreation
-      Result = Struct.new(:success, :summary, :child_refs, :child_keys, :evidence_path, keyword_init: true)
+      Result = Struct.new(:success, :status, :summary, :child_refs, :child_keys, :evidence_path, keyword_init: true)
 
       def initialize(storage_dir:, child_writer:)
         @storage_dir = storage_dir
@@ -14,12 +14,12 @@ module A3
       end
 
       def call(task:, gate:, proposal_evidence_path: nil, review_evidence_path: nil)
-        return blocked_result(task: task, summary: "decomposition child creation gate is closed") unless gate
-
         proposal_evidence_path ||= evidence_path_for(task.ref, "proposal.json")
         review_evidence_path ||= evidence_path_for(task.ref, "proposal-review.json")
         proposal_evidence = load_json(proposal_evidence_path)
         review_evidence = load_json(review_evidence_path)
+        return gate_closed_result(task: task, proposal_evidence: proposal_evidence, review_evidence: review_evidence) unless gate
+
         validation_errors = validation_errors_for(proposal_evidence: proposal_evidence, review_evidence: review_evidence)
         return blocked_result(task: task, summary: validation_errors.join("; "), proposal_evidence: proposal_evidence, review_evidence: review_evidence) unless validation_errors.empty?
 
@@ -32,6 +32,7 @@ module A3
           persist_evidence(
             task: task,
             success: true,
+            status: "created",
             summary: "created or reconciled #{write_result.child_refs.size} decomposition child ticket(s)",
             proposal_evidence: proposal_evidence,
             review_evidence: review_evidence,
@@ -68,6 +69,7 @@ module A3
         persist_evidence(
           task: task,
           success: false,
+          status: "blocked",
           summary: summary,
           proposal_evidence: proposal_evidence,
           review_evidence: review_evidence,
@@ -75,7 +77,19 @@ module A3
         )
       end
 
-      def persist_evidence(task:, success:, summary:, proposal_evidence:, review_evidence:, writer_result:)
+      def gate_closed_result(task:, proposal_evidence:, review_evidence:)
+        persist_evidence(
+          task: task,
+          success: nil,
+          status: "gate_closed",
+          summary: "decomposition child creation gate is closed",
+          proposal_evidence: proposal_evidence,
+          review_evidence: review_evidence,
+          writer_result: nil
+        )
+      end
+
+      def persist_evidence(task:, success:, status:, summary:, proposal_evidence:, review_evidence:, writer_result:)
         evidence_dir = File.join(@storage_dir, "decomposition-evidence", slugify(task.ref))
         FileUtils.mkdir_p(evidence_dir)
         path = File.join(evidence_dir, "child-creation.json")
@@ -87,6 +101,7 @@ module A3
             "task_ref" => task.ref,
             "phase" => "child_creation",
             "success" => success,
+            "status" => status,
             "summary" => summary,
             "proposal_fingerprint" => proposal_evidence && proposal_evidence["proposal_fingerprint"],
             "child_refs" => child_refs,
@@ -96,7 +111,7 @@ module A3
             "writer_result" => writer_result
           )}\n"
         )
-        Result.new(success: success, summary: summary, child_refs: child_refs, child_keys: child_keys, evidence_path: path)
+        Result.new(success: success, status: status, summary: summary, child_refs: child_refs, child_keys: child_keys, evidence_path: path)
       end
 
       def writer_result_payload(result)

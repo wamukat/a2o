@@ -315,7 +315,8 @@ module A3
         bridge = build_external_task_bridge(session.options)
         result = A3::Application::RunDecompositionInvestigation.new(
           storage_dir: session.options.fetch(:storage_dir),
-          project_root: File.dirname(session.options.fetch(:manifest_path))
+          project_root: File.dirname(session.options.fetch(:manifest_path)),
+          progress_io: out
         ).call(
           task: task,
           project_surface: session.project_surface,
@@ -404,9 +405,15 @@ module A3
       result = A3::Application::RunDecompositionChildCreation.new(
         storage_dir: options.fetch(:storage_dir),
         child_writer: writer
-      ).call(task: task, gate: options.fetch(:gate))
+      ).call(
+        task: task,
+        gate: options.fetch(:gate),
+        proposal_evidence_path: options[:proposal_evidence_path],
+        review_evidence_path: options[:review_evidence_path]
+      )
 
       out.puts("decomposition child creation #{task.ref} success=#{result.success}")
+      out.puts("status=#{result.status}") if result.status
       out.puts("summary=#{result.summary}")
       out.puts("child_refs=#{result.child_refs.join(',')}")
       out.puts("child_keys=#{result.child_keys.join(',')}")
@@ -1529,6 +1536,8 @@ module A3
       parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
       parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
       parser.on("--gate") { options[:gate] = true }
+      parser.on("--proposal-evidence-path PATH") { |value| options[:proposal_evidence_path] = File.expand_path(value) }
+      parser.on("--review-evidence-path PATH") { |value| options[:review_evidence_path] = File.expand_path(value) }
       parser.on("--kanban-command VALUE") { |value| options[:kanban_command] = value }
       parser.on("--kanban-command-arg VALUE") do |value|
         options[:kanban_command_args] ||= []

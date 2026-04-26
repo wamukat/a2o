@@ -32,7 +32,15 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
     Dir.mktmpdir do |dir|
       source_repo = File.join(dir, "repo-source")
       FileUtils.mkdir_p(File.join(source_repo, "lib"))
+      FileUtils.mkdir_p(File.join(source_repo, ".git"))
+      FileUtils.mkdir_p(File.join(source_repo, "target"))
+      FileUtils.mkdir_p(File.join(source_repo, "service", "build"))
+      FileUtils.mkdir_p(File.join(source_repo, "vendor", "bundle"))
       File.write(File.join(source_repo, "lib", "a.rb"), "class A; end\n")
+      File.write(File.join(source_repo, "service", "app.rb"), "class App; end\n")
+      File.write(File.join(source_repo, "service", "build", "generated.bin"), "generated\n")
+      File.write(File.join(source_repo, "target", "generated.bin"), "generated\n")
+      File.write(File.join(source_repo, "vendor", "bundle", "gem-cache"), "cache\n")
       project_surface = A3::Domain::ProjectSurface.new(
         implementation_skill: "skills/implementation.md",
         review_skill: "skills/review.md",
@@ -51,13 +59,15 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
         File.write(env.fetch("A2O_DECOMPOSITION_RESULT_PATH"), JSON.generate("summary" => "investigated #{request.fetch('title')}", "affected_files" => ["lib/a.rb"]))
         ["out", "", FakeStatus.new(true, 0)]
       end
+      progress = StringIO.new
 
       result = nil
       begin
         result = described_class.new(
           storage_dir: dir,
           process_runner: process_runner,
-          clock: -> { Time.utc(2026, 4, 26, 3, 0, 0) }
+          clock: -> { Time.utc(2026, 4, 26, 3, 0, 0) },
+          progress_io: progress
         ).call(
           task: task,
           project_surface: project_surface,
@@ -87,7 +97,15 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
         expect(isolated_repo).not_to eq(source_repo)
         expect(isolated_repo).to start_with(result.workspace_root)
         expect(File.read(File.join(isolated_repo, "lib", "a.rb"))).to eq("class A; end\n")
+        expect(File.read(File.join(isolated_repo, "service", "app.rb"))).to eq("class App; end\n")
+        expect(File).not_to exist(File.join(isolated_repo, ".git"))
+        expect(File).not_to exist(File.join(isolated_repo, "target"))
+        expect(File).not_to exist(File.join(isolated_repo, "service", "build"))
+        expect(File).not_to exist(File.join(isolated_repo, "vendor", "bundle"))
         expect(File.writable?(isolated_repo)).to be(false)
+        expect(progress.string).to include("decomposition materialize slot=repo_alpha")
+        expect(progress.string).to include("status=start")
+        expect(progress.string).to include("status=done")
 
         evidence = JSON.parse(File.read(result.evidence_path))
         expect(evidence).to include(

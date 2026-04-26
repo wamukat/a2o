@@ -160,7 +160,7 @@ The command writes one JSON object to `A2O_DECOMPOSITION_RESULT_PATH`. The MVP r
 To run investigation:
 
 ```bash
-a2o run-decomposition-investigation A2O#123 project.yaml --storage-dir .work/a2o/state --repo-source repo_alpha=/path/to/repo
+a2o runtime decomposition investigate A2O#123 --repo-source repo_alpha=/path/to/repo
 ```
 
 The author command receives:
@@ -174,7 +174,7 @@ The author command writes one proposal JSON object to `A2O_DECOMPOSITION_AUTHOR_
 To run the proposal step after investigation evidence exists:
 
 ```bash
-a2o run-decomposition-proposal-author A2O#123 project.yaml --storage-dir .work/a2o/state
+a2o runtime decomposition propose A2O#123
 ```
 
 By default A2O reads investigation evidence from `decomposition-evidence/<task>/investigation.json` under the storage directory. Use `--investigation-evidence-path` to provide another evidence file. When the task is backed by an external Kanban ticket, A2O posts the proposal summary back to that source ticket.
@@ -188,17 +188,19 @@ Proposal review commands are run sequentially. Each command receives:
 Each review result should be a JSON object with `summary` and `findings`. Findings use `severity` values `critical`, `major`, `minor`, or `info`; any `critical` finding blocks the proposal and records evidence. A clean review marks the proposal `eligible` for the next configured gate but does not create child tickets.
 
 ```bash
-a2o run-decomposition-proposal-review A2O#123 project.yaml --storage-dir .work/a2o/state
-a2o show-decomposition-status A2O#123 --storage-dir .work/a2o/state
+a2o runtime decomposition review A2O#123
+a2o runtime decomposition status A2O#123
 ```
 
 Child ticket creation is behind an explicit gate and requires a Kanban command boundary:
 
 ```bash
-a2o run-decomposition-child-creation A2O#123 --storage-dir .work/a2o/state --gate --kanban-command task --kanban-project Project
+a2o runtime decomposition create-children A2O#123 --gate
 ```
 
-The command refuses to create children without `--gate`, requires an eligible proposal review for the same proposal fingerprint, reuses existing children by child key, and only then applies `trigger:auto-implement`.
+The command refuses to create children without `--gate`, records `gate_closed` evidence without changing an eligible proposal to `blocked`, requires an eligible proposal review for the same proposal fingerprint, reuses existing children by child key, and only then applies `trigger:auto-implement`.
+
+The host launcher wrapper reads storage, project config, Kanban, repo label, and default repo source settings from the bootstrapped runtime package. Use `--project-config project-test.yaml` when the package contains a non-default config file. The lower-level runtime-container commands remain available for diagnostics, but user-facing operation should prefer the `a2o runtime decomposition ...` wrapper.
 
 ## Runtime Phases
 

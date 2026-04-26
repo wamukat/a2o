@@ -50,8 +50,12 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
 
       result = described_class.new(storage_dir: dir, child_writer: writer).call(task: task, gate: false)
 
-      expect(result.success).to be(false)
+      expect(result.success).to be_nil
+      expect(result.status).to eq("gate_closed")
       expect(result.summary).to eq("decomposition child creation gate is closed")
+      evidence = JSON.parse(File.read(result.evidence_path))
+      expect(evidence.fetch("status")).to eq("gate_closed")
+      expect(evidence["success"]).to be_nil
     end
   end
 
@@ -68,8 +72,10 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
       result = described_class.new(storage_dir: dir, child_writer: writer).call(task: task, gate: true)
 
       expect(result.success).to be(true)
+      expect(result.status).to eq("created")
       expect(result.child_refs).to eq(["A3-v2#5301"])
       evidence = JSON.parse(File.read(result.evidence_path))
+      expect(evidence.fetch("status")).to eq("created")
       expect(evidence.fetch("proposal_fingerprint")).to eq("fp-1")
       expect(evidence.fetch("child_keys")).to eq(["child-key-1"])
     end
@@ -83,6 +89,7 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
       result = described_class.new(storage_dir: dir, child_writer: writer).call(task: task, gate: true)
 
       expect(result.success).to be(false)
+      expect(result.status).to eq("blocked")
       expect(result.summary).to include("proposal review is not eligible")
     end
   end
