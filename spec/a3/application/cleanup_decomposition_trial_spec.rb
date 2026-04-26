@@ -86,4 +86,17 @@ RSpec.describe A3::Application::CleanupDecompositionTrial do
       expect(File.exist?(File.join(external_dir, "A3-v2-5300"))).to be(true)
     end
   end
+
+  it "refuses to dry-run cleanup through symlinked evidence paths before reading evidence" do
+    Dir.mktmpdir do |dir|
+      external_dir = File.join(dir, "external")
+      FileUtils.mkdir_p(File.join(external_dir, "A3-v2-5300"))
+      File.write(File.join(external_dir, "A3-v2-5300", "proposal.json"), JSON.generate("proposal_fingerprint" => "external"))
+      FileUtils.ln_s(external_dir, File.join(dir, "decomposition-evidence"))
+
+      expect do
+        described_class.new(storage_dir: dir).call(task_ref: "A3-v2#5300")
+      end.to raise_error(ArgumentError, /contains symlink/)
+    end
+  end
 end

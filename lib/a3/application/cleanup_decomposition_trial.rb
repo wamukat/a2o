@@ -20,6 +20,7 @@ module A3
           TargetPath.new(kind: "evidence_dir", path: safe_child_path("decomposition-evidence", slug), exists: false),
           TargetPath.new(kind: "workspace_dir", path: safe_child_path("decomposition-workspaces", slug), exists: false)
         ].map { |target| target.exists = File.exist?(target.path); target }
+        target_paths.each { |target| assert_safe_target!(target.path) if target.exists }
         evidence_records = collect_evidence_records(target_paths.first.path)
         deleted_paths = apply ? delete_existing_targets(target_paths) : []
 
