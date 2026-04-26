@@ -4223,7 +4223,6 @@ func TestRuntimeLogsPrintsCompletedPhaseArtifacts(t *testing.T) {
 	}
 	joined := strings.Join(runner.joinedCalls(), "\n")
 	for _, want := range []string{
-		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 show-task --storage-backend json --storage-dir /var/lib/a3/test-runtime A2O#16",
 		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime ruby -rjson -e",
 		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 agent-artifact-read --storage-dir /var/lib/a3/test-runtime worker-run-16-implementation-ai-raw-log",
 		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 agent-artifact-read --storage-dir /var/lib/a3/test-runtime worker-run-16-implementation-combined-log",
@@ -4231,6 +4230,73 @@ func TestRuntimeLogsPrintsCompletedPhaseArtifacts(t *testing.T) {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("runtime logs missing call %q in:\n%s", want, joined)
 		}
+	}
+}
+
+func TestRuntimeLogsStaticModeIncludesChildArtifactsForParent(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		logManifestOutput: `{"run_ref":"","current_run":"","phase":"","source_type":"","source_ref":"","active":false,"artifacts":[{"task_ref":"Sample#41","phase":"planning","artifact_id":"parent-planning-combined-log","mode":"combined-log"},{"task_ref":"Sample#42","phase":"implementation","artifact_id":"child-implementation-ai-raw-log","mode":"ai-raw-log"},{"task_ref":"Sample#42","phase":"verification","artifact_id":"child-verification-combined-log","mode":"combined-log"},{"task_ref":"Sample#43","phase":"implementation","artifact_id":"child-implementation-ai-raw-log","mode":"ai-raw-log"}]}`,
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "logs", "Sample#41"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	if !strings.Contains(output, "=== phase: planning (combined-log) artifact=parent-planning-combined-log ===") {
+		t.Fatalf("runtime logs should keep parent artifact header unchanged, got:\n%s", output)
+	}
+	if !strings.Contains(output, "=== task: Sample#42 phase: implementation (ai-raw-log) artifact=child-implementation-ai-raw-log ===") {
+		t.Fatalf("runtime logs should include child implementation artifact with task header, got:\n%s", output)
+	}
+	if !strings.Contains(output, "=== task: Sample#42 phase: verification (combined-log) artifact=child-verification-combined-log ===") {
+		t.Fatalf("runtime logs should include child verification artifact with task header, got:\n%s", output)
+	}
+	if count := strings.Count(output, "artifact=child-implementation-ai-raw-log"); count != 1 {
+		t.Fatalf("runtime logs should de-duplicate child artifacts, count=%d output:\n%s", count, output)
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(joined, "/var/lib/a3/test-runtime/tasks.json /var/lib/a3/test-runtime/runs.json Sample#41 true") {
+		t.Fatalf("runtime logs should request static child aggregation, calls:\n%s", joined)
+	}
+
+	runner = &fakeRunner{
+		logManifestOutput: `{"run_ref":"","current_run":"","phase":"","source_type":"","source_ref":"","active":false,"artifacts":[{"task_ref":"Sample#41","phase":"planning","artifact_id":"parent-planning-combined-log","mode":"combined-log"}]}`,
+	}
+	stdout.Reset()
+	stderr.Reset()
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "logs", "Sample#41", "--no-children"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+	joined = strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(joined, "/var/lib/a3/test-runtime/tasks.json /var/lib/a3/test-runtime/runs.json Sample#41 false") {
+		t.Fatalf("runtime logs --no-children should request parent-only static manifest, calls:\n%s", joined)
+	}
+	if strings.Contains(stdout.String(), "task: Sample#42") {
+		t.Fatalf("runtime logs --no-children should not include child sections, got:\n%s", stdout.String())
 	}
 }
 

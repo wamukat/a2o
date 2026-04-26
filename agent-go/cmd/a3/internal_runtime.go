@@ -1090,7 +1090,13 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 		lastLiveKey := ""
 		lastWaitingKey := ""
 		for {
-			manifest, err := runtimeTaskLogManifest(effectiveConfig, plan, runner, taskRef)
+			var manifest runtimeTaskLogSnapshot
+			var err error
+			if *follow {
+				manifest, err = runtimeTaskLogManifest(effectiveConfig, plan, runner, taskRef)
+			} else {
+				manifest, err = runtimeStaticTaskLogManifest(effectiveConfig, plan, runner, taskRef, !*noChildren)
+			}
 			if err != nil {
 				return err
 			}
@@ -1098,7 +1104,11 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 				if printedArtifacts[item.ArtifactID] {
 					continue
 				}
-				if err := printRuntimeArtifactSection(effectiveConfig, plan, runner, stdout, item.Phase, item.ArtifactID, item.Mode); err != nil {
+				headerTaskRef := ""
+				if !*follow && strings.TrimSpace(item.TaskRef) != "" && item.TaskRef != taskRef {
+					headerTaskRef = item.TaskRef
+				}
+				if err := printRuntimeArtifactSection(effectiveConfig, plan, runner, stdout, headerTaskRef, item.Phase, item.ArtifactID, item.Mode); err != nil {
 					return err
 				}
 				printedArtifacts[item.ArtifactID] = true
@@ -1786,6 +1796,7 @@ func latestRuntimeRunRef(config runtimeInstanceConfig, plan runtimeRunOncePlan, 
 }
 
 type runtimePhaseLogArtifact struct {
+	TaskRef    string `json:"task_ref"`
 	Phase      string `json:"phase"`
 	ArtifactID string `json:"artifact_id"`
 	Mode       string `json:"mode"`
@@ -1866,6 +1877,64 @@ func runtimeTaskLogManifest(config runtimeInstanceConfig, plan runtimeRunOncePla
 	}, nil
 }
 
+func runtimeStaticTaskLogManifest(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, taskRef string, includeChildren bool) (runtimeTaskLogSnapshot, error) {
+	script := strings.Join([]string{
+		"tasks_path = ARGV.fetch(0)",
+		"runs_path = ARGV.fetch(1)",
+		"requested = ARGV.fetch(2).to_s",
+		"include_children = ARGV.fetch(3) == 'true'",
+		"tasks = File.exist?(tasks_path) ? JSON.parse(File.read(tasks_path)) : {}",
+		"runs = File.exist?(runs_path) ? JSON.parse(File.read(runs_path)) : {}",
+		"task = tasks[requested] || {}",
+		"target_refs = [requested]",
+		"if include_children && task['kind'].to_s == 'parent'",
+		"  child_refs = Array(task['child_refs']).map(&:to_s)",
+		"  child_refs.concat(tasks.each_with_object([]) { |(ref, payload), refs| refs << ref.to_s if payload.is_a?(Hash) && payload['parent_ref'].to_s == requested })",
+		"  target_refs.concat(child_refs)",
+		"end",
+		"target_refs = target_refs.map(&:to_s).reject(&:empty?).uniq",
+		"target_set = target_refs.each_with_object({}) { |ref, memo| memo[ref] = true }",
+		"seen_artifacts = {}",
+		"artifacts = []",
+		"runs.values.each do |record|",
+		"  task_ref = record['task_ref'].to_s",
+		"  next unless target_set[task_ref]",
+		"  Array(record.dig('evidence', 'phase_records')).each do |phase_record|",
+		"    entries = Array(phase_record.dig('execution_record', 'diagnostics', 'agent_artifacts'))",
+		"    [['ai-raw-log', 'ai-raw-log'], ['combined-log', 'combined-log']].each do |role, mode|",
+		"      artifact = entries.find { |item| item['role'] == role && item['artifact_id'].to_s != '' }",
+		"      next unless artifact",
+		"      artifact_id = artifact['artifact_id'].to_s",
+		"      next if seen_artifacts[artifact_id]",
+		"      seen_artifacts[artifact_id] = true",
+		"      artifacts << {'task_ref' => task_ref, 'phase' => phase_record['phase'].to_s, 'artifact_id' => artifact_id, 'mode' => mode}",
+		"    end",
+		"  end",
+		"end",
+		"payload = {'run_ref' => '', 'current_run' => '', 'phase' => '', 'source_type' => '', 'source_ref' => '', 'task_status' => task['status'].to_s, 'active' => false, 'artifacts' => artifacts}",
+		"puts JSON.generate(payload)",
+	}, "; ")
+	output, err := dockerComposeExecOutput(config, plan, runner, "ruby", "-rjson", "-e", script, path.Join(plan.StorageDir, "tasks.json"), path.Join(plan.StorageDir, "runs.json"), taskRef, fmt.Sprintf("%t", includeChildren))
+	if err != nil {
+		return runtimeTaskLogSnapshot{}, err
+	}
+	var payload runtimeTaskLogManifestPayload
+	if err := json.Unmarshal(output, &payload); err != nil {
+		return runtimeTaskLogSnapshot{}, err
+	}
+	return runtimeTaskLogSnapshot{
+		RunRef:             payload.RunRef,
+		CurrentRunRef:      payload.CurrentRun,
+		CurrentPhase:       payload.Phase,
+		SourceType:         payload.SourceType,
+		SourceRef:          payload.SourceRef,
+		TaskStatus:         payload.TaskStatus,
+		Active:             payload.Active,
+		LiveMode:           preferredLiveMode(plan, taskRef, payload.Phase),
+		CompletedArtifacts: payload.Artifacts,
+	}, nil
+}
+
 func runtimeLogsShouldKeepFollowing(taskStatus string) bool {
 	switch strings.ToLower(strings.TrimSpace(taskStatus)) {
 	case "in_progress", "in review", "in_review", "verifying", "merging":
@@ -1875,12 +1944,16 @@ func runtimeLogsShouldKeepFollowing(taskStatus string) bool {
 	}
 }
 
-func printRuntimeArtifactSection(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, phase string, artifactID string, mode string) error {
+func printRuntimeArtifactSection(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, taskRef string, phase string, artifactID string, mode string) error {
 	output, err := runtimeDescribeSectionOutput(config, plan, runner, "agent_artifact", "a3", "agent-artifact-read", "--storage-dir", plan.StorageDir, artifactID)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "=== phase: %s (%s) artifact=%s ===\n", phase, mode, artifactID)
+	if strings.TrimSpace(taskRef) == "" {
+		fmt.Fprintf(stdout, "=== phase: %s (%s) artifact=%s ===\n", phase, mode, artifactID)
+	} else {
+		fmt.Fprintf(stdout, "=== task: %s phase: %s (%s) artifact=%s ===\n", taskRef, phase, mode, artifactID)
+	}
 	if strings.TrimSpace(output) != "" {
 		fmt.Fprintln(stdout, output)
 	}
