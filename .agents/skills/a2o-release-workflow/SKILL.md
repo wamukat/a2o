@@ -16,8 +16,9 @@ An A2O release is not complete until all of the following are true:
 3. git tag and push are complete
 4. GHCR runtime image publish has succeeded
 5. the matching GitHub Release exists with user-facing release notes
-6. local post-release cleanup has removed stale release leftovers that are no longer needed, including old local release Docker images that are not backing active containers
-7. the A2O kanban release ticket records the final result
+6. linked public issues are reviewed and either closed with release comments or explicitly left open with reasons
+7. local post-release cleanup has removed stale release leftovers that are no longer needed, including old local release Docker images that are not backing active containers
+8. the A2O kanban release ticket records the final result
 
 ## Workflow
 
