@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
   spec.name = "a2o"
-  spec.version = "0.5.33"
+  spec.version = "0.5.34"
   spec.summary = "A2O orchestration runtime"
   spec.authors = ["wamukat"]
   spec.files = Dir[

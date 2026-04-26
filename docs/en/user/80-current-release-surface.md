@@ -1,6 +1,6 @@
-# A2O 0.5.33 Current Release Surface
+# A2O 0.5.34 Current Release Surface
 
-This document describes the currently supported A2O 0.5.33 user surface and validation boundary.
+This document describes the currently supported A2O 0.5.34 user surface and validation boundary.
 
 Use it to confirm which features can be documented for users and what can be treated as validated at this release. For setup steps, read [10-quickstart.md](10-quickstart.md). For configuration fields, read [90-project-package-schema.md](90-project-package-schema.md).
 
@@ -16,7 +16,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Runtime container lifecycle: `a2o runtime up`, `down`
 - Foreground runtime execution: `a2o runtime run-once`, `a2o runtime loop`
 - Resident scheduler lifecycle: `a2o runtime resume`, `pause`, `status`
-- Runtime diagnosis and recovery: `a2o runtime image-digest`, `doctor`, `watch-summary`, `logs [task-ref] --follow`, `describe-task <task-ref>`, `skill-feedback list`, `skill-feedback propose`, `reset-task <task-ref>`, `show-artifact <artifact-id>`
+- Runtime diagnosis and recovery: `a2o runtime image-digest`, `doctor`, `watch-summary`, `logs [task-ref] --follow [--no-children]`, `describe-task <task-ref>`, `skill-feedback list`, `skill-feedback propose`, `reset-task <task-ref>`, `show-artifact <artifact-id>`
 - Upgrade diagnosis: `a2o upgrade check`
 - Single-file project package config: `project.yaml`
 - Investigate decomposition MVP: `runtime.decomposition.investigate.command`, `runtime.decomposition.author.command`, `a2o runtime decomposition investigate`, `propose`, `review`, `create-children`, and `status`
@@ -29,7 +29,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Agent HTTP worker gateway, including claimed-job heartbeats
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates
-- GHCR runtime image tags: `latest`, `0.5.33`, and `sha-*`
+- GHCR runtime image tags: `latest`, `0.5.34`, and `sha-*`
 - Tag releases also publish `latest`, so the released version tag and `latest` are expected to point to the same runtime image after release publication finishes.
 - Local release gate: full RSpec suite
 
