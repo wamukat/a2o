@@ -233,7 +233,10 @@ RSpec.describe A3::CLI do
       proposal_evidence_path: "/tmp/custom-proposal.json",
       review_evidence_path: "/tmp/custom-review.json"
     )
+    expect(out.string).to include("decomposition child creation A3-v2#5300 status=gate_closed")
+    expect(out.string).to include("child_creation_result=not_attempted")
     expect(out.string).to include("status=gate_closed")
+    expect(out.string).not_to include("success=")
   end
 
   it "imports an external Kanban task before gated child creation uses the parent external id" do

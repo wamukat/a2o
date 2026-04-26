@@ -422,8 +422,13 @@ module A3
         review_evidence_path: options[:review_evidence_path]
       )
 
-      out.puts("decomposition child creation #{task.ref} success=#{result.success}")
-      out.puts("status=#{result.status}") if result.status
+      if result.success.nil? && result.status == "gate_closed"
+        out.puts("decomposition child creation #{task.ref} status=#{result.status}")
+        out.puts("child_creation_result=not_attempted")
+      else
+        out.puts("decomposition child creation #{task.ref} success=#{result.success}")
+        out.puts("status=#{result.status}") if result.status
+      end
       out.puts("summary=#{result.summary}")
       out.puts("child_refs=#{result.child_refs.join(',')}")
       out.puts("child_keys=#{result.child_keys.join(',')}")
