@@ -28,6 +28,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder do
       prepare_workspace: instance_double(A3::Application::PrepareWorkspace),
       plan_rerun: instance_double(A3::Application::PlanRerun),
       plan_next_runnable_task: instance_double(A3::Application::PlanNextRunnableTask),
+      plan_next_decomposition_task: instance_double(A3::Application::PlanNextDecompositionTask),
       schedule_next_run: instance_double(A3::Application::ScheduleNextRun),
       build_merge_plan: instance_double(A3::Application::BuildMergePlan),
       run_verification: instance_double(A3::Application::RunVerification),
@@ -36,6 +37,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder do
       register_completed_run: instance_double(A3::Application::RegisterCompletedRun),
       reconcile_manual_merge_recovery: instance_double(A3::Application::ReconcileManualMergeRecovery),
       start_run: instance_double(A3::Application::StartRun),
+      external_task_activity_publisher: instance_double(A3::Infra::NullExternalTaskActivityPublisher),
       workspace_provisioner: instance_double(A3::Infra::LocalWorkspaceProvisioner)
     }
   end
@@ -126,6 +128,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder do
       :pause_scheduler,
       :resume_scheduler,
       :plan_next_runnable_task,
+      :plan_next_decomposition_task,
       :schedule_next_run,
       :build_merge_plan,
       :run_verification,
