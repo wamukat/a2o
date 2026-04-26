@@ -170,7 +170,7 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 	reviewEvidencePath := flags.String("review-evidence-path", "", "proposal review evidence path")
 	var repoSources stringListFlag
 	flags.Var(&repoSources, "repo-source", "repo source mapping SLOT=PATH; may be repeated")
-	flagArgs, positionals, err := splitRuntimeDecompositionArgs(args[1:])
+	flagArgs, positionals, err := splitRuntimeDecompositionArgs(action, args[1:])
 	if err != nil {
 		return err
 	}
@@ -215,13 +215,15 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 	return nil
 }
 
-func splitRuntimeDecompositionArgs(args []string) ([]string, []string, error) {
+func splitRuntimeDecompositionArgs(action string, args []string) ([]string, []string, error) {
 	var flagArgs []string
 	var positionals []string
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
-		case arg == "--gate" || arg == "--apply" || arg == "--dry-run":
+		case arg == "--gate":
+			flagArgs = append(flagArgs, arg)
+		case action == "cleanup" && (arg == "--apply" || arg == "--dry-run"):
 			if arg != "--dry-run" {
 				flagArgs = append(flagArgs, arg)
 			}

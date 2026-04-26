@@ -4174,6 +4174,24 @@ func TestRuntimeDecompositionUnknownOptionStillErrors(t *testing.T) {
 	}
 }
 
+func TestRuntimeDecompositionCleanupFlagsAreRejectedForOtherActions(t *testing.T) {
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"runtime", "decomposition", "create-children", "A2O#245", "--gate", "--dry-run"}, runner, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("run returned success, stdout=%s", stdout.String())
+	}
+
+	if got := stderr.String(); !strings.Contains(got, "unknown runtime decomposition option: --dry-run") {
+		t.Fatalf("stderr should include unknown dry-run option, got:\n%s", got)
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("invalid cleanup flags should not start runtime, got calls: %#v", runner.joinedCalls())
+	}
+}
+
 func TestRuntimeDecompositionCleanupDispatchesStorageCommand(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
