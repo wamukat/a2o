@@ -205,6 +205,15 @@ a2o runtime decomposition create-children A2O#123 --gate
 
 このコマンドは `--gate` がない場合は child を作成せず、eligible proposal を `blocked` に変えずに `gate_closed` evidence を記録する。同じ proposal fingerprint に対する eligible proposal review が必要であり、既存 child は child key で再利用する。その後に限って `trigger:auto-implement` を付ける。
 
+trial cleanup は既定で dry-run になる。
+
+```bash
+a2o runtime decomposition cleanup A2O#123 --dry-run
+a2o runtime decomposition cleanup A2O#123 --apply
+```
+
+cleanup は task slug に対応する local evidence と disposable workspace の path を表示し、evidence から proposal fingerprint と child ref を読み取って表示する。`--apply` は選択した task の `decomposition-evidence/<task>` と `decomposition-workspaces/<task>` だけを削除する。Kanban ticket や comment はこの command では削除しない。
+
 host launcher wrapper は、bootstrap 済み runtime package から storage、project config、Kanban、repo label、既定の repo source 設定を読む。package 内に通常とは異なる config file がある場合は `--project-config project-test.yaml` を使う。低レベルの runtime-container command は診断用に残すが、利用者向けの運用では `a2o runtime decomposition ...` wrapper を優先する。
 
 ## Runtime Phases

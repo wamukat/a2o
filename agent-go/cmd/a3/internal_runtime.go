@@ -153,14 +153,18 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 
 func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
 	if len(args) == 0 || isHelpArg(args[0]) {
-		fmt.Fprintln(stdout, "usage: a2o runtime decomposition investigate|propose|review|create-children|status TASK_REF [--project-config project-test.yaml] [--repo-source SLOT=PATH] [--gate]")
+		printRuntimeDecompositionUsage(stdout)
 		return nil
 	}
 	action := args[0]
+	if len(args) >= 2 && isHelpArg(args[1]) {
+		return printRuntimeDecompositionActionUsage(stdout, action)
+	}
 	flags := flag.NewFlagSet("a2o runtime decomposition "+action, flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	projectConfig := flags.String("project-config", "", "explicit project config file, for example project-test.yaml")
 	gate := flags.Bool("gate", false, "allow create-children to write child tickets")
+	applyCleanup := flags.Bool("apply", false, "apply decomposition cleanup")
 	investigationEvidencePath := flags.String("investigation-evidence-path", "", "proposal input evidence path")
 	proposalEvidencePath := flags.String("proposal-evidence-path", "", "proposal evidence path")
 	reviewEvidencePath := flags.String("review-evidence-path", "", "proposal review evidence path")
@@ -189,6 +193,7 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 	}
 	command, err := runtimeDecompositionCommand(action, taskRef, plan, normalizeRuntimeDecompositionRepoSources(plan, repoSources), runtimeDecompositionOverrides{
 		Gate:                      *gate,
+		ApplyCleanup:              *applyCleanup,
 		InvestigationEvidencePath: *investigationEvidencePath,
 		ProposalEvidencePath:      *proposalEvidencePath,
 		ReviewEvidencePath:        *reviewEvidencePath,
@@ -216,8 +221,10 @@ func splitRuntimeDecompositionArgs(args []string) ([]string, []string, error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
-		case arg == "--gate":
-			flagArgs = append(flagArgs, arg)
+		case arg == "--gate" || arg == "--apply" || arg == "--dry-run":
+			if arg != "--dry-run" {
+				flagArgs = append(flagArgs, arg)
+			}
 		case arg == "--project-config" || arg == "--repo-source" || arg == "--investigation-evidence-path" || arg == "--proposal-evidence-path" || arg == "--review-evidence-path":
 			if i+1 >= len(args) {
 				return nil, nil, fmt.Errorf("%s requires a value", arg)
@@ -237,6 +244,7 @@ func splitRuntimeDecompositionArgs(args []string) ([]string, []string, error) {
 
 type runtimeDecompositionOverrides struct {
 	Gate                      bool
+	ApplyCleanup              bool
 	InvestigationEvidencePath string
 	ProposalEvidencePath      string
 	ReviewEvidencePath        string
@@ -281,10 +289,46 @@ func runtimeDecompositionCommand(action string, taskRef string, plan runtimeRunO
 		}
 	case "status":
 		args = append(args, "show-decomposition-status", taskRef, "--storage-backend", "json", "--storage-dir", plan.StorageDir)
+	case "cleanup":
+		args = append(args, "cleanup-decomposition-trial", taskRef, "--storage-backend", "json", "--storage-dir", plan.StorageDir)
+		if overrides.ApplyCleanup {
+			args = append(args, "--apply")
+		}
 	default:
 		return nil, fmt.Errorf("unknown runtime decomposition subcommand: %s", action)
 	}
 	return args, nil
+}
+
+func printRuntimeDecompositionUsage(w io.Writer) {
+	fmt.Fprintln(w, "usage: a2o runtime decomposition investigate|propose|review|create-children|status|cleanup TASK_REF [--project-config project-test.yaml]")
+	fmt.Fprintln(w, "actions:")
+	fmt.Fprintln(w, "  investigate       run the configured decomposition investigation command")
+	fmt.Fprintln(w, "  propose           create proposal evidence from investigation evidence")
+	fmt.Fprintln(w, "  review            review proposal evidence")
+	fmt.Fprintln(w, "  create-children   create or reconcile Kanban child tickets; requires --gate")
+	fmt.Fprintln(w, "  status            show local decomposition evidence status")
+	fmt.Fprintln(w, "  cleanup           list or remove local decomposition trial evidence/workspaces")
+}
+
+func printRuntimeDecompositionActionUsage(w io.Writer, action string) error {
+	switch action {
+	case "investigate":
+		fmt.Fprintln(w, "usage: a2o runtime decomposition investigate TASK_REF [--project-config project-test.yaml] [--repo-source SLOT=PATH]")
+	case "propose":
+		fmt.Fprintln(w, "usage: a2o runtime decomposition propose TASK_REF [--project-config project-test.yaml] [--investigation-evidence-path PATH]")
+	case "review":
+		fmt.Fprintln(w, "usage: a2o runtime decomposition review TASK_REF [--project-config project-test.yaml] [--proposal-evidence-path PATH]")
+	case "create-children":
+		fmt.Fprintln(w, "usage: a2o runtime decomposition create-children TASK_REF [--project-config project-test.yaml] [--proposal-evidence-path PATH] [--review-evidence-path PATH] [--gate]")
+	case "status":
+		fmt.Fprintln(w, "usage: a2o runtime decomposition status TASK_REF [--project-config project-test.yaml]")
+	case "cleanup":
+		fmt.Fprintln(w, "usage: a2o runtime decomposition cleanup TASK_REF [--project-config project-test.yaml] [--dry-run|--apply]")
+	default:
+		return fmt.Errorf("unknown runtime decomposition subcommand: %s", action)
+	}
+	return nil
 }
 
 func runtimeDecompositionRuntimeOptions(plan runtimeRunOncePlan) []string {

@@ -200,6 +200,15 @@ a2o runtime decomposition create-children A2O#123 --gate
 
 The command refuses to create children without `--gate`, records `gate_closed` evidence without changing an eligible proposal to `blocked`, requires an eligible proposal review for the same proposal fingerprint, reuses existing children by child key, and only then applies `trigger:auto-implement`.
 
+Trial cleanup is dry-run by default:
+
+```bash
+a2o runtime decomposition cleanup A2O#123 --dry-run
+a2o runtime decomposition cleanup A2O#123 --apply
+```
+
+Cleanup reports the local evidence and disposable workspace paths for the task slug, including proposal fingerprint and child refs discovered from evidence. `--apply` removes only `decomposition-evidence/<task>` and `decomposition-workspaces/<task>` for the selected task. Kanban tickets and comments are not deleted by this command.
+
 The host launcher wrapper reads storage, project config, Kanban, repo label, and default repo source settings from the bootstrapped runtime package. Use `--project-config project-test.yaml` when the package contains a non-default config file. The lower-level runtime-container commands remain available for diagnostics, but user-facing operation should prefer the `a2o runtime decomposition ...` wrapper.
 
 ## Runtime Phases

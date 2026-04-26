@@ -4138,6 +4138,82 @@ func TestRuntimeDecompositionStatusUsesStorageOnlyCommand(t *testing.T) {
 	}
 }
 
+func TestRuntimeDecompositionActionHelpDoesNotStartRuntime(t *testing.T) {
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"runtime", "decomposition", "status", "--help"}, runner, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+	}
+
+	if got := stdout.String(); !strings.Contains(got, "usage: a2o runtime decomposition status TASK_REF") {
+		t.Fatalf("stdout should include action usage, got:\n%s", got)
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("help should not start runtime, got calls: %#v", runner.joinedCalls())
+	}
+}
+
+func TestRuntimeDecompositionUnknownOptionStillErrors(t *testing.T) {
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"runtime", "decomposition", "status", "A2O#245", "--bogus"}, runner, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("run returned success, stdout=%s", stdout.String())
+	}
+
+	if got := stderr.String(); !strings.Contains(got, "unknown runtime decomposition option: --bogus") {
+		t.Fatalf("stderr should include unknown option, got:\n%s", got)
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("invalid options should not start runtime, got calls: %#v", runner.joinedCalls())
+	}
+}
+
+func TestRuntimeDecompositionCleanupDispatchesStorageCommand(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "decomposition", "cleanup", "A2O#245", "--apply"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"cleanup-decomposition-trial",
+		"A2O#245",
+		"'--storage-dir' '/var/lib/a3/test-runtime'",
+		"'--apply'",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("runtime decomposition cleanup missing call %q in:\n%s", want, joined)
+		}
+	}
+}
+
 func TestRuntimeDecompositionCreateChildrenPassesKanbanReadOptions(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

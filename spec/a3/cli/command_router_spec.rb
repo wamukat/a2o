@@ -31,6 +31,7 @@ RSpec.describe A3::CLI::CommandRouter do
       expect(described_class.session_kind_for("run-decomposition-proposal-review")).to eq(:runtime)
       expect(described_class.session_kind_for("run-decomposition-child-creation")).to eq(:storage)
       expect(described_class.session_kind_for("show-decomposition-status")).to eq(:storage)
+      expect(described_class.session_kind_for("cleanup-decomposition-trial")).to eq(:storage)
       expect(described_class.session_kind_for("skill-feedback-list")).to eq(:storage)
       expect(described_class.session_kind_for("skill-feedback-propose")).to eq(:storage)
       expect(described_class.session_kind_for("watch-summary")).to eq(:storage)

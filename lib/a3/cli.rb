@@ -447,6 +447,31 @@ module A3
       end
     end
 
+    def handle_cleanup_decomposition_trial(argv, out:, run_id_generator:, command_runner:, merge_runner:)
+      options = parse_cleanup_decomposition_trial_options(argv)
+      result = A3::Application::CleanupDecompositionTrial.new(storage_dir: options.fetch(:storage_dir)).call(
+        task_ref: options.fetch(:task_ref),
+        apply: options.fetch(:apply)
+      )
+
+      out.puts("decomposition cleanup task=#{result.task_ref} mode=#{result.mode}")
+      result.target_paths.each do |target|
+        action = target.exists ? (result.mode == "apply" ? "delete" : "would_delete") : "none"
+        out.puts("#{target.kind} path=#{target.path} exists=#{target.exists} action=#{action}")
+      end
+      out.puts("proposal_fingerprint=#{result.proposal_fingerprint}") if result.proposal_fingerprint
+      out.puts("child_refs=#{result.child_refs.join(',')}") unless result.child_refs.empty?
+      out.puts("child_keys=#{result.child_keys.join(',')}") unless result.child_keys.empty?
+      result.evidence_records.each do |record|
+        parts = ["evidence_file path=#{record.path}"]
+        parts << "phase=#{record.phase}" if record.phase
+        parts << "status=#{record.status}" if record.status
+        parts << "success=#{record.success.inspect}" unless record.success.nil?
+        out.puts(parts.join(" "))
+      end
+      out.puts("deleted_paths=#{result.deleted_paths.join(',')}")
+    end
+
     def handle_execute_next_runnable_task(argv, out:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:)
       with_runtime_session(
         argv: argv,
@@ -1529,6 +1554,24 @@ module A3
       parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
       parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
       parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      remaining = parser.parse(argv)
+      options[:task_ref] = remaining.fetch(0)
+      options
+    end
+
+    def parse_cleanup_decomposition_trial_options(argv)
+      options = {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        repo_sources: {},
+        apply: false
+      }
+      parser = OptionParser.new
+      parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      parser.on("--dry-run") { options[:apply] = false }
+      parser.on("--apply") { options[:apply] = true }
       remaining = parser.parse(argv)
       options[:task_ref] = remaining.fetch(0)
       options
