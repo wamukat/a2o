@@ -1084,6 +1084,8 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 				return err
 			}
 			taskRef = resolvedTaskRef
+		} else if err := validateRuntimeLogsTaskRef(effectiveConfig, plan, runner, taskRef); err != nil {
+			return err
 		}
 		printedArtifacts := map[string]bool{}
 		offsets := map[string]int64{}
@@ -1143,6 +1145,11 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 			time.Sleep(*pollInterval)
 		}
 	})
+}
+
+func validateRuntimeLogsTaskRef(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, taskRef string) error {
+	_, err := runtimeDescribeSectionOutput(config, plan, runner, "task", "a3", "show-task", "--storage-backend", "json", "--storage-dir", plan.StorageDir, taskRef)
+	return err
 }
 
 func normalizeRuntimeLogsArgs(args []string) ([]string, error) {

@@ -4300,6 +4300,41 @@ func TestRuntimeLogsStaticModeIncludesChildArtifactsForParent(t *testing.T) {
 	}
 }
 
+func TestRuntimeLogsStaticModeFailsForMissingTaskRef(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{failShowTask: true}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "logs", "Missing#404"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("runtime logs should fail for a missing task ref")
+		}
+	})
+
+	if !strings.Contains(stderr.String(), "task not found") {
+		t.Fatalf("runtime logs should surface show-task failure, stderr=%q stdout=%q", stderr.String(), stdout.String())
+	}
+	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "agent-artifact-read") {
+		t.Fatalf("runtime logs should not read artifacts for missing task refs")
+	}
+}
+
 func TestRuntimeLogsFollowsLatestActiveRunWhenTaskCurrentRunIsBlank(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
