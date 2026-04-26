@@ -22,6 +22,7 @@ module A3
             build_scope_snapshot: @context.build_scope_snapshot,
             build_artifact_owner: @context.build_artifact_owner,
             plan_next_decomposition_task: @context.plan_next_decomposition_task,
+            external_task_source: @context.external_task_source,
             external_task_activity_publisher: @context.external_task_activity_publisher
           }.freeze
         end

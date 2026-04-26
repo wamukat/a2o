@@ -4138,6 +4138,49 @@ func TestRuntimeDecompositionStatusUsesStorageOnlyCommand(t *testing.T) {
 	}
 }
 
+func TestRuntimeDecompositionCreateChildrenPassesKanbanReadOptions(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "decomposition", "create-children", "Portal#240"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"run-decomposition-child-creation",
+		"Portal#240",
+		"'--kanban-command' 'python3'",
+		"'--kanban-project' 'A2OReferenceMultiRepo'",
+		"'--kanban-status' 'To do'",
+		"'--kanban-repo-label' 'repo:catalog=repo_alpha'",
+		"'--kanban-repo-label' 'repo:storefront=repo_beta'",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("runtime decomposition create-children missing call %q in:\n%s", want, joined)
+		}
+	}
+}
+
 func TestRuntimeDecompositionForwardsEvidencePathOverrides(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

@@ -58,6 +58,10 @@ module A3
           @runtime_services.fetch(:external_task_activity_publisher)
         end
 
+        def external_task_source
+          @runtime_services.fetch(:external_task_source)
+        end
+
         def schedule_next_run
           @runtime_services.fetch(:schedule_next_run)
         end

@@ -236,6 +236,109 @@ RSpec.describe A3::CLI do
     expect(out.string).to include("status=gate_closed")
   end
 
+  it "imports an external Kanban task before gated child creation uses the parent external id" do
+    Dir.mktmpdir do |dir|
+      evidence_dir = File.join(dir, "decomposition-evidence", "Portal-240")
+      FileUtils.mkdir_p(evidence_dir)
+      proposal_evidence = {
+        "success" => true,
+        "proposal_fingerprint" => "fp-1",
+        "proposal" => {
+          "children" => [
+            {
+              "child_key" => "child-1",
+              "title" => "Build portal slice",
+              "body" => "Implement the portal slice.",
+              "acceptance_criteria" => ["works"],
+              "labels" => [],
+              "depends_on" => [],
+              "rationale" => "Needed for the portal."
+            }
+          ]
+        }
+      }
+      File.write(File.join(evidence_dir, "proposal.json"), JSON.generate(proposal_evidence))
+      File.write(
+        File.join(evidence_dir, "proposal-review.json"),
+        JSON.generate(
+          "disposition" => "eligible",
+          "request" => {
+            "proposal_evidence" => {
+              "proposal_fingerprint" => "fp-1"
+            }
+          }
+        )
+      )
+      external_task = A3::Domain::Task.new(
+        ref: "Portal#240",
+        kind: :single,
+        edit_scope: [:repo_alpha],
+        status: :todo,
+        external_task_id: 240,
+        labels: ["trigger:investigate"]
+      )
+      A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json")).save(
+        A3::Domain::Task.new(
+          ref: "Portal#240",
+          kind: :single,
+          edit_scope: [:repo_alpha],
+          status: :todo,
+          labels: ["trigger:investigate"]
+        )
+      )
+      source = double("ExternalTaskSource")
+      allow(source).to receive(:fetch_by_ref).with("Portal#240").and_return(external_task)
+      allow(described_class).to receive(:build_external_task_source).and_return(source)
+      writer = instance_double(A3::Infra::KanbanCliProposalChildWriter)
+      write_result = A3::Infra::KanbanCliProposalChildWriter::Result.new(
+        success?: true,
+        child_refs: ["Portal#241"],
+        child_keys: ["child-1"],
+        summary: nil,
+        diagnostics: nil
+      )
+      allow(A3::Infra::KanbanCliProposalChildWriter).to receive(:new).and_return(writer)
+      allow(writer).to receive(:call).and_return(write_result)
+
+      out = StringIO.new
+      described_class.start(
+        [
+          "run-decomposition-child-creation",
+          "Portal#240",
+          "--storage-dir", dir,
+          "--gate",
+          "--kanban-command", "task",
+          "--kanban-project", "Portal",
+          "--kanban-repo-label", "repo:portal=repo_alpha"
+        ],
+        out: out
+      )
+
+      expect(writer).to have_received(:call).with(
+        parent_task_ref: "Portal#240",
+        parent_external_task_id: 240,
+        proposal_evidence: proposal_evidence
+      )
+      expect(out.string).to include("decomposition child creation Portal#240 success=true")
+      expect(A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json")).fetch("Portal#240").external_task_id).to eq(240)
+    end
+  end
+
+  it "raises record not found for direct child creation when no local or external task source can resolve the task" do
+    Dir.mktmpdir do |dir|
+      expect do
+        described_class.start(
+          [
+            "run-decomposition-child-creation",
+            "Portal#999",
+            "--storage-dir", dir
+          ],
+          out: StringIO.new
+        )
+      end.to raise_error(A3::Domain::RecordNotFound, /Task not found: Portal#999/)
+    end
+  end
+
   it "runs decomposition investigation from a stored task, project manifest, and repo sources" do
     Dir.mktmpdir do |dir|
       begin
@@ -330,6 +433,100 @@ RSpec.describe A3::CLI do
         )
         expect(evidence.fetch("request").fetch("slot_paths").fetch("repo_alpha")).to start_with(
           File.join(dir, "decomposition-workspaces", "A3-v2-5300")
+        )
+      ensure
+        workspace_root = File.join(dir, "decomposition-workspaces")
+        FileUtils.chmod_R("u+w", workspace_root) if File.exist?(workspace_root)
+      end
+    end
+  end
+
+  it "imports an external Kanban task before direct decomposition investigation fetches local storage" do
+    Dir.mktmpdir do |dir|
+      begin
+        repo_source = File.join(dir, "repo-alpha")
+        FileUtils.mkdir_p(repo_source)
+        File.write(File.join(repo_source, "README.md"), "repo alpha\n")
+        commands_dir = File.join(dir, "commands")
+        FileUtils.mkdir_p(commands_dir)
+        investigate_path = File.join(commands_dir, "investigate.rb")
+        File.write(
+          investigate_path,
+          <<~RUBY
+            #!#{RbConfig.ruby}
+            require "json"
+            request = JSON.parse(File.read(ENV.fetch("A2O_DECOMPOSITION_REQUEST_PATH")))
+            File.write(ENV.fetch("A2O_DECOMPOSITION_RESULT_PATH"), JSON.generate("summary" => "investigated \#{request.fetch("title")}"))
+          RUBY
+        )
+        FileUtils.chmod(0o755, investigate_path)
+        manifest_path = File.join(dir, "project.yaml")
+        File.write(
+          manifest_path,
+          <<~YAML
+            schema_version: 1
+            runtime:
+              decomposition:
+                investigate:
+                  command: ["commands/investigate.rb"]
+              phases:
+                implementation:
+                  skill: skills/implementation/base.md
+                review:
+                  skill: skills/review/default.md
+                merge:
+                  policy: ff_only
+                  target_ref: refs/heads/main
+          YAML
+        )
+        external_task = A3::Domain::Task.new(
+          ref: "Portal#240",
+          kind: :single,
+          edit_scope: [:repo_alpha],
+          status: :todo,
+          external_task_id: 240,
+          labels: ["trigger:investigate"]
+        )
+        source = double("ExternalTaskSource")
+        allow(source).to receive(:fetch_by_ref).with("Portal#240").and_return(external_task)
+        allow(source).to receive(:fetch_task_packet_by_external_task_id).with(240).and_return(
+          "ref" => "Portal#240",
+          "title" => "Split portal work",
+          "description" => "Create decomposed portal tasks.",
+          "status" => "To do",
+          "labels" => ["trigger:investigate"]
+        )
+        bridge = A3::Infra::KanbanBridgeBundle.new(
+          task_source: source,
+          task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new,
+          task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new,
+          follow_up_child_writer: nil,
+          task_snapshot_reader: A3::Infra::NullExternalTaskSnapshotReader.new
+        )
+        allow(described_class).to receive(:build_external_task_bridge).and_return(bridge)
+
+        out = StringIO.new
+        described_class.start(
+          [
+            "run-decomposition-investigation",
+            "Portal#240",
+            manifest_path,
+            "--storage-dir", dir,
+            "--repo-source", "repo_alpha=#{repo_source}",
+            "--kanban-command", "task",
+            "--kanban-project", "Portal",
+            "--kanban-repo-label", "repo:portal=repo_alpha"
+          ],
+          out: out
+        )
+
+        expect(out.string).to include("decomposition investigation Portal#240 success=true")
+        stored_task = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json")).fetch("Portal#240")
+        expect(stored_task.external_task_id).to eq(240)
+        evidence = JSON.parse(File.read(File.join(dir, "decomposition-evidence", "Portal-240", "investigation.json")))
+        expect(evidence.fetch("request")).to include(
+          "title" => "Split portal work",
+          "description" => "Create decomposed portal tasks."
         )
       ensure
         workspace_root = File.join(dir, "decomposition-workspaces")

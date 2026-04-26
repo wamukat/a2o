@@ -7,7 +7,7 @@ module A3
   module Bootstrap
     class RuntimeServicesBuilder
       class SupportGroupBuilder
-        def self.build(repositories:, run_id_generator:, storage_dir:, repo_sources:, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
+        def self.build(repositories:, run_id_generator:, storage_dir:, repo_sources:, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
           workspace_plan_builder = A3::Application::BuildWorkspacePlan.new(repo_slots: repo_sources.keys)
           start_phase = A3::Application::StartPhase.new(
             workspace_plan_builder: workspace_plan_builder,
@@ -60,6 +60,7 @@ module A3
             workspace_provisioner: workspace_provisioner,
             prepare_workspace: prepare_workspace,
             plan_rerun: A3::Application::PlanRerun.new,
+            external_task_source: external_task_source,
             external_task_status_publisher: external_task_status_publisher,
             external_task_activity_publisher: external_task_activity_publisher
           }

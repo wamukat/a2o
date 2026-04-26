@@ -52,6 +52,7 @@ module A3
           run_id_generator: @run_id_generator,
           storage_dir: @storage_dir,
           repo_sources: @repo_sources,
+          external_task_source: @external_task_source,
           external_task_status_publisher: @external_task_status_publisher,
           external_task_activity_publisher: @external_task_activity_publisher,
           external_follow_up_child_writer: @external_follow_up_child_writer

@@ -759,6 +759,41 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
+  it "can fetch a single task by ref without applying the status filter" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 5002,
+          "ref" => "Sample#5002",
+          "status" => "In review",
+          "labels" => ["repo:ui-app", "trigger:auto-scheduler-validation"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-scheduler-validation"],
+      status: "To do",
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      task = source.fetch_by_ref("Sample#5002")
+
+      expect(task.ref).to eq("Sample#5002")
+      expect(task.status).to eq(:in_review)
+      expect(task.edit_scope).to eq([:repo_beta])
+      expect(task.external_task_id).to eq(5002)
+    end
+  end
+
   it "can fetch a task packet with title and description for worker requests" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,

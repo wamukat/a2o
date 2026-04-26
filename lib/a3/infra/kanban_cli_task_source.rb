@@ -42,6 +42,16 @@ module A3
         build_scalar_task_from_snapshot(snapshot)
       end
 
+      def fetch_by_ref(task_ref)
+        payload = @client.fetch_task_by_ref(task_ref)
+        task_id = Integer(payload.fetch("id"))
+        payload["labels"] = load_task_labels(task_id)
+        snapshot = normalize_snapshot(payload, ignore_status_filter: true)
+        return nil unless snapshot
+
+        build_scalar_task_from_snapshot(snapshot)
+      end
+
       def fetch_task_packet_by_external_task_id(task_id)
         payload = @client.fetch_task_by_id(task_id)
         payload["labels"] = load_task_labels(task_id)

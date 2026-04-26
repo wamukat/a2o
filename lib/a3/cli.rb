@@ -311,7 +311,7 @@ module A3
         command_runner: command_runner,
         merge_runner: merge_runner
       ) do |session|
-        task = session.container.fetch(:task_repository).fetch(session.options.fetch(:task_ref))
+        task = resolve_direct_task(container: session.container, task_ref: session.options.fetch(:task_ref))
         bridge = build_external_task_bridge(session.options)
         result = A3::Application::RunDecompositionInvestigation.new(
           storage_dir: session.options.fetch(:storage_dir),
@@ -342,7 +342,7 @@ module A3
         command_runner: command_runner,
         merge_runner: merge_runner
       ) do |session|
-        task = session.container.fetch(:task_repository).fetch(session.options.fetch(:task_ref))
+        task = resolve_direct_task(container: session.container, task_ref: session.options.fetch(:task_ref))
         runner = A3::Application::RunDecompositionProposalAuthor.new(
           storage_dir: session.options.fetch(:storage_dir),
           project_root: File.dirname(session.options.fetch(:manifest_path)),
@@ -370,7 +370,7 @@ module A3
         command_runner: command_runner,
         merge_runner: merge_runner
       ) do |session|
-        task = session.container.fetch(:task_repository).fetch(session.options.fetch(:task_ref))
+        task = resolve_direct_task(container: session.container, task_ref: session.options.fetch(:task_ref))
         result = A3::Application::RunDecompositionProposalReview.new(
           storage_dir: session.options.fetch(:storage_dir),
           project_root: File.dirname(session.options.fetch(:manifest_path)),
@@ -391,7 +391,17 @@ module A3
     def handle_run_decomposition_child_creation(argv, out:, run_id_generator:, command_runner:, merge_runner:)
       options = parse_run_decomposition_child_creation_options(argv)
       repositories = build_watch_summary_repositories(options: options)
-      task = repositories.fetch(:task_repository).fetch(options.fetch(:task_ref))
+      external_task_source =
+        if kanban_bridge_enabled?(options)
+          build_external_task_source(options)
+        else
+          A3::Infra::NullExternalTaskSource.new
+        end
+      task = resolve_direct_task(
+        task_repository: repositories.fetch(:task_repository),
+        external_task_source: external_task_source,
+        task_ref: options.fetch(:task_ref)
+      )
       writer =
         if options.fetch(:gate)
           A3::Infra::KanbanCliProposalChildWriter.new(
@@ -1538,13 +1548,9 @@ module A3
       parser.on("--gate") { options[:gate] = true }
       parser.on("--proposal-evidence-path PATH") { |value| options[:proposal_evidence_path] = File.expand_path(value) }
       parser.on("--review-evidence-path PATH") { |value| options[:review_evidence_path] = File.expand_path(value) }
-      parser.on("--kanban-command VALUE") { |value| options[:kanban_command] = value }
-      parser.on("--kanban-command-arg VALUE") do |value|
-        options[:kanban_command_args] ||= []
-        options[:kanban_command_args] << value
-      end
-      parser.on("--kanban-project VALUE") { |value| options[:kanban_project] = value }
-      parser.on("--kanban-working-dir DIR") { |value| options[:kanban_working_dir] = File.expand_path(value) }
+      options[:kanban_repo_label_map] = {}
+      options[:kanban_trigger_labels] = []
+      add_kanban_bridge_options(parser, options)
       remaining = parser.parse(argv)
       options[:task_ref] = remaining.fetch(0)
       if options.fetch(:gate) && (!options[:kanban_command] || !options[:kanban_project])
@@ -2027,6 +2033,63 @@ module A3
       else
         raise ArgumentError, "Unsupported storage backend: #{options.fetch(:storage_backend)}"
       end
+    end
+
+    def resolve_direct_task(container: nil, task_repository: nil, external_task_source: nil, task_ref:)
+      repository = task_repository || container.fetch(:task_repository)
+      source = external_task_source || container.fetch(:external_task_source)
+      local_task = fetch_optional_task(repository, task_ref)
+      unless source.respond_to?(:fetch_by_ref)
+        raise A3::Domain::RecordNotFound, "Task not found: #{task_ref}" unless local_task
+
+        return local_task
+      end
+
+      imported_task = source.fetch_by_ref(task_ref)
+      return local_task if local_task && !imported_task
+      raise A3::Domain::RecordNotFound, "Task not found: #{task_ref}" unless imported_task
+
+      repository.save(reconcile_direct_external_task(local_task, imported_task))
+      repository.fetch(task_ref)
+    end
+
+    def fetch_optional_task(repository, task_ref)
+      repository.fetch(task_ref)
+    rescue A3::Domain::RecordNotFound
+      nil
+    end
+
+    def reconcile_direct_external_task(local_task, imported_task)
+      return imported_task unless local_task
+
+      child_refs = imported_task.child_refs.any? ? imported_task.child_refs : local_task.child_refs
+      parent_ref = imported_task.parent_ref || local_task.parent_ref
+      kind =
+        if child_refs.any?
+          :parent
+        elsif parent_ref
+          :child
+        else
+          imported_task.kind
+        end
+      active = !local_task.current_run_ref.nil?
+
+      A3::Domain::Task.new(
+        ref: imported_task.ref,
+        kind: kind,
+        edit_scope: imported_task.edit_scope,
+        verification_scope: imported_task.verification_scope,
+        status: active ? local_task.status : imported_task.status,
+        current_run_ref: local_task.current_run_ref,
+        parent_ref: parent_ref,
+        child_refs: child_refs,
+        blocking_task_refs: imported_task.blocking_task_refs,
+        priority: imported_task.priority,
+        external_task_id: imported_task.external_task_id || local_task.external_task_id,
+        verification_source_ref: local_task.verification_source_ref,
+        automation_enabled: imported_task.automation_enabled,
+        labels: imported_task.labels
+      )
     end
 
     def load_watch_summary_worker_runs(storage_dir)

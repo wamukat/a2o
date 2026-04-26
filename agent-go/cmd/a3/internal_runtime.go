@@ -275,9 +275,9 @@ func runtimeDecompositionCommand(action string, taskRef string, plan runtimeRunO
 		if strings.TrimSpace(overrides.ReviewEvidencePath) != "" {
 			args = append(args, "--review-evidence-path", workspaceContainerPath(plan.HostRootDir, overrides.ReviewEvidencePath))
 		}
+		args = append(args, runtimeDecompositionKanbanOptions(plan)...)
 		if overrides.Gate {
 			args = append(args, "--gate")
-			args = append(args, runtimeDecompositionKanbanWriteOptions(plan)...)
 		}
 	case "status":
 		args = append(args, "show-decomposition-status", taskRef, "--storage-backend", "json", "--storage-dir", plan.StorageDir)
