@@ -23,6 +23,7 @@ RSpec.describe A3::Bootstrap::RuntimeServicesBuilder::SchedulingGroupBuilder do
       )
 
       expect(result.fetch(:plan_next_runnable_task)).to be_a(A3::Application::PlanNextRunnableTask)
+      expect(result.fetch(:plan_next_decomposition_task)).to be_a(A3::Application::PlanNextDecompositionTask)
       expect(result.fetch(:start_run)).to be_a(A3::Application::StartRun)
       expect(result.fetch(:schedule_next_run)).to be_a(A3::Application::ScheduleNextRun)
     end
