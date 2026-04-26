@@ -42,6 +42,8 @@ module A3
         return [] unless File.directory?(evidence_dir)
 
         Dir.glob(File.join(evidence_dir, "**", "*.json")).sort.filter_map do |path|
+          next if symlink_in_path?(File.expand_path(path))
+
           payload = load_json(path)
           next unless payload.is_a?(Hash)
 
