@@ -8,16 +8,18 @@ module A3
         review_skill
         verification_commands
         remediation_commands
+        decomposition_investigate_command
         workspace_hook
       ].freeze
 
       attr_reader(*SURFACE_KEYS)
 
-      def initialize(implementation_skill:, review_skill:, verification_commands:, remediation_commands:, workspace_hook:)
+      def initialize(implementation_skill:, review_skill:, verification_commands:, remediation_commands:, workspace_hook:, decomposition_investigate_command: nil)
         @implementation_skill = deep_freeze_value(implementation_skill)
         @review_skill = deep_freeze_value(review_skill)
         @verification_commands = deep_freeze_value(verification_commands)
         @remediation_commands = deep_freeze_value(remediation_commands)
+        @decomposition_investigate_command = deep_freeze_value(decomposition_investigate_command)
         @workspace_hook = deep_freeze_value(workspace_hook)
         freeze
       end

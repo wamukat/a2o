@@ -59,6 +59,9 @@ runtime:
     single: false
     skip_labels: []
     require_labels: []
+  decomposition:
+    investigate:
+      command: [app/project-package/commands/investigate.sh]
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -117,6 +120,32 @@ task_templates:
 `agent` はホスト側ワークスペース、プロダクトのツールチェーン要件、実行コマンド要件を持つ。`required_bins` は、エージェントが作業開始前に前提条件を検証できるよう宣言的に残す。
 
 `runtime` は実行時の既定値とフェーズ定義を持つ。
+
+## Runtime Decomposition
+
+`runtime.decomposition.investigate.command` は、`trigger:investigate` チケット分解で使うプロジェクト所有の調査コマンドである。プロジェクトが decomposition investigation pipeline を使う場合に指定する。
+
+コマンドは空でない文字列配列でなければならない。
+
+```yaml
+runtime:
+  decomposition:
+    investigate:
+      command:
+        - app/project-package/commands/investigate.sh
+        - "--format"
+        - json
+```
+
+A2O は隔離された disposable decomposition workspace でこのコマンドを実行する。コマンドには次の公開 `A2O_*` パスを渡す。
+
+- `A2O_DECOMPOSITION_REQUEST_PATH`
+- `A2O_DECOMPOSITION_RESULT_PATH`
+- `A2O_WORKSPACE_ROOT`
+
+コマンドは `A2O_DECOMPOSITION_RESULT_PATH` に単一の JSON object を書く。MVP では `summary` を空でない文字列として必須にする。非ゼロ終了、JSON 未作成、不正 JSON、`summary` 欠落は、証跡付きで decomposition run を block する。
+
+## Runtime Phases
 
 `runtime.phases` はフェーズごとのスキル、実行コマンド、検証 / 修復コマンド、マージ方針を持つ。A2O はフェーズごとの実行コマンドを内部の標準入力バンドル用ランチャー設定へ変換する。利用者は別途 `launcher.json` を作らない。
 

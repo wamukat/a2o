@@ -29,6 +29,11 @@ RSpec.describe A3::CLI do
                 "remediation" => {
                   "commands" => ["commands/apply-remediation"]
                 }
+              },
+              "decomposition" => {
+                "investigate" => {
+                  "command" => ["commands/investigate", "--json"]
+                }
               }
             }
           }

@@ -53,6 +53,9 @@ runtime:
     single: false
     skip_labels: []
     require_labels: []
+  decomposition:
+    investigate:
+      command: [app/project-package/commands/investigate.sh]
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -112,6 +115,30 @@ Repo slots are stable aliases used in runtime state and agent job payloads.
 `agent.required_bins` lists commands that must exist where `a2o-agent` runs.
 
 `agent.workspace_root` is disposable runtime output. It should normally live under `.work/a2o/`.
+
+## Runtime Decomposition
+
+`runtime.decomposition.investigate.command` is the project-owned command for `trigger:investigate` ticket decomposition. It is optional unless the project wants A2O to run the decomposition investigation pipeline.
+
+The command must be a non-empty array of non-empty strings:
+
+```yaml
+runtime:
+  decomposition:
+    investigate:
+      command:
+        - app/project-package/commands/investigate.sh
+        - "--format"
+        - json
+```
+
+A2O runs the command in an isolated disposable decomposition workspace. The command receives public `A2O_*` paths:
+
+- `A2O_DECOMPOSITION_REQUEST_PATH`
+- `A2O_DECOMPOSITION_RESULT_PATH`
+- `A2O_WORKSPACE_ROOT`
+
+The command writes one JSON object to `A2O_DECOMPOSITION_RESULT_PATH`. The MVP requires `summary` as a non-empty string. Non-zero exit, missing JSON, invalid JSON, or missing `summary` blocks the decomposition run with evidence.
 
 ## Runtime Phases
 

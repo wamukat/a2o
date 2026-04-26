@@ -43,7 +43,8 @@ module A3
           review_skill: payload["review_skill"],
           verification_commands: payload.fetch("verification_commands", []),
           remediation_commands: payload.fetch("remediation_commands", []),
-          workspace_hook: nil
+          workspace_hook: nil,
+          decomposition_investigate_command: decomposition_investigate_command(runtime)
         )
       end
 
@@ -131,6 +132,30 @@ module A3
           raise A3::Domain::ConfigurationError,
                 "project.yaml runtime.phases.#{name}.workspace_hook is no longer supported; use phase commands or project package commands"
         end
+      end
+
+      def decomposition_investigate_command(runtime)
+        decomposition = runtime.fetch("decomposition", nil)
+        return nil unless decomposition
+        unless decomposition.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.decomposition must be a mapping"
+        end
+
+        investigate = decomposition.fetch("investigate", nil)
+        return nil unless investigate
+        unless investigate.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.decomposition.investigate must be a mapping"
+        end
+
+        command = investigate.fetch("command") do
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.decomposition.investigate.command must be provided"
+        end
+        unless command.is_a?(Array) && command.any? && command.all? { |entry| entry.is_a?(String) && !entry.empty? }
+          raise A3::Domain::ConfigurationError,
+                "project.yaml runtime.decomposition.investigate.command must be a non-empty array of non-empty strings"
+        end
+
+        command
       end
 
     end
