@@ -58,6 +58,10 @@ runtime:
       command: [app/project-package/commands/investigate.sh]
     author:
       command: [app/project-package/commands/author-proposal.sh]
+    review:
+      commands:
+        - [app/project-package/commands/review-proposal-architecture.sh]
+        - [app/project-package/commands/review-proposal-planning.sh]
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -137,6 +141,10 @@ runtime:
         - app/project-package/commands/author-proposal.sh
         - "--format"
         - json
+    review:
+      commands:
+        - [app/project-package/commands/review-proposal-architecture.sh]
+        - [app/project-package/commands/review-proposal-planning.sh]
 ```
 
 A2O runs decomposition commands in an isolated disposable decomposition workspace. The investigation command receives public `A2O_*` paths:
@@ -162,6 +170,19 @@ a2o run-decomposition-proposal-author A2O#123 project.yaml --storage-dir .work/a
 ```
 
 By default A2O reads investigation evidence from `decomposition-evidence/<task>/investigation.json` under the storage directory. Use `--investigation-evidence-path` to provide another evidence file. When the task is backed by an external Kanban ticket, A2O posts the proposal summary back to that source ticket.
+
+Proposal review commands are run sequentially. Each command receives:
+
+- `A2O_DECOMPOSITION_REVIEW_REQUEST_PATH`
+- `A2O_DECOMPOSITION_REVIEW_RESULT_PATH`
+- `A2O_WORKSPACE_ROOT`
+
+Each review result should be a JSON object with `summary` and `findings`. Findings use `severity` values `critical`, `major`, `minor`, or `info`; any `critical` finding blocks the proposal and records evidence. A clean review marks the proposal `eligible` for the next configured gate but does not create child tickets.
+
+```bash
+a2o run-decomposition-proposal-review A2O#123 project.yaml --storage-dir .work/a2o/state
+a2o show-decomposition-status A2O#123 --storage-dir .work/a2o/state
+```
 
 ## Runtime Phases
 

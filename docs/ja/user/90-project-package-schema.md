@@ -64,6 +64,10 @@ runtime:
       command: [app/project-package/commands/investigate.sh]
     author:
       command: [app/project-package/commands/author-proposal.sh]
+    review:
+      commands:
+        - [app/project-package/commands/review-proposal-architecture.sh]
+        - [app/project-package/commands/review-proposal-planning.sh]
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -142,6 +146,10 @@ runtime:
         - app/project-package/commands/author-proposal.sh
         - "--format"
         - json
+    review:
+      commands:
+        - [app/project-package/commands/review-proposal-architecture.sh]
+        - [app/project-package/commands/review-proposal-planning.sh]
 ```
 
 A2O は隔離された disposable decomposition workspace で decomposition command を実行する。investigation command には次の公開 `A2O_*` パスを渡す。
@@ -167,6 +175,19 @@ a2o run-decomposition-proposal-author A2O#123 project.yaml --storage-dir .work/a
 ```
 
 既定では storage directory 配下の `decomposition-evidence/<task>/investigation.json` を読む。別の evidence file を使う場合は `--investigation-evidence-path` を指定する。task が外部 Kanban ticket と紐づいている場合、A2O は proposal summary を source ticket に投稿する。
+
+proposal review command は逐次実行する。各 command には次を渡す。
+
+- `A2O_DECOMPOSITION_REVIEW_REQUEST_PATH`
+- `A2O_DECOMPOSITION_REVIEW_RESULT_PATH`
+- `A2O_WORKSPACE_ROOT`
+
+各 review result は `summary` と `findings` を持つ JSON object とする。finding の `severity` は `critical`、`major`、`minor`、`info` を使う。`critical` finding が 1 件でもあれば proposal は block され、証跡が保存される。clean review は proposal を次の configured gate に進められる `eligible` として扱うが、child ticket は作成しない。
+
+```bash
+a2o run-decomposition-proposal-review A2O#123 project.yaml --storage-dir .work/a2o/state
+a2o show-decomposition-status A2O#123 --storage-dir .work/a2o/state
+```
 
 ## Runtime Phases
 

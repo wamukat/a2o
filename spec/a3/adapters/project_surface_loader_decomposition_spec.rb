@@ -57,6 +57,32 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     end
   end
 
+  it "loads decomposition review commands from project.yaml" do
+    Dir.mktmpdir do |dir|
+      path = write_project_yaml(
+        dir,
+        {
+          "phases" => base_phases,
+          "decomposition" => {
+            "review" => {
+              "commands" => [
+                ["commands/review-architecture.sh"],
+                ["commands/review-planning.sh", "--json"]
+              ]
+            }
+          }
+        }
+      )
+
+      surface = described_class.new(preset_dir: File.join(dir, "presets")).load(path)
+
+      expect(surface.decomposition_review_commands).to eq([
+        ["commands/review-architecture.sh"],
+        ["commands/review-planning.sh", "--json"]
+      ])
+    end
+  end
+
   it "rejects invalid decomposition investigate command declarations" do
     Dir.mktmpdir do |dir|
       path = write_project_yaml(

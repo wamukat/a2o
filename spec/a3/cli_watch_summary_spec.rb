@@ -87,6 +87,36 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "shows decomposition status separately from the task tree" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "Sample#5300",
+          kind: :single,
+          edit_scope: [:repo_alpha],
+          status: :todo,
+          labels: ["trigger:investigate"]
+        )
+      )
+      evidence_dir = File.join(dir, "decomposition-evidence", "Sample-5300")
+      FileUtils.mkdir_p(evidence_dir)
+      File.write(File.join(evidence_dir, "proposal.json"), JSON.generate("proposal_fingerprint" => "abc123"))
+      File.write(File.join(evidence_dir, "proposal-review.json"), JSON.generate("disposition" => "blocked", "summary" => "blocked by critical finding"))
+
+      out = StringIO.new
+      described_class.start(
+        ["watch-summary", "--storage-backend", "json", "--storage-dir", dir],
+        out: out
+      )
+
+      expect(out.string).to include("Decomposition")
+      expect(out.string).to include("- #5300 state=blocked disposition=blocked fingerprint=abc123")
+      expect(out.string).to include("blocked_reason=blocked by critical finding")
+      expect(out.string).to include("Task Tree")
+    end
+  end
+
   it "hides per-task detail lines unless details are requested" do
     Dir.mktmpdir do |dir|
       task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))

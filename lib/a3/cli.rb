@@ -330,6 +330,49 @@ module A3
       end
     end
 
+    def handle_run_decomposition_proposal_review(argv, out:, run_id_generator:, command_runner:, merge_runner:)
+      with_runtime_session(
+        argv: argv,
+        parse_with: :parse_run_decomposition_proposal_review_options,
+        run_id_generator: run_id_generator,
+        command_runner: command_runner,
+        merge_runner: merge_runner
+      ) do |session|
+        task = session.container.fetch(:task_repository).fetch(session.options.fetch(:task_ref))
+        result = A3::Application::RunDecompositionProposalReview.new(
+          storage_dir: session.options.fetch(:storage_dir),
+          project_root: File.dirname(session.options.fetch(:manifest_path)),
+          publish_external_task_activity: session.container.fetch(:external_task_activity_publisher)
+        ).call(
+          task: task,
+          project_surface: session.project_surface,
+          proposal_evidence_path: session.options.fetch(:proposal_evidence_path)
+        )
+
+        out.puts("decomposition proposal review #{task.ref} disposition=#{result.disposition} success=#{result.success}")
+        out.puts("summary=#{result.summary}")
+        out.puts("critical_findings=#{result.critical_findings.size}")
+        out.puts("evidence_path=#{result.evidence_path}")
+      end
+    end
+
+    def handle_show_decomposition_status(argv, out:, run_id_generator:, command_runner:, merge_runner:)
+      with_storage_container(
+        argv: argv,
+        parse_with: :parse_show_decomposition_status_options,
+        run_id_generator: run_id_generator,
+        command_runner: command_runner,
+        merge_runner: merge_runner
+      ) do |options, _container|
+        status = A3::Application::ShowDecompositionStatus.new(storage_dir: options.fetch(:storage_dir)).call(task_ref: options.fetch(:task_ref))
+        out.puts("decomposition task=#{status.task_ref} state=#{status.state}")
+        out.puts("proposal_fingerprint=#{status.proposal_fingerprint}") if status.proposal_fingerprint
+        out.puts("disposition=#{status.disposition}") if status.disposition
+        out.puts("blocked_reason=#{status.blocked_reason}") if status.blocked_reason && status.state == "blocked"
+        status.evidence_paths.each { |key, path| out.puts("evidence.#{key}=#{path}") }
+      end
+    end
+
     def handle_execute_next_runnable_task(argv, out:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:)
       with_runtime_session(
         argv: argv,
@@ -739,6 +782,7 @@ module A3
         kanban_snapshots_by_id: kanban_snapshot_index.by_id,
         worker_runs_by_task_ref: load_watch_summary_worker_runs(options.fetch(:storage_dir))
       ).call
+      attach_decomposition_entries(summary, tasks: tasks, storage_dir: options.fetch(:storage_dir))
 
       ShowOutputFormatter.watch_summary_lines(summary, details: options.fetch(:details)).each { |line| out.puts(line) }
     end
@@ -1336,6 +1380,56 @@ module A3
       options
     end
 
+    def parse_run_decomposition_proposal_review_options(argv)
+      options = {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        preset_dir: File.expand_path("config/presets", Dir.pwd),
+        repo_sources: {},
+        kanban_repo_label_map: {},
+        kanban_trigger_labels: [],
+        verification_command_runner: nil,
+        merge_runner: nil,
+        worker_gateway: nil,
+        worker_command_args: []
+      }
+
+      parser = OptionParser.new
+      parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      parser.on("--preset-dir DIR") { |value| options[:preset_dir] = File.expand_path(value) }
+      parser.on("--proposal-evidence-path PATH") { |value| options[:proposal_evidence_path] = File.expand_path(value) }
+      add_kanban_bridge_options(parser, options)
+      add_verification_command_runner_options(parser, options)
+      add_merge_runner_options(parser, options)
+      add_worker_gateway_options(parser, options)
+      remaining = parser.parse(argv)
+
+      options[:task_ref] = remaining.fetch(0)
+      options[:manifest_path] = File.expand_path(remaining.fetch(1))
+      options[:proposal_evidence_path] ||= default_decomposition_proposal_evidence_path(
+        storage_dir: options.fetch(:storage_dir),
+        task_ref: options.fetch(:task_ref)
+      )
+      options
+    end
+
+    def parse_show_decomposition_status_options(argv)
+      options = {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        repo_sources: {}
+      }
+      parser = OptionParser.new
+      parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      remaining = parser.parse(argv)
+      options[:task_ref] = remaining.fetch(0)
+      options
+    end
+
     def parse_execute_until_idle_options(argv)
       options = {
         storage_backend: :json,
@@ -1727,6 +1821,22 @@ module A3
 
     def default_decomposition_investigation_evidence_path(storage_dir:, task_ref:)
       File.join(storage_dir, "decomposition-evidence", task_ref.to_s.gsub(/[^A-Za-z0-9._-]+/, "-"), "investigation.json")
+    end
+
+    def default_decomposition_proposal_evidence_path(storage_dir:, task_ref:)
+      File.join(storage_dir, "decomposition-evidence", task_ref.to_s.gsub(/[^A-Za-z0-9._-]+/, "-"), "proposal.json")
+    end
+
+    def attach_decomposition_entries(summary, tasks:, storage_dir:)
+      entries = tasks
+        .select(&:decomposition_requested?)
+        .filter_map do |task|
+          status = A3::Application::ShowDecompositionStatus.new(storage_dir: storage_dir).call(task_ref: task.ref)
+          next if status.state == "none"
+
+          status
+        end
+      summary.define_singleton_method(:decomposition_entries) { entries.freeze }
     end
 
     def skill_feedback_entry_parts(entry)

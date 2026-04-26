@@ -45,7 +45,8 @@ module A3
           remediation_commands: payload.fetch("remediation_commands", []),
           workspace_hook: nil,
           decomposition_investigate_command: decomposition_command(runtime, "investigate"),
-          decomposition_author_command: decomposition_command(runtime, "author")
+          decomposition_author_command: decomposition_command(runtime, "author"),
+          decomposition_review_commands: decomposition_review_commands(runtime)
         )
       end
 
@@ -157,6 +158,35 @@ module A3
         end
 
         command
+      end
+
+      def decomposition_review_commands(runtime)
+        decomposition = runtime.fetch("decomposition", nil)
+        return [] unless decomposition
+        unless decomposition.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.decomposition must be a mapping"
+        end
+
+        review = decomposition.fetch("review", nil)
+        return [] unless review
+        unless review.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.decomposition.review must be a mapping"
+        end
+
+        commands = review.fetch("commands") do
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.decomposition.review.commands must be provided"
+        end
+        unless commands.is_a?(Array) && commands.any?
+          raise A3::Domain::ConfigurationError,
+                "project.yaml runtime.decomposition.review.commands must be a non-empty array of command arrays"
+        end
+        commands.each do |command|
+          unless command.is_a?(Array) && command.any? && command.all? { |entry| entry.is_a?(String) && !entry.empty? }
+            raise A3::Domain::ConfigurationError,
+                  "project.yaml runtime.decomposition.review.commands must be a non-empty array of command arrays"
+          end
+        end
+        commands
       end
     end
   end

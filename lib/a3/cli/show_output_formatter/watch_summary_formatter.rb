@@ -51,6 +51,7 @@ module A3
         def lines(summary, details: false)
           [
             render_scheduler_state(summary),
+            render_decomposition_section(summary),
             render_task_tree(summary, details: details),
             render_next_section(summary),
             render_running_section(summary)
@@ -89,6 +90,21 @@ module A3
                 lines << "#{' ' * (4 + tree_ref_width + 1)}#{truncate(single_line(line), TREE_TITLE_WIDTH + 24)}"
               end
             end
+          end
+          lines.join("\n")
+        end
+
+        def render_decomposition_section(summary)
+          entries = Array(summary.respond_to?(:decomposition_entries) ? summary.decomposition_entries : [])
+          return "" if entries.empty?
+
+          lines = ["Decomposition"]
+          entries.each do |entry|
+            parts = ["- #{short_ref(entry.task_ref)}", "state=#{entry.state}"]
+            parts << "disposition=#{entry.disposition}" if entry.disposition
+            parts << "fingerprint=#{entry.proposal_fingerprint}" if entry.proposal_fingerprint
+            lines << parts.join(" ")
+            lines << "  blocked_reason=#{single_line(entry.blocked_reason)}" if entry.blocked_reason && entry.state == "blocked"
           end
           lines.join("\n")
         end
