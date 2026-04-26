@@ -153,7 +153,15 @@ A2O runs decomposition commands in an isolated disposable decomposition workspac
 - `A2O_DECOMPOSITION_RESULT_PATH`
 - `A2O_WORKSPACE_ROOT`
 
+The request JSON includes the source task `title`, `description`, labels, priority, parent/child/blocker refs, isolated repo `slot_paths`, `source_task`, and rerun context fields `previous_evidence_path` and `previous_evidence_summary` when prior investigation evidence exists. A2O requires non-empty source task title and description before running investigation.
+
 The command writes one JSON object to `A2O_DECOMPOSITION_RESULT_PATH`. The MVP requires `summary` as a non-empty string. Non-zero exit, missing JSON, invalid JSON, or missing `summary` blocks the decomposition run with evidence.
+
+To run investigation:
+
+```bash
+a2o run-decomposition-investigation A2O#123 project.yaml --storage-dir .work/a2o/state --repo-source repo_alpha=/path/to/repo
+```
 
 The author command receives:
 

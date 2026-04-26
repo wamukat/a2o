@@ -18,6 +18,16 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
     )
   end
 
+  let(:source_task_snapshot) do
+    {
+      "ref" => "A3-v2#5300",
+      "title" => "Split workflow",
+      "description" => "Investigate decomposition requirements.",
+      "status" => "To do",
+      "labels" => ["trigger:investigate"]
+    }
+  end
+
   it "runs the project investigate command in an isolated workspace and persists evidence" do
     Dir.mktmpdir do |dir|
       source_repo = File.join(dir, "repo-source")
@@ -52,13 +62,7 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
           task: task,
           project_surface: project_surface,
           slot_paths: { repo_alpha: source_repo },
-          task_snapshot: {
-            "ref" => "A3-v2#5300",
-            "title" => "Split workflow",
-            "description" => "Investigate decomposition requirements.",
-            "status" => "To do",
-            "labels" => ["trigger:investigate"]
-          }
+          task_snapshot: source_task_snapshot
         )
 
         expect(result.success).to be(true)
@@ -123,6 +127,7 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
       described_class.new(storage_dir: dir, process_runner: process_runner).call(
         task: task,
         project_surface: project_surface,
+        task_snapshot: source_task_snapshot,
         previous_evidence_path: previous_path
       )
 
@@ -156,7 +161,7 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
         storage_dir: dir,
         project_root: project_root,
         process_runner: process_runner
-      ).call(task: task, project_surface: project_surface)
+      ).call(task: task, project_surface: project_surface, task_snapshot: source_task_snapshot)
 
       expect(captured.fetch(:command)).to eq([File.join(project_root, "commands/investigate.sh"), "--json"])
     end
@@ -179,7 +184,8 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
 
       result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
         task: task,
-        project_surface: project_surface
+        project_surface: project_surface,
+        task_snapshot: source_task_snapshot
       )
 
       expect(result.success).to be(false)
@@ -209,7 +215,8 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
 
       result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
         task: task,
-        project_surface: project_surface
+        project_surface: project_surface,
+        task_snapshot: source_task_snapshot
       )
 
       expect(result.success).to be(false)
@@ -234,7 +241,8 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
 
       result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
         task: task,
-        project_surface: project_surface
+        project_surface: project_surface,
+        task_snapshot: source_task_snapshot
       )
 
       expect(result.success).to be(false)
@@ -266,8 +274,8 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
         clock: -> { Time.utc(2026, 4, 26, 3, 0, 0) }
       )
 
-      first = use_case.call(task: task, project_surface: project_surface)
-      second = use_case.call(task: task, project_surface: project_surface)
+      first = use_case.call(task: task, project_surface: project_surface, task_snapshot: source_task_snapshot)
+      second = use_case.call(task: task, project_surface: project_surface, task_snapshot: source_task_snapshot)
 
       expect(first.workspace_root).not_to eq(second.workspace_root)
       expect(first.result_path).not_to eq(second.result_path)
@@ -287,6 +295,27 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
       expect do
         described_class.new(storage_dir: dir).call(task: task, project_surface: project_surface)
       end.to raise_error(A3::Domain::ConfigurationError, /runtime.decomposition.investigate.command/)
+    end
+  end
+
+  it "requires source task title and description" do
+    Dir.mktmpdir do |dir|
+      project_surface = A3::Domain::ProjectSurface.new(
+        implementation_skill: "skills/implementation.md",
+        review_skill: "skills/review.md",
+        verification_commands: [],
+        remediation_commands: [],
+        workspace_hook: nil,
+        decomposition_investigate_command: ["investigate"]
+      )
+
+      expect do
+        described_class.new(storage_dir: dir).call(
+          task: task,
+          project_surface: project_surface,
+          task_snapshot: source_task_snapshot.merge("description" => "")
+        )
+      end.to raise_error(A3::Domain::ConfigurationError, /source task description is missing/)
     end
   end
 end

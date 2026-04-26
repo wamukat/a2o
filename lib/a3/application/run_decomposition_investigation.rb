@@ -21,6 +21,7 @@ module A3
       def call(task:, project_surface:, slot_paths: {}, task_snapshot: nil, previous_evidence_path: nil)
         command = project_surface.decomposition_investigate_command
         raise A3::Domain::ConfigurationError, "project.yaml runtime.decomposition.investigate.command must be provided" unless command
+        validate_source_task!(task: task, task_snapshot: task_snapshot)
 
         workspace_root = prepare_workspace_root(task_ref: task.ref)
         isolated_slot_paths = materialize_isolated_slot_paths(slot_paths: slot_paths, workspace_root: workspace_root)
@@ -87,6 +88,18 @@ module A3
         )
       rescue SystemCallError => e
         ["", e.message, CommandStatus.new(false, nil)]
+      end
+
+      def validate_source_task!(task:, task_snapshot:)
+        unless task_snapshot.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "decomposition investigation requires source task title and description for #{task.ref}"
+        end
+        if snapshot_value(task_snapshot, "title").to_s.strip.empty?
+          raise A3::Domain::ConfigurationError, "decomposition investigation source task title is missing for #{task.ref}"
+        end
+        if snapshot_value(task_snapshot, "description").to_s.strip.empty?
+          raise A3::Domain::ConfigurationError, "decomposition investigation source task description is missing for #{task.ref}"
+        end
       end
 
       def prepare_workspace_root(task_ref:)

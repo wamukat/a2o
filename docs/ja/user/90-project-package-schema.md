@@ -158,7 +158,15 @@ A2O は隔離された disposable decomposition workspace で decomposition comm
 - `A2O_DECOMPOSITION_RESULT_PATH`
 - `A2O_WORKSPACE_ROOT`
 
+request JSON には、source task の `title`、`description`、label、priority、parent / child / blocker ref、隔離された repo `slot_paths`、`source_task`、過去の investigation evidence が存在する場合の rerun context である `previous_evidence_path` と `previous_evidence_summary` が含まれる。A2O は investigation 実行前に、source task title と description が空でないことを要求する。
+
 コマンドは `A2O_DECOMPOSITION_RESULT_PATH` に単一の JSON object を書く。MVP では `summary` を空でない文字列として必須にする。非ゼロ終了、JSON 未作成、不正 JSON、`summary` 欠落は、証跡付きで decomposition run を block する。
+
+investigation を実行するには次を使う。
+
+```bash
+a2o run-decomposition-investigation A2O#123 project.yaml --storage-dir .work/a2o/state --repo-source repo_alpha=/path/to/repo
+```
 
 author command には次を渡す。
 

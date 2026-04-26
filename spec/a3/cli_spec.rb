@@ -254,13 +254,24 @@ RSpec.describe A3::CLI do
             labels: ["trigger:investigate"]
           )
         )
-        allow(described_class).to receive(:decomposition_task_snapshot).and_return(
-          "ref" => "A3-v2#5300",
-          "title" => "Split import workflow",
-          "description" => "Create decomposed tasks.",
-          "status" => "To do",
-          "labels" => ["trigger:investigate"]
+        source = instance_double(
+          A3::Infra::NullExternalTaskSource,
+          fetch_task_packet_by_ref: {
+            "ref" => "A3-v2#5300",
+            "title" => "Split import workflow",
+            "description" => "Create decomposed tasks.",
+            "status" => "To do",
+            "labels" => ["trigger:investigate"]
+          }
         )
+        bridge = A3::Infra::KanbanBridgeBundle.new(
+          task_source: source,
+          task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new,
+          task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new,
+          follow_up_child_writer: nil,
+          task_snapshot_reader: A3::Infra::NullExternalTaskSnapshotReader.new
+        )
+        allow(described_class).to receive(:build_external_task_bridge).and_return(bridge)
 
         out = StringIO.new
         described_class.start(
@@ -287,6 +298,58 @@ RSpec.describe A3::CLI do
         workspace_root = File.join(dir, "decomposition-workspaces")
         FileUtils.chmod_R("u+w", workspace_root) if File.exist?(workspace_root)
       end
+    end
+  end
+
+  it "fails decomposition investigation when source task content is unavailable" do
+    Dir.mktmpdir do |dir|
+      commands_dir = File.join(dir, "commands")
+      FileUtils.mkdir_p(commands_dir)
+      investigate_path = File.join(commands_dir, "investigate.rb")
+      File.write(investigate_path, "#!#{RbConfig.ruby}\n")
+      FileUtils.chmod(0o755, investigate_path)
+      manifest_path = File.join(dir, "project.yaml")
+      File.write(
+        manifest_path,
+        <<~YAML
+          schema_version: 1
+          runtime:
+            decomposition:
+              investigate:
+                command: ["commands/investigate.rb"]
+            phases:
+              implementation:
+                skill: skills/implementation/base.md
+              review:
+                skill: skills/review/default.md
+              merge:
+                policy: ff_only
+                target_ref: refs/heads/main
+        YAML
+      )
+      task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "A3-v2#5300",
+          kind: :single,
+          edit_scope: [:repo_alpha],
+          status: :todo,
+          labels: ["trigger:investigate"]
+        )
+      )
+
+      out = StringIO.new
+      expect do
+        described_class.start(
+          [
+            "run-decomposition-investigation",
+            "A3-v2#5300",
+            manifest_path,
+            "--storage-dir", dir
+          ],
+          out: out
+        )
+      end.to raise_error(A3::Domain::ConfigurationError, /requires source task title and description/)
     end
   end
 
