@@ -34,6 +34,7 @@ module A3
         :task_kind,
         :status,
         :parent_ref,
+        :blocking_task_refs,
         :next_candidate,
         :running,
         :waiting,
@@ -113,6 +114,7 @@ module A3
           task_kind: task.kind,
           status: display_status(canonical_status),
           parent_ref: task.parent_ref,
+          blocking_task_refs: task.blocking_task_refs,
           next_candidate: task.ref == selected_next_ref,
           running: !running_entry.nil?,
           waiting: waiting,
@@ -314,7 +316,7 @@ module A3
       def sort_tasks_for_tree(tasks)
         by_parent = Hash.new { |hash, key| hash[key] = [] }
         tasks.each { |task| by_parent[task.parent_ref] << task }
-        by_parent.each_value { |children| children.sort_by! { |task| task.ref } }
+        by_parent.each_value { |children| children.replace(topologically_sort_siblings(children)) }
 
         ordered = []
         visit = lambda do |parent_ref|
@@ -327,6 +329,47 @@ module A3
         missing = tasks.reject { |task| ordered.include?(task) }.sort_by(&:ref)
         ordered.concat(missing)
         ordered
+      end
+
+      def topologically_sort_siblings(tasks)
+        refs = tasks.map(&:ref)
+        by_ref = tasks.each_with_object({}) { |task, memo| memo[task.ref] = task }
+        dependents_by_ref = Hash.new { |hash, key| hash[key] = [] }
+        dependency_count_by_ref = refs.each_with_object({}) { |ref, memo| memo[ref] = 0 }
+
+        tasks.each do |task|
+          sibling_blockers = task.blocking_task_refs.select { |ref| by_ref.key?(ref) }
+          sibling_blockers.each do |blocker_ref|
+            dependents_by_ref[blocker_ref] << task.ref
+            dependency_count_by_ref[task.ref] += 1
+          end
+        end
+
+        ready = refs.select { |ref| dependency_count_by_ref.fetch(ref).zero? }.sort_by { |ref| task_ref_sort_key(ref) }
+        ordered_refs = []
+
+        until ready.empty?
+          ref = ready.shift
+          ordered_refs << ref
+
+          dependents_by_ref.fetch(ref, []).sort_by { |dependent_ref| task_ref_sort_key(dependent_ref) }.each do |dependent_ref|
+            dependency_count_by_ref[dependent_ref] -= 1
+            next unless dependency_count_by_ref.fetch(dependent_ref).zero?
+
+            ready << dependent_ref
+            ready.sort_by! { |candidate_ref| task_ref_sort_key(candidate_ref) }
+          end
+        end
+
+        unresolved_refs = refs.reject { |ref| ordered_refs.include?(ref) }.sort_by { |ref| task_ref_sort_key(ref) }
+        (ordered_refs + unresolved_refs).map { |ref| by_ref.fetch(ref) }
+      end
+
+      def task_ref_sort_key(ref)
+        text = ref.to_s
+        match = text.match(/#(\d+)\z/)
+        numeric_id = match ? match[1].to_i : Float::INFINITY
+        [text.sub(/#\d+\z/, "#"), numeric_id, text]
       end
     end
   end

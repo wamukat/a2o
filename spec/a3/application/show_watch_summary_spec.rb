@@ -212,6 +212,153 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(result.running_entries.first.heartbeat_age_seconds).to eq(30)
   end
 
+  it "sorts top-level parent groups by blocker dependencies" do
+    blocked_parent = A3::Domain::Task.new(
+      ref: "Sample#10",
+      kind: :parent,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :todo,
+      child_refs: %w[Sample#11],
+      blocking_task_refs: %w[Sample#9]
+    )
+    blocked_child = A3::Domain::Task.new(
+      ref: "Sample#11",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :todo,
+      parent_ref: blocked_parent.ref
+    )
+    blocker_parent = A3::Domain::Task.new(
+      ref: "Sample#9",
+      kind: :parent,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :todo,
+      child_refs: %w[Sample#12]
+    )
+    blocker_child = A3::Domain::Task.new(
+      ref: "Sample#12",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :todo,
+      parent_ref: blocker_parent.ref
+    )
+    [blocked_parent, blocked_child, blocker_parent, blocker_child].each { |task| task_repository.save(task) }
+
+    result = use_case.call
+
+    expect(result.tasks.map(&:ref)).to eq(%w[Sample#9 Sample#12 Sample#10 Sample#11])
+  end
+
+  it "sorts children within a parent by blocker dependencies and numeric ticket tie-breaks" do
+    parent = A3::Domain::Task.new(
+      ref: "Sample#100",
+      kind: :parent,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :todo,
+      child_refs: %w[Sample#10 Sample#9 Sample#11]
+    )
+    later_child = A3::Domain::Task.new(
+      ref: "Sample#11",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :todo,
+      parent_ref: parent.ref,
+      blocking_task_refs: %w[Sample#9 Sample#10]
+    )
+    child_ten = A3::Domain::Task.new(
+      ref: "Sample#10",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :todo,
+      parent_ref: parent.ref
+    )
+    child_nine = A3::Domain::Task.new(
+      ref: "Sample#9",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :todo,
+      parent_ref: parent.ref
+    )
+    [parent, later_child, child_ten, child_nine].each { |task| task_repository.save(task) }
+
+    result = use_case.call
+
+    expect(result.tasks.map(&:ref)).to eq(%w[Sample#100 Sample#9 Sample#10 Sample#11])
+  end
+
+  it "does not let cross-parent child blockers reorder a parent's children" do
+    parent_a = A3::Domain::Task.new(
+      ref: "Sample#200",
+      kind: :parent,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :todo,
+      child_refs: %w[Sample#201]
+    )
+    child_a = A3::Domain::Task.new(
+      ref: "Sample#201",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :todo,
+      parent_ref: parent_a.ref,
+      blocking_task_refs: %w[Sample#301]
+    )
+    parent_b = A3::Domain::Task.new(
+      ref: "Sample#300",
+      kind: :parent,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :todo,
+      child_refs: %w[Sample#301]
+    )
+    child_b = A3::Domain::Task.new(
+      ref: "Sample#301",
+      kind: :child,
+      edit_scope: [:repo_beta],
+      verification_scope: [:repo_beta],
+      status: :todo,
+      parent_ref: parent_b.ref
+    )
+    [parent_a, child_a, parent_b, child_b].each { |task| task_repository.save(task) }
+
+    result = use_case.call
+
+    expect(result.tasks.map(&:ref)).to eq(%w[Sample#200 Sample#201 Sample#300 Sample#301])
+  end
+
+  it "keeps displaying tasks with cyclic blockers using numeric fallback order" do
+    task_ten = A3::Domain::Task.new(
+      ref: "Sample#10",
+      kind: :single,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :todo,
+      blocking_task_refs: %w[Sample#9]
+    )
+    task_nine = A3::Domain::Task.new(
+      ref: "Sample#9",
+      kind: :single,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :todo,
+      blocking_task_refs: %w[Sample#10]
+    )
+    [task_ten, task_nine].each { |task| task_repository.save(task) }
+
+    result = use_case.call
+
+    expect(result.tasks.map(&:ref)).to eq(%w[Sample#9 Sample#10])
+  end
+
   it "uses kanban current tasks as the watch-summary set while overlaying runtime state" do
     stale_runtime_task = A3::Domain::Task.new(
       ref: "Sample#stale",
