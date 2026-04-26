@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "fileutils"
 require "tmpdir"
 
 RSpec.describe A3::Application::RunDecompositionInvestigation do
@@ -19,6 +20,9 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
 
   it "runs the project investigate command in an isolated workspace and persists evidence" do
     Dir.mktmpdir do |dir|
+      source_repo = File.join(dir, "repo-source")
+      FileUtils.mkdir_p(File.join(source_repo, "lib"))
+      File.write(File.join(source_repo, "lib", "a.rb"), "class A; end\n")
       project_surface = A3::Domain::ProjectSurface.new(
         implementation_skill: "skills/implementation.md",
         review_skill: "skills/review.md",
@@ -36,42 +40,80 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
         ["out", "", FakeStatus.new(true, 0)]
       end
 
-      result = described_class.new(
+      result = nil
+      begin
+        result = described_class.new(
+          storage_dir: dir,
+          process_runner: process_runner,
+          clock: -> { Time.utc(2026, 4, 26, 3, 0, 0) }
+        ).call(
+          task: task,
+          project_surface: project_surface,
+          slot_paths: { repo_alpha: source_repo }
+        )
+
+        expect(result.success).to be(true)
+        expect(result.summary).to eq("investigated")
+        expect(captured.fetch(:command)).to eq(["investigate", "--json"])
+        expect(captured.fetch(:chdir)).to eq(result.workspace_root)
+        expect(result.workspace_root).to start_with(File.join(dir, "decomposition-workspaces", "A3-v2-5300"))
+        expect(captured.fetch(:env)).to include(
+          "A2O_DECOMPOSITION_REQUEST_PATH" => result.request_path,
+          "A2O_DECOMPOSITION_RESULT_PATH" => result.result_path,
+          "A2O_WORKSPACE_ROOT" => result.workspace_root
+        )
+
+        request = JSON.parse(File.read(result.request_path))
+        isolated_repo = request.fetch("slot_paths").fetch("repo_alpha")
+        expect(request).to include(
+          "task_ref" => "A3-v2#5300",
+          "labels" => ["trigger:investigate"]
+        )
+        expect(isolated_repo).not_to eq(source_repo)
+        expect(isolated_repo).to start_with(result.workspace_root)
+        expect(File.read(File.join(isolated_repo, "lib", "a.rb"))).to eq("class A; end\n")
+        expect(File.writable?(isolated_repo)).to be(false)
+
+        evidence = JSON.parse(File.read(result.evidence_path))
+        expect(evidence).to include(
+          "task_ref" => "A3-v2#5300",
+          "phase" => "investigation",
+          "success" => true,
+          "summary" => "investigated"
+        )
+        expect(evidence.fetch("workspace_root")).to eq(result.workspace_root)
+      ensure
+        FileUtils.chmod_R("u+w", result.workspace_root) if result
+      end
+    end
+  end
+
+  it "resolves relative command paths against the project root" do
+    Dir.mktmpdir do |dir|
+      project_root = File.join(dir, "project")
+      FileUtils.mkdir_p(project_root)
+      project_surface = A3::Domain::ProjectSurface.new(
+        implementation_skill: "skills/implementation.md",
+        review_skill: "skills/review.md",
+        verification_commands: [],
+        remediation_commands: [],
+        workspace_hook: nil,
+        decomposition_investigate_command: ["commands/investigate.sh", "--json"]
+      )
+      captured = {}
+      process_runner = lambda do |command, env:, **|
+        captured[:command] = command
+        File.write(env.fetch("A2O_DECOMPOSITION_RESULT_PATH"), JSON.generate("summary" => "ok"))
+        ["", "", FakeStatus.new(true, 0)]
+      end
+
+      described_class.new(
         storage_dir: dir,
-        process_runner: process_runner,
-        clock: -> { Time.utc(2026, 4, 26, 3, 0, 0) }
-      ).call(
-        task: task,
-        project_surface: project_surface,
-        slot_paths: { repo_alpha: "/repo/source" }
-      )
+        project_root: project_root,
+        process_runner: process_runner
+      ).call(task: task, project_surface: project_surface)
 
-      expect(result.success).to be(true)
-      expect(result.summary).to eq("investigated")
-      expect(captured.fetch(:command)).to eq(["investigate", "--json"])
-      expect(captured.fetch(:chdir)).to eq(result.workspace_root)
-      expect(result.workspace_root).to start_with(File.join(dir, "decomposition-workspaces", "A3-v2-5300"))
-      expect(captured.fetch(:env)).to include(
-        "A2O_DECOMPOSITION_REQUEST_PATH" => result.request_path,
-        "A2O_DECOMPOSITION_RESULT_PATH" => result.result_path,
-        "A2O_WORKSPACE_ROOT" => result.workspace_root
-      )
-
-      request = JSON.parse(File.read(result.request_path))
-      expect(request).to include(
-        "task_ref" => "A3-v2#5300",
-        "labels" => ["trigger:investigate"],
-        "slot_paths" => { "repo_alpha" => "/repo/source" }
-      )
-
-      evidence = JSON.parse(File.read(result.evidence_path))
-      expect(evidence).to include(
-        "task_ref" => "A3-v2#5300",
-        "phase" => "investigation",
-        "success" => true,
-        "summary" => "investigated"
-      )
-      expect(evidence.fetch("workspace_root")).to eq(result.workspace_root)
+      expect(captured.fetch(:command)).to eq([File.join(project_root, "commands/investigate.sh"), "--json"])
     end
   end
 
@@ -128,6 +170,62 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
       expect(result.success).to be(false)
       expect(result.summary).to eq("investigation result JSON is missing or invalid")
       expect(result.observed_state).to eq("missing_or_invalid_result_json")
+    end
+  end
+
+  it "persists failure evidence when the command cannot launch" do
+    Dir.mktmpdir do |dir|
+      project_surface = A3::Domain::ProjectSurface.new(
+        implementation_skill: "skills/implementation.md",
+        review_skill: "skills/review.md",
+        verification_commands: [],
+        remediation_commands: [],
+        workspace_hook: nil,
+        decomposition_investigate_command: ["missing-investigate"]
+      )
+      process_runner = lambda do |_command, **|
+        raise Errno::ENOENT, "missing-investigate"
+      end
+
+      result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
+        task: task,
+        project_surface: project_surface
+      )
+
+      expect(result.success).to be(false)
+      expect(result.summary).to include("failed to launch")
+      expect(result.observed_state).to include("launch_error")
+      evidence = JSON.parse(File.read(result.evidence_path))
+      expect(evidence.fetch("success")).to be(false)
+      expect(evidence.fetch("stderr")).to include("missing-investigate")
+    end
+  end
+
+  it "uses a unique workspace for each investigation run" do
+    Dir.mktmpdir do |dir|
+      project_surface = A3::Domain::ProjectSurface.new(
+        implementation_skill: "skills/implementation.md",
+        review_skill: "skills/review.md",
+        verification_commands: [],
+        remediation_commands: [],
+        workspace_hook: nil,
+        decomposition_investigate_command: ["investigate"]
+      )
+      process_runner = lambda do |_command, env:, **|
+        File.write(env.fetch("A2O_DECOMPOSITION_RESULT_PATH"), JSON.generate("summary" => "ok"))
+        ["", "", FakeStatus.new(true, 0)]
+      end
+      use_case = described_class.new(
+        storage_dir: dir,
+        process_runner: process_runner,
+        clock: -> { Time.utc(2026, 4, 26, 3, 0, 0) }
+      )
+
+      first = use_case.call(task: task, project_surface: project_surface)
+      second = use_case.call(task: task, project_surface: project_surface)
+
+      expect(first.workspace_root).not_to eq(second.workspace_root)
+      expect(first.result_path).not_to eq(second.result_path)
     end
   end
 

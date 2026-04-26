@@ -3,14 +3,17 @@
 require "fileutils"
 require "json"
 require "open3"
+require "pathname"
+require "tmpdir"
 
 module A3
   module Application
     class RunDecompositionInvestigation
       Result = Struct.new(:success, :summary, :result, :request_path, :result_path, :workspace_root, :evidence_path, :failing_command, :observed_state, keyword_init: true)
 
-      def initialize(storage_dir:, process_runner: nil, clock: -> { Time.now.utc })
+      def initialize(storage_dir:, project_root: Dir.pwd, process_runner: nil, clock: -> { Time.now.utc })
         @storage_dir = storage_dir
+        @project_root = project_root
         @process_runner = process_runner || method(:run_process)
         @clock = clock
       end
@@ -20,25 +23,20 @@ module A3
         raise A3::Domain::ConfigurationError, "project.yaml runtime.decomposition.investigate.command must be provided" unless command
 
         workspace_root = prepare_workspace_root(task_ref: task.ref)
+        isolated_slot_paths = materialize_isolated_slot_paths(slot_paths: slot_paths, workspace_root: workspace_root)
         request_path = File.join(workspace_root, ".a2o", "decomposition-investigate-request.json")
         result_path = File.join(workspace_root, ".a2o", "decomposition-investigate-result.json")
         FileUtils.mkdir_p(File.dirname(request_path))
-        request = request_payload(task: task, slot_paths: slot_paths, workspace_root: workspace_root)
+        FileUtils.rm_f(result_path)
+        request = request_payload(task: task, slot_paths: isolated_slot_paths, workspace_root: workspace_root)
         write_json(request_path, request)
 
-        stdout, stderr, status = @process_runner.call(
-          command,
-          chdir: workspace_root,
-          env: {
-            "A2O_DECOMPOSITION_REQUEST_PATH" => request_path,
-            "A2O_DECOMPOSITION_RESULT_PATH" => result_path,
-            "A2O_WORKSPACE_ROOT" => workspace_root
-          }
-        )
+        command = resolve_command(command)
+        stdout, stderr, status = run_command(command: command, workspace_root: workspace_root, request_path: request_path, result_path: result_path)
 
         result = load_result(result_path)
         success = status.success? && valid_result?(result)
-        summary = summary_for(success: success, command: command, status: status, result: result)
+        summary = summary_for(success: success, command: command, status: status, result: result, stderr: stderr)
         evidence_path = persist_evidence(
           task: task,
           command: command,
@@ -63,21 +61,75 @@ module A3
           workspace_root: workspace_root,
           evidence_path: evidence_path,
           failing_command: success ? nil : command.join(" "),
-          observed_state: success ? nil : observed_state(status: status, result: result)
+          observed_state: success ? nil : observed_state(status: status, result: result, stderr: stderr)
         )
       end
 
       private
 
-      def prepare_workspace_root(task_ref:)
-        root = File.join(
-          @storage_dir,
-          "decomposition-workspaces",
-          slugify(task_ref),
-          @clock.call.strftime("%Y%m%d%H%M%S")
+      CommandStatus = Struct.new(:success?, :exitstatus)
+
+      def run_command(command:, workspace_root:, request_path:, result_path:)
+        @process_runner.call(
+          command,
+          chdir: workspace_root,
+          env: {
+            "A2O_DECOMPOSITION_REQUEST_PATH" => request_path,
+            "A2O_DECOMPOSITION_RESULT_PATH" => result_path,
+            "A2O_WORKSPACE_ROOT" => workspace_root
+          }
         )
-        FileUtils.mkdir_p(root)
-        root
+      rescue SystemCallError => e
+        ["", e.message, CommandStatus.new(false, nil)]
+      end
+
+      def prepare_workspace_root(task_ref:)
+        base_dir = File.join(@storage_dir, "decomposition-workspaces", slugify(task_ref))
+        FileUtils.mkdir_p(base_dir)
+        Dir.mktmpdir("run-#{@clock.call.strftime('%Y%m%d%H%M%S')}-", base_dir)
+      end
+
+      def materialize_isolated_slot_paths(slot_paths:, workspace_root:)
+        slots_root = File.join(workspace_root, "slots")
+        FileUtils.mkdir_p(slots_root)
+        stringify_hash(slot_paths).each_with_object({}) do |(slot, source_path), memo|
+          destination = File.join(slots_root, slugify(slot))
+          copy_slot(source_path: source_path, destination: destination)
+          make_read_only(destination)
+          memo[slot] = destination
+        end
+      end
+
+      def copy_slot(source_path:, destination:)
+        raise A3::Domain::ConfigurationError, "decomposition slot path does not exist: #{source_path}" unless File.exist?(source_path)
+
+        if File.directory?(source_path)
+          FileUtils.mkdir_p(destination)
+          entries = Dir.children(source_path)
+          FileUtils.cp_r(entries.map { |entry| File.join(source_path, entry) }, destination) unless entries.empty?
+        else
+          FileUtils.mkdir_p(File.dirname(destination))
+          FileUtils.cp(source_path, destination)
+        end
+      end
+
+      def make_read_only(path)
+        FileUtils.chmod_R("a-w", path)
+      end
+
+      def resolve_command(command)
+        first, *rest = command
+        resolved_first =
+          if relative_path_command?(first)
+            File.expand_path(first, @project_root)
+          else
+            first
+          end
+        [resolved_first, *rest]
+      end
+
+      def relative_path_command?(value)
+        value.include?(File::SEPARATOR) && Pathname.new(value).relative?
       end
 
       def request_payload(task:, slot_paths:, workspace_root:)
@@ -108,8 +160,9 @@ module A3
         result.is_a?(Hash) && result["summary"].is_a?(String) && !result["summary"].strip.empty?
       end
 
-      def summary_for(success:, command:, status:, result:)
+      def summary_for(success:, command:, status:, result:, stderr:)
         return result.fetch("summary") if success
+        return "#{command.join(' ')} failed to launch: #{stderr}" if status.exitstatus.nil?
         return "#{command.join(' ')} failed with exit #{status.exitstatus}" unless status.success?
         return "investigation result JSON is missing or invalid" unless result
 
@@ -141,7 +194,8 @@ module A3
         evidence_path
       end
 
-      def observed_state(status:, result:)
+      def observed_state(status:, result:, stderr:)
+        return "launch_error: #{stderr}" if status.exitstatus.nil?
         return "exit #{status.exitstatus}" unless status.success?
         return "missing_or_invalid_result_json" unless result
 
