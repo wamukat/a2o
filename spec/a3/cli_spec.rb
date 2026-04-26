@@ -612,6 +612,15 @@ RSpec.describe A3::CLI do
     expect(options.fetch(:storage_dir)).to eq("/tmp/custom-state")
   end
 
+  it "rejects conflicting decomposition cleanup modes in the runtime command parser" do
+    expect do
+      described_class.send(
+        :parse_cleanup_decomposition_trial_options,
+        ["A2O#254", "--dry-run", "--apply"]
+      )
+    end.to raise_error(ArgumentError, /only one of --dry-run or --apply/)
+  end
+
   it "builds a subprocess-cli kanban bridge bundle" do
     Dir.mktmpdir do |dir|
       bundle = described_class.send(

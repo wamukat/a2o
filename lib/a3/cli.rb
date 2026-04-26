@@ -1564,16 +1564,18 @@ module A3
         storage_backend: :json,
         storage_dir: default_storage_dir,
         repo_sources: {},
-        apply: false
+        apply: false,
+        cleanup_mode: nil
       }
       parser = OptionParser.new
       parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
       parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
       parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
-      parser.on("--dry-run") { options[:apply] = false }
-      parser.on("--apply") { options[:apply] = true }
+      parser.on("--dry-run") { options[:cleanup_mode] = register_cleanup_mode(options[:cleanup_mode], :dry_run) }
+      parser.on("--apply") { options[:cleanup_mode] = register_cleanup_mode(options[:cleanup_mode], :apply) }
       remaining = parser.parse(argv)
       options[:task_ref] = remaining.fetch(0)
+      options[:apply] = options[:cleanup_mode] == :apply
       options
     end
 
@@ -1997,6 +1999,14 @@ module A3
 
     def default_decomposition_proposal_evidence_path(storage_dir:, task_ref:)
       File.join(storage_dir, "decomposition-evidence", task_ref.to_s.gsub(/[^A-Za-z0-9._-]+/, "-"), "proposal.json")
+    end
+
+    def register_cleanup_mode(current_mode, next_mode)
+      if current_mode && current_mode != next_mode
+        raise ArgumentError, "cleanup-decomposition-trial accepts only one of --dry-run or --apply"
+      end
+
+      next_mode
     end
 
     def attach_decomposition_entries(summary, tasks:, storage_dir:)
