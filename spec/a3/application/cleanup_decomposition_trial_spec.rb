@@ -73,4 +73,17 @@ RSpec.describe A3::Application::CleanupDecompositionTrial do
       expect(File.exist?(other_dir)).to be(true)
     end
   end
+
+  it "refuses to apply cleanup through symlinked storage paths" do
+    Dir.mktmpdir do |dir|
+      external_dir = File.join(dir, "external")
+      FileUtils.mkdir_p(File.join(external_dir, "A3-v2-5300"))
+      FileUtils.ln_s(external_dir, File.join(dir, "decomposition-evidence"))
+
+      expect do
+        described_class.new(storage_dir: dir).call(task_ref: "A3-v2#5300", apply: true)
+      end.to raise_error(ArgumentError, /contains symlink/)
+      expect(File.exist?(File.join(external_dir, "A3-v2-5300"))).to be(true)
+    end
+  end
 end

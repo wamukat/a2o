@@ -81,15 +81,32 @@ module A3
         allowed_bases = %w[decomposition-evidence decomposition-workspaces].map do |kind|
           File.expand_path(File.join(@storage_dir, kind))
         end
-        return if allowed_bases.any? { |base| expanded.start_with?("#{base}#{File::SEPARATOR}") }
+        unless allowed_bases.any? { |base| expanded.start_with?("#{base}#{File::SEPARATOR}") }
+          raise ArgumentError, "unsafe decomposition cleanup target: #{path}"
+        end
+        if symlink_in_path?(expanded)
+          raise ArgumentError, "unsafe decomposition cleanup target contains symlink: #{path}"
+        end
 
-        raise ArgumentError, "unsafe decomposition cleanup target: #{path}"
+        true
       end
 
       def load_json(path)
         JSON.parse(File.read(path))
       rescue JSON::ParserError
         nil
+      end
+
+      def symlink_in_path?(path)
+        storage = File.expand_path(@storage_dir)
+        current = path
+        while current.start_with?("#{storage}#{File::SEPARATOR}") || current == storage
+          return true if File.symlink?(current)
+          break if current == storage
+
+          current = File.dirname(current)
+        end
+        false
       end
 
       def child_refs_for(payload)

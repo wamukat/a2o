@@ -4192,6 +4192,24 @@ func TestRuntimeDecompositionCleanupFlagsAreRejectedForOtherActions(t *testing.T
 	}
 }
 
+func TestRuntimeDecompositionCleanupRejectsConflictingModes(t *testing.T) {
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"runtime", "decomposition", "cleanup", "A2O#245", "--apply", "--dry-run"}, runner, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("run returned success, stdout=%s", stdout.String())
+	}
+
+	if got := stderr.String(); !strings.Contains(got, "runtime decomposition cleanup accepts only one of --dry-run or --apply") {
+		t.Fatalf("stderr should include conflicting cleanup mode, got:\n%s", got)
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("conflicting cleanup modes should not start runtime, got calls: %#v", runner.joinedCalls())
+	}
+}
+
 func TestRuntimeDecompositionCleanupDispatchesStorageCommand(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

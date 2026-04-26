@@ -165,6 +165,7 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 	projectConfig := flags.String("project-config", "", "explicit project config file, for example project-test.yaml")
 	gate := flags.Bool("gate", false, "allow create-children to write child tickets")
 	applyCleanup := flags.Bool("apply", false, "apply decomposition cleanup")
+	dryRunCleanup := flags.Bool("dry-run", false, "preview decomposition cleanup")
 	investigationEvidencePath := flags.String("investigation-evidence-path", "", "proposal input evidence path")
 	proposalEvidencePath := flags.String("proposal-evidence-path", "", "proposal evidence path")
 	reviewEvidencePath := flags.String("review-evidence-path", "", "proposal review evidence path")
@@ -176,6 +177,9 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 	}
 	if err := flags.Parse(flagArgs); err != nil {
 		return err
+	}
+	if action == "cleanup" && *applyCleanup && *dryRunCleanup {
+		return fmt.Errorf("runtime decomposition cleanup accepts only one of --dry-run or --apply")
 	}
 	if len(positionals) != 1 {
 		return fmt.Errorf("usage: a2o runtime decomposition %s TASK_REF", action)
@@ -224,9 +228,7 @@ func splitRuntimeDecompositionArgs(action string, args []string) ([]string, []st
 		case arg == "--gate":
 			flagArgs = append(flagArgs, arg)
 		case action == "cleanup" && (arg == "--apply" || arg == "--dry-run"):
-			if arg != "--dry-run" {
-				flagArgs = append(flagArgs, arg)
-			}
+			flagArgs = append(flagArgs, arg)
 		case arg == "--project-config" || arg == "--repo-source" || arg == "--investigation-evidence-path" || arg == "--proposal-evidence-path" || arg == "--review-evidence-path":
 			if i+1 >= len(args) {
 				return nil, nil, fmt.Errorf("%s requires a value", arg)
