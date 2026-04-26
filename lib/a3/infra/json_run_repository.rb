@@ -2,6 +2,7 @@
 
 require "json"
 require "fileutils"
+require "tempfile"
 
 module A3
   module Infra
@@ -14,7 +15,7 @@ module A3
       end
 
       def save(run)
-        records = load_records
+        records = load_records_for_write
         records[run.ref] = A3::Adapters::RunRecord.dump(run)
         write_records(records)
       end
@@ -52,23 +53,49 @@ module A3
         {}
       end
 
+      def load_records_for_write
+        return {} unless File.exist?(@path)
+
+        records = JSON.parse(File.read(@path))
+        return records if records.is_a?(Hash)
+
+        quarantine_corrupt_store
+        {}
+      rescue JSON::ParserError
+        quarantine_corrupt_store
+        {}
+      end
+
       def write_records(records)
         FileUtils.mkdir_p(File.dirname(@path))
-        temp_path = "#{@path}.tmp"
-        File.open(temp_path, "w") do |file|
+        temp_path = nil
+        Tempfile.create([File.basename(@path), ".tmp"], File.dirname(@path)) do |file|
+          temp_path = file.path
           file.write(JSON.pretty_generate(records))
           file.flush
           file.fsync
+          file.close
+          File.rename(temp_path, @path)
+          temp_path = nil
         end
-        File.rename(temp_path, @path)
       ensure
-        FileUtils.rm_f(temp_path) if defined?(temp_path) && File.exist?(temp_path)
+        FileUtils.rm_f(temp_path) if temp_path && File.exist?(temp_path)
       end
 
       def load_valid_record(record)
         A3::Adapters::RunRecord.load(record)
       rescue *RECORD_CORRUPTION_ERRORS
         nil
+      end
+
+      def quarantine_corrupt_store
+        return unless File.exist?(@path)
+
+        FileUtils.mv(@path, corrupt_store_path)
+      end
+
+      def corrupt_store_path
+        "#{@path}.corrupt.#{Time.now.utc.strftime('%Y%m%d%H%M%S')}.#{$$}.#{Thread.current.object_id}"
       end
     end
   end

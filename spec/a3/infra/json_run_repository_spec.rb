@@ -133,7 +133,18 @@ RSpec.describe A3::Infra::JsonRunRepository do
   it "writes records atomically through a temporary file rename" do
     repository.save(build_run("run-1"))
 
-    expect(File.exist?(File.join(@tmpdir, "runs.json.tmp"))).to be(false)
+    expect(Dir.children(@tmpdir).grep(/runs\.json.*\.tmp/)).to eq([])
     expect(JSON.parse(File.read(File.join(@tmpdir, "runs.json"))).keys).to eq(["run-1"])
+  end
+
+  it "quarantines corrupt stores before writing a new run" do
+    File.write(File.join(@tmpdir, "runs.json"), '{ "run-1": { "ref": "run-1"')
+
+    repository.save(build_run("run-2"))
+
+    expect(JSON.parse(File.read(File.join(@tmpdir, "runs.json"))).keys).to eq(["run-2"])
+    quarantined = Dir.children(@tmpdir).grep(/runs\.json\.corrupt\./)
+    expect(quarantined.size).to eq(1)
+    expect(File.read(File.join(@tmpdir, quarantined.first))).to eq('{ "run-1": { "ref": "run-1"')
   end
 end
