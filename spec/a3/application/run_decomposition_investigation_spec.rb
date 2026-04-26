@@ -36,7 +36,9 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
         captured[:command] = command
         captured[:chdir] = chdir
         captured[:env] = env
-        File.write(env.fetch("A2O_DECOMPOSITION_RESULT_PATH"), JSON.generate("summary" => "investigated", "affected_files" => ["lib/a.rb"]))
+        request = JSON.parse(File.read(env.fetch("A2O_DECOMPOSITION_REQUEST_PATH")))
+        captured[:request] = request
+        File.write(env.fetch("A2O_DECOMPOSITION_RESULT_PATH"), JSON.generate("summary" => "investigated #{request.fetch('title')}", "affected_files" => ["lib/a.rb"]))
         ["out", "", FakeStatus.new(true, 0)]
       end
 
@@ -49,11 +51,18 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
         ).call(
           task: task,
           project_surface: project_surface,
-          slot_paths: { repo_alpha: source_repo }
+          slot_paths: { repo_alpha: source_repo },
+          task_snapshot: {
+            "ref" => "A3-v2#5300",
+            "title" => "Split workflow",
+            "description" => "Investigate decomposition requirements.",
+            "status" => "To do",
+            "labels" => ["trigger:investigate"]
+          }
         )
 
         expect(result.success).to be(true)
-        expect(result.summary).to eq("investigated")
+        expect(result.summary).to eq("investigated Split workflow")
         expect(captured.fetch(:command)).to eq(["investigate", "--json"])
         expect(captured.fetch(:chdir)).to eq(result.workspace_root)
         expect(result.workspace_root).to start_with(File.join(dir, "decomposition-workspaces", "A3-v2-5300"))
@@ -67,6 +76,8 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
         isolated_repo = request.fetch("slot_paths").fetch("repo_alpha")
         expect(request).to include(
           "task_ref" => "A3-v2#5300",
+          "title" => "Split workflow",
+          "description" => "Investigate decomposition requirements.",
           "labels" => ["trigger:investigate"]
         )
         expect(isolated_repo).not_to eq(source_repo)
@@ -79,12 +90,46 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
           "task_ref" => "A3-v2#5300",
           "phase" => "investigation",
           "success" => true,
-          "summary" => "investigated"
+          "summary" => "investigated Split workflow"
         )
         expect(evidence.fetch("workspace_root")).to eq(result.workspace_root)
       ensure
         FileUtils.chmod_R("u+w", result.workspace_root) if result
       end
+    end
+  end
+
+  it "includes previous evidence summary in rerun requests" do
+    Dir.mktmpdir do |dir|
+      previous_dir = File.join(dir, "decomposition-evidence", "A3-v2-5300")
+      FileUtils.mkdir_p(previous_dir)
+      previous_path = File.join(previous_dir, "investigation.json")
+      File.write(previous_path, JSON.generate("summary" => "previous investigation"))
+      project_surface = A3::Domain::ProjectSurface.new(
+        implementation_skill: "skills/implementation.md",
+        review_skill: "skills/review.md",
+        verification_commands: [],
+        remediation_commands: [],
+        workspace_hook: nil,
+        decomposition_investigate_command: ["investigate"]
+      )
+      captured = {}
+      process_runner = lambda do |_command, env:, **|
+        captured[:request] = JSON.parse(File.read(env.fetch("A2O_DECOMPOSITION_REQUEST_PATH")))
+        File.write(env.fetch("A2O_DECOMPOSITION_RESULT_PATH"), JSON.generate("summary" => "ok"))
+        ["", "", FakeStatus.new(true, 0)]
+      end
+
+      described_class.new(storage_dir: dir, process_runner: process_runner).call(
+        task: task,
+        project_surface: project_surface,
+        previous_evidence_path: previous_path
+      )
+
+      expect(captured.fetch(:request)).to include(
+        "previous_evidence_path" => previous_path,
+        "previous_evidence_summary" => "previous investigation"
+      )
     end
   end
 

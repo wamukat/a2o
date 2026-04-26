@@ -42,6 +42,7 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
           "priority" => 3,
           "verification_level" => "unit",
           "depends_on" => [],
+          "boundary" => "scheduler routing",
           "rationale" => "This is the smallest scheduler boundary."
         },
         {
@@ -52,6 +53,7 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
           "priority" => 2,
           "verification_level" => "unit",
           "depends_on" => ["Add routing"],
+          "boundary" => "proposal review gate",
           "rationale" => "Review should be separate from authoring."
         }
       ],
@@ -227,6 +229,29 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
       expect(result.summary).to include("children[0].labels must be an array")
       expect(result.summary).to include("children[0].depends_on must be an array")
       expect(result.summary).to include("unresolved_questions must be an array")
+    end
+  end
+
+  it "blocks when child drafts omit stable boundaries" do
+    Dir.mktmpdir do |dir|
+      invalid_payload = valid_author_result.merge(
+        "children" => [
+          valid_author_result.fetch("children").first.reject { |key, _| key == "boundary" }
+        ]
+      )
+      process_runner = lambda do |_command, env:, **|
+        File.write(env.fetch("A2O_DECOMPOSITION_AUTHOR_RESULT_PATH"), JSON.generate(invalid_payload))
+        ["", "", FakeAuthorStatus.new(true, 0)]
+      end
+
+      result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
+        task: task,
+        project_surface: project_surface,
+        investigation_evidence: { "summary" => "ok" }
+      )
+
+      expect(result.success).to be(false)
+      expect(result.summary).to include("children[0].boundary must be a non-empty string")
     end
   end
 

@@ -16,14 +16,20 @@ module A3
         investigation_path = File.join(root, "investigation.json")
         proposal_path = File.join(root, "proposal.json")
         review_path = File.join(root, "proposal-review.json")
+        child_creation_path = File.join(root, "child-creation.json")
         proposal = load_json(proposal_path)
         review = load_json(review_path)
+        child_creation = load_json(child_creation_path)
         disposition = review && review["disposition"]
         state =
-          if review && disposition == "blocked"
+          if child_creation && child_creation["success"] == false
+            "blocked"
+          elsif child_creation && child_creation["success"] == true
+            "done"
+          elsif review && disposition == "blocked"
             "blocked"
           elsif review && disposition == "eligible"
-            "done"
+            "active"
           elsif proposal
             "active"
           elsif File.exist?(investigation_path)
@@ -37,16 +43,23 @@ module A3
           state: state,
           proposal_fingerprint: proposal && proposal["proposal_fingerprint"],
           disposition: disposition,
-          blocked_reason: review && review["summary"],
+          blocked_reason: blocked_reason_for(review: review, child_creation: child_creation),
           evidence_paths: {
             "investigation" => investigation_path,
             "proposal" => proposal_path,
-            "proposal_review" => review_path
+            "proposal_review" => review_path,
+            "child_creation" => child_creation_path
           }.select { |_key, path| File.exist?(path) }
         )
       end
 
       private
+
+      def blocked_reason_for(review:, child_creation:)
+        return child_creation["summary"] if child_creation && child_creation["success"] == false
+
+        review && review["summary"]
+      end
 
       def load_json(path)
         return nil unless File.exist?(path)

@@ -161,7 +161,7 @@ The author command receives:
 - `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH`
 - `A2O_WORKSPACE_ROOT`
 
-The author command writes one proposal JSON object to `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH`. A2O normalizes the draft, derives `proposal_fingerprint` and per-child `child_key` values, and stores proposal evidence without creating Kanban child tickets. The proposal must include at least one child draft. Each child draft requires `title`, `body`, `acceptance_criteria`, `labels`, `depends_on`, and `rationale`. `unresolved_questions` must be an array.
+The author command writes one proposal JSON object to `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH`. A2O normalizes the draft, derives `proposal_fingerprint` and per-child `child_key` values, and stores proposal evidence without creating Kanban child tickets. The proposal must include at least one child draft. Each child draft requires `title`, `body`, `acceptance_criteria`, `labels`, `depends_on`, `boundary`, and `rationale`. `boundary` must be stable across reruns because A2O derives the child idempotency key from it. `unresolved_questions` must be an array.
 
 To run the proposal step after investigation evidence exists:
 

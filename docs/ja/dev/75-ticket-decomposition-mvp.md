@@ -135,7 +135,7 @@ proposal には次を含める。
 - 想定する blocker relation
 - 想定する parent / child relation
 - `trigger:auto-implement` の付与方針
-- 各子チケット境界の rationale
+- 各 child draft の安定した boundary と rationale
 - 未解決の質問と、人間判断が必要な項目
 
 proposal fingerprint は idempotency のために必須とする。source ticket ref、source revision fields、investigation result digest、順序付き child draft content から生成する。

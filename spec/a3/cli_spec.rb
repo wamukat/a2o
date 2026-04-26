@@ -137,6 +137,7 @@ RSpec.describe A3::CLI do
                   "acceptance_criteria" => ["routing is tested"],
                   "labels" => [],
                   "depends_on" => [],
+                  "boundary" => "scheduler routing",
                   "rationale" => "Scheduler routing is the first boundary."
                 }
               ],
@@ -195,6 +196,97 @@ RSpec.describe A3::CLI do
       evidence = JSON.parse(File.read(File.join(dir, "decomposition-evidence", "A3-v2-5300", "proposal.json")))
       expect(evidence.fetch("success")).to be(true)
       expect(evidence.fetch("proposal").fetch("children").first.fetch("title")).to eq("Add routing")
+    end
+  end
+
+  it "runs decomposition investigation from a stored task, project manifest, and repo sources" do
+    Dir.mktmpdir do |dir|
+      begin
+        repo_source = File.join(dir, "repo-alpha")
+        FileUtils.mkdir_p(repo_source)
+        File.write(File.join(repo_source, "README.md"), "repo alpha\n")
+        commands_dir = File.join(dir, "commands")
+        FileUtils.mkdir_p(commands_dir)
+        investigate_path = File.join(commands_dir, "investigate.rb")
+        File.write(
+          investigate_path,
+          <<~RUBY
+            #!#{RbConfig.ruby}
+            require "json"
+            request = JSON.parse(File.read(ENV.fetch("A2O_DECOMPOSITION_REQUEST_PATH")))
+            raise "missing repo_alpha slot" unless request.fetch("slot_paths").fetch("repo_alpha")
+            File.write(
+              ENV.fetch("A2O_DECOMPOSITION_RESULT_PATH"),
+              JSON.generate(
+                "summary" => "investigated \#{request.fetch("title")}",
+                "source_description" => request.fetch("description")
+              )
+            )
+          RUBY
+        )
+        FileUtils.chmod(0o755, investigate_path)
+        manifest_path = File.join(dir, "project.yaml")
+        File.write(
+          manifest_path,
+          <<~YAML
+            schema_version: 1
+            runtime:
+              decomposition:
+                investigate:
+                  command: ["commands/investigate.rb"]
+              phases:
+                implementation:
+                  skill: skills/implementation/base.md
+                review:
+                  skill: skills/review/default.md
+                merge:
+                  policy: ff_only
+                  target_ref: refs/heads/main
+          YAML
+        )
+        task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))
+        task_repository.save(
+          A3::Domain::Task.new(
+            ref: "A3-v2#5300",
+            kind: :single,
+            edit_scope: [:repo_alpha],
+            status: :todo,
+            labels: ["trigger:investigate"]
+          )
+        )
+        allow(described_class).to receive(:decomposition_task_snapshot).and_return(
+          "ref" => "A3-v2#5300",
+          "title" => "Split import workflow",
+          "description" => "Create decomposed tasks.",
+          "status" => "To do",
+          "labels" => ["trigger:investigate"]
+        )
+
+        out = StringIO.new
+        described_class.start(
+          [
+            "run-decomposition-investigation",
+            "A3-v2#5300",
+            manifest_path,
+            "--storage-dir", dir,
+            "--repo-source", "repo_alpha=#{repo_source}"
+          ],
+          out: out
+        )
+
+        expect(out.string).to include("decomposition investigation A3-v2#5300 success=true")
+        evidence = JSON.parse(File.read(File.join(dir, "decomposition-evidence", "A3-v2-5300", "investigation.json")))
+        expect(evidence.fetch("request")).to include(
+          "title" => "Split import workflow",
+          "description" => "Create decomposed tasks."
+        )
+        expect(evidence.fetch("request").fetch("slot_paths").fetch("repo_alpha")).to start_with(
+          File.join(dir, "decomposition-workspaces", "A3-v2-5300")
+        )
+      ensure
+        workspace_root = File.join(dir, "decomposition-workspaces")
+        FileUtils.chmod_R("u+w", workspace_root) if File.exist?(workspace_root)
+      end
     end
   end
 

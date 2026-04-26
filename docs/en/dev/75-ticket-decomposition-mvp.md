@@ -135,7 +135,7 @@ The proposal should contain:
 - expected blocker relations
 - expected parent/child relations
 - suggested `trigger:auto-implement` usage
-- rationale for each child boundary
+- stable boundary and rationale for each child draft
 - unresolved questions and required human decisions
 
 The proposal fingerprint is required for idempotency. It should be derived from the source ticket ref, source revision fields, investigation result digest, and ordered child draft content.

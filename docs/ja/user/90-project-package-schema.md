@@ -166,7 +166,7 @@ author command には次を渡す。
 - `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH`
 - `A2O_WORKSPACE_ROOT`
 
-author command は `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH` に proposal JSON object を 1 つ書く。A2O は draft を正規化し、`proposal_fingerprint` と child ごとの `child_key` を導出し、Kanban child ticket は作成せずに proposal evidence を保存する。proposal には 1 件以上の child draft が必要である。各 child draft は `title`、`body`、`acceptance_criteria`、`labels`、`depends_on`、`rationale` を持つ。`unresolved_questions` は配列でなければならない。
+author command は `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH` に proposal JSON object を 1 つ書く。A2O は draft を正規化し、`proposal_fingerprint` と child ごとの `child_key` を導出し、Kanban child ticket は作成せずに proposal evidence を保存する。proposal には 1 件以上の child draft が必要である。各 child draft は `title`、`body`、`acceptance_criteria`、`labels`、`depends_on`、`boundary`、`rationale` を持つ。`boundary` は child idempotency key の導出元になるため rerun 間で安定している必要がある。`unresolved_questions` は配列でなければならない。
 
 investigation evidence が存在する状態で proposal step を実行するには次を使う。
 

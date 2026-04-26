@@ -187,7 +187,7 @@ module A3
         return ["#{prefix} must be an object"] unless child.is_a?(Hash)
 
         errors = []
-        %w[child_key title body rationale].each do |key|
+        %w[child_key title body rationale boundary].each do |key|
           errors << "#{prefix}.#{key} must be a non-empty string" unless non_empty_string?(child[key])
         end
         %w[acceptance_criteria labels depends_on].each do |key|
@@ -278,8 +278,7 @@ module A3
       end
 
       def child_key_for(task_ref:, child:)
-        boundary = child["boundary"] || child["rationale"] || child["title"]
-        Digest::SHA256.hexdigest(canonical_json("source_ticket_ref" => task_ref, "boundary" => boundary.to_s))[0, 24]
+        Digest::SHA256.hexdigest(canonical_json("source_ticket_ref" => task_ref, "boundary" => child["boundary"].to_s))[0, 24]
       end
 
       def canonical_json(value)

@@ -302,6 +302,36 @@ module A3
       end
     end
 
+    def handle_run_decomposition_investigation(argv, out:, run_id_generator:, command_runner:, merge_runner:)
+      with_runtime_session(
+        argv: argv,
+        parse_with: :parse_run_decomposition_investigation_options,
+        run_id_generator: run_id_generator,
+        command_runner: command_runner,
+        merge_runner: merge_runner
+      ) do |session|
+        task = session.container.fetch(:task_repository).fetch(session.options.fetch(:task_ref))
+        bridge = build_external_task_bridge(session.options)
+        result = A3::Application::RunDecompositionInvestigation.new(
+          storage_dir: session.options.fetch(:storage_dir),
+          project_root: File.dirname(session.options.fetch(:manifest_path))
+        ).call(
+          task: task,
+          project_surface: session.project_surface,
+          slot_paths: session.options.fetch(:repo_sources),
+          task_snapshot: decomposition_task_snapshot(bridge: bridge, task: task),
+          previous_evidence_path: default_decomposition_investigation_evidence_path(
+            storage_dir: session.options.fetch(:storage_dir),
+            task_ref: task.ref
+          )
+        )
+
+        out.puts("decomposition investigation #{task.ref} success=#{result.success}")
+        out.puts("summary=#{result.summary}")
+        out.puts("evidence_path=#{result.evidence_path}")
+      end
+    end
+
     def handle_run_decomposition_proposal_author(argv, out:, run_id_generator:, command_runner:, merge_runner:)
       with_runtime_session(
         argv: argv,
@@ -1371,6 +1401,36 @@ module A3
       options
     end
 
+    def parse_run_decomposition_investigation_options(argv)
+      options = {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        preset_dir: File.expand_path("config/presets", Dir.pwd),
+        repo_sources: {},
+        kanban_repo_label_map: {},
+        kanban_trigger_labels: [],
+        verification_command_runner: nil,
+        merge_runner: nil,
+        worker_gateway: nil,
+        worker_command_args: []
+      }
+
+      parser = OptionParser.new
+      parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      parser.on("--preset-dir DIR") { |value| options[:preset_dir] = File.expand_path(value) }
+      add_kanban_bridge_options(parser, options)
+      add_verification_command_runner_options(parser, options)
+      add_merge_runner_options(parser, options)
+      add_worker_gateway_options(parser, options)
+      remaining = parser.parse(argv)
+
+      options[:task_ref] = remaining.fetch(0)
+      options[:manifest_path] = File.expand_path(remaining.fetch(1))
+      options
+    end
+
     def parse_run_decomposition_proposal_author_options(argv)
       options = {
         storage_backend: :json,
@@ -1890,6 +1950,18 @@ module A3
           status
         end
       summary.define_singleton_method(:decomposition_entries) { entries.freeze }
+    end
+
+    def decomposition_task_snapshot(bridge:, task:)
+      if task.external_task_id && bridge.task_source.respond_to?(:fetch_task_packet_by_external_task_id)
+        return bridge.task_source.fetch_task_packet_by_external_task_id(task.external_task_id)
+      end
+
+      if bridge.task_source.respond_to?(:fetch_task_packet_by_ref)
+        bridge.task_source.fetch_task_packet_by_ref(task.ref)
+      end
+    rescue A3::Domain::ConfigurationError, KeyError, RuntimeError
+      nil
     end
 
     def skill_feedback_entry_parts(entry)

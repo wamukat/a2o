@@ -18,7 +18,7 @@ module A3
         @clock = clock
       end
 
-      def call(task:, project_surface:, slot_paths: {})
+      def call(task:, project_surface:, slot_paths: {}, task_snapshot: nil, previous_evidence_path: nil)
         command = project_surface.decomposition_investigate_command
         raise A3::Domain::ConfigurationError, "project.yaml runtime.decomposition.investigate.command must be provided" unless command
 
@@ -28,7 +28,13 @@ module A3
         result_path = File.join(workspace_root, ".a2o", "decomposition-investigate-result.json")
         FileUtils.mkdir_p(File.dirname(request_path))
         FileUtils.rm_f(result_path)
-        request = request_payload(task: task, slot_paths: isolated_slot_paths, workspace_root: workspace_root)
+        request = request_payload(
+          task: task,
+          slot_paths: isolated_slot_paths,
+          workspace_root: workspace_root,
+          task_snapshot: task_snapshot,
+          previous_evidence_path: previous_evidence_path
+        )
         write_json(request_path, request)
 
         command = resolve_command(command)
@@ -132,19 +138,54 @@ module A3
         value.include?(File::SEPARATOR) && Pathname.new(value).relative?
       end
 
-      def request_payload(task:, slot_paths:, workspace_root:)
+      def request_payload(task:, slot_paths:, workspace_root:, task_snapshot:, previous_evidence_path:)
+        previous_evidence = load_previous_evidence(previous_evidence_path)
         {
           "task_ref" => task.ref,
           "task_kind" => task.kind.to_s,
-          "title" => nil,
+          "title" => snapshot_value(task_snapshot, "title"),
+          "description" => snapshot_value(task_snapshot, "description"),
           "labels" => task.labels,
           "priority" => task.priority,
           "parent_ref" => task.parent_ref,
           "child_refs" => task.child_refs,
           "blocking_task_refs" => task.blocking_task_refs,
+          "source_task" => source_task_payload(task_snapshot),
+          "previous_evidence_path" => previous_evidence_path,
+          "previous_evidence_summary" => previous_evidence && previous_evidence["summary"],
           "slot_paths" => stringify_hash(slot_paths),
           "workspace_root" => workspace_root
         }
+      end
+
+      def load_previous_evidence(path)
+        return nil unless path && File.exist?(path)
+
+        payload = JSON.parse(File.read(path))
+        payload.is_a?(Hash) ? payload : nil
+      rescue JSON::ParserError
+        nil
+      end
+
+      def source_task_payload(task_snapshot)
+        return nil unless task_snapshot.is_a?(Hash)
+
+        {
+          "id" => task_snapshot["task_id"] || task_snapshot["id"],
+          "ref" => task_snapshot["ref"],
+          "title" => snapshot_value(task_snapshot, "title"),
+          "description" => snapshot_value(task_snapshot, "description"),
+          "status" => task_snapshot["status"],
+          "labels" => Array(task_snapshot["labels"]).map(&:to_s),
+          "parent_ref" => task_snapshot["parent_ref"]
+        }.compact
+      end
+
+      def snapshot_value(task_snapshot, key)
+        return nil unless task_snapshot.is_a?(Hash)
+
+        value = task_snapshot[key] || task_snapshot[key.to_sym]
+        value && value.to_s
       end
 
       def load_result(result_path)
