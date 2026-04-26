@@ -19,6 +19,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Runtime diagnosis and recovery: `a2o runtime image-digest`, `doctor`, `watch-summary`, `logs [task-ref] --follow`, `describe-task <task-ref>`, `skill-feedback list`, `skill-feedback propose`, `reset-task <task-ref>`, `show-artifact <artifact-id>`
 - Upgrade diagnosis: `a2o upgrade check`
 - Single-file project package config: `project.yaml`
+- Investigate decomposition MVP: `runtime.decomposition.investigate.command`, `runtime.decomposition.author.command`, `a2o run-decomposition-investigation`, `run-decomposition-proposal-author`, `run-decomposition-proposal-review`, `run-decomposition-child-creation`, and `show-decomposition-status`
 - Project runtime tuning fields for agent server connectivity: `runtime.agent_control_plane_connect_timeout`, `runtime.agent_control_plane_request_timeout`, `runtime.agent_control_plane_retry_count`, `runtime.agent_control_plane_retry_delay`
 - Optional child/single review gate fields: `runtime.review_gate.child`, `runtime.review_gate.single`, `runtime.review_gate.skip_labels`, `runtime.review_gate.require_labels`
 - External Kanbalone bootstrap fields: `--kanban-mode external`, `--kanban-url`, `--kanban-runtime-url`

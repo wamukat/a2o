@@ -19,6 +19,7 @@ A2O 0.5.33 で現在利用できる公開機能と検証範囲を示す。
 - ランタイム診断・復旧: `a2o runtime image-digest`、`doctor`、`watch-summary`、`logs [task-ref] --follow`、`describe-task <task-ref>`、`skill-feedback list`、`skill-feedback propose`、`reset-task <task-ref>`、`show-artifact <artifact-id>`
 - アップグレード診断: `a2o upgrade check`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
+- investigate decomposition MVP: `runtime.decomposition.investigate.command`、`runtime.decomposition.author.command`、`a2o run-decomposition-investigation`、`run-decomposition-proposal-author`、`run-decomposition-proposal-review`、`run-decomposition-child-creation`、`show-decomposition-status`
 - agent server 接続向けの project runtime 調整項目: `runtime.agent_control_plane_connect_timeout`、`runtime.agent_control_plane_request_timeout`、`runtime.agent_control_plane_retry_count`、`runtime.agent_control_plane_retry_delay`
 - child / single タスク向けの任意 review gate 項目: `runtime.review_gate.child`、`runtime.review_gate.single`、`runtime.review_gate.skip_labels`、`runtime.review_gate.require_labels`
 - 外部 Kanbalone bootstrap 項目: `--kanban-mode external`、`--kanban-url`、`--kanban-runtime-url`
