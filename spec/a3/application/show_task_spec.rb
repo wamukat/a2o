@@ -172,4 +172,18 @@ RSpec.describe A3::Application::ShowTask do
       hash_including("summary" => "Do not lose this pending feedback.")
     )
   end
+
+  it "falls back to empty skill feedback when current run storage is corrupt" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "runs.json"), '{ "run-1": { "ref": "run-1", "artifact_id": "worker-abc')
+      run_repository = A3::Infra::JsonRunRepository.new(File.join(dir, "runs.json"))
+
+      result = described_class.new(
+        task_repository: task_repository,
+        run_repository: run_repository
+      ).call(task_ref: "A3-v2#child")
+
+      expect(result.skill_feedback).to eq([])
+    end
+  end
 end

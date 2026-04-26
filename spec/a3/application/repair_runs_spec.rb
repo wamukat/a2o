@@ -123,6 +123,42 @@ RSpec.describe A3::Application::RepairRuns do
     end
   end
 
+  it "repairs tasks pointing at corrupt JSON run records" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::InMemoryTaskRepository.new
+      run_repository = A3::Infra::JsonRunRepository.new(File.join(dir, "runs.json"))
+      File.write(
+        File.join(dir, "runs.json"),
+        JSON.pretty_generate("run-corrupt" => ["not", "a", "hash"])
+      )
+
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "Sample#3153",
+          kind: :single,
+          edit_scope: [:repo_alpha],
+          status: :in_progress,
+          current_run_ref: "run-corrupt"
+        )
+      )
+
+      use_case = described_class.new(
+        task_repository: task_repository,
+        run_repository: run_repository,
+        storage_dir: dir
+      )
+
+      dry_run = use_case.call(apply: false)
+      expect(dry_run.actions.map(&:kind)).to contain_exactly(:corrupt_run_record)
+      expect(task_repository.fetch("Sample#3153").current_run_ref).to eq("run-corrupt")
+
+      applied = use_case.call(apply: true)
+      expect(applied.actions.map(&:kind)).to contain_exactly(:corrupt_run_record)
+      expect(task_repository.fetch("Sample#3153").current_run_ref).to be_nil
+      expect(task_repository.fetch("Sample#3153").status).to eq(:in_progress)
+    end
+  end
+
   it "does not repair non-terminal runs while a direct execute-until-idle process is alive" do
     Dir.mktmpdir do |dir|
       task_repository = A3::Infra::InMemoryTaskRepository.new

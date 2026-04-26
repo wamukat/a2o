@@ -16,6 +16,7 @@ module A3
       def call(apply:)
         actions = []
         runs_by_ref = @run_repository.all.each_with_object({}) { |run, memo| memo[run.ref] = run }
+        corrupt_run_refs = corrupt_run_refs_by_ref
         shot_active = active_shot_lock?
         direct_run_active = @execution_process_probe.active_execute_until_idle?
 
@@ -38,7 +39,13 @@ module A3
           end
 
           actions << RepairAction.new(
-            kind: stale_task_kind_for(run, shot_active: shot_active, direct_run_active: direct_run_active),
+            kind: stale_task_kind_for(
+              run,
+              task: task,
+              corrupt_run_refs: corrupt_run_refs,
+              shot_active: shot_active,
+              direct_run_active: direct_run_active
+            ),
             target_ref: task.ref,
             applied: apply
           )
@@ -48,6 +55,12 @@ module A3
       end
 
       private
+
+      def corrupt_run_refs_by_ref
+        return [] unless @run_repository.respond_to?(:corrupt_run_refs)
+
+        @run_repository.corrupt_run_refs
+      end
 
       def stale_shot_lock?
         path = shot_lock_path
@@ -89,7 +102,8 @@ module A3
         task_ref.gsub(/[^A-Za-z0-9._-]+/, "-")
       end
 
-      def stale_task_kind_for(run, shot_active:, direct_run_active:)
+      def stale_task_kind_for(run, task:, corrupt_run_refs:, shot_active:, direct_run_active:)
+        return :corrupt_run_record if corrupt_run_refs.include?(task.current_run_ref)
         return :stale_task_missing_run if run.nil?
         return :stale_task_terminal_run if run.terminal?
         return :stale_task_missing_workspace unless workspace_present?(run)

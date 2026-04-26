@@ -106,4 +106,34 @@ RSpec.describe A3::Infra::JsonRunRepository do
 
     expect(repository.all.map(&:ref)).to eq(%w[run-10 run-2])
   end
+
+  it "treats truncated JSON as an empty run store" do
+    File.write(File.join(@tmpdir, "runs.json"), '{ "run-1": { "ref": "run-1", "artifact_id": "worker-abc')
+
+    expect(repository.all).to eq([])
+    expect(repository.corrupt_run_refs).to eq([])
+    expect { repository.fetch("run-1") }.to raise_error(A3::Domain::RecordNotFound)
+  end
+
+  it "skips malformed run records and exposes their refs for repair" do
+    valid_run = build_run("run-valid")
+    File.write(
+      File.join(@tmpdir, "runs.json"),
+      JSON.pretty_generate(
+        "run-corrupt" => ["not", "a", "hash"],
+        "run-valid" => A3::Adapters::RunRecord.dump(valid_run)
+      )
+    )
+
+    expect(repository.all.map(&:ref)).to eq(["run-valid"])
+    expect(repository.corrupt_run_refs).to eq(["run-corrupt"])
+    expect { repository.fetch("run-corrupt") }.to raise_error(A3::Domain::RecordNotFound)
+  end
+
+  it "writes records atomically through a temporary file rename" do
+    repository.save(build_run("run-1"))
+
+    expect(File.exist?(File.join(@tmpdir, "runs.json.tmp"))).to be(false)
+    expect(JSON.parse(File.read(File.join(@tmpdir, "runs.json"))).keys).to eq(["run-1"])
+  end
 end
