@@ -278,6 +278,30 @@ module A3
       end
     end
 
+    def handle_plan_next_decomposition_task(argv, out:, run_id_generator:, command_runner:, merge_runner:)
+      with_storage_container(
+        argv: argv,
+        parse_with: :parse_storage_options,
+        run_id_generator: run_id_generator,
+        command_runner: command_runner,
+        merge_runner: merge_runner
+      ) do |options, container|
+        result = container.fetch(:plan_next_decomposition_task).call
+
+        if result.active_task
+          out.puts("active decomposition #{result.active_task.ref}")
+        elsif result.task
+          out.puts("next decomposition #{result.task.ref}")
+        else
+          out.puts("no decomposition task")
+        end
+
+        result.candidates.each do |candidate|
+          out.puts("candidate #{candidate.ref} status=#{candidate.status}")
+        end
+      end
+    end
+
     def handle_execute_next_runnable_task(argv, out:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:)
       with_runtime_session(
         argv: argv,

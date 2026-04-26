@@ -49,4 +49,44 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("assessment A3-v2#3021 reason=sibling_running blocked_by=A3-v2#3020")
     end
   end
+
+  it "prints the next decomposition task separately from runnable implementation tasks" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "A3-v2#5100",
+          kind: :single,
+          edit_scope: [:repo_alpha],
+          status: :todo,
+          labels: ["trigger:investigate"],
+          priority: 3
+        )
+      )
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "A3-v2#5101",
+          kind: :single,
+          edit_scope: [:repo_beta],
+          status: :todo,
+          labels: ["trigger:auto-implement"],
+          priority: 1
+        )
+      )
+
+      out = StringIO.new
+      described_class.start(
+        [
+          "plan-next-decomposition-task",
+          "--storage-backend", "sqlite",
+          "--storage-dir", dir
+        ],
+        out: out
+      )
+
+      expect(out.string).to include("next decomposition A3-v2#5100")
+      expect(out.string).to include("candidate A3-v2#5100 status=todo")
+      expect(out.string).not_to include("A3-v2#5101")
+    end
+  end
 end

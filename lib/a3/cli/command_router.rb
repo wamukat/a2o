@@ -34,6 +34,7 @@ module A3
         "diagnose-blocked" => Definition.new(handler: :handle_diagnose_blocked, session_kind: :storage),
         "show-blocked-diagnosis" => Definition.new(handler: :handle_show_blocked_diagnosis, session_kind: :storage_runtime_package),
         "plan-next-runnable-task" => Definition.new(handler: :handle_plan_next_runnable_task, session_kind: :storage),
+        "plan-next-decomposition-task" => Definition.new(handler: :handle_plan_next_decomposition_task, session_kind: :storage),
         "execute-next-runnable-task" => Definition.new(handler: :handle_execute_next_runnable_task, needs_worker_gateway: true, session_kind: :runtime),
         "execute-until-idle" => Definition.new(handler: :handle_execute_until_idle, needs_worker_gateway: true, session_kind: :runtime),
         "show-scheduler-state" => Definition.new(handler: :handle_show_scheduler_state, session_kind: :storage),

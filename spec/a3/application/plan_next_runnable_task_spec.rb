@@ -146,6 +146,35 @@ RSpec.describe A3::Application::PlanNextRunnableTask do
     expect(blocked_assessment.reason).to eq(:not_trigger_selected)
   end
 
+  it "does not select trigger-investigate source tickets for ordinary implementation" do
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#5100",
+        kind: :single,
+        edit_scope: [:repo_alpha],
+        status: :todo,
+        priority: 5,
+        labels: ["trigger:investigate"]
+      )
+    )
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#5101",
+        kind: :single,
+        edit_scope: [:repo_beta],
+        status: :todo,
+        priority: 1,
+        labels: ["trigger:auto-implement"]
+      )
+    )
+
+    result = use_case.call
+
+    expect(result.task&.ref).to eq("A3-v2#5101")
+    routed_assessment = result.assessments.find { |assessment| assessment.task_ref == "A3-v2#5100" }
+    expect(routed_assessment.reason).to eq(:decomposition_requested)
+  end
+
   it "keeps ref ordering as the tie-breaker for equal priority tasks" do
     task_repository.save(
       A3::Domain::Task.new(

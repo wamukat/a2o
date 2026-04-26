@@ -5,6 +5,8 @@ module A3
     class InvalidPhaseError < StandardError; end
 
     class Task
+      DECOMPOSITION_TRIGGER_LABEL = "trigger:investigate"
+
       attr_reader :ref, :kind, :edit_scope, :verification_scope, :status, :current_run_ref, :parent_ref, :child_refs, :blocking_task_refs, :priority, :external_task_id, :verification_source_ref, :automation_enabled, :labels
 
       def initialize(ref:, kind:, edit_scope:, verification_scope: nil, status: :todo, current_run_ref: nil, parent_ref: nil, child_refs: [], blocking_task_refs: [], priority: 0, external_task_id: nil, verification_source_ref: nil, automation_enabled: true, labels: [])
@@ -124,6 +126,10 @@ module A3
         else
           nil
         end
+      end
+
+      def decomposition_requested?
+        labels.include?(DECOMPOSITION_TRIGGER_LABEL)
       end
 
       def ==(other)

@@ -20,7 +20,8 @@ module A3
             scheduler_state_repository: @context.scheduler_state_repository,
             scheduler_cycle_repository: @context.scheduler_cycle_repository,
             build_scope_snapshot: @context.build_scope_snapshot,
-            build_artifact_owner: @context.build_artifact_owner
+            build_artifact_owner: @context.build_artifact_owner,
+            plan_next_decomposition_task: @context.plan_next_decomposition_task
           }.freeze
         end
       end

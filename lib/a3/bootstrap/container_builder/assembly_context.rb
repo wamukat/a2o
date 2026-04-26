@@ -50,6 +50,10 @@ module A3
           @runtime_services.fetch(:plan_next_runnable_task)
         end
 
+        def plan_next_decomposition_task
+          @runtime_services.fetch(:plan_next_decomposition_task)
+        end
+
         def schedule_next_run
           @runtime_services.fetch(:schedule_next_run)
         end
