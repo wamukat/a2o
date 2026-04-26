@@ -78,8 +78,9 @@ func run(args []string) int {
 		RetryDelay:     *controlPlaneRetryDelay,
 	}
 	worker := agent.Worker{
-		AgentName: *agentName,
-		Client:    client,
+		AgentName:         *agentName,
+		Client:            client,
+		HeartbeatErrorLog: os.Stderr,
 	}
 	if *workspaceRoot != "" || len(sourceAliases) > 0 {
 		worker.Materializer = agent.WorkspaceMaterializer{

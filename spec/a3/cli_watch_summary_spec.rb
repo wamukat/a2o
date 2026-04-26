@@ -87,6 +87,72 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "uses claimed agent job heartbeats for watch-summary running entries" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))
+      run_repository = A3::Infra::JsonRunRepository.new(File.join(dir, "runs.json"))
+
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "Sample#3138",
+          kind: :child,
+          edit_scope: [:repo_alpha],
+          verification_scope: [:repo_alpha],
+          status: :in_progress,
+          current_run_ref: "run-1"
+        )
+      )
+      run_repository.save(
+        A3::Domain::Run.new(
+          ref: "run-1",
+          task_ref: "Sample#3138",
+          phase: :implementation,
+          workspace_kind: :ticket_workspace,
+          source_descriptor: A3::Domain::SourceDescriptor.new(
+            workspace_kind: :ticket_workspace,
+            source_type: :branch_head,
+            ref: "refs/heads/a2o/work/Sample-3138",
+            task_ref: "Sample#3138"
+          ),
+          scope_snapshot: A3::Domain::ScopeSnapshot.new(
+            edit_scope: [:repo_alpha],
+            verification_scope: [:repo_alpha],
+            ownership_scope: :task
+          ),
+          artifact_owner: A3::Domain::ArtifactOwner.new(
+            owner_ref: "Sample#3138",
+            owner_scope: :task,
+            snapshot_version: "refs/heads/a2o/work/Sample-3138"
+          )
+        )
+      )
+      File.write(
+        File.join(dir, "agent_jobs.json"),
+        JSON.pretty_generate(
+          "job-1" => {
+            "state" => "claimed",
+            "claimed_at" => (Time.now.utc - 60).iso8601,
+            "heartbeat_at" => Time.now.utc.iso8601,
+            "request" => {
+              "job_id" => "job-1",
+              "task_ref" => "Sample#3138",
+              "phase" => "implementation"
+            }
+          }
+        )
+      )
+
+      out = StringIO.new
+      described_class.start(
+        ["watch-summary", "--storage-backend", "json", "--storage-dir", dir],
+        out: out
+      )
+
+      expect(out.string).to match(/- #3138 implementation\/implementation\/running_command hb=\d+s/)
+      expect(out.string).not_to include("hb=?")
+    end
+  end
+
   it "shows decomposition status separately from the task tree" do
     Dir.mktmpdir do |dir|
       task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))

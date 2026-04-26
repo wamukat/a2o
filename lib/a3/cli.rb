@@ -4,6 +4,7 @@ require "optparse"
 require "pathname"
 require "shellwords"
 require "json"
+require "time"
 require "a3/domain/phase_source_policy"
 require "a3/cli/command_router"
 require "a3/cli/handler_support"
@@ -2020,12 +2021,32 @@ module A3
     end
 
     def load_watch_summary_worker_runs(storage_dir)
+      records = []
+      records.concat(load_watch_summary_legacy_worker_runs(storage_dir))
+      records.concat(load_watch_summary_agent_job_runs(storage_dir))
+
+      records.each_with_object({}) do |record, memo|
+        task_ref = String(record["task_ref"]).strip
+        next if task_ref.empty?
+
+        heartbeat_at = parse_watch_summary_time(record["heartbeat_at"])
+        next unless heartbeat_at
+
+        existing = memo[task_ref]
+        existing_heartbeat_at = parse_watch_summary_time(existing && existing["heartbeat_at"])
+        next if existing_heartbeat_at && existing_heartbeat_at >= heartbeat_at
+
+        memo[task_ref] = record
+      end
+    end
+
+    def load_watch_summary_legacy_worker_runs(storage_dir)
       path = File.join(storage_dir, "worker-runs.json")
-      return {} unless File.exist?(path)
+      return [] unless File.exist?(path)
 
       payload = JSON.parse(File.read(path))
       runs = payload.fetch("runs", {})
-      return {} unless runs.is_a?(Hash)
+      return [] unless runs.is_a?(Hash)
 
       runs.each_with_object({}) do |(_key, record), memo|
         next unless record.is_a?(Hash)
@@ -2038,9 +2059,52 @@ module A3
         next if existing && Integer(existing["updated_at_epoch_ms"] || 0) >= updated_at
 
         memo[task_ref] = record
+      end.values
+    rescue JSON::ParserError, TypeError, ArgumentError
+      []
+    end
+
+    def load_watch_summary_agent_job_runs(storage_dir)
+      path = File.join(storage_dir, "agent_jobs.json")
+      return [] unless File.exist?(path)
+
+      payload = JSON.parse(File.read(path))
+      return [] unless payload.is_a?(Hash)
+
+      payload.values.filter_map do |record|
+        next unless record.is_a?(Hash)
+        next unless String(record["state"]).strip == "claimed"
+
+        request = record["request"]
+        next unless request.is_a?(Hash)
+
+        task_ref = String(request["task_ref"]).strip
+        heartbeat_at = String(record["heartbeat_at"]).strip
+        next if task_ref.empty? || heartbeat_at.empty?
+
+        parsed_heartbeat_at = parse_watch_summary_time(heartbeat_at)
+        next unless parsed_heartbeat_at
+
+        {
+          "task_ref" => task_ref,
+          "state" => "running_command",
+          "heartbeat_at" => heartbeat_at,
+          "updated_at_epoch_ms" => (parsed_heartbeat_at.to_f * 1000).to_i,
+          "source" => "agent_jobs",
+          "job_id" => String(request["job_id"]).strip
+        }
       end
     rescue JSON::ParserError, TypeError, ArgumentError
-      {}
+      []
+    end
+
+    def parse_watch_summary_time(raw_value)
+      value = raw_value.to_s.strip
+      return nil if value.empty?
+
+      Time.iso8601(value).utc
+    rescue ArgumentError
+      nil
     end
 
     def build_bootstrap_session(options:, run_id_generator:, command_runner:, merge_runner:, worker_gateway: nil)

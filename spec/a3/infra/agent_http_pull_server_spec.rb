@@ -33,6 +33,16 @@ RSpec.describe A3::Infra::AgentHttpPullServer do
     expect(claim_response.code).to eq("200")
     expect(JSON.parse(claim_response.body).fetch("job").fetch("job_id")).to eq("job-1")
 
+    heartbeat_response = post_json(
+      base_uri + "/v1/agent/jobs/job-1/heartbeat",
+      "heartbeat" => "2026-04-11T08:00:30Z"
+    )
+    expect(heartbeat_response.code).to eq("200")
+    expect(store.fetch("job-1")).to have_attributes(
+      state: :claimed,
+      heartbeat_at: "2026-04-11T08:00:30Z"
+    )
+
     result_response = post_json(
       base_uri + "/v1/agent/jobs/job-1/result",
       agent_job_result("job-1").result_form

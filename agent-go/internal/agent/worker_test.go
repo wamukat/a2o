@@ -5,8 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -78,6 +80,33 @@ func TestWorkerEmitsInProgressHeartbeats(t *testing.T) {
 	}
 	if result.Heartbeat == "" {
 		t.Fatalf("final result should preserve heartbeat: %#v", result)
+	}
+}
+
+func TestWorkerReportsHeartbeatErrorsWithoutFailingJob(t *testing.T) {
+	tmp := t.TempDir()
+	request := testRequest(tmp)
+	client := &fakeClient{request: &request, heartbeatErr: errors.New("heartbeat endpoint unavailable")}
+	var heartbeatLog bytes.Buffer
+
+	result, idle, err := Worker{
+		AgentName:         "host-local",
+		Client:            client,
+		Executor:          fakeExecutor{},
+		Now:               func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+		HeartbeatErrorLog: &heartbeatLog,
+	}.RunOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idle {
+		t.Fatal("expected job result, got idle")
+	}
+	if result.Status != "succeeded" {
+		t.Fatalf("status = %s", result.Status)
+	}
+	if !strings.Contains(heartbeatLog.String(), "a2o-agent heartbeat failed job_id=job-1") || !strings.Contains(heartbeatLog.String(), "heartbeat endpoint unavailable") {
+		t.Fatalf("heartbeat error log missing context: %q", heartbeatLog.String())
 	}
 }
 
@@ -531,12 +560,13 @@ func (failingExecutor) Execute(JobRequest) ExecutionResult {
 }
 
 type fakeClient struct {
-	mu         sync.Mutex
-	request    *JobRequest
-	requests   []*JobRequest
-	uploads    []ArtifactUpload
-	heartbeats []string
-	result     *JobResult
+	mu           sync.Mutex
+	request      *JobRequest
+	requests     []*JobRequest
+	uploads      []ArtifactUpload
+	heartbeats   []string
+	heartbeatErr error
+	result       *JobResult
 }
 
 func (f *fakeClient) ClaimNext(string) (*JobRequest, error) {
@@ -562,7 +592,7 @@ func (f *fakeClient) Heartbeat(jobID string, heartbeat string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.heartbeats = append(f.heartbeats, jobID+"="+heartbeat)
-	return nil
+	return f.heartbeatErr
 }
 
 func (f *fakeClient) SubmitResult(result JobResult) error {

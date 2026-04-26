@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -44,6 +45,7 @@ type Worker struct {
 	Materializer      WorkspacePreparer
 	Now               func() time.Time
 	HeartbeatInterval time.Duration
+	HeartbeatErrorLog io.Writer
 }
 
 type LoopOptions struct {
@@ -184,7 +186,9 @@ func (w Worker) startHeartbeat(jobID string) func() {
 	}
 	done := make(chan struct{})
 	send := func() {
-		_ = w.Client.Heartbeat(jobID, w.now().Format(time.RFC3339))
+		if err := w.Client.Heartbeat(jobID, w.now().Format(time.RFC3339)); err != nil {
+			w.logHeartbeatError(jobID, err)
+		}
 	}
 	send()
 	go func() {
@@ -207,6 +211,13 @@ func (w Worker) startHeartbeat(jobID string) func() {
 		stopped = true
 		close(done)
 	}
+}
+
+func (w Worker) logHeartbeatError(jobID string, err error) {
+	if err == nil || w.HeartbeatErrorLog == nil {
+		return
+	}
+	fmt.Fprintf(w.HeartbeatErrorLog, "a2o-agent heartbeat failed job_id=%s error=%v\n", jobID, err)
 }
 
 func (w Worker) runMergeJob(request JobRequest, startedAt string) (*JobResult, bool, error) {
