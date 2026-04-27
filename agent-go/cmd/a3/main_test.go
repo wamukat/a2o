@@ -1531,8 +1531,6 @@ runtime:
 func TestUnsupportedRuntimeCommandsAreNotPublicEntrypoints(t *testing.T) {
 	for _, command := range [][]string{
 		{"runtime", "command-plan"},
-		{"runtime", "start"},
-		{"runtime", "stop"},
 	} {
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
@@ -1547,6 +1545,39 @@ func TestUnsupportedRuntimeCommandsAreNotPublicEntrypoints(t *testing.T) {
 		if !strings.Contains(stderr.String(), "a2o runtime run-once") {
 			t.Fatalf("stderr should guide to runtime entrypoints, got %q", stderr.String())
 		}
+	}
+}
+
+func TestRemovedRuntimeCompatibilityCommandsExplainMigration(t *testing.T) {
+	tests := []struct {
+		command     string
+		replacement string
+	}{
+		{command: "start", replacement: "a2o runtime resume"},
+		{command: "stop", replacement: "a2o runtime pause"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.command, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+
+			code := run([]string{"runtime", tt.command}, &fakeRunner{}, &stdout, &stderr)
+			if code == 0 {
+				t.Fatalf("run(runtime %s) unexpectedly succeeded", tt.command)
+			}
+
+			output := stderr.String()
+			for _, want := range []string{
+				"removed runtime subcommand: " + tt.command,
+				"compatibility alias was removed",
+				"migration_required=true",
+				`replacement_command="` + tt.replacement + `"`,
+			} {
+				if !strings.Contains(output, want) {
+					t.Fatalf("stderr missing %q in %q", want, output)
+				}
+			}
+		})
 	}
 }
 

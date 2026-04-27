@@ -59,6 +59,7 @@ An A2O release is not complete until all of the following are true:
    - If it already exists, update it.
    - Write user-facing release notes in English unless the user asks otherwise.
    - Summarize what changed for operators and users, not just internal ticket numbers.
+   - If the release removes a compatibility surface, include an explicit migration note that names the removed command/config/env, explains the replacement, and says the runtime now fails fast with a migration-required diagnostic instead of silently preserving the compatibility layer.
    - Do not include local Kanbalone/A2O ticket URLs in release notes. Link only to public GitHub issues or pull requests when referencing tickets.
    - Mark only the newest release as `latest` unless the user asks otherwise.
 

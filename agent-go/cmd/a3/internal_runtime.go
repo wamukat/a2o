@@ -132,11 +132,25 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
+	case "start", "stop":
+		printRemovedRuntimeCommandError(stderr, args[0])
+		return 2
 	default:
 		fmt.Fprintf(stderr, "unknown runtime subcommand: %s\n", args[0])
 		printUsage(stderr)
 		return 2
 	}
+}
+
+func printRemovedRuntimeCommandError(stderr io.Writer, command string) {
+	replacement := map[string]string{
+		"start": "a2o runtime resume",
+		"stop":  "a2o runtime pause",
+	}[command]
+	fmt.Fprintf(stderr, "removed runtime subcommand: %s\n", command)
+	fmt.Fprintln(stderr, "reason: this compatibility alias was removed to keep the runtime lifecycle contract explicit.")
+	fmt.Fprintf(stderr, "migration_required=true replacement_command=%q\n", replacement)
+	fmt.Fprintf(stderr, "use %q instead of %q.\n", replacement, "a2o runtime "+command)
 }
 
 func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
