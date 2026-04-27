@@ -16,7 +16,7 @@ import (
 )
 
 const packagedKanbanCLIPath = "/opt/a2o/share/tools/kanban/cli.py"
-const packagedKanbanBootstrapPath = "/opt/a2o/share/tools/kanban/bootstrap_soloboard.py"
+const packagedKanbanBootstrapPath = "/opt/a2o/share/tools/kanban/bootstrap_kanbalone.py"
 
 func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -665,7 +665,7 @@ func printRuntimeServiceStatus(config runtimeInstanceConfig, runner commandRunne
 		service string
 	}{
 		{name: "runtime_container", service: config.RuntimeService},
-		{name: "kanban_service", service: "soloboard"},
+		{name: "kanban_service", service: "kanbalone"},
 	} {
 		if check.name == "kanban_service" && isExternalKanban(config) {
 			if err := checkExternalKanbanHealth(kanbanPublicURL(config)); err != nil {
@@ -913,7 +913,10 @@ func runRuntimeUp(args []string, runner commandRunner, stdout io.Writer, stderr 
 		}
 		services := []string{effectiveConfig.RuntimeService}
 		if !isExternalKanban(effectiveConfig) {
-			services = append(services, "soloboard")
+			if _, err := guardRemovedSoloBoardKanbanData(effectiveConfig, runner); err != nil {
+				return err
+			}
+			services = append(services, "kanbalone")
 		}
 		if _, err := runExternal(runner, "docker", append(composePrefix, append([]string{"up", "-d"}, services...)...)...); err != nil {
 			return err
@@ -982,7 +985,7 @@ func runRuntimeDoctor(args []string, runner commandRunner, stdout io.Writer, std
 		service string
 	}{
 		{name: "runtime_container", service: effectiveConfig.RuntimeService},
-		{name: "kanban_service", service: "soloboard"},
+		{name: "kanban_service", service: "kanbalone"},
 	} {
 		if check.name == "kanban_service" && isExternalKanban(effectiveConfig) {
 			if err := checkExternalKanbanHealth(kanbanPublicURL(effectiveConfig)); err != nil {
@@ -1749,7 +1752,10 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, overrides runtimeRun
 		}
 		services := []string{config.RuntimeService}
 		if !isExternalKanban(config) {
-			services = append(services, "soloboard")
+			if _, err := guardRemovedSoloBoardKanbanData(config, runner); err != nil {
+				return err
+			}
+			services = append(services, "kanbalone")
 		}
 		if _, err := runExternal(runner, "docker", append(plan.ComposePrefix, append([]string{"up", "-d"}, services...)...)...); err != nil {
 			return err

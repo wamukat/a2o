@@ -6,7 +6,7 @@ ENGINE_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"
 WORKSPACE_ROOT="$(cd "${ENGINE_ROOT}/.." && pwd)"
 
 COMPOSE_PROJECT="${COMPOSE_PROJECT:-a2o-runtime}"
-COMPOSE_FILE="${COMPOSE_FILE:-${ENGINE_ROOT}/docker/compose/a2o-soloboard.yml}"
+COMPOSE_FILE="${COMPOSE_FILE:-${ENGINE_ROOT}/docker/compose/a2o-kanbalone.yml}"
 RUNTIME_SERVICE="${RUNTIME_SERVICE:-a2o-runtime}"
 
 detect_host_target() {
@@ -38,12 +38,10 @@ exported_agent="${work_dir}/a3-agent"
 source_root="${work_dir}/source/catalog-service"
 workspace_root="${work_dir}/workspaces"
 
-A2O_BUNDLE_KANBALONE_PORT="${A2O_BUNDLE_KANBALONE_PORT:-${A2O_BUNDLE_SOLOBOARD_PORT:-3470}}" \
-A2O_BUNDLE_SOLOBOARD_PORT="${A2O_BUNDLE_SOLOBOARD_PORT:-${A2O_BUNDLE_KANBALONE_PORT:-3470}}" \
+A2O_BUNDLE_KANBALONE_PORT="${A2O_BUNDLE_KANBALONE_PORT:-3470}" \
 docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" build "${RUNTIME_SERVICE}"
 
-A2O_BUNDLE_KANBALONE_PORT="${A2O_BUNDLE_KANBALONE_PORT:-${A2O_BUNDLE_SOLOBOARD_PORT:-3470}}" \
-A2O_BUNDLE_SOLOBOARD_PORT="${A2O_BUNDLE_SOLOBOARD_PORT:-${A2O_BUNDLE_KANBALONE_PORT:-3470}}" \
+A2O_BUNDLE_KANBALONE_PORT="${A2O_BUNDLE_KANBALONE_PORT:-3470}" \
 docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" up -d --no-deps --force-recreate "${RUNTIME_SERVICE}"
 
 runtime_container="$(docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" ps -q "${RUNTIME_SERVICE}")"

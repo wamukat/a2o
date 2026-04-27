@@ -92,10 +92,10 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 			report("kanban_volume", true, "create_new "+kanbanDataVolumeName(effectiveConfig.ComposeProject), "none")
 		}
 
-		if output, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "ps", "--status", "running", "-q", "soloboard")...); err != nil {
+		if output, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "ps", "--status", "running", "-q", "kanbalone")...); err != nil {
 			report("kanban_service", false, err.Error(), "run a2o kanban up")
 		} else if strings.TrimSpace(string(output)) == "" {
-			report("kanban_service", false, "soloboard is not running", "run a2o kanban up")
+			report("kanban_service", false, "kanbalone is not running", "run a2o kanban up")
 		} else {
 			report("kanban_service", true, kanbanPublicURL(effectiveConfig), "none")
 		}

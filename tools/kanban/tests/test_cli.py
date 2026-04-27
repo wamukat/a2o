@@ -80,7 +80,7 @@ class SoloBoardCliTest(unittest.TestCase):
 
     def test_task_watch_summary_list_excludes_archived_tasks(self) -> None:
         args = SimpleNamespace(
-            backend="soloboard",
+            backend="kanbalone",
             base_url="http://localhost:3460",
             token="",
             project_id=None,
@@ -119,6 +119,10 @@ class SoloBoardCliTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Unsupported kanban backend"):
             kanban_cli.resolve_backend_kind("unsupported-backend")
 
+    def test_resolve_backend_rejects_removed_soloboard_backend(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "migration_required=true replacement_backend=kanbalone"):
+            kanban_cli.resolve_backend_kind("soloboard")
+
     def test_resolve_backend_defaults_to_kanbalone(self) -> None:
         with patched_env({"KANBAN_BACKEND": None}):
             self.assertEqual("kanbalone", kanban_cli.resolve_backend_kind(None))
@@ -131,17 +135,23 @@ class SoloBoardCliTest(unittest.TestCase):
         with patched_env({"KANBALONE_BASE_URL": "http://localhost:3470/", "SOLOBOARD_BASE_URL": "http://localhost:3460/"}):
             self.assertEqual("http://localhost:3470", kanban_cli.resolve_base_url(None))
 
-    def test_resolve_base_url_keeps_soloboard_env_fallback(self) -> None:
+    def test_resolve_base_url_rejects_soloboard_env_fallback(self) -> None:
         with patched_env({"KANBALONE_BASE_URL": None, "SOLOBOARD_BASE_URL": "http://localhost:3460/"}):
-            self.assertEqual("http://localhost:3460", kanban_cli.resolve_base_url(None))
+            with self.assertRaisesRegex(RuntimeError, "migration_required=true replacement_env=KANBALONE_BASE_URL"):
+                kanban_cli.resolve_base_url(None)
 
     def test_resolve_token_allows_empty_kanbalone_token(self) -> None:
         with patched_env({"KANBALONE_API_TOKEN": None, "SOLOBOARD_API_TOKEN": None}):
             self.assertEqual("", kanban_cli.resolve_token(None))
 
-    def test_resolve_token_uses_kanbalone_env_before_soloboard_fallback(self) -> None:
+    def test_resolve_token_uses_kanbalone_env(self) -> None:
         with patched_env({"KANBALONE_API_TOKEN": "public-token", "SOLOBOARD_API_TOKEN": "legacy-token"}):
             self.assertEqual("public-token", kanban_cli.resolve_token(None))
+
+    def test_resolve_token_rejects_soloboard_env_fallback(self) -> None:
+        with patched_env({"KANBALONE_API_TOKEN": None, "SOLOBOARD_API_TOKEN": "legacy-token"}):
+            with self.assertRaisesRegex(RuntimeError, "migration_required=true replacement_env=KANBALONE_API_TOKEN"):
+                kanban_cli.resolve_token(None)
 
     def test_rest_request_sends_patch_payload(self) -> None:
         response = Mock()
@@ -188,14 +198,12 @@ class SoloBoardCliTest(unittest.TestCase):
             ),
         )
 
-    def test_parser_backend_choices_include_kanbalone_and_soloboard_alias(self) -> None:
+    def test_parser_backend_choices_include_only_kanbalone(self) -> None:
         parser = kanban_cli.build_parser()
         args = parser.parse_args(["--backend", "kanbalone", "task-get", "--task", "A2O#1"])
         self.assertEqual("kanbalone", args.backend)
         args = parser.parse_args(["--backend", "soloboard", "task-get", "--task", "A2O#1"])
         self.assertEqual("soloboard", args.backend)
-        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
-            parser.parse_args(["--backend", "unsupported-backend", "task-get", "--task", "A2O#1"])
 
     def test_parser_accepts_task_reorder_without_priority(self) -> None:
         parser = kanban_cli.build_parser()
@@ -284,7 +292,7 @@ class SoloBoardCliTest(unittest.TestCase):
             description_path = handle.name
         try:
             args = SimpleNamespace(
-                backend="soloboard",
+                backend="kanbalone",
                 base_url="http://localhost:3460",
                 token="",
                 project_id=None,
@@ -333,7 +341,7 @@ class SoloBoardCliTest(unittest.TestCase):
             raise AssertionError(f"unexpected request: {method} {path}")
 
         args = SimpleNamespace(
-            backend="soloboard",
+            backend="kanbalone",
             base_url="http://localhost:3460",
             token="",
             project_id=None,
@@ -431,7 +439,7 @@ class SoloBoardCliTest(unittest.TestCase):
             append_path = append_file.name
         try:
             base_args = {
-                "backend": "soloboard",
+                "backend": "kanbalone",
                 "base_url": "http://localhost:3460",
                 "token": "",
                 "task": "Sample#101",
@@ -510,7 +518,7 @@ class SoloBoardCliTest(unittest.TestCase):
             replace_path = replace_file.name
         try:
             args = SimpleNamespace(
-                backend="soloboard",
+                backend="kanbalone",
                 base_url="http://localhost:3460",
                 token="",
                 task="Sample#101",

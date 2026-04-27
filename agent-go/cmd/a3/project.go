@@ -497,7 +497,7 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 	composeFile := flags.String("compose-file", "", "A2O distribution compose file")
 	runtimeService := flags.String("runtime-service", "a2o-runtime", "docker compose runtime service name")
 	kanbalonePort := flags.String("kanbalone-port", "", "host kanban service port")
-	soloBoardPort := flags.String("soloboard-port", "", "host kanban service port (compatibility alias for --kanbalone-port)")
+	soloBoardPort := flags.String("soloboard-port", "", "removed compatibility alias for --kanbalone-port")
 	kanbanModeFlag := flags.String("kanban-mode", kanbanModeBundled, "kanban mode: bundled or external")
 	kanbanURL := flags.String("kanban-url", "", "external Kanbalone base URL")
 	kanbanRuntimeURL := flags.String("kanban-runtime-url", "", "external Kanbalone URL reachable from the runtime container")
@@ -509,6 +509,12 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 	}
 	if flags.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+	if err := validateRemovedSoloBoardEnvironment(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(*soloBoardPort) != "" {
+		return removedSoloBoardInputError("--soloboard-port", "--kanbalone-port")
 	}
 	resolvedKanbanPort, err := resolveKanbanPort(*kanbalonePort, *soloBoardPort)
 	if err != nil {
@@ -567,7 +573,7 @@ func runProjectBootstrap(args []string, stdout io.Writer, stderr io.Writer) erro
 		ComposeFile:      resolvedComposeFile,
 		ComposeProject:   projectName,
 		RuntimeService:   strings.TrimSpace(*runtimeService),
-		SoloBoardPort:    resolvedKanbanPort,
+		KanbalonePort:    resolvedKanbanPort,
 		KanbanMode:       resolvedKanbanMode,
 		KanbanURL:        resolvedKanbanURL,
 		KanbanRuntimeURL: resolvedKanbanRuntimeURL,
@@ -599,14 +605,11 @@ func resolveKanbanMode(value string) (string, error) {
 func resolveKanbanPort(kanbalonePort string, soloBoardPort string) (string, error) {
 	kanbalonePort = strings.TrimSpace(kanbalonePort)
 	soloBoardPort = strings.TrimSpace(soloBoardPort)
-	if kanbalonePort != "" && soloBoardPort != "" && kanbalonePort != soloBoardPort {
-		return "", fmt.Errorf("--kanbalone-port and --soloboard-port specify different values")
-	}
 	if kanbalonePort != "" {
 		return kanbalonePort, nil
 	}
 	if soloBoardPort != "" {
-		return soloBoardPort, nil
+		return "", removedSoloBoardInputError("--soloboard-port", "--kanbalone-port")
 	}
 	return "3470", nil
 }

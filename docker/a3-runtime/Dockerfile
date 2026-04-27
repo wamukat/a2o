@@ -78,7 +78,7 @@ COPY config /tmp/a3-engine/config
 COPY tools /tmp/a3-engine/tools
 COPY tools /opt/a2o/share/tools
 COPY docker/compose /opt/a2o/share/docker/compose
-RUN cp /opt/a2o/share/docker/compose/a2o-soloboard.release.yml /opt/a2o/share/docker/compose/a2o-soloboard.yml
+RUN cp /opt/a2o/share/docker/compose/a2o-kanbalone.release.yml /opt/a2o/share/docker/compose/a2o-kanbalone.yml
 
 COPY --from=agent-builder /opt/a2o/agents /opt/a2o/agents
 

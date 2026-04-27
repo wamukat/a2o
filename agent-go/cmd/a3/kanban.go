@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -95,7 +96,7 @@ func runKanbanUp(args []string, runner commandRunner, stdout io.Writer, stderr i
 			return nil
 		}
 		volumeName := kanbanDataVolumeName(effectiveConfig.ComposeProject)
-		volumeExists, err := dockerVolumeExists(runner, volumeName)
+		volumeExists, err := guardRemovedSoloBoardKanbanData(effectiveConfig, runner)
 		if err != nil {
 			return err
 		}
@@ -107,7 +108,7 @@ func runKanbanUp(args []string, runner commandRunner, stdout io.Writer, stderr i
 			mode = "reuse_existing"
 		}
 		fmt.Fprintf(stdout, "kanban_data compose_project=%s volume=%s mode=%s\n", effectiveConfig.ComposeProject, volumeName, mode)
-		fmt.Fprintf(stdout, "kanban_backup_hint=docker run --rm -v %s:/data -v \"$PWD\":/backup alpine sh -c 'cp /data/soloboard.sqlite /backup/soloboard-%s.sqlite'\n", volumeName, sanitizeBackupName(effectiveConfig.ComposeProject))
+		fmt.Fprintf(stdout, "kanban_backup_hint=docker run --rm -v %s:/data -v \"$PWD\":/backup alpine sh -c 'cp /data/kanbalone.sqlite /backup/kanbalone-%s.sqlite'\n", volumeName, sanitizeBackupName(effectiveConfig.ComposeProject))
 		if *build {
 			if _, err := runExternal(runner, "docker", append(composePrefix, "build", effectiveConfig.RuntimeService)...); err != nil {
 				return err
@@ -116,7 +117,7 @@ func runKanbanUp(args []string, runner commandRunner, stdout io.Writer, stderr i
 		if err := cleanupLegacyRuntimeServiceOrphans(effectiveConfig, runner, stdout); err != nil {
 			return err
 		}
-		if _, err := runExternal(runner, "docker", append(composePrefix, "up", "-d", effectiveConfig.RuntimeService, "soloboard")...); err != nil {
+		if _, err := runExternal(runner, "docker", append(composePrefix, "up", "-d", effectiveConfig.RuntimeService, "kanbalone")...); err != nil {
 			return err
 		}
 		if err := runKanbanBootstrap(effectiveConfig, runner, stdout); err != nil {
@@ -132,7 +133,59 @@ func kanbanDataVolumeName(composeProject string) string {
 	if project == "" {
 		project = "a2o-runtime"
 	}
+	return project + "_kanbalone-data"
+}
+
+func legacySoloBoardDataVolumeName(composeProject string) string {
+	project := strings.TrimSpace(composeProject)
+	if project == "" {
+		project = "a2o-runtime"
+	}
 	return project + "_soloboard-data"
+}
+
+func guardRemovedSoloBoardKanbanData(config runtimeInstanceConfig, runner commandRunner) (bool, error) {
+	volumeName := kanbanDataVolumeName(config.ComposeProject)
+	volumeExists, err := dockerVolumeExists(runner, volumeName)
+	if err != nil {
+		return false, err
+	}
+	legacyVolumeName := legacySoloBoardDataVolumeName(config.ComposeProject)
+	legacyVolumeExists, err := dockerVolumeExists(runner, legacyVolumeName)
+	if err != nil {
+		return false, err
+	}
+	if legacyVolumeExists && !volumeExists {
+		return false, fmt.Errorf("removed SoloBoard data volume detected: %s; migration_required=true replacement_volume=%s action=copy_or_rename_existing_kanban_data_before_starting_bundled_kanbalone", legacyVolumeName, volumeName)
+	}
+	if volumeExists {
+		hasLegacyDB, err := kanbanVolumeHasLegacySoloBoardDB(runner, volumeName)
+		if err != nil {
+			return false, err
+		}
+		if hasLegacyDB {
+			return false, fmt.Errorf("removed SoloBoard database file detected in volume %s: soloboard.sqlite; migration_required=true replacement_file=kanbalone.sqlite action=rename_existing_database_file_before_starting_bundled_kanbalone", volumeName)
+		}
+	}
+	return volumeExists, nil
+}
+
+func kanbanVolumeHasLegacySoloBoardDB(runner commandRunner, volumeName string) (bool, error) {
+	output, err := runner.Run(
+		"docker",
+		"run",
+		"--rm",
+		"-v",
+		volumeName+":/data",
+		"alpine",
+		"sh",
+		"-c",
+		"if [ -f /data/soloboard.sqlite ] && [ ! -f /data/kanbalone.sqlite ]; then echo legacy-soloboard-db; fi",
+	)
+	if err != nil {
+		return false, fmt.Errorf("inspect kanban database files in volume %s: %w", volumeName, err)
+	}
+	return strings.TrimSpace(string(output)) == "legacy-soloboard-db", nil
 }
 
 func dockerVolumeExists(runner commandRunner, volumeName string) (bool, error) {
@@ -257,6 +310,9 @@ func runKanbanDoctor(args []string, runner commandRunner, stdout io.Writer, stde
 	if flags.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
+	if err := validateRemovedSoloBoardEnvironment(); err != nil {
+		return err
+	}
 
 	config, configPath, err := loadInstanceConfigFromWorkingTree()
 	if err != nil {
@@ -274,7 +330,7 @@ func runKanbanDoctor(args []string, runner commandRunner, stdout io.Writer, stde
 		return nil
 	}
 	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
-	output, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "ps", "soloboard")...)
+	output, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "ps", "kanbalone")...)
 	if err != nil {
 		return err
 	}
@@ -290,6 +346,9 @@ func runKanbanURL(args []string, stdout io.Writer, stderr io.Writer) error {
 	}
 	if flags.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+	if err := validateRemovedSoloBoardEnvironment(); err != nil {
+		return err
 	}
 
 	config, _, err := loadInstanceConfigFromWorkingTree()
@@ -308,10 +367,10 @@ func kanbanPublicURL(config runtimeInstanceConfig) string {
 }
 
 func publicKanbanPort(config runtimeInstanceConfig) string {
-	if value := envDefaultCompat("A2O_BUNDLE_KANBALONE_PORT", "A2O_BUNDLE_SOLOBOARD_PORT", ""); strings.TrimSpace(value) != "" {
+	if value := strings.TrimSpace(os.Getenv("A2O_BUNDLE_KANBALONE_PORT")); value != "" {
 		return value
 	}
-	return envDefaultCompat("A2O_BUNDLE_SOLOBOARD_PORT", "A3_BUNDLE_SOLOBOARD_PORT", envDefaultValue(config.SoloBoardPort, "3470"))
+	return envDefaultValue(config.KanbalonePort, "3470")
 }
 
 func kanbanMode(config runtimeInstanceConfig) string {
@@ -331,7 +390,7 @@ func normalizeKanbanBaseURL(value string) string {
 }
 
 func kanbanRuntimeURL(config runtimeInstanceConfig) string {
-	if value := envDefaultCompat("A2O_KANBALONE_INTERNAL_URL", "A2O_SOLOBOARD_INTERNAL_URL", ""); strings.TrimSpace(value) != "" {
+	if value := strings.TrimSpace(os.Getenv("A2O_KANBALONE_INTERNAL_URL")); value != "" {
 		return normalizeKanbanBaseURL(value)
 	}
 	if isExternalKanban(config) {
@@ -340,7 +399,7 @@ func kanbanRuntimeURL(config runtimeInstanceConfig) string {
 		}
 		return dockerReachableKanbanURL(config.KanbanURL)
 	}
-	return envDefaultCompat("A2O_SOLOBOARD_INTERNAL_URL", "A3_SOLOBOARD_INTERNAL_URL", "http://soloboard:3000")
+	return "http://kanbalone:3000"
 }
 
 func dockerReachableKanbanURL(value string) string {

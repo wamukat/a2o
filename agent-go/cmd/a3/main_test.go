@@ -256,7 +256,7 @@ func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
 		tempDir,
 		"--compose-project",
 		"a3-test",
-		"--soloboard-port",
+		"--kanbalone-port",
 		"3479",
 	}, &fakeRunner{}, &stdout, &stderr)
 	if code != 0 {
@@ -278,8 +278,8 @@ func TestProjectBootstrapWritesRuntimeInstanceConfig(t *testing.T) {
 	if config.ComposeProject != "a3-test" {
 		t.Fatalf("ComposeProject=%q", config.ComposeProject)
 	}
-	if config.SoloBoardPort != "3479" {
-		t.Fatalf("SoloBoardPort=%q", config.SoloBoardPort)
+	if config.KanbalonePort != "3479" {
+		t.Fatalf("KanbalonePort=%q", config.KanbalonePort)
 	}
 	if config.RuntimeService != "a2o-runtime" {
 		t.Fatalf("RuntimeService=%q", config.RuntimeService)
@@ -324,8 +324,8 @@ func TestProjectBootstrapAcceptsKanbalonePort(t *testing.T) {
 	if err := json.Unmarshal(body, &config); err != nil {
 		t.Fatalf("invalid instance config: %v", err)
 	}
-	if config.SoloBoardPort != "3481" {
-		t.Fatalf("SoloBoardPort=%q", config.SoloBoardPort)
+	if config.KanbalonePort != "3481" {
+		t.Fatalf("KanbalonePort=%q", config.KanbalonePort)
 	}
 }
 
@@ -374,7 +374,7 @@ func TestProjectBootstrapAcceptsExternalKanban(t *testing.T) {
 	}
 }
 
-func TestProjectBootstrapRejectsConflictingKanbanPorts(t *testing.T) {
+func TestProjectBootstrapRejectsRemovedSoloboardPort(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "a2o-project")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -398,18 +398,45 @@ func TestProjectBootstrapRejectsConflictingKanbanPorts(t *testing.T) {
 	if code == 0 {
 		t.Fatalf("run succeeded unexpectedly, stdout=%s", stdout.String())
 	}
-	if !strings.Contains(stderr.String(), "--kanbalone-port and --soloboard-port specify different values") {
+	if !strings.Contains(stderr.String(), "removed SoloBoard compatibility input: --soloboard-port") ||
+		!strings.Contains(stderr.String(), "migration_required=true replacement=--kanbalone-port") {
 		t.Fatalf("stderr=%q", stderr.String())
 	}
 }
 
 func TestKanbanPublicURLPrefersKanbalonePortEnv(t *testing.T) {
 	t.Setenv("A2O_BUNDLE_KANBALONE_PORT", "3498")
-	t.Setenv("A2O_BUNDLE_SOLOBOARD_PORT", "3501")
 
-	got := kanbanPublicURL(runtimeInstanceConfig{SoloBoardPort: "3479"})
+	got := kanbanPublicURL(runtimeInstanceConfig{KanbalonePort: "3479"})
 	if got != "http://localhost:3498/" {
 		t.Fatalf("kanbanPublicURL=%q", got)
+	}
+}
+
+func TestKanbanURLRejectsRemovedSoloBoardEnv(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    filepath.Join(tempDir, "package"),
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-test",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3479",
+	})
+	t.Setenv("A2O_BUNDLE_SOLOBOARD_PORT", "3480")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"kanban", "url"}, &fakeRunner{}, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run succeeded unexpectedly, stdout=%s", stdout.String())
+		}
+	})
+	if !strings.Contains(stderr.String(), "removed SoloBoard compatibility input: environment variable A2O_BUNDLE_SOLOBOARD_PORT") ||
+		!strings.Contains(stderr.String(), "migration_required=true replacement=environment variable A2O_BUNDLE_KANBALONE_PORT") {
+		t.Fatalf("stderr=%q", stderr.String())
 	}
 }
 
@@ -511,7 +538,7 @@ func TestRuntimeCommandsReadLegacyInstanceConfig(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "legacy-project",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3479",
+		KanbalonePort:  "3479",
 		AgentPort:      "7393",
 		StorageDir:     "/var/lib/a3/a2o-runtime",
 	})
@@ -578,7 +605,7 @@ func TestProjectTemplatePrintsValidMinimalProjectYaml(t *testing.T) {
 	if strings.Contains(stdout.String(), "prompt_transport") || strings.Contains(stdout.String(), "default_profile") || strings.Contains(stdout.String(), "phase_profiles") {
 		t.Fatalf("template should use compact executor syntax, got:\n%s", stdout.String())
 	}
-	if strings.Contains(stdout.String(), "provider: soloboard") {
+	if strings.Contains(stdout.String(), "provider: kanbalone") {
 		t.Fatalf("template should not expose fixed kanban provider, got:\n%s", stdout.String())
 	}
 	config, err := loadProjectPackageConfig(packageDir)
@@ -651,7 +678,7 @@ func TestProjectTemplateWritesOutputFileWithCustomExecutorArgs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("project template missing: %v", err)
 	}
-	if strings.Contains(string(body), "provider: soloboard") {
+	if strings.Contains(string(body), "provider: kanbalone") {
 		t.Fatalf("template should not expose fixed kanban provider:\n%s", string(body))
 	}
 	if strings.Contains(string(body), "bootstrap:") || strings.Contains(string(body), "bootstrap.json") {
@@ -1716,7 +1743,7 @@ func TestKanbanUpUsesBootstrappedInstanceConfig(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1730,13 +1757,13 @@ func TestKanbanUpUsesBootstrappedInstanceConfig(t *testing.T) {
 	})
 
 	joined := runner.joinedCalls()
-	assertCallContains(t, joined, "docker volume inspect a3-test_soloboard-data")
+	assertCallContains(t, joined, "docker volume inspect a3-test_kanbalone-data")
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml build a2o-runtime")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime soloboard")
-	if !strings.Contains(stdout.String(), "kanban_data compose_project=a3-test volume=a3-test_soloboard-data mode=reuse_existing") {
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime kanbalone")
+	if !strings.Contains(stdout.String(), "kanban_data compose_project=a3-test volume=a3-test_kanbalone-data mode=reuse_existing") {
 		t.Fatalf("stdout should describe kanban data volume, got %q", stdout.String())
 	}
-	if !strings.Contains(stdout.String(), "kanban_up compose_project=a3-test volume=a3-test_soloboard-data url=http://localhost:3480/") {
+	if !strings.Contains(stdout.String(), "kanban_up compose_project=a3-test volume=a3-test_kanbalone-data url=http://localhost:3480/") {
 		t.Fatalf("stdout should describe kanban up, got %q", stdout.String())
 	}
 }
@@ -1750,7 +1777,7 @@ func TestKanbanUpFreshBoardFailsWhenVolumeExists(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1763,8 +1790,76 @@ func TestKanbanUpFreshBoardFailsWhenVolumeExists(t *testing.T) {
 		}
 	})
 
-	if !strings.Contains(stderr.String(), "fresh board requested but kanban volume already exists: a3-test_soloboard-data") {
+	if !strings.Contains(stderr.String(), "fresh board requested but kanban volume already exists: a3-test_kanbalone-data") {
 		t.Fatalf("stderr should describe existing volume, got %q", stderr.String())
+	}
+}
+
+func TestKanbanUpFailsWhenLegacySoloBoardVolumeWouldBeOrphaned(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    filepath.Join(tempDir, "package"),
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3480",
+	})
+	runner := &fakeRunner{missingVolumes: map[string]bool{"a3-test_kanbalone-data": true}}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"kanban", "up"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail when old SoloBoard volume exists without the new Kanbalone volume")
+		}
+	})
+
+	output := stderr.String()
+	for _, want := range []string{
+		"removed SoloBoard data volume detected: a3-test_soloboard-data",
+		"migration_required=true",
+		"replacement_volume=a3-test_kanbalone-data",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stderr missing %q in %q", want, output)
+		}
+	}
+}
+
+func TestKanbanUpFailsWhenLegacySoloBoardDatabaseFileWouldBeIgnored(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    filepath.Join(tempDir, "package"),
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3480",
+	})
+	runner := &fakeRunner{legacySoloBoardDBVolumes: map[string]bool{"a3-test_kanbalone-data": true}}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"kanban", "up"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail when the new volume still contains only soloboard.sqlite")
+		}
+	})
+
+	output := stderr.String()
+	for _, want := range []string{
+		"removed SoloBoard database file detected in volume a3-test_kanbalone-data: soloboard.sqlite",
+		"migration_required=true",
+		"replacement_file=kanbalone.sqlite",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stderr missing %q in %q", want, output)
+		}
 	}
 }
 
@@ -1780,7 +1875,7 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 		"  name: reference",
 		"kanban:",
 		// Older project.yaml files with provider remain loadable for compatibility.
-		"  provider: soloboard",
+		"  provider: kanbalone",
 		"  project: A2OReference",
 		"  labels:",
 		"    - area:reference",
@@ -1828,7 +1923,7 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -1842,8 +1937,8 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 	})
 
 	joined := runner.joinedCalls()
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime soloboard")
-	assertCallContains(t, joined, `docker compose -p a3-test -f compose.yml exec -T a2o-runtime python3 /opt/a2o/share/tools/kanban/bootstrap_soloboard.py --config-json {"boards":[{"name":"A2OReference","tags":[{"name":"area:reference"},{"name":"repo:app"}]}]} --base-url http://soloboard:3000 --board A2OReference`)
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime kanbalone")
+	assertCallContains(t, joined, `docker compose -p a3-test -f compose.yml exec -T a2o-runtime python3 /opt/a2o/share/tools/kanban/bootstrap_kanbalone.py --config-json {"boards":[{"name":"A2OReference","tags":[{"name":"area:reference"},{"name":"repo:app"}]}]} --base-url http://kanbalone:3000 --board A2OReference`)
 	if !strings.Contains(stdout.String(), "kanban_bootstrapped project=A2OReference source=project.yaml") {
 		t.Fatalf("stdout should describe kanban bootstrap, got %q", stdout.String())
 	}
@@ -1892,8 +1987,8 @@ func TestKanbanUpExternalUsesRuntimeOnlyAndExternalURL(t *testing.T) {
 	if !strings.Contains(strings.Join(joined, "\n"), "--base-url http://kanban.example.internal:3470") {
 		t.Fatalf("external kanban bootstrap should use runtime URL, calls:\n%s", strings.Join(joined, "\n"))
 	}
-	if strings.Contains(strings.Join(joined, "\n"), " up -d a2o-runtime soloboard") {
-		t.Fatalf("external kanban up must not start bundled soloboard, calls:\n%s", strings.Join(joined, "\n"))
+	if strings.Contains(strings.Join(joined, "\n"), " up -d a2o-runtime kanbalone") {
+		t.Fatalf("external kanban up must not start bundled kanbalone, calls:\n%s", strings.Join(joined, "\n"))
 	}
 	if !strings.Contains(stdout.String(), "kanban_up mode=external compose_project=a3-test url="+server.URL+"/ runtime_url=http://kanban.example.internal:3470") {
 		t.Fatalf("stdout should describe external kanban, got %q", stdout.String())
@@ -1945,7 +2040,7 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a2o-sample",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 	})
 	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
 	if err := os.MkdirAll(filepath.Dir(agentPath), 0o755); err != nil {
@@ -1974,7 +2069,7 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 		"doctor_check name=agent_required_command.sh status=ok",
 		"doctor_check name=repo_clean.app status=ok detail=" + repoDir,
 		"doctor_check name=agent_install status=ok",
-		"doctor_check name=kanban_volume status=ok detail=reuse_existing volume=a2o-sample_soloboard-data note=healthy_board_reuse action=none",
+		"doctor_check name=kanban_volume status=ok detail=reuse_existing volume=a2o-sample_kanbalone-data note=healthy_board_reuse action=none",
 		"doctor_check name=kanban_service status=ok detail=http://localhost:3480/",
 		"doctor_check name=runtime_container status=ok detail=A2O runtime container=runtime-container",
 		"doctor_check name=runtime_image_digest status=ok detail=ghcr.io/wamukat/a2o-engine@sha256:test",
@@ -2072,7 +2167,7 @@ func TestDoctorExternalKanbanSkipsBundledServiceChecks(t *testing.T) {
 		}
 	}
 	joined := strings.Join(runner.joinedCalls(), "\n")
-	if strings.Contains(joined, "volume inspect") || strings.Contains(joined, " -q soloboard") {
+	if strings.Contains(joined, "volume inspect") || strings.Contains(joined, " -q kanbalone") {
 		t.Fatalf("external doctor should not inspect bundled kanban resources, calls:\n%s", joined)
 	}
 }
@@ -2160,7 +2255,7 @@ func TestDoctorFlagsFixtureReferencesInProductionProjectYaml(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a2o-sample",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 	})
 	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
 	if err := os.MkdirAll(filepath.Dir(agentPath), 0o755); err != nil {
@@ -2265,7 +2360,7 @@ func TestDoctorFlagsPrivateProjectScriptContractUsage(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a2o-sample",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 	})
 	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
 	if err := os.MkdirAll(filepath.Dir(agentPath), 0o755); err != nil {
@@ -2348,7 +2443,7 @@ func TestDoctorFlagsPrivateContractUsageInProjectYaml(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a2o-sample",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 	})
 	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
 	if err := os.MkdirAll(filepath.Dir(agentPath), 0o755); err != nil {
@@ -2703,7 +2798,7 @@ func TestDoctorAgentInstallFailureShowsExactOutputPath(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a2o-sample",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 	})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -2732,7 +2827,7 @@ func TestKanbanURLUsesBootstrappedInstanceConfig(t *testing.T) {
 		SchemaVersion: 1,
 		PackagePath:   filepath.Join(tempDir, "package"),
 		WorkspaceRoot: tempDir,
-		SoloBoardPort: "3480",
+		KanbalonePort: "3480",
 	})
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -2866,7 +2961,7 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -2882,7 +2977,7 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	})
 
 	joined := runner.joinedCalls()
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime soloboard")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime kanbalone")
 	if hasCallPrefix(joined, "bash "+packageDir) {
 		t.Fatalf("run-once should not call project runtime script:\n%s", strings.Join(joined, "\n"))
 	}
@@ -2970,7 +3065,42 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	}
 }
 
-func TestRuntimeRunOnceExternalKanbanDoesNotStartSoloboard(t *testing.T) {
+func TestRuntimeRunOnceFailsWhenLegacySoloBoardVolumeWouldBeOrphaned(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3480",
+	})
+	runner := &fakeRunner{missingVolumes: map[string]bool{"a3-test_kanbalone-data": true}}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("runtime run-once should fail before starting a new empty Kanbalone volume")
+		}
+	})
+	if !strings.Contains(stderr.String(), "removed SoloBoard data volume detected: a3-test_soloboard-data") ||
+		!strings.Contains(stderr.String(), "migration_required=true") {
+		t.Fatalf("stderr=%q", stderr.String())
+	}
+	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), " up -d a2o-runtime kanbalone") {
+		t.Fatalf("runtime run-once should fail before compose up, calls:\n%s", runner.joinedCalls())
+	}
+}
+
+func TestRuntimeRunOnceExternalKanbanDoesNotStartBundledKanbalone(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -3005,8 +3135,8 @@ func TestRuntimeRunOnceExternalKanbanDoesNotStartSoloboard(t *testing.T) {
 	if !strings.Contains(joined+"\n", "docker compose -p a3-test -f compose.yml up -d a2o-runtime\n") {
 		t.Fatalf("external run-once should start runtime service, calls:\n%s", joined)
 	}
-	if strings.Contains(joined, " up -d a2o-runtime soloboard") {
-		t.Fatalf("external run-once must not start bundled soloboard, calls:\n%s", joined)
+	if strings.Contains(joined, " up -d a2o-runtime kanbalone") {
+		t.Fatalf("external run-once must not start bundled kanbalone, calls:\n%s", joined)
 	}
 	if !strings.Contains(joined, "'--kanban-command-arg' 'http://kanban.example.internal:3470'") {
 		t.Fatalf("external run-once should pass external runtime kanban URL, calls:\n%s", joined)
@@ -3035,7 +3165,7 @@ func TestRuntimeRunOnceUsesExplicitProjectConfig(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 	})
 	runner := &fakeRunner{}
@@ -3092,7 +3222,7 @@ func TestRuntimeRunOnceRemovesLegacyRuntimeServiceOrphanBeforeStarting(t *testin
 	joined := runner.joinedCalls()
 	assertCallContains(t, joined, "docker ps -a --filter label=com.docker.compose.project=a2o-upgrade --filter label=com.docker.compose.service=a3-runtime --format {{.ID}}")
 	assertCallContains(t, joined, "docker rm -f old-runtime-1")
-	assertCallContains(t, joined, "docker compose -p a2o-upgrade -f compose.yml up -d a2o-runtime soloboard")
+	assertCallContains(t, joined, "docker compose -p a2o-upgrade -f compose.yml up -d a2o-runtime kanbalone")
 	if !strings.Contains(stdout.String(), "runtime_orphan_cleanup compose_project=a2o-upgrade service=legacy-runtime containers=old-runtime-1 action=removed") {
 		t.Fatalf("stdout should report orphan cleanup, got %q", stdout.String())
 	}
@@ -3804,12 +3934,41 @@ func TestRuntimeUpStartsContainersWithoutScheduler(t *testing.T) {
 
 	joined := runner.joinedCalls()
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml build a2o-runtime")
-	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime soloboard")
+	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime kanbalone")
 	if strings.Contains(strings.Join(joined, "\n"), "start-background") {
 		t.Fatalf("runtime up must not launch scheduler, got:\n%s", strings.Join(joined, "\n"))
 	}
 	if !strings.Contains(stdout.String(), "runtime_up compose_project=a3-test") {
 		t.Fatalf("stdout should report runtime up, got %q", stdout.String())
+	}
+}
+
+func TestRuntimeUpFailsWhenLegacySoloBoardVolumeWouldBeOrphaned(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    filepath.Join(tempDir, "package"),
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+	})
+	runner := &fakeRunner{missingVolumes: map[string]bool{"a3-test_kanbalone-data": true}}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "up"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("runtime up should fail before starting a new empty Kanbalone volume")
+		}
+	})
+	if !strings.Contains(stderr.String(), "removed SoloBoard data volume detected: a3-test_soloboard-data") ||
+		!strings.Contains(stderr.String(), "migration_required=true") {
+		t.Fatalf("stderr=%q", stderr.String())
+	}
+	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), " up -d a2o-runtime kanbalone") {
+		t.Fatalf("runtime up should fail before compose up, calls:\n%s", runner.joinedCalls())
 	}
 }
 
@@ -3837,7 +3996,7 @@ func TestRuntimeUpCanPullConfiguredImageBeforeStarting(t *testing.T) {
 
 	joined := runner.joinedCalls()
 	assertCallContains(t, joined, "docker compose -p a2o-pull -f compose.yml pull a2o-runtime")
-	assertCallContains(t, joined, "docker compose -p a2o-pull -f compose.yml up -d a2o-runtime soloboard")
+	assertCallContains(t, joined, "docker compose -p a2o-pull -f compose.yml up -d a2o-runtime kanbalone")
 	if runner.lastEnv["A2O_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine:latest" {
 		t.Fatalf("runtime up should map public A2O_RUNTIME_IMAGE into compose env, got %#v", runner.lastEnv)
 	}
@@ -3867,8 +4026,8 @@ func TestRuntimeUpRemovesLegacyRuntimeServiceOrphanBeforeStarting(t *testing.T) 
 	joined := runner.joinedCalls()
 	assertCallContains(t, joined, "docker ps -a --filter label=com.docker.compose.project=a2o-upgrade --filter label=com.docker.compose.service=a3-runtime --format {{.ID}}")
 	assertCallContains(t, joined, "docker rm -f old-runtime-1")
-	assertCallContains(t, joined, "docker compose -p a2o-upgrade -f compose.yml up -d a2o-runtime soloboard")
-	if strings.Contains(strings.Join(joined, "\n"), " soloboard-data") {
+	assertCallContains(t, joined, "docker compose -p a2o-upgrade -f compose.yml up -d a2o-runtime kanbalone")
+	if strings.Contains(strings.Join(joined, "\n"), " kanbalone-data") {
 		t.Fatalf("orphan cleanup must not touch kanban volumes, got:\n%s", strings.Join(joined, "\n"))
 	}
 	if !strings.Contains(stdout.String(), "runtime_orphan_cleanup compose_project=a2o-upgrade service=legacy-runtime containers=old-runtime-1 action=removed") {
@@ -3901,7 +4060,7 @@ func TestRuntimeUpReportsSafeRemediationWhenLegacyOrphanRemovalFails(t *testing.
 	})
 
 	joined := strings.Join(runner.joinedCalls(), "\n")
-	if strings.Contains(joined, "docker compose -p a2o-upgrade -f compose.yml up -d a2o-runtime soloboard") {
+	if strings.Contains(joined, "docker compose -p a2o-upgrade -f compose.yml up -d a2o-runtime kanbalone") {
 		t.Fatalf("runtime up must stop before compose up when orphan removal fails, got:\n%s", joined)
 	}
 	if !strings.Contains(stderr.String(), "safe_remediation='docker' 'rm' '-f' 'old-runtime-1' 'old-runtime-2'") {
@@ -4012,7 +4171,7 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -4068,7 +4227,7 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 		"export A2O_INTERNAL_SECRET_REFERENCE=\"${A2O_INTERNAL_SECRET_REFERENCE:-a2o-runtime-secret}\"",
 		"show-run",
 		filepath.Join(packageDir, "project.yaml"),
-		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime python3 /opt/a2o/share/tools/kanban/cli.py --backend kanbalone --base-url http://soloboard:3000 task-comment-list --project A2OReferenceMultiRepo --task A2O#16",
+		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime python3 /opt/a2o/share/tools/kanban/cli.py --backend kanbalone --base-url http://kanbalone:3000 task-comment-list --project A2OReferenceMultiRepo --task A2O#16",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("describe-task missing call %q in:\n%s", want, joined)
@@ -4090,7 +4249,7 @@ func TestRuntimeDecompositionInvestigationRunsThroughHostLauncher(t *testing.T) 
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
 	runner := &fakeRunner{}
@@ -4377,7 +4536,7 @@ func TestRuntimeResetTaskPrintsBlockedRecoveryPlan(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a2o/test-runtime",
 	})
@@ -4431,7 +4590,7 @@ func TestRuntimeShowArtifactReadsContainerArtifact(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -4470,7 +4629,7 @@ func TestRuntimeClearLogsRunsContainerClearInDryRunModeByDefault(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -4512,7 +4671,7 @@ func TestRuntimeLogsPrintsCompletedPhaseArtifacts(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -4675,7 +4834,7 @@ func TestRuntimeLogsFollowsLatestActiveRunWhenTaskCurrentRunIsBlank(t *testing.T
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -4728,7 +4887,7 @@ func TestRuntimeLogsFollowsLatestActiveRunWhenTaskCurrentRunIsStale(t *testing.T
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -5102,7 +5261,7 @@ func TestRuntimeWatchSummaryRunsContainerSummaryWithKanbanContext(t *testing.T) 
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -5134,7 +5293,7 @@ func TestRuntimeWatchSummaryRunsContainerSummaryWithKanbanContext(t *testing.T) 
 	joined := strings.Join(runner.joinedCalls(), "\n")
 	for _, want := range []string{
 		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 watch-summary --storage-backend json --storage-dir /var/lib/a3/test-runtime",
-		"--kanban-command python3 --kanban-command-arg /opt/a2o/share/tools/kanban/cli.py --kanban-command-arg --backend --kanban-command-arg kanbalone --kanban-command-arg --base-url --kanban-command-arg http://soloboard:3000",
+		"--kanban-command python3 --kanban-command-arg /opt/a2o/share/tools/kanban/cli.py --kanban-command-arg --backend --kanban-command-arg kanbalone --kanban-command-arg --base-url --kanban-command-arg http://kanbalone:3000",
 		"--kanban-project A2OReferenceMultiRepo --kanban-working-dir /workspace",
 		"--kanban-repo-label repo:catalog=repo_alpha",
 		"--kanban-repo-label repo:storefront=repo_beta",
@@ -5165,7 +5324,7 @@ func TestRuntimeWatchSummaryPassesDetailsFlag(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -5200,7 +5359,7 @@ func TestRuntimeSkillFeedbackListUsesRuntimeStorage(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -5239,7 +5398,7 @@ func TestRuntimeSkillFeedbackProposeUsesRuntimeStorage(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -5278,7 +5437,7 @@ func TestRuntimeWatchSummaryShowsStoppedWhenSchedulerPIDFileIsMissing(t *testing
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -5312,7 +5471,7 @@ func TestRuntimeWatchSummaryShowsStaleWhenSchedulerProcessIsNotRunning(t *testin
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -5356,7 +5515,7 @@ func TestRuntimeWatchSummaryPreservesPausedSummaryWithoutLiveSchedulerProcess(t 
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -5412,7 +5571,7 @@ func TestRuntimeDescribeTaskContinuesWhenRuntimeTaskStateIsUnavailable(t *testin
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -5557,7 +5716,7 @@ func TestRuntimeDescribeTaskFindsLatestRunWhenTaskHasNoCurrentRun(t *testing.T) 
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -5825,7 +5984,7 @@ func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
 		"runtime_package=" + packageDir,
 		"kanban_url=http://localhost:3470/",
 		"runtime_status_check name=runtime_container status=running container=runtime-container",
-		"runtime_status_check name=kanban_service status=running container=soloboard-container",
+		"runtime_status_check name=kanban_service status=running container=kanbalone-container",
 		"runtime_image_digest=ghcr.io/wamukat/a2o-engine@sha256:test",
 		"runtime_image_pinned_ref=ghcr.io/wamukat/a2o-engine@sha256:pinned",
 		"runtime_image_local_latest_ref=ghcr.io/wamukat/a2o-engine:latest",
@@ -5877,7 +6036,7 @@ func TestRuntimeStatusReportsEmptyHistoryWithoutRubyReadError(t *testing.T) {
 	if !strings.Contains(output, "runtime_status_check name=runtime_container status=running container=runtime-container") {
 		t.Fatalf("stdout should still report healthy runtime container, got:\n%s", output)
 	}
-	if !strings.Contains(output, "runtime_status_check name=kanban_service status=running container=soloboard-container") {
+	if !strings.Contains(output, "runtime_status_check name=kanban_service status=running container=kanbalone-container") {
 		t.Fatalf("stdout should still report healthy kanban service, got:\n%s", output)
 	}
 	if !strings.Contains(output, "runtime_latest_run status=no_runs reason=history_empty") {
@@ -6083,7 +6242,7 @@ func TestUpgradeCheckReportsCheckOnlyPlan(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a2o-upgrade",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		RuntimeImage:   "ghcr.io/wamukat/a2o-engine@sha256:instance",
 	})
 	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
@@ -6416,7 +6575,7 @@ func TestRuntimeRunOncePrefersPublicA2OAgentPath(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -6457,7 +6616,7 @@ func TestRuntimeRunOnceIgnoresLegacyA2OAgentPath(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -6541,7 +6700,7 @@ runtime:
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -6634,7 +6793,7 @@ func TestRuntimeRunOnceAllowsEnvToOverrideStaleInstanceRuntimeValues(t *testing.
 	})
 
 	joined := strings.Join(runner.joinedCalls(), "\n")
-	if !strings.Contains(joined, "docker compose -p env-project -f env-compose.yml up -d a2o-runtime soloboard") {
+	if !strings.Contains(joined, "docker compose -p env-project -f env-compose.yml up -d a2o-runtime kanbalone") {
 		t.Fatalf("run-once should use env compose override, calls:\n%s", joined)
 	}
 	if !strings.Contains(joined, "http://127.0.0.1:7555") {
@@ -6660,7 +6819,7 @@ func TestRuntimeRunOnceRepairsStaleRunsOnStartupAndAttemptBudgetExhaustion(t *te
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -6709,7 +6868,7 @@ func TestRuntimeLoopRunsConfiguredCycles(t *testing.T) {
 		ComposeFile:    "compose.yml",
 		ComposeProject: "a3-test",
 		RuntimeService: "a2o-runtime",
-		SoloBoardPort:  "3480",
+		KanbalonePort:  "3480",
 		AgentPort:      "7394",
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
@@ -6981,31 +7140,33 @@ func mustReadTestFile(t *testing.T, path string) []byte {
 }
 
 type fakeRunner struct {
-	calls                   [][]string
-	emptyContainer          bool
-	failShowTask            bool
-	taskWithoutCurrentRun   bool
-	staleCurrentRun         bool
-	runtimeExitMissing      bool
-	legacyRuntimeOrphans    []string
-	failLegacyRuntimeRM     bool
-	missingRunHistory       bool
-	schedulerPaused         bool
-	schedulerStopReason     string
-	schedulerExecutedCount  int
-	startBackgroundErr      error
-	err                     error
-	lastEnv                 map[string]string
-	nextPID                 int
-	processCommands         map[int]string
-	errorOutput             string
-	imageInspectDigests     map[string]string
-	containerImageIDs       map[string]string
-	logManifestOutput       string
-	logManifestOutputs      []string
-	runtimeLogTargetsOutput string
-	watchSummaryOutput      string
-	taskStatus              string
+	calls                    [][]string
+	emptyContainer           bool
+	missingVolumes           map[string]bool
+	legacySoloBoardDBVolumes map[string]bool
+	failShowTask             bool
+	taskWithoutCurrentRun    bool
+	staleCurrentRun          bool
+	runtimeExitMissing       bool
+	legacyRuntimeOrphans     []string
+	failLegacyRuntimeRM      bool
+	missingRunHistory        bool
+	schedulerPaused          bool
+	schedulerStopReason      string
+	schedulerExecutedCount   int
+	startBackgroundErr       error
+	err                      error
+	lastEnv                  map[string]string
+	nextPID                  int
+	processCommands          map[int]string
+	errorOutput              string
+	imageInspectDigests      map[string]string
+	containerImageIDs        map[string]string
+	logManifestOutput        string
+	logManifestOutputs       []string
+	runtimeLogTargetsOutput  string
+	watchSummaryOutput       string
+	taskStatus               string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -7024,10 +7185,8 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		"A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS":  os.Getenv("A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"),
 		"A2O_BRANCH_NAMESPACE":                os.Getenv("A2O_BRANCH_NAMESPACE"),
 		"A2O_KANBALONE_INTERNAL_URL":          os.Getenv("A2O_KANBALONE_INTERNAL_URL"),
-		"A2O_SOLOBOARD_INTERNAL_URL":          os.Getenv("A2O_SOLOBOARD_INTERNAL_URL"),
 		"A3_HOST_AGENT_BIN":                   os.Getenv("A3_HOST_AGENT_BIN"),
 		"A3_RUNTIME_IMAGE":                    os.Getenv("A3_RUNTIME_IMAGE"),
-		"A3_SOLOBOARD_INTERNAL_URL":           os.Getenv("A3_SOLOBOARD_INTERNAL_URL"),
 	}
 	if r.err != nil {
 		output := r.errorOutput
@@ -7061,11 +7220,20 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		}
 		return []byte{}, nil
 	case name == "docker" && len(args) >= 3 && args[0] == "volume" && args[1] == "inspect":
+		if r.missingVolumes != nil && r.missingVolumes[args[2]] {
+			return []byte("No such volume: " + args[2] + "\n"), errors.New("no such volume")
+		}
 		return []byte(`[{"Name":"` + args[2] + `"}]`), nil
+	case name == "docker" && len(args) >= 5 && args[0] == "run" && args[1] == "--rm" && args[2] == "-v":
+		volumeName := strings.TrimSuffix(args[3], ":/data")
+		if r.legacySoloBoardDBVolumes != nil && r.legacySoloBoardDBVolumes[volumeName] {
+			return []byte("legacy-soloboard-db\n"), nil
+		}
+		return []byte{}, nil
 	case strings.Contains(joined, " compose ") && strings.Contains(joined, " images --quiet "):
 		return []byte("image-123\n"), nil
-	case strings.Contains(joined, " compose ") && strings.Contains(joined, " ps --status running -q soloboard"):
-		return []byte("soloboard-container\n"), nil
+	case strings.Contains(joined, " compose ") && strings.Contains(joined, " ps --status running -q kanbalone"):
+		return []byte("kanbalone-container\n"), nil
 	case strings.Contains(joined, " compose ") && (strings.Contains(joined, " ps --status running -q a2o-runtime") || strings.Contains(joined, " ps --status running -q a2o-runtime")):
 		return []byte("runtime-container\n"), nil
 	case name == "docker" && len(args) >= 4 && args[0] == "inspect":

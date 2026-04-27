@@ -40,8 +40,8 @@ RELATION_KIND_TO_LABEL = {
 }
 LABEL_TO_RELATION_KIND = {label: kind for kind, label in RELATION_KIND_TO_LABEL.items()}
 DEFAULT_TRACE_LOG_PATH = Path(".work/kanban/trace.log")
-SUPPORTED_BACKENDS = ("kanbalone", "soloboard")
-KANBALONE_COMPAT_BACKENDS = {"kanbalone", "soloboard"}
+SUPPORTED_BACKENDS = ("kanbalone",)
+KANBALONE_BACKENDS = {"kanbalone"}
 
 
 @dataclass(frozen=True)
@@ -88,26 +88,37 @@ def trace_log(event: str, **payload: Any) -> None:
 
 def resolve_backend_kind(cli_value: str | None) -> str:
     value = str(cli_value or os.environ.get("KANBAN_BACKEND") or "kanbalone").strip().lower()
+    if value == "soloboard":
+        raise RuntimeError(
+            "Removed kanban backend: soloboard. "
+            "migration_required=true replacement_backend=kanbalone. "
+            "Use KANBAN_BACKEND=kanbalone or omit KANBAN_BACKEND."
+        )
     if value not in SUPPORTED_BACKENDS:
         raise RuntimeError(f"Unsupported kanban backend: {value}. Supported: {', '.join(SUPPORTED_BACKENDS)}")
     return value
 
 
 def resolve_base_url(cli_value: str | None, *, backend_kind: str = "kanbalone") -> str:
-    if backend_kind not in KANBALONE_COMPAT_BACKENDS:
+    if backend_kind not in KANBALONE_BACKENDS:
         raise RuntimeError(f"Unsupported kanban backend: {backend_kind}")
-    return (
-        cli_value
-        or os.environ.get("KANBALONE_BASE_URL")
-        or os.environ.get("SOLOBOARD_BASE_URL")
-        or "http://localhost:3000"
-    ).rstrip("/")
+    if not cli_value and not os.environ.get("KANBALONE_BASE_URL") and os.environ.get("SOLOBOARD_BASE_URL"):
+        raise RuntimeError(
+            "Removed environment variable: SOLOBOARD_BASE_URL. "
+            "migration_required=true replacement_env=KANBALONE_BASE_URL."
+        )
+    return (cli_value or os.environ.get("KANBALONE_BASE_URL") or "http://localhost:3000").rstrip("/")
 
 
 def resolve_token(cli_value: str | None, *, backend_kind: str = "kanbalone") -> str:
-    if backend_kind not in KANBALONE_COMPAT_BACKENDS:
+    if backend_kind not in KANBALONE_BACKENDS:
         raise RuntimeError(f"Unsupported kanban backend: {backend_kind}")
-    return cli_value or os.environ.get("KANBALONE_API_TOKEN") or os.environ.get("SOLOBOARD_API_TOKEN") or ""
+    if not cli_value and not os.environ.get("KANBALONE_API_TOKEN") and os.environ.get("SOLOBOARD_API_TOKEN"):
+        raise RuntimeError(
+            "Removed environment variable: SOLOBOARD_API_TOKEN. "
+            "migration_required=true replacement_env=KANBALONE_API_TOKEN."
+        )
+    return cli_value or os.environ.get("KANBALONE_API_TOKEN") or ""
 
 
 def resolve_backend_context(*, backend: str | None, base_url: str | None, token: str | None) -> BackendContext:
@@ -828,7 +839,7 @@ def iterate_kanban_tasks(
             continue
         enriched.append(item)
     enriched.sort(key=lambda task: (task_index(task) if task_index(task) is not None else 10**9, int(task["id"])))
-    return {"id": project_id, "view_kind": "soloboard"}, columns, enriched
+    return {"id": project_id, "view_kind": "kanbalone"}, columns, enriched
 
 
 def relation_tasks_payload(base_url: str, token: str, *, task_id: int) -> dict[str, list[dict[str, Any]]]:
@@ -1712,7 +1723,7 @@ def cmd_task_relation_delete(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Operate the configured kanban backend from the command line.")
-    parser.add_argument("--backend", choices=SUPPORTED_BACKENDS)
+    parser.add_argument("--backend")
     parser.add_argument("--base-url")
     parser.add_argument("--token")
     subparsers = parser.add_subparsers(dest="command", required=True)

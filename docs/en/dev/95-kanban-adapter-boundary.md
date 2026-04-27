@@ -2,7 +2,7 @@
 
 This document defines the adapter boundary used when A2O Engine reads and writes kanban tasks. In the runtime flow, scheduler task selection, status publication, comments, evidence reporting, and parent/child task relation management all pass through this boundary.
 
-Read this to keep A2O domain state separate from Kanbalone API and CLI details. Kanbalone is the renamed successor of SoloBoard. The public adapter backend name is `kanbalone`; `soloboard` remains only as a compatibility alias for older project and runtime wiring. Kanban is the user-visible task queue, but Engine code should read and write it through an operation-level client that explicitly maps lane names and resolved flags into A2O semantics.
+Read this to keep A2O domain state separate from Kanbalone API and CLI details. Kanbalone is the renamed successor of SoloBoard. The public adapter backend name is `kanbalone`; SoloBoard-era backend names are removed compatibility inputs. Kanban is the user-visible task queue, but Engine code should read and write it through an operation-level client that explicitly maps lane names and resolved flags into A2O semantics.
 
 ## Current Contract
 
@@ -14,7 +14,7 @@ The A2O engine talks to kanban through a command contract compatible with `tools
 
 The command contract is the external tooling surface. Internally, Ruby code reaches kanban through an operation client boundary instead of scattering subprocess calls across orchestration code.
 
-Use `KANBALONE_BASE_URL`, `KANBALONE_API_TOKEN`, and `KANBAN_BACKEND=kanbalone` for new adapter configuration. `SOLOBOARD_BASE_URL`, `SOLOBOARD_API_TOKEN`, and `KANBAN_BACKEND=soloboard` are compatibility fallbacks only. Compose service names and packaged compose filenames may still contain `soloboard`; those names are runtime packaging compatibility surfaces and should be migrated separately from the CLI backend name.
+Use `KANBALONE_BASE_URL`, `KANBALONE_API_TOKEN`, and `KANBAN_BACKEND=kanbalone` for adapter configuration. SoloBoard-era backend and environment names are removed compatibility inputs; when they are invoked directly, A2O reports `migration_required=true` and the Kanbalone replacement.
 
 ## Runtime Kanbalone Modes
 

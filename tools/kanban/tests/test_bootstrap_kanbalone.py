@@ -13,7 +13,7 @@ TOOLS_DIR = Path(__file__).resolve().parents[2]
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from kanban import bootstrap_soloboard
+from kanban import bootstrap_kanbalone
 
 
 class SoloBoardBootstrapTest(unittest.TestCase):
@@ -23,18 +23,18 @@ class SoloBoardBootstrapTest(unittest.TestCase):
             config.write_text(json.dumps({"projects": []}), encoding="utf-8")
 
             with self.assertRaisesRegex(RuntimeError, "boards array"):
-                bootstrap_soloboard.load_config(config)
+                bootstrap_kanbalone.load_config(config)
 
     def test_defaults_lanes_and_internal_tags_when_omitted(self) -> None:
         spec = {"name": "A2OReference", "tags": [{"name": "repo:app"}]}
 
         self.assertEqual(
             ["Backlog", "To do", "In progress", "In review", "Inspection", "Merging", "Done"],
-            bootstrap_soloboard.board_lanes(spec),
+            bootstrap_kanbalone.board_lanes(spec),
         )
         self.assertEqual(
             ["trigger:auto-implement", "trigger:auto-parent", "blocked", "repo:app"],
-            [tag["name"] for tag in bootstrap_soloboard.board_tags(spec)],
+            [tag["name"] for tag in bootstrap_kanbalone.board_tags(spec)],
         )
 
     def test_explicit_lanes_and_tags_remain_supported(self) -> None:
@@ -44,8 +44,8 @@ class SoloBoardBootstrapTest(unittest.TestCase):
             "tags": [{"name": "blocked", "color": "#cc3f3f"}],
         }
 
-        self.assertEqual(["Ready", "Done"], bootstrap_soloboard.board_lanes(spec))
-        tags = bootstrap_soloboard.board_tags(spec)
+        self.assertEqual(["Ready", "Done"], bootstrap_kanbalone.board_lanes(spec))
+        tags = bootstrap_kanbalone.board_tags(spec)
         self.assertEqual(["trigger:auto-implement", "trigger:auto-parent", "blocked"], [tag["name"] for tag in tags])
         self.assertEqual("#cc3f3f", tags[2]["color"])
 
@@ -67,19 +67,19 @@ class SoloBoardBootstrapTest(unittest.TestCase):
             )
 
             with (
-                patch.object(bootstrap_soloboard.kanban_cli, "resolve_backend_context") as context,
-                patch.object(bootstrap_soloboard, "ensure_board", return_value={"id": 10}),
-                patch.object(bootstrap_soloboard, "ensure_lanes", return_value={"bucket_ids_by_name": {"To do": 1, "Done": 2}}) as ensure_lanes,
-                patch.object(bootstrap_soloboard, "ensure_tags", return_value=[{"title": "repo:app"}]) as ensure_tags,
-                patch("sys.argv", ["bootstrap_soloboard.py", "--config", str(config), "--board", "A2OReference"]),
+                patch.object(bootstrap_kanbalone.kanban_cli, "resolve_backend_context") as context,
+                patch.object(bootstrap_kanbalone, "ensure_board", return_value={"id": 10}),
+                patch.object(bootstrap_kanbalone, "ensure_lanes", return_value={"bucket_ids_by_name": {"To do": 1, "Done": 2}}) as ensure_lanes,
+                patch.object(bootstrap_kanbalone, "ensure_tags", return_value=[{"title": "repo:app"}]) as ensure_tags,
+                patch("sys.argv", ["bootstrap_kanbalone.py", "--config", str(config), "--board", "A2OReference"]),
             ):
                 context.return_value.base_url = "http://localhost:3460"
                 context.return_value.token = ""
 
                 with redirect_stdout(StringIO()):
-                    self.assertEqual(0, bootstrap_soloboard.main())
+                    self.assertEqual(0, bootstrap_kanbalone.main())
                 ensure_lanes.assert_called_once()
-                self.assertEqual(bootstrap_soloboard.DEFAULT_A2O_LANES, ensure_lanes.call_args.args[3])
+                self.assertEqual(bootstrap_kanbalone.DEFAULT_A2O_LANES, ensure_lanes.call_args.args[3])
                 self.assertEqual(
                     ["trigger:auto-implement", "trigger:auto-parent", "blocked", "repo:app"],
                     [tag["name"] for tag in ensure_tags.call_args.args[3]],
@@ -98,17 +98,17 @@ class SoloBoardBootstrapTest(unittest.TestCase):
         )
 
         with (
-            patch.object(bootstrap_soloboard.kanban_cli, "resolve_backend_context") as context,
-            patch.object(bootstrap_soloboard, "ensure_board", return_value={"id": 10}),
-            patch.object(bootstrap_soloboard, "ensure_lanes", return_value={"bucket_ids_by_name": {"To do": 1}}),
-            patch.object(bootstrap_soloboard, "ensure_tags", return_value=[{"title": "repo:app"}]) as ensure_tags,
-            patch("sys.argv", ["bootstrap_soloboard.py", "--config-json", config_json, "--board", "A2OReference"]),
+            patch.object(bootstrap_kanbalone.kanban_cli, "resolve_backend_context") as context,
+            patch.object(bootstrap_kanbalone, "ensure_board", return_value={"id": 10}),
+            patch.object(bootstrap_kanbalone, "ensure_lanes", return_value={"bucket_ids_by_name": {"To do": 1}}),
+            patch.object(bootstrap_kanbalone, "ensure_tags", return_value=[{"title": "repo:app"}]) as ensure_tags,
+            patch("sys.argv", ["bootstrap_kanbalone.py", "--config-json", config_json, "--board", "A2OReference"]),
         ):
             context.return_value.base_url = "http://localhost:3460"
             context.return_value.token = ""
 
             with redirect_stdout(StringIO()):
-                self.assertEqual(0, bootstrap_soloboard.main())
+                self.assertEqual(0, bootstrap_kanbalone.main())
             self.assertEqual(
                 ["trigger:auto-implement", "trigger:auto-parent", "blocked", "repo:app"],
                 [tag["name"] for tag in ensure_tags.call_args.args[3]],

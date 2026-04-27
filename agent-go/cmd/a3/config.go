@@ -15,7 +15,7 @@ type runtimeInstanceConfig struct {
 	ComposeFile      string `json:"compose_file"`
 	ComposeProject   string `json:"compose_project"`
 	RuntimeService   string `json:"runtime_service"`
-	SoloBoardPort    string `json:"soloboard_port"`
+	KanbalonePort    string `json:"kanbalone_port"`
 	KanbanMode       string `json:"kanban_mode,omitempty"`
 	KanbanURL        string `json:"kanban_url,omitempty"`
 	KanbanRuntimeURL string `json:"kanban_runtime_url,omitempty"`
@@ -30,16 +30,16 @@ func defaultComposeFile() string {
 		executableDir := filepath.Dir(executablePath)
 		candidates = append(
 			candidates,
-			filepath.Join(executableDir, "..", "share", "a2o", "docker", "compose", "a2o-soloboard.yml"),
-			filepath.Join(executableDir, "..", "share", "a3", "docker", "compose", "a2o-soloboard.yml"),
+			filepath.Join(executableDir, "..", "share", "a2o", "docker", "compose", "a2o-kanbalone.yml"),
+			filepath.Join(executableDir, "..", "share", "a3", "docker", "compose", "a2o-kanbalone.yml"),
 		)
 	}
 	candidates = append(candidates,
-		"a3-engine/docker/compose/a2o-soloboard.yml",
-		"docker/compose/a2o-soloboard.yml",
-		"../docker/compose/a2o-soloboard.yml",
-		"../share/a2o/docker/compose/a2o-soloboard.yml",
-		"../share/a3/docker/compose/a2o-soloboard.yml",
+		"a3-engine/docker/compose/a2o-kanbalone.yml",
+		"docker/compose/a2o-kanbalone.yml",
+		"../docker/compose/a2o-kanbalone.yml",
+		"../share/a2o/docker/compose/a2o-kanbalone.yml",
+		"../share/a3/docker/compose/a2o-kanbalone.yml",
 	)
 	for _, candidate := range candidates {
 		if _, err := os.Stat(candidate); err == nil {
@@ -164,6 +164,9 @@ func readInstanceConfig(path string) (*runtimeInstanceConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read instance config: %w", err)
 	}
+	if strings.Contains(string(body), `"soloboard_port"`) {
+		return nil, removedSoloBoardInputError("runtime instance config field soloboard_port", "kanbalone_port")
+	}
 	var config runtimeInstanceConfig
 	if err := json.Unmarshal(body, &config); err != nil {
 		return nil, fmt.Errorf("parse instance config %s: %w", path, err)
@@ -244,19 +247,18 @@ func runtimeServiceName(config runtimeInstanceConfig) string {
 }
 
 func withComposeEnv(config runtimeInstanceConfig, fn func() error) error {
+	if err := validateRemovedSoloBoardEnvironment(); err != nil {
+		return err
+	}
 	return withEnv(composeEnv(config), fn)
 }
 
 func composeEnv(config runtimeInstanceConfig) map[string]string {
 	overrides := map[string]string{}
-	if kanbanPort := envDefaultCompat("A2O_BUNDLE_KANBALONE_PORT", "A2O_BUNDLE_SOLOBOARD_PORT", ""); strings.TrimSpace(kanbanPort) != "" {
+	if kanbanPort := strings.TrimSpace(os.Getenv("A2O_BUNDLE_KANBALONE_PORT")); kanbanPort != "" {
 		overrides["A2O_BUNDLE_KANBALONE_PORT"] = kanbanPort
-		overrides["A2O_BUNDLE_SOLOBOARD_PORT"] = kanbanPort
-		overrides["A3_BUNDLE_SOLOBOARD_PORT"] = kanbanPort
-	} else if kanbanPort := envDefaultCompat("A2O_BUNDLE_SOLOBOARD_PORT", "A3_BUNDLE_SOLOBOARD_PORT", config.SoloBoardPort); strings.TrimSpace(kanbanPort) != "" {
+	} else if kanbanPort := strings.TrimSpace(config.KanbalonePort); kanbanPort != "" {
 		overrides["A2O_BUNDLE_KANBALONE_PORT"] = kanbanPort
-		overrides["A2O_BUNDLE_SOLOBOARD_PORT"] = kanbanPort
-		overrides["A3_BUNDLE_SOLOBOARD_PORT"] = kanbanPort
 	}
 	if agentPort := envDefaultCompat("A2O_BUNDLE_AGENT_PORT", "A3_BUNDLE_AGENT_PORT", config.AgentPort); strings.TrimSpace(agentPort) != "" {
 		overrides["A2O_BUNDLE_AGENT_PORT"] = agentPort
@@ -274,10 +276,29 @@ func composeEnv(config runtimeInstanceConfig) map[string]string {
 	}
 	if runtimeURL := kanbanRuntimeURL(config); isExternalKanban(config) && runtimeURL != "" {
 		overrides["A2O_KANBALONE_INTERNAL_URL"] = runtimeURL
-		overrides["A2O_SOLOBOARD_INTERNAL_URL"] = runtimeURL
-		overrides["A3_SOLOBOARD_INTERNAL_URL"] = runtimeURL
 	}
 	return overrides
+}
+
+func removedSoloBoardInputError(removed string, replacement string) error {
+	return fmt.Errorf("removed SoloBoard compatibility input: %s; migration_required=true replacement=%s", removed, replacement)
+}
+
+func validateRemovedSoloBoardEnvironment() error {
+	replacements := map[string]string{
+		"A2O_BUNDLE_SOLOBOARD_PORT":  "A2O_BUNDLE_KANBALONE_PORT",
+		"A3_BUNDLE_SOLOBOARD_PORT":   "A2O_BUNDLE_KANBALONE_PORT",
+		"A2O_SOLOBOARD_INTERNAL_URL": "A2O_KANBALONE_INTERNAL_URL",
+		"A3_SOLOBOARD_INTERNAL_URL":  "A2O_KANBALONE_INTERNAL_URL",
+		"SOLOBOARD_BASE_URL":         "KANBALONE_BASE_URL",
+		"SOLOBOARD_API_TOKEN":        "KANBALONE_API_TOKEN",
+	}
+	for removed, replacement := range replacements {
+		if strings.TrimSpace(os.Getenv(removed)) != "" {
+			return removedSoloBoardInputError("environment variable "+removed, "environment variable "+replacement)
+		}
+	}
+	return nil
 }
 
 func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttempts string) map[string]string {

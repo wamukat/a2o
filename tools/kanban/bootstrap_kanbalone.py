@@ -77,7 +77,7 @@ def capture_print_json(callback) -> Any:
 
 def ensure_lanes(base_url: str, token: str, board_id: int, lane_names: list[str]) -> dict[str, Any]:
     args = argparse.Namespace(
-        backend="soloboard",
+        backend="kanbalone",
         project_id=board_id,
         project=None,
         bucket=lane_names,
@@ -129,7 +129,7 @@ def board_tags(spec: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Bootstrap SoloBoard boards, lanes, and tags from a project config.")
+    parser = argparse.ArgumentParser(description="Bootstrap Kanbalone boards, lanes, and tags from a project config.")
     config_group = parser.add_mutually_exclusive_group(required=True)
     config_group.add_argument("--config", type=Path)
     config_group.add_argument("--config-json")
@@ -138,7 +138,7 @@ def main() -> int:
     parser.add_argument("--board", dest="boards", action="append", default=[])
     args = parser.parse_args()
 
-    context = kanban_cli.resolve_backend_context(backend="soloboard", base_url=args.base_url, token=args.token)
+    context = kanban_cli.resolve_backend_context(backend="kanbalone", base_url=args.base_url, token=args.token)
     selected = set(args.boards)
     specs = load_config(args.config) if args.config else load_config_json(args.config_json)
     specs_by_name = {str(spec.get("name") or ""): spec for spec in specs}
