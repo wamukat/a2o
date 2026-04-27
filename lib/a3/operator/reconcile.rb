@@ -5,6 +5,7 @@ require "json"
 require "optparse"
 require "pathname"
 require "tempfile"
+require "a3/operator/activity_evidence"
 require "a3/operator/diagnostics"
 
 module A3Reconcile
@@ -17,44 +18,6 @@ module A3Reconcile
 
     def to_h
       { "active_task_refs" => normalized.task_refs }
-    end
-  end
-
-  WorkerRunRecord = Struct.new(
-    :task_ref, :task_id, :team, :phase, :state, :started_at, :heartbeat_at, :updated_at_epoch_ms,
-    :last_output_at, :last_output_line, :current_command, :result_path, :stdout_log_path, :stderr_log_path,
-    :raw_stdout_log_path, :raw_stderr_log_path, :cwd, :detail, :log_scope,
-    keyword_init: true
-  ) do
-    def to_h
-      {
-        "task_ref" => task_ref,
-        "task_id" => task_id,
-        "team" => team,
-        "phase" => phase,
-        "log_scope" => log_scope,
-        "state" => state,
-        "started_at" => started_at,
-        "heartbeat_at" => heartbeat_at,
-        "updated_at_epoch_ms" => updated_at_epoch_ms,
-        "last_output_at" => last_output_at,
-        "last_output_line" => last_output_line,
-        "current_command" => current_command,
-        "result_path" => result_path,
-        "stdout_log_path" => stdout_log_path,
-        "stderr_log_path" => stderr_log_path,
-        "raw_stdout_log_path" => raw_stdout_log_path,
-        "raw_stderr_log_path" => raw_stderr_log_path,
-        "cwd" => cwd,
-        "detail" => detail
-      }
-    end
-  end
-
-  WorkerRunStore = Struct.new(:runs, keyword_init: true) do
-    def to_h
-      ordered = runs.keys.sort_by { |ref| [runs.fetch(ref).updated_at_epoch_ms, ref] }.reverse
-      { "runs" => ordered.each_with_object({}) { |ref, acc| acc[ref] = runs.fetch(ref).to_h } }
     end
   end
 
@@ -118,54 +81,8 @@ module A3Reconcile
     normalized
   end
 
-  def load_worker_run_store(path)
-    store_path = Pathname(path)
-    return WorkerRunStore.new(runs: {}) unless store_path.exist?
-
-    payload = JSON.parse(store_path.read)
-    raw_runs = payload["runs"] || {}
-    raise "worker run store must contain runs object" unless raw_runs.is_a?(Hash)
-
-    runs = {}
-    raw_runs.each do |key, raw_record|
-      raise "worker run entry must be an object: #{key}" unless raw_record.is_a?(Hash)
-      updated_at = raw_record["updated_at_epoch_ms"]
-      raise "worker run updated_at_epoch_ms must be an integer: #{key}" unless updated_at.is_a?(Integer)
-      task_id = raw_record["task_id"]
-      runs[key.to_s] = WorkerRunRecord.new(
-        task_ref: raw_record["task_ref"].to_s.strip,
-        task_id: task_id.nil? ? nil : Integer(task_id),
-        team: raw_record["team"].to_s.strip,
-        phase: raw_record["phase"].to_s.strip.empty? ? nil : raw_record["phase"].to_s.strip,
-        log_scope: raw_record.fetch("log_scope", "worker").to_s.strip.empty? ? "worker" : raw_record.fetch("log_scope", "worker").to_s.strip,
-        state: raw_record["state"].to_s.strip,
-        started_at: raw_record["started_at"].to_s.strip,
-        heartbeat_at: raw_record["heartbeat_at"].to_s.strip,
-        updated_at_epoch_ms: updated_at,
-        last_output_at: raw_record["last_output_at"].to_s.strip.empty? ? nil : raw_record["last_output_at"].to_s.strip,
-        last_output_line: raw_record["last_output_line"].to_s.strip.empty? ? nil : raw_record["last_output_line"].to_s.strip,
-        current_command: raw_record["current_command"].to_s.strip.empty? ? nil : raw_record["current_command"].to_s.strip,
-        result_path: raw_record["result_path"].to_s.strip.empty? ? nil : raw_record["result_path"].to_s.strip,
-        stdout_log_path: raw_record["stdout_log_path"].to_s.strip.empty? ? nil : raw_record["stdout_log_path"].to_s.strip,
-        stderr_log_path: raw_record["stderr_log_path"].to_s.strip.empty? ? nil : raw_record["stderr_log_path"].to_s.strip,
-        raw_stdout_log_path: raw_record["raw_stdout_log_path"].to_s.strip.empty? ? nil : raw_record["raw_stdout_log_path"].to_s.strip,
-        raw_stderr_log_path: raw_record["raw_stderr_log_path"].to_s.strip.empty? ? nil : raw_record["raw_stderr_log_path"].to_s.strip,
-        cwd: raw_record["cwd"].to_s.strip.empty? ? nil : raw_record["cwd"].to_s.strip,
-        detail: raw_record["detail"].to_s.strip.empty? ? nil : raw_record["detail"].to_s.strip
-      )
-    end
-    WorkerRunStore.new(runs: runs)
-  end
-
-  def save_worker_run_store(path, store)
-    exclusive_file_lock(path) do
-      atomic_write_text(path, JSON.pretty_generate(store.to_h) + "\n")
-    end
-    store
-  end
-
   def describe_worker_runs(path)
-    load_worker_run_store(path).runs.values.sort_by { |item| [item.updated_at_epoch_ms, item.task_ref] }.reverse
+    A3::Operator::ActivityEvidence.describe_activity(activity_file: A3::Operator::ActivityEvidence.agent_jobs_path_from(worker_runs_file: path))
   end
 
   def live_scheduler_processes(project, patterns: nil)
@@ -234,24 +151,7 @@ module A3Reconcile
   end
 
   def mark_stale_worker_runs(worker_runs_file, stale_active_runs)
-    return if stale_active_runs.empty?
-
-    store = load_worker_run_store(worker_runs_file)
-    runs = store.runs.dup
-    changed = false
-    stale_active_runs.each do |item|
-      runs.each do |record_key, record|
-        next unless record.task_ref == item.fetch("task_ref")
-        next if TERMINAL_WORKER_RUN_STATES.include?(record.state)
-
-        detail_suffix = "reconciled_stale_run(reason=#{item.fetch('reason')})"
-        detail = record.detail.to_s
-        detail = "#{detail}; #{detail_suffix}".sub(/\A; /, "").strip unless detail.include?(detail_suffix)
-        runs[record_key] = WorkerRunRecord.new(**record.to_h.transform_keys(&:to_sym), detail: detail, state: "failed")
-        changed = true
-      end
-    end
-    save_worker_run_store(worker_runs_file, WorkerRunStore.new(runs: runs)) if changed
+    nil
   end
 
   def apply_stale_active_run_reconciliation(project:, active_runs_file:, worker_runs_file:, task_ref: nil, live_process_patterns: nil)

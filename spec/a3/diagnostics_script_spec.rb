@@ -7,6 +7,25 @@ require "time"
 require "a3/operator/diagnostics"
 
 RSpec.describe A3Diagnostics do
+  def write_agent_job(path, job_id:, task_ref:, phase:, state:, heartbeat_at:, activity_state: nil)
+    payload = path.exist? ? JSON.parse(path.read) : {}
+    payload[job_id] = {
+      "state" => state == "selected" ? "queued" : (state == "completed" ? "completed" : "claimed"),
+      "claimed_at" => heartbeat_at,
+      "heartbeat_at" => heartbeat_at,
+      "request" => {
+        "job_id" => job_id,
+        "task_ref" => task_ref,
+        "phase" => phase,
+        "command" => "worker",
+        "args" => [],
+        "working_dir" => path.dirname.to_s
+      },
+      "result" => activity_state || state == "completed" ? { "status" => "success", "activity_state" => activity_state }.compact : nil
+    }.compact
+    path.write(JSON.generate(payload))
+  end
+
   it "describes state through the engine diagnostics operator" do
     Dir.mktmpdir("a3-diagnostics-wrapper-") do |dir|
       root = Pathname(dir)
@@ -50,22 +69,7 @@ RSpec.describe A3Diagnostics do
       worker_runs = root.join("worker-runs.json")
       current_iso = Time.now.utc.iso8601
       active_runs.write(JSON.generate({ "active_task_refs" => ["Sample#1"] }))
-      worker_runs.write(
-        JSON.generate(
-          "runs" => {
-            "Sample#1" => {
-              "task_ref" => "Sample#1",
-              "task_id" => 1,
-              "team" => "implementation",
-              "phase" => "implementation",
-              "state" => "running",
-              "started_at" => current_iso,
-              "heartbeat_at" => current_iso,
-              "updated_at_epoch_ms" => 10
-            }
-          }
-        )
-      )
+      write_agent_job(root.join("agent_jobs.json"), job_id: "job-1", task_ref: "Sample#1", phase: "implementation", state: "running", heartbeat_at: current_iso)
 
       report = described_class.describe_state(
         project: "sample",
@@ -85,7 +89,7 @@ RSpec.describe A3Diagnostics do
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
       active_runs.write(JSON.generate({ "active_task_refs" => [] }))
-      worker_runs.write("{")
+      root.join("agent_jobs.json").write("{")
 
       report = described_class.describe_state(
         project: "sample",
@@ -107,20 +111,8 @@ RSpec.describe A3Diagnostics do
       worker_runs = root.join("worker-runs.json")
       current_iso = Time.now.utc.iso8601
       active_runs.write(JSON.generate({ "active_task_refs" => ["Sample#10", "Sample#11"] }))
-      worker_runs.write(
-        JSON.generate(
-          "runs" => {
-            "Sample#10" => {
-              "task_ref" => "Sample#10", "task_id" => 10, "team" => "implementation", "phase" => "implementation",
-              "state" => "selected", "started_at" => current_iso, "heartbeat_at" => current_iso, "updated_at_epoch_ms" => 30
-            },
-            "Sample#11" => {
-              "task_ref" => "Sample#11", "task_id" => 11, "team" => "inspection", "phase" => "inspection",
-              "state" => "started", "started_at" => current_iso, "heartbeat_at" => current_iso, "updated_at_epoch_ms" => 20
-            }
-          }
-        )
-      )
+      write_agent_job(root.join("agent_jobs.json"), job_id: "job-10", task_ref: "Sample#10", phase: "implementation", state: "selected", heartbeat_at: current_iso, activity_state: "selected")
+      write_agent_job(root.join("agent_jobs.json"), job_id: "job-11", task_ref: "Sample#11", phase: "inspection", state: "started", heartbeat_at: current_iso, activity_state: "started")
 
       report = described_class.describe_state(project: "sample", root_dir: root, active_runs_file: active_runs, worker_runs_file: worker_runs)
 
@@ -136,16 +128,7 @@ RSpec.describe A3Diagnostics do
       worker_runs = root.join("worker-runs.json")
       current_iso = Time.now.utc.iso8601
       active_runs.write(JSON.generate({ "active_task_refs" => ["Sample#20"] }))
-      worker_runs.write(
-        JSON.generate(
-          "runs" => {
-            "Sample#20::integration_judgment::integration_judgment" => {
-              "task_ref" => "Sample#20", "task_id" => 20, "team" => "review", "phase" => "integration_judgment",
-              "state" => "running_command", "started_at" => current_iso, "heartbeat_at" => current_iso, "updated_at_epoch_ms" => 20
-            }
-          }
-        )
-      )
+      write_agent_job(root.join("agent_jobs.json"), job_id: "job-20", task_ref: "Sample#20", phase: "integration_judgment", state: "running_command", heartbeat_at: current_iso)
 
       report = described_class.describe_state(project: "sample", root_dir: root, active_runs_file: active_runs, worker_runs_file: worker_runs)
       running = report.fetch("running_runs").first

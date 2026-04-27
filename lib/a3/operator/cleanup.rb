@@ -9,6 +9,7 @@ require "set"
 require "time"
 require "find"
 
+require "a3/operator/activity_evidence"
 require "a3/operator/rerun_workspace_support"
 
 module A3Cleanup
@@ -131,13 +132,12 @@ module A3Cleanup
       end
     end
     if worker_path.exist?
-      payload = JSON.parse(worker_path.read)
-      (payload["runs"] || {}).each_value do |item|
-        next unless item.is_a?(Hash)
-
-        state = item["state"].to_s
-        task_ref = item["task_ref"].to_s.strip
-        active_refs << task_ref if !task_ref.empty? && NONTERMINAL_WORKER_STATES.include?(state)
+      warn "removed worker-runs.json state detected: #{worker_path}; migration_required=true replacement=#{A3::Operator::ActivityEvidence.agent_jobs_path_from(worker_runs_file: worker_path)}"
+    end
+    A3::Operator::ActivityEvidence.describe_activity(activity_file: A3::Operator::ActivityEvidence.agent_jobs_path_from(worker_runs_file: worker_path)).each do |record|
+      task_ref = record.task_ref.to_s.strip
+      if !task_ref.empty? && NONTERMINAL_WORKER_STATES.include?(record.state.to_s)
+        active_refs << task_ref
       end
     end
     active_refs

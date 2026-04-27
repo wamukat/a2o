@@ -2151,9 +2151,7 @@ module A3
     end
 
     def load_watch_summary_worker_runs(storage_dir)
-      records = []
-      records.concat(load_watch_summary_legacy_worker_runs(storage_dir))
-      records.concat(load_watch_summary_agent_job_runs(storage_dir))
+      records = load_watch_summary_agent_job_runs(storage_dir)
 
       records.each_with_object({}) do |record, memo|
         task_ref = String(record["task_ref"]).strip
@@ -2168,30 +2166,6 @@ module A3
 
         memo[task_ref] = record
       end
-    end
-
-    def load_watch_summary_legacy_worker_runs(storage_dir)
-      path = File.join(storage_dir, "worker-runs.json")
-      return [] unless File.exist?(path)
-
-      payload = JSON.parse(File.read(path))
-      runs = payload.fetch("runs", {})
-      return [] unless runs.is_a?(Hash)
-
-      runs.each_with_object({}) do |(_key, record), memo|
-        next unless record.is_a?(Hash)
-
-        task_ref = String(record["task_ref"]).strip
-        next if task_ref.empty?
-
-        updated_at = Integer(record["updated_at_epoch_ms"] || 0)
-        existing = memo[task_ref]
-        next if existing && Integer(existing["updated_at_epoch_ms"] || 0) >= updated_at
-
-        memo[task_ref] = record
-      end.values
-    rescue JSON::ParserError, TypeError, ArgumentError
-      []
     end
 
     def load_watch_summary_agent_job_runs(storage_dir)

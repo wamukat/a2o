@@ -219,7 +219,10 @@ RSpec.describe A3Cleanup do
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
       File.write(active_runs, JSON.generate({ "active_task_refs" => ["Sample#1"] }))
-      File.write(worker_runs, JSON.generate({ "runs" => { "Sample#2" => { "task_ref" => "Sample#2", "state" => "running" }, "Sample#3" => { "task_ref" => "Sample#3", "state" => "completed" } } }))
+      File.write(root.join("agent_jobs.json"), JSON.generate({
+        "job-2" => { "state" => "claimed", "claimed_at" => Time.now.utc.iso8601, "heartbeat_at" => Time.now.utc.iso8601, "request" => { "job_id" => "job-2", "task_ref" => "Sample#2", "phase" => "implementation" } },
+        "job-3" => { "state" => "completed", "claimed_at" => Time.now.utc.iso8601, "heartbeat_at" => Time.now.utc.iso8601, "request" => { "job_id" => "job-3", "task_ref" => "Sample#3", "phase" => "implementation" }, "result" => { "status" => "success" } }
+      }))
 
       refs = described_class.load_active_refs(active_runs_file: active_runs, worker_runs_file: worker_runs)
 

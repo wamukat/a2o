@@ -5,42 +5,12 @@ require "optparse"
 require "pathname"
 require "set"
 require "time"
+require "a3/operator/activity_evidence"
 
 module A3Diagnostics
-  TERMINAL_WORKER_RUN_STATES = Set.new(%w[completed failed timed_out blocked kanban_apply_failed blocked_task_failure blocked_refresh_failure launch_failed needs_commit_retry needs_handoff_retry needs_rework_retry no_op_terminal]).freeze
+  TERMINAL_WORKER_RUN_STATES = A3::Operator::ActivityEvidence::TERMINAL_STATES
   DISPLAY_PHASE_ALIASES = { "integration_judgment" => "merge" }.freeze
   STANDARD_PATH_DIRS = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"].freeze
-
-  WorkerRunRecord = Struct.new(
-    :task_ref, :task_id, :team, :phase, :state, :started_at, :heartbeat_at, :updated_at_epoch_ms,
-    :last_output_at, :last_output_line, :current_command, :result_path, :stdout_log_path, :stderr_log_path,
-    :raw_stdout_log_path, :raw_stderr_log_path, :cwd, :detail, :log_scope,
-    keyword_init: true
-  ) do
-    def to_h
-      {
-        "task_ref" => task_ref,
-        "task_id" => task_id,
-        "team" => team,
-        "phase" => phase,
-        "log_scope" => log_scope,
-        "state" => state,
-        "started_at" => started_at,
-        "heartbeat_at" => heartbeat_at,
-        "updated_at_epoch_ms" => updated_at_epoch_ms,
-        "last_output_at" => last_output_at,
-        "last_output_line" => last_output_line,
-        "current_command" => current_command,
-        "result_path" => result_path,
-        "stdout_log_path" => stdout_log_path,
-        "stderr_log_path" => stderr_log_path,
-        "raw_stdout_log_path" => raw_stdout_log_path,
-        "raw_stderr_log_path" => raw_stderr_log_path,
-        "cwd" => cwd,
-        "detail" => detail
-      }
-    end
-  end
 
   module_function
 
@@ -96,52 +66,11 @@ module A3Diagnostics
   end
 
   def effectively_live_worker_run?(record, stale_after_seconds: 120)
-    return false if TERMINAL_WORKER_RUN_STATES.include?(record.state)
-
-    heartbeat_at = parse_heartbeat_timestamp(record.heartbeat_at)
-    return true if heartbeat_at.nil?
-
-    (Time.now.utc - heartbeat_at) <= stale_after_seconds
+    A3::Operator::ActivityEvidence.effectively_live?(record, stale_after_seconds: stale_after_seconds)
   end
 
   def describe_worker_runs(path)
-    store_path = Pathname(path)
-    return [] unless store_path.exist?
-
-    payload = JSON.parse(store_path.read)
-    runs_payload = payload["runs"] || {}
-    raise "worker run store runs must be an object" unless runs_payload.is_a?(Hash)
-
-    records = runs_payload.values.map do |raw_record|
-      raise "worker run entry must be an object" unless raw_record.is_a?(Hash)
-
-      updated_at = raw_record["updated_at_epoch_ms"]
-      raise "worker run updated_at_epoch_ms must be an integer" unless updated_at.is_a?(Integer)
-
-      task_id = raw_record["task_id"]
-      WorkerRunRecord.new(
-        task_ref: raw_record["task_ref"].to_s.strip,
-        task_id: task_id.nil? ? nil : Integer(task_id),
-        team: raw_record["team"].to_s.strip,
-        phase: raw_record["phase"].to_s.strip.empty? ? nil : raw_record["phase"].to_s.strip,
-        log_scope: raw_record.fetch("log_scope", "worker").to_s.strip.empty? ? "worker" : raw_record.fetch("log_scope", "worker").to_s.strip,
-        state: raw_record["state"].to_s.strip,
-        started_at: raw_record["started_at"].to_s.strip,
-        heartbeat_at: raw_record["heartbeat_at"].to_s.strip,
-        updated_at_epoch_ms: updated_at,
-        last_output_at: raw_record["last_output_at"].to_s.strip.empty? ? nil : raw_record["last_output_at"].to_s.strip,
-        last_output_line: raw_record["last_output_line"].to_s.strip.empty? ? nil : raw_record["last_output_line"].to_s.strip,
-        current_command: raw_record["current_command"].to_s.strip.empty? ? nil : raw_record["current_command"].to_s.strip,
-        result_path: raw_record["result_path"].to_s.strip.empty? ? nil : raw_record["result_path"].to_s.strip,
-        stdout_log_path: raw_record["stdout_log_path"].to_s.strip.empty? ? nil : raw_record["stdout_log_path"].to_s.strip,
-        stderr_log_path: raw_record["stderr_log_path"].to_s.strip.empty? ? nil : raw_record["stderr_log_path"].to_s.strip,
-        raw_stdout_log_path: raw_record["raw_stdout_log_path"].to_s.strip.empty? ? nil : raw_record["raw_stdout_log_path"].to_s.strip,
-        raw_stderr_log_path: raw_record["raw_stderr_log_path"].to_s.strip.empty? ? nil : raw_record["raw_stderr_log_path"].to_s.strip,
-        cwd: raw_record["cwd"].to_s.strip.empty? ? nil : raw_record["cwd"].to_s.strip,
-        detail: raw_record["detail"].to_s.strip.empty? ? nil : raw_record["detail"].to_s.strip
-      )
-    end
-    records.sort_by { |item| [item.updated_at_epoch_ms, item.task_ref] }.reverse
+    A3::Operator::ActivityEvidence.describe_activity(activity_file: A3::Operator::ActivityEvidence.agent_jobs_path_from(worker_runs_file: path))
   end
 
   def normalize_env_value(value)
@@ -345,6 +274,8 @@ module A3Diagnostics
     unavailable = []
     unavailable << active_error if active_error
     unavailable << worker_error if worker_error
+    legacy_diagnostic = A3::Operator::ActivityEvidence.legacy_state_diagnostic(worker_runs_file: worker_runs_file)
+    unavailable << legacy_diagnostic if legacy_diagnostic
     {
       "project" => project,
       "active_runs_file" => active_runs_file.to_s,

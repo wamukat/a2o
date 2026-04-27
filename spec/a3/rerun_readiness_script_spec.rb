@@ -11,6 +11,21 @@ RSpec.describe A3RerunReadiness do
     File.write(path, JSON.pretty_generate(payload) + "\n")
   end
 
+  def write_agent_job_for(path, task_ref:, phase:, state:)
+    write_json(
+      path.dirname.join("agent_jobs.json"),
+      {
+        "job-#{task_ref.delete('#')}" => {
+          "state" => "completed",
+          "claimed_at" => "2026-04-02T14:24:20+09:00",
+          "heartbeat_at" => "2026-04-02T14:24:20+09:00",
+          "request" => { "job_id" => "job-#{task_ref.delete('#')}", "task_ref" => task_ref, "phase" => phase },
+          "result" => { "status" => "success", "activity_state" => state }
+        }
+      }
+    )
+  end
+
   it "reports cleanup paths and blocked labels as not ready" do
     Dir.mktmpdir("a3-rerun-readiness-") do |dir|
       root = Pathname(dir)
@@ -21,23 +36,7 @@ RSpec.describe A3RerunReadiness do
       active_runs = root.join(".work", "a3", "state", "sample", "active-runs.json")
       worker_runs = root.join(".work", "a3", "state", "sample", "worker-runs.json")
       write_json(active_runs, { "active_task_refs" => [] })
-      write_json(
-        worker_runs,
-        {
-          "runs" => {
-            "Sample#2981" => {
-              "task_ref" => "Sample#2981",
-              "task_id" => 2981,
-              "team" => "review",
-              "phase" => "review",
-              "state" => "blocked",
-              "started_at" => "2026-04-02T14:24:20+09:00",
-              "heartbeat_at" => "2026-04-02T14:24:20+09:00",
-              "updated_at_epoch_ms" => 1
-            }
-          }
-        }
-      )
+      write_agent_job_for(worker_runs, task_ref: "Sample#2981", phase: "review", state: "blocked")
 
       allow(described_class).to receive(:inspect_kanban_task).and_return(["In review", false, ["blocked"]])
 
@@ -66,23 +65,7 @@ RSpec.describe A3RerunReadiness do
       active_runs = root.join(".work", "a3", "state", "sample", "active-runs.json")
       worker_runs = root.join(".work", "a3", "state", "sample", "worker-runs.json")
       write_json(active_runs, { "active_task_refs" => [] })
-      write_json(
-        worker_runs,
-        {
-          "runs" => {
-            "Sample#2981" => {
-              "task_ref" => "Sample#2981",
-              "task_id" => 2981,
-              "team" => "review",
-              "phase" => "review",
-              "state" => "blocked",
-              "started_at" => "2026-04-02T14:24:20+09:00",
-              "heartbeat_at" => "2026-04-02T14:24:20+09:00",
-              "updated_at_epoch_ms" => 1
-            }
-          }
-        }
-      )
+      write_agent_job_for(worker_runs, task_ref: "Sample#2981", phase: "review", state: "blocked")
 
       allow(described_class).to receive(:inspect_kanban_task).and_return(["In review", false, ["blocked"]])
 

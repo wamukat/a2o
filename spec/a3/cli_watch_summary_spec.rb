@@ -54,14 +54,16 @@ RSpec.describe A3::CLI do
         )
       )
       File.write(
-        File.join(dir, "worker-runs.json"),
+        File.join(dir, "agent_jobs.json"),
         JSON.pretty_generate(
-          "runs" => {
-            "Sample#3138" => {
+          "job-3138" => {
+            "state" => "claimed",
+            "claimed_at" => (Time.now.utc - 60).iso8601,
+            "heartbeat_at" => Time.now.utc.iso8601,
+            "request" => {
+              "job_id" => "job-3138",
               "task_ref" => "Sample#3138",
-              "state" => "running_command",
-              "heartbeat_at" => Time.now.utc.iso8601,
-              "updated_at_epoch_ms" => 1
+              "phase" => "implementation"
             }
           }
         )

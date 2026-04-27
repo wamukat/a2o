@@ -5,27 +5,13 @@ require "open3"
 require "optparse"
 require "pathname"
 require "set"
+require "a3/operator/activity_evidence"
 require "a3/operator/rerun_workspace_support"
 
 module A3
   module Operator
     module RerunReadiness
-      TERMINAL_WORKER_RUN_STATES = Set.new(
-        %w[
-          completed
-          failed
-          timed_out
-          blocked
-          kanban_apply_failed
-          blocked_task_failure
-          blocked_refresh_failure
-          launch_failed
-          needs_commit_retry
-          needs_handoff_retry
-          needs_rework_retry
-          no_op_terminal
-        ]
-      ).freeze
+      TERMINAL_WORKER_RUN_STATES = ActivityEvidence::TERMINAL_STATES
       ReadinessCheck = Struct.new(:name, :ok, :blocking, :detail, keyword_init: true) do
         def to_h
           {
@@ -51,24 +37,7 @@ module A3
       end
 
       def load_worker_run_store(path)
-        store_path = Pathname(path)
-        return {} unless store_path.exist?
-
-        payload = JSON.parse(store_path.read)
-        raw_runs = payload["runs"] || {}
-        raise "worker run store must contain a runs object" unless raw_runs.is_a?(Hash)
-
-        raw_runs.each_with_object({}) do |(key, value), runs|
-          raise "worker run entry must be an object: #{key}" unless value.is_a?(Hash)
-
-          task_ref = value["task_ref"].to_s.strip
-          raise "worker run entry is missing task_ref: #{key}" if task_ref.empty?
-
-          record = value.dup
-          record["task_ref"] = task_ref
-          record["task_id"] = Integer(record["task_id"]) if record.key?("task_id") && !record["task_id"].nil?
-          runs[key.to_s] = record
-        end
+        ActivityEvidence.latest_by_task_ref(activity_file: ActivityEvidence.agent_jobs_path_from(worker_runs_file: path)).transform_values(&:to_h)
       end
 
       def latest_worker_run(worker_runs_file:, task_ref:)

@@ -6,6 +6,19 @@ require "tmpdir"
 require "a3/operator/reconcile"
 
 RSpec.describe A3Reconcile do
+  def write_agent_job(path, job_id:, task_ref:, phase:, state:, status: "success")
+    payload = path.exist? ? JSON.parse(path.read) : {}
+    completed = %w[completed failed blocked].include?(state)
+    payload[job_id] = {
+      "state" => completed ? "completed" : "claimed",
+      "claimed_at" => "2026-03-23T00:00:00+00:00",
+      "heartbeat_at" => "2026-03-23T00:10:00+00:00",
+      "request" => { "job_id" => job_id, "task_ref" => task_ref, "phase" => phase, "command" => "worker", "args" => [], "working_dir" => path.dirname.to_s },
+      "result" => completed ? { "status" => status, "activity_state" => state } : nil
+    }.compact
+    path.write(JSON.generate(payload))
+  end
+
   it "inspects active runs through the engine reconcile operator" do
     Dir.mktmpdir("a3-reconcile-wrapper-") do |dir|
       root = Pathname(dir)
@@ -47,17 +60,7 @@ RSpec.describe A3Reconcile do
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
       active_runs.write(JSON.generate({ "active_task_refs" => ["Sample#1", "Sample#2"] }))
-      worker_runs.write(
-        JSON.generate(
-          "runs" => {
-            "Sample#1" => {
-              "task_ref" => "Sample#1", "task_id" => 1, "team" => "implementation", "phase" => "implementation",
-              "state" => "completed", "started_at" => "2026-03-23T00:00:00+00:00", "heartbeat_at" => "2026-03-23T00:00:01+00:00",
-              "updated_at_epoch_ms" => 1
-            }
-          }
-        )
-      )
+      write_agent_job(root.join("agent_jobs.json"), job_id: "job-1", task_ref: "Sample#1", phase: "implementation", state: "completed")
       allow(described_class).to receive(:live_scheduler_processes).and_return([])
 
       payload = described_class.inspect_stale_active_runs(project: "sample", active_runs_file: active_runs, worker_runs_file: worker_runs)
@@ -78,17 +81,7 @@ RSpec.describe A3Reconcile do
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
       active_runs.write(JSON.generate({ "active_task_refs" => ["Sample#9"] }))
-      worker_runs.write(
-        JSON.generate(
-          "runs" => {
-            "Sample#9" => {
-              "task_ref" => "Sample#9", "task_id" => 9, "team" => "implementation", "phase" => "implementation",
-              "state" => "running", "started_at" => "2026-03-23T00:00:00+00:00", "heartbeat_at" => "2026-03-23T00:10:00+00:00",
-              "updated_at_epoch_ms" => 10
-            }
-          }
-        )
-      )
+      write_agent_job(root.join("agent_jobs.json"), job_id: "job-9", task_ref: "Sample#9", phase: "implementation", state: "running")
       allow(described_class).to receive(:live_scheduler_processes).and_return([])
 
       payload = described_class.apply_stale_active_run_reconciliation(project: "sample", active_runs_file: active_runs, worker_runs_file: worker_runs)
@@ -96,9 +89,7 @@ RSpec.describe A3Reconcile do
       expect(payload.fetch("applied")).to eq(true)
       expect(payload.fetch("stale_active_runs").map { |item| item.fetch("task_ref") }).to eq(["Sample#9"])
       expect(JSON.parse(active_runs.read)).to eq({ "active_task_refs" => [] })
-      worker_payload = JSON.parse(worker_runs.read)
-      expect(worker_payload.fetch("runs").fetch("Sample#9").fetch("state")).to eq("failed")
-      expect(worker_payload.fetch("runs").fetch("Sample#9").fetch("detail")).to include("reconciled_stale_run(reason=stale_worker_run)")
+      expect(worker_runs).not_to exist
     end
   end
 
@@ -108,22 +99,12 @@ RSpec.describe A3Reconcile do
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
       active_runs.write(JSON.generate({ "active_task_refs" => [] }))
-      worker_runs.write(
-        JSON.generate(
-          "runs" => {
-            "Sample#2561" => {
-              "task_ref" => "Sample#2561", "task_id" => 2561, "team" => "implementation", "phase" => "implementation",
-              "state" => "running", "started_at" => "2026-03-23T00:00:00+00:00", "heartbeat_at" => "2026-03-23T00:10:00+00:00",
-              "updated_at_epoch_ms" => 10
-            }
-          }
-        )
-      )
+      write_agent_job(root.join("agent_jobs.json"), job_id: "job-2561", task_ref: "Sample#2561", phase: "implementation", state: "running")
       allow(described_class).to receive(:live_scheduler_processes).and_return([])
 
       payload = described_class.inspect_stale_active_runs(project: "sample", active_runs_file: active_runs, worker_runs_file: worker_runs)
       expect(payload.fetch("stale_active_runs")).to eq([
-        { "task_ref" => "Sample#2561", "task_id" => 2561, "reason" => "stale_worker_run", "latest_state" => "running" }
+        { "task_ref" => "Sample#2561", "task_id" => 2561, "reason" => "stale_worker_run", "latest_state" => "running_command" }
       ])
     end
   end
