@@ -1678,7 +1678,7 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
-	return withEnv(runtimeRunOnceEnv(effectiveConfig, overrides.MaxSteps, overrides.AgentAttempts), func() error {
+	return withRuntimeRunOnceEnv(effectiveConfig, overrides.MaxSteps, overrides.AgentAttempts, func() error {
 		return runGenericRuntimeRunOnce(effectiveConfig, overrides, *projectConfig, runner, stdout)
 	})
 }

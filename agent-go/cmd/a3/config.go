@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 )
 
 type runtimeInstanceConfig struct {
@@ -23,6 +24,8 @@ type runtimeInstanceConfig struct {
 	StorageDir       string `json:"storage_dir"`
 	RuntimeImage     string `json:"runtime_image,omitempty"`
 }
+
+var internalGeneratedA3EnvDepth atomic.Int32
 
 func defaultComposeFile() string {
 	candidates := []string{}
@@ -306,9 +309,12 @@ func removedA3InputError(removed string, replacement string) error {
 }
 
 func validateRemovedA3Environment() error {
+	if internalGeneratedA3EnvDepth.Load() > 0 {
+		return nil
+	}
 	for _, removed := range removedA3EnvironmentNames() {
 		replacement := "A2O_" + strings.TrimPrefix(removed, "A3_")
-		if strings.TrimSpace(os.Getenv(removed)) != "" && strings.TrimSpace(os.Getenv(replacement)) == "" {
+		if strings.TrimSpace(os.Getenv(removed)) != "" {
 			return removedA3InputError("environment variable "+removed, "environment variable "+replacement)
 		}
 	}
@@ -440,4 +446,13 @@ func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttem
 		overrides["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] = strings.TrimSpace(agentAttempts)
 	}
 	return overrides
+}
+
+func withRuntimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttempts string, fn func() error) error {
+	if err := validateRemovedA3Environment(); err != nil {
+		return err
+	}
+	internalGeneratedA3EnvDepth.Add(1)
+	defer internalGeneratedA3EnvDepth.Add(-1)
+	return withEnv(runtimeRunOnceEnv(config, maxSteps, agentAttempts), fn)
 }

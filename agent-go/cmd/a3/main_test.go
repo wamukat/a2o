@@ -524,6 +524,7 @@ func TestApplyAgentInstallOverridesMapsLegacyRuntimeServiceToA2O(t *testing.T) {
 }
 
 func TestRemovedA3RuntimeEnvironmentRequiresMigration(t *testing.T) {
+	t.Setenv("A2O_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:public")
 	t.Setenv("A3_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
 
 	err := validateRemovedA3Environment()
