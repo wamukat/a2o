@@ -264,6 +264,7 @@ a2o runtime metrics list --format json
 a2o runtime metrics list --format csv
 a2o runtime metrics summary
 a2o runtime metrics summary --group-by parent --format json
+a2o runtime metrics trends --group-by parent --format json
 ```
 
 Grafana, spreadsheets, and BI tools should consume these exports or downstream copies of them. They are not required runtime dependencies for the first metrics implementation.

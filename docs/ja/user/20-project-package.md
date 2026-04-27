@@ -267,6 +267,7 @@ a2o runtime metrics list --format json
 a2o runtime metrics list --format csv
 a2o runtime metrics summary
 a2o runtime metrics summary --group-by parent --format json
+a2o runtime metrics trends --group-by parent --format json
 ```
 
 Grafana、表計算ソフト、BI ツールは、これらの export またはその下流コピーを読む。初期のメトリクス実装では、これらはランタイムの必須依存ではない。

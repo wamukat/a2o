@@ -863,13 +863,13 @@ module A3
 
     def handle_metrics(argv, out:, run_id_generator:, command_runner:, merge_runner:)
       action = argv.shift
-      unless %w[list summary].include?(action)
-        raise ArgumentError, "usage: a2o metrics list|summary"
+      unless %w[list summary trends].include?(action)
+        raise ArgumentError, "usage: a2o metrics list|summary|trends"
       end
 
       with_storage_container(
         argv: argv,
-        parse_with: action == "list" ? :parse_metrics_list_options : :parse_metrics_summary_options,
+        parse_with: metrics_options_parser(action),
         run_id_generator: run_id_generator,
         command_runner: command_runner,
         merge_runner: merge_runner
@@ -880,6 +880,8 @@ module A3
           write_metrics_list(out, reporter.list, format: options.fetch(:format))
         when "summary"
           write_metrics_summary(out, reporter.summary(group_by: options.fetch(:group_by)), format: options.fetch(:format))
+        when "trends"
+          write_metrics_trends(out, reporter.trends(group_by: options.fetch(:group_by)), format: options.fetch(:format))
         end
       end
     end
@@ -2054,6 +2056,35 @@ module A3
       options
     end
 
+    def parse_metrics_trends_options(argv)
+      options = {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        repo_sources: {},
+        format: :text,
+        group_by: :all
+      }
+      parser = OptionParser.new
+      parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      parser.on("--format FORMAT") { |value| options[:format] = metrics_format(value, allowed: %i[text json]) }
+      parser.on("--group-by GROUP") { |value| options[:group_by] = metrics_trends_group_by(value) }
+      parser.parse(argv)
+      options
+    end
+
+    def metrics_options_parser(action)
+      case action
+      when "list"
+        :parse_metrics_list_options
+      when "summary"
+        :parse_metrics_summary_options
+      when "trends"
+        :parse_metrics_trends_options
+      end
+    end
+
     def metrics_format(value, allowed:)
       format = value.to_s.to_sym
       return format if allowed.include?(format)
@@ -2066,6 +2097,13 @@ module A3
       return group_by if %i[task parent].include?(group_by)
 
       raise ArgumentError, "unsupported metrics summary group-by: #{value}"
+    end
+
+    def metrics_trends_group_by(value)
+      group_by = value.to_s.to_sym
+      return group_by if %i[all task parent].include?(group_by)
+
+      raise ArgumentError, "unsupported metrics trends group-by: #{value}"
     end
 
     def session_filter(value)
@@ -2170,6 +2208,26 @@ module A3
         end
       else
         raise ArgumentError, "unsupported metrics summary format: #{format}"
+      end
+    end
+
+    def write_metrics_trends(out, entries, format:)
+      case format
+      when :json
+        out.puts(JSON.pretty_generate(entries.map(&:persisted_form)))
+      when :text
+        if entries.empty?
+          out.puts("metrics_trends=none")
+        else
+          entries.each do |entry|
+            parts = entry.persisted_form.map do |key, value|
+              "#{key}=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(value)}"
+            end
+            out.puts("metrics_trends #{parts.join(' ')}")
+          end
+        end
+      else
+        raise ArgumentError, "unsupported metrics trends format: #{format}"
       end
     end
 

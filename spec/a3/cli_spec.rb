@@ -160,6 +160,67 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "prints task metrics trends without changing list or summary output" do
+    Dir.mktmpdir do |dir|
+      repository = A3::Infra::JsonTaskMetricsRepository.new(File.join(dir, "task_metrics.json"))
+      repository.save(
+        A3::Domain::TaskMetricsRecord.new(
+          task_ref: "A2O#101",
+          parent_ref: "A2O#100",
+          timestamp: "2026-04-27T01:00:00Z",
+          code_changes: { "lines_added" => 10 },
+          tests: { "passed_count" => 9, "failed_count" => 1 },
+          coverage: { "line_percent" => 80.0 },
+          timing: { "verification_seconds" => 30, "total_seconds" => 120, "rework_count" => 1 },
+          cost: { "tokens_input" => 3000, "tokens_output" => 500 }
+        )
+      )
+      repository.save(
+        A3::Domain::TaskMetricsRecord.new(
+          task_ref: "A2O#102",
+          parent_ref: "A2O#100",
+          timestamp: "2026-04-27T02:00:00Z",
+          code_changes: { "lines_added" => 5 },
+          tests: { "passed_count" => 5, "failed_count" => 0 },
+          coverage: { "line_percent" => 82.0 },
+          timing: { "verification_seconds" => 10, "total_seconds" => 60 },
+          cost: { "tokens_input" => 1000, "tokens_output" => 250 }
+        )
+      )
+
+      text_out = StringIO.new
+      described_class.start(["metrics", "trends", "--storage-dir", dir], out: text_out)
+
+      expect(text_out.string).to include("metrics_trends group_key=all")
+      expect(text_out.string).to include("rework_count=1")
+      expect(text_out.string).to include('unsupported_indicators=["blocked_rate"]')
+
+      json_out = StringIO.new
+      described_class.start(["metrics", "trends", "--storage-dir", dir, "--group-by", "parent", "--format", "json"], out: json_out)
+
+      expect(JSON.parse(json_out.string)).to contain_exactly(
+        hash_including(
+          "group_key" => "A2O#100",
+          "record_count" => 2,
+          "task_count" => 2,
+          "lines_added" => 15,
+          "tests_total" => 15,
+          "tests_failed" => 1,
+          "test_failure_rate" => (1.0 / 15.0),
+          "avg_verification_seconds" => 20.0,
+          "avg_total_seconds" => 90.0,
+          "rework_count" => 1,
+          "rework_rate" => 0.5,
+          "tokens_input" => 4000,
+          "tokens_output" => 750,
+          "tokens_per_line_added" => (4750.0 / 15.0),
+          "line_coverage_delta" => 2.0,
+          "unsupported_indicators" => ["blocked_rate"]
+        )
+      )
+    end
+  end
+
   it "routes manifest-driven runtime commands through the shared runtime session helper" do
     out = StringIO.new
     session = Struct.new(:options, :container, :project_context, :project_surface, keyword_init: true).new(

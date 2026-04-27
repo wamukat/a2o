@@ -292,6 +292,7 @@ a2o runtime metrics list --format json
 a2o runtime metrics list --format csv
 a2o runtime metrics summary
 a2o runtime metrics summary --group-by parent --format json
+a2o runtime metrics trends --group-by parent --format json
 ```
 
 ### 通知 hook

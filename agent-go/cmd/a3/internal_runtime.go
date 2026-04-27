@@ -1292,8 +1292,8 @@ func runRuntimeSkillFeedback(args []string, runner commandRunner, stdout io.Writ
 }
 
 func runRuntimeMetrics(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
-	if len(args) == 0 || (args[0] != "list" && args[0] != "summary") {
-		return fmt.Errorf("usage: a2o runtime metrics (list|summary)")
+	if len(args) == 0 || (args[0] != "list" && args[0] != "summary" && args[0] != "trends") {
+		return fmt.Errorf("usage: a2o runtime metrics (list|summary|trends)")
 	}
 	subcommand := args[0]
 	flags := flag.NewFlagSet("a2o runtime metrics "+subcommand, flag.ContinueOnError)
@@ -1307,6 +1307,12 @@ func runRuntimeMetrics(args []string, runner commandRunner, stdout io.Writer, st
 		format = "text"
 		flags.StringVar(&format, "format", "text", "output format: text or json")
 		flags.StringVar(&groupBy, "group-by", "task", "summary grouping: task or parent")
+	}
+	if subcommand == "trends" {
+		format = "text"
+		groupBy = "all"
+		flags.StringVar(&format, "format", "text", "output format: text or json")
+		flags.StringVar(&groupBy, "group-by", "all", "trend grouping: all, task, or parent")
 	}
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
@@ -1326,7 +1332,7 @@ func runRuntimeMetrics(args []string, runner commandRunner, stdout io.Writer, st
 			return err
 		}
 		runtimeArgs := []string{"a3", "metrics", subcommand, "--storage-backend", "json", "--storage-dir", plan.StorageDir, "--format", format}
-		if subcommand == "summary" {
+		if subcommand == "summary" || subcommand == "trends" {
 			runtimeArgs = append(runtimeArgs, "--group-by", groupBy)
 		}
 		output, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "metrics", runtimeArgs...)

@@ -10,6 +10,8 @@ A2O should keep the v0.5.37 CLI/export surface as the stable metrics data-access
 - `a2o metrics list --format csv`
 - `a2o metrics summary --format json`
 - `a2o metrics summary --group-by parent --format json`
+- `a2o metrics trends --format json`
+- `a2o metrics trends --group-by parent --format json`
 - host wrapper equivalents under `a2o runtime metrics ...`
 
 A2O should not add a runtime REST API or bundled dashboard server until a concrete consumer proves the CLI/export contract is insufficient. External dashboards should consume JSON/CSV exports directly, or a project-owned sync job should copy those exports into the dashboard database.
@@ -61,6 +63,36 @@ Consumers must treat unknown keys inside section objects as project-owned extens
 
 With `--group-by task`, `group_key` is the task ref. With `--group-by parent`, `group_key` is `parent_ref` when present and falls back to `task_ref` for standalone tasks.
 
+`metrics trends --format json` returns derived indicators calculated from stored metrics records:
+
+```json
+[
+  {
+    "group_key": "A2O#226",
+    "record_count": 3,
+    "task_count": 3,
+    "parent_count": 1,
+    "latest_timestamp": "2026-04-27T06:18:00Z",
+    "lines_added": 42,
+    "tests_total": 21,
+    "tests_failed": 1,
+    "test_failure_rate": 0.047619047619047616,
+    "avg_verification_seconds": 120.0,
+    "avg_total_seconds": 600.0,
+    "rework_count": 1,
+    "rework_rate": 0.3333333333333333,
+    "tokens_input": 4000,
+    "tokens_output": 750,
+    "tokens_per_line_added": 113.0952380952381,
+    "latest_line_coverage": 82.5,
+    "line_coverage_delta": 2.5,
+    "unsupported_indicators": ["blocked_rate"]
+  }
+]
+```
+
+`metrics trends` defaults to `--group-by all`. It also accepts `--group-by task` and `--group-by parent`. Indicators that cannot be computed from task metrics records are listed in `unsupported_indicators` instead of being silently omitted.
+
 ## CSV Contract
 
 `metrics list --format csv` is the spreadsheet-friendly mirror of list JSON. It includes these headers:
@@ -88,6 +120,6 @@ The section columns contain JSON objects encoded as CSV fields. CSV is for repor
 
 ## Follow-up Ticket Guidance
 
-- A2O#307 should implement trends and derived indicators as CLI/export features over the stable list JSON records.
+- A2O#307 implements trends and derived indicators as CLI/export features over the stable list JSON records.
 - A2O#308 should evaluate Grafana as an external consumer of JSON/CSV exports or a project-owned copied database. It should not assume a runtime REST API exists.
 - A2O#226 and GitHub #16 remain open until the trends and dashboard decisions are completed or explicitly descoped.

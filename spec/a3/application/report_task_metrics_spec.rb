@@ -91,4 +91,41 @@ RSpec.describe A3::Application::ReportTaskMetrics do
     expect(entry.latest_timestamp).to eq("2026-04-27T01:00:00Z")
     expect(entry.latest_line_coverage).to eq(80.0)
   end
+
+  it "reports derived trends from stored records" do
+    repository.save(
+      A3::Domain::TaskMetricsRecord.new(
+        task_ref: "A2O#101",
+        parent_ref: "A2O#100",
+        timestamp: "2026-04-27T03:00:00Z",
+        code_changes: { "lines_added" => 15 },
+        tests: { "passed_count" => 5, "failed_count" => 1 },
+        coverage: { "line_percent" => 84.0 },
+        timing: { "verification_seconds" => 20, "total_seconds" => 100, "rework_count" => 1 },
+        cost: { "tokens_input" => 2000, "tokens_output" => 500 }
+      )
+    )
+
+    entry = reporter.trends(group_by: :parent).first.persisted_form
+
+    expect(entry).to include(
+      "group_key" => "A2O#100",
+      "record_count" => 3,
+      "task_count" => 2,
+      "lines_added" => 30,
+      "tests_total" => 16,
+      "tests_failed" => 2,
+      "test_failure_rate" => 0.125,
+      "avg_verification_seconds" => 20.0,
+      "avg_total_seconds" => 100.0,
+      "rework_count" => 1,
+      "rework_rate" => (1.0 / 3.0),
+      "tokens_input" => 2000,
+      "tokens_output" => 500,
+      "tokens_per_line_added" => (2500.0 / 30.0),
+      "latest_line_coverage" => 84.0,
+      "line_coverage_delta" => 4.0,
+      "unsupported_indicators" => ["blocked_rate"]
+    )
+  end
 end
