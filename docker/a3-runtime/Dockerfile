@@ -93,7 +93,6 @@ RUN ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a2o \
       > /usr/local/bin/a3 \
     && chmod 0755 /usr/local/bin/a3
 
-ENV A3_ROOT_DIR=/workspace
 ENV A2O_ROOT_DIR=/workspace
 ENV A3_IMAGE_VERSION=${A3_IMAGE_VERSION}
 ENV A2O_IMAGE_VERSION=${A3_IMAGE_VERSION}

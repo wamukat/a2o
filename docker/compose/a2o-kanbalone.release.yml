@@ -3,7 +3,6 @@ services:
     image: ${A2O_RUNTIME_IMAGE:-ghcr.io/wamukat/a2o-engine:latest}
     working_dir: /workspace
     environment:
-      A3_ROOT_DIR: /workspace
       A2O_ROOT_DIR: /workspace
     volumes:
       - ${A2O_WORKSPACE_ROOT:-../../..}:/workspace

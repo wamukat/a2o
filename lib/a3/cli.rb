@@ -2625,6 +2625,7 @@ module A3
     end
 
     def agent_environment_from_options(options)
+      validate_agent_env!(options.fetch(:agent_env, {}))
       environment = {}
       workspace_root = options[:agent_workspace_root].to_s
       environment["workspace_root"] = workspace_root unless workspace_root.empty?
@@ -2639,6 +2640,13 @@ module A3
       environment["required_bins"] = required_bins unless required_bins.empty?
 
       environment.empty? ? nil : environment
+    end
+
+    def validate_agent_env!(env)
+      return unless env.transform_keys(&:to_s).key?("A3_ROOT_DIR")
+
+      raise KeyError,
+            "removed A3 root utility input: environment variable A3_ROOT_DIR; migration_required=true replacement=environment variable A2O_ROOT_DIR"
     end
 
     def add_agent_support_ref_option(options, value)

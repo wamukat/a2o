@@ -21,6 +21,7 @@ module A3
         @worker_protocol = worker_protocol
         @workspace_request_builder = workspace_request_builder
         @env = env.transform_keys(&:to_s).transform_values(&:to_s).freeze
+        validate_root_env!(@env)
         @agent_environment = agent_environment
       end
 
@@ -41,6 +42,13 @@ module A3
       end
 
       private
+
+      def validate_root_env!(env)
+        return unless env.transform_keys(&:to_s).key?("A3_ROOT_DIR")
+
+        raise KeyError,
+              "removed A3 root utility input: environment variable A3_ROOT_DIR; migration_required=true replacement=environment variable A2O_ROOT_DIR"
+      end
 
       def run_same_path(skill:, workspace:, task:, run:, phase_runtime:, task_packet:)
         result_path = @worker_protocol.result_path(workspace)

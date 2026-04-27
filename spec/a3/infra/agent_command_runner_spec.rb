@@ -214,6 +214,22 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     original_legacy ? ENV["A3_ROOT_DIR"] = original_legacy : ENV.delete("A3_ROOT_DIR")
   end
 
+  it "rejects explicit legacy A3_ROOT_DIR during runner construction" do
+    expect do
+      described_class.new(
+        control_plane_client: client,
+        runtime_profile: "docker-dev-env",
+        shared_workspace_mode: "same-path",
+        env: { "A3_ROOT_DIR" => "/tmp/legacy-root" },
+        job_id_generator: -> { "job-1" },
+        sleeper: ->(_) {}
+      )
+    end.to raise_error(
+      KeyError,
+      /removed A3 root utility input: environment variable A3_ROOT_DIR; migration_required=true replacement=environment variable A2O_ROOT_DIR/
+    )
+  end
+
   it "expands public command placeholders before enqueueing agent jobs" do
     client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :succeeded, 0)) }
     runner = described_class.new(

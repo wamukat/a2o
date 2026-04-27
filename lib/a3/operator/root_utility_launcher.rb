@@ -17,7 +17,7 @@ module A3RootUtilityLauncher
 
   def self.fetch_root_env(name, default)
     legacy_name = name.sub(/\AA2O_ROOT_/, "A3_ROOT_")
-    if ENV.key?(legacy_name) && !ENV.key?(name)
+    if ENV.key?(legacy_name)
       raise KeyError,
             "removed A3 root utility input: environment variable #{legacy_name}; migration_required=true replacement=environment variable #{name}"
     end

@@ -17,6 +17,7 @@ module A3
         @monotonic_clock = monotonic_clock
         @workspace_request_builder = workspace_request_builder
         @env = env.transform_keys(&:to_s).transform_values(&:to_s).freeze
+        validate_root_env!(@env)
         @agent_environment = agent_environment
       end
 
@@ -180,7 +181,7 @@ module A3
       end
 
       def default_env(overrides = {})
-        if ENV.key?("A3_ROOT_DIR") && !ENV.key?("A2O_ROOT_DIR") && !overrides.transform_keys(&:to_s).key?("A2O_ROOT_DIR")
+        if ENV.key?("A3_ROOT_DIR") || overrides.transform_keys(&:to_s).key?("A3_ROOT_DIR")
           raise KeyError,
                 "removed A3 root utility input: environment variable A3_ROOT_DIR; migration_required=true replacement=environment variable A2O_ROOT_DIR"
         end
@@ -188,6 +189,13 @@ module A3
         {
           "A2O_ROOT_DIR" => ENV.fetch("A2O_ROOT_DIR", Dir.pwd)
         }
+      end
+
+      def validate_root_env!(env)
+        return unless env.transform_keys(&:to_s).key?("A3_ROOT_DIR")
+
+        raise KeyError,
+              "removed A3 root utility input: environment variable A3_ROOT_DIR; migration_required=true replacement=environment variable A2O_ROOT_DIR"
       end
 
       def workspace_automation_env(workspace)

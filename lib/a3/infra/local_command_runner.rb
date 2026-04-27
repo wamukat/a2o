@@ -46,7 +46,7 @@ module A3
       private
 
       def default_env(overrides = {})
-        if ENV.key?("A3_ROOT_DIR") && !ENV.key?("A2O_ROOT_DIR") && !overrides.transform_keys(&:to_s).key?("A2O_ROOT_DIR")
+        if ENV.key?("A3_ROOT_DIR") || overrides.transform_keys(&:to_s).key?("A3_ROOT_DIR")
           raise KeyError,
                 "removed A3 root utility input: environment variable A3_ROOT_DIR; migration_required=true replacement=environment variable A2O_ROOT_DIR"
         end

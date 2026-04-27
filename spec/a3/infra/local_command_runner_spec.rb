@@ -66,6 +66,22 @@ RSpec.describe A3::Infra::LocalCommandRunner do
     original_legacy ? ENV["A3_ROOT_DIR"] = original_legacy : ENV.delete("A3_ROOT_DIR")
   end
 
+  it "rejects explicit legacy A3_ROOT_DIR even when A2O_ROOT_DIR is available" do
+    original_public = ENV["A2O_ROOT_DIR"]
+    original_legacy = ENV.delete("A3_ROOT_DIR")
+    ENV["A2O_ROOT_DIR"] = "/tmp/a2o-root"
+
+    expect do
+      described_class.new.run(["true"], workspace: workspace, env: { "A3_ROOT_DIR" => "/tmp/legacy-root" })
+    end.to raise_error(
+      KeyError,
+      /removed A3 root utility input: environment variable A3_ROOT_DIR; migration_required=true replacement=environment variable A2O_ROOT_DIR/
+    )
+  ensure
+    original_public ? ENV["A2O_ROOT_DIR"] = original_public : ENV.delete("A2O_ROOT_DIR")
+    original_legacy ? ENV["A3_ROOT_DIR"] = original_legacy : ENV.delete("A3_ROOT_DIR")
+  end
+
   it "expands public command placeholders before execution" do
     workspace_root = File.join(tmpdir, "workspace with spaces; no shell")
     FileUtils.mkdir_p(workspace_root)

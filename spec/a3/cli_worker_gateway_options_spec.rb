@@ -50,6 +50,29 @@ RSpec.describe "A3 CLI worker gateway options" do
     expect(gateway.instance_variable_get(:@env)).to eq("A2O_ROOT_DIR" => "/host/a2o")
   end
 
+  it "rejects legacy root env options for an agent HTTP worker gateway" do
+    expect do
+      A3::CLI.send(
+        :build_worker_gateway,
+        options: {
+          worker_gateway: "agent-http",
+          worker_command: "ruby",
+          worker_command_args: ["worker.rb"],
+          agent_control_plane_url: "http://127.0.0.1:4567",
+          agent_runtime_profile: "host-local",
+          agent_shared_workspace_mode: "same-path",
+          agent_env: {
+            "A3_ROOT_DIR" => "/host/a3"
+          }
+        },
+        command_runner: instance_double(A3::Infra::LocalCommandRunner)
+      )
+    end.to raise_error(
+      KeyError,
+      /removed A3 root utility input: environment variable A3_ROOT_DIR; migration_required=true replacement=environment variable A2O_ROOT_DIR/
+    )
+  end
+
   it "passes engine-managed agent environment options to an agent HTTP worker gateway" do
     gateway = A3::CLI.send(
       :build_worker_gateway,
@@ -306,6 +329,27 @@ RSpec.describe "A3 CLI worker gateway options" do
     )
 
     expect(runner.instance_variable_get(:@env)).to eq("A2O_ROOT_DIR" => "/host/a2o")
+  end
+
+  it "rejects legacy root env options for an agent HTTP verification command runner" do
+    expect do
+      A3::CLI.send(
+        :build_command_runner,
+        options: {
+          verification_command_runner: "agent-http",
+          agent_control_plane_url: "http://127.0.0.1:4567",
+          agent_runtime_profile: "host-local",
+          agent_shared_workspace_mode: "same-path",
+          agent_env: {
+            "A3_ROOT_DIR" => "/host/a3"
+          }
+        },
+        fallback: instance_double(A3::Infra::LocalCommandRunner)
+      )
+    end.to raise_error(
+      KeyError,
+      /removed A3 root utility input: environment variable A3_ROOT_DIR; migration_required=true replacement=environment variable A2O_ROOT_DIR/
+    )
   end
 
   it "passes engine-managed agent environment options to verification and merge runners" do
