@@ -131,10 +131,10 @@ module A3
           detail: "task is not present in active-runs.json"
         )
         checks << ReadinessCheck.new(
-          name: "latest_agent_job_terminal_or_absent",
+          name: "latest_worker_run_terminal_or_absent",
           ok: latest.nil? || TERMINAL_AGENT_JOB_STATES.include?(latest["state"].to_s.strip),
           blocking: true,
-          detail: "latest agent job is terminal or missing"
+          detail: "latest worker run is terminal or missing"
         )
         checks << ReadinessCheck.new(
           name: "broken_support_bridges_cleared",
@@ -168,8 +168,8 @@ module A3
           detail = item.detail
           if item.name == "active_run_cleared" && !item.ok
             detail = "task is still active: #{task_ref}"
-          elsif item.name == "latest_agent_job_terminal_or_absent" && !item.ok && latest
-            detail = "latest agent job is non-terminal: #{latest['state']}"
+          elsif item.name == "latest_worker_run_terminal_or_absent" && !item.ok && latest
+            detail = "latest worker run is non-terminal: #{latest['state']}"
           elsif item.name == "broken_support_bridges_cleared" && !item.ok
             detail = "broken top-level support bridges remain: #{broken_bridges.join(', ')}"
           elsif item.name == "rerun_cleanup_paths_cleared" && !item.ok
@@ -193,7 +193,7 @@ module A3
           "task_ref" => task_ref,
           "issue_workspace" => issue_workspace.to_s,
           "ready" => ready,
-          "latest_agent_job" => latest,
+          "latest_worker_run" => latest,
           "cleanup_paths" => cleanup_paths,
           "checks" => annotated_checks.map(&:to_h),
           "task_status" => task_status,

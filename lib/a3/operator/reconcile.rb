@@ -128,15 +128,15 @@ module A3Reconcile
     candidate_refs.to_a.sort.each do |candidate_ref|
       latest = latest_runs[candidate_ref]
       if latest.nil?
-        stale_runs << StaleActiveRun.new(task_ref: candidate_ref, task_id: nil, reason: "missing_agent_job", latest_state: nil)
+        stale_runs << StaleActiveRun.new(task_ref: candidate_ref, task_id: nil, reason: "missing_worker_run", latest_state: nil)
         next
       end
       if TERMINAL_AGENT_JOB_STATES.include?(latest.state)
-        stale_runs << StaleActiveRun.new(task_ref: candidate_ref, task_id: latest.task_id, reason: "latest_agent_job_terminal", latest_state: latest.state)
+        stale_runs << StaleActiveRun.new(task_ref: candidate_ref, task_id: latest.task_id, reason: "latest_run_terminal", latest_state: latest.state)
         next
       end
       unless A3Diagnostics.effectively_live_agent_job?(latest)
-        stale_runs << StaleActiveRun.new(task_ref: candidate_ref, task_id: latest.task_id, reason: "stale_agent_job", latest_state: latest.state)
+        stale_runs << StaleActiveRun.new(task_ref: candidate_ref, task_id: latest.task_id, reason: "stale_worker_run", latest_state: latest.state)
         next
       end
       if live_processes.empty?

@@ -14,7 +14,7 @@ require "a3/operator/rerun_workspace_support"
 
 module A3Cleanup
   NON_CLEANUP_STATUSES = Set.new(["In progress", "In review", "Inspection", "Merging"]).freeze
-  NONTERMINAL_WORKER_STATES = Set.new(["started", "running", "running_command", "thinking", "writing_result"]).freeze
+  NONTERMINAL_AGENT_JOB_STATES = Set.new(["started", "running", "running_command", "thinking", "writing_result"]).freeze
   DISPOSABLE_CACHE_TOP_LEVELS = Set.new(["m2-seed"]).freeze
   BUILD_OUTPUT_DIR_NAMES = Set.new(["target", "surefire-reports", "site"]).freeze
 
@@ -137,7 +137,7 @@ module A3Cleanup
     end
     A3::Operator::ActivityEvidence.describe_activity(activity_file: activity_file).each do |record|
       task_ref = record.task_ref.to_s.strip
-      if !task_ref.empty? && NONTERMINAL_WORKER_STATES.include?(record.state.to_s)
+      if !task_ref.empty? && NONTERMINAL_AGENT_JOB_STATES.include?(record.state.to_s)
         active_refs << task_ref
       end
     end
