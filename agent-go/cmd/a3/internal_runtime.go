@@ -2561,10 +2561,10 @@ func ensureRuntimeHostAgent(config runtimeInstanceConfig, plan runtimeRunOncePla
 		if err != nil {
 			return err
 		}
-		if _, err := runExternal(runner, "docker", "exec", containerID, "a3", "agent", "package", "verify", "--target", plan.HostAgentTarget); err != nil {
+		if _, err := runExternal(runner, "docker", "exec", containerID, "a2o", "agent", "package", "verify", "--target", plan.HostAgentTarget); err != nil {
 			return err
 		}
-		if _, err := runExternal(runner, "docker", "exec", containerID, "a3", "agent", "package", "export", "--target", plan.HostAgentTarget, "--output", "/tmp/a2o-runtime-run-once-agent"); err != nil {
+		if _, err := runExternal(runner, "docker", "exec", containerID, "a2o", "agent", "package", "export", "--target", plan.HostAgentTarget, "--output", "/tmp/a2o-runtime-run-once-agent"); err != nil {
 			return err
 		}
 		if _, err := runExternal(runner, "docker", "cp", containerID+":/tmp/a2o-runtime-run-once-agent", plan.HostAgentBin); err != nil {

@@ -5996,6 +5996,49 @@ func TestRuntimeDescribeTaskContinuesWhenRuntimeTaskStateIsUnavailable(t *testin
 	}
 }
 
+func TestEnsureRuntimeHostAgentUsesPublicA2OPackageCommand(t *testing.T) {
+	tempDir := t.TempDir()
+	hostAgentBin := filepath.Join(tempDir, ".work", "a2o", "agent", "bin", "a2o-agent")
+	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
+	plan := runtimeRunOncePlan{
+		ComposePrefix:   []string{"compose", "-p", "a3-test", "-f", "compose.yml"},
+		HostAgentSource: "runtime-image",
+		HostAgentTarget: "linux-amd64",
+		HostAgentBin:    hostAgentBin,
+		WorkspaceRoot:   filepath.Join(tempDir, "workspace"),
+	}
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+
+	if err := ensureRuntimeHostAgent(config, plan, runner, &stdout); err != nil {
+		t.Fatalf("ensureRuntimeHostAgent failed: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "runtime_agent_export target=linux-amd64 output="+hostAgentBin) {
+		t.Fatalf("stdout should report runtime agent export, got %q", stdout.String())
+	}
+	info, err := os.Stat(hostAgentBin)
+	if err != nil {
+		t.Fatalf("exported host agent missing: %v", err)
+	}
+	if info.Mode().Perm()&0o111 == 0 {
+		t.Fatalf("exported host agent should be executable, mode=%s", info.Mode())
+	}
+
+	joined := runner.joinedCalls()
+	for _, want := range []string{
+		"docker compose -p a3-test -f compose.yml ps -q a2o-runtime",
+		"docker exec container-123 a2o agent package verify --target linux-amd64",
+		"docker exec container-123 a2o agent package export --target linux-amd64 --output /tmp/a2o-runtime-run-once-agent",
+		"docker cp container-123:/tmp/a2o-runtime-run-once-agent " + hostAgentBin,
+	} {
+		assertCallContains(t, joined, want)
+	}
+	joinedText := strings.Join(joined, "\n")
+	if strings.Contains(joinedText, "docker exec container-123 a3 agent package") {
+		t.Fatalf("runtime host agent export must not call removed a3 agent package command:\n%s", joinedText)
+	}
+}
+
 func TestRunHostAgentLoopPreservesExistingLogAcrossRestarts(t *testing.T) {
 	tempDir := t.TempDir()
 	hostAgentLog := filepath.Join(tempDir, ".work", "a2o", "runtime-host-agent", "agent.log")
