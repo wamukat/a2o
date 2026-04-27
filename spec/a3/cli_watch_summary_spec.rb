@@ -286,6 +286,66 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "shows Kanbalone tag reasons only in detailed watch-summary output" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "Sample#3138",
+          kind: :child,
+          edit_scope: [:repo_alpha],
+          verification_scope: [:repo_alpha],
+          status: :blocked,
+          external_task_id: 3138
+        )
+      )
+
+      fake_cli = create_fake_kanban_cli(
+        dir,
+        snapshots: [
+          {
+            "id" => 3138,
+            "ref" => "Sample#3138",
+            "title" => "Blocked task",
+            "status" => "Blocked",
+            "labels" => ["trigger:auto-implement", "repo:ui-app", "blocked"],
+            "label_reasons" => [
+              {
+                "title" => "blocked",
+                "reason" => "blocked by review finding",
+                "details" => { "run_ref" => "run-1" }
+              }
+            ]
+          }
+        ]
+      )
+
+      default_out = StringIO.new
+      detailed_out = StringIO.new
+      args = [
+        "watch-summary",
+        "--storage-backend", "json",
+        "--storage-dir", dir,
+        "--kanban-command", "ruby",
+        "--kanban-command-arg", fake_cli.fetch(:script_path),
+        "--kanban-project", "Sample",
+        "--kanban-working-dir", dir,
+        "--kanban-trigger-label", "trigger:auto-implement",
+        "--kanban-repo-label", "repo:ui-app=repo_alpha"
+      ]
+
+      with_env(fake_cli.fetch(:env)) do
+        described_class.start(args.dup, out: default_out)
+        described_class.start([*args, "--details"], out: detailed_out)
+      end
+
+      expect(default_out.string).to include("Blocked task")
+      expect(default_out.string).not_to include("kanban_tag_reason")
+      expect(detailed_out.string).to include("kanban_tag_reason label=blocked reason=blocked by review finding")
+      expect(detailed_out.string).to include('kanban_tag_details label=blocked {"run_ref":"run-1"}')
+    end
+  end
+
   it "shows current kanban tasks and hides resolved ones even when runtime storage is stale" do
     Dir.mktmpdir do |dir|
       task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))

@@ -330,7 +330,7 @@ def normalize_task_summary(task: dict[str, Any], *, project_title: str) -> dict[
     }
 
 
-def normalize_task_detail(task: dict[str, Any], *, project_title: str) -> dict[str, Any]:
+def normalize_task_detail(task: dict[str, Any], *, project_title: str, label_reasons: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     normalized = dict(task)
     normalized["ref"] = canonical_human_task_ref_for_task(task, project_title=project_title)
     normalized["short_ref"] = short_task_ref(task)
@@ -339,6 +339,8 @@ def normalize_task_detail(task: dict[str, Any], *, project_title: str) -> dict[s
     normalized["index"] = task_index(task)
     normalized["done"] = bool(task.get("done", False))
     normalized["is_archived"] = bool(task.get("is_archived", False))
+    if label_reasons is not None:
+        normalized["label_reasons"] = label_reasons
     return normalized
 
 
@@ -402,6 +404,7 @@ def normalize_task_snapshot(
             for tag in tags
         )
     )
+    label_reasons = list_task_label_reasons(base_url, token, task_id)
     blocked_refs = tuple(
         ref
         for item in related_tasks.get("blocked", [])
@@ -418,6 +421,7 @@ def normalize_task_snapshot(
         "description_summary": summarize_description(description),
         "description_source": description_source,
         "labels": list(label_titles),
+        "label_reasons": label_reasons,
         "blocking_task_refs": list(sorted(set(blocked_refs))),
         "parent_refs": parent_refs,
         "parent_ref": parent_refs[0] if parent_refs else None,
@@ -455,6 +459,7 @@ def normalize_task_watch_summary(
         "done": bool(task.get("done", False)),
         "is_archived": bool(task.get("is_archived", False)),
         "parent_ref": parent_refs[0] if parent_refs else None,
+        "label_reasons": list_task_label_reasons(base_url, token, task_id),
     }
 
 
@@ -1530,7 +1535,7 @@ def cmd_task_get(args: argparse.Namespace) -> int:
     )
     task = get_task_with_status(base_url, token, task_id)
     project_title = resolve_project_title(base_url, token, project_id=int(task["project_id"]))
-    return print_json(normalize_task_detail(task, project_title=project_title))
+    return print_json(normalize_task_detail(task, project_title=project_title, label_reasons=list_task_label_reasons(base_url, token, task_id)))
 
 
 def cmd_task_relation_list(args: argparse.Namespace) -> int:

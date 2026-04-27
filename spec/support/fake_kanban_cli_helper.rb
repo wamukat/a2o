@@ -77,7 +77,8 @@ module FakeKanbanCliHelper
               "status" => item["status"],
               "done" => item["done"] == true,
               "is_archived" => item["is_archived"] == true,
-              "parent_ref" => item["parent_ref"]
+              "parent_ref" => item["parent_ref"],
+              "label_reasons" => Array(item["label_reasons"])
             }
           end.reject { |item| item["done"] || item["is_archived"] }
           print JSON.generate(rendered)

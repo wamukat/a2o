@@ -101,10 +101,13 @@ The adapter exposes these APIs conservatively:
 
 - `task-label-add` accepts optional `--reason` and `--details-json` / `--details-file`. When the connected Kanbalone supports reasoned tag attach, the adapter sends the reason metadata. Older Kanbalone instances fall back to the existing `tagIds` update and silently drop reason metadata.
 - `task-label-reason-list` returns current tags with `reason`, `details`, `reason_comment_id`, and `attached_at` when supported. Older Kanbalone instances return the current tag list with null reason fields.
+- `task-get` and `task-watch-summary-list` include `label_reasons` when reason metadata can be read. Missing reasons remain `null` / unspecified and do not block reads.
 - `task-event-create` writes an opaque structured event when supported. If the API is unavailable, callers must provide `--fallback-comment` or `--fallback-comment-file` so the adapter can preserve a human-readable timeline comment.
 - `task-event-list` returns structured events when supported and an empty list when the API is unavailable.
 
 Structured events are an automation log surface, not a replacement for the current status/tag model.
+
+Reasoned tag metadata is shown only in detail-oriented operator surfaces. `watch-summary --details` may render `kanban_tag_reason` / `kanban_tag_details` lines, while normal `watch-summary` output stays compact.
 
 A2O emits structured Kanbalone events for these lifecycle points when the connected adapter supports `task-event-create`:
 

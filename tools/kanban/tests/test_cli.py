@@ -49,7 +49,7 @@ class KanbaloneCliTest(unittest.TestCase):
             kanban_cli,
             "relation_tasks_payload",
             return_value={"parenttask": [{"id": 51, "ref": "A2O#51"}]},
-        ):
+        ), patch.object(kanban_cli, "list_task_label_reasons", return_value=[]):
             normalized = kanban_cli.normalize_task_watch_summary(
                 "http://localhost:3000",
                 "",
@@ -68,7 +68,10 @@ class KanbaloneCliTest(unittest.TestCase):
             "is_archived": True,
         }
 
-        with patch.object(kanban_cli, "relation_tasks_payload", return_value={"parenttask": []}):
+        with (
+            patch.object(kanban_cli, "relation_tasks_payload", return_value={"parenttask": []}),
+            patch.object(kanban_cli, "list_task_label_reasons", return_value=[]),
+        ):
             normalized = kanban_cli.normalize_task_watch_summary(
                 "http://localhost:3000",
                 "",
@@ -108,6 +111,7 @@ class KanbaloneCliTest(unittest.TestCase):
             patch.object(kanban_cli, "resolve_project_title", return_value="A2O"),
             patch.object(kanban_cli, "get_columns", return_value=[{"id": 9, "title": "To do"}]),
             patch.object(kanban_cli, "relation_tasks_payload", return_value={"parenttask": []}),
+            patch.object(kanban_cli, "list_task_label_reasons", return_value=[]),
             contextlib.redirect_stdout(io.StringIO()) as stdout,
         ):
             self.assertEqual(0, kanban_cli.cmd_task_watch_summary_list(args))
@@ -261,6 +265,55 @@ class KanbaloneCliTest(unittest.TestCase):
             ],
             result,
         )
+
+    def test_task_get_includes_label_reason_metadata(self) -> None:
+        args = SimpleNamespace(
+            backend="kanbalone",
+            base_url="http://localhost:3460",
+            token="",
+            task_id=42,
+            task=None,
+            project_id=None,
+            project="A2O",
+        )
+
+        with (
+            patch.object(
+                kanban_cli,
+                "get_task_with_status",
+                return_value={
+                    "id": 42,
+                    "project_id": 2,
+                    "reference": "A2O#42",
+                    "identifier": "#42",
+                    "index": 42,
+                    "title": "Blocked task",
+                    "done": False,
+                },
+            ),
+            patch.object(kanban_cli, "resolve_project_title", return_value="A2O"),
+            patch.object(
+                kanban_cli,
+                "list_task_label_reasons",
+                return_value=[
+                    {
+                        "id": 12,
+                        "title": "blocked",
+                        "description": "",
+                        "hex_color": "#cc3f3f",
+                        "reason": "blocked by test",
+                        "details": {"run_ref": "run-1"},
+                        "reason_comment_id": None,
+                        "attached_at": None,
+                    }
+                ],
+            ),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            self.assertEqual(0, kanban_cli.cmd_task_get(args))
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual("blocked by test", payload["label_reasons"][0]["reason"])
 
     def test_create_task_event_writes_structured_event_when_supported(self) -> None:
         with patch.object(
@@ -761,6 +814,22 @@ class KanbaloneCliTest(unittest.TestCase):
                     "tags": [{"id": 1, "name": "trigger:auto-implement"}],
                 },
             ),
+            patch.object(
+                kanban_cli,
+                "list_task_label_reasons",
+                return_value=[
+                    {
+                        "id": 2,
+                        "title": "blocked",
+                        "description": "",
+                        "hex_color": "#cc3f3f",
+                        "reason": "blocked by test",
+                        "details": {"run_ref": "run-1"},
+                        "reason_comment_id": None,
+                        "attached_at": "2026-04-27T00:00:00Z",
+                    }
+                ],
+            ),
         ):
             snapshot = kanban_cli.normalize_task_snapshot(
                 "http://localhost:3460",
@@ -786,6 +855,7 @@ class KanbaloneCliTest(unittest.TestCase):
         self.assertEqual("Heading first line second line", snapshot["description_summary"])
         self.assertEqual("detail", snapshot["description_source"])
         self.assertEqual(["trigger:auto-implement"], snapshot["labels"])
+        self.assertEqual("blocked by test", snapshot["label_reasons"][0]["reason"])
 
     def test_task_snapshot_falls_back_to_list_description_when_detail_omits_body(self) -> None:
         with (
@@ -807,6 +877,7 @@ class KanbaloneCliTest(unittest.TestCase):
                     "tags": [{"id": 1, "name": "trigger:auto-implement"}],
                 },
             ),
+            patch.object(kanban_cli, "list_task_label_reasons", return_value=[]),
         ):
             snapshot = kanban_cli.normalize_task_snapshot(
                 "http://localhost:3460",

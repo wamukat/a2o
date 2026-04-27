@@ -101,10 +101,13 @@ Kanbalone `v0.9.21` は、チケットに付与されたタグの任意の理由
 
 - `task-label-add` は任意の `--reason` と `--details-json` / `--details-file` を受け取る。接続先 Kanbalone が理由付きタグ付与に対応している場合は理由メタデータを送る。古い Kanbalone では既存の `tagIds` 更新へ fallback し、理由メタデータは破棄する。
 - `task-label-reason-list` は対応時に現在のタグを `reason`、`details`、`reason_comment_id`、`attached_at` 付きで返す。古い Kanbalone では現在のタグ一覧に null の理由フィールドを付けて返す。
+- `task-get` と `task-watch-summary-list` は、理由メタデータが読める場合に `label_reasons` を含める。理由がない場合は null / 未指定として扱い、読み取りを止めない。
 - `task-event-create` は対応時に opaque な構造化イベントを書き込む。API がない場合、呼び出し側は `--fallback-comment` または `--fallback-comment-file` を渡し、アダプターが人間向け timeline comment を維持できるようにする。
 - `task-event-list` は対応時に構造化イベントを返し、API がない場合は空配列を返す。
 
 構造化イベントは automation log の surface であり、現在の status / tag モデルの置き換えではない。
+
+理由付きタグのメタデータは、詳細確認向けの operator surface にだけ表示する。`watch-summary --details` では `kanban_tag_reason` / `kanban_tag_details` 行を出すことがあるが、通常の `watch-summary` はコンパクトなままにする。
 
 A2O は接続先アダプターが `task-event-create` に対応している場合、次の lifecycle point を構造化 Kanbalone event として書き込む。
 

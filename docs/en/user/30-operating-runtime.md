@@ -61,6 +61,7 @@ a2o runtime describe-task <task-ref>
 
 `describe-task` gathers run state, phases, workspace details, evidence, kanban comments, log hints, skill feedback summaries, and agent artifact commands.
 When a task is blocked by an invalid worker result, `describe-task` prints `execution_validation_error=` or `blocked_validation_error=` lines with the worker result schema errors. `watch-summary --details` also includes `validation_error=` detail lines for blocked tasks.
+When Kanbalone exposes reason metadata for blocked or clarification labels, `describe-task` includes it in the kanban task section and `watch-summary --details` prints `kanban_tag_reason=` detail lines. Normal `watch-summary` output does not show those extra lines.
 When a worker cannot continue because the product requirement is ambiguous or conflicting, it can return `clarification_request`. A2O stores the task as `needs_clarification`, adds the `needs:clarification` kanban label, posts the question/context/options/impact as a kanban comment, and excludes the task from scheduling until the requester answers and the clarification label/state is cleared.
 
 For prompt / skill / worker-command PDCA, A2O now persists:

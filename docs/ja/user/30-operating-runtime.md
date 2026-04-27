@@ -61,6 +61,7 @@ a2o runtime describe-task <task-ref>
 
 `describe-task` は実行、フェーズ、ワークスペース、証跡、カンバンコメント、ログの手がかり、skill feedback 要約、エージェント成果物の読み方をまとめて表示する。
 不正な worker result によりタスクが blocked になった場合、`describe-task` は worker result schema error を `execution_validation_error=` または `blocked_validation_error=` 行として表示する。`watch-summary --details` でも blocked タスクの詳細行に `validation_error=` が表示される。
+Kanbalone が blocked / clarification ラベルの理由メタデータを返す場合、`describe-task` は kanban task セクションにそれを含め、`watch-summary --details` は `kanban_tag_reason=` の詳細行を表示する。通常の `watch-summary` にはこれらの追加行を出さない。
 worker がプロダクト仕様の曖昧さや矛盾により安全に続行できない場合は `clarification_request` を返せる。A2O はタスクを `needs_clarification` として保存し、Kanban に `needs:clarification` ラベルを付け、質問・背景・選択肢・影響をコメントに残し、依頼者の回答後にラベル／状態が解除されるまでスケジューラ対象外にする。
 
 prompt / skill / worker command の改善に使うため、A2O は次の分析用 artifact を永続化する。

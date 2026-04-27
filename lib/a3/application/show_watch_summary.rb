@@ -4,6 +4,7 @@ require_relative "../domain/task_phase_projection"
 require_relative "../domain/runnable_task_assessment"
 require_relative "../domain/scheduler_selection_policy"
 require_relative "../domain/upstream_line_guard"
+require "json"
 require "time"
 
 module A3
@@ -104,8 +105,8 @@ module A3
         running_entry = build_running_entry(runtime_task, run: current_run)
         runnable_phase = task.runnable_phase
         upstream_assessment = @upstream_line_guard.evaluate(task: task, phase: runnable_phase, tasks: tasks, runs: runs)
-        blocked_lines = build_detail_lines(runtime_task, task_runs, assessment, upstream_assessment)
         kanban_snapshot = resolve_kanban_snapshot(task)
+        blocked_lines = build_detail_lines(runtime_task, task_runs, assessment, upstream_assessment, kanban_snapshot: kanban_snapshot)
         waiting = waiting_assessment?(assessment) || !upstream_assessment.healthy?
 
         TaskEntry.new(
@@ -210,12 +211,13 @@ module A3
         %i[in_progress in_review verifying merging].include?(status)
       end
 
-      def build_detail_lines(task, task_runs, assessment, upstream_assessment)
+      def build_detail_lines(task, task_runs, assessment, upstream_assessment, kanban_snapshot: nil)
         lines = []
         latest_run = task_runs.last
         if task.verification_source_ref
           lines << "merge_recovery verification_source_ref=#{task.verification_source_ref}"
         end
+        append_kanban_tag_reason_lines(lines, kanban_snapshot)
         append_review_disposition_lines(lines, task_runs)
         unless upstream_assessment.healthy?
           lines << "waiting_reason=#{upstream_assessment.reason}"
@@ -241,6 +243,23 @@ module A3
           end
         end
         lines.freeze
+      end
+
+      def append_kanban_tag_reason_lines(lines, kanban_snapshot)
+        return unless kanban_snapshot.is_a?(Hash)
+
+        Array(kanban_snapshot["label_reasons"]).each do |item|
+          next unless item.is_a?(Hash)
+
+          reason = single_line(item["reason"])
+          next unless present?(reason)
+
+          label = single_line(item["title"] || item["name"] || item.dig("tag", "title") || item.dig("tag", "name"))
+          label_part = present?(label) ? " label=#{label}" : ""
+          lines << "kanban_tag_reason#{label_part} reason=#{reason}"
+          details = item["details"]
+          lines << "kanban_tag_details#{label_part} #{JSON.generate(details)}" if details.is_a?(Hash) && !details.empty?
+        end
       end
 
       def append_validation_error_lines(lines, diagnostics)
