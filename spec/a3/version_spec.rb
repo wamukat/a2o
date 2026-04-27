@@ -23,4 +23,18 @@ RSpec.describe "A3 version" do
 
     expect(gemspec).to include(%(spec.version = "#{A3::VERSION}"))
   end
+
+  it "keeps bundled Kanbalone default image aligned with the documented release surface" do
+    expected_image = "ghcr.io/wamukat/kanbalone:v0.9.21"
+    repo_root = File.expand_path("../..", __dir__)
+    release_compose = File.read(File.join(repo_root, "docker/compose/a2o-kanbalone.release.yml"))
+    dev_compose = File.read(File.join(repo_root, "docker/compose/a2o-kanbalone.yml"))
+    english_surface = File.read(File.join(repo_root, "docs/en/user/80-current-release-surface.md"))
+    japanese_surface = File.read(File.join(repo_root, "docs/ja/user/80-current-release-surface.md"))
+
+    expect(release_compose).to include("KANBALONE_IMAGE:-#{expected_image}")
+    expect(dev_compose).to include("KANBALONE_IMAGE:-#{expected_image}")
+    expect(english_surface).to include("Kanbalone `v0.9.21`")
+    expect(japanese_surface).to include("Kanbalone イメージは `v0.9.21`")
+  end
 end
