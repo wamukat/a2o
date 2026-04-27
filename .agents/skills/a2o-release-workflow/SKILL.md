@@ -29,6 +29,11 @@ An A2O release is not complete until all of the following are true:
 2. Verify locally.
    - Run focused release verification first.
    - Run broader verification when the blast radius warrants it.
+   - For behavior-changing releases or accumulated unreleased work, build a local RC runtime image and run the host-path smoke before tagging:
+     - build/tag the local image as `ghcr.io/wamukat/a2o-engine:<version>-local`
+     - run `VERSION=<version> agent-go/scripts/validation-local-rc-smoke.sh`
+     - record the local image ID, smoke output, and any expected local-only digest limitations on the release ticket
+   - The local RC smoke must exercise the installed host launcher, not only direct Ruby/runtime internals. It should catch project package validation drift, local image diagnostics, agent package export/install, and user-facing runtime commands before GHCR publish.
    - For release-reference-only changes, verify with targeted commands such as version specs, CLI specs, `git diff --check`, and stale-version searches; do not rerun the full suite after every small follow-up unless behavior changed or the previous full-suite result is stale.
    - Run the full suite once before tagging when the release candidate includes behavior changes or accumulated unreleased work warrants it. If a later review fix only touches release metadata, release bookkeeping constants that do not affect build/publish/runtime behavior, docs, or CLI help text, repeat only the focused checks that cover that fix.
    - Re-run the full suite after a follow-up fix when it touches runtime behavior, dependencies, build/package logic, a CLI execution path beyond help text, or when the previous full-suite result no longer corresponds to the candidate being tagged.

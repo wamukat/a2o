@@ -762,13 +762,19 @@ func runtimeImageComparisonStatus(expected string, actual string, expectedImageI
 		}
 		return "mismatch"
 	}
-	if expectedDigest == "" && actualDigest == "" && strings.TrimSpace(expectedImageID) != "" && strings.TrimSpace(actualImageID) != "" {
-		if strings.TrimSpace(expectedImageID) == strings.TrimSpace(actualImageID) {
+	expectedID := imageIDIdentity(expectedImageID)
+	actualID := imageIDIdentity(actualImageID)
+	if expectedDigest == "" && actualDigest == "" && expectedID != "" && actualID != "" {
+		if expectedID == actualID {
 			return "current"
 		}
 		return "mismatch"
 	}
 	return "unknown"
+}
+
+func imageIDIdentity(imageID string) string {
+	return strings.TrimPrefix(strings.TrimSpace(imageID), "sha256:")
 }
 
 func runtimeImageLatestAction(status string, latestRef string) string {

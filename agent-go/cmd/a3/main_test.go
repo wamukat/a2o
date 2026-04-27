@@ -6777,10 +6777,11 @@ func TestRuntimeImageDigestUsesImageIDFallbackForLocalImages(t *testing.T) {
 	})
 	runner := &fakeRunner{
 		containerImageIDs: map[string]string{
-			"runtime-container": "image-123",
+			"runtime-container": "sha256:image-123",
 		},
 		imageInspectDigests: map[string]string{
 			"image-123": "",
+			"sha256:image-123": "",
 		},
 	}
 	var stdout bytes.Buffer
@@ -6798,7 +6799,7 @@ func TestRuntimeImageDigestUsesImageIDFallbackForLocalImages(t *testing.T) {
 		"runtime_image_pinned_ref=ghcr.io/wamukat/a2o-engine:0.5.37-local",
 		"runtime_image_pinned_digest=unavailable",
 		"runtime_image_pinned_image_id=image-123",
-		"runtime_image_running_container=runtime-container image_id=image-123 digest=unavailable",
+		"runtime_image_running_container=runtime-container image_id=sha256:image-123 digest=unavailable",
 		"runtime_image_running_status=current action=none",
 	} {
 		if !strings.Contains(stdout.String(), want) {
