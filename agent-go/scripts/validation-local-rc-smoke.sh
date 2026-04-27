@@ -62,9 +62,9 @@ if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
 fi
 
 HOST_INSTALL_DIR="${WORK_DIR}/host-install"
-PACKAGE_DIR="${WORK_DIR}/project-package"
-SOURCE_DIR="${WORK_DIR}/repo/app"
 WORKSPACE_DIR="${WORK_DIR}/workspace"
+PACKAGE_DIR="${WORKSPACE_DIR}/project-package"
+SOURCE_DIR="${WORKSPACE_DIR}/repo/app"
 HOST_A2O="${HOST_INSTALL_DIR}/bin/a2o"
 KANBALONE_PORT="${KANBALONE_PORT:-"$(find_free_port)"}"
 AGENT_PORT="${AGENT_PORT:-"$(find_free_port)"}"
@@ -149,12 +149,19 @@ run_a2o project bootstrap \
   run_a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent --build
   run_a2o doctor | tee "${WORK_DIR}/doctor.out"
   run_a2o runtime image-digest | tee "${WORK_DIR}/image-digest.out"
+  run_a2o runtime run-once --max-steps 0 --agent-attempts 1 --agent-poll-interval 1s | tee "${WORK_DIR}/runtime-run-once.out"
   run_a2o runtime down
 )
 
 grep -Fq "doctor_status=ok" "${WORK_DIR}/doctor.out"
 grep -Fq "runtime_image_pinned_image_id=" "${WORK_DIR}/image-digest.out"
 grep -Fq "runtime_image_running_status=current action=none" "${WORK_DIR}/image-digest.out"
+grep -Fq "runtime_agent_export target=" "${WORK_DIR}/runtime-run-once.out"
+grep -Fq "kanban_run_once_finished exit=0" "${WORK_DIR}/runtime-run-once.out"
+if grep -Fq "removed A3 runtime package command" "${WORK_DIR}/runtime-run-once.out"; then
+  echo "runtime run-once used removed A3 agent package command" >&2
+  exit 1
+fi
 
 repo_digests="$(docker image inspect "${IMAGE}" --format '{{json .RepoDigests}}')"
 if [[ "${EXPECT_LOCAL_NO_DIGEST}" == "1" && "${repo_digests}" == "[]" ]]; then
