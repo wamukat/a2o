@@ -89,7 +89,7 @@ docker run --rm \
     --runtime-image ghcr.io/wamukat/a2o-engine:0.5.36
 ```
 
-The container command copies platform binaries such as `a2o-darwin-amd64` and `a2o-linux-amd64`, copies A2O distribution assets such as the standard compose file under `$HOME/.local/share/a2o`, records the runtime image used by later `a2o kanban ...` commands, then writes a host-side `a2o` shell wrapper that selects the right binary with `uname`. Compatibility `a3` launchers are also installed. Mount the install prefix, not only the `bin` directory, so the share assets are exported to the host. The host does not need Ruby.
+The container command copies platform binaries such as `a2o-darwin-amd64` and `a2o-linux-amd64`, copies A2O distribution assets such as the standard compose file under `$HOME/.local/share/a2o`, records the runtime image used by later `a2o kanban ...` commands, then writes a host-side `a2o` shell wrapper that selects the right binary with `uname`. Legacy `a3` launchers are not installed; existing files are removed during host install. Mount the install prefix, not only the `bin` directory, so the share assets are exported to the host. The host does not need Ruby.
 
 Detect the package target for the current host:
 

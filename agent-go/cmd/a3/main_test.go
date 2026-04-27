@@ -131,8 +131,8 @@ func TestAgentInstallExportsAgentFromRuntimeImage(t *testing.T) {
 	assertCallContains(t, joined, "docker compose -p test-project -f compose.yml build a2o-runtime")
 	assertCallContains(t, joined, "docker compose -p test-project -f compose.yml up -d --no-deps a2o-runtime")
 	assertCallContains(t, joined, "docker compose -p test-project -f compose.yml ps -q a2o-runtime")
-	assertCallContains(t, joined, "docker exec container-123 a3 agent package verify --target darwin-amd64")
-	assertCallContains(t, joined, "docker exec container-123 a3 agent package export --target darwin-amd64 --output /tmp/a2o-agent-export")
+	assertCallContains(t, joined, "docker exec container-123 a2o agent package verify --target darwin-amd64")
+	assertCallContains(t, joined, "docker exec container-123 a2o agent package export --target darwin-amd64 --output /tmp/a2o-agent-export")
 	assertCallContains(t, joined, "docker cp container-123:/tmp/a2o-agent-export "+outputPath)
 }
 
@@ -199,7 +199,7 @@ func TestAgentInstallAutoFallsBackToRuntimeImageWhenEnvPackageDirIsInvalid(t *te
 	if code != 0 {
 		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 	}
-	assertCallContains(t, runner.joinedCalls(), "docker exec container-123 a3 agent package verify --target darwin-amd64")
+	assertCallContains(t, runner.joinedCalls(), "docker exec container-123 a2o agent package verify --target darwin-amd64")
 	if !strings.Contains(stdout.String(), "source=runtime-image") {
 		t.Fatalf("stdout should report runtime-image fallback, got %q", stdout.String())
 	}
@@ -2931,7 +2931,7 @@ func TestAgentInstallUsesBootstrappedInstanceConfig(t *testing.T) {
 	joined := runner.joinedCalls()
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d --no-deps a2o-runtime")
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml ps -q a2o-runtime")
-	assertCallContains(t, joined, "docker exec container-123 a3 agent package verify --target linux-amd64")
+	assertCallContains(t, joined, "docker exec container-123 a2o agent package verify --target linux-amd64")
 	assertCallContains(t, joined, "docker cp container-123:/tmp/a2o-agent-export "+filepath.Join(tempDir, hostAgentBinRelativePath))
 }
 

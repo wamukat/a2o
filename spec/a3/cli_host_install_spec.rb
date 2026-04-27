@@ -24,6 +24,9 @@ RSpec.describe "A3 host install CLI" do
     share_source_dir = File.join(@tmp_dir, "share-source")
     write_share_asset(share_source_dir, "docker/compose/a2o-kanbalone.yml", "services: {}\n")
     output_dir = File.join(@tmp_dir, "out")
+    FileUtils.mkdir_p(output_dir)
+    File.write(File.join(output_dir, "a3"), "old wrapper\n")
+    File.write(File.join(output_dir, "a3-darwin-amd64"), "old launcher\n")
     share_dir = File.join(@tmp_dir, "share-out")
     out = StringIO.new
 

@@ -48,7 +48,7 @@ Current user-facing install flows rely on the runtime image as the source of pac
 
 - `a2o host install`
 - `a2o agent install`
-- `a3 agent package list|verify|export`
+- `a2o agent package list|verify|export`
 
 The runtime image contains `/opt/a2o/agents/release-manifest.jsonl` plus per-target archives, and the install/export commands read from that package store.
 
@@ -72,10 +72,10 @@ This makes the current user experience simple, but it makes release publish slow
 
 The package-set contract is now:
 
-- `release-manifest.jsonl` remains the archive inventory for `a3 agent package list|verify|export`
+- `release-manifest.jsonl` remains the archive inventory for `a2o agent package list|verify|export`
 - `package-compatibility.json` is the package-set compatibility contract
 - the consuming runtime version and the package-set `runtime_version` must match exactly
-- `a3 host install` validates the contract when a package directory exposes either the compatibility file or the archive manifest
+- `a2o host install` validates the contract when a package directory exposes either the compatibility file or the archive manifest
 
 Legacy package directories without either file still work for host-launcher-only fixtures, but published package sets are expected to carry the compatibility contract.
 

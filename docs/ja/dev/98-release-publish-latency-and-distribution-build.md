@@ -48,7 +48,7 @@
 
 - `a2o host install`
 - `a2o agent install`
-- `a3 agent package list|verify|export`
+- `a2o agent package list|verify|export`
 
 runtime image には `/opt/a2o/agents/release-manifest.jsonl` と target 別 archive が含まれ、install/export command はその package store を読む。
 
@@ -72,10 +72,10 @@ runtime image には `/opt/a2o/agents/release-manifest.jsonl` と target 別 arc
 
 現在の package-set contract は次のとおり。
 
-- `release-manifest.jsonl` は `a3 agent package list|verify|export` 用の archive inventory として残す
+- `release-manifest.jsonl` は `a2o agent package list|verify|export` 用の archive inventory として残す
 - `package-compatibility.json` を package-set compatibility contract とする
 - package set を読む runtime version と、package set が持つ `runtime_version` は完全一致を要求する
-- `a3 host install` は、package directory に compatibility file または archive manifest がある場合、この contract を検証する
+- `a2o host install` は、package directory に compatibility file または archive manifest がある場合、この contract を検証する
 
 どちらの file も持たない legacy package directory は host launcher fixture 用として引き続き許容するが、公開する package set には compatibility contract を持たせる前提にする。
 

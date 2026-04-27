@@ -147,10 +147,10 @@ func runAgentInstall(args []string, runner commandRunner, stdout io.Writer, stde
 		return err
 	}
 
-	if _, err := runExternal(runner, "docker", "exec", containerID, "a3", "agent", "package", "verify", "--target", resolvedTarget); err != nil {
+	if _, err := runExternal(runner, "docker", "exec", containerID, "a2o", "agent", "package", "verify", "--target", resolvedTarget); err != nil {
 		return err
 	}
-	if _, err := runExternal(runner, "docker", "exec", containerID, "a3", "agent", "package", "export", "--target", resolvedTarget, "--output", *runtimeOutput); err != nil {
+	if _, err := runExternal(runner, "docker", "exec", containerID, "a2o", "agent", "package", "export", "--target", resolvedTarget, "--output", *runtimeOutput); err != nil {
 		return err
 	}
 	if _, err := runExternal(runner, "docker", "cp", containerID+":"+*runtimeOutput, outputPath); err != nil {

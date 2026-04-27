@@ -968,7 +968,7 @@ module A3
       subject = argv.shift
       action = argv.shift
       unless subject == "package" && %w[list export verify].include?(action)
-        raise ArgumentError, "usage: a3 agent package list|export|verify"
+        raise ArgumentError, "usage: a2o agent package list|export|verify"
       end
 
       options = parse_agent_package_options(argv)
@@ -1003,7 +1003,7 @@ module A3
     def handle_host(argv, out:)
       action = argv.shift
       unless action == "install"
-        raise ArgumentError, "usage: a3 host install --output-dir DIR"
+        raise ArgumentError, "usage: a2o host install --output-dir DIR"
       end
 
       options = parse_host_install_options(argv)
@@ -1018,6 +1018,7 @@ module A3
       wrapper_path = File.join(output_dir, "a2o")
       File.write(wrapper_path, host_launcher_wrapper)
       FileUtils.chmod(0o755, wrapper_path)
+      remove_legacy_host_launchers(output_dir: output_dir)
 
       out.puts("host_launcher_installed output=#{wrapper_path} targets=#{installed_targets.join(',')}")
       out.puts("host_share_installed output=#{installed_share_dir}") if installed_share_dir
@@ -1163,6 +1164,11 @@ module A3
       raise A3::Domain::ConfigurationError, "host launcher binaries not found under #{package_dir}" if targets.empty?
 
       targets
+    end
+
+    def remove_legacy_host_launchers(output_dir:)
+      Dir.glob(File.join(output_dir, "a3-*")).each { |path| FileUtils.rm_f(path) }
+      FileUtils.rm_f(File.join(output_dir, "a3"))
     end
 
     def validate_host_package_dir!(package_dir)
