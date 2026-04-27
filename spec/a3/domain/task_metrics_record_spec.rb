@@ -107,9 +107,23 @@ RSpec.describe A3::Domain::TaskMetricsRecord do
       described_class.from_project_metrics(
         task_ref: "MemberPortal#65",
         timestamp: timestamp,
-        payload: { "timing" => { "total_seconds" => 12 } }
+        payload: { "unsupported" => {} }
       )
-    end.to raise_error(ArgumentError, "task metrics payload contains unsupported section(s): timing")
+    end.to raise_error(ArgumentError, "task metrics payload contains unsupported section(s): unsupported")
+  end
+
+  it "accepts timing and cost sections from the metrics payload when runtime values are not provided" do
+    record = described_class.from_project_metrics(
+      task_ref: "MemberPortal#65",
+      timestamp: timestamp,
+      payload: {
+        "timing" => { "total_seconds" => 12 },
+        "cost" => { "ai_requests" => 1 }
+      }
+    )
+
+    expect(record.timing).to eq("total_seconds" => 12)
+    expect(record.cost).to eq("ai_requests" => 1)
   end
 
   it "rejects project metadata that does not match the runtime task context" do
