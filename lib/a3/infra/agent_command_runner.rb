@@ -32,7 +32,7 @@ module A3
         summaries = []
         artifacts = []
         Array(commands).each do |command|
-          command_env = default_env.merge(workspace_automation_env(workspace)).merge(@env).merge(env)
+          command_env = default_env(@env.merge(env)).merge(workspace_automation_env(workspace)).merge(@env).merge(env)
           expanded_command = expand_command_placeholders(command, workspace: workspace, env: command_env)
           request = build_job_request(command: expanded_command, workspace: workspace, env: command_env, task: task, run: run, command_intent: command_intent, worker_protocol_request: worker_protocol_request)
           record = enqueue(request)
@@ -179,7 +179,12 @@ module A3
         )
       end
 
-      def default_env
+      def default_env(overrides = {})
+        if ENV.key?("A3_ROOT_DIR") && !ENV.key?("A2O_ROOT_DIR") && !overrides.transform_keys(&:to_s).key?("A2O_ROOT_DIR")
+          raise KeyError,
+                "removed A3 root utility input: environment variable A3_ROOT_DIR; migration_required=true replacement=environment variable A2O_ROOT_DIR"
+        end
+
         {
           "A2O_ROOT_DIR" => ENV.fetch("A2O_ROOT_DIR", Dir.pwd)
         }

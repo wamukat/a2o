@@ -191,6 +191,29 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(request.env.fetch("A2O_ROOT_DIR")).to eq("/host/a2o")
   end
 
+  it "rejects legacy A3_ROOT_DIR when A2O_ROOT_DIR is absent" do
+    original_public = ENV.delete("A2O_ROOT_DIR")
+    original_legacy = ENV["A3_ROOT_DIR"]
+    ENV["A3_ROOT_DIR"] = "/tmp/legacy-root"
+    runner = described_class.new(
+      control_plane_client: client,
+      runtime_profile: "docker-dev-env",
+      shared_workspace_mode: "same-path",
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_) {}
+    )
+
+    expect do
+      runner.run(["task verify"], workspace: workspace, task: task, run: run)
+    end.to raise_error(
+      KeyError,
+      /removed A3 root utility input: environment variable A3_ROOT_DIR; migration_required=true replacement=environment variable A2O_ROOT_DIR/
+    )
+  ensure
+    original_public ? ENV["A2O_ROOT_DIR"] = original_public : ENV.delete("A2O_ROOT_DIR")
+    original_legacy ? ENV["A3_ROOT_DIR"] = original_legacy : ENV.delete("A3_ROOT_DIR")
+  end
+
   it "expands public command placeholders before enqueueing agent jobs" do
     client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :succeeded, 0)) }
     runner = described_class.new(
