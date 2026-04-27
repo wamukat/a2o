@@ -199,6 +199,7 @@ module A3
           status = String(item["status"]).strip
           next if ref.empty? || task_id.nil?
           next if !status.empty? && blocking_status_resolved?(status)
+          next if item["is_archived"] == true || item["isArchived"] == true
 
           refs << [ref, task_id]
         end

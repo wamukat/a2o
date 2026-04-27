@@ -220,6 +220,46 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
+  it "does not keep archived blockers in task topology" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 8000,
+          "ref" => "Sample#8000",
+          "status" => "To do",
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "blocking_task_refs" => ["Sample#8001"]
+        },
+        {
+          "id" => 8001,
+          "ref" => "Sample#8001",
+          "status" => "To do",
+          "is_archived" => true,
+          "labels" => ["repo:ui-app", "trigger:auto-implement"]
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-implement"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+      task = tasks.find { |candidate| candidate.ref == "Sample#8000" }
+
+      expect(tasks.map(&:ref)).to eq(["Sample#8000"])
+      expect(task.blocking_task_refs).to eq([])
+    end
+  end
+
   it "builds parent tasks when imported snapshots reference them as children" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,
