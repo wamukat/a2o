@@ -472,6 +472,7 @@ def validate_payload(payload, request:)
       valid_repo_scopes = valid_review_disposition_repo_scopes(request, include_unresolved: true)
       errors << "review_disposition.kind must be one of #{valid_kinds.join(', ')}" unless valid_kinds.include?(disposition["kind"])
       errors << "review_disposition.repo_scope must be one of #{valid_repo_scopes.join(', ')}" unless valid_repo_scopes.include?(disposition["repo_scope"])
+      errors << "review_disposition.kind must be completed when success is true for parent review" if payload["success"] == true && disposition["kind"] != "completed"
     elsif implementation_phase
       valid_repo_scopes = valid_review_disposition_repo_scopes(request, include_unresolved: false)
       errors << "review_disposition.kind must be completed for implementation evidence" unless disposition["kind"] == "completed"

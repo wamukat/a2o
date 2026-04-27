@@ -236,6 +236,9 @@ module A3
             unless valid_repo_scopes.include?(disposition["repo_scope"])
               errors << "review_disposition.repo_scope must be one of #{valid_repo_scopes.join(', ')}"
             end
+            if worker_response["success"] == true && disposition["kind"] != "completed"
+              errors << "review_disposition.kind must be completed when success is true for parent review"
+            end
           elsif implementation_phase
             valid_repo_scopes = valid_review_disposition_repo_scopes(workspace, include_unresolved: false)
             errors << "review_disposition.kind must be completed for implementation evidence" unless disposition["kind"] == "completed"

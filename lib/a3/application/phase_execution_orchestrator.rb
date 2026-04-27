@@ -61,12 +61,13 @@ module A3
 
       def completion_outcome_for(task:, run:, execution:)
         return :verification_required if execution.success? && run.phase == :merge && execution.merge_recovery_verification_required?
-        return :completed if execution.success?
         if task.kind == :parent && run.phase == :review
           return :follow_up_child if execution.review_disposition&.follow_up_child?
+          return :completed if execution.success? && execution.review_disposition&.completed?
 
           return :blocked
         end
+        return :completed if execution.success?
         return :retryable if run.phase == :merge && execution.merge_recovery_required?
         return :rework if run.phase == :review && execution.rework_required?
 

@@ -232,7 +232,7 @@ RSpec.describe A3::Application::PhaseExecutionOrchestrator do
     expect(result.run.terminal_outcome).to eq(:rework)
   end
 
-  it "routes parent review findings into follow-up child flow instead of blocked execution" do
+  it "routes parent review follow-up disposition before generic success completion" do
     handler_result = A3::Application::HandleParentReviewDisposition::Result.new(
       terminal_status: :todo,
       terminal_outcome: :follow_up_child,
@@ -284,7 +284,7 @@ RSpec.describe A3::Application::PhaseExecutionOrchestrator do
       )
     )
     execution = A3::Application::ExecutionResult.new(
-      success: false,
+      success: true,
       summary: "repo_beta follow-up required",
       failing_command: nil,
       observed_state: "review_findings",
@@ -314,5 +314,56 @@ RSpec.describe A3::Application::PhaseExecutionOrchestrator do
 
     expect(result.run.terminal_outcome).to eq(:follow_up_child)
     expect(handler).to have_received(:call)
+  end
+
+  it "fails closed when parent review success carries a blocked disposition" do
+    parent_task = A3::Domain::Task.new(
+      ref: "Sample#3141",
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      verification_scope: %i[repo_alpha repo_beta],
+      status: :in_review,
+      current_run_ref: "run-parent-review-blocked"
+    )
+    parent_run = A3::Domain::Run.new(
+      ref: "run-parent-review-blocked",
+      task_ref: parent_task.ref,
+      phase: :review,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :integration_record,
+        ref: "refs/heads/a2o/parent/Sample-3141",
+        task_ref: parent_task.ref
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: %i[repo_alpha repo_beta],
+        verification_scope: %i[repo_alpha repo_beta],
+        ownership_scope: :parent
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: parent_task.ref,
+        owner_scope: :parent,
+        snapshot_version: "snap-1"
+      )
+    )
+    execution = A3::Application::ExecutionResult.new(
+      success: true,
+      summary: "parent review blocked",
+      response_bundle: {
+        "rework_required" => false,
+        "review_disposition" => {
+          "kind" => "blocked",
+          "repo_scope" => "unresolved",
+          "summary" => "cannot route follow-up",
+          "description" => "No configured repo scope can handle this finding.",
+          "finding_key" => "parent-review-blocked"
+        }
+      }
+    )
+
+    outcome = orchestrator.send(:completion_outcome_for, task: parent_task, run: parent_run, execution: execution)
+
+    expect(outcome).to eq(:blocked)
   end
 end

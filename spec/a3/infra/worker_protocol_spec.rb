@@ -363,6 +363,36 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(result.skill_feedback).to eq([])
   end
 
+  it "rejects parent review success with follow-up child disposition" do
+    result = described_class.new(review_disposition_repo_scopes: %w[repo_beta]).build_execution_result(
+      {
+        "success" => true,
+        "summary" => "follow-up required",
+        "task_ref" => task.ref,
+        "run_ref" => run.ref,
+        "phase" => "review",
+        "rework_required" => false,
+        "review_disposition" => {
+          "kind" => "follow_up_child",
+          "repo_scope" => "repo_beta",
+          "summary" => "follow-up required",
+          "description" => "Reviewer found work for a child task.",
+          "finding_key" => "follow-up-1"
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: run.ref,
+      expected_phase: :review
+    )
+
+    expect(result).to have_attributes(success?: false)
+    expect(result.summary).to eq("worker result schema invalid")
+    expect(result.diagnostics.fetch("validation_errors")).to include(
+      "review_disposition.kind must be completed when success is true for parent review"
+    )
+  end
+
   def implementation_run
     A3::Domain::Run.new(
       ref: "run-implementation-1",
