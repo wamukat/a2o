@@ -198,10 +198,14 @@ module A3Reconcile
   def parse_args(argv)
     options = {}
     parser = OptionParser.new
-    parser.banner = "usage: reconcile.rb --project NAME --active-runs-file FILE --worker-runs-file FILE [options]"
+    parser.banner = "usage: reconcile.rb --project NAME --active-runs-file FILE --agent-jobs-file FILE [options]"
     parser.on("--project VALUE") { |value| options[:project] = value }
     parser.on("--active-runs-file VALUE") { |value| options[:active_runs_file] = value }
-    parser.on("--worker-runs-file VALUE") { |value| options[:worker_runs_file] = value }
+    parser.on("--agent-jobs-file VALUE") { |value| options[:agent_jobs_file] = value }
+    parser.on("--worker-runs-file VALUE") do
+      raise OptionParser::InvalidOption,
+            "removed option --worker-runs-file; migration_required=true replacement=--agent-jobs-file"
+    end
     parser.on("--launcher-config VALUE") { |value| options[:launcher_config] = value }
     parser.on("--status VALUE") { |value| options[:status] = value }
     parser.on("--task-ref VALUE") { |value| options[:task_ref] = value }
@@ -214,7 +218,7 @@ module A3Reconcile
   def main(argv = ARGV, out: $stdout)
     options = parse_args(argv.dup)
     active_runs_file = Pathname(options.fetch(:active_runs_file))
-    worker_runs_file = Pathname(options.fetch(:worker_runs_file))
+    worker_runs_file = Pathname(options.fetch(:agent_jobs_file)).dirname.join("worker-runs.json")
     payload =
       if options[:apply]
         result = apply_stale_active_run_reconciliation(

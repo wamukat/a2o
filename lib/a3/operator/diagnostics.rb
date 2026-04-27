@@ -316,7 +316,11 @@ module A3Diagnostics
       parser.on("--project VALUE") { |value| options[:project] = value }
       parser.on("--root-dir VALUE") { |value| options[:root_dir] = value }
       parser.on("--active-runs-file VALUE") { |value| options[:active_runs_file] = value }
-      parser.on("--worker-runs-file VALUE") { |value| options[:worker_runs_file] = value }
+      parser.on("--agent-jobs-file VALUE") { |value| options[:agent_jobs_file] = value }
+      parser.on("--worker-runs-file VALUE") do
+        raise OptionParser::InvalidOption,
+              "removed option --worker-runs-file; migration_required=true replacement=--agent-jobs-file"
+      end
       parser.on("--interval VALUE", Float) { |value| options[:interval] = value }
       parser.on("--iterations VALUE", Integer) { |value| options[:iterations] = value }
     when "doctor-env"
@@ -330,13 +334,15 @@ module A3Diagnostics
     options = parse_args(argv.dup)
     case options[:command]
     when "describe-state"
-      out.puts(JSON.pretty_generate(describe_state(project: options.fetch(:project), root_dir: Pathname(options.fetch(:root_dir)), active_runs_file: Pathname(options.fetch(:active_runs_file)), worker_runs_file: Pathname(options.fetch(:worker_runs_file)))))
+      worker_runs_file = Pathname(options.fetch(:agent_jobs_file)).dirname.join("worker-runs.json")
+      out.puts(JSON.pretty_generate(describe_state(project: options.fetch(:project), root_dir: Pathname(options.fetch(:root_dir)), active_runs_file: Pathname(options.fetch(:active_runs_file)), worker_runs_file: worker_runs_file)))
       0
     when "watch"
+      worker_runs_file = Pathname(options.fetch(:agent_jobs_file)).dirname.join("worker-runs.json")
       count = 0
       loop do
         out.puts("\n---\n") if count.positive?
-        out.puts(JSON.pretty_generate(describe_state(project: options.fetch(:project), root_dir: Pathname(options.fetch(:root_dir)), active_runs_file: Pathname(options.fetch(:active_runs_file)), worker_runs_file: Pathname(options.fetch(:worker_runs_file)))))
+        out.puts(JSON.pretty_generate(describe_state(project: options.fetch(:project), root_dir: Pathname(options.fetch(:root_dir)), active_runs_file: Pathname(options.fetch(:active_runs_file)), worker_runs_file: worker_runs_file)))
         count += 1
         return 0 if options[:iterations].to_i.positive? && count >= options[:iterations]
         sleeper.sleep(options.fetch(:interval, 2.0))

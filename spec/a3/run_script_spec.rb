@@ -47,8 +47,10 @@ RSpec.describe A3RootUtilityLauncher do
       root = Pathname(temp_dir)
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
+      agent_jobs = root.join("agent_jobs.json")
       active_runs.write(JSON.generate({ "active_task_refs" => [] }))
       worker_runs.write(JSON.generate({ "runs" => {} }))
+      agent_jobs.write(JSON.generate({}))
 
       stdout, _stderr, status = Open3.capture3(
         root_utility_env,
@@ -56,7 +58,7 @@ RSpec.describe A3RootUtilityLauncher do
           "describe-state",
           "--project", "a2o-reference",
           "--active-runs-file", active_runs.to_s,
-          "--worker-runs-file", worker_runs.to_s
+          "--agent-jobs-file", agent_jobs.to_s
         ),
         chdir: described_class::ROOT_DIR.to_s
       )
@@ -73,12 +75,14 @@ RSpec.describe A3RootUtilityLauncher do
       fake_task = fake_bin.join("task")
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
+      agent_jobs = root.join("agent_jobs.json")
       launcher = root.join("launcher.json")
       fake_bin.mkpath
       fake_task.write("#!/bin/sh\nprintf '[]\\n'\n")
       File.chmod(0o755, fake_task)
       active_runs.write(JSON.generate({ "active_task_refs" => [] }))
       worker_runs.write(JSON.generate({ "runs" => {} }))
+      agent_jobs.write(JSON.generate({}))
       launcher.write(JSON.generate({ "shell" => { "inherit_env" => true, "env_files" => [], "env_overrides" => {} } }))
 
       stdout, _stderr, status = Open3.capture3(
@@ -87,7 +91,7 @@ RSpec.describe A3RootUtilityLauncher do
           "cleanup",
           "--project", "a2o-reference",
           "--active-runs-file", active_runs.to_s,
-          "--worker-runs-file", worker_runs.to_s,
+          "--agent-jobs-file", agent_jobs.to_s,
           "--launcher-config", launcher.to_s
         ),
         chdir: described_class::ROOT_DIR.to_s
@@ -103,8 +107,10 @@ RSpec.describe A3RootUtilityLauncher do
       root = Pathname(temp_dir)
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
+      agent_jobs = root.join("agent_jobs.json")
       active_runs.write(JSON.generate({ "active_task_refs" => [] }))
       worker_runs.write(JSON.generate({ "runs" => {} }))
+      agent_jobs.write(JSON.generate({}))
 
       stdout, _stderr, status = Open3.capture3(
         root_utility_env,
@@ -112,7 +118,7 @@ RSpec.describe A3RootUtilityLauncher do
           "reconcile-active-runs",
           "--project", "a2o-reference",
           "--active-runs-file", active_runs.to_s,
-          "--worker-runs-file", worker_runs.to_s
+          "--agent-jobs-file", agent_jobs.to_s
         ),
         chdir: described_class::ROOT_DIR.to_s
       )
@@ -193,7 +199,7 @@ RSpec.describe A3RootUtilityLauncher do
         "--kanban-project", "A2OReferenceMultiRepo",
         "--root-dir", described_class::ROOT_DIR.to_s,
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "worker-runs.json").to_s,
+        "--agent-jobs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "agent_jobs.json").to_s,
         "--launcher-config", described_class::RUNTIME_CONFIG.to_s,
         "--done-ttl-hours", "24",
         "--blocked-ttl-hours", "24",
@@ -226,7 +232,7 @@ RSpec.describe A3RootUtilityLauncher do
         "--kanban-project", "A2OReferenceMultiRepo",
         "--root-dir", described_class::ROOT_DIR.to_s,
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "worker-runs.json").to_s,
+        "--agent-jobs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "agent_jobs.json").to_s,
         "--launcher-config", described_class::RUNTIME_CONFIG.to_s,
         "--done-ttl-hours", "24",
         "--blocked-ttl-hours", "24",
@@ -263,7 +269,7 @@ RSpec.describe A3RootUtilityLauncher do
         "--kanban-project", "A2OReferenceMultiRepo",
         "--root-dir", described_class::ROOT_DIR.to_s,
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "worker-runs.json").to_s,
+        "--agent-jobs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "agent_jobs.json").to_s,
         "--launcher-config", described_class::RUNTIME_CONFIG.to_s,
         "--done-ttl-hours", "24",
         "--blocked-ttl-hours", "24",
@@ -299,7 +305,7 @@ RSpec.describe A3RootUtilityLauncher do
         "--kanban-project", "A2OReferenceMultiRepo",
         "--root-dir", described_class::ROOT_DIR.to_s,
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "worker-runs.json").to_s,
+        "--agent-jobs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "agent_jobs.json").to_s,
         "--launcher-config", described_class::RUNTIME_CONFIG.to_s,
         "--done-ttl-hours", "24",
         "--blocked-ttl-hours", "24",
@@ -323,7 +329,7 @@ RSpec.describe A3RootUtilityLauncher do
       [
         "--project", "a2o-reference",
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "worker-runs.json").to_s,
+        "--agent-jobs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "agent_jobs.json").to_s,
         "--live-process-pattern", "a2o-runtime-run-once",
         "--live-process-pattern", "a2o-reference-kanban-scheduler-auto",
         "--launcher-config", described_class::RUNTIME_CONFIG.to_s,
@@ -360,7 +366,7 @@ RSpec.describe A3RootUtilityLauncher do
         "--root-dir", described_class::ROOT_DIR.to_s,
         "--task-ref", "A2OReferenceMultiRepo#2700",
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "worker-runs.json").to_s,
+        "--agent-jobs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "agent_jobs.json").to_s,
         "--kanban-project", "A2OReferenceMultiRepo"
       ],
       default_kanban_working_dir: described_class::ROOT_DIR
@@ -379,7 +385,7 @@ RSpec.describe A3RootUtilityLauncher do
         "--project", "a2o-reference",
         "--root-dir", described_class::ROOT_DIR.to_s,
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "worker-runs.json").to_s
+        "--agent-jobs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "agent_jobs.json").to_s
       ]
     )
   end
@@ -448,7 +454,7 @@ RSpec.describe A3RootUtilityLauncher do
         "--project", "a2o-reference",
         "--root-dir", described_class::ROOT_DIR.to_s,
         "--active-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "active-runs.json").to_s,
-        "--worker-runs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "worker-runs.json").to_s,
+        "--agent-jobs-file", described_class::ROOT_DIR.join(".work", "a3", "state", "a2o-reference", "agent_jobs.json").to_s,
         "--interval", "3.0",
         "--iterations", "4"
       ]

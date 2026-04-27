@@ -205,18 +205,22 @@ module A3
         }
 
         parser = OptionParser.new
-        parser.banner = "usage: rerun_readiness.rb --project NAME --root-dir DIR --task-ref REF --active-runs-file FILE --worker-runs-file FILE [options]"
+        parser.banner = "usage: rerun_readiness.rb --project NAME --root-dir DIR --task-ref REF --active-runs-file FILE --agent-jobs-file FILE [options]"
         parser.on("--project VALUE") { |value| options[:project] = value }
         parser.on("--root-dir VALUE") { |value| options[:root_dir] = value }
         parser.on("--task-ref VALUE") { |value| options[:task_ref] = value }
         parser.on("--active-runs-file VALUE") { |value| options[:active_runs_file] = value }
-        parser.on("--worker-runs-file VALUE") { |value| options[:worker_runs_file] = value }
+        parser.on("--agent-jobs-file VALUE") { |value| options[:agent_jobs_file] = value }
+        parser.on("--worker-runs-file VALUE") do
+          raise OptionParser::InvalidOption,
+                "removed option --worker-runs-file; migration_required=true replacement=--agent-jobs-file"
+        end
         parser.on("--kanban-project VALUE") { |value| options[:kanban_project] = value }
         parser.on("--kanban-working-dir VALUE") { |value| options[:kanban_working_dir] = value }
         parser.on("--allow-blocked-label") { options[:allow_blocked_label] = true }
         parser.parse!(argv)
 
-        %i[project root_dir task_ref active_runs_file worker_runs_file].each do |key|
+        %i[project root_dir task_ref active_runs_file agent_jobs_file].each do |key|
           raise OptionParser::MissingArgument, "--#{key.to_s.tr('_', '-')}" if options[key].to_s.empty?
         end
         options
@@ -230,7 +234,7 @@ module A3
           project: options.fetch(:project),
           task_ref: options.fetch(:task_ref),
           active_runs_file: options.fetch(:active_runs_file),
-          worker_runs_file: options.fetch(:worker_runs_file),
+          worker_runs_file: Pathname(options.fetch(:agent_jobs_file)).dirname.join("worker-runs.json"),
           kanban_project: options[:kanban_project].to_s.strip.empty? ? nil : options[:kanban_project].strip,
           kanban_working_dir: kanban_working_dir,
           allow_blocked_label: options.fetch(:allow_blocked_label)

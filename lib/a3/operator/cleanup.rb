@@ -867,12 +867,16 @@ module A3Cleanup
       apply: false
     }
     parser = OptionParser.new
-    parser.banner = "usage: cleanup.rb --project NAME --root-dir DIR --active-runs-file FILE --worker-runs-file FILE [options]"
+    parser.banner = "usage: cleanup.rb --project NAME --root-dir DIR --active-runs-file FILE --agent-jobs-file FILE [options]"
     parser.on("--project VALUE") { |value| options[:project] = value }
     parser.on("--kanban-project VALUE") { |value| options[:kanban_project] = value }
     parser.on("--root-dir VALUE") { |value| options[:root_dir] = value }
     parser.on("--active-runs-file VALUE") { |value| options[:active_runs_file] = value }
-    parser.on("--worker-runs-file VALUE") { |value| options[:worker_runs_file] = value }
+    parser.on("--agent-jobs-file VALUE") { |value| options[:agent_jobs_file] = value }
+    parser.on("--worker-runs-file VALUE") do
+      raise OptionParser::InvalidOption,
+            "removed option --worker-runs-file; migration_required=true replacement=--agent-jobs-file"
+    end
     parser.on("--launcher-config VALUE") { |value| options[:launcher_config] = value }
     parser.on("--done-ttl-hours VALUE", Integer) { |value| options[:done_ttl_hours] = value }
     parser.on("--blocked-ttl-hours VALUE", Integer) { |value| options[:blocked_ttl_hours] = value }
@@ -892,7 +896,7 @@ module A3Cleanup
     parser.on("--apply") { options[:apply] = true }
     parser.parse!(argv)
 
-    %i[project root_dir active_runs_file worker_runs_file].each do |key|
+    %i[project root_dir active_runs_file agent_jobs_file].each do |key|
       raise OptionParser::MissingArgument, "--#{key.to_s.tr('_', '-')}" if options[key].to_s.empty?
     end
     options
@@ -909,7 +913,7 @@ module A3Cleanup
     )
     active_refs = load_active_refs(
       active_runs_file: options.fetch(:active_runs_file),
-      worker_runs_file: options.fetch(:worker_runs_file)
+      worker_runs_file: Pathname(options.fetch(:agent_jobs_file)).dirname.join("worker-runs.json")
     )
     now = Time.now.utc
     candidates = build_cleanup_candidates(

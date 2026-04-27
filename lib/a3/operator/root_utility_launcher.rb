@@ -84,8 +84,13 @@ module A3RootUtilityLauncher
     active_runs_file ? Pathname(active_runs_file) : ROOT_DIR.join(".work", "a3", "state", project, "active-runs.json")
   end
 
-  def resolve_worker_runs_file(project:, worker_runs_file: nil)
-    worker_runs_file ? Pathname(worker_runs_file) : ROOT_DIR.join(".work", "a3", "state", project, "worker-runs.json")
+  def removed_worker_runs_option
+    raise OptionParser::InvalidOption,
+          "removed option --worker-runs-file; migration_required=true replacement=--agent-jobs-file"
+  end
+
+  def resolve_agent_jobs_file(project:, agent_jobs_file: nil)
+    agent_jobs_file ? Pathname(agent_jobs_file) : ROOT_DIR.join(".work", "a3", "state", project, "agent_jobs.json")
   end
 
   def resolve_scheduler_pause_file(project)
@@ -232,12 +237,14 @@ module A3RootUtilityLauncher
       parser.on("--reason REASON") { |value| options["reason"] = value }
     when "describe-state"
       parser.on("--active-runs-file PATH") { |value| options["active_runs_file"] = value }
-      parser.on("--worker-runs-file PATH") { |value| options["worker_runs_file"] = value }
+      parser.on("--agent-jobs-file PATH") { |value| options["agent_jobs_file"] = value }
+      parser.on("--worker-runs-file PATH") { removed_worker_runs_option }
     when "watch"
       options["interval"] = 2.0
       options["iterations"] = 0
       parser.on("--active-runs-file PATH") { |value| options["active_runs_file"] = value }
-      parser.on("--worker-runs-file PATH") { |value| options["worker_runs_file"] = value }
+      parser.on("--agent-jobs-file PATH") { |value| options["agent_jobs_file"] = value }
+      parser.on("--worker-runs-file PATH") { removed_worker_runs_option }
       parser.on("--interval SECONDS", Float) { |value| options["interval"] = value }
       parser.on("--iterations COUNT", Integer) { |value| options["iterations"] = value }
     when "doctor-env"
@@ -263,7 +270,8 @@ module A3RootUtilityLauncher
       )
       parser.on("--manifest PATH") { |value| options["manifest"] = value }
       parser.on("--active-runs-file PATH") { |value| options["active_runs_file"] = value }
-      parser.on("--worker-runs-file PATH") { |value| options["worker_runs_file"] = value }
+      parser.on("--agent-jobs-file PATH") { |value| options["agent_jobs_file"] = value }
+      parser.on("--worker-runs-file PATH") { removed_worker_runs_option }
       parser.on("--launcher-config PATH") { |value| options["launcher_config"] = value }
       parser.on("--done-ttl-hours HOURS", Integer) { |value| options["done_ttl_hours"] = value }
       parser.on("--blocked-ttl-hours HOURS", Integer) { |value| options["blocked_ttl_hours"] = value }
@@ -284,7 +292,8 @@ module A3RootUtilityLauncher
     when "reconcile-active-runs"
       options["apply"] = false
       parser.on("--active-runs-file PATH") { |value| options["active_runs_file"] = value }
-      parser.on("--worker-runs-file PATH") { |value| options["worker_runs_file"] = value }
+      parser.on("--agent-jobs-file PATH") { |value| options["agent_jobs_file"] = value }
+      parser.on("--worker-runs-file PATH") { removed_worker_runs_option }
       parser.on("--launcher-config PATH") { |value| options["launcher_config"] = value }
       parser.on("--status STATUS") { |value| options["status"] = value }
       parser.on("--apply") { options["apply"] = true }
@@ -325,8 +334,8 @@ module A3RootUtilityLauncher
           ROOT_DIR.to_s,
           "--active-runs-file",
           resolve_active_runs_file(project: options.fetch("project"), active_runs_file: options["active_runs_file"]).to_s,
-          "--worker-runs-file",
-          resolve_worker_runs_file(project: options.fetch("project"), worker_runs_file: options["worker_runs_file"]).to_s
+          "--agent-jobs-file",
+          resolve_agent_jobs_file(project: options.fetch("project"), agent_jobs_file: options["agent_jobs_file"]).to_s
         ]
       )
     when "watch"
@@ -339,8 +348,8 @@ module A3RootUtilityLauncher
           ROOT_DIR.to_s,
           "--active-runs-file",
           resolve_active_runs_file(project: options.fetch("project"), active_runs_file: options["active_runs_file"]).to_s,
-          "--worker-runs-file",
-          resolve_worker_runs_file(project: options.fetch("project"), worker_runs_file: options["worker_runs_file"]).to_s,
+          "--agent-jobs-file",
+          resolve_agent_jobs_file(project: options.fetch("project"), agent_jobs_file: options["agent_jobs_file"]).to_s,
           "--interval",
           options.fetch("interval").to_s,
           "--iterations",
@@ -357,8 +366,8 @@ module A3RootUtilityLauncher
         ROOT_DIR.to_s,
         "--active-runs-file",
         resolve_active_runs_file(project: options.fetch("project"), active_runs_file: options["active_runs_file"]).to_s,
-        "--worker-runs-file",
-        resolve_worker_runs_file(project: options.fetch("project"), worker_runs_file: options["worker_runs_file"]).to_s,
+        "--agent-jobs-file",
+        resolve_agent_jobs_file(project: options.fetch("project"), agent_jobs_file: options["agent_jobs_file"]).to_s,
         "--launcher-config",
         resolve_launcher_config(
           project: options.fetch("project"),
@@ -412,8 +421,8 @@ module A3RootUtilityLauncher
         options.fetch("project"),
         "--active-runs-file",
         resolve_active_runs_file(project: options.fetch("project"), active_runs_file: options["active_runs_file"]).to_s,
-        "--worker-runs-file",
-        resolve_worker_runs_file(project: options.fetch("project"), worker_runs_file: options["worker_runs_file"]).to_s
+        "--agent-jobs-file",
+        resolve_agent_jobs_file(project: options.fetch("project"), agent_jobs_file: options["agent_jobs_file"]).to_s
       ]
       reconcile_live_process_patterns(options.fetch("project")).each do |pattern|
         reconcile_command.concat(["--live-process-pattern", pattern])
@@ -457,8 +466,8 @@ module A3RootUtilityLauncher
         options.fetch("task_ref"),
         "--active-runs-file",
         resolve_active_runs_file(project: options.fetch("project")).to_s,
-        "--worker-runs-file",
-        resolve_worker_runs_file(project: options.fetch("project")).to_s,
+        "--agent-jobs-file",
+        resolve_agent_jobs_file(project: options.fetch("project")).to_s,
         "--kanban-project",
         resolve_kanban_project(options.fetch("project"))
       ]

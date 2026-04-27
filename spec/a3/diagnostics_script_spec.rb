@@ -31,8 +31,10 @@ RSpec.describe A3Diagnostics do
       root = Pathname(dir)
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
+      agent_jobs = root.join("agent_jobs.json")
       active_runs.write(JSON.generate({ "active_task_refs" => [] }))
       worker_runs.write(JSON.generate({ "runs" => {} }))
+      agent_jobs.write(JSON.generate({}))
 
       stdout = capture_stdout do
         expect(
@@ -42,7 +44,7 @@ RSpec.describe A3Diagnostics do
               "--project", "sample",
               "--root-dir", root.to_s,
               "--active-runs-file", active_runs.to_s,
-              "--worker-runs-file", worker_runs.to_s
+              "--agent-jobs-file", agent_jobs.to_s
             ]
           )
         ).to eq(0)
