@@ -51,6 +51,7 @@ module A3
         def lines(summary, details: false)
           [
             render_scheduler_state(summary),
+            render_warnings_section(summary),
             render_decomposition_section(summary),
             render_task_tree(summary, details: details),
             render_next_section(summary),
@@ -59,6 +60,13 @@ module A3
             rendered = decorate_lines(section.split("\n"))
             index.zero? ? rendered : ["", *rendered]
           end
+        end
+
+        def render_warnings_section(summary)
+          warnings = Array(summary.respond_to?(:warnings) ? summary.warnings : [])
+          return "" if warnings.empty?
+
+          (["Warnings"] + warnings.map { |warning| "- #{single_line(warning)}" }).join("\n")
         end
 
         def render_scheduler_state(summary)

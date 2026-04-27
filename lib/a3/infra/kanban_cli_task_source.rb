@@ -5,6 +5,8 @@ require "set"
 module A3
   module Infra
     class KanbanCliTaskSource
+      WatchSummaryLoadResult = Struct.new(:tasks, :warnings, keyword_init: true)
+
       ACTIVE_STATUS_MAP = {
         "To do" => :todo,
         "In progress" => :in_progress,
@@ -32,6 +34,18 @@ module A3
           topology_snapshots: topology.fetch(:snapshots),
           child_refs_by_parent: topology.fetch(:child_refs_by_parent)
         )
+      end
+
+      def load_for_watch_summary
+        selection = load_selection_snapshots(tolerate_invalid_edit_scope: true)
+        selection_snapshots = selection.fetch(:snapshots)
+        topology = load_topology(selection_snapshots: selection_snapshots)
+        tasks = build_tasks(
+          selection_snapshots,
+          topology_snapshots: topology.fetch(:snapshots),
+          child_refs_by_parent: topology.fetch(:child_refs_by_parent)
+        )
+        WatchSummaryLoadResult.new(tasks: tasks, warnings: selection.fetch(:warnings))
       end
 
       def fetch_by_external_task_id(task_id)
@@ -79,13 +93,39 @@ module A3
         }
       end
 
-      def load_selection_snapshots
+      def load_selection_snapshots(tolerate_invalid_edit_scope: false)
         args = ["task-snapshot-list", "--project", @project]
         args += ["--status", @status] if pass_status_filter_to_kanban?
         payload = @client.run_json_command(*args)
         raise A3::Domain::ConfigurationError, "kanban task-snapshot-list must return an array" unless payload.is_a?(Array)
 
+        if tolerate_invalid_edit_scope
+          snapshots = []
+          warnings = []
+          payload.each do |raw_snapshot|
+            snapshots << normalize_snapshot(raw_snapshot)
+          rescue A3::Domain::ConfigurationError => e
+            warnings << watch_summary_warning(raw_snapshot: raw_snapshot, error: e)
+          end
+
+          return {
+            snapshots: snapshots.compact.freeze,
+            warnings: warnings.freeze
+          }.freeze
+        end
+
         payload.map { |raw_snapshot| normalize_snapshot(raw_snapshot) }.compact.freeze
+      end
+
+      def watch_summary_warning(raw_snapshot:, error:)
+        ref =
+          if raw_snapshot.is_a?(Hash)
+            String(raw_snapshot["ref"]).strip
+          else
+            ""
+          end
+        prefix = ref.empty? ? "kanban task" : "kanban task #{ref}"
+        "#{prefix} skipped: #{error.message}"
       end
 
       def load_topology(selection_snapshots:)

@@ -286,6 +286,57 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "warns and continues when a kanban watch task has no repo label" do
+    Dir.mktmpdir do |dir|
+      fake_cli = create_fake_kanban_cli(
+        dir,
+        snapshots: [
+          {
+            "id" => 3138,
+            "ref" => "Sample#3138",
+            "title" => "Configured task",
+            "status" => "To do",
+            "labels" => ["trigger:auto-implement", "repo:ui-app"]
+          },
+          {
+            "id" => 4000,
+            "ref" => "Sample#4000",
+            "title" => "Missing repo label",
+            "status" => "To do",
+            "labels" => ["trigger:auto-parent"]
+          }
+        ]
+      )
+
+      out = StringIO.new
+      with_env(fake_cli.fetch(:env)) do
+        expect do
+          described_class.start(
+            [
+              "watch-summary",
+              "--storage-backend", "json",
+              "--storage-dir", dir,
+              "--kanban-command", "ruby",
+              "--kanban-command-arg", fake_cli.fetch(:script_path),
+              "--kanban-project", "Sample",
+              "--kanban-working-dir", dir,
+              "--kanban-trigger-label", "trigger:auto-implement",
+              "--kanban-trigger-label", "trigger:auto-parent",
+              "--kanban-repo-label", "repo:ui-app=repo_alpha"
+            ],
+            out: out
+          )
+        end.not_to raise_error
+      end
+
+      expect(out.string).to include("Warnings")
+      expect(out.string).to include("kanban task Sample#4000 skipped")
+      expect(out.string).to include("has no repo label that maps to an A2O edit scope")
+      expect(out.string).to include("Configured task")
+      expect(out.string).not_to include("(no tasks to watch)")
+    end
+  end
+
   it "shows Kanbalone tag reasons only in detailed watch-summary output" do
     Dir.mktmpdir do |dir|
       task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))

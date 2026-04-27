@@ -893,10 +893,17 @@ module A3
       bridge = build_external_task_bridge(options)
       tasks =
         if kanban_bridge_enabled?(options)
-          bridge.task_source.load
+          if bridge.task_source.respond_to?(:load_for_watch_summary)
+            watch_summary_load = bridge.task_source.load_for_watch_summary
+            watch_summary_warnings = watch_summary_load.warnings
+            watch_summary_load.tasks
+          else
+            bridge.task_source.load
+          end
         else
           task_repository.all
         end
+      watch_summary_warnings ||= []
       task_ids = tasks.map(&:external_task_id).compact
       task_refs = tasks.reject { |task| task.external_task_id }.map(&:ref)
       kanban_snapshot_index = bridge.task_snapshot_reader.load(
@@ -912,6 +919,7 @@ module A3
         kanban_snapshots_by_id: kanban_snapshot_index.by_id,
         agent_jobs_by_task_ref: load_watch_summary_agent_jobs_by_task_ref(options.fetch(:storage_dir))
       ).call
+      summary.warnings.concat(watch_summary_warnings)
       attach_decomposition_entries(summary, tasks: tasks, storage_dir: options.fetch(:storage_dir))
 
       ShowOutputFormatter.watch_summary_lines(summary, details: options.fetch(:details)).each { |line| out.puts(line) }

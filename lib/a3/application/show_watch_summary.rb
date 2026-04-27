@@ -16,6 +16,7 @@ module A3
         :next_candidates,
         :running_entries,
         :tasks,
+        :warnings,
         keyword_init: true
       )
 
@@ -90,7 +91,8 @@ module A3
           scheduler_paused_at: nil,
           next_candidates: selected_next_ref ? [selected_next_ref].freeze : [].freeze,
           running_entries: task_entries.map(&:running_entry).compact.sort_by(&:task_ref).freeze,
-          tasks: sort_tasks_for_tree(task_entries).freeze
+          tasks: sort_tasks_for_tree(task_entries).freeze,
+          warnings: []
         )
       end
 
