@@ -104,10 +104,11 @@ module A3
     end
 
     class VerificationExecutionStrategy
-      def initialize(command_runner:, task_packet_builder:, worker_protocol: A3::Infra::WorkerProtocol.new)
+      def initialize(command_runner:, task_packet_builder:, worker_protocol: A3::Infra::WorkerProtocol.new, metrics_collector: nil)
         @command_runner = command_runner
         @task_packet_builder = task_packet_builder
         @worker_protocol = worker_protocol
+        @metrics_collector = metrics_collector
       end
 
       def execute(task:, run:, runtime:, workspace:)
@@ -116,6 +117,9 @@ module A3
 
         verification = run_verification_commands(task: task, run: run, runtime: runtime, workspace: workspace)
         return verification unless verification.success?
+        metrics = collect_metrics(task: task, run: run, runtime: runtime, workspace: workspace)
+        return verification.with_diagnostics(verification.diagnostics.merge("metrics_collection" => metrics.error)) if metrics&.error
+        verification = verification.with_diagnostics(verification.diagnostics.merge("metrics_collection" => { "collected" => true })) if metrics&.collected?
         return verification if runtime.remediation_commands.empty?
 
         A3::Application::ExecutionResult.new(
@@ -211,6 +215,12 @@ module A3
       end
 
       private
+
+      def collect_metrics(task:, run:, runtime:, workspace:)
+        return nil unless @metrics_collector
+
+        @metrics_collector.call(task: task, run: run, runtime: runtime, workspace: workspace)
+      end
 
       def command_request_context(task:, run:, runtime:, workspace:, command_intent:)
         task_packet = @task_packet_builder.call(task: task)

@@ -30,6 +30,9 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
           },
           "remediation" => {
             "commands" => ["commands/apply-remediation"]
+          },
+          "metrics" => {
+            "commands" => ["commands/collect-metrics"]
           }
         }
       }
@@ -41,6 +44,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     expect(surface.review_skill).to eq("skills/review/project.md")
     expect(surface.verification_commands).to eq(["commands/verify-all"])
     expect(surface.remediation_commands).to eq(["commands/apply-remediation"])
+    expect(surface.metrics_collection_commands).to eq(["commands/collect-metrics"])
     expect(surface.workspace_hook).to be_nil
   end
 

@@ -78,6 +78,7 @@ RSpec.describe A3::Domain::ProjectContext do
       "review_skill" => "skills/review/default.md",
       "verification_commands" => ["commands/verify-all"],
       "remediation_commands" => ["commands/apply-remediation"],
+      "metrics_collection_commands" => [],
       "merge_target" => "merge_to_parent",
       "merge_policy" => "ff_only",
       "merge_target_ref" => "refs/heads/live",

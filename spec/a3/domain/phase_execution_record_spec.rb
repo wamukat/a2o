@@ -37,6 +37,7 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
         "review_skill" => "sample-review",
         "verification_commands" => ["commands/check-style", "commands/verify-all"],
         "remediation_commands" => ["commands/apply-remediation"],
+        "metrics_collection_commands" => [],
         "workspace_hook" => "sample-bootstrap",
         "merge_target" => "merge_to_parent",
         "merge_policy" => "ff_only",

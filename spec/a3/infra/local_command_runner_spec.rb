@@ -103,4 +103,15 @@ RSpec.describe A3::Infra::LocalCommandRunner do
     expect(result.success?).to be(true)
     expect(File.read(result_path)).to eq(a2o_root)
   end
+
+  it "captures stdout for metrics collection commands" do
+    result = described_class.new.run(
+      ["ruby -rjson -e 'print JSON.generate({\"tests\"=>{\"passed_count\"=>3}})'"],
+      workspace: workspace,
+      command_intent: :metrics_collection
+    )
+
+    expect(result.success?).to be(true)
+    expect(result.diagnostics.fetch("stdout")).to eq('{"tests":{"passed_count":3}}')
+  end
 end

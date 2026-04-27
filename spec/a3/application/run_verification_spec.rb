@@ -20,12 +20,14 @@ RSpec.describe A3::Application::RunVerification do
       run_repository: run_repository,
       register_completed_run: register_completed_run,
       command_runner: command_runner,
-      prepare_workspace: prepare_workspace
+      prepare_workspace: prepare_workspace,
+      task_metrics_repository: task_metrics_repository
     )
   end
 
   let(:task_repository) { A3::Infra::InMemoryTaskRepository.new }
   let(:run_repository) { A3::Infra::InMemoryRunRepository.new }
+  let(:task_metrics_repository) { A3::Infra::InMemoryTaskMetricsRepository.new }
   let(:integration_ref_readiness_checker) do
     instance_double(
       A3::Infra::IntegrationRefReadinessChecker,
@@ -93,6 +95,23 @@ RSpec.describe A3::Application::RunVerification do
         verification_commands: ["commands/verify-all", "commands/gate-standard"],
         remediation_commands: ["commands/apply-remediation"],
         workspace_hook: "hooks/prepare-runtime.sh"
+      ),
+      merge_config: A3::Domain::MergeConfig.new(
+        target: :merge_to_parent,
+        policy: :ff_only
+      )
+    )
+  end
+
+  let(:metrics_project_context) do
+    A3::Domain::ProjectContext.new(
+      surface: A3::Domain::ProjectSurface.new(
+        implementation_skill: "skills/implementation/base.md",
+        review_skill: "skills/review/base.md",
+        verification_commands: ["commands/verify-all"],
+        remediation_commands: [],
+        metrics_collection_commands: ["commands/collect-metrics"],
+        workspace_hook: nil
       ),
       merge_config: A3::Domain::MergeConfig.new(
         target: :merge_to_parent,
@@ -235,6 +254,148 @@ RSpec.describe A3::Application::RunVerification do
       verification_commands: ["commands/verify-all", "commands/gate-standard"]
     )
     expect(result.run.phase_records.last.blocked_diagnosis&.failing_command).to eq("commands/gate-standard")
+  end
+
+  it "collects task metrics after successful verification when configured" do
+    allow(prepare_workspace).to receive(:call).and_return(
+      A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
+    )
+    allow(command_runner).to receive(:run).with(
+      metrics_project_context.resolve_phase_runtime(task: task, phase: run.phase).verification_commands,
+      workspace: prepared_workspace,
+      env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
+      task: anything,
+      run: anything,
+      worker_protocol_request: hash_including("command_intent" => "verification")
+    ).and_return(
+      A3::Application::ExecutionResult.new(
+        success: true,
+        summary: "commands/verify-all ok"
+      )
+    )
+    allow(command_runner).to receive(:run).with(
+      ["commands/collect-metrics"],
+      workspace: prepared_workspace,
+      env: {},
+      task: task,
+      run: run,
+      command_intent: :metrics_collection
+    ).and_return(
+      A3::Application::ExecutionResult.new(
+        success: true,
+        summary: "commands/collect-metrics ok",
+        diagnostics: {
+          "stdout" => JSON.generate(
+            "code_changes" => { "lines_added" => 10 },
+            "tests" => { "passed_count" => 5 },
+            "coverage" => { "line_percent" => 80.0 },
+            "custom" => { "team" => "alpha" }
+          )
+        }
+      )
+    )
+
+    result = use_case.call(task_ref: task.ref, run_ref: run.ref, project_context: metrics_project_context)
+
+    expect(result.task.status).to eq(:merging)
+    expect(task_metrics_repository.all.map(&:persisted_form)).to contain_exactly(
+      hash_including(
+        "task_ref" => task.ref,
+        "parent_ref" => task.parent_ref,
+        "code_changes" => { "lines_added" => 10 },
+        "tests" => { "passed_count" => 5 },
+        "coverage" => { "line_percent" => 80.0 },
+        "custom" => { "team" => "alpha" }
+      )
+    )
+    expect(result.run.phase_records.last.execution_record.diagnostics).to include(
+      "metrics_collection" => { "collected" => true }
+    )
+  end
+
+  it "records metrics collection errors without hiding successful verification" do
+    allow(prepare_workspace).to receive(:call).and_return(
+      A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
+    )
+    allow(command_runner).to receive(:run).with(
+      metrics_project_context.resolve_phase_runtime(task: task, phase: run.phase).verification_commands,
+      workspace: prepared_workspace,
+      env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
+      task: anything,
+      run: anything,
+      worker_protocol_request: hash_including("command_intent" => "verification")
+    ).and_return(
+      A3::Application::ExecutionResult.new(
+        success: true,
+        summary: "commands/verify-all ok"
+      )
+    )
+    allow(command_runner).to receive(:run).with(
+      ["commands/collect-metrics"],
+      workspace: prepared_workspace,
+      env: {},
+      task: task,
+      run: run,
+      command_intent: :metrics_collection
+    ).and_return(
+      A3::Application::ExecutionResult.new(
+        success: true,
+        summary: "commands/collect-metrics ok",
+        diagnostics: { "stdout" => "not json" }
+      )
+    )
+
+    result = use_case.call(task_ref: task.ref, run_ref: run.ref, project_context: metrics_project_context)
+
+    expect(result.task.status).to eq(:merging)
+    expect(task_metrics_repository.all).to eq([])
+    expect(result.run.phase_records.last.execution_record.diagnostics.fetch("metrics_collection")).to include(
+      "summary" => "metrics collection produced invalid JSON",
+      "failing_command" => "metrics_collection"
+    )
+  end
+
+  it "records invalid metrics payload shape without hiding successful verification" do
+    allow(prepare_workspace).to receive(:call).and_return(
+      A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
+    )
+    allow(command_runner).to receive(:run).with(
+      metrics_project_context.resolve_phase_runtime(task: task, phase: run.phase).verification_commands,
+      workspace: prepared_workspace,
+      env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
+      task: anything,
+      run: anything,
+      worker_protocol_request: hash_including("command_intent" => "verification")
+    ).and_return(
+      A3::Application::ExecutionResult.new(
+        success: true,
+        summary: "commands/verify-all ok"
+      )
+    )
+    allow(command_runner).to receive(:run).with(
+      ["commands/collect-metrics"],
+      workspace: prepared_workspace,
+      env: {},
+      task: task,
+      run: run,
+      command_intent: :metrics_collection
+    ).and_return(
+      A3::Application::ExecutionResult.new(
+        success: true,
+        summary: "commands/collect-metrics ok",
+        diagnostics: { "stdout" => JSON.generate("not an object") }
+      )
+    )
+
+    result = use_case.call(task_ref: task.ref, run_ref: run.ref, project_context: metrics_project_context)
+
+    expect(result.task.status).to eq(:merging)
+    expect(task_metrics_repository.all).to eq([])
+    expect(result.run.phase_records.last.execution_record.diagnostics.fetch("metrics_collection")).to include(
+      "summary" => "metrics collection produced invalid metrics payload",
+      "failing_command" => "metrics_collection",
+      "observed_state" => "task metrics payload must be a JSON object"
+    )
   end
 
   it "records blocked diagnosis when slot-local remediation fails before verification" do

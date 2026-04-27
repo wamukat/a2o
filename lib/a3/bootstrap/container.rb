@@ -51,9 +51,10 @@ module A3
         )
       end
 
-      def initialize(task_repository:, run_repository:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:, storage_dir:, repo_sources:, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
+      def initialize(task_repository:, run_repository:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:, storage_dir:, repo_sources:, task_metrics_repository: A3::Infra::InMemoryTaskMetricsRepository.new, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
         @task_repository = task_repository
         @run_repository = run_repository
+        @task_metrics_repository = task_metrics_repository
         @run_id_generator = run_id_generator
         @command_runner = command_runner
         @merge_runner = merge_runner
@@ -70,6 +71,7 @@ module A3
         repositories = A3::Bootstrap::RepositoryRegistry.build(
           task_repository: @task_repository,
           run_repository: @run_repository,
+          task_metrics_repository: @task_metrics_repository,
           storage_dir: @storage_dir
         )
         runtime_services = A3::Bootstrap::RuntimeServicesBuilder.build(
@@ -97,13 +99,15 @@ module A3
         when :json
           {
             task_repository: A3::Infra::JsonTaskRepository.new(File.join(storage_dir, "tasks.json")),
-            run_repository: A3::Infra::JsonRunRepository.new(File.join(storage_dir, "runs.json"))
+            run_repository: A3::Infra::JsonRunRepository.new(File.join(storage_dir, "runs.json")),
+            task_metrics_repository: A3::Infra::JsonTaskMetricsRepository.new(File.join(storage_dir, "task_metrics.json"))
           }
         when :sqlite
           db_path = File.join(storage_dir, "a3.sqlite3")
           {
             task_repository: A3::Infra::SqliteTaskRepository.new(db_path),
-            run_repository: A3::Infra::SqliteRunRepository.new(db_path)
+            run_repository: A3::Infra::SqliteRunRepository.new(db_path),
+            task_metrics_repository: A3::Infra::SqliteTaskMetricsRepository.new(db_path)
           }
         else
           raise ArgumentError, "unsupported storage backend: #{storage_backend}"

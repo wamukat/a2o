@@ -43,6 +43,7 @@ module A3
           review_skill: payload["review_skill"],
           verification_commands: payload.fetch("verification_commands", []),
           remediation_commands: payload.fetch("remediation_commands", []),
+          metrics_collection_commands: payload.fetch("metrics_collection_commands", []),
           workspace_hook: nil,
           decomposition_investigate_command: decomposition_command(runtime, "investigate"),
           decomposition_author_command: decomposition_command(runtime, "author"),
@@ -76,6 +77,7 @@ module A3
         review = phase_mapping(phases, "review")
         verification = optional_phase_mapping(phases, "verification")
         remediation = optional_phase_mapping(phases, "remediation")
+        metrics = optional_phase_mapping(phases, "metrics")
 
         payload = {
           "implementation_skill" => implementation.fetch("skill") do
@@ -85,7 +87,8 @@ module A3
             raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.review.skill must be provided"
           end,
           "verification_commands" => verification.fetch("commands", []),
-          "remediation_commands" => remediation.fetch("commands", [])
+          "remediation_commands" => remediation.fetch("commands", []),
+          "metrics_collection_commands" => metrics.fetch("commands", [])
         }
         parent_review = optional_phase_mapping(phases, "parent_review")
         if parent_review.key?("skill")

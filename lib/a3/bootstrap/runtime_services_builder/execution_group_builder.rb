@@ -31,7 +31,8 @@ module A3
               command_runner: command_runner,
               prepare_workspace: support_group.fetch(:prepare_workspace),
               task_packet_builder: build_worker_task_packet,
-              inherited_parent_state_resolver: support_group.fetch(:inherited_parent_state_resolver)
+              inherited_parent_state_resolver: support_group.fetch(:inherited_parent_state_resolver),
+              task_metrics_repository: repositories.fetch(:task_metrics_repository, A3::Infra::InMemoryTaskMetricsRepository.new)
             ),
             run_merge: A3::Application::RunMerge.new(
               task_repository: repositories.fetch(:task_repository),

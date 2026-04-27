@@ -3,17 +3,19 @@
 module A3
   module Bootstrap
     class RepositoryRegistry
-      def self.build(task_repository:, run_repository:, storage_dir:)
+      def self.build(task_repository:, run_repository:, storage_dir:, task_metrics_repository: A3::Infra::InMemoryTaskMetricsRepository.new)
         new(
           task_repository: task_repository,
           run_repository: run_repository,
+          task_metrics_repository: task_metrics_repository,
           storage_dir: storage_dir
         ).build
       end
 
-      def initialize(task_repository:, run_repository:, storage_dir:)
+      def initialize(task_repository:, run_repository:, storage_dir:, task_metrics_repository: A3::Infra::InMemoryTaskMetricsRepository.new)
         @task_repository = task_repository
         @run_repository = run_repository
+        @task_metrics_repository = task_metrics_repository
         @storage_dir = storage_dir
       end
 
@@ -23,6 +25,7 @@ module A3
           storage_dir: @storage_dir,
           task_repository: @task_repository,
           run_repository: @run_repository,
+          task_metrics_repository: @task_metrics_repository,
           scheduler_state_repository: scheduler_state_repository(store),
           scheduler_cycle_repository: scheduler_cycle_repository(store)
         }.freeze

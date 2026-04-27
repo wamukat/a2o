@@ -25,6 +25,7 @@ module A3
           review_skill: surface.resolve(:review_skill, task_kind: task.kind, repo_scope: task.repo_scope_key, phase: phase),
           verification_commands: Array(surface.resolve(:verification_commands, task_kind: task.kind, repo_scope: task.repo_scope_key, phase: phase)),
           remediation_commands: Array(surface.resolve(:remediation_commands, task_kind: task.kind, repo_scope: task.repo_scope_key, phase: phase)),
+          metrics_collection_commands: Array(surface.resolve(:metrics_collection_commands, task_kind: task.kind, repo_scope: task.repo_scope_key, phase: phase)),
           workspace_hook: surface.workspace_hook,
           merge_target: resolved_merge_config.target,
           merge_policy: resolved_merge_config.policy,
