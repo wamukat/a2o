@@ -33,6 +33,7 @@ module A3
           log_uploads: [log_upload],
           artifact_uploads: artifact_uploads,
           workspace_descriptor: workspace_descriptor_for(request),
+          worker_protocol_result: worker_protocol_result_for(request: request, execution: execution),
           heartbeat: finished_at
         )
         @control_plane_client.submit_result(result)
@@ -50,6 +51,19 @@ module A3
           media_type: "text/plain"
         )
         @control_plane_client.upload_artifact(upload, content)
+      end
+
+      def worker_protocol_result_for(request:, execution:)
+        return nil unless request.worker_protocol_request&.fetch("command_intent", nil) == "metrics_collection"
+
+        {
+          "success" => execution.status == :succeeded,
+          "summary" => summary_for(request: request, execution: execution),
+          "diagnostics" => {
+            "stdout" => execution.stdout.to_s,
+            "stderr" => execution.stderr.to_s
+          }
+        }
       end
 
       def upload_execution_metadata(request:, execution:, started_at:, finished_at:)

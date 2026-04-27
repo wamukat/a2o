@@ -67,6 +67,41 @@ RSpec.describe A3::Agent::RunOnceWorker do
     expect(client.result.workspace_descriptor.workspace_kind).to eq(:runtime_workspace)
   end
 
+  it "captures stdout and stderr in worker protocol result for metrics collection jobs" do
+    metrics_request = A3::Domain::AgentJobRequest.from_request_form(
+      request.request_form.merge(
+        "worker_protocol_request" => { "command_intent" => "metrics_collection" }
+      )
+    )
+    metrics_client = FakeControlPlaneClient.new(metrics_request)
+    metrics_executor = Class.new do
+      def call(_request)
+        A3::Agent::LocalCommandExecutor::Result.new(
+          status: :succeeded,
+          exit_code: 0,
+          stdout: "{\"tests\":{\"passed_count\":3}}\n",
+          stderr: "",
+          combined_log: "{\"tests\":{\"passed_count\":3}}\n"
+        )
+      end
+    end.new
+
+    result = described_class.new(
+      agent_name: "host-local",
+      control_plane_client: metrics_client,
+      command_executor: metrics_executor,
+      clock: fixed_clock
+    ).call
+
+    expect(result.worker_protocol_result).to include(
+      "success" => true,
+      "diagnostics" => {
+        "stdout" => "{\"tests\":{\"passed_count\":3}}\n",
+        "stderr" => ""
+      }
+    )
+  end
+
   it "returns idle when no job is available" do
     idle_client = FakeControlPlaneClient.new(nil)
 

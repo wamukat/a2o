@@ -5,19 +5,21 @@ require "open3"
 module A3
   module Agent
     class LocalCommandExecutor
-      Result = Struct.new(:status, :exit_code, :combined_log, keyword_init: true)
+      Result = Struct.new(:status, :exit_code, :combined_log, :stdout, :stderr, keyword_init: true)
 
       def call(request)
         stdout, stderr, status, exit_code = capture(request)
         Result.new(
           status: status,
           exit_code: exit_code,
+          stdout: stdout.to_s,
+          stderr: stderr.to_s,
           combined_log: stdout.to_s + stderr.to_s
         )
       rescue Errno::ENOENT => e
-        Result.new(status: :failed, exit_code: 127, combined_log: "#{e.class}: #{e.message}\n")
+        Result.new(status: :failed, exit_code: 127, stdout: "", stderr: "#{e.class}: #{e.message}\n", combined_log: "#{e.class}: #{e.message}\n")
       rescue SystemCallError => e
-        Result.new(status: :failed, exit_code: 1, combined_log: "#{e.class}: #{e.message}\n")
+        Result.new(status: :failed, exit_code: 1, stdout: "", stderr: "#{e.class}: #{e.message}\n", combined_log: "#{e.class}: #{e.message}\n")
       end
 
       private

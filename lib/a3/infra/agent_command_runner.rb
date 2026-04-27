@@ -32,6 +32,7 @@ module A3
 
         summaries = []
         artifacts = []
+        last_result = nil
         Array(commands).each do |command|
           command_env = default_env(@env.merge(env)).merge(workspace_automation_env(workspace)).merge(@env).merge(env)
           expanded_command = expand_command_placeholders(command, workspace: workspace, env: command_env)
@@ -43,6 +44,7 @@ module A3
           return completed if completed.is_a?(A3::Application::ExecutionResult)
 
           result = completed.result
+          last_result = result
           return failed_command_result(command: expanded_command, result: result) unless result.succeeded?
 
           summaries << "#{expanded_command} ok"
@@ -52,9 +54,7 @@ module A3
         A3::Application::ExecutionResult.new(
           success: true,
           summary: summaries.join("; "),
-          diagnostics: {
-            "agent_artifacts" => artifacts
-          }
+          diagnostics: success_diagnostics(artifacts: artifacts, result: last_result, command_intent: command_intent)
         )
       end
 
@@ -76,8 +76,15 @@ module A3
           env: env,
           timeout_seconds: @timeout_seconds,
           artifact_rules: [],
-          worker_protocol_request: worker_protocol_request
+          worker_protocol_request: worker_protocol_request_for(command_intent: command_intent, worker_protocol_request: worker_protocol_request)
         )
+      end
+
+      def worker_protocol_request_for(command_intent:, worker_protocol_request:)
+        return worker_protocol_request if worker_protocol_request
+        return nil unless command_intent&.to_sym == :metrics_collection
+
+        { "command_intent" => "metrics_collection" }
       end
 
       def workspace_request_for(workspace:, task:, run:, command_intent:)
@@ -156,6 +163,16 @@ module A3
 
       def agent_artifacts_from_result(result)
         (result.log_uploads + result.artifact_uploads).map(&:persisted_form)
+      end
+
+      def success_diagnostics(artifacts:, result:, command_intent:)
+        diagnostics = { "agent_artifacts" => artifacts }
+        return diagnostics unless command_intent&.to_sym == :metrics_collection
+
+        worker_diagnostics = result.worker_protocol_result&.fetch("diagnostics", nil)
+        return diagnostics unless worker_diagnostics.is_a?(Hash)
+
+        diagnostics.merge(worker_diagnostics.slice("stdout", "stderr"))
       end
 
       def unsupported_workspace_result

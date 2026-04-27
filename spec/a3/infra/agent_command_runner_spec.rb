@@ -120,6 +120,48 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(runner.agent_owned_workspace?).to eq(true)
   end
 
+  it "passes metrics collection intent to materialized command jobs as read-only work" do
+    client.on_fetch = ->(job_id) do
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: {
+            "success" => true,
+            "summary" => "metrics collected",
+            "diagnostics" => {
+              "stdout" => "{\"tests\":{\"passed_count\":3}}\n",
+              "stderr" => ""
+            }
+          }
+        )
+      )
+    end
+    builder = A3::Infra::AgentWorkspaceRequestBuilder.new(source_aliases: {repo_alpha: "sample-catalog-service"})
+    runner = described_class.new(
+      control_plane_client: client,
+      runtime_profile: "docker-dev-env",
+      shared_workspace_mode: "agent-materialized",
+      workspace_request_builder: builder,
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_) {}
+    )
+
+    result = runner.run(["task metrics"], workspace: workspace, task: task, run: run, command_intent: :metrics_collection)
+
+    request = client.records.values.first.request
+    expect(result).to have_attributes(success?: true, summary: "task metrics ok")
+    expect(result.diagnostics).to include(
+      "stdout" => "{\"tests\":{\"passed_count\":3}}\n",
+      "stderr" => ""
+    )
+    expect(request.worker_protocol_request).to eq("command_intent" => "metrics_collection")
+    expect(request.workspace_request.publish_policy).to be_nil
+    expect(request.workspace_request.slots.fetch("repo_alpha")).to include("access" => "read_only")
+  end
+
   it "passes public worker protocol requests to materialized command jobs" do
     client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :succeeded, 0)) }
     builder = A3::Infra::AgentWorkspaceRequestBuilder.new(source_aliases: {repo_alpha: "sample-catalog-service"})
@@ -257,7 +299,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(request.env.fetch("A2O_ROOT_DIR")).to eq("/host/a2o-root")
   end
 
-  def agent_result(job_id, status, exit_code)
+  def agent_result(job_id, status, exit_code, worker_protocol_result: nil)
     A3::Domain::AgentJobResult.new(
       job_id: job_id,
       status: status,
@@ -283,6 +325,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
         source_descriptor: source_descriptor,
         slot_descriptors: {}
       ),
+      worker_protocol_result: worker_protocol_result,
       heartbeat: "2026-04-11T08:00:01Z"
     )
   end

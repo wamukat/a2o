@@ -279,6 +279,20 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     expect(request.slots.fetch("repo_beta")).to include("access" => "read_only", "ownership" => "support")
   end
 
+  it "keeps metrics collection commands read-only and non-publishable" do
+    request = described_class.new(
+      source_aliases: {
+        repo_alpha: "sample-alpha",
+        repo_beta: "sample-beta"
+      },
+      support_ref: "refs/heads/feature/prototype"
+    ).call(workspace: workspace, task: task, run: run(:verification), command_intent: :metrics_collection)
+
+    expect(request.publish_policy).to be_nil
+    expect(request.slots.fetch("repo_alpha")).to include("access" => "read_only", "ownership" => "edit_target")
+    expect(request.slots.fetch("repo_beta")).to include("access" => "read_only", "ownership" => "support")
+  end
+
   it "keeps support slots present for verification even when the scope is narrow" do
     request = described_class.new(
       source_aliases: {
