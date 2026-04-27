@@ -6526,6 +6526,63 @@ func TestRuntimeStatusReportsStaleForUnrelatedReusedPID(t *testing.T) {
 	assertCallContains(t, runner.joinedCalls(), "process-command 12345")
 }
 
+func TestRuntimeStatusReportsStoppedForPausedSchedulerWithStalePID(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+	})
+	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
+	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(paths.PIDFile, []byte("12345\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	command := testSchedulerCommand(t, "runtime", "loop", "--interval", "60s")
+	if err := os.WriteFile(paths.CommandFile, []byte(command+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{
+		schedulerPaused: true,
+		processCommands: map[int]string{12345: "sleep 999"},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "status"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	if !strings.Contains(output, "runtime_scheduler_status=stopped stale_pid=12345") {
+		t.Fatalf("paused stale pid should be reported as stopped metadata, got %q", output)
+	}
+	if !strings.Contains(output, "note=scheduler_stopped_stale_pid_harmless") {
+		t.Fatalf("stdout should explain harmless stale pid, got %q", output)
+	}
+	if strings.Contains(output, "runtime_scheduler_status=stale pid=12345") {
+		t.Fatalf("paused stale pid should not be surfaced as stale status, got %q", output)
+	}
+	if !strings.Contains(output, "runtime_scheduler paused=true") {
+		t.Fatalf("stdout should preserve paused scheduler state, got %q", output)
+	}
+	assertCallContains(t, runner.joinedCalls(), "process-running 12345")
+	assertCallContains(t, runner.joinedCalls(), "process-command 12345")
+}
+
 func TestRuntimeImageDigestPrintsPinnedRuntimeDigest(t *testing.T) {
 	t.Setenv("A2O_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
 	tempDir := t.TempDir()

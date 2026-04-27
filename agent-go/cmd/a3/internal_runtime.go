@@ -592,6 +592,16 @@ func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, std
 	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
 	fmt.Fprintf(stdout, "kanban_mode=%s\n", kanbanMode(effectiveConfig))
 	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(effectiveConfig))
+	var pauseSummary runtimeSchedulerPauseInfo
+	ensurePauseSummary := func() error {
+		if pauseSummary.Line != "" {
+			return nil
+		}
+		return withComposeEnv(effectiveConfig, func() error {
+			pauseSummary = runtimeSchedulerPauseSummary(effectiveConfig, runner)
+			return nil
+		})
+	}
 	pid, err := readSchedulerPID(paths.PIDFile)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -602,10 +612,20 @@ func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, std
 	} else if schedulerProcessRunning(pid, paths.CommandFile, runner) {
 		fmt.Fprintf(stdout, "runtime_scheduler_status=running pid=%d pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
 	} else {
-		fmt.Fprintf(stdout, "runtime_scheduler_status=stale pid=%d pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
+		if err := ensurePauseSummary(); err != nil {
+			return err
+		}
+		if pauseSummary.Available && pauseSummary.Paused {
+			fmt.Fprintf(stdout, "runtime_scheduler_status=stopped stale_pid=%d pid_file=%s log=%s note=scheduler_stopped_stale_pid_harmless cleanup_hint=remove_stale_pid_file\n", pid, paths.PIDFile, paths.LogFile)
+		} else {
+			fmt.Fprintf(stdout, "runtime_scheduler_status=stale pid=%d pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
+		}
 	}
 	return withComposeEnv(effectiveConfig, func() error {
-		printRuntimeSchedulerPauseState(effectiveConfig, runner, stdout)
+		if pauseSummary.Line == "" {
+			pauseSummary = runtimeSchedulerPauseSummary(effectiveConfig, runner)
+		}
+		fmt.Fprintln(stdout, pauseSummary.Line)
 		printRuntimeServiceStatus(effectiveConfig, runner, stdout)
 		printRuntimeImageStatus(&effectiveConfig, runner, stdout)
 		printLatestRuntimeSummary(effectiveConfig, runner, stdout)
@@ -622,26 +642,41 @@ func runtimeSchedulerStateCommand(config runtimeInstanceConfig, runner commandRu
 	return err
 }
 
-func printRuntimeSchedulerPauseState(config runtimeInstanceConfig, runner commandRunner, stdout io.Writer) {
+type runtimeSchedulerPauseInfo struct {
+	Line      string
+	Paused    bool
+	Available bool
+}
+
+func runtimeSchedulerPauseSummary(config runtimeInstanceConfig, runner commandRunner) runtimeSchedulerPauseInfo {
 	plan, err := buildRuntimeRunOncePlan(config, runtimeRunOnceOverrides{}, "")
 	if err != nil {
-		fmt.Fprintf(stdout, "runtime_scheduler_pause status=unavailable reason=%s\n", singleLine(err.Error()))
-		return
+		return runtimeSchedulerPauseInfo{
+			Line: "runtime_scheduler_pause status=unavailable reason=" + singleLine(err.Error()),
+		}
 	}
 	output, err := dockerComposeExecOutput(config, plan, runner, "a3", "show-scheduler-state", "--storage-backend", "json", "--storage-dir", plan.StorageDir)
 	if err != nil {
-		fmt.Fprintf(stdout, "runtime_scheduler_pause status=unavailable reason=%s\n", singleLine(err.Error()))
-		return
+		return runtimeSchedulerPauseInfo{
+			Line: "runtime_scheduler_pause status=unavailable reason=" + singleLine(err.Error()),
+		}
 	}
 	summary := strings.TrimSpace(string(output))
 	if summary == "" {
-		fmt.Fprintln(stdout, "runtime_scheduler_pause status=unavailable reason=empty")
-		return
+		return runtimeSchedulerPauseInfo{
+			Line: "runtime_scheduler_pause status=unavailable reason=empty",
+		}
 	}
+	paused := false
 	if strings.HasPrefix(summary, "scheduler ") {
+		paused = strings.Contains(" "+summary+" ", " paused=true ")
 		summary = "runtime_" + summary
 	}
-	fmt.Fprintln(stdout, sanitizePublicCommand(summary))
+	return runtimeSchedulerPauseInfo{
+		Line:      sanitizePublicCommand(summary),
+		Paused:    paused,
+		Available: true,
+	}
 }
 
 func runRuntimeImageDigest(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
