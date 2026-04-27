@@ -92,7 +92,7 @@ func TestClassifyUserFacingError(t *testing.T) {
 
 func TestAgentInstallExportsAgentFromRuntimeImage(t *testing.T) {
 	tempDir := t.TempDir()
-	outputPath := filepath.Join(tempDir, "bin", "a3-agent")
+	outputPath := filepath.Join(tempDir, "bin", "a2o-agent")
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -138,7 +138,7 @@ func TestAgentInstallExportsAgentFromRuntimeImage(t *testing.T) {
 
 func TestAgentInstallExportsAgentFromPackageDir(t *testing.T) {
 	tempDir := t.TempDir()
-	outputPath := filepath.Join(tempDir, "bin", "a3-agent")
+	outputPath := filepath.Join(tempDir, "bin", "a2o-agent")
 	packageDir := writeAgentPackageDir(t, tempDir, map[string]string{"darwin-amd64": "#!/bin/sh\necho package-dir\n"})
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -172,7 +172,7 @@ func TestAgentInstallExportsAgentFromPackageDir(t *testing.T) {
 
 func TestAgentInstallAutoFallsBackToRuntimeImageWhenEnvPackageDirIsInvalid(t *testing.T) {
 	tempDir := t.TempDir()
-	outputPath := filepath.Join(tempDir, "bin", "a3-agent")
+	outputPath := filepath.Join(tempDir, "bin", "a2o-agent")
 	invalidDir := filepath.Join(tempDir, "invalid-packages")
 	if err := os.MkdirAll(invalidDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -207,7 +207,7 @@ func TestAgentInstallAutoFallsBackToRuntimeImageWhenEnvPackageDirIsInvalid(t *te
 
 func TestAgentInstallFailsWithoutFallbackWhenExplicitPackageDirIsInvalid(t *testing.T) {
 	tempDir := t.TempDir()
-	outputPath := filepath.Join(tempDir, "bin", "a3-agent")
+	outputPath := filepath.Join(tempDir, "bin", "a2o-agent")
 	invalidDir := filepath.Join(tempDir, "invalid-packages")
 	if err := os.MkdirAll(invalidDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -7038,7 +7038,7 @@ func TestAgentInstallFailsWhenRuntimeContainerIsMissing(t *testing.T) {
 		"--target",
 		"linux-amd64",
 		"--output",
-		filepath.Join(t.TempDir(), "a3-agent"),
+		filepath.Join(t.TempDir(), "a2o-agent"),
 		"--compose-project",
 		"a3-test",
 		"--compose-file",
@@ -7057,7 +7057,7 @@ func TestAgentInstallRequiresInstanceConfigOrExplicitCompose(t *testing.T) {
 	var stderr bytes.Buffer
 
 	withChdir(t, t.TempDir(), func() {
-		code := run([]string{"agent", "install", "--target", "linux-amd64", "--output", filepath.Join(t.TempDir(), "a3-agent")}, &fakeRunner{}, &stdout, &stderr)
+		code := run([]string{"agent", "install", "--target", "linux-amd64", "--output", filepath.Join(t.TempDir(), "a2o-agent")}, &fakeRunner{}, &stdout, &stderr)
 		if code == 0 {
 			t.Fatalf("run should fail without an instance config")
 		}
@@ -7081,11 +7081,11 @@ func writeAgentPackageDir(t *testing.T, root string, binaries map[string]string)
 		if err := os.MkdirAll(targetDir, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		launcherPath := filepath.Join(targetDir, "a3")
+		launcherPath := filepath.Join(targetDir, "a2o")
 		if err := os.WriteFile(launcherPath, []byte(body), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		archiveName := fmt.Sprintf("a3-agent-%s-%s.tar.gz", version, target)
+		archiveName := fmt.Sprintf("a2o-agent-%s-%s.tar.gz", version, target)
 		archivePath := filepath.Join(packageDir, archiveName)
 		writeAgentArchiveFile(t, archivePath, body)
 		sum := sha256.Sum256(mustReadTestFile(t, archivePath))
@@ -7133,7 +7133,7 @@ func writeAgentArchiveFile(t *testing.T, path, body string) {
 	gzipWriter := gzip.NewWriter(file)
 	tarWriter := tar.NewWriter(gzipWriter)
 	content := []byte(body)
-	header := &tar.Header{Name: "a3-agent", Mode: 0o755, Size: int64(len(content))}
+	header := &tar.Header{Name: "a2o-agent", Mode: 0o755, Size: int64(len(content))}
 	if err := tarWriter.WriteHeader(header); err != nil {
 		t.Fatal(err)
 	}

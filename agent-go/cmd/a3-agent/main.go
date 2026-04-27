@@ -306,7 +306,7 @@ func doctorConfig(config agent.RuntimeProfileConfig) error {
 	if err := os.MkdirAll(config.WorkspaceRoot, 0o755); err != nil {
 		return fmt.Errorf("workspace_root is not writable: %w", err)
 	}
-	probePath := filepath.Join(config.WorkspaceRoot, ".a3-agent-write-probe")
+	probePath := filepath.Join(config.WorkspaceRoot, ".a2o-agent-write-probe")
 	if err := os.WriteFile(probePath, []byte("ok\n"), 0o600); err != nil {
 		return fmt.Errorf("workspace_root is not writable: %w", err)
 	}

@@ -373,7 +373,7 @@ func extractAgentArchiveBinary(archivePath, outputPath string) error {
 		if err != nil {
 			return fmt.Errorf("read agent package archive: %w", err)
 		}
-		if header.Typeflag != tar.TypeReg || filepath.Base(header.Name) != "a3-agent" {
+		if header.Typeflag != tar.TypeReg || filepath.Base(header.Name) != "a2o-agent" {
 			continue
 		}
 		if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
@@ -392,7 +392,7 @@ func extractAgentArchiveBinary(archivePath, outputPath string) error {
 		}
 		return nil
 	}
-	return fmt.Errorf("agent package archive does not contain a3-agent: %s", archivePath)
+	return fmt.Errorf("agent package archive does not contain a2o-agent: %s; migration_required=true replacement_archive=a2o-agent-<version>-<os>-<arch>.tar.gz", archivePath)
 }
 
 func firstNonEmptyString(values ...string) string {

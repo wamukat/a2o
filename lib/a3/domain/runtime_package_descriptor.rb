@@ -240,7 +240,7 @@ module A3
       end
 
       def agent_runtime_command_summary
-        "a3-agent -config #{agent_profile_path}"
+        "a2o-agent -config #{agent_profile_path}"
       end
 
       def agent_worker_gateway_options_summary

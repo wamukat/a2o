@@ -9,7 +9,7 @@ module A3
         remediation_commands
         A3::Application::ExecutionResult.new(
           success: false,
-          summary: "workspace publication must be executed by a3-agent",
+          summary: "workspace publication must be executed by a2o-agent",
           failing_command: "workspace_change_publication",
           observed_state: "engine_workspace_mutation_disabled",
           diagnostics: {

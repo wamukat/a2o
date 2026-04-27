@@ -1018,12 +1018,8 @@ module A3
       wrapper_path = File.join(output_dir, "a2o")
       File.write(wrapper_path, host_launcher_wrapper)
       FileUtils.chmod(0o755, wrapper_path)
-      compat_wrapper_path = File.join(output_dir, "a3")
-      File.write(compat_wrapper_path, host_launcher_wrapper)
-      FileUtils.chmod(0o755, compat_wrapper_path)
 
       out.puts("host_launcher_installed output=#{wrapper_path} targets=#{installed_targets.join(',')}")
-      out.puts("host_launcher_alias output=#{compat_wrapper_path}")
       out.puts("host_share_installed output=#{installed_share_dir}") if installed_share_dir
       out.puts("host_runtime_image=#{options[:runtime_image]}") if options[:runtime_image]
     end
@@ -1129,7 +1125,7 @@ module A3
 
     def parse_agent_package_options(argv)
       options = {
-        package_dir: ENV.fetch("A2O_AGENT_PACKAGE_DIR", ENV.fetch("A3_AGENT_PACKAGE_DIR", A3::Infra::AgentPackageStore::DEFAULT_PACKAGE_DIR))
+        package_dir: A3::Infra::AgentPackageStore.default_package_dir
       }
       parser = OptionParser.new
       parser.on("--package-dir DIR") { |value| options[:package_dir] = File.expand_path(value) }
@@ -1141,7 +1137,7 @@ module A3
 
     def parse_host_install_options(argv)
       options = {
-        package_dir: ENV.fetch("A2O_AGENT_PACKAGE_DIR", ENV.fetch("A3_AGENT_PACKAGE_DIR", A3::Infra::AgentPackageStore::DEFAULT_PACKAGE_DIR))
+        package_dir: A3::Infra::AgentPackageStore.default_package_dir
       }
       parser = OptionParser.new
       parser.on("--package-dir DIR") { |value| options[:package_dir] = File.expand_path(value) }
@@ -1157,14 +1153,11 @@ module A3
     def install_host_launchers(package_dir:, output_dir:)
       package_store = validate_host_package_dir!(package_dir)
       resolved_dir = package_store&.resolved_host_install_package_dir || package_dir
-      targets = Dir.glob(File.join(resolved_dir, "*", "a3")).sort.map do |source|
+      targets = Dir.glob(File.join(resolved_dir, "*", "a2o")).sort.map do |source|
         target = File.basename(File.dirname(source))
-        destination = File.join(output_dir, "a3-#{target}")
+        destination = File.join(output_dir, "a2o-#{target}")
         FileUtils.cp(source, destination)
         FileUtils.chmod(0o755, destination)
-        public_destination = File.join(output_dir, "a2o-#{target}")
-        FileUtils.cp(source, public_destination)
-        FileUtils.chmod(0o755, public_destination)
         target
       end
       raise A3::Domain::ConfigurationError, "host launcher binaries not found under #{package_dir}" if targets.empty?
@@ -1226,7 +1219,10 @@ module A3
         command_name="$(basename "$0")"
         case "$command_name" in
           a2o) binary="$dir/a2o-$os_part-$arch_part" ;;
-          *) binary="$dir/a3-$os_part-$arch_part" ;;
+          *)
+            echo "removed A3 host launcher alias: $command_name; migration_required=true replacement=a2o" >&2
+            exit 2
+            ;;
         esac
         if [ ! -x "$binary" ]; then
           echo "A2O host launcher not found for ${os_part}-${arch_part}: $binary" >&2

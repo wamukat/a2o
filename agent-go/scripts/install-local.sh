@@ -10,12 +10,12 @@ mkdir -p "${BIN_DIR}"
 
 (
   cd "${ROOT_DIR}"
-  go build -trimpath -o "${BIN_DIR}/a3-agent" ./cmd/a3-agent
-  go build -trimpath -o "${BIN_DIR}/a3" ./cmd/a3
+  go build -trimpath -o "${BIN_DIR}/a2o-agent" ./cmd/a3-agent
+  go build -trimpath -o "${BIN_DIR}/a2o" ./cmd/a3
 )
 
-echo "installed ${BIN_DIR}/a3-agent"
-echo "installed ${BIN_DIR}/a3"
-if ! command -v a3-agent >/dev/null 2>&1; then
+echo "installed ${BIN_DIR}/a2o-agent"
+echo "installed ${BIN_DIR}/a2o"
+if ! command -v a2o-agent >/dev/null 2>&1; then
   echo "note: ${BIN_DIR} is not currently on PATH"
 fi

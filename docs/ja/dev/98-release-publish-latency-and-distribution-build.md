@@ -97,7 +97,7 @@ runtime image には `/opt/a2o/agents/release-manifest.jsonl` と target 別 arc
 
 現在の publication surface は次のとおり。
 
-- `a3-agent-<version>-darwin-arm64.tar.gz` のような target 別 archive
+- `a2o-agent-<version>-darwin-arm64.tar.gz` のような target 別 archive
 - `release-manifest.jsonl`
 - `checksums.txt`
 - `package-compatibility.json`

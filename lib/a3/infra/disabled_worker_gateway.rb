@@ -10,7 +10,7 @@ module A3
         task_packet
         A3::Application::ExecutionResult.new(
           success: false,
-          summary: "worker phase must be executed by a3-agent; configure --worker-gateway agent-http",
+          summary: "worker phase must be executed by a2o-agent; configure --worker-gateway agent-http",
           failing_command: "worker_gateway",
           observed_state: "engine_worker_execution_disabled",
           diagnostics: {

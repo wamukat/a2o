@@ -32,22 +32,18 @@ RSpec.describe "A3 host install CLI" do
     end
 
     expect(out.string).to include("host_launcher_installed output=#{File.join(output_dir, 'a2o')}")
-    expect(out.string).to include("host_launcher_alias output=#{File.join(output_dir, 'a3')}")
     expect(out.string).to include("targets=darwin-amd64,linux-arm64")
     expect(out.string).to include("host_share_installed output=#{share_dir}")
     expect(out.string).to include("host_runtime_image=example/a2o-engine:latest")
-    expect(File.read(File.join(output_dir, "a3-darwin-amd64"))).to eq("darwin launcher\n")
-    expect(File.executable?(File.join(output_dir, "a3-darwin-amd64"))).to be(true)
+    expect(File.exist?(File.join(output_dir, "a3-darwin-amd64"))).to be(false)
     expect(File.read(File.join(output_dir, "a2o-darwin-amd64"))).to eq("darwin launcher\n")
     expect(File.executable?(File.join(output_dir, "a2o-darwin-amd64"))).to be(true)
-    expect(File.read(File.join(output_dir, "a3-linux-arm64"))).to eq("linux launcher\n")
-    expect(File.executable?(File.join(output_dir, "a3-linux-arm64"))).to be(true)
+    expect(File.exist?(File.join(output_dir, "a3-linux-arm64"))).to be(false)
     expect(File.read(File.join(output_dir, "a2o-linux-arm64"))).to eq("linux launcher\n")
     expect(File.executable?(File.join(output_dir, "a2o-linux-arm64"))).to be(true)
     expect(File.read(File.join(output_dir, "a2o"))).to include("exec \"$binary\" \"$@\"")
     expect(File.executable?(File.join(output_dir, "a2o"))).to be(true)
-    expect(File.read(File.join(output_dir, "a3"))).to include("exec \"$binary\" \"$@\"")
-    expect(File.executable?(File.join(output_dir, "a3"))).to be(true)
+    expect(File.exist?(File.join(output_dir, "a3"))).to be(false)
     expect(File.read(File.join(share_dir, "docker/compose/a2o-kanbalone.yml"))).to eq("services: {}\n")
     expect(File.read(File.join(share_dir, "runtime-image"))).to eq("example/a2o-engine:latest\n")
   end
@@ -93,7 +89,7 @@ RSpec.describe "A3 host install CLI" do
 
     A3::CLI.start(["host", "install", "--package-dir", package_dir, "--output-dir", output_dir], out: out)
 
-    expect(File.read(File.join(output_dir, "a3-darwin-amd64"))).to eq("darwin external\n")
+    expect(File.read(File.join(output_dir, "a2o-darwin-amd64"))).to eq("darwin external\n")
     expect(out.string).to include("host_launcher_installed")
   end
 
@@ -114,18 +110,18 @@ RSpec.describe "A3 host install CLI" do
   def write_host_launcher(package_dir, target, body)
     target_dir = File.join(package_dir, target)
     FileUtils.mkdir_p(target_dir)
-    path = File.join(target_dir, "a3")
+    path = File.join(target_dir, "a2o")
     File.write(path, body)
     FileUtils.chmod(0o755, path)
   end
 
   def write_manifest(package_dir, target:)
     goos, goarch = target.split("-", 2)
-    archive = "a3-agent-dev-#{target}.tar.gz"
+    archive = "a2o-agent-dev-#{target}.tar.gz"
     path = File.join(package_dir, archive)
     tar_io = StringIO.new
     Gem::Package::TarWriter.new(tar_io) do |tar|
-      tar.add_file("a3-agent", 0o755) { |entry| entry.write("agent\n") }
+      tar.add_file("a2o-agent", 0o755) { |entry| entry.write("agent\n") }
     end
     tar_io.rewind
     Zlib::GzipWriter.open(path) { |gzip| gzip.write(tar_io.string) }
@@ -173,12 +169,12 @@ RSpec.describe "A3 host install CLI" do
     write_manifest(bundle_root, target: target)
     write_contract(bundle_root, runtime_version: runtime_version, package_version: A3::VERSION)
     File.write(File.join(bundle_root, "checksums.txt"), "dummy  dummy\n")
-    archive = File.join(bundle_root, "a3-agent-#{A3::VERSION}-#{target}.tar.gz")
+    archive = File.join(bundle_root, "a2o-agent-#{A3::VERSION}-#{target}.tar.gz")
     File.write(archive, "placeholder")
     bundle_path = File.join(@tmp_dir, "a2o-agent-packages-#{A3::VERSION}.tar.gz")
     tar_io = StringIO.new
     Gem::Package::TarWriter.new(tar_io) do |tar|
-      %W[checksums.txt release-manifest.jsonl package-compatibility.json #{File.basename(archive)} #{target}/a3].each do |relative_path|
+      %W[checksums.txt release-manifest.jsonl package-compatibility.json #{File.basename(archive)} #{target}/a2o].each do |relative_path|
         full_path = File.join(bundle_root, relative_path)
         mode = File.stat(full_path).mode & 0o777
         tar.add_file(relative_path, mode) { |entry| entry.write(File.binread(full_path)) }

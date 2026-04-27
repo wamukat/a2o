@@ -34,7 +34,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-exported_agent="${work_dir}/a3-agent"
+exported_agent="${work_dir}/a2o-agent"
 source_root="${work_dir}/source/catalog-service"
 workspace_root="${work_dir}/workspaces"
 
@@ -45,9 +45,9 @@ A2O_BUNDLE_KANBALONE_PORT="${A2O_BUNDLE_KANBALONE_PORT:-3470}" \
 docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" up -d --no-deps --force-recreate "${RUNTIME_SERVICE}"
 
 runtime_container="$(docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" ps -q "${RUNTIME_SERVICE}")"
-docker exec "${runtime_container}" a3 agent package verify --target "${target}"
-docker exec "${runtime_container}" a3 agent package export --target "${target}" --output /tmp/a3-agent-validation
-docker cp "${runtime_container}:/tmp/a3-agent-validation" "${exported_agent}"
+docker exec "${runtime_container}" a2o agent package verify --target "${target}"
+docker exec "${runtime_container}" a2o agent package export --target "${target}" --output /tmp/a2o-agent-validation
+docker cp "${runtime_container}:/tmp/a2o-agent-validation" "${exported_agent}"
 chmod +x "${exported_agent}"
 
 mkdir -p "${source_root}"

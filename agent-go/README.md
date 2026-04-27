@@ -1,6 +1,6 @@
 # A2O Agent Go Scaffold
 
-This module contains the public `a2o-agent` scaffold for macOS, Linux, and WSL2 Ubuntu. The internal implementation name remains `a3-agent` for the current release.
+This module contains the public `a2o-agent` scaffold for macOS, Linux, and WSL2 Ubuntu.
 
 It intentionally depends only on the Go standard library. The Ruby reference agent class remains useful for protocol fixtures, but it is not a release executable. This module is the only agent target for host / dev-env installation.
 
@@ -26,8 +26,8 @@ This writes binaries and release archives under `dist/` for:
 
 Release output includes:
 
-- platform binary directories, for example `dist/linux-amd64/a3-agent` and `dist/linux-amd64/a3`; `a2o host install` writes public `a2o-*` launcher names from these binaries
-- archives, for example `dist/a3-agent-0.5.36-linux-amd64.tar.gz`
+- platform binary directories, for example `dist/linux-amd64/a2o-agent` and `dist/linux-amd64/a2o`; `a2o host install` writes public `a2o-*` launcher names from these binaries
+- archives, for example `dist/a2o-agent-0.5.36-linux-amd64.tar.gz`
 - `dist/checksums.txt`
 - `dist/release-manifest.jsonl`
 - `dist/package-compatibility.json`
@@ -55,26 +55,26 @@ Install from source when Go is available:
 ./scripts/install-local.sh
 ```
 
-By default this installs compatibility binaries under `$HOME/.local/bin`. Public runtime installs should prefer `a2o host install` and `a2o agent install`.
+By default this installs `a2o` and `a2o-agent` under `$HOME/.local/bin`. Public runtime installs should prefer `a2o host install` and `a2o agent install`.
 
 Install from a release archive when Go is not required on the target host:
 
 ```sh
-./scripts/install-release.sh dist/a3-agent-0.5.36-linux-amd64.tar.gz
+./scripts/install-release.sh dist/a2o-agent-0.5.36-linux-amd64.tar.gz
 ```
 
 Verify the release checksum before installing:
 
 ```sh
 CHECKSUM_FILE=dist/checksums.txt \
-./scripts/install-release.sh dist/a3-agent-0.5.36-linux-amd64.tar.gz
+./scripts/install-release.sh dist/a2o-agent-0.5.36-linux-amd64.tar.gz
 ```
 
-The installer installs `a2o-agent` and compatibility alias `a3-agent`. It does not install or enable OS service definitions. Standard A2O operation uses `a2o host install`, `a2o project bootstrap`, `a2o kanban ...`, `a2o agent install`, and `a2o runtime ...`; direct agent loop commands are compatibility / diagnostic tools for operators and developers.
+The installer installs `a2o-agent`. It does not install legacy `a3-agent` aliases or OS service definitions. Standard A2O operation uses `a2o host install`, `a2o project bootstrap`, `a2o kanban ...`, `a2o agent install`, and `a2o runtime ...`.
 
 ## Host Launcher
 
-`a2o` is the host-side launcher. It is the user-facing command for Docker A2O Engine operations and host/dev-env agent installation. It is a Go binary and does not require Ruby on the host. `a3` remains as an internal / compatibility alias.
+`a2o` is the host-side launcher. It is the user-facing command for Docker A2O Engine operations and host/dev-env agent installation. It is a Go binary and does not require Ruby on the host. Host install no longer writes the legacy `a3` wrapper or `a3-*` platform launchers.
 
 Install the host launcher from a published A2O Engine image:
 

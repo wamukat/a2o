@@ -69,7 +69,7 @@ RSpec.describe A3::Domain::RuntimePackageDescriptor do
     expect(descriptor.operator_summary.fetch("secret_contract")).to eq("secret_delivery_mode=environment_variable secret_reference=A3_SECRET")
     expect(descriptor.operator_summary.fetch("migration_contract")).to eq("scheduler_store_migration_state=not_required")
     expect(descriptor.operator_summary.fetch("agent_runtime_profile")).to eq("profile=host-local control_plane_url=http://127.0.0.1:7393 profile_path=<agent-runtime-profile.json> source_aliases= freshness_policy=reuse_if_clean_and_ref_matches cleanup_policy=retain_until_a3_cleanup")
-    expect(descriptor.operator_summary.fetch("agent_runtime_command")).to eq("a3-agent -config <agent-runtime-profile.json>")
+    expect(descriptor.operator_summary.fetch("agent_runtime_command")).to eq("a2o-agent -config <agent-runtime-profile.json>")
     expect(descriptor.operator_summary.fetch("agent_worker_gateway_options")).to eq("--worker-gateway agent-http --agent-control-plane-url http://127.0.0.1:7393 --agent-runtime-profile host-local --agent-shared-workspace-mode agent-materialized --agent-workspace-freshness-policy reuse_if_clean_and_ref_matches --agent-workspace-cleanup-policy retain_until_a3_cleanup")
     expect(descriptor.operator_summary.fetch("runtime_contract")).to eq("project_config_schema_version=1 required_project_config_schema_version=1 required_preset_schema_version=1 preset_schema_versions= repo_source_strategy=none repo_source_slots= secret_delivery_mode=environment_variable secret_reference=A3_SECRET scheduler_store_migration_state=not_required")
     expect(descriptor.operator_summary.fetch("secret_delivery_action")).to eq("provide secrets via environment variable A3_SECRET")
@@ -123,7 +123,7 @@ RSpec.describe A3::Domain::RuntimePackageDescriptor do
       "repo_alpha" => "sample-catalog-service",
       "repo_beta" => "sample-storefront"
     )
-    expect(descriptor.agent_runtime_profile_summary.fetch("agent_command")).to eq("a3-agent -config /profiles/dev-env-agent.json")
+    expect(descriptor.agent_runtime_profile_summary.fetch("agent_command")).to eq("a2o-agent -config /profiles/dev-env-agent.json")
     expect(descriptor.operator_summary.fetch("agent_runtime_profile")).to include("source_aliases=repo_alpha=sample-catalog-service,repo_beta=sample-storefront")
     expect(descriptor.operator_summary.fetch("agent_worker_gateway_options")).to include("--agent-source-alias repo_alpha=sample-catalog-service")
     expect(descriptor.operator_summary.fetch("agent_worker_gateway_options")).not_to include("/repos/alpha")

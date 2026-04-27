@@ -7,7 +7,7 @@ module A3
         workspace
         A3::Application::ExecutionResult.new(
           success: false,
-          summary: "merge must be executed by a3-agent; configure --merge-runner agent-http",
+          summary: "merge must be executed by a2o-agent; configure --merge-runner agent-http",
           failing_command: "merge_runner",
           observed_state: "engine_merge_mutation_disabled",
           diagnostics: {

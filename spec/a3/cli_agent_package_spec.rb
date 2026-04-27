@@ -30,7 +30,7 @@ RSpec.describe "A3 agent package CLI" do
   it "exports the selected packaged agent binary" do
     archive = write_agent_archive(target: "darwin-arm64", body: "binary\n")
     write_manifest(target: "darwin-arm64", archive: File.basename(archive))
-    output = File.join(@tmp_dir, "out", "a3-agent")
+    output = File.join(@tmp_dir, "out", "a2o-agent")
     out = StringIO.new
 
     A3::CLI.start(
@@ -59,15 +59,15 @@ RSpec.describe "A3 agent package CLI" do
     write_contract(runtime_version: "9.9.9", package_version: A3::VERSION)
 
     expect do
-      A3::CLI.start(["agent", "package", "export", "--package-dir", @tmp_dir, "--target", "linux-arm64", "--output", File.join(@tmp_dir, "out", "a3-agent")], out: StringIO.new)
+      A3::CLI.start(["agent", "package", "export", "--package-dir", @tmp_dir, "--target", "linux-arm64", "--output", File.join(@tmp_dir, "out", "a2o-agent")], out: StringIO.new)
     end.to raise_error(A3::Domain::ConfigurationError, /runtime compatibility mismatch/)
   end
 
   def write_agent_archive(target:, body: "agent-binary\n")
-    archive_path = File.join(@tmp_dir, "a3-agent-dev-#{target}.tar.gz")
+    archive_path = File.join(@tmp_dir, "a2o-agent-dev-#{target}.tar.gz")
     tar_io = StringIO.new
     Gem::Package::TarWriter.new(tar_io) do |tar|
-      tar.add_file("a3-agent", 0o755) { |entry| entry.write(body) }
+      tar.add_file("a2o-agent", 0o755) { |entry| entry.write(body) }
     end
     tar_io.rewind
     Zlib::GzipWriter.open(archive_path) { |gzip| gzip.write(tar_io.string) }

@@ -37,7 +37,7 @@ cleanup() {
 trap cleanup EXIT
 
 dist_dir="${DIST_DIR:-"${work_dir}/dist"}"
-exported_agent="${work_dir}/bin/a3-agent"
+exported_agent="${work_dir}/bin/a2o-agent"
 source_root="${work_dir}/source/catalog-service"
 workspace_root="${work_dir}/workspaces"
 
@@ -54,8 +54,8 @@ ruby -I "${ENGINE_ROOT}/lib" "${ENGINE_ROOT}/bin/a3" agent package export \
 
 mkdir -p "${source_root}"
 git -C "${source_root}" init -q
-git -C "${source_root}" config user.name "A3 Release Validation"
-git -C "${source_root}" config user.email "a3-release-validation@example.com"
+git -C "${source_root}" config user.name "A2O Release Validation"
+git -C "${source_root}" config user.email "a2o-release-validation@example.com"
 printf 'release validation\n' > "${source_root}/README.md"
 git -C "${source_root}" add README.md
 git -C "${source_root}" commit -q -m "initial release validation source"

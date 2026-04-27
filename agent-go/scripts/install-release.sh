@@ -10,7 +10,7 @@ CHECKSUM_FILE="${CHECKSUM_FILE:-}"
 VERIFY_CHECKSUMS="${VERIFY_CHECKSUMS:-0}"
 
 if [[ -z "${ARCHIVE_PATH}" ]]; then
-  echo "usage: install-release.sh /path/to/a3-agent-<version>-<os>-<arch>.tar.gz" >&2
+  echo "usage: install-release.sh /path/to/a2o-agent-<version>-<os>-<arch>.tar.gz" >&2
   exit 2
 fi
 if [[ ! -f "${ARCHIVE_PATH}" ]]; then
@@ -72,17 +72,15 @@ case "${ARCHIVE_PATH}" in
 esac
 
 binary_source=""
-if [[ -f "${tmpdir}/a3-agent" ]]; then
-  binary_source="${tmpdir}/a3-agent"
+if [[ -f "${tmpdir}/a2o-agent" ]]; then
+  binary_source="${tmpdir}/a2o-agent"
 else
-  echo "archive does not contain a3-agent binary" >&2
+  echo "archive does not contain a2o-agent binary; migration_required=true replacement_archive=a2o-agent-<version>-<os>-<arch>.tar.gz" >&2
   exit 2
 fi
 
 install -m 0755 "${binary_source}" "${BIN_DIR}/a2o-agent"
-install -m 0755 "${binary_source}" "${BIN_DIR}/a3-agent"
 echo "installed ${BIN_DIR}/a2o-agent"
-echo "installed compatibility alias ${BIN_DIR}/a3-agent"
 if ! command -v a2o-agent >/dev/null 2>&1; then
   echo "note: ${BIN_DIR} is not currently on PATH"
 fi

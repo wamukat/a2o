@@ -71,7 +71,7 @@ module A3
           merge_request: merge_request_form(merge_plan),
           agent_environment: @agent_environment,
           working_dir: ".",
-          command: "a3-agent-merge",
+          command: "a2o-agent-merge",
           args: [],
           env: {},
           timeout_seconds: @timeout_seconds,
@@ -242,7 +242,7 @@ module A3
           merge_recovery_request: merge_recovery_request_form(merge_plan, recovery_candidate),
           agent_environment: @agent_environment,
           working_dir: ".",
-          command: "a3-agent-merge-recovery",
+          command: "a2o-agent-merge-recovery",
           args: [],
           env: {},
           timeout_seconds: @timeout_seconds,
@@ -449,7 +449,7 @@ module A3
           errors << "#{slot_name}.merge_before_head must be present" unless present_string?(descriptor["merge_before_head"])
           errors << "#{slot_name}.merge_after_head must be present" unless present_string?(descriptor["merge_after_head"])
           errors << "#{slot_name}.resolved_head must match merge_after_head" unless descriptor["resolved_head"] == descriptor["merge_after_head"]
-          unless %w[a2o-agent a3-agent].include?(descriptor["project_repo_mutator"])
+          unless descriptor["project_repo_mutator"] == "a2o-agent"
             errors << "#{slot_name}.project_repo_mutator must be a2o-agent"
           end
           merged_slots << {
@@ -494,7 +494,6 @@ module A3
         return false unless marker_scan_result.is_a?(Hash)
         valid_scanners = %w[
           a2o-agent-conflict-marker-scan
-          a3-agent-conflict-marker-scan
         ]
         return false unless valid_scanners.include?(marker_scan_result["scanner"])
 

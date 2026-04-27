@@ -22,7 +22,7 @@ module A3
       Contract = Struct.new(:schema, :package_version, :runtime_version, :archive_manifest, :launcher_layout, keyword_init: true)
       Publication = Struct.new(:schema, :version, :bundle_archive, :bundle_url, :bundle_archive_sha256, :compatibility_contract, :archive_manifest, :checksums_file, :package_source_hint, keyword_init: true)
 
-      def initialize(package_dir: ENV.fetch("A2O_AGENT_PACKAGE_DIR", ENV.fetch("A3_AGENT_PACKAGE_DIR", DEFAULT_PACKAGE_DIR)))
+      def initialize(package_dir: default_package_dir)
         @package_dir = File.expand_path(package_dir)
       end
 
@@ -229,7 +229,11 @@ module A3
           raise A3::Domain::ConfigurationError, "unsupported agent package publication schema: #{publication_payload.schema}"
         end
 
-        cache_root = ENV.fetch("A2O_AGENT_PACKAGE_CACHE_DIR", ENV.fetch("A3_AGENT_PACKAGE_CACHE_DIR", "/tmp/a2o-agent-package-cache"))
+        if ENV.fetch("A3_AGENT_PACKAGE_CACHE_DIR", "").strip != ""
+          raise A3::Domain::ConfigurationError,
+                "removed A3 compatibility input: environment variable A3_AGENT_PACKAGE_CACHE_DIR; migration_required=true replacement=environment variable A2O_AGENT_PACKAGE_CACHE_DIR"
+        end
+        cache_root = ENV.fetch("A2O_AGENT_PACKAGE_CACHE_DIR", "/tmp/a2o-agent-package-cache")
         cache_key = "#{publication_payload.version}-#{publication_payload.bundle_archive_sha256}"
         cache_dir = File.join(File.expand_path(cache_root), cache_key)
         extracted_dir = File.join(cache_dir, "bundle")
@@ -281,7 +285,7 @@ module A3
         required_targets = %w[darwin-amd64 darwin-arm64 linux-amd64 linux-arm64]
         available_targets = manifest_packages.map(&:target)
         required_targets.all? do |target|
-          available_targets.include?(target) && File.file?(File.join(package_dir, target, "a3"))
+          available_targets.include?(target) && File.file?(File.join(package_dir, target, "a2o"))
         end
       rescue A3::Domain::ConfigurationError
         false
@@ -293,7 +297,7 @@ module A3
           Gem::Package::TarReader.new(gzip) do |tar|
             tar.each do |entry|
               next unless entry.file?
-              next unless File.basename(entry.full_name) == "a3-agent"
+              next unless File.basename(entry.full_name) == "a2o-agent"
 
               File.open(output, "wb") { |file| file.write(entry.read) }
               found = true
@@ -301,7 +305,8 @@ module A3
             end
           end
         end
-        raise A3::Domain::ConfigurationError, "agent package archive does not contain a3-agent: #{archive_path}" unless found
+        raise A3::Domain::ConfigurationError,
+              "agent package archive does not contain a2o-agent: #{archive_path}; migration_required=true replacement_archive=a2o-agent-<version>-<os>-<arch>.tar.gz" unless found
       end
 
       def resolved_archive_path(package)
@@ -311,6 +316,18 @@ module A3
         return package.archive_path(external_store.package_dir) if publication
 
         local_path
+      end
+
+      def self.default_package_dir
+        if ENV.fetch("A3_AGENT_PACKAGE_DIR", "").strip != ""
+          raise A3::Domain::ConfigurationError,
+                "removed A3 compatibility input: environment variable A3_AGENT_PACKAGE_DIR; migration_required=true replacement=environment variable A2O_AGENT_PACKAGE_DIR"
+        end
+        ENV.fetch("A2O_AGENT_PACKAGE_DIR", DEFAULT_PACKAGE_DIR)
+      end
+
+      def default_package_dir
+        self.class.default_package_dir
       end
     end
   end

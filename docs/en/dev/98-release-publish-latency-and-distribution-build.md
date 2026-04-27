@@ -97,7 +97,7 @@ The current policy is:
 
 The current publication surface is:
 
-- per-target archives such as `a3-agent-<version>-darwin-arm64.tar.gz`
+- per-target archives such as `a2o-agent-<version>-darwin-arm64.tar.gz`
 - `release-manifest.jsonl`
 - `checksums.txt`
 - `package-compatibility.json`

@@ -37,6 +37,14 @@ RSpec.describe A3::Infra::AgentPackageStore do
     expect(contract.package_version).to eq(A3::VERSION)
   end
 
+  it "fails fast when the removed A3 package directory environment is used" do
+    with_env("A3_AGENT_PACKAGE_DIR" => "/tmp/old-a3-agent-packages") do
+      expect do
+        described_class.new
+      end.to raise_error(A3::Domain::ConfigurationError, /migration_required=true replacement=environment variable A2O_AGENT_PACKAGE_DIR/)
+    end
+  end
+
   it "verifies release archive checksums" do
     archive = write_agent_archive(target: "darwin-arm64")
     write_manifest(target: "darwin-arm64", archive: File.basename(archive))
@@ -46,10 +54,10 @@ RSpec.describe A3::Infra::AgentPackageStore do
     expect(results.fetch(0)).to include(target: "darwin-arm64", ok: true)
   end
 
-  it "exports an executable a3-agent binary from the selected archive" do
+  it "exports an executable a2o-agent binary from the selected archive" do
     archive = write_agent_archive(target: "linux-arm64", body: "#!/bin/sh\necho agent\n")
     write_manifest(target: "linux-arm64", archive: File.basename(archive))
-    output = File.join(@tmp_dir, "bin", "a3-agent")
+    output = File.join(@tmp_dir, "bin", "a2o-agent")
 
     result = described_class.new(package_dir: @tmp_dir).export(target: "linux/arm64", output: output)
 
@@ -63,7 +71,7 @@ RSpec.describe A3::Infra::AgentPackageStore do
     write_manifest(target: "linux-amd64", archive: File.basename(archive), sha256: "0" * 64)
 
     expect do
-      described_class.new(package_dir: @tmp_dir).export(target: "linux-amd64", output: File.join(@tmp_dir, "a3-agent"))
+      described_class.new(package_dir: @tmp_dir).export(target: "linux-amd64", output: File.join(@tmp_dir, "a2o-agent"))
     end.to raise_error(A3::Domain::ConfigurationError, /checksum mismatch/)
   end
 
@@ -100,7 +108,7 @@ RSpec.describe A3::Infra::AgentPackageStore do
   it "falls back to an externally published bundle when the local package dir has only a publication descriptor" do
     bundle_path = write_publication_bundle(target: "darwin-arm64", body: "#!/bin/sh\necho external\n")
     write_publication(bundle_path: bundle_path)
-    output = File.join(@tmp_dir, "bin", "a3-agent")
+    output = File.join(@tmp_dir, "bin", "a2o-agent")
 
     result = described_class.new(package_dir: @tmp_dir).export(target: "darwin-arm64", output: output)
 
@@ -108,15 +116,26 @@ RSpec.describe A3::Infra::AgentPackageStore do
     expect(File.read(output)).to eq("#!/bin/sh\necho external\n")
   end
 
+  it "fails fast when the removed A3 package cache environment is used" do
+    bundle_path = write_publication_bundle(target: "darwin-arm64", body: "#!/bin/sh\necho external\n")
+    write_publication(bundle_path: bundle_path)
+
+    with_env("A3_AGENT_PACKAGE_CACHE_DIR" => "/tmp/old-a3-agent-cache") do
+      expect do
+        described_class.new(package_dir: @tmp_dir).export(target: "darwin-arm64", output: File.join(@tmp_dir, "bin", "a2o-agent"))
+      end.to raise_error(A3::Domain::ConfigurationError, /migration_required=true replacement=environment variable A2O_AGENT_PACKAGE_CACHE_DIR/)
+    end
+  end
+
   it "falls back to an externally published bundle when the local manifest exists but archives are not embedded" do
     bundle_path = write_publication_bundle(target: "linux-amd64", body: "#!/bin/sh\necho external linux\n")
     write_publication(bundle_path: bundle_path)
     File.write(
       File.join(@tmp_dir, "release-manifest.jsonl"),
-      JSON.generate("version" => A3::VERSION, "goos" => "linux", "goarch" => "amd64", "archive" => "a3-agent-dev-linux-amd64.tar.gz", "sha256" => "placeholder") + "\n"
+      JSON.generate("version" => A3::VERSION, "goos" => "linux", "goarch" => "amd64", "archive" => "a2o-agent-dev-linux-amd64.tar.gz", "sha256" => "placeholder") + "\n"
     )
     write_contract(runtime_version: A3::VERSION, package_version: A3::VERSION)
-    output = File.join(@tmp_dir, "bin", "a3-agent")
+    output = File.join(@tmp_dir, "bin", "a2o-agent")
 
     result = described_class.new(package_dir: @tmp_dir).export(target: "linux/amd64", output: output)
 
@@ -129,7 +148,7 @@ RSpec.describe A3::Infra::AgentPackageStore do
     write_publication(bundle_path: bundle_path)
     File.write(
       File.join(@tmp_dir, "release-manifest.jsonl"),
-      JSON.generate("version" => A3::VERSION, "goos" => "linux", "goarch" => "amd64", "archive" => "a3-agent-dev-linux-amd64.tar.gz", "sha256" => "placeholder") + "\n"
+      JSON.generate("version" => A3::VERSION, "goos" => "linux", "goarch" => "amd64", "archive" => "a2o-agent-dev-linux-amd64.tar.gz", "sha256" => "placeholder") + "\n"
     )
     write_contract(runtime_version: A3::VERSION, package_version: A3::VERSION)
 
@@ -166,7 +185,7 @@ RSpec.describe A3::Infra::AgentPackageStore do
     write_manifest(target: "darwin-arm64", archive: File.basename(archive))
     write_contract(runtime_version: A3::VERSION, package_version: A3::VERSION)
     write_publication(bundle_path: "/definitely/missing/a2o-agent-packages.tar.gz")
-    output = File.join(@tmp_dir, "bin", "a3-agent")
+    output = File.join(@tmp_dir, "bin", "a2o-agent")
 
     result = described_class.new(package_dir: @tmp_dir).export(target: "darwin-arm64", output: output)
 
@@ -175,10 +194,10 @@ RSpec.describe A3::Infra::AgentPackageStore do
   end
 
   def write_agent_archive(target:, body: "agent-binary\n")
-    archive_path = File.join(@tmp_dir, "a3-agent-dev-#{target}.tar.gz")
+    archive_path = File.join(@tmp_dir, "a2o-agent-dev-#{target}.tar.gz")
     tar_io = StringIO.new
     Gem::Package::TarWriter.new(tar_io) do |tar|
-      tar.add_file("a3-agent", 0o755) { |entry| entry.write(body) }
+      tar.add_file("a2o-agent", 0o755) { |entry| entry.write(body) }
     end
     tar_io.rewind
     Zlib::GzipWriter.open(archive_path) { |gzip| gzip.write(tar_io.string) }
@@ -233,17 +252,17 @@ RSpec.describe A3::Infra::AgentPackageStore do
   def write_publication_bundle(target:, body:, runtime_version: A3::VERSION)
     bundle_root = File.join(@tmp_dir, "bundle-root")
     FileUtils.mkdir_p(bundle_root)
-    archive = File.join(bundle_root, "a3-agent-dev-#{target}.tar.gz")
+    archive = File.join(bundle_root, "a2o-agent-dev-#{target}.tar.gz")
     tar_io = StringIO.new
     Gem::Package::TarWriter.new(tar_io) do |tar|
-      tar.add_file("a3-agent", 0o755) { |entry| entry.write(body) }
+      tar.add_file("a2o-agent", 0o755) { |entry| entry.write(body) }
     end
     tar_io.rewind
     Zlib::GzipWriter.open(archive) { |gzip| gzip.write(tar_io.string) }
     target_dir = File.join(bundle_root, target)
     FileUtils.mkdir_p(target_dir)
-    File.write(File.join(target_dir, "a3"), body)
-    FileUtils.chmod(0o755, File.join(target_dir, "a3"))
+    File.write(File.join(target_dir, "a2o"), body)
+    FileUtils.chmod(0o755, File.join(target_dir, "a2o"))
     manifest_path = File.join(bundle_root, "release-manifest.jsonl")
     goos, goarch = target.split("-", 2)
     File.write(
@@ -269,7 +288,7 @@ RSpec.describe A3::Infra::AgentPackageStore do
       add_path_to_tar(tar, bundle_root, "release-manifest.jsonl")
       add_path_to_tar(tar, bundle_root, "package-compatibility.json")
       add_path_to_tar(tar, bundle_root, File.basename(archive))
-      add_path_to_tar(tar, bundle_root, File.join(target, "a3"))
+      add_path_to_tar(tar, bundle_root, File.join(target, "a2o"))
     end
     tar_io.rewind
     Zlib::GzipWriter.open(bundle_path) { |gzip| gzip.write(tar_io.string) }
@@ -281,5 +300,21 @@ RSpec.describe A3::Infra::AgentPackageStore do
     body = File.binread(full_path)
     mode = File.stat(full_path).mode & 0o777
     tar.add_file(relative_path, mode) { |entry| entry.write(body) }
+  end
+
+  def with_env(values)
+    previous = values.each_with_object({}) do |(key, value), memo|
+      memo[key] = ENV.key?(key) ? ENV.fetch(key) : :__missing__
+      ENV[key] = value
+    end
+    yield
+  ensure
+    previous&.each do |key, value|
+      if value == :__missing__
+        ENV.delete(key)
+      else
+        ENV[key] = value
+      end
+    end
   end
 end

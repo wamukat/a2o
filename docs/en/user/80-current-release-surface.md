@@ -42,6 +42,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Bundled Kanbalone data names changed from `<compose-project>_soloboard-data` / `soloboard.sqlite` to `<compose-project>_kanbalone-data` / `kanbalone.sqlite`. If the old volume exists and the new one does not, `a2o kanban up` fails with `migration_required=true` instead of silently creating an empty board. Copy or rename the existing Kanban data before starting the bundled service.
 - Public `A3_*` environment fallbacks for runtime, agent, and worker configuration are removed where `A2O_*` replacements exist. Use `A2O_RUNTIME_IMAGE`, `A2O_COMPOSE_PROJECT`, `A2O_COMPOSE_FILE`, `A2O_RUNTIME_SERVICE`, `A2O_BUNDLE_AGENT_PORT`, `A2O_BUNDLE_STORAGE_DIR`, `A2O_AGENT_PACKAGE_DIR`, `A2O_AGENT_*`, `A2O_WORKER_*`, `A2O_WORKSPACE_ROOT`, and `A2O_ROOT_DIR`. Removed `A3_*` inputs fail with `migration_required=true` and the replacement name.
 - `worker-runs.json` is no longer an activity state source. Operator diagnostics, cleanup, rerun readiness, reconcile, and watch-summary use `agent_jobs.json`; leftover `worker-runs.json` is reported with `migration_required=true`.
+- Public agent package and host launcher artifacts use `a2o-agent` / `a2o` names. Release archives are named `a2o-agent-<version>-<os>-<arch>.tar.gz`, archives contain `a2o-agent`, host install writes `a2o` and `a2o-<os>-<arch>` only, and old package/cache environment names fail with `migration_required=true`.
 
 ## Validation Scope
 

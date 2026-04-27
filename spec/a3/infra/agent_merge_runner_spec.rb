@@ -73,7 +73,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
 
     request = client.records.values.first.request
     expect(request.phase).to eq(:merge)
-    expect(request.command).to eq("a3-agent-merge")
+    expect(request.command).to eq("a2o-agent-merge")
     expect(request.merge_request).to include(
       "workspace_id" => "merge-Sample-42-run-merge-1",
       "policy" => "ff_only"
@@ -204,7 +204,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     client.on_fetch = lambda do |job_id|
       request = client.records.fetch(job_id).request
       case request.command
-      when "a3-agent-merge"
+      when "a2o-agent-merge"
         client.complete(job_id, agent_result(
           job_id,
           workspace_descriptor(
@@ -240,7 +240,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
           "MAVEN_REPO_LOCAL" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo_alpha/.work/m2/repository"
         )
         client.complete(job_id, agent_result(job_id, workspace_descriptor({}), summary: "recovery worker resolved conflict"))
-      when "a3-agent-merge-recovery"
+      when "a2o-agent-merge-recovery"
         expect(request.merge_recovery_request).to eq(
           "workspace_id" => "merge-recovery-merge-run-merge-1-job-1",
           "slots" => {
@@ -279,7 +279,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
 
     expect(execution).to have_attributes(success?: true)
     expect(client.records.values.map { |record| record.request.command }).to eq(
-      ["a3-agent-merge", "a3-merge-recovery-worker", "a3-agent-merge-recovery"]
+      ["a2o-agent-merge", "a3-merge-recovery-worker", "a2o-agent-merge-recovery"]
     )
     recovery = execution.diagnostics.fetch("merge_recovery")
     expect(recovery).to include(
@@ -326,7 +326,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     client.on_fetch = lambda do |job_id|
       request = client.records.fetch(job_id).request
       case request.command
-      when "a3-agent-merge"
+      when "a2o-agent-merge"
         client.complete(job_id, agent_result(
           job_id,
           workspace_descriptor(
@@ -359,7 +359,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
           "conflict_files" => ["docs/10-ops/validation.md"]
         )
         client.complete(job_id, agent_result(job_id, workspace_descriptor({}, workspace_id: "merge-Sample-245-run-merge-245", task_ref: "Sample#245"), summary: "resolved Sample#245 validation docs conflict"))
-      when "a3-agent-merge-recovery"
+      when "a2o-agent-merge-recovery"
         expect(request.merge_recovery_request.fetch("slots").fetch("repo_alpha")).to include(
           "runtime_path" => "/agent/workspaces/merge-Sample-245-run-merge-245/repo_alpha",
           "conflict_files" => ["docs/10-ops/validation.md"]
@@ -478,7 +478,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
         "resolved_conflict_files" => ["docs/conflict.md"],
         "changed_files" => ["docs/conflict.md"],
         "marker_scan_result" => {
-          "scanner" => "a3-agent-conflict-marker-scan",
+          "scanner" => "a2o-agent-conflict-marker-scan",
           "unresolved_files" => ["docs/conflict.md"]
         }
       }

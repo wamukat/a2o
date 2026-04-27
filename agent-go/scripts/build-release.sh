@@ -53,15 +53,15 @@ for target in "${targets[@]}"; do
   (
     cd "${ROOT_DIR}"
     GOOS="${goos}" GOARCH="${goarch}" CGO_ENABLED=0 \
-      go build -trimpath -o "${out_dir}/a3-agent" ./cmd/a3-agent
+      go build -trimpath -o "${out_dir}/a2o-agent" ./cmd/a3-agent
     GOOS="${goos}" GOARCH="${goarch}" CGO_ENABLED=0 \
-      go build -trimpath -ldflags "-X main.version=${VERSION}" -o "${out_dir}/a3" ./cmd/a3
+      go build -trimpath -ldflags "-X main.version=${VERSION}" -o "${out_dir}/a2o" ./cmd/a3
   )
 
-  archive_name="a3-agent-${VERSION}-${goos}-${goarch}"
+  archive_name="a2o-agent-${VERSION}-${goos}-${goarch}"
   if [[ "${PACKAGE_ARCHIVES}" == "1" ]]; then
     archive_path="${DIST_DIR}/${archive_name}.tar.gz"
-    tar -C "${out_dir}" -czf "${archive_path}" "a3-agent"
+    tar -C "${out_dir}" -czf "${archive_path}" "a2o-agent"
     checksum="$(sha256sum_or_shasum "${archive_path}")"
     printf '%s  %s\n' "${checksum}" "$(basename "${archive_path}")" >> "${DIST_DIR}/checksums.txt"
     printf '{"version":"%s","goos":"%s","goarch":"%s","archive":"%s","sha256":"%s"}\n' \
@@ -78,7 +78,7 @@ if [[ "${PACKAGE_ARCHIVES}" == "1" ]]; then
   )
   for target in "${targets[@]}"; do
     bundle_items+=("${target/\//-}")
-    bundle_items+=("a3-agent-${VERSION}-${target/\//-}.tar.gz")
+    bundle_items+=("a2o-agent-${VERSION}-${target/\//-}.tar.gz")
   done
   (
     cd "${DIST_DIR}"

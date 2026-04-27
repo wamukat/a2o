@@ -24,10 +24,9 @@ These names may remain in implementation details:
 - `a3`
 - `bin/a3`
 - `.a3`
-- `A3_*` environment variables
-- compatibility `refs/heads/a3/...`
+- legacy `refs/heads/a3/...` references where required to read old state
 
-Do not require users to author these names in normal setup docs. If they appear in diagnostics or internal implementation docs, describe them as compatibility surfaces.
+Do not require users to author these names in normal setup docs. If removed public A3 compatibility inputs appear in diagnostics, include `migration_required=true` and the A2O replacement.
 
 ## Naming Rules
 
@@ -35,7 +34,7 @@ Do not require users to author these names in normal setup docs. If they appear 
 - New project packages use A2O names.
 - New CLI affordances should prefer `a2o`.
 - Internal Ruby Engine APIs may keep A3 names where they are not part of the public user surface.
-- Compatibility aliases must not become the documented primary path.
+- Public compatibility aliases should be removed once migration guidance is available.
 
 ## User-Facing Runtime
 
