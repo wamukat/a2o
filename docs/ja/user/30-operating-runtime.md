@@ -60,6 +60,7 @@ a2o runtime describe-task <task-ref>
 ```
 
 `describe-task` は実行、フェーズ、ワークスペース、証跡、カンバンコメント、ログの手がかり、skill feedback 要約、エージェント成果物の読み方をまとめて表示する。
+不正な worker result によりタスクが blocked になった場合、`describe-task` は worker result schema error を `execution_validation_error=` または `blocked_validation_error=` 行として表示する。`watch-summary --details` でも blocked タスクの詳細行に `validation_error=` が表示される。
 
 prompt / skill / worker command の改善に使うため、A2O は次の分析用 artifact を永続化する。
 

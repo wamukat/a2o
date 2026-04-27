@@ -60,6 +60,7 @@ a2o runtime describe-task <task-ref>
 ```
 
 `describe-task` gathers run state, phases, workspace details, evidence, kanban comments, log hints, skill feedback summaries, and agent artifact commands.
+When a task is blocked by an invalid worker result, `describe-task` prints `execution_validation_error=` or `blocked_validation_error=` lines with the worker result schema errors. `watch-summary --details` also includes `validation_error=` detail lines for blocked tasks.
 
 For prompt / skill / worker-command PDCA, A2O now persists:
 
