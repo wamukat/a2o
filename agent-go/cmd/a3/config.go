@@ -265,17 +265,13 @@ func composeEnv(config runtimeInstanceConfig) map[string]string {
 	}
 	if agentPort := envDefault("A2O_BUNDLE_AGENT_PORT", config.AgentPort); strings.TrimSpace(agentPort) != "" {
 		overrides["A2O_BUNDLE_AGENT_PORT"] = agentPort
-		overrides["A3_BUNDLE_AGENT_PORT"] = agentPort
 	}
 	if strings.TrimSpace(config.WorkspaceRoot) != "" {
 		overrides["A2O_WORKSPACE_ROOT"] = config.WorkspaceRoot
 		overrides["A2O_HOST_WORKSPACE_ROOT"] = config.WorkspaceRoot
-		overrides["A3_WORKSPACE_ROOT"] = config.WorkspaceRoot
-		overrides["A3_HOST_WORKSPACE_ROOT"] = config.WorkspaceRoot
 	}
 	if runtimeImage := runtimeImageReference(&config); runtimeImage != "" {
 		overrides["A2O_RUNTIME_IMAGE"] = runtimeImage
-		overrides["A3_RUNTIME_IMAGE"] = runtimeImage
 	}
 	if runtimeURL := kanbanRuntimeURL(config); isExternalKanban(config) && runtimeURL != "" {
 		overrides["A2O_KANBALONE_INTERNAL_URL"] = runtimeURL
@@ -420,30 +416,22 @@ func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttem
 	overrides := composeEnv(config)
 	overrides["A2O_BUNDLE_COMPOSE_FILE"] = config.ComposeFile
 	overrides["A2O_BUNDLE_PROJECT"] = config.ComposeProject
-	overrides["A3_BUNDLE_COMPOSE_FILE"] = config.ComposeFile
-	overrides["A3_BUNDLE_PROJECT"] = config.ComposeProject
 	if storageDir := envDefault("A2O_BUNDLE_STORAGE_DIR", config.StorageDir); strings.TrimSpace(storageDir) != "" {
 		overrides["A2O_BUNDLE_STORAGE_DIR"] = storageDir
-		overrides["A3_BUNDLE_STORAGE_DIR"] = storageDir
 	}
 	if strings.TrimSpace(config.WorkspaceRoot) != "" {
 		overrides["A2O_RUNTIME_RUN_ONCE_HOST_ROOT_DIR"] = config.WorkspaceRoot
 		overrides["A2O_RUNTIME_RUN_ONCE_HOST_ROOT"] = filepath.Join(config.WorkspaceRoot, runtimeHostAgentRelativePath)
 		overrides["A2O_HOST_AGENT_BIN"] = filepath.Join(config.WorkspaceRoot, hostAgentBinRelativePath)
-		overrides["A3_RUNTIME_RUN_ONCE_HOST_ROOT_DIR"] = config.WorkspaceRoot
-		overrides["A3_RUNTIME_RUN_ONCE_HOST_ROOT"] = filepath.Join(config.WorkspaceRoot, runtimeHostAgentRelativePath)
-		overrides["A3_HOST_AGENT_BIN"] = filepath.Join(config.WorkspaceRoot, hostAgentBinRelativePath)
 	}
 	if strings.TrimSpace(config.ComposeProject) != "" {
 		overrides["A2O_BRANCH_NAMESPACE"] = defaultBranchNamespace(config.ComposeProject)
 	}
 	if strings.TrimSpace(maxSteps) != "" {
 		overrides["A2O_RUNTIME_RUN_ONCE_MAX_STEPS"] = strings.TrimSpace(maxSteps)
-		overrides["A3_RUNTIME_RUN_ONCE_MAX_STEPS"] = strings.TrimSpace(maxSteps)
 	}
 	if strings.TrimSpace(agentAttempts) != "" {
 		overrides["A2O_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] = strings.TrimSpace(agentAttempts)
-		overrides["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] = strings.TrimSpace(agentAttempts)
 	}
 	return overrides
 }

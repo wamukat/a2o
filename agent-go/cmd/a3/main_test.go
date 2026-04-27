@@ -3212,20 +3212,11 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 			t.Fatalf("run-once missing %q in:\n%s", want, joinedText)
 		}
 	}
-	if runner.lastEnv["A3_BUNDLE_COMPOSE_FILE"] != "compose.yml" {
-		t.Fatalf("compose env=%q", runner.lastEnv["A3_BUNDLE_COMPOSE_FILE"])
-	}
 	if runner.lastEnv["A2O_BUNDLE_COMPOSE_FILE"] != "compose.yml" {
 		t.Fatalf("public compose env=%q", runner.lastEnv["A2O_BUNDLE_COMPOSE_FILE"])
 	}
-	if runner.lastEnv["A3_BUNDLE_PROJECT"] != "a3-test" {
-		t.Fatalf("project env=%q", runner.lastEnv["A3_BUNDLE_PROJECT"])
-	}
 	if runner.lastEnv["A2O_BUNDLE_PROJECT"] != "a3-test" {
 		t.Fatalf("public project env=%q", runner.lastEnv["A2O_BUNDLE_PROJECT"])
-	}
-	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"] != "1" {
-		t.Fatalf("max steps env=%q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"])
 	}
 	if runner.lastEnv["A2O_RUNTIME_RUN_ONCE_MAX_STEPS"] != "1" {
 		t.Fatalf("public max steps env=%q", runner.lastEnv["A2O_RUNTIME_RUN_ONCE_MAX_STEPS"])
@@ -3233,9 +3224,10 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	if runner.lastEnv["A2O_BRANCH_NAMESPACE"] != "test" {
 		t.Fatalf("branch namespace env=%q", runner.lastEnv["A2O_BRANCH_NAMESPACE"])
 	}
-	if runner.lastEnv["A3_HOST_AGENT_BIN"] != filepath.Join(tempDir, ".work", "a2o", "agent", "bin", "a2o-agent") {
-		t.Fatalf("agent bin env=%q", runner.lastEnv["A3_HOST_AGENT_BIN"])
+	if runner.lastEnv["A2O_HOST_AGENT_BIN"] != filepath.Join(tempDir, ".work", "a2o", "agent", "bin", "a2o-agent") {
+		t.Fatalf("public agent bin env=%q", runner.lastEnv["A2O_HOST_AGENT_BIN"])
 	}
+	assertNoRemovedA3Env(t, runner.lastEnv)
 }
 
 func TestRuntimeRunOnceFailsWhenLegacySoloBoardVolumeWouldBeOrphaned(t *testing.T) {
@@ -6437,9 +6429,10 @@ func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
 	}
 	assertCallContains(t, runner.joinedCalls(), "process-running 12345")
 	assertCallContains(t, runner.joinedCalls(), "process-command 12345")
-	if runner.lastEnv["A3_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine@sha256:pinned" {
+	if runner.lastEnv["A2O_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine@sha256:pinned" {
 		t.Fatalf("runtime status should evaluate compose with runtime image env, got %#v", runner.lastEnv)
 	}
+	assertNoRemovedA3Env(t, runner.lastEnv)
 }
 
 func TestRuntimeStatusReportsEmptyHistoryWithoutRubyReadError(t *testing.T) {
@@ -6575,9 +6568,10 @@ func TestRuntimeImageDigestPrintsPinnedRuntimeDigest(t *testing.T) {
 			t.Fatalf("stdout should include %q in:\n%s", want, stdout.String())
 		}
 	}
-	if runner.lastEnv["A3_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine@sha256:pinned" {
+	if runner.lastEnv["A2O_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine@sha256:pinned" {
 		t.Fatalf("image-digest should evaluate compose with runtime image env, got %#v", runner.lastEnv)
 	}
+	assertNoRemovedA3Env(t, runner.lastEnv)
 }
 
 func TestRuntimeImageDigestUsesInstanceRuntimeImageWhenEnvIsAbsent(t *testing.T) {
@@ -7078,9 +7072,10 @@ func TestRuntimeRunOncePrefersPublicA2OAgentPath(t *testing.T) {
 		}
 	})
 
-	if runner.lastEnv["A3_HOST_AGENT_BIN"] != publicAgentPath {
-		t.Fatalf("agent bin env=%q, want %q", runner.lastEnv["A3_HOST_AGENT_BIN"], publicAgentPath)
+	if runner.lastEnv["A2O_HOST_AGENT_BIN"] != publicAgentPath {
+		t.Fatalf("agent bin env=%q, want %q", runner.lastEnv["A2O_HOST_AGENT_BIN"], publicAgentPath)
 	}
+	assertNoRemovedA3Env(t, runner.lastEnv)
 }
 
 func TestRuntimeRunOnceIgnoresLegacyA2OAgentPath(t *testing.T) {
@@ -7120,9 +7115,10 @@ func TestRuntimeRunOnceIgnoresLegacyA2OAgentPath(t *testing.T) {
 	})
 
 	publicAgentPath := filepath.Join(tempDir, ".work", "a2o", "agent", "bin", "a2o-agent")
-	if runner.lastEnv["A3_HOST_AGENT_BIN"] != publicAgentPath {
-		t.Fatalf("agent bin env=%q, want canonical %q", runner.lastEnv["A3_HOST_AGENT_BIN"], publicAgentPath)
+	if runner.lastEnv["A2O_HOST_AGENT_BIN"] != publicAgentPath {
+		t.Fatalf("agent bin env=%q, want canonical %q", runner.lastEnv["A2O_HOST_AGENT_BIN"], publicAgentPath)
 	}
+	assertNoRemovedA3Env(t, runner.lastEnv)
 }
 
 func TestRuntimeRunOnceReadsProjectYaml(t *testing.T) {
@@ -7377,11 +7373,46 @@ func TestRuntimeLoopRunsConfiguredCycles(t *testing.T) {
 	if !strings.Contains(stdout.String(), "kanban_loop_finished cycles=2") {
 		t.Fatalf("stdout should report loop completion, got %q", stdout.String())
 	}
-	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"] != "3" {
-		t.Fatalf("max steps env=%q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_MAX_STEPS"])
+	if runner.lastEnv["A2O_RUNTIME_RUN_ONCE_MAX_STEPS"] != "3" {
+		t.Fatalf("max steps env=%q", runner.lastEnv["A2O_RUNTIME_RUN_ONCE_MAX_STEPS"])
 	}
-	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] != "4" {
-		t.Fatalf("agent attempts env=%q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"])
+	if runner.lastEnv["A2O_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] != "4" {
+		t.Fatalf("agent attempts env=%q", runner.lastEnv["A2O_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"])
+	}
+	assertNoRemovedA3Env(t, runner.lastEnv)
+}
+
+func TestRuntimeRunOnceEnvDoesNotGenerateRemovedA3CompatibilityInputs(t *testing.T) {
+	env := runtimeRunOnceEnv(runtimeInstanceConfig{
+		WorkspaceRoot:  "/tmp/a2o-workspace",
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-test",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a2o/runtime",
+		RuntimeImage:   "ghcr.io/wamukat/a2o-engine:test",
+	}, "3", "4")
+
+	for _, removed := range removedA3EnvironmentNames() {
+		if value := strings.TrimSpace(env[removed]); value != "" {
+			t.Fatalf("runtime env generated removed compatibility input %s=%q", removed, value)
+		}
+	}
+	for _, required := range []string{
+		"A2O_WORKSPACE_ROOT",
+		"A2O_HOST_WORKSPACE_ROOT",
+		"A2O_BUNDLE_COMPOSE_FILE",
+		"A2O_BUNDLE_PROJECT",
+		"A2O_BUNDLE_STORAGE_DIR",
+		"A2O_RUNTIME_IMAGE",
+		"A2O_RUNTIME_RUN_ONCE_HOST_ROOT_DIR",
+		"A2O_RUNTIME_RUN_ONCE_HOST_ROOT",
+		"A2O_HOST_AGENT_BIN",
+		"A2O_RUNTIME_RUN_ONCE_MAX_STEPS",
+		"A2O_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS",
+	} {
+		if strings.TrimSpace(env[required]) == "" {
+			t.Fatalf("runtime env missing public input %s in %#v", required, env)
+		}
 	}
 }
 
@@ -7625,6 +7656,15 @@ func mustReadTestFile(t *testing.T, path string) []byte {
 		t.Fatal(err)
 	}
 	return body
+}
+
+func assertNoRemovedA3Env(t *testing.T, env map[string]string) {
+	t.Helper()
+	for _, removed := range removedA3EnvironmentNames() {
+		if value := strings.TrimSpace(env[removed]); value != "" {
+			t.Fatalf("runtime command env generated removed compatibility input %s=%q", removed, value)
+		}
+	}
 }
 
 type fakeRunner struct {
