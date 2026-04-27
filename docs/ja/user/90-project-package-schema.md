@@ -333,7 +333,7 @@ payload は schema `a2o.notification/v1` を使う。
 }
 ```
 
-初期実装で発火するイベントは、`task.phase_completed`、`task.blocked`、`task.completed`、`task.reworked`、`parent.follow_up_child_created` である。`task.started`、`runtime.idle`、`runtime.error` は、後続の scheduler-level hook point 用に予約されたイベント名である。
+初期実装で発火するイベントは、`task.phase_completed`、`task.blocked`、`task.needs_clarification`、`task.completed`、`task.reworked`、`parent.follow_up_child_created` である。`task.started`、`runtime.idle`、`runtime.error` は、後続の scheduler-level hook point 用に予約されたイベント名である。
 
 hook 実行 record は、stdout、stderr、exit status、実行時間、command、event、payload path とともに、最新 phase execution diagnostics の `notification_hooks` に保存される。
 

@@ -14,12 +14,13 @@ module A3
         "Done" => :done
       }.freeze
 
-      def initialize(command_argv: nil, project:, repo_label_map:, trigger_labels:, blocked_label: "blocked", status: nil, working_dir: nil, client: nil)
+      def initialize(command_argv: nil, project:, repo_label_map:, trigger_labels:, blocked_label: "blocked", clarification_label: "needs:clarification", status: nil, working_dir: nil, client: nil)
         @project = project.to_s
         @client = client || KanbanCommandClient.subprocess(command_argv: command_argv, project: @project, working_dir: working_dir)
         @repo_label_map = normalize_repo_label_map(repo_label_map)
         @trigger_labels = Array(trigger_labels).map(&:to_s).reject(&:empty?).freeze
         @blocked_label = blocked_label.to_s
+        @clarification_label = clarification_label.to_s
         @status = normalize_status_filter(status)
       end
 
@@ -369,6 +370,7 @@ module A3
 
       def normalize_status(raw_status, labels:)
         return :blocked if labels.include?(@blocked_label)
+        return :needs_clarification if labels.include?(@clarification_label)
 
         ACTIVE_STATUS_MAP[String(raw_status)]
       end
@@ -423,12 +425,14 @@ module A3
 
       def status_matches_filter?(raw_status:, normalized_status:)
         return @status == display_status_for(normalized_status) if normalized_status == :blocked
+        return @status == display_status_for(normalized_status) if normalized_status == :needs_clarification
 
         @status == String(raw_status) || @status == display_status_for(normalized_status)
       end
 
       def display_status_for(status)
         return "Blocked" if status == :blocked
+        return "Needs clarification" if status == :needs_clarification
 
         ACTIVE_STATUS_MAP.invert.fetch(status, status.to_s)
       end

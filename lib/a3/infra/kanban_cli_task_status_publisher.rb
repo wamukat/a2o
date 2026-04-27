@@ -7,6 +7,7 @@ module A3
     class KanbanCliTaskStatusPublisher
       STATUS_MAP = {
         blocked: "To do",
+        needs_clarification: "To do",
         in_progress: "In progress",
         in_review: "In review",
         verifying: "Inspection",
@@ -14,10 +15,11 @@ module A3
         done: "Done"
       }.freeze
 
-      def initialize(command_argv: nil, project:, blocked_label: "blocked", working_dir: nil, client: nil)
+      def initialize(command_argv: nil, project:, blocked_label: "blocked", clarification_label: "needs:clarification", working_dir: nil, client: nil)
         @project = project.to_s
         @client = client || KanbanCommandClient.subprocess(command_argv: command_argv, project: @project, working_dir: working_dir)
         @blocked_label = blocked_label.to_s
+        @clarification_label = clarification_label.to_s
       end
 
       def publish(task_ref:, status:, external_task_id: nil, task_kind: nil)
@@ -26,12 +28,22 @@ module A3
 
         if normalized_status == :blocked
           add_blocked_label(task_id)
+          remove_clarification_label(task_id)
           target_status = STATUS_MAP.fetch(:blocked)
           run_command("task-transition", "--project", @project, "--task-id", task_id.to_s, "--status", target_status)
           return nil
         end
 
+        if normalized_status == :needs_clarification
+          remove_blocked_label(task_id)
+          add_clarification_label(task_id)
+          target_status = STATUS_MAP.fetch(:needs_clarification)
+          run_command("task-transition", "--project", @project, "--task-id", task_id.to_s, "--status", target_status)
+          return nil
+        end
+
         remove_blocked_label(task_id)
+        remove_clarification_label(task_id)
 
         target_status = STATUS_MAP[normalized_status]
         return nil unless target_status
@@ -60,15 +72,33 @@ module A3
         run_command("task-label-add", "--project", @project, "--task-id", task_id.to_s, "--label", @blocked_label)
       end
 
+      def add_clarification_label(task_id)
+        run_command("task-label-add", "--project", @project, "--task-id", task_id.to_s, "--label", @clarification_label)
+      end
+
       def remove_blocked_label(task_id)
         return nil unless blocked_label_present?(task_id)
 
         run_command("task-label-remove", "--project", @project, "--task-id", task_id.to_s, "--label", @blocked_label)
       end
 
+      def remove_clarification_label(task_id)
+        return nil unless clarification_label_present?(task_id)
+
+        run_command("task-label-remove", "--project", @project, "--task-id", task_id.to_s, "--label", @clarification_label)
+      end
+
       def blocked_label_present?(task_id)
+        label_present?(task_id, @blocked_label)
+      end
+
+      def clarification_label_present?(task_id)
+        label_present?(task_id, @clarification_label)
+      end
+
+      def label_present?(task_id, label)
         payload = @client.load_task_labels(task_id, include_project: true)
-        payload.any? { |item| String(item.fetch("title", "")).strip == @blocked_label }
+        payload.any? { |item| String(item.fetch("title", "")).strip == label }
       end
 
       def canonical_status(task_kind:, status:)

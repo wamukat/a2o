@@ -232,6 +232,56 @@ RSpec.describe A3::Application::PhaseExecutionOrchestrator do
     expect(result.run.terminal_outcome).to eq(:rework)
   end
 
+  it "stops a task in needs_clarification without recording blocked diagnostics" do
+    clarification = {
+      "question" => "Which API contract should win?",
+      "context" => "The requested behavior conflicts with the public permission model.",
+      "options" => ["Change the public contract", "Keep the existing contract"],
+      "recommended_option" => "Keep the existing contract",
+      "impact" => "A2O will not schedule this task again until the request is answered."
+    }
+    execution = A3::Application::ExecutionResult.new(
+      success: false,
+      summary: "requirement conflict",
+      response_bundle: {
+        "success" => false,
+        "summary" => "requirement conflict",
+        "rework_required" => false,
+        "clarification_request" => clarification
+      }
+    )
+    blocked_diagnosis = A3::Domain::BlockedDiagnosis.new(
+      task_ref: task.ref,
+      run_ref: run.ref,
+      phase: :implementation,
+      outcome: :blocked,
+      review_target: run.evidence.review_target,
+      source_descriptor: run.source_descriptor,
+      scope_snapshot: run.scope_snapshot,
+      artifact_owner: run.artifact_owner,
+      expected_state: "worker phase succeeds",
+      observed_state: "ambiguous requirement",
+      failing_command: "worker_gateway",
+      diagnostic_summary: "requirement conflict",
+      infra_diagnostics: {}
+    )
+
+    result = orchestrator.persist_and_complete(
+      task_ref: task.ref,
+      run_ref: run.ref,
+      task: task,
+      run: run,
+      runtime: runtime,
+      execution: execution,
+      blocked_diagnosis: blocked_diagnosis
+    )
+
+    expect(result.task.status).to eq(:needs_clarification)
+    expect(result.run.terminal_outcome).to eq(:needs_clarification)
+    expect(result.run.phase_records.last.blocked_diagnosis).to be_nil
+    expect(result.run.phase_records.last.execution_record.clarification_request).to eq(clarification)
+  end
+
   it "routes parent review follow-up disposition before generic success completion" do
     handler_result = A3::Application::HandleParentReviewDisposition::Result.new(
       terminal_status: :todo,

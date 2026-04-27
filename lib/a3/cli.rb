@@ -2427,6 +2427,7 @@ module A3
       parser.on("--kanban-status VALUE") { |value| options[:kanban_status] = value }
       parser.on("--kanban-working-dir DIR") { |value| options[:kanban_working_dir] = File.expand_path(value) }
       parser.on("--kanban-blocked-label VALUE") { |value| options[:kanban_blocked_label] = value }
+      parser.on("--kanban-clarification-label VALUE") { |value| options[:kanban_clarification_label] = value }
       parser.on("--kanban-follow-up-label VALUE") { |value| options[:kanban_follow_up_label] = value }
       parser.on("--kanban-trigger-label VALUE") { |value| options[:kanban_trigger_labels] << value }
       parser.on("--kanban-repo-label VALUE") { |value| add_kanban_repo_label_option(options, value) }
@@ -2539,12 +2540,15 @@ module A3
             repo_label_map: options.fetch(:kanban_repo_label_map),
             trigger_labels: options.fetch(:kanban_trigger_labels),
             blocked_label: options.fetch(:kanban_blocked_label, "blocked"),
+            clarification_label: options.fetch(:kanban_clarification_label, "needs:clarification"),
             status: options[:kanban_status],
             working_dir: working_dir
           ),
           task_status_publisher: A3::Infra::KanbanCliTaskStatusPublisher.new(
             command_argv: command_argv,
             project: project,
+            blocked_label: options.fetch(:kanban_blocked_label, "blocked"),
+            clarification_label: options.fetch(:kanban_clarification_label, "needs:clarification"),
             working_dir: working_dir
           ),
           task_activity_publisher: A3::Infra::KanbanCliTaskActivityPublisher.new(
@@ -2820,6 +2824,7 @@ module A3
       provided_keys << :kanban_trigger_labels unless options.fetch(:kanban_trigger_labels, []).empty?
       provided_keys << :kanban_working_dir if options[:kanban_working_dir]
       provided_keys << :kanban_blocked_label if options[:kanban_blocked_label]
+      provided_keys << :kanban_clarification_label if options[:kanban_clarification_label]
       return if provided_keys.empty? || kanban_bridge_enabled?(options)
 
       raise ArgumentError,

@@ -7,15 +7,16 @@ module A3
     class PhaseExecutionRecord
       include DeepFreezable
 
-      attr_reader :summary, :failing_command, :observed_state, :diagnostics, :runtime_snapshot, :review_disposition, :skill_feedback, :follow_up_child_fingerprints
+      attr_reader :summary, :failing_command, :observed_state, :diagnostics, :runtime_snapshot, :review_disposition, :clarification_request, :skill_feedback, :follow_up_child_fingerprints
 
-      def initialize(summary:, failing_command: nil, observed_state: nil, diagnostics: {}, runtime_snapshot: nil, review_disposition: nil, skill_feedback: [], follow_up_child_fingerprints: [])
+      def initialize(summary:, failing_command: nil, observed_state: nil, diagnostics: {}, runtime_snapshot: nil, review_disposition: nil, clarification_request: nil, skill_feedback: [], follow_up_child_fingerprints: [])
         @summary = summary
         @failing_command = failing_command
         @observed_state = observed_state
         @diagnostics = deep_freeze_value(diagnostics)
         @runtime_snapshot = runtime_snapshot
         @review_disposition = deep_freeze_value(review_disposition)
+        @clarification_request = deep_freeze_value(clarification_request)
         @skill_feedback = deep_freeze_value(Array(skill_feedback))
         @follow_up_child_fingerprints = deep_freeze_value(Array(follow_up_child_fingerprints))
         freeze
@@ -31,6 +32,7 @@ module A3
           diagnostics: record.fetch("diagnostics", {}),
           runtime_snapshot: PhaseRuntimeSnapshot.from_persisted_form(record["runtime_snapshot"]),
           review_disposition: record["review_disposition"],
+          clarification_request: record["clarification_request"],
           skill_feedback: record.fetch("skill_feedback", []),
           follow_up_child_fingerprints: record.fetch("follow_up_child_fingerprints", [])
         )
@@ -50,6 +52,7 @@ module A3
             "description" => execution.review_disposition.description,
             "finding_key" => execution.review_disposition.finding_key
           },
+          clarification_request: execution.clarification_request&.persisted_form,
           skill_feedback: execution.skill_feedback
         )
       end
@@ -62,6 +65,7 @@ module A3
           diagnostics: diagnostics,
           runtime_snapshot: runtime_snapshot,
           review_disposition: review_disposition,
+          clarification_request: clarification_request,
           skill_feedback: skill_feedback,
           follow_up_child_fingerprints: fingerprints
         )
@@ -75,6 +79,7 @@ module A3
           diagnostics: value,
           runtime_snapshot: runtime_snapshot,
           review_disposition: review_disposition,
+          clarification_request: clarification_request,
           skill_feedback: skill_feedback,
           follow_up_child_fingerprints: follow_up_child_fingerprints
         )
@@ -88,6 +93,7 @@ module A3
           "diagnostics" => diagnostics,
           "runtime_snapshot" => runtime_snapshot&.persisted_form,
           "review_disposition" => review_disposition,
+          "clarification_request" => clarification_request,
           "skill_feedback" => skill_feedback,
           "follow_up_child_fingerprints" => follow_up_child_fingerprints
         }
@@ -101,6 +107,7 @@ module A3
           other.diagnostics == diagnostics &&
           other.runtime_snapshot == runtime_snapshot &&
           other.review_disposition == review_disposition &&
+          other.clarification_request == clarification_request &&
           other.skill_feedback == skill_feedback &&
           other.follow_up_child_fingerprints == follow_up_child_fingerprints
       end

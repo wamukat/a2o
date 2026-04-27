@@ -454,7 +454,7 @@ func TestWorkerResponseSchemaIncludesPhaseSpecificProperties(t *testing.T) {
 			request: map[string]any{
 				"phase": "implementation",
 			},
-			properties: []string{"changed_files", "review_disposition"},
+			properties: []string{"changed_files", "review_disposition", "clarification_request"},
 			required:   []string{},
 		},
 		{
@@ -465,8 +465,8 @@ func TestWorkerResponseSchemaIncludesPhaseSpecificProperties(t *testing.T) {
 					"task_kind": "parent",
 				},
 			},
-			properties: []string{"review_disposition"},
-			required:   []string{"review_disposition"},
+			properties: []string{"review_disposition", "clarification_request"},
+			required:   []string{},
 		},
 	}
 	for _, tc := range tests {
@@ -497,6 +497,11 @@ func TestWorkerResponseSchemaIncludesPhaseSpecificProperties(t *testing.T) {
 			for _, property := range tc.required {
 				if !required[property] {
 					t.Fatalf("schema should require %q: %s", property, body)
+				}
+			}
+			for _, property := range []string{"failing_command", "observed_state"} {
+				if required[property] {
+					t.Fatalf("schema should not require %q when clarification_request can replace failure diagnostics: %s", property, body)
 				}
 			}
 		})
@@ -538,6 +543,58 @@ func TestWorkerPayloadRequiresReviewDispositionOnlyForImplementationSuccess(t *t
 	errors := validateWorkerPayload(successPayload, request)
 	if !containsString(errors, "review_disposition must be present for implementation success") {
 		t.Fatalf("implementation success should require review_disposition, got %#v", errors)
+	}
+}
+
+func TestWorkerPayloadAcceptsClarificationRequestWithoutFailureDiagnostics(t *testing.T) {
+	request := map[string]any{
+		"task_ref": "A2O#7",
+		"run_ref":  "run-1",
+		"phase":    "review",
+	}
+	payload := map[string]any{
+		"task_ref":        "A2O#7",
+		"run_ref":         "run-1",
+		"phase":           "review",
+		"success":         false,
+		"summary":         "requirement conflict",
+		"rework_required": false,
+		"clarification_request": map[string]any{
+			"question":           "Which behavior should win?",
+			"context":            "The request conflicts with the permission model.",
+			"options":            []any{"Change permissions", "Keep current behavior"},
+			"recommended_option": "Keep current behavior",
+			"impact":             "The task waits for requester input.",
+		},
+	}
+	if errors := validateWorkerPayload(payload, request); len(errors) != 0 {
+		t.Fatalf("clarification request should be valid, got %#v", errors)
+	}
+}
+
+func TestWorkerPayloadAcceptsParentReviewClarificationWithoutReviewDisposition(t *testing.T) {
+	request := map[string]any{
+		"task_ref": "A2O#7",
+		"run_ref":  "run-1",
+		"phase":    "review",
+		"phase_runtime": map[string]any{
+			"task_kind": "parent",
+		},
+	}
+	payload := map[string]any{
+		"task_ref":        "A2O#7",
+		"run_ref":         "run-1",
+		"phase":           "review",
+		"success":         false,
+		"summary":         "parent review needs requester input",
+		"rework_required": false,
+		"clarification_request": map[string]any{
+			"question": "Which child boundary should be used?",
+			"context":  "Both decompositions are plausible.",
+		},
+	}
+	if errors := validateWorkerPayload(payload, request); len(errors) != 0 {
+		t.Fatalf("parent review clarification request should be valid, got %#v", errors)
 	}
 }
 

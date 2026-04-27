@@ -340,7 +340,7 @@ The payload uses schema `a2o.notification/v1`:
 }
 ```
 
-The initial emitted event set is `task.phase_completed`, `task.blocked`, `task.completed`, `task.reworked`, and `parent.follow_up_child_created`. `task.started`, `runtime.idle`, and `runtime.error` are reserved event names for later scheduler-level hook points.
+The initial emitted event set is `task.phase_completed`, `task.blocked`, `task.needs_clarification`, `task.completed`, `task.reworked`, and `parent.follow_up_child_created`. `task.started`, `runtime.idle`, and `runtime.error` are reserved event names for later scheduler-level hook points.
 
 Hook execution records are stored in the latest phase execution diagnostics under `notification_hooks` with stdout, stderr, exit status, timing, command, event, and payload path.
 

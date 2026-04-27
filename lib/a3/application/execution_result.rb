@@ -47,6 +47,13 @@ module A3
         nil
       end
 
+      def clarification_request
+        return nil if invalid_worker_result?
+        return nil unless response_bundle.is_a?(Hash)
+
+        A3::Domain::ClarificationRequest.from_response_bundle(response_bundle)
+      end
+
       def skill_feedback
         return [] if invalid_worker_result?
         return [] unless response_bundle.is_a?(Hash)

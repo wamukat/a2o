@@ -119,7 +119,7 @@ module A3
           running: !running_entry.nil?,
           waiting: waiting,
           done: canonical_status == :done,
-          blocked: canonical_status == :blocked,
+          blocked: %i[blocked needs_clarification].include?(canonical_status),
           blocked_lines: blocked_lines,
           running_entry: running_entry,
           phase_counts: phase_counts_for(task, task_runs),
@@ -166,7 +166,8 @@ module A3
           verifying: "Inspection",
           merging: "Merging",
           done: "Done",
-          blocked: "Blocked"
+          blocked: "Blocked",
+          needs_clarification: "Needs clarification"
         }.fetch(status, status.to_s)
       end
 
@@ -229,6 +230,7 @@ module A3
           end
         end
         if latest_run
+          append_clarification_request_lines(lines, latest_run)
           phase_record = latest_run.phase_records.reverse_each.find { |item| !item.blocked_diagnosis.nil? }
           diagnosis = phase_record&.blocked_diagnosis
           if diagnosis
@@ -249,6 +251,18 @@ module A3
 
           lines << "validation_error=#{single_line(error)}"
         end
+      end
+
+      def append_clarification_request_lines(lines, run)
+        phase_record = run.phase_records.reverse_each.find { |item| item.execution_record&.clarification_request.is_a?(Hash) }
+        request = phase_record&.execution_record&.clarification_request
+        return unless request.is_a?(Hash)
+
+        lines << "clarification_question=#{single_line(request['question'])}" if present?(request["question"])
+        lines << "clarification_context=#{single_line(request['context'])}" if present?(request["context"])
+        options = Array(request["options"]).map { |option| single_line(option) }.reject(&:empty?)
+        lines << "clarification_options=#{options.join(' | ')}" unless options.empty?
+        lines << "clarification_impact=#{single_line(request['impact'])}" if present?(request["impact"])
       end
 
       def append_review_disposition_lines(lines, task_runs)

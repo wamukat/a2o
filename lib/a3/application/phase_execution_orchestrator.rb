@@ -61,6 +61,7 @@ module A3
 
       def completion_outcome_for(task:, run:, execution:)
         return :verification_required if execution.success? && run.phase == :merge && execution.merge_recovery_verification_required?
+        return :needs_clarification if execution.clarification_request
         if task.kind == :parent && run.phase == :review
           return :follow_up_child if execution.review_disposition&.follow_up_child?
           return :completed if execution.success? && execution.review_disposition&.completed?

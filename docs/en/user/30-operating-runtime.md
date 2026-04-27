@@ -61,6 +61,7 @@ a2o runtime describe-task <task-ref>
 
 `describe-task` gathers run state, phases, workspace details, evidence, kanban comments, log hints, skill feedback summaries, and agent artifact commands.
 When a task is blocked by an invalid worker result, `describe-task` prints `execution_validation_error=` or `blocked_validation_error=` lines with the worker result schema errors. `watch-summary --details` also includes `validation_error=` detail lines for blocked tasks.
+When a worker cannot continue because the product requirement is ambiguous or conflicting, it can return `clarification_request`. A2O stores the task as `needs_clarification`, adds the `needs:clarification` kanban label, posts the question/context/options/impact as a kanban comment, and excludes the task from scheduling until the requester answers and the clarification label/state is cleared.
 
 For prompt / skill / worker-command PDCA, A2O now persists:
 
@@ -87,6 +88,7 @@ Scheduler selection follows the kanban board as the source of truth.
 - Tasks in `Resolved` or `Archived` are not scheduling targets and do not appear in `watch-summary`.
 - Tasks in `Done` remain visible and remain part of the current board view until a human resolves them.
 - An unresolved kanban blocker keeps the blocked task out of runnable selection.
+- A task labeled `needs:clarification` is imported as `needs_clarification` and is not runnable; this is requester-input waiting, not a technical `blocked` failure.
 - Parent/child gating and sibling ordering still apply in addition to kanban blockers.
 - When a parent ticket has child tasks, A2O treats that parent-child set as one selection group.
 - When multiple parent groups are present, A2O first chooses the group whose parent ticket has the highest priority.

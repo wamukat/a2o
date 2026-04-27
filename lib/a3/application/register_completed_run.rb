@@ -59,6 +59,7 @@ module A3
         return nil unless task.kind == :parent
         return nil unless run.phase.to_sym == :review
         return nil if outcome.to_sym == :completed
+        return nil if outcome.to_sym == :needs_clarification
 
         unless @handle_parent_review_disposition
           return finalize_parent_review_disposition(
@@ -207,6 +208,7 @@ module A3
         end
 
         append_review_disposition_comment_lines(lines, execution_record&.review_disposition)
+        append_clarification_request_comment_lines(lines, execution_record&.clarification_request)
         append_merge_recovery_comment_lines(lines, execution_record&.diagnostics || execution&.diagnostics)
 
         if blocked_diagnosis
@@ -236,6 +238,17 @@ module A3
         lines << "レビュー結果: #{fields.join(' ')}" unless fields.empty?
         lines << "レビュー要約: #{single_line(disposition['summary'])}" if present?(disposition["summary"])
         lines << "レビュー詳細: #{single_line(disposition['description'])}" if present?(disposition["description"])
+      end
+
+      def append_clarification_request_comment_lines(lines, request)
+        return unless request.is_a?(Hash)
+
+        lines << "確認依頼: #{single_line(request['question'])}" if present?(request["question"])
+        lines << "確認背景: #{single_line(request['context'])}" if present?(request["context"])
+        options = Array(request["options"]).map { |option| single_line(option) }.reject(&:empty?)
+        lines << "選択肢: #{options.each_with_index.map { |option, index| "#{index + 1}. #{option}" }.join(' / ')}" unless options.empty?
+        lines << "推奨: #{single_line(request['recommended_option'])}" if present?(request["recommended_option"])
+        lines << "影響: #{single_line(request['impact'])}" if present?(request["impact"])
       end
 
       def append_merge_recovery_comment_lines(lines, diagnostics)

@@ -740,7 +740,7 @@ RSpec.describe "worker:stdin-bundle" do
     end
   end
 
-  it "requires review_disposition in the parent review schema" do
+  it "allows parent review schema to use clarification_request instead of review_disposition" do
     request = {
       "task_ref" => "Sample#3140",
       "run_ref" => "run-parent-review-1",
@@ -774,9 +774,34 @@ RSpec.describe "worker:stdin-bundle" do
       expect(status.success?).to eq(true), "#{stdout}\n#{stderr}"
       schema = JSON.parse(stdout)
       expect(schema.fetch("properties").fetch("review_disposition").fetch("type")).to eq("object")
-      expect(schema.fetch("required")).to include("review_disposition")
+      expect(schema.fetch("properties")).to have_key("clarification_request")
+      expect(schema.fetch("required")).not_to include("review_disposition")
       expect(schema.fetch("properties")).not_to have_key("changed_files")
     end
+  end
+
+  it "accepts parent review clarification requests without review_disposition" do
+    request = {
+      "task_ref" => "Sample#3140",
+      "run_ref" => "run-parent-review-1",
+      "phase" => "review",
+      "phase_runtime" => { "task_kind" => "parent", "review_skill" => "skill.md" },
+      "slot_paths" => { "repo_alpha" => "/tmp/workspace/repo-alpha", "repo_beta" => "/tmp/workspace/repo-beta" }
+    }
+    payload = {
+      "task_ref" => "Sample#3140",
+      "run_ref" => "run-parent-review-1",
+      "phase" => "review",
+      "success" => false,
+      "summary" => "parent review needs requester input",
+      "rework_required" => false,
+      "clarification_request" => {
+        "question" => "Which child boundary should be used?",
+        "context" => "Both decompositions are plausible."
+      }
+    }
+
+    expect(validate_payload(payload, request: request)).to eq([])
   end
 
   it "rejects parent review success with follow-up child disposition in helper validation" do

@@ -1248,6 +1248,82 @@ func TestWorkerValidateResultRequiresReviewDispositionForImplementationSuccess(t
 	}
 }
 
+func TestWorkerValidateResultAcceptsClarificationRequestWithoutFailureDiagnostics(t *testing.T) {
+	tempDir := t.TempDir()
+	requestPath := filepath.Join(tempDir, "request.json")
+	resultPath := filepath.Join(tempDir, "result.json")
+	request := map[string]any{
+		"task_ref": "A2O#62",
+		"run_ref":  "run-1",
+		"phase":    "review",
+	}
+	result := map[string]any{
+		"task_ref":        "A2O#62",
+		"run_ref":         "run-1",
+		"phase":           "review",
+		"success":         false,
+		"summary":         "requirement conflict",
+		"rework_required": false,
+		"clarification_request": map[string]any{
+			"question":           "Which behavior should win?",
+			"context":            "The request conflicts with the permission model.",
+			"options":            []any{"Change permissions", "Keep current behavior"},
+			"recommended_option": "Keep current behavior",
+			"impact":             "The task waits for requester input.",
+		},
+	}
+	writeJSONFileForTest(t, requestPath, request)
+	writeJSONFileForTest(t, resultPath, result)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"worker", "validate-result", "--request", requestPath, "--result", resultPath}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("validate-result returned %d, stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "worker_protocol_status=ok") {
+		t.Fatalf("validate-result should report ok, got %q", stdout.String())
+	}
+}
+
+func TestWorkerValidateResultAcceptsParentReviewClarificationWithoutReviewDisposition(t *testing.T) {
+	tempDir := t.TempDir()
+	requestPath := filepath.Join(tempDir, "request.json")
+	resultPath := filepath.Join(tempDir, "result.json")
+	request := map[string]any{
+		"task_ref": "A2O#62",
+		"run_ref":  "run-1",
+		"phase":    "review",
+		"phase_runtime": map[string]any{
+			"task_kind": "parent",
+		},
+	}
+	result := map[string]any{
+		"task_ref":        "A2O#62",
+		"run_ref":         "run-1",
+		"phase":           "review",
+		"success":         false,
+		"summary":         "parent review needs requester input",
+		"rework_required": false,
+		"clarification_request": map[string]any{
+			"question": "Which child boundary should be used?",
+			"context":  "Both decompositions are plausible.",
+		},
+	}
+	writeJSONFileForTest(t, requestPath, request)
+	writeJSONFileForTest(t, resultPath, result)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"worker", "validate-result", "--request", requestPath, "--result", resultPath}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("validate-result returned %d, stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "worker_protocol_status=ok") {
+		t.Fatalf("validate-result should report ok, got %q", stdout.String())
+	}
+}
+
 func TestWorkerValidateResultRejectsMalformedReviewDispositionOnImplementationFailure(t *testing.T) {
 	tempDir := t.TempDir()
 	requestPath := filepath.Join(tempDir, "request.json")

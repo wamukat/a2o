@@ -22,8 +22,20 @@ module A3
             task.topology.children.each do |child|
               result << "child=#{child.ref} status=#{child.status} current_run=#{child.current_run_ref}"
             end
+            append_clarification_request_lines(result, task.clarification_request)
             append_skill_feedback_lines(result, task.skill_feedback)
           end
+        end
+
+        def append_clarification_request_lines(result, request)
+          return unless request.is_a?(Hash)
+
+          result << "clarification_question=#{request['question']}" if request["question"]
+          result << "clarification_context=#{request['context']}" if request["context"]
+          options = Array(request["options"]).reject { |option| option.to_s.strip.empty? }
+          result << "clarification_options=#{options.join(' | ')}" unless options.empty?
+          result << "clarification_recommended_option=#{request['recommended_option']}" if request["recommended_option"]
+          result << "clarification_impact=#{request['impact']}" if request["impact"]
         end
 
         def append_skill_feedback_lines(result, feedback_entries)

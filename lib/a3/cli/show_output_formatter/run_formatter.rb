@@ -85,6 +85,7 @@ module A3
           append_agent_job_timing_lines(result, execution.diagnostics)
           result << "verification_summary=#{execution.verification_summary}" if execution.verification_summary
           append_review_disposition_lines(result, execution.review_disposition)
+          append_clarification_request_lines(result, execution.clarification_request)
           append_skill_feedback_lines(result, execution.skill_feedback)
           append_inherited_parent_lines(result, execution.diagnostics)
           append_validation_error_lines(result, "execution_validation_error", execution.diagnostics)
@@ -158,6 +159,17 @@ module A3
           result << "review_disposition kind=#{review_disposition['kind']} repo_scope=#{review_disposition['repo_scope']} finding_key=#{review_disposition['finding_key']}"
           result << "review_disposition_summary=#{review_disposition['summary']}" if review_disposition["summary"]
           result << "review_disposition_description=#{review_disposition['description']}" if review_disposition["description"]
+        end
+
+        def append_clarification_request_lines(result, request)
+          return unless request.is_a?(Hash)
+
+          result << "clarification_question=#{request['question']}" if request["question"]
+          result << "clarification_context=#{request['context']}" if request["context"]
+          options = Array(request["options"]).reject { |option| option.to_s.strip.empty? }
+          result << "clarification_options=#{options.join(' | ')}" unless options.empty?
+          result << "clarification_recommended_option=#{request['recommended_option']}" if request["recommended_option"]
+          result << "clarification_impact=#{request['impact']}" if request["impact"]
         end
 
         def append_skill_feedback_lines(result, feedback_entries)

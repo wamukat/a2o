@@ -7,6 +7,7 @@ module A3
         task.started
         task.phase_completed
         task.blocked
+        task.needs_clarification
         task.completed
         task.reworked
         parent.follow_up_child_created

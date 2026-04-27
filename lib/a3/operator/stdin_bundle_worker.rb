@@ -115,7 +115,7 @@ def bundle_for(request)
     instruction << " After you finish implementation, perform a final self-review before returning. When that self-review is clean, include review_disposition with kind=completed so the outer runtime can preserve review evidence without a separate review phase."
   elsif phase == "review"
     if request.dig("phase_runtime", "task_kind").to_s == "parent"
-      instruction << " For parent review, always include review_disposition. Use kind=completed when review is clean, kind=follow_up_child with a configured slot repo_scope for code follow-up, and kind=blocked with repo_scope unresolved when the finding should block the parent. Valid repo_scope values for this request: #{review_scopes.join(', ')}. Parent review must not rely on rework_required routing."
+      instruction << " For parent review, include review_disposition unless you return clarification_request. Use kind=completed when review is clean, kind=follow_up_child with a configured slot repo_scope for code follow-up, and kind=blocked with repo_scope unresolved when the finding should block the parent. Use clarification_request instead when the finding needs requester input rather than code follow-up or technical blocking. Valid repo_scope values for this request: #{review_scopes.join(', ')}. Parent review must not rely on rework_required routing."
     else
       instruction << " For review, report success only when you found no findings; otherwise return success=false with a short summary and set rework_required=true for code findings that should go back to implementation. Reserve rework_required=false for infrastructure or launch failures that should stay blocked. For review findings, you may set failing_command to null."
     end
@@ -133,20 +133,20 @@ def bundle_for(request)
           "phase",
           "success",
           "summary",
-          "failing_command",
-          "observed_state",
           "rework_required"
         ],
         "notes" => [
           "Return a single JSON object only.",
-          "Always include task_ref, run_ref, phase, success, summary, failing_command, observed_state, and rework_required.",
+          "Always include task_ref, run_ref, phase, success, summary, and rework_required.",
           "Use null for failing_command and observed_state when success is true.",
+          "For failures, include failing_command and observed_state unless you return clarification_request.",
           "For review failures with rework_required=true, failing_command may be null.",
           "Set rework_required=false unless this is a review failure caused by findings that should return to implementation.",
+          "When requirements are ambiguous or conflicting and you cannot safely continue, return success=false, rework_required=false, and clarification_request with question, optional context/options/recommended_option/impact. This is for requester input, not runtime or validation failures.",
           "For implementation success, include changed_files as an object like {\"repo_alpha\": [\"src/main.rb\"]} using only relative paths under each slot.",
           "For implementation success, you may include review_disposition when the final self-review is clean.",
           "For review failures caused by findings, include rework_required=true.",
-          "For parent review, include review_disposition with kind, repo_scope, summary, description, and finding_key.",
+          "For parent review, include review_disposition with kind, repo_scope, summary, description, and finding_key unless you return clarification_request.",
           "Optionally include skill_feedback when this run revealed reusable project or A2O skill guidance. Use category, summary, proposal.target, and optional repo_scope, skill_path, confidence, evidence, and proposal.suggested_patch. Do not edit skill files directly from this field."
         ]
       },
@@ -176,6 +176,7 @@ def response_schema(request)
     "failing_command" => { "type" => ["string", "null"] },
     "observed_state" => { "type" => ["string", "null"] },
     "rework_required" => { "type" => "boolean" },
+    "clarification_request" => clarification_request_schema,
     "skill_feedback" => skill_feedback_schema
   }
   required_fields = [
@@ -184,8 +185,6 @@ def response_schema(request)
     "phase",
     "success",
     "summary",
-    "failing_command",
-    "observed_state",
     "rework_required"
   ]
   if implementation_phase
@@ -222,12 +221,29 @@ def response_schema(request)
       "required" => %w[kind repo_scope summary description finding_key],
       "additionalProperties" => false
     }
-    required_fields << "review_disposition"
   end
   {
     "type" => "object",
     "properties" => properties,
     "required" => required_fields,
+    "additionalProperties" => false
+  }
+end
+
+def clarification_request_schema
+  {
+    "type" => ["object", "null"],
+    "properties" => {
+      "question" => { "type" => "string" },
+      "context" => { "type" => "string" },
+      "options" => {
+        "type" => "array",
+        "items" => { "type" => "string" }
+      },
+      "recommended_option" => { "type" => "string" },
+      "impact" => { "type" => "string" }
+    },
+    "required" => ["question"],
     "additionalProperties" => false
   }
 end
@@ -432,10 +448,10 @@ def validate_payload(payload, request:)
   errors << "phase must match the worker request" if payload.key?("phase") && payload["phase"] != request["phase"]
 
   if payload["success"] == false
-    if payload["rework_required"] != true && !payload["failing_command"].is_a?(String)
+    if payload["rework_required"] != true && !clarification_request_present?(payload) && !payload["failing_command"].is_a?(String)
       errors << "failing_command must be a string when success is false unless rework_required is true"
     end
-    errors << "observed_state must be a string when success is false" unless payload["observed_state"].is_a?(String)
+    errors << "observed_state must be a string when success is false" unless clarification_request_present?(payload) || payload["observed_state"].is_a?(String)
   else
     errors << "failing_command must be a string or null when success is true" if payload.key?("failing_command") && !payload["failing_command"].nil? && !payload["failing_command"].is_a?(String)
     errors << "observed_state must be a string or null when success is true" if payload.key?("observed_state") && !payload["observed_state"].nil? && !payload["observed_state"].is_a?(String)
@@ -443,6 +459,7 @@ def validate_payload(payload, request:)
 
   errors << "diagnostics must be an object" if payload.key?("diagnostics") && !payload["diagnostics"].is_a?(Hash)
   validate_skill_feedback(payload["skill_feedback"]).each { |error| errors << error } if payload.key?("skill_feedback")
+  validate_clarification_request(payload["clarification_request"], success: payload["success"]).each { |error| errors << error } if payload.key?("clarification_request")
   if payload.key?("changed_files")
     changed_files = payload["changed_files"]
     unless changed_files.nil? || changed_files.is_a?(Hash)
@@ -488,12 +505,35 @@ def validate_payload(payload, request:)
       errors << "review_disposition.kind must be completed for implementation evidence" unless disposition["kind"] == "completed"
       errors << "review_disposition.repo_scope must be one of #{valid_repo_scopes.join(', ')}" unless valid_repo_scopes.include?(disposition["repo_scope"])
     end
-  elsif parent_review
+  elsif parent_review && !clarification_request_present?(payload)
     errors << "review_disposition must be present for parent review"
   elsif implementation_phase && payload["success"] == true
     errors << "review_disposition must be present for implementation success"
   end
   errors
+end
+
+def validate_clarification_request(value, success:)
+  return [] if value.nil?
+  return ["clarification_request must be an object when present"] unless value.is_a?(Hash)
+
+  errors = []
+  errors << "clarification_request must only be present when success is false" if success == true
+  errors << "clarification_request.question must be a non-empty string" unless value["question"].is_a?(String) && !value["question"].strip.empty?
+  %w[context recommended_option impact].each do |field|
+    errors << "clarification_request.#{field} must be a string when present" if value.key?(field) && !value[field].nil? && !value[field].is_a?(String)
+  end
+  if value.key?("options")
+    options = value["options"]
+    unless options.is_a?(Array) && options.all? { |entry| entry.is_a?(String) && !entry.strip.empty? }
+      errors << "clarification_request.options must be an array of non-empty strings"
+    end
+  end
+  errors
+end
+
+def clarification_request_present?(payload)
+  payload["clarification_request"].is_a?(Hash)
 end
 
 def normalize_payload!(payload)

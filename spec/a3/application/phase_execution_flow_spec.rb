@@ -342,6 +342,58 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
     end
   end
 
+  it "prepares a real workspace when only a needs clarification notification hook is configured" do
+    Dir.mktmpdir do |dir|
+      prepared_workspace = A3::Domain::PreparedWorkspace.new(
+        workspace_kind: :ticket_workspace,
+        root_path: dir,
+        source_descriptor: run.source_descriptor,
+        slot_paths: { repo_alpha: dir }
+      )
+      execution = A3::Application::ExecutionResult.new(
+        success: false,
+        summary: "requirement conflict",
+        response_bundle: {
+          "rework_required" => false,
+          "clarification_request" => {
+            "question" => "Which behavior should win?"
+          }
+        }
+      )
+      context = project_context_with_notifications(
+        failure_policy: "best_effort",
+        hooks: [
+          A3::Domain::NotificationConfig::Hook.new(
+            event: "task.needs_clarification",
+            command: ["ruby", "-e", "puts 'clarification hook'"]
+          )
+        ]
+      )
+
+      allow(strategy).to receive(:requires_workspace?).and_return(false)
+      allow(prepare_workspace).to receive(:call).and_return(
+        A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
+      )
+      allow(strategy).to receive(:execute).and_return(execution)
+      allow(strategy).to receive(:verification_summary).with(have_attributes(summary: "requirement conflict")).and_return(nil)
+      allow(strategy).to receive(:blocked_expected_state).and_return("phase succeeds")
+      allow(strategy).to receive(:blocked_default_failing_command).and_return("adapter")
+      allow(strategy).to receive(:blocked_extra_diagnostics).with(have_attributes(summary: "requirement conflict")).and_return(execution.diagnostics)
+
+      result = flow.call(
+        task_ref: task.ref,
+        run_ref: run.ref,
+        project_context: context,
+        strategy: strategy
+      )
+
+      hook_record = result.run.phase_records.last.execution_record.diagnostics.fetch("notification_hooks").first
+      expect(result.task.status).to eq(:needs_clarification)
+      expect(hook_record).to include("event" => "task.needs_clarification", "success" => true, "stdout" => "clarification hook\n")
+      expect(prepare_workspace).to have_received(:call)
+    end
+  end
+
   it "records notification diagnostics before raising for blocking hook failures" do
     Dir.mktmpdir do |dir|
       prepared_workspace = A3::Domain::PreparedWorkspace.new(

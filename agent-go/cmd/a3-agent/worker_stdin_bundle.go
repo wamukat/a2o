@@ -231,6 +231,18 @@ func writeWorkerResponseSchema(request map[string]any) (string, func(), error) {
 		"failing_command": map[string]any{"type": []string{"string", "null"}},
 		"observed_state":  map[string]any{"type": []string{"string", "null"}},
 		"rework_required": map[string]any{"type": "boolean"},
+		"clarification_request": map[string]any{
+			"type": []string{"object", "null"},
+			"properties": map[string]any{
+				"question":           map[string]any{"type": "string"},
+				"context":            map[string]any{"type": "string"},
+				"options":            map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+				"recommended_option": map[string]any{"type": "string"},
+				"impact":             map[string]any{"type": "string"},
+			},
+			"required":             []string{"question"},
+			"additionalProperties": false,
+		},
 	}
 	if stringValue(request["phase"]) == "implementation" {
 		properties["changed_files"] = map[string]any{
@@ -285,11 +297,7 @@ func reviewDispositionSchema(schemaType any) map[string]any {
 }
 
 func workerRequiredFields(request map[string]any) []string {
-	fields := []string{"task_ref", "run_ref", "phase", "success", "summary", "failing_command", "observed_state", "rework_required"}
-	phase := stringValue(request["phase"])
-	if phase == "review" && nestedString(request, "phase_runtime", "task_kind") == "parent" {
-		fields = append(fields, "review_disposition")
-	}
+	fields := []string{"task_ref", "run_ref", "phase", "success", "summary", "rework_required"}
 	return fields
 }
 
@@ -511,12 +519,14 @@ func workerBundle() string {
 			"required_keys": workerRequiredFields(request),
 			"notes": []string{
 				"Return a single JSON object only.",
-				"Always include task_ref, run_ref, phase, success, summary, failing_command, observed_state, and rework_required.",
+				"Always include task_ref, run_ref, phase, success, summary, and rework_required.",
 				"Use null for failing_command and observed_state when success is true.",
+				"For failures, include failing_command and observed_state unless you return clarification_request.",
+				"When requirements are ambiguous or conflicting and you cannot safely continue, return success=false, rework_required=false, and clarification_request with question, optional context/options/recommended_option/impact. This is for requester input, not runtime or validation failures.",
 				"For implementation success, include changed_files keyed by slot name with relative paths to publish.",
 				"For implementation success, include review_disposition with kind=completed when self-review is clean.",
 				"For review failures caused by findings, include rework_required=true.",
-				"For parent review, include review_disposition with kind, repo_scope, summary, description, and finding_key.",
+				"For parent review, include review_disposition with kind, repo_scope, summary, description, and finding_key unless you return clarification_request.",
 			},
 		},
 		"operating_contract": map[string]any{
@@ -568,7 +578,7 @@ func workerInstruction(request map[string]any) string {
 		return instruction + " For implementation success, make the required code change, leave git staging/commit publication to the outer A2O runtime, and include changed_files keyed by slot name with relative paths to publish. After you finish implementation, perform a final self-review before returning. When that self-review is clean, include review_disposition with kind=completed so the outer runtime can preserve review evidence without a separate review phase."
 	}
 	if phase == "review" && nestedString(request, "phase_runtime", "task_kind") == "parent" {
-		return instruction + " For parent review, always include review_disposition. Use kind=completed when review is clean, kind=follow_up_child with a configured slot repo_scope for code follow-up, and kind=blocked with repo_scope unresolved when the finding should block the parent. Parent review must not rely on rework_required routing."
+		return instruction + " For parent review, include review_disposition unless you return clarification_request. Use kind=completed when review is clean, kind=follow_up_child with a configured slot repo_scope for code follow-up, and kind=blocked with repo_scope unresolved when the finding should block the parent. Use clarification_request instead when the finding needs requester input rather than code follow-up or technical blocking. Parent review must not rely on rework_required routing."
 	}
 	if phase == "review" {
 		return instruction + " For review, report success only when you found no findings; otherwise return success=false with a short summary and set rework_required=true for code findings that should go back to implementation. Reserve rework_required=false for infrastructure or launch failures that should stay blocked. For review findings, you may set failing_command to null."
@@ -604,19 +614,23 @@ func validateWorkerPayload(payload map[string]any, request map[string]any) []str
 	}
 	success, _ := payload["success"].(bool)
 	if !success {
-		if rework, _ := payload["rework_required"].(bool); !rework && stringValue(payload["failing_command"]) == "" {
+		clarification := clarificationRequestPresent(payload)
+		if rework, _ := payload["rework_required"].(bool); !rework && !clarification && stringValue(payload["failing_command"]) == "" {
 			errors = append(errors, "failing_command must be a string when success is false unless rework_required is true")
 		}
-		if stringValue(payload["observed_state"]) == "" {
+		if !clarification && stringValue(payload["observed_state"]) == "" {
 			errors = append(errors, "observed_state must be a string when success is false")
 		}
+	}
+	if _, ok := payload["clarification_request"]; ok {
+		errors = append(errors, validateClarificationRequest(payload["clarification_request"], success)...)
 	}
 	if stringValue(request["phase"]) == "implementation" && success {
 		if _, ok := payload["changed_files"].(map[string]any); !ok {
 			errors = append(errors, "changed_files must be present for implementation success")
 		}
 	}
-	if needsReviewDisposition(request, success) {
+	if needsReviewDisposition(request, success) && !clarificationRequestPresent(payload) {
 		disposition, ok := payload["review_disposition"].(map[string]any)
 		if !ok {
 			if stringValue(request["phase"]) == "implementation" {
@@ -628,6 +642,49 @@ func validateWorkerPayload(payload map[string]any, request map[string]any) []str
 			for _, key := range []string{"kind", "repo_scope", "summary", "description", "finding_key"} {
 				if stringValue(disposition[key]) == "" {
 					errors = append(errors, "review_disposition."+key+" must be a string")
+				}
+			}
+		}
+	}
+	return errors
+}
+
+func clarificationRequestPresent(payload map[string]any) bool {
+	_, ok := payload["clarification_request"].(map[string]any)
+	return ok
+}
+
+func validateClarificationRequest(value any, success bool) []string {
+	if value == nil {
+		return nil
+	}
+	request, ok := value.(map[string]any)
+	if !ok {
+		return []string{"clarification_request must be an object when present"}
+	}
+	errors := []string{}
+	if success {
+		errors = append(errors, "clarification_request must only be present when success is false")
+	}
+	if strings.TrimSpace(stringValue(request["question"])) == "" {
+		errors = append(errors, "clarification_request.question must be a non-empty string")
+	}
+	for _, field := range []string{"context", "recommended_option", "impact"} {
+		if raw, ok := request[field]; ok && raw != nil {
+			if _, ok := raw.(string); !ok {
+				errors = append(errors, "clarification_request."+field+" must be a string when present")
+			}
+		}
+	}
+	if rawOptions, ok := request["options"]; ok {
+		options, ok := rawOptions.([]any)
+		if !ok {
+			errors = append(errors, "clarification_request.options must be an array of non-empty strings")
+		} else {
+			for _, option := range options {
+				if strings.TrimSpace(stringValue(option)) == "" {
+					errors = append(errors, "clarification_request.options must be an array of non-empty strings")
+					break
 				}
 			}
 		}

@@ -6,9 +6,9 @@ module A3
   module Domain
     class OperatorInspectionReadModel
       class TaskView
-        attr_reader :ref, :kind, :status, :current_run_ref, :edit_scope, :verification_scope, :topology, :runnable_assessment, :skill_feedback
+        attr_reader :ref, :kind, :status, :current_run_ref, :edit_scope, :verification_scope, :topology, :runnable_assessment, :skill_feedback, :clarification_request
 
-        def initialize(ref:, kind:, status:, current_run_ref:, edit_scope:, verification_scope:, topology:, runnable_assessment:, skill_feedback: [])
+        def initialize(ref:, kind:, status:, current_run_ref:, edit_scope:, verification_scope:, topology:, runnable_assessment:, skill_feedback: [], clarification_request: nil)
           @ref = ref
           @kind = kind.to_sym
           @status = status.to_sym
@@ -18,10 +18,11 @@ module A3
           @topology = topology
           @runnable_assessment = runnable_assessment
           @skill_feedback = Array(skill_feedback).freeze
+          @clarification_request = clarification_request
           freeze
         end
 
-        def self.from_task(task:, tasks:, skill_feedback: [])
+        def self.from_task(task:, tasks:, skill_feedback: [], clarification_request: nil)
           new(
             ref: task.ref,
             kind: task.kind,
@@ -33,7 +34,8 @@ module A3
             runnable_assessment: RunnableAssessment.from_assessment(
               A3::Domain::RunnableTaskAssessment.evaluate(task: task, tasks: tasks)
             ),
-            skill_feedback: skill_feedback
+            skill_feedback: skill_feedback,
+            clarification_request: clarification_request
           )
         end
       end

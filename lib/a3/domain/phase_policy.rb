@@ -53,6 +53,7 @@ module A3
       def terminal_status_for(phase:, outcome:)
         outcome_name = outcome.to_sym
         return :blocked if outcome_name == :blocked
+        return :needs_clarification if outcome_name == :needs_clarification
         return @task_kind == :parent ? :blocked : :in_progress if outcome_name == :rework
         return @current_status if %i[retryable terminal_noop].include?(outcome_name)
         return :done if phase.to_sym == :merge

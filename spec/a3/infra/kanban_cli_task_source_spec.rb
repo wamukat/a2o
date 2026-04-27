@@ -57,6 +57,39 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
+  it "maps clarification-labeled tasks to needs_clarification" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      task_get_includes_labels: false,
+      snapshots: [
+        {
+          "id" => 3047,
+          "ref" => "Sample#3047",
+          "status" => "To do",
+          "labels" => ["repo:ui-app", "trigger:auto-implement", "needs:clarification"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-implement"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+
+      expect(tasks.fetch(0).status).to eq(:needs_clarification)
+      expect(tasks.fetch(0).runnable_phase).to be_nil
+    end
+  end
+
   it "excludes resolved done-lane tasks from the imported set" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,

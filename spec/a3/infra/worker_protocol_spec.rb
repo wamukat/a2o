@@ -223,6 +223,63 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
+  it "accepts a clarification request without blocked failure diagnostics" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => false,
+        "summary" => "permission model is ambiguous",
+        "task_ref" => task.ref,
+        "run_ref" => run.ref,
+        "phase" => "review",
+        "rework_required" => false,
+        "clarification_request" => {
+          "question" => "Should this bypass require admin approval?",
+          "context" => "The ticket conflicts with the current permission model.",
+          "options" => ["Require admin approval", "Keep the current model"],
+          "recommended_option" => "Require admin approval",
+          "impact" => "Scheduler waits until the requester answers."
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: run.ref,
+      expected_phase: :review
+    )
+
+    expect(result).to have_attributes(success?: false, failing_command: nil, observed_state: nil)
+    expect(result.clarification_request).to have_attributes(
+      question: "Should this bypass require admin approval?",
+      options: ["Require admin approval", "Keep the current model"]
+    )
+  end
+
+  it "rejects malformed clarification requests" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => false,
+        "summary" => "ambiguous",
+        "task_ref" => task.ref,
+        "run_ref" => run.ref,
+        "phase" => "review",
+        "rework_required" => false,
+        "clarification_request" => {
+          "question" => " ",
+          "options" => ["valid", ""]
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: run.ref,
+      expected_phase: :review
+    )
+
+    expect(result.summary).to eq("worker result schema invalid")
+    expect(result.diagnostics.fetch("validation_errors")).to include(
+      "clarification_request.question must be a non-empty string",
+      "clarification_request.options must be an array of non-empty strings"
+    )
+  end
+
   it "accepts and normalizes structured skill feedback without changing successful worker flow" do
     result = described_class.new(
       repo_scope_aliases: { "repo:both" => "both" },

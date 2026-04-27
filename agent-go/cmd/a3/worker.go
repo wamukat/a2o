@@ -212,12 +212,13 @@ func validatePublicWorkerPayload(payload map[string]any, request map[string]any,
 	}
 	success, _ := payload["success"].(bool)
 	if !success {
+		clarification := publicClarificationRequestPresent(payload)
 		if rework, _ := payload["rework_required"].(bool); !rework {
-			if _, ok := payload["failing_command"].(string); !ok {
+			if _, ok := payload["failing_command"].(string); !ok && !clarification {
 				errors = append(errors, "failing_command must be a string when success is false unless rework_required is true")
 			}
 		}
-		if _, ok := payload["observed_state"].(string); !ok {
+		if _, ok := payload["observed_state"].(string); !ok && !clarification {
 			errors = append(errors, "observed_state must be a string when success is false")
 		}
 	} else {
@@ -236,6 +237,9 @@ func validatePublicWorkerPayload(payload map[string]any, request map[string]any,
 		if _, ok := diagnostics.(map[string]any); !ok {
 			errors = append(errors, "diagnostics must be an object")
 		}
+	}
+	if _, ok := payload["clarification_request"]; ok {
+		errors = append(errors, validatePublicClarificationRequest(payload["clarification_request"], success)...)
 	}
 	if workerStringValue(request["phase"]) == "implementation" && success {
 		changedFiles, ok := payload["changed_files"]
@@ -257,7 +261,7 @@ func validatePublicWorkerPayload(payload map[string]any, request map[string]any,
 			errors = append(errors, validateChangedFiles(changedFilesMap)...)
 		}
 	}
-	if publicWorkerNeedsReviewDisposition(request, success) || payload["review_disposition"] != nil {
+	if (publicWorkerNeedsReviewDisposition(request, success) && !publicClarificationRequestPresent(payload)) || payload["review_disposition"] != nil {
 		rawDisposition, ok := payload["review_disposition"]
 		if !ok {
 			if workerStringValue(request["phase"]) == "implementation" {
@@ -371,12 +375,51 @@ func validReviewDispositionRepoScopes(request map[string]any, includeUnresolved 
 }
 
 func publicWorkerRequiredFields(request map[string]any) []string {
-	fields := []string{"task_ref", "run_ref", "phase", "success", "summary", "failing_command", "observed_state", "rework_required"}
-	phase := workerStringValue(request["phase"])
-	if phase == "review" && workerNestedString(request, "phase_runtime", "task_kind") == "parent" {
-		fields = append(fields, "review_disposition")
-	}
+	fields := []string{"task_ref", "run_ref", "phase", "success", "summary", "rework_required"}
 	return fields
+}
+
+func publicClarificationRequestPresent(payload map[string]any) bool {
+	_, ok := payload["clarification_request"].(map[string]any)
+	return ok
+}
+
+func validatePublicClarificationRequest(value any, success bool) []string {
+	if value == nil {
+		return nil
+	}
+	request, ok := value.(map[string]any)
+	if !ok {
+		return []string{"clarification_request must be an object when present"}
+	}
+	errors := []string{}
+	if success {
+		errors = append(errors, "clarification_request must only be present when success is false")
+	}
+	if strings.TrimSpace(workerStringValue(request["question"])) == "" {
+		errors = append(errors, "clarification_request.question must be a non-empty string")
+	}
+	for _, field := range []string{"context", "recommended_option", "impact"} {
+		if raw, ok := request[field]; ok && raw != nil {
+			if _, ok := raw.(string); !ok {
+				errors = append(errors, "clarification_request."+field+" must be a string when present")
+			}
+		}
+	}
+	if rawOptions, ok := request["options"]; ok {
+		options, ok := rawOptions.([]any)
+		if !ok {
+			errors = append(errors, "clarification_request.options must be an array of non-empty strings")
+		} else {
+			for _, option := range options {
+				if strings.TrimSpace(workerStringValue(option)) == "" {
+					errors = append(errors, "clarification_request.options must be an array of non-empty strings")
+					break
+				}
+			}
+		}
+	}
+	return errors
 }
 
 func publicWorkerNeedsReviewDisposition(request map[string]any, success bool) bool {

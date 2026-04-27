@@ -181,6 +181,25 @@ a2o worker validate-result --request request.json --result result.json
 
 The validator reports concrete missing keys, type errors, and `task_ref` / `run_ref` / `phase` mismatches before runtime execution. If your executor uses configured review scopes or repo-scope aliases, pass the same public values with repeated `--review-scope SCOPE` and `--repo-scope-alias FROM=TO`.
 
+If the worker cannot continue because the requested product behavior is ambiguous or conflicts with an existing contract, return `success=false`, `rework_required=false`, and `clarification_request` instead of using `blocked` diagnostics:
+
+```json
+{
+  "success": false,
+  "summary": "Requirement conflicts with the current permission model.",
+  "rework_required": false,
+  "clarification_request": {
+    "question": "Should admin approval be required for this bypass?",
+    "context": "The ticket asks for a bypass, but the current permission model requires explicit approval.",
+    "options": ["Require admin approval", "Keep the current model"],
+    "recommended_option": "Require admin approval",
+    "impact": "A2O pauses scheduling for this task until the requester answers."
+  }
+}
+```
+
+Use `clarification_request` only for requester input. Runtime failures, invalid worker output, verification failures, merge conflicts, and missing credentials should remain technical failures with `failing_command` / `observed_state` so they become `blocked` diagnostics.
+
 ## Verification And Remediation
 
 Verification commands prove the task result. Remediation commands may format code or perform project-approved cleanup before verification retries.
@@ -270,6 +289,7 @@ Supported phase-completion events are:
 
 - `task.phase_completed`
 - `task.blocked`
+- `task.needs_clarification`
 - `task.completed`
 - `task.reworked`
 - `parent.follow_up_child_created`

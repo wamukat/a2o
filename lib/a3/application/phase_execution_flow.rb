@@ -151,6 +151,7 @@ module A3
       def notification_events_for(task:, run:)
         events = ["task.phase_completed"]
         events << "task.blocked" if task.status == :blocked
+        events << "task.needs_clarification" if task.status == :needs_clarification
         events << "task.completed" if task.status == :done
         events << "task.reworked" if run.terminal_outcome == :rework
         events << "parent.follow_up_child_created" if run.terminal_outcome == :follow_up_child
@@ -161,6 +162,7 @@ module A3
         emitted_events = %w[
           task.phase_completed
           task.blocked
+          task.needs_clarification
           task.completed
           task.reworked
           parent.follow_up_child_created

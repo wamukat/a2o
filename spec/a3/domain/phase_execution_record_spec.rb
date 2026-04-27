@@ -27,6 +27,7 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
       "observed_state" => "exit 0",
       "diagnostics" => { "stdout" => "ok" },
       "review_disposition" => nil,
+      "clarification_request" => nil,
       "skill_feedback" => [],
       "follow_up_child_fingerprints" => [],
       "runtime_snapshot" => {
@@ -114,6 +115,33 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
         }
       }
     ])
+    expect(described_class.from_persisted_form(record.persisted_form)).to eq(record)
+  end
+
+  it "captures clarification requests from an execution result" do
+    execution = A3::Application::ExecutionResult.new(
+      success: false,
+      summary: "needs requester input",
+      response_bundle: {
+        "clarification_request" => {
+          "question" => "Which option should be implemented?",
+          "context" => "The acceptance criteria conflict.",
+          "options" => ["Option A", "Option B"],
+          "recommended_option" => "Option A",
+          "impact" => "Runtime waits for requester input."
+        }
+      }
+    )
+
+    record = described_class.from_execution_result(execution)
+
+    expect(record.clarification_request).to eq(
+      "question" => "Which option should be implemented?",
+      "context" => "The acceptance criteria conflict.",
+      "options" => ["Option A", "Option B"],
+      "recommended_option" => "Option A",
+      "impact" => "Runtime waits for requester input."
+    )
     expect(described_class.from_persisted_form(record.persisted_form)).to eq(record)
   end
 

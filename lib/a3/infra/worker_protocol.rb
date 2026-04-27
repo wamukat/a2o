@@ -249,6 +249,7 @@ module A3
         end
         if worker_response.fetch("success", nil) == false &&
            worker_response["rework_required"] != true &&
+           !clarification_request_present?(worker_response) &&
            !worker_response["failing_command"].is_a?(String)
           errors << "failing_command must be a string when success is false unless rework_required is true"
         elsif worker_response.key?("failing_command") && !worker_response["failing_command"].nil? && !worker_response["failing_command"].is_a?(String)
@@ -256,7 +257,7 @@ module A3
         end
         if worker_response.key?("observed_state") && !worker_response["observed_state"].nil? && !worker_response["observed_state"].is_a?(String)
           errors << "observed_state must be a string when present"
-        elsif worker_response.fetch("success", nil) == false && !worker_response["observed_state"].is_a?(String)
+        elsif worker_response.fetch("success", nil) == false && !clarification_request_present?(worker_response) && !worker_response["observed_state"].is_a?(String)
           errors << "observed_state must be a string when success is false"
         end
         diagnostics = worker_response["diagnostics"]
@@ -264,6 +265,7 @@ module A3
           errors << "diagnostics must be an object"
         end
         validate_skill_feedback(worker_response["skill_feedback"]).each { |error| errors << error } if worker_response.key?("skill_feedback")
+        validate_clarification_request(worker_response["clarification_request"], success: worker_response["success"]).each { |error| errors << error } if worker_response.key?("clarification_request")
         unless [true, false].include?(worker_response["rework_required"])
           errors << "rework_required must be true or false"
         end
@@ -356,6 +358,33 @@ module A3
         end
         errors << "#{prefix}.evidence must be an object when present" if entry.key?("evidence") && !entry["evidence"].is_a?(Hash)
         errors
+      end
+
+      def validate_clarification_request(value, success:)
+        return [] if value.nil?
+        return ["clarification_request must be an object when present"] unless value.is_a?(Hash)
+
+        errors = []
+        errors << "clarification_request must only be present when success is false" if success == true
+        errors << "clarification_request.question must be a non-empty string" unless present_string?(value["question"])
+        %w[context recommended_option impact].each do |field|
+          errors << "clarification_request.#{field} must be a string when present" if value.key?(field) && !value[field].nil? && !value[field].is_a?(String)
+        end
+        if value.key?("options")
+          options = value["options"]
+          unless options.is_a?(Array) && options.all? { |entry| entry.is_a?(String) && !entry.strip.empty? }
+            errors << "clarification_request.options must be an array of non-empty strings"
+          end
+        end
+        errors
+      end
+
+      def clarification_request_present?(worker_response)
+        worker_response["clarification_request"].is_a?(Hash)
+      end
+
+      def present_string?(value)
+        value.is_a?(String) && !value.strip.empty?
       end
 
       def normalize_repo_scope_aliases(repo_scope_aliases)
