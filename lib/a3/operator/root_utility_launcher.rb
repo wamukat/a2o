@@ -14,11 +14,22 @@ require "a3/operator/rerun_readiness"
 
 module A3RootUtilityLauncher
   PrepareRuntimeConfigFailed = Class.new(StandardError)
-  ROOT_DIR = Pathname(ENV.fetch("A3_ROOT_DIR", Dir.pwd)).expand_path.freeze
-  CONFIG_DIR = ROOT_DIR.join(ENV.fetch("A3_ROOT_CONFIG_DIR", "scripts/a3/config")).freeze
-  RUNTIME_CONFIG = ROOT_DIR.join(ENV.fetch("A3_ROOT_RUNTIME_CONFIG_PATH", ".work/a3/config/runtime.json")).freeze
-  PREPARE_RUNTIME_CONFIG_SCRIPT = ROOT_DIR.join(ENV.fetch("A3_ROOT_PREPARE_RUNTIME_CONFIG_SCRIPT", "scripts/a3/prepare_runtime_config.rb")).freeze
-  LEGACY_A3ENGINE_DISABLED_MESSAGE = ENV.fetch("A3_ROOT_LEGACY_DISABLED_MESSAGE", "Legacy A3Engine commands are disabled. Use canonical A3 root entrypoints or root local utility commands only.").freeze
+
+  def self.fetch_root_env(name, default)
+    legacy_name = name.sub(/\AA2O_ROOT_/, "A3_ROOT_")
+    if ENV.key?(legacy_name) && !ENV.key?(name)
+      raise KeyError,
+            "removed A3 root utility input: environment variable #{legacy_name}; migration_required=true replacement=environment variable #{name}"
+    end
+
+    ENV.fetch(name, default)
+  end
+
+  ROOT_DIR = Pathname(fetch_root_env("A2O_ROOT_DIR", Dir.pwd)).expand_path.freeze
+  CONFIG_DIR = ROOT_DIR.join(fetch_root_env("A2O_ROOT_CONFIG_DIR", "scripts/a3/config")).freeze
+  RUNTIME_CONFIG = ROOT_DIR.join(fetch_root_env("A2O_ROOT_RUNTIME_CONFIG_PATH", ".work/a3/config/runtime.json")).freeze
+  PREPARE_RUNTIME_CONFIG_SCRIPT = ROOT_DIR.join(fetch_root_env("A2O_ROOT_PREPARE_RUNTIME_CONFIG_SCRIPT", "scripts/a3/prepare_runtime_config.rb")).freeze
+  LEGACY_A3ENGINE_DISABLED_MESSAGE = fetch_root_env("A2O_ROOT_LEGACY_DISABLED_MESSAGE", "Legacy A3Engine commands are disabled. Use canonical A3 root entrypoints or root local utility commands only.").freeze
   LEGACY_A3ENGINE_COMMANDS = %w[
     validate-manifest
     describe-project
@@ -98,7 +109,7 @@ module A3RootUtilityLauncher
   end
 
   def reconcile_live_process_patterns(project)
-    injected_patterns = ENV.fetch("A3_ROOT_RECONCILE_LIVE_PROCESS_PATTERN", "").split(File::PATH_SEPARATOR)
+    injected_patterns = A3RootUtilityLauncher.fetch_root_env("A2O_ROOT_RECONCILE_LIVE_PROCESS_PATTERN", "").split(File::PATH_SEPARATOR)
     (injected_patterns + ["#{project}-kanban-scheduler-auto"]).map(&:strip).reject(&:empty?)
   end
 
@@ -192,7 +203,7 @@ module A3RootUtilityLauncher
   end
 
   def resolve_launcher_config(project:, command:, launcher_config: nil)
-    runtime_config_projects = ENV.fetch("A3_ROOT_RUNTIME_CONFIG_PROJECTS", "").split(",").map(&:strip).reject(&:empty?)
+    runtime_config_projects = A3RootUtilityLauncher.fetch_root_env("A2O_ROOT_RUNTIME_CONFIG_PROJECTS", "").split(",").map(&:strip).reject(&:empty?)
     if launcher_config.nil? && runtime_config_projects.include?(project) && %w[doctor-env reconcile-active-runs cleanup].include?(command)
       rc = run_prepare_runtime_config
       raise PrepareRuntimeConfigFailed, rc.to_s unless rc.zero?
@@ -227,7 +238,7 @@ module A3RootUtilityLauncher
     command = argv.first
     raise SystemExit, "unknown command: #{command}" unless COMMANDS.include?(command)
 
-    options = { "project" => ENV.fetch("A3_ROOT_DEFAULT_PROJECT", "default") }
+    options = { "project" => A3RootUtilityLauncher.fetch_root_env("A2O_ROOT_DEFAULT_PROJECT", "default") }
     parser = OptionParser.new
     parser.on("--project PROJECT") { |value| options["project"] = value }
 

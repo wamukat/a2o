@@ -33,20 +33,20 @@ RSpec.describe A3::Infra::LocalCommandRunner do
     expect(result.summary).to include("ruby -e 'print ENV.fetch(\"A2O_WORKER_REQUEST_PATH\")' ok")
   end
 
-  it "provides A3_ROOT_DIR when the caller does not inject it" do
-    original = ENV.delete("A3_ROOT_DIR")
+  it "provides A2O_ROOT_DIR when the caller does not inject it" do
+    original = ENV.delete("A2O_ROOT_DIR")
     begin
       Dir.chdir(tmpdir) do
         result = described_class.new.run(
-          ["ruby -e 'print ENV.fetch(\"A3_ROOT_DIR\")'"],
+          ["ruby -e 'print ENV.fetch(\"A2O_ROOT_DIR\")'"],
           workspace: workspace
         )
 
         expect(result.success?).to be(true)
-        expect(result.summary).to include("ruby -e 'print ENV.fetch(\"A3_ROOT_DIR\")' ok")
+        expect(result.summary).to include("ruby -e 'print ENV.fetch(\"A2O_ROOT_DIR\")' ok")
       end
     ensure
-      ENV["A3_ROOT_DIR"] = original if original
+      original ? ENV["A2O_ROOT_DIR"] = original : ENV.delete("A2O_ROOT_DIR")
     end
   end
 

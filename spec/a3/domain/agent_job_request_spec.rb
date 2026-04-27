@@ -20,7 +20,7 @@ RSpec.describe A3::Domain::AgentJobRequest do
       working_dir: "/workspace/sample-catalog-service",
       command: "task",
       args: ["ops:flow:standard"],
-      env: { A3_ROOT_DIR: "/workspace" },
+      env: { A2O_ROOT_DIR: "/workspace" },
       timeout_seconds: 1800,
       artifact_rules: [
         {
@@ -40,7 +40,7 @@ RSpec.describe A3::Domain::AgentJobRequest do
       "working_dir" => "/workspace/sample-catalog-service",
       "command" => "task",
       "args" => ["ops:flow:standard"],
-      "env" => { "A3_ROOT_DIR" => "/workspace" },
+      "env" => { "A2O_ROOT_DIR" => "/workspace" },
       "timeout_seconds" => 1800,
       "artifact_rules" => [
         {
@@ -89,7 +89,7 @@ RSpec.describe A3::Domain::AgentJobRequest do
           "sample-catalog-service" => "/agent/repos/starters"
         },
         env: {
-          A3_ROOT_DIR: "/agent/a3"
+          A2O_ROOT_DIR: "/agent/a2o"
         },
         required_bins: ["git", "task"]
       },
@@ -113,7 +113,7 @@ RSpec.describe A3::Domain::AgentJobRequest do
         "sample-catalog-service" => "/agent/repos/starters"
       },
       "env" => {
-        "A3_ROOT_DIR" => "/agent/a3"
+        "A2O_ROOT_DIR" => "/agent/a2o"
       },
       "required_bins" => ["git", "task"]
     )

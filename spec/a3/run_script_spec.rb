@@ -7,14 +7,13 @@ require "tmpdir"
 
 RUN_SCRIPT_SPEC_ROOT_DIR = Pathname(__dir__).join("..", "..").expand_path
 ENV["A2O_ROOT_DIR"] ||= RUN_SCRIPT_SPEC_ROOT_DIR.to_s
-ENV["A3_ROOT_DIR"] ||= RUN_SCRIPT_SPEC_ROOT_DIR.to_s
-ENV["A3_ROOT_DEFAULT_PROJECT"] ||= "a2o-reference"
-ENV["A3_ROOT_RUNTIME_CONFIG_PATH"] ||= ".work/a3/config/a2o-reference-runtime.json"
-ENV["A3_ROOT_CONFIG_DIR"] ||= "spec/fixtures/a3/config"
-ENV["A3_ROOT_PREPARE_RUNTIME_CONFIG_SCRIPT"] ||= "spec/fixtures/a3/prepare_runtime_config.rb"
-ENV["A3_ROOT_RUNTIME_CONFIG_PROJECTS"] ||= "a2o-reference"
-ENV["A3_ROOT_RECONCILE_LIVE_PROCESS_PATTERN"] ||= "a2o-runtime-run-once"
-ENV["A3_ROOT_LEGACY_DISABLED_MESSAGE"] ||= "Legacy A3Engine-v1 commands are disabled."
+ENV["A2O_ROOT_DEFAULT_PROJECT"] ||= "a2o-reference"
+ENV["A2O_ROOT_RUNTIME_CONFIG_PATH"] ||= ".work/a3/config/a2o-reference-runtime.json"
+ENV["A2O_ROOT_CONFIG_DIR"] ||= "spec/fixtures/a3/config"
+ENV["A2O_ROOT_PREPARE_RUNTIME_CONFIG_SCRIPT"] ||= "spec/fixtures/a3/prepare_runtime_config.rb"
+ENV["A2O_ROOT_RUNTIME_CONFIG_PROJECTS"] ||= "a2o-reference"
+ENV["A2O_ROOT_RECONCILE_LIVE_PROCESS_PATTERN"] ||= "a2o-runtime-run-once"
+ENV["A2O_ROOT_LEGACY_DISABLED_MESSAGE"] ||= "Legacy A3Engine-v1 commands are disabled."
 
 require "a3/operator/root_utility_launcher"
 
@@ -41,6 +40,22 @@ RSpec.describe A3RootUtilityLauncher do
 
     expect(status.success?).to eq(false)
     expect(stderr).to include(described_class::LEGACY_A3ENGINE_DISABLED_MESSAGE)
+  end
+
+  it "rejects legacy root utility env names" do
+    original_public = ENV.delete("A2O_ROOT_DEFAULT_PROJECT")
+    original_legacy = ENV["A3_ROOT_DEFAULT_PROJECT"]
+    ENV["A3_ROOT_DEFAULT_PROJECT"] = "legacy"
+
+    expect do
+      described_class.fetch_root_env("A2O_ROOT_DEFAULT_PROJECT", "default")
+    end.to raise_error(
+      KeyError,
+      /removed A3 root utility input: environment variable A3_ROOT_DEFAULT_PROJECT; migration_required=true replacement=environment variable A2O_ROOT_DEFAULT_PROJECT/
+    )
+  ensure
+    original_public ? ENV["A2O_ROOT_DEFAULT_PROJECT"] = original_public : ENV.delete("A2O_ROOT_DEFAULT_PROJECT")
+    original_legacy ? ENV["A3_ROOT_DEFAULT_PROJECT"] = original_legacy : ENV.delete("A3_ROOT_DEFAULT_PROJECT")
   end
 
   it "delegates operational commands through the A3 CLI root-utility entrypoint" do

@@ -41,13 +41,13 @@ RSpec.describe "A3 CLI worker gateway options" do
         agent_runtime_profile: "host-local",
         agent_shared_workspace_mode: "same-path",
         agent_env: {
-          "A3_ROOT_DIR" => "/host/a3"
+          "A2O_ROOT_DIR" => "/host/a2o"
         }
       },
       command_runner: instance_double(A3::Infra::LocalCommandRunner)
     )
 
-    expect(gateway.instance_variable_get(:@env)).to eq("A3_ROOT_DIR" => "/host/a3")
+    expect(gateway.instance_variable_get(:@env)).to eq("A2O_ROOT_DIR" => "/host/a2o")
   end
 
   it "passes engine-managed agent environment options to an agent HTTP worker gateway" do
@@ -65,7 +65,7 @@ RSpec.describe "A3 CLI worker gateway options" do
           "sample-catalog-service" => "/agent/repos/starters"
         },
         agent_env: {
-          "A3_ROOT_DIR" => "/agent/a3"
+          "A2O_ROOT_DIR" => "/agent/a2o"
         },
         agent_required_bins: ["git", "task"]
       },
@@ -78,7 +78,7 @@ RSpec.describe "A3 CLI worker gateway options" do
         "sample-catalog-service" => "/agent/repos/starters"
       },
       "env" => {
-        "A3_ROOT_DIR" => "/agent/a3"
+        "A2O_ROOT_DIR" => "/agent/a2o"
       },
       "required_bins" => ["git", "task"]
     )
@@ -299,13 +299,13 @@ RSpec.describe "A3 CLI worker gateway options" do
         agent_runtime_profile: "host-local",
         agent_shared_workspace_mode: "same-path",
         agent_env: {
-          "A3_ROOT_DIR" => "/host/a3"
+          "A2O_ROOT_DIR" => "/host/a2o"
         }
       },
       fallback: instance_double(A3::Infra::LocalCommandRunner)
     )
 
-    expect(runner.instance_variable_get(:@env)).to eq("A3_ROOT_DIR" => "/host/a3")
+    expect(runner.instance_variable_get(:@env)).to eq("A2O_ROOT_DIR" => "/host/a2o")
   end
 
   it "passes engine-managed agent environment options to verification and merge runners" do

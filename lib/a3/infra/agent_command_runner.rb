@@ -181,8 +181,7 @@ module A3
 
       def default_env
         {
-          "A3_ROOT_DIR" => ENV.fetch("A3_ROOT_DIR", Dir.pwd),
-          "A2O_ROOT_DIR" => ENV.fetch("A2O_ROOT_DIR", ENV.fetch("A3_ROOT_DIR", Dir.pwd))
+          "A2O_ROOT_DIR" => ENV.fetch("A2O_ROOT_DIR", Dir.pwd)
         }
       end
 

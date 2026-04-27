@@ -179,7 +179,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
       control_plane_client: client,
       runtime_profile: "docker-dev-env",
       shared_workspace_mode: "same-path",
-      env: { A3_ROOT_DIR: "/host/a3" },
+      env: { A2O_ROOT_DIR: "/host/a2o" },
       job_id_generator: -> { "job-1" },
       sleeper: ->(_) {}
     )
@@ -188,7 +188,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
 
     request = client.records.values.first.request
     expect(result.success?).to eq(true)
-    expect(request.env.fetch("A3_ROOT_DIR")).to eq("/host/a3")
+    expect(request.env.fetch("A2O_ROOT_DIR")).to eq("/host/a2o")
   end
 
   it "expands public command placeholders before enqueueing agent jobs" do
