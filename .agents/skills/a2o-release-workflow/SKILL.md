@@ -72,6 +72,7 @@ An A2O release is not complete until all of the following are true:
    - If it already exists, update it.
    - Write user-facing release notes in English unless the user asks otherwise.
    - Summarize what changed for operators and users, not just internal ticket numbers.
+   - For any release that changes runtime behavior, host launcher behavior, shared host assets, agent install/export behavior, runtime image selection, or generated runtime/agent configuration, include an explicit `Migration / Upgrade Steps` section. The section must say whether users need to update the host launcher, shared assets, runtime image/container, project agent binary, project package config, or generated state, and must include concrete commands where possible.
    - If the release removes a compatibility surface, include an explicit migration note that names the removed command/config/env, explains the replacement, and says the runtime now fails fast with a migration-required diagnostic instead of silently preserving the compatibility layer.
    - Do not include local Kanbalone/A2O ticket URLs in release notes. Link only to public GitHub issues or pull requests when referencing tickets.
    - Mark only the newest release as `latest` unless the user asks otherwise.
