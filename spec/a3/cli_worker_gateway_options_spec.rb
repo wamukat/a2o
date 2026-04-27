@@ -401,6 +401,51 @@ RSpec.describe "A3 CLI worker gateway options" do
     end
   end
 
+  it "uses canonical A2O agent token env defaults for agent server options" do
+    with_env(
+      "A2O_AGENT_TOKEN" => "agent-token",
+      "A2O_AGENT_TOKEN_FILE" => "",
+      "A2O_AGENT_CONTROL_TOKEN" => "control-token",
+      "A2O_AGENT_CONTROL_TOKEN_FILE" => "",
+      "A3_AGENT_TOKEN" => nil,
+      "A3_AGENT_TOKEN_FILE" => nil,
+      "A3_AGENT_CONTROL_TOKEN" => nil,
+      "A3_AGENT_CONTROL_TOKEN_FILE" => nil
+    ) do
+      options = A3::CLI.send(:parse_agent_server_options, [])
+
+      expect(options.fetch(:agent_token)).to eq("agent-token")
+      expect(options.fetch(:agent_control_token)).to eq("control-token")
+    end
+  end
+
+  it "rejects legacy A3 agent token env defaults for agent server options" do
+    with_env(
+      "A2O_AGENT_TOKEN" => "agent-token",
+      "A3_AGENT_TOKEN" => "legacy-token"
+    ) do
+      expect do
+        A3::CLI.send(:parse_agent_server_options, [])
+      end.to raise_error(
+        KeyError,
+        /removed A3 compatibility input: environment variable A3_AGENT_TOKEN; migration_required=true replacement=environment variable A2O_AGENT_TOKEN/
+      )
+    end
+  end
+
+  it "rejects legacy A3 agent token env defaults for worker gateway options" do
+    with_env("A3_AGENT_CONTROL_TOKEN_FILE" => "/tmp/legacy-control-token") do
+      parser = OptionParser.new
+
+      expect do
+        A3::CLI.send(:add_worker_gateway_options, parser, {})
+      end.to raise_error(
+        KeyError,
+        /removed A3 compatibility input: environment variable A3_AGENT_CONTROL_TOKEN_FILE; migration_required=true replacement=environment variable A2O_AGENT_CONTROL_TOKEN_FILE/
+      )
+    end
+  end
+
   it "prefers a direct agent auth token over a token file" do
     Dir.mktmpdir do |dir|
       token_path = File.join(dir, "agent-token")

@@ -1732,10 +1732,10 @@ module A3
         port: A3::Infra::AgentHttpPullServer::DEFAULT_PORT,
         job_store_path: nil,
         artifact_store_dir: nil,
-        agent_token: ENV.fetch("A3_AGENT_TOKEN", ""),
-        agent_token_file: ENV.fetch("A3_AGENT_TOKEN_FILE", ""),
-        agent_control_token: ENV.fetch("A3_AGENT_CONTROL_TOKEN", ""),
-        agent_control_token_file: ENV.fetch("A3_AGENT_CONTROL_TOKEN_FILE", "")
+        agent_token: canonical_agent_env("A2O_AGENT_TOKEN", "A3_AGENT_TOKEN"),
+        agent_token_file: canonical_agent_env("A2O_AGENT_TOKEN_FILE", "A3_AGENT_TOKEN_FILE"),
+        agent_control_token: canonical_agent_env("A2O_AGENT_CONTROL_TOKEN", "A3_AGENT_CONTROL_TOKEN"),
+        agent_control_token_file: canonical_agent_env("A2O_AGENT_CONTROL_TOKEN_FILE", "A3_AGENT_CONTROL_TOKEN_FILE")
       }
 
       parser = OptionParser.new
@@ -2315,10 +2315,10 @@ module A3
     end
 
     def add_worker_gateway_options(parser, options)
-      options[:agent_token] ||= ENV.fetch("A3_AGENT_TOKEN", "")
-      options[:agent_token_file] ||= ENV.fetch("A3_AGENT_TOKEN_FILE", "")
-      options[:agent_control_token] ||= ENV.fetch("A3_AGENT_CONTROL_TOKEN", "")
-      options[:agent_control_token_file] ||= ENV.fetch("A3_AGENT_CONTROL_TOKEN_FILE", "")
+      options[:agent_token] ||= canonical_agent_env("A2O_AGENT_TOKEN", "A3_AGENT_TOKEN")
+      options[:agent_token_file] ||= canonical_agent_env("A2O_AGENT_TOKEN_FILE", "A3_AGENT_TOKEN_FILE")
+      options[:agent_control_token] ||= canonical_agent_env("A2O_AGENT_CONTROL_TOKEN", "A3_AGENT_CONTROL_TOKEN")
+      options[:agent_control_token_file] ||= canonical_agent_env("A2O_AGENT_CONTROL_TOKEN_FILE", "A3_AGENT_CONTROL_TOKEN_FILE")
       parser.on("--worker-gateway VALUE") { |value| options[:worker_gateway] = value }
       parser.on("--worker-command VALUE") { |value| options[:worker_command] = value }
       parser.on("--worker-command-arg VALUE") { |value| options[:worker_command_args] << value }
@@ -2601,6 +2601,15 @@ module A3
       raise ArgumentError, "#{label} file is empty: #{token_file}" if content.empty?
 
       content
+    end
+
+    def canonical_agent_env(canonical_name, legacy_name)
+      if ENV.key?(legacy_name)
+        raise KeyError,
+              "removed A3 compatibility input: environment variable #{legacy_name}; migration_required=true replacement=environment variable #{canonical_name}"
+      end
+
+      ENV.fetch(canonical_name, "")
     end
 
     def agent_workspace_request_builder(options)
