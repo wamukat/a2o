@@ -25,6 +25,7 @@
 | 参照用プロダクトによる検証 | [90-reference-product-suite.md](90-reference-product-suite.md) |
 | release publish の遅延と distribution 境界 | [98-release-publish-latency-and-distribution-build.md](98-release-publish-latency-and-distribution-build.md) |
 | カンバンアダプターと Kanbalone 境界 | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
+| legacy worker activity state の退役 | [97-worker-runs-legacy-state-retirement.md](97-worker-runs-legacy-state-retirement.md) |
 
 ## A2O が実現するランタイムの流れ
 

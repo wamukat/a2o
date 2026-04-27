@@ -25,6 +25,7 @@ Read this document first to understand runtime flow and responsibility boundarie
 | Validation through reference products | [90-reference-product-suite.md](90-reference-product-suite.md) |
 | Release publish latency and distribution boundary | [98-release-publish-latency-and-distribution-build.md](98-release-publish-latency-and-distribution-build.md) |
 | Kanban adapter and Kanbalone boundary | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
+| Legacy worker activity state retirement | [97-worker-runs-legacy-state-retirement.md](97-worker-runs-legacy-state-retirement.md) |
 
 ## Runtime Flow
 
