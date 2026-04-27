@@ -255,7 +255,19 @@ RSpec.describe A3::Application::ExecuteUntilIdle do
         )
       end
       allow(worker_gateway).to receive(:run).and_return(
-        A3::Application::ExecutionResult.new(success: true, summary: "review completed")
+        A3::Application::ExecutionResult.new(
+          success: true,
+          summary: "review completed",
+          response_bundle: {
+            "review_disposition" => {
+              "kind" => "completed",
+              "repo_scope" => "repo_alpha",
+              "summary" => "No findings",
+              "description" => "Parent review completed without outstanding findings.",
+              "finding_key" => "completed-no-findings"
+            }
+          }
+        )
       )
       allow(command_runner).to receive(:run).and_return(
         A3::Application::ExecutionResult.new(success: true, summary: "verification completed")

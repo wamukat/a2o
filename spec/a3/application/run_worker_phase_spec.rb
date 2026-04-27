@@ -422,7 +422,19 @@ RSpec.describe A3::Application::RunWorkerPhase do
         task_packet: { "task_ref" => review_task.ref }
       )
     ).and_return(
-      A3::Application::ExecutionResult.new(success: true, summary: "review completed")
+      A3::Application::ExecutionResult.new(
+        success: true,
+        summary: "review completed",
+        response_bundle: {
+          "review_disposition" => {
+            "kind" => "completed",
+            "repo_scope" => "repo_alpha",
+            "summary" => "No findings",
+            "description" => "Parent review completed without outstanding findings.",
+            "finding_key" => "completed-no-findings"
+          }
+        }
+      )
     )
 
     result = use_case.call(task_ref: review_task.ref, run_ref: review_run.ref, project_context: project_context)
@@ -431,6 +443,10 @@ RSpec.describe A3::Application::RunWorkerPhase do
     expect(result.run.terminal_outcome).to eq(:completed)
     expect(result.workspace).to eq(review_workspace)
     expect(result.run.phase_records.last.execution_record&.summary).to eq("review completed")
+    expect(result.run.phase_records.last.execution_record&.review_disposition).to include(
+      "kind" => "completed",
+      "finding_key" => "completed-no-findings"
+    )
   end
 
   it "runs a child review rerun through the worker gateway" do
