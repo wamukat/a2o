@@ -85,7 +85,7 @@ runtime image には `/opt/a2o/agents/release-manifest.jsonl` と target 別 arc
 
 現在の policy は次のとおり。
 
-- `a2o agent install --package-source auto` は `--package-dir` または `A2O_AGENT_PACKAGE_DIR` / `A3_AGENT_PACKAGE_DIR` を優先する
+- `a2o agent install --package-source auto` は `--package-dir` または `A2O_AGENT_PACKAGE_DIR` を優先する
 - auto mode が環境変数経由で package directory を見つけ、その validation に失敗した場合のみ runtime image へフォールバックする
 - auto mode でも `--package-dir` を明示した場合は operator の明示選択とみなし、フォールバックしない
 - `--package-source package-dir` は compatible な host package directory を必須とし、フォールバックしない

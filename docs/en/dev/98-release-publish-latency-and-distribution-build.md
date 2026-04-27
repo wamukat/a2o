@@ -85,7 +85,7 @@ Legacy package directories without either file still work for host-launcher-only
 
 The current policy is:
 
-- `a2o agent install --package-source auto` prefers `--package-dir` or `A2O_AGENT_PACKAGE_DIR` / `A3_AGENT_PACKAGE_DIR`
+- `a2o agent install --package-source auto` prefers `--package-dir` or `A2O_AGENT_PACKAGE_DIR`
 - if auto mode discovers a package directory only through the environment and validation fails, install falls back to the runtime image
 - `--package-dir` in auto mode is treated as an explicit operator choice and does not fall back
 - `--package-source package-dir` requires a compatible host package directory and never falls back

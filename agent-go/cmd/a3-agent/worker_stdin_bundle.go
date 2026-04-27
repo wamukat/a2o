@@ -18,11 +18,8 @@ type executorProfile struct {
 	Env     map[string]string
 }
 
-func envCompat(publicName string, legacyName string) string {
-	if value := strings.TrimSpace(os.Getenv(publicName)); value != "" {
-		return value
-	}
-	return strings.TrimSpace(os.Getenv(legacyName))
+func envPublic(publicName string) string {
+	return strings.TrimSpace(os.Getenv(publicName))
 }
 
 func runWorkerStdinBundle(args []string) int {
@@ -30,8 +27,12 @@ func runWorkerStdinBundle(args []string) int {
 		fmt.Fprintf(os.Stderr, "unexpected arguments: %s\n", strings.Join(args, " "))
 		return 2
 	}
-	requestPath := envCompat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH")
-	resultPath := envCompat("A2O_WORKER_RESULT_PATH", "A3_WORKER_RESULT_PATH")
+	if err := validateRemovedA3WorkerEnvironment(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	requestPath := envPublic("A2O_WORKER_REQUEST_PATH")
+	resultPath := envPublic("A2O_WORKER_RESULT_PATH")
 	if requestPath == "" || resultPath == "" {
 		fmt.Fprintln(os.Stderr, "worker request and result paths are required")
 		return 1
@@ -189,7 +190,7 @@ func sanitizeWorkerDiagnosticString(value string) string {
 }
 
 func workerWorkspaceRoot() string {
-	if root := envCompat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT"); root != "" {
+	if root := envPublic("A2O_WORKSPACE_ROOT"); root != "" {
 		return root
 	}
 	wd, err := os.Getwd()
@@ -197,6 +198,23 @@ func workerWorkspaceRoot() string {
 		return "."
 	}
 	return wd
+}
+
+func validateRemovedA3WorkerEnvironment() error {
+	replacements := map[string]string{
+		"A3_WORKER_REQUEST_PATH":         "A2O_WORKER_REQUEST_PATH",
+		"A3_WORKER_RESULT_PATH":          "A2O_WORKER_RESULT_PATH",
+		"A3_WORKSPACE_ROOT":              "A2O_WORKSPACE_ROOT",
+		"A3_WORKER_LAUNCHER_CONFIG_PATH": "A2O_WORKER_LAUNCHER_CONFIG_PATH",
+		"A3_ROOT_DIR":                    "A2O_ROOT_DIR",
+		"A3_AGENT_AI_RAW_LOG_ROOT":       "A2O_AGENT_AI_RAW_LOG_ROOT",
+	}
+	for removed, replacement := range replacements {
+		if strings.TrimSpace(os.Getenv(removed)) != "" {
+			return removedA3AgentInputError("environment variable "+removed, "environment variable "+replacement)
+		}
+	}
+	return nil
 }
 
 func writeWorkerResponseSchema(request map[string]any) (string, func(), error) {
@@ -304,7 +322,7 @@ func workerExecutorCommand(request map[string]any, resultPath string, schemaPath
 }
 
 func workerLauncherConfigPath() string {
-	return envCompat("A2O_WORKER_LAUNCHER_CONFIG_PATH", "A3_WORKER_LAUNCHER_CONFIG_PATH")
+	return envPublic("A2O_WORKER_LAUNCHER_CONFIG_PATH")
 }
 
 func resolveWorkerExecutorProfile(request map[string]any, executor map[string]any) (executorProfile, error) {
@@ -409,9 +427,6 @@ func workerRootDir() string {
 	if root := strings.TrimSpace(os.Getenv("A2O_ROOT_DIR")); root != "" {
 		return root
 	}
-	if root := strings.TrimSpace(os.Getenv("A3_ROOT_DIR")); root != "" {
-		return root
-	}
 	return workerWorkspaceRoot()
 }
 
@@ -464,7 +479,7 @@ func runWorkerExecutor(command []string, commandEnv map[string]string, workspace
 }
 
 func workerAIRawLogWriter() (io.Writer, func()) {
-	root := envCompat("A2O_AGENT_AI_RAW_LOG_ROOT", "A3_AGENT_AI_RAW_LOG_ROOT")
+	root := envPublic("A2O_AGENT_AI_RAW_LOG_ROOT")
 	if root == "" {
 		return nil, func() {}
 	}
@@ -486,7 +501,7 @@ func workerAIRawLogWriter() (io.Writer, func()) {
 
 func workerBundle() string {
 	request := map[string]any{}
-	_ = readJSONFile(envCompat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH"), &request)
+	_ = readJSONFile(envPublic("A2O_WORKER_REQUEST_PATH"), &request)
 	bundle := map[string]any{
 		"type":        "a2o-worker-stdin-bundle",
 		"instruction": workerInstruction(request),
@@ -505,7 +520,7 @@ func workerBundle() string {
 			},
 		},
 		"operating_contract": map[string]any{
-			"workspace_root": envCompat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT"),
+			"workspace_root": envPublic("A2O_WORKSPACE_ROOT"),
 			"slot_paths":     mapValue(request["slot_paths"]),
 			"phase_runtime":  mapValue(request["phase_runtime"]),
 			"rules": []string{
@@ -521,7 +536,7 @@ func workerBundle() string {
 
 func workerRequestValue(key string) any {
 	request := map[string]any{}
-	if err := readJSONFile(envCompat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH"), &request); err != nil {
+	if err := readJSONFile(envPublic("A2O_WORKER_REQUEST_PATH"), &request); err != nil {
 		return nil
 	}
 	return request[key]

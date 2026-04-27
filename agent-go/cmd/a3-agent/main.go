@@ -35,6 +35,10 @@ func run(args []string) int {
 	if len(args) > 1 && args[0] == "worker" && args[1] == "stdin-bundle" {
 		return runWorkerStdinBundle(args[2:])
 	}
+	if err := validateRemovedA3AgentEnvironment(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
 
 	configPath := preScanConfigPath(args)
 	config, err := agent.LoadRuntimeProfileConfig(configPath)
@@ -46,21 +50,21 @@ func run(args []string) int {
 	flags := flag.NewFlagSet("a2o-agent", flag.ContinueOnError)
 	flags.Usage = printAgentUsage
 	configFlag := flags.String("config", configPath, "runtime profile JSON file")
-	agentName := flags.String("agent", defaultStringCompat("A2O_AGENT_NAME", "A3_AGENT_NAME", config.AgentName, "local-agent"), "agent name used when polling the A2O control plane")
-	controlPlaneURL := defaultStringCompat("A2O_CONTROL_PLANE_URL", "A3_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393")
+	agentName := flags.String("agent", defaultString("A2O_AGENT_NAME", config.AgentName, "local-agent"), "agent name used when polling the A2O control plane")
+	controlPlaneURL := defaultString("A2O_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393")
 	flags.StringVar(&controlPlaneURL, "control-plane-url", controlPlaneURL, "A2O control plane base URL")
 	flags.StringVar(&controlPlaneURL, "engine", controlPlaneURL, "alias for --control-plane-url")
-	controlPlaneConnectTimeout := flags.Duration("control-plane-connect-timeout", envDurationCompat("A2O_AGENT_CONTROL_PLANE_CONNECT_TIMEOUT", "A3_AGENT_CONTROL_PLANE_CONNECT_TIMEOUT", durationFromConfig(config.ControlPlaneConnectTimeout)), "TCP connect timeout for the A2O control plane")
-	controlPlaneRequestTimeout := flags.Duration("control-plane-request-timeout", envDurationCompat("A2O_AGENT_CONTROL_PLANE_REQUEST_TIMEOUT", "A3_AGENT_CONTROL_PLANE_REQUEST_TIMEOUT", durationFromConfig(config.ControlPlaneRequestTimeout)), "per-request timeout for the A2O control plane")
-	controlPlaneRetryCount := flags.Int("control-plane-retries", envIntCompat("A2O_AGENT_CONTROL_PLANE_RETRIES", "A3_AGENT_CONTROL_PLANE_RETRIES", config.ControlPlaneRetryCount), "retry count for transient control plane request failures")
-	controlPlaneRetryDelay := flags.Duration("control-plane-retry-delay", envDurationCompat("A2O_AGENT_CONTROL_PLANE_RETRY_DELAY", "A3_AGENT_CONTROL_PLANE_RETRY_DELAY", durationFromConfig(config.ControlPlaneRetryDelay)), "delay between transient control plane retries")
-	agentToken := flags.String("agent-token", envDefaultCompat("A2O_AGENT_TOKEN", "A3_AGENT_TOKEN", ""), "bearer token for the A2O control plane")
-	agentTokenFile := flags.String("agent-token-file", defaultStringCompat("A2O_AGENT_TOKEN_FILE", "A3_AGENT_TOKEN_FILE", config.AgentTokenFile, ""), "file containing bearer token for the A2O control plane")
-	workspaceRoot := flags.String("workspace-root", defaultStringCompat("A2O_AGENT_WORKSPACE_ROOT", "A3_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root for materialized jobs")
+	controlPlaneConnectTimeout := flags.Duration("control-plane-connect-timeout", envDuration("A2O_AGENT_CONTROL_PLANE_CONNECT_TIMEOUT", durationFromConfig(config.ControlPlaneConnectTimeout)), "TCP connect timeout for the A2O control plane")
+	controlPlaneRequestTimeout := flags.Duration("control-plane-request-timeout", envDuration("A2O_AGENT_CONTROL_PLANE_REQUEST_TIMEOUT", durationFromConfig(config.ControlPlaneRequestTimeout)), "per-request timeout for the A2O control plane")
+	controlPlaneRetryCount := flags.Int("control-plane-retries", envInt("A2O_AGENT_CONTROL_PLANE_RETRIES", config.ControlPlaneRetryCount), "retry count for transient control plane request failures")
+	controlPlaneRetryDelay := flags.Duration("control-plane-retry-delay", envDuration("A2O_AGENT_CONTROL_PLANE_RETRY_DELAY", durationFromConfig(config.ControlPlaneRetryDelay)), "delay between transient control plane retries")
+	agentToken := flags.String("agent-token", envDefault("A2O_AGENT_TOKEN", ""), "bearer token for the A2O control plane")
+	agentTokenFile := flags.String("agent-token-file", defaultString("A2O_AGENT_TOKEN_FILE", config.AgentTokenFile, ""), "file containing bearer token for the A2O control plane")
+	workspaceRoot := flags.String("workspace-root", defaultString("A2O_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root for materialized jobs")
 	loop := flags.Bool("loop", false, "run continuously until interrupted")
-	pollInterval := flags.Duration("poll-interval", envDurationCompat("A2O_AGENT_POLL_INTERVAL", "A3_AGENT_POLL_INTERVAL", time.Second), "idle poll interval for loop mode")
-	maxIterations := flags.Int("max-iterations", envIntCompat("A2O_AGENT_MAX_ITERATIONS", "A3_AGENT_MAX_ITERATIONS", 0), "maximum loop iterations; 0 means unlimited")
-	sourceAliases := sourceAliasFlag(mergeSourceAliases(config.SourceAliases, parseSourceAliases(envDefaultCompat("A2O_AGENT_SOURCE_ALIASES", "A3_AGENT_SOURCE_ALIASES", ""))))
+	pollInterval := flags.Duration("poll-interval", envDuration("A2O_AGENT_POLL_INTERVAL", time.Second), "idle poll interval for loop mode")
+	maxIterations := flags.Int("max-iterations", envInt("A2O_AGENT_MAX_ITERATIONS", 0), "maximum loop iterations; 0 means unlimited")
+	sourceAliases := sourceAliasFlag(mergeSourceAliases(config.SourceAliases, parseSourceAliases(envDefault("A2O_AGENT_SOURCE_ALIASES", ""))))
 	flags.Var(&sourceAliases, "source-alias", "source alias mapping for materialized jobs, in name=path form; repeatable")
 	if err := flags.Parse(args); err != nil {
 		return 2
@@ -122,6 +126,10 @@ func printAgentUsage() {
 }
 
 func runDoctor(args []string) int {
+	if err := validateRemovedA3AgentEnvironment(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
 	configPath := preScanConfigPath(args)
 	config, err := agent.LoadRuntimeProfileConfig(configPath)
 	if err != nil {
@@ -131,12 +139,12 @@ func runDoctor(args []string) int {
 	flags := flag.NewFlagSet("a2o-agent doctor", flag.ContinueOnError)
 	flags.Usage = printAgentUsage
 	configFlag := flags.String("config", configPath, "runtime profile JSON file")
-	agentName := flags.String("agent", defaultStringCompat("A2O_AGENT_NAME", "A3_AGENT_NAME", config.AgentName, "local-agent"), "agent name")
-	controlPlaneURL := defaultStringCompat("A2O_CONTROL_PLANE_URL", "A3_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393")
+	agentName := flags.String("agent", defaultString("A2O_AGENT_NAME", config.AgentName, "local-agent"), "agent name")
+	controlPlaneURL := defaultString("A2O_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393")
 	flags.StringVar(&controlPlaneURL, "control-plane-url", controlPlaneURL, "A2O control plane base URL")
 	flags.StringVar(&controlPlaneURL, "engine", controlPlaneURL, "alias for --control-plane-url")
-	workspaceRoot := flags.String("workspace-root", defaultStringCompat("A2O_AGENT_WORKSPACE_ROOT", "A3_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root for materialized jobs")
-	sourceAliases := sourceAliasFlag(mergeSourceAliases(config.SourceAliases, parseSourceAliases(envDefaultCompat("A2O_AGENT_SOURCE_ALIASES", "A3_AGENT_SOURCE_ALIASES", ""))))
+	workspaceRoot := flags.String("workspace-root", defaultString("A2O_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root for materialized jobs")
+	sourceAliases := sourceAliasFlag(mergeSourceAliases(config.SourceAliases, parseSourceAliases(envDefault("A2O_AGENT_SOURCE_ALIASES", ""))))
 	flags.Var(&sourceAliases, "source-path", "source alias mapping for materialized jobs, in name=path form; repeatable")
 	flags.Var(&sourceAliases, "source-alias", "compatibility alias for --source-path")
 	requiredBins := stringSliceFlag(config.RequiredBins)
@@ -175,6 +183,10 @@ func durationFromConfig(raw string) time.Duration {
 }
 
 func runCleanupWorkspace(args []string) int {
+	if err := validateRemovedA3AgentEnvironment(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
 	configPath := preScanConfigPath(args)
 	config, err := agent.LoadRuntimeProfileConfig(configPath)
 	if err != nil {
@@ -184,7 +196,7 @@ func runCleanupWorkspace(args []string) int {
 	flags := flag.NewFlagSet("a2o-agent cleanup-workspace", flag.ContinueOnError)
 	flags.Usage = printAgentUsage
 	configFlag := flags.String("config", configPath, "runtime profile JSON file")
-	workspaceRoot := flags.String("workspace-root", defaultStringCompat("A2O_AGENT_WORKSPACE_ROOT", "A3_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root")
+	workspaceRoot := flags.String("workspace-root", defaultString("A2O_AGENT_WORKSPACE_ROOT", config.WorkspaceRoot, ""), "agent-owned workspace root")
 	descriptorPath := flags.String("descriptor", "", "workspace descriptor JSON file")
 	dryRun := flags.Bool("dry-run", false, "report cleanup candidates without deleting")
 	if err := flags.Parse(args); err != nil {
@@ -389,7 +401,7 @@ func preScanConfigPath(args []string) string {
 			}
 		}
 	}
-	return envDefaultCompat("A2O_AGENT_CONFIG", "A3_AGENT_CONFIG", "")
+	return envDefault("A2O_AGENT_CONFIG", "")
 }
 
 func mergeSourceAliases(base map[string]string, overlays ...map[string]string) map[string]string {
@@ -415,13 +427,6 @@ func defaultString(envKey string, configValue string, fallback string) string {
 	return fallback
 }
 
-func defaultStringCompat(publicEnvKey string, legacyEnvKey string, configValue string, fallback string) string {
-	if value := os.Getenv(publicEnvKey); value != "" {
-		return value
-	}
-	return defaultString(legacyEnvKey, configValue, fallback)
-}
-
 func defaultIfEmpty(value string, fallback string) string {
 	if value == "" {
 		return fallback
@@ -436,13 +441,6 @@ func envDefault(key, fallback string) string {
 	return fallback
 }
 
-func envDefaultCompat(publicKey string, legacyKey string, fallback string) string {
-	if value := os.Getenv(publicKey); value != "" {
-		return value
-	}
-	return envDefault(legacyKey, fallback)
-}
-
 func envDuration(key string, fallback time.Duration) time.Duration {
 	value := os.Getenv(key)
 	if value == "" {
@@ -453,13 +451,6 @@ func envDuration(key string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return parsed
-}
-
-func envDurationCompat(publicKey string, legacyKey string, fallback time.Duration) time.Duration {
-	if os.Getenv(publicKey) != "" {
-		return envDuration(publicKey, fallback)
-	}
-	return envDuration(legacyKey, fallback)
 }
 
 func envInt(key string, fallback int) int {
@@ -474,9 +465,30 @@ func envInt(key string, fallback int) int {
 	return parsed
 }
 
-func envIntCompat(publicKey string, legacyKey string, fallback int) int {
-	if os.Getenv(publicKey) != "" {
-		return envInt(publicKey, fallback)
+func removedA3AgentInputError(removed string, replacement string) error {
+	return fmt.Errorf("removed A3 compatibility input: %s; migration_required=true replacement=%s", removed, replacement)
+}
+
+func validateRemovedA3AgentEnvironment() error {
+	replacements := map[string]string{
+		"A3_AGENT_CONFIG":                        "A2O_AGENT_CONFIG",
+		"A3_AGENT_NAME":                          "A2O_AGENT_NAME",
+		"A3_CONTROL_PLANE_URL":                   "A2O_CONTROL_PLANE_URL",
+		"A3_AGENT_CONTROL_PLANE_CONNECT_TIMEOUT": "A2O_AGENT_CONTROL_PLANE_CONNECT_TIMEOUT",
+		"A3_AGENT_CONTROL_PLANE_REQUEST_TIMEOUT": "A2O_AGENT_CONTROL_PLANE_REQUEST_TIMEOUT",
+		"A3_AGENT_CONTROL_PLANE_RETRIES":         "A2O_AGENT_CONTROL_PLANE_RETRIES",
+		"A3_AGENT_CONTROL_PLANE_RETRY_DELAY":     "A2O_AGENT_CONTROL_PLANE_RETRY_DELAY",
+		"A3_AGENT_TOKEN":                         "A2O_AGENT_TOKEN",
+		"A3_AGENT_TOKEN_FILE":                    "A2O_AGENT_TOKEN_FILE",
+		"A3_AGENT_WORKSPACE_ROOT":                "A2O_AGENT_WORKSPACE_ROOT",
+		"A3_AGENT_POLL_INTERVAL":                 "A2O_AGENT_POLL_INTERVAL",
+		"A3_AGENT_MAX_ITERATIONS":                "A2O_AGENT_MAX_ITERATIONS",
+		"A3_AGENT_SOURCE_ALIASES":                "A2O_AGENT_SOURCE_ALIASES",
 	}
-	return envInt(legacyKey, fallback)
+	for removed, replacement := range replacements {
+		if strings.TrimSpace(os.Getenv(removed)) != "" {
+			return removedA3AgentInputError("environment variable "+removed, "environment variable "+replacement)
+		}
+	}
+	return nil
 }

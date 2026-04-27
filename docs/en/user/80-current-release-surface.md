@@ -40,6 +40,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - `a2o runtime start` and `a2o runtime stop` are no longer compatibility aliases. Use `a2o runtime resume` to resume the resident scheduler and `a2o runtime pause` to pause it after the current work. If the removed commands are invoked, A2O exits non-zero and prints `migration_required=true` with the replacement command.
 - SoloBoard-era Kanbalone compatibility names are removed. Use `KANBAN_BACKEND=kanbalone`, `KANBALONE_BASE_URL`, `KANBALONE_API_TOKEN`, `--kanbalone-port`, `A2O_BUNDLE_KANBALONE_PORT`, and `A2O_KANBALONE_INTERNAL_URL`. Removed SoloBoard inputs fail with `migration_required=true` and the replacement name.
 - Bundled Kanbalone data names changed from `<compose-project>_soloboard-data` / `soloboard.sqlite` to `<compose-project>_kanbalone-data` / `kanbalone.sqlite`. If the old volume exists and the new one does not, `a2o kanban up` fails with `migration_required=true` instead of silently creating an empty board. Copy or rename the existing Kanban data before starting the bundled service.
+- Public `A3_*` environment fallbacks for runtime, agent, and worker configuration are removed where `A2O_*` replacements exist. Use `A2O_RUNTIME_IMAGE`, `A2O_COMPOSE_PROJECT`, `A2O_COMPOSE_FILE`, `A2O_RUNTIME_SERVICE`, `A2O_BUNDLE_AGENT_PORT`, `A2O_BUNDLE_STORAGE_DIR`, `A2O_AGENT_PACKAGE_DIR`, `A2O_AGENT_*`, `A2O_WORKER_*`, `A2O_WORKSPACE_ROOT`, and `A2O_ROOT_DIR`. Removed `A3_*` inputs fail with `migration_required=true` and the replacement name.
 
 ## Validation Scope
 

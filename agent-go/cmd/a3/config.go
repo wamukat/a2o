@@ -60,9 +60,6 @@ func explicitRuntimeImageReference() string {
 	if value := strings.TrimSpace(os.Getenv("A2O_RUNTIME_IMAGE")); value != "" {
 		return value
 	}
-	if value := strings.TrimSpace(os.Getenv("A3_RUNTIME_IMAGE")); value != "" {
-		return value
-	}
 	return ""
 }
 
@@ -205,21 +202,21 @@ func defaultComposeProjectName(packagePath string) string {
 
 func applyAgentInstallOverrides(config runtimeInstanceConfig, composeProject string, composeFile string, runtimeService string) runtimeInstanceConfig {
 	if strings.TrimSpace(config.ComposeProject) == "" {
-		config.ComposeProject = envDefaultCompat("A2O_COMPOSE_PROJECT", "A3_COMPOSE_PROJECT", "a2o-runtime")
+		config.ComposeProject = envDefault("A2O_COMPOSE_PROJECT", "a2o-runtime")
 	}
 	if strings.TrimSpace(config.ComposeFile) == "" {
-		config.ComposeFile = envDefaultCompat("A2O_COMPOSE_FILE", "A3_COMPOSE_FILE", defaultComposeFile())
+		config.ComposeFile = envDefault("A2O_COMPOSE_FILE", defaultComposeFile())
 	}
 	if strings.TrimSpace(config.RuntimeService) == "" {
-		config.RuntimeService = envDefaultCompat("A2O_RUNTIME_SERVICE", "A3_RUNTIME_SERVICE", "a2o-runtime")
+		config.RuntimeService = envDefault("A2O_RUNTIME_SERVICE", "a2o-runtime")
 	}
-	if envComposeProject := envDefaultCompat("A2O_COMPOSE_PROJECT", "A3_COMPOSE_PROJECT", ""); envComposeProject != "" {
+	if envComposeProject := envDefault("A2O_COMPOSE_PROJECT", ""); envComposeProject != "" {
 		config.ComposeProject = envComposeProject
 	}
-	if envComposeFile := envDefaultCompat("A2O_COMPOSE_FILE", "A3_COMPOSE_FILE", ""); envComposeFile != "" {
+	if envComposeFile := envDefault("A2O_COMPOSE_FILE", ""); envComposeFile != "" {
 		config.ComposeFile = envComposeFile
 	}
-	if envRuntimeService := envDefaultCompat("A2O_RUNTIME_SERVICE", "A3_RUNTIME_SERVICE", ""); envRuntimeService != "" {
+	if envRuntimeService := envDefault("A2O_RUNTIME_SERVICE", ""); envRuntimeService != "" {
 		config.RuntimeService = envRuntimeService
 	}
 	if strings.TrimSpace(composeProject) != "" {
@@ -250,6 +247,9 @@ func withComposeEnv(config runtimeInstanceConfig, fn func() error) error {
 	if err := validateRemovedSoloBoardEnvironment(); err != nil {
 		return err
 	}
+	if err := validateRemovedA3Environment(); err != nil {
+		return err
+	}
 	return withEnv(composeEnv(config), fn)
 }
 
@@ -260,7 +260,7 @@ func composeEnv(config runtimeInstanceConfig) map[string]string {
 	} else if kanbanPort := strings.TrimSpace(config.KanbalonePort); kanbanPort != "" {
 		overrides["A2O_BUNDLE_KANBALONE_PORT"] = kanbanPort
 	}
-	if agentPort := envDefaultCompat("A2O_BUNDLE_AGENT_PORT", "A3_BUNDLE_AGENT_PORT", config.AgentPort); strings.TrimSpace(agentPort) != "" {
+	if agentPort := envDefault("A2O_BUNDLE_AGENT_PORT", config.AgentPort); strings.TrimSpace(agentPort) != "" {
 		overrides["A2O_BUNDLE_AGENT_PORT"] = agentPort
 		overrides["A3_BUNDLE_AGENT_PORT"] = agentPort
 	}
@@ -301,13 +301,122 @@ func validateRemovedSoloBoardEnvironment() error {
 	return nil
 }
 
+func removedA3InputError(removed string, replacement string) error {
+	return fmt.Errorf("removed A3 compatibility input: %s; migration_required=true replacement=%s", removed, replacement)
+}
+
+func validateRemovedA3Environment() error {
+	for _, removed := range removedA3EnvironmentNames() {
+		replacement := "A2O_" + strings.TrimPrefix(removed, "A3_")
+		if strings.TrimSpace(os.Getenv(removed)) != "" && strings.TrimSpace(os.Getenv(replacement)) == "" {
+			return removedA3InputError("environment variable "+removed, "environment variable "+replacement)
+		}
+	}
+	return nil
+}
+
+func removedA3EnvironmentNames() []string {
+	return []string{
+		"A3_AGENT_AI_RAW_LOG_ROOT",
+		"A3_AGENT_LIVE_LOG_ROOT",
+		"A3_BUNDLE_AGENT_PORT",
+		"A3_BUNDLE_COMPOSE_FILE",
+		"A3_BUNDLE_PROJECT",
+		"A3_BUNDLE_STORAGE_DIR",
+		"A3_COMPOSE_FILE",
+		"A3_COMPOSE_PROJECT",
+		"A3_HOST_AGENT_BIN",
+		"A3_HOST_WORKSPACE_ROOT",
+		"A3_RUNTIME_IMAGE",
+		"A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS",
+		"A3_RUNTIME_RUN_ONCE_AGENT_CONTROL_PLANE_CONNECT_TIMEOUT",
+		"A3_RUNTIME_RUN_ONCE_AGENT_CONTROL_PLANE_REQUEST_TIMEOUT",
+		"A3_RUNTIME_RUN_ONCE_AGENT_CONTROL_PLANE_RETRIES",
+		"A3_RUNTIME_RUN_ONCE_AGENT_CONTROL_PLANE_RETRY_DELAY",
+		"A3_RUNTIME_RUN_ONCE_AGENT_INTERNAL_PORT",
+		"A3_RUNTIME_RUN_ONCE_AGENT_JOB_TIMEOUT_SECONDS",
+		"A3_RUNTIME_RUN_ONCE_AGENT_LOCAL_MATERIALIZER_ARGS",
+		"A3_RUNTIME_RUN_ONCE_AGENT_POLL_INTERVAL",
+		"A3_RUNTIME_RUN_ONCE_AGENT_REQUIRED_BINS",
+		"A3_RUNTIME_RUN_ONCE_AGENT_SOURCE",
+		"A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_ALIASES",
+		"A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS",
+		"A3_RUNTIME_RUN_ONCE_AGENT_TARGET",
+		"A3_RUNTIME_RUN_ONCE_AGENT_WORKSPACE_ROOT",
+		"A3_RUNTIME_RUN_ONCE_ARCHIVE_STATE",
+		"A3_RUNTIME_RUN_ONCE_EXIT_FILE",
+		"A3_RUNTIME_RUN_ONCE_HOST_AGENT_LOG",
+		"A3_RUNTIME_RUN_ONCE_HOST_ROOT",
+		"A3_RUNTIME_RUN_ONCE_HOST_ROOT_DIR",
+		"A3_RUNTIME_RUN_ONCE_KANBAN_PROJECT",
+		"A3_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS",
+		"A3_RUNTIME_RUN_ONCE_KANBAN_STATUS",
+		"A3_RUNTIME_RUN_ONCE_LIVE_REF",
+		"A3_RUNTIME_RUN_ONCE_LOCAL_SOURCE_ALIASES",
+		"A3_RUNTIME_RUN_ONCE_LOG",
+		"A3_RUNTIME_RUN_ONCE_MAVEN_WORKSPACE_BOOTSTRAP_MODE",
+		"A3_RUNTIME_RUN_ONCE_MAX_STEPS",
+		"A3_RUNTIME_RUN_ONCE_PID_FILE",
+		"A3_RUNTIME_RUN_ONCE_PRESET_DIR",
+		"A3_RUNTIME_RUN_ONCE_PROJECT_CONFIG",
+		"A3_RUNTIME_RUN_ONCE_REFERENCE_PACKAGE",
+		"A3_RUNTIME_RUN_ONCE_REPO_SOURCES",
+		"A3_RUNTIME_RUN_ONCE_SERVER_LOG",
+		"A3_RUNTIME_RUN_ONCE_SERVER_PID_FILE",
+		"A3_RUNTIME_RUN_ONCE_WORKER",
+		"A3_RUNTIME_RUN_ONCE_WORKER_ARGS",
+		"A3_RUNTIME_RUN_ONCE_WORKER_COMMAND",
+		"A3_RUNTIME_SCHEDULER_AGENT_ATTEMPTS",
+		"A3_RUNTIME_SCHEDULER_AGENT_CONTROL_PLANE_CONNECT_TIMEOUT",
+		"A3_RUNTIME_SCHEDULER_AGENT_CONTROL_PLANE_REQUEST_TIMEOUT",
+		"A3_RUNTIME_SCHEDULER_AGENT_CONTROL_PLANE_RETRIES",
+		"A3_RUNTIME_SCHEDULER_AGENT_CONTROL_PLANE_RETRY_DELAY",
+		"A3_RUNTIME_SCHEDULER_AGENT_INTERNAL_PORT",
+		"A3_RUNTIME_SCHEDULER_AGENT_JOB_TIMEOUT_SECONDS",
+		"A3_RUNTIME_SCHEDULER_AGENT_LOCAL_MATERIALIZER_ARGS",
+		"A3_RUNTIME_SCHEDULER_AGENT_POLL_INTERVAL",
+		"A3_RUNTIME_SCHEDULER_AGENT_REQUIRED_BINS",
+		"A3_RUNTIME_SCHEDULER_AGENT_SOURCE",
+		"A3_RUNTIME_SCHEDULER_AGENT_SOURCE_ALIASES",
+		"A3_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS",
+		"A3_RUNTIME_SCHEDULER_AGENT_TARGET",
+		"A3_RUNTIME_SCHEDULER_AGENT_WORKSPACE_ROOT",
+		"A3_RUNTIME_SCHEDULER_ARCHIVE_STATE",
+		"A3_RUNTIME_SCHEDULER_EXIT_FILE",
+		"A3_RUNTIME_SCHEDULER_HOST_AGENT_LOG",
+		"A3_RUNTIME_SCHEDULER_HOST_ROOT",
+		"A3_RUNTIME_SCHEDULER_HOST_ROOT_DIR",
+		"A3_RUNTIME_SCHEDULER_KANBAN_PROJECT",
+		"A3_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS",
+		"A3_RUNTIME_SCHEDULER_KANBAN_STATUS",
+		"A3_RUNTIME_SCHEDULER_LIVE_REF",
+		"A3_RUNTIME_SCHEDULER_LOCAL_SOURCE_ALIASES",
+		"A3_RUNTIME_SCHEDULER_LOG",
+		"A3_RUNTIME_SCHEDULER_MAVEN_WORKSPACE_BOOTSTRAP_MODE",
+		"A3_RUNTIME_SCHEDULER_MAX_STEPS",
+		"A3_RUNTIME_SCHEDULER_PID_FILE",
+		"A3_RUNTIME_SCHEDULER_PRESET_DIR",
+		"A3_RUNTIME_SCHEDULER_PROJECT_CONFIG",
+		"A3_RUNTIME_SCHEDULER_REFERENCE_PACKAGE",
+		"A3_RUNTIME_SCHEDULER_REPO_SOURCES",
+		"A3_RUNTIME_SCHEDULER_SERVER_LOG",
+		"A3_RUNTIME_SCHEDULER_SERVER_PID_FILE",
+		"A3_RUNTIME_SCHEDULER_WORKER",
+		"A3_RUNTIME_SCHEDULER_WORKER_ARGS",
+		"A3_RUNTIME_SCHEDULER_WORKER_COMMAND",
+		"A3_RUNTIME_SERVICE",
+		"A3_WORKER_LAUNCHER_CONFIG_PATH",
+		"A3_WORKSPACE_ROOT",
+	}
+}
+
 func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttempts string) map[string]string {
 	overrides := composeEnv(config)
 	overrides["A2O_BUNDLE_COMPOSE_FILE"] = config.ComposeFile
 	overrides["A2O_BUNDLE_PROJECT"] = config.ComposeProject
 	overrides["A3_BUNDLE_COMPOSE_FILE"] = config.ComposeFile
 	overrides["A3_BUNDLE_PROJECT"] = config.ComposeProject
-	if storageDir := envDefaultCompat("A2O_BUNDLE_STORAGE_DIR", "A3_BUNDLE_STORAGE_DIR", config.StorageDir); strings.TrimSpace(storageDir) != "" {
+	if storageDir := envDefault("A2O_BUNDLE_STORAGE_DIR", config.StorageDir); strings.TrimSpace(storageDir) != "" {
 		overrides["A2O_BUNDLE_STORAGE_DIR"] = storageDir
 		overrides["A3_BUNDLE_STORAGE_DIR"] = storageDir
 	}

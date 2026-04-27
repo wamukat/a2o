@@ -514,13 +514,30 @@ func TestApplyAgentInstallOverridesMapsLegacyRuntimeServiceToA2O(t *testing.T) {
 		t.Fatalf("RuntimeService=%q", config.RuntimeService)
 	}
 
-	t.Setenv("A3_RUNTIME_SERVICE", "a3-runtime")
 	config = applyAgentInstallOverrides(runtimeInstanceConfig{
 		ComposeProject: "custom",
 		ComposeFile:    "compose.yml",
 	}, "", "", "a3-runtime")
 	if config.RuntimeService != "a2o-runtime" {
 		t.Fatalf("legacy override RuntimeService=%q", config.RuntimeService)
+	}
+}
+
+func TestRemovedA3RuntimeEnvironmentRequiresMigration(t *testing.T) {
+	t.Setenv("A3_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
+
+	err := validateRemovedA3Environment()
+	if err == nil || !strings.Contains(err.Error(), "migration_required=true replacement=environment variable A2O_RUNTIME_IMAGE") {
+		t.Fatalf("expected migration error, got %v", err)
+	}
+}
+
+func TestRemovedA3AgentPackageDirRequiresMigration(t *testing.T) {
+	t.Setenv("A3_AGENT_PACKAGE_DIR", "/tmp/a3-agent-package")
+
+	_, err := resolveAgentPackageInstallSource("auto", "")
+	if err == nil || !strings.Contains(err.Error(), "migration_required=true replacement=environment variable A2O_AGENT_PACKAGE_DIR") {
+		t.Fatalf("expected migration error, got %v", err)
 	}
 }
 
@@ -5939,7 +5956,7 @@ func TestRuntimeResumeRestoresPausedStateWhenBackgroundLaunchFails(t *testing.T)
 }
 
 func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
-	t.Setenv("A3_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
+	t.Setenv("A2O_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -6096,7 +6113,7 @@ func TestRuntimeStatusReportsStaleForUnrelatedReusedPID(t *testing.T) {
 }
 
 func TestRuntimeImageDigestPrintsPinnedRuntimeDigest(t *testing.T) {
-	t.Setenv("A3_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
+	t.Setenv("A2O_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -6805,7 +6822,7 @@ func TestRuntimeRunOnceAllowsEnvToOverrideStaleInstanceRuntimeValues(t *testing.
 }
 
 func TestRuntimeRunOnceRepairsStaleRunsOnStartupAndAttemptBudgetExhaustion(t *testing.T) {
-	t.Setenv("A3_RUNTIME_RUN_ONCE_ARCHIVE_STATE", "1")
+	t.Setenv("A2O_RUNTIME_RUN_ONCE_ARCHIVE_STATE", "1")
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -6942,7 +6959,7 @@ func TestRuntimeContainerProcessBuildsQuotedBackgroundScript(t *testing.T) {
 }
 
 func TestArchiveRuntimeStateUsesStructuredDockerCommands(t *testing.T) {
-	t.Setenv("A3_RUNTIME_RUN_ONCE_ARCHIVE_STATE", "1")
+	t.Setenv("A2O_RUNTIME_RUN_ONCE_ARCHIVE_STATE", "1")
 	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
 	plan := runtimeRunOncePlan{
 		ComposePrefix: []string{"compose", "-p", "a3-test", "-f", "compose.yml"},

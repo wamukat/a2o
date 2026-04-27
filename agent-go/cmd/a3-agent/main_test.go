@@ -25,27 +25,31 @@ func TestPreScanConfigPath(t *testing.T) {
 	}
 }
 
-func TestPublicAgentEnvironmentAliasesTakePrecedence(t *testing.T) {
+func TestPublicAgentEnvironmentConfig(t *testing.T) {
 	t.Setenv("A2O_AGENT_CONFIG", "/tmp/public-profile.json")
-	t.Setenv("A3_AGENT_CONFIG", "/tmp/legacy-profile.json")
 	t.Setenv("A2O_AGENT_NAME", "public-agent")
-	t.Setenv("A3_AGENT_NAME", "legacy-agent")
 	t.Setenv("A2O_AGENT_POLL_INTERVAL", "3s")
-	t.Setenv("A3_AGENT_POLL_INTERVAL", "9s")
 	t.Setenv("A2O_AGENT_MAX_ITERATIONS", "4")
-	t.Setenv("A3_AGENT_MAX_ITERATIONS", "8")
 
 	if got := preScanConfigPath(nil); got != "/tmp/public-profile.json" {
 		t.Fatalf("preScanConfigPath env = %q", got)
 	}
-	if got := defaultStringCompat("A2O_AGENT_NAME", "A3_AGENT_NAME", "", "local-agent"); got != "public-agent" {
-		t.Fatalf("agent name alias = %q", got)
+	if got := defaultString("A2O_AGENT_NAME", "", "local-agent"); got != "public-agent" {
+		t.Fatalf("agent name env = %q", got)
 	}
-	if got := envDurationCompat("A2O_AGENT_POLL_INTERVAL", "A3_AGENT_POLL_INTERVAL", 0); got.String() != "3s" {
-		t.Fatalf("poll interval alias = %s", got)
+	if got := envDuration("A2O_AGENT_POLL_INTERVAL", 0); got.String() != "3s" {
+		t.Fatalf("poll interval env = %s", got)
 	}
-	if got := envIntCompat("A2O_AGENT_MAX_ITERATIONS", "A3_AGENT_MAX_ITERATIONS", 0); got != 4 {
-		t.Fatalf("max iterations alias = %d", got)
+	if got := envInt("A2O_AGENT_MAX_ITERATIONS", 0); got != 4 {
+		t.Fatalf("max iterations env = %d", got)
+	}
+}
+
+func TestRemovedA3AgentEnvironmentRequiresMigration(t *testing.T) {
+	t.Setenv("A3_AGENT_CONFIG", "/tmp/legacy-profile.json")
+	err := validateRemovedA3AgentEnvironment()
+	if err == nil || !strings.Contains(err.Error(), "migration_required=true replacement=environment variable A2O_AGENT_CONFIG") {
+		t.Fatalf("expected migration error, got %v", err)
 	}
 }
 
@@ -402,14 +406,11 @@ JSON
 	}
 }
 
-func TestWorkerEnvCompatFallsBackToLegacyNames(t *testing.T) {
+func TestRemovedA3WorkerEnvironmentRequiresMigration(t *testing.T) {
 	t.Setenv("A3_WORKER_REQUEST_PATH", "/tmp/legacy-request.json")
-	if got := envCompat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH"); got != "/tmp/legacy-request.json" {
-		t.Fatalf("legacy fallback = %q", got)
-	}
-	t.Setenv("A2O_WORKER_REQUEST_PATH", "/tmp/public-request.json")
-	if got := envCompat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH"); got != "/tmp/public-request.json" {
-		t.Fatalf("public env should win, got %q", got)
+	err := validateRemovedA3WorkerEnvironment()
+	if err == nil || !strings.Contains(err.Error(), "migration_required=true replacement=environment variable A2O_WORKER_REQUEST_PATH") {
+		t.Fatalf("expected migration error, got %v", err)
 	}
 }
 

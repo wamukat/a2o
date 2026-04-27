@@ -61,10 +61,7 @@ func envDefault(name string, fallback string) string {
 }
 
 func envDefaultCompat(publicName string, legacyName string, fallback string) string {
-	if value := strings.TrimSpace(os.Getenv(publicName)); value != "" {
-		return value
-	}
-	return envDefault(legacyName, fallback)
+	return envDefault(publicName, fallback)
 }
 
 func envDefaultValue(value string, fallback string) string {

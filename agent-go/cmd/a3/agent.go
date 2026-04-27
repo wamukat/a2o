@@ -178,7 +178,10 @@ func resolveAgentPackageInstallSource(source, packageDir string) (agentInstallRe
 	resolvedDir := strings.TrimSpace(packageDir)
 	explicitDir := resolvedDir != ""
 	if !explicitDir {
-		resolvedDir = strings.TrimSpace(firstNonEmptyString(os.Getenv("A2O_AGENT_PACKAGE_DIR"), os.Getenv("A3_AGENT_PACKAGE_DIR")))
+		if strings.TrimSpace(os.Getenv("A3_AGENT_PACKAGE_DIR")) != "" {
+			return agentInstallResolution{}, removedA3InputError("environment variable A3_AGENT_PACKAGE_DIR", "environment variable A2O_AGENT_PACKAGE_DIR")
+		}
+		resolvedDir = strings.TrimSpace(os.Getenv("A2O_AGENT_PACKAGE_DIR"))
 	}
 
 	switch resolvedSource {
