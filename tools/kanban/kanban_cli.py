@@ -371,7 +371,7 @@ def normalize_task_snapshot(
     description_source = "detail" if str(detailed_task.get("description") or detailed_task.get("bodyMarkdown") or "") else ("list" if description else "empty")
     tags = detailed_task.get("tags") if isinstance(detailed_task, dict) else None
     if not isinstance(tags, list):
-        raise RuntimeError("Unexpected SoloBoard task tags response.")
+        raise RuntimeError("Unexpected Kanbalone task tags response.")
     label_titles = tuple(
         sorted(
             normalize_label(tag)["title"]
@@ -468,14 +468,14 @@ def parse_iso_datetime_to_epoch(value: str | None) -> int:
         return 0
 
 
-def soloboard_find_lane_name(board_shell: dict[str, Any], lane_id: int) -> str | None:
+def kanbalone_find_lane_name(board_shell: dict[str, Any], lane_id: int) -> str | None:
     for lane in board_shell.get("lanes") or []:
         if int(lane.get("id") or 0) == lane_id:
             return str(lane.get("name") or "")
     return None
 
 
-def soloboard_find_lane_id(board_shell: dict[str, Any], lane_name: str) -> int:
+def kanbalone_find_lane_id(board_shell: dict[str, Any], lane_name: str) -> int:
     normalized = lane_name.strip().lower()
     for lane in board_shell.get("lanes") or []:
         if str(lane.get("name") or "").strip().lower() == normalized:
@@ -484,27 +484,27 @@ def soloboard_find_lane_id(board_shell: dict[str, Any], lane_name: str) -> int:
     raise RuntimeError(f"Lane not found: {lane_name}. Available: {available}")
 
 
-def soloboard_resolved(ticket: dict[str, Any]) -> bool:
+def kanbalone_resolved(ticket: dict[str, Any]) -> bool:
     if "isResolved" not in ticket:
-        raise RuntimeError("SoloBoard ticket response is missing isResolved.")
+        raise RuntimeError("Kanbalone ticket response is missing isResolved.")
     return bool(ticket["isResolved"])
 
 
-def soloboard_archived(ticket: dict[str, Any]) -> bool:
+def kanbalone_archived(ticket: dict[str, Any]) -> bool:
     return bool(ticket.get("isArchived", ticket.get("is_archived", False)))
 
 
-def soloboard_normalize_ticket(ticket: dict[str, Any], *, board_title: str, board_shell: dict[str, Any] | None = None) -> dict[str, Any]:
+def kanbalone_normalize_ticket(ticket: dict[str, Any], *, board_title: str, board_shell: dict[str, Any] | None = None) -> dict[str, Any]:
     lane_id = int(ticket.get("laneId") or 0)
-    status = soloboard_find_lane_name(board_shell or {"lanes": []}, lane_id) if board_shell else None
+    status = kanbalone_find_lane_name(board_shell or {"lanes": []}, lane_id) if board_shell else None
     return {
         "id": int(ticket["id"]),
         "project_id": int(ticket.get("boardId") or 0),
         "column_id": lane_id,
         "bucket_id": lane_id,
         "priority": int(ticket.get("priority") or 0),
-        "done": soloboard_resolved(ticket),
-        "is_archived": soloboard_archived(ticket),
+        "done": kanbalone_resolved(ticket),
+        "is_archived": kanbalone_archived(ticket),
         "status": status,
         "title": ticket.get("title") or "",
         "description": ticket.get("bodyMarkdown") or "",
@@ -641,7 +641,7 @@ def get_task(base_url: str, token: str, task_id: int) -> dict[str, Any]:
         raise RuntimeError(f"Task not found: {task_id}")
     board_title = resolve_project_title(base_url, token, project_id=int(task.get("boardId") or 0))
     board_shell = rest_request(base_url, token, "GET", f"/api/boards/{int(task.get('boardId') or 0)}")
-    normalized = soloboard_normalize_ticket(task, board_title=board_title, board_shell=board_shell)
+    normalized = kanbalone_normalize_ticket(task, board_title=board_title, board_shell=board_shell)
     normalized["bodyMarkdown"] = task.get("bodyMarkdown") or ""
     normalized["tags"] = task.get("tags") or []
     normalized["comments"] = task.get("comments") or []
@@ -787,7 +787,7 @@ def enrich_task(task: dict[str, Any]) -> dict[str, Any]:
             "project_id": int(task.get("boardId") or 0),
             "column_id": int(task.get("laneId") or 0),
             "priority": int(task.get("priority") or 0),
-            "done": soloboard_resolved(task),
+            "done": kanbalone_resolved(task),
             "reference": task.get("ref") or "",
             "title": task.get("title") or "",
             "description": task.get("bodyMarkdown") or "",
@@ -834,7 +834,7 @@ def iterate_kanban_tasks(
         raise RuntimeError("Unexpected tasks response.")
     enriched = []
     for task in tasks:
-        item = soloboard_normalize_ticket(task, board_title=board_title, board_shell=board_shell)
+        item = kanbalone_normalize_ticket(task, board_title=board_title, board_shell=board_shell)
         if not include_closed and item.get("is_archived"):
             continue
         enriched.append(item)
@@ -870,7 +870,7 @@ def get_task_with_status(base_url: str, token: str, task_id: int) -> dict[str, A
     board_shell = rest_request(base_url, token, "GET", f"/api/boards/{board_id}")
     board_title = str(board_shell.get("board", {}).get("name") or board_id)
     normalized = normalize_task_detail(
-        soloboard_normalize_ticket(task, board_title=board_title, board_shell=board_shell),
+        kanbalone_normalize_ticket(task, board_title=board_title, board_shell=board_shell),
         project_title=board_title,
     )
     normalized["related_tasks"] = relation_tasks_payload(base_url, token, task_id=task_id)
@@ -931,7 +931,7 @@ def update_task(base_url: str, token: str, task_id: int, changes: dict[str, Any]
         updated = {**updated, "bodyMarkdown": changes["description"]}
     board_title = resolve_project_title(base_url, token, project_id=int(updated.get("boardId") or 0))
     board_shell = rest_request(base_url, token, "GET", f"/api/boards/{int(updated.get('boardId') or 0)}")
-    return soloboard_normalize_ticket(updated, board_title=board_title, board_shell=board_shell)
+    return kanbalone_normalize_ticket(updated, board_title=board_title, board_shell=board_shell)
 
 
 def create_relation(
@@ -953,7 +953,7 @@ def create_relation(
         blocker_ids = sorted({int(item) for item in (task.get("blockerIds") or [])} | {other_task_id})
         updated = rest_request(base_url, token, "PATCH", f"/api/tickets/{task_id}", payload={"blockerIds": blocker_ids})
         return {"id": int(updated.get("id") or task_id)}
-    raise RuntimeError(f"Unsupported relation kind for SoloBoard: {relation_kind}")
+    raise RuntimeError(f"Unsupported relation kind for Kanbalone: {relation_kind}")
 
 
 def delete_relation(
@@ -967,19 +967,19 @@ def delete_relation(
     if relation_kind == "subtask":
         updated = rest_request(base_url, token, "PATCH", f"/api/tickets/{other_task_id}", payload={"parentTicketId": None})
         if int(updated.get("parentTicketId") or 0) == task_id:
-            raise RuntimeError("SoloBoard API did not clear parentTicketId; parent/subtask relation delete is not yet reliable.")
+            raise RuntimeError("Kanbalone API did not clear parentTicketId; parent/subtask relation delete is not yet reliable.")
         return {"result": bool(updated)}
     if relation_kind == "parenttask":
         updated = rest_request(base_url, token, "PATCH", f"/api/tickets/{task_id}", payload={"parentTicketId": None})
         if int(updated.get("parentTicketId") or 0) == other_task_id:
-            raise RuntimeError("SoloBoard API did not clear parentTicketId; parent/subtask relation delete is not yet reliable.")
+            raise RuntimeError("Kanbalone API did not clear parentTicketId; parent/subtask relation delete is not yet reliable.")
         return {"result": bool(updated)}
     if relation_kind == "blocked":
         task = rest_request(base_url, token, "GET", f"/api/tickets/{task_id}")
         blocker_ids = [int(item) for item in (task.get("blockerIds") or []) if int(item) != other_task_id]
         updated = rest_request(base_url, token, "PATCH", f"/api/tickets/{task_id}", payload={"blockerIds": blocker_ids})
         return {"result": bool(updated)}
-    raise RuntimeError(f"Unsupported relation kind for SoloBoard: {relation_kind}")
+    raise RuntimeError(f"Unsupported relation kind for Kanbalone: {relation_kind}")
 
 
 def move_task_to_bucket(
@@ -1008,7 +1008,7 @@ def transition_task_status(
         raise RuntimeError(f"Task not found: {task_id}")
     payload: dict[str, Any] = {"laneName": status}
     target_is_done = status.strip().lower() == "done"
-    task_is_done = soloboard_resolved(task)
+    task_is_done = kanbalone_resolved(task)
     if sync_done_state and target_is_done:
         payload["isResolved"] = True
     elif not target_is_done and (sync_done_state or task_is_done):
@@ -1017,7 +1017,7 @@ def transition_task_status(
     board_id = int(transitioned.get("boardId") or 0)
     board_shell = rest_request(base_url, token, "GET", f"/api/boards/{board_id}")
     board_title = str(board_shell.get("board", {}).get("name") or board_id)
-    normalized = soloboard_normalize_ticket(transitioned, board_title=board_title, board_shell=board_shell)
+    normalized = kanbalone_normalize_ticket(transitioned, board_title=board_title, board_shell=board_shell)
     normalized["related_tasks"] = relation_tasks_payload(base_url, token, task_id=task_id)
     return normalized
 
@@ -1104,7 +1104,7 @@ def reorder_task(
     if updated is None:
         raise RuntimeError(f"Reordered task was not returned: {task_id}")
     board_title = str(board_shell.get("board", {}).get("name") or board_id)
-    return soloboard_normalize_ticket(updated, board_title=board_title, board_shell=board_shell)
+    return kanbalone_normalize_ticket(updated, board_title=board_title, board_shell=board_shell)
 
 
 def print_json(payload: Any) -> int:
@@ -1407,7 +1407,7 @@ def cmd_task_create(args: argparse.Namespace) -> int:
     board_shell = rest_request(base_url, token, "GET", f"/api/boards/{project_id}")
     lanes = board_shell.get("lanes") if isinstance(board_shell, dict) else None
     if not isinstance(lanes, list) or not lanes:
-        raise RuntimeError("SoloBoard board must have at least one lane.")
+        raise RuntimeError("Kanbalone board must have at least one lane.")
     lane_name = args.status or "To do"
     matched = [lane for lane in lanes if str(lane.get("name") or "").strip().lower() == lane_name.strip().lower()]
     lane = matched[0] if matched else lanes[0]
@@ -1426,7 +1426,7 @@ def cmd_task_create(args: argparse.Namespace) -> int:
     if isinstance(created, dict) and not created.get("bodyMarkdown"):
         created = {**created, "bodyMarkdown": description}
     board_title = str(board_shell.get("board", {}).get("name") or project_id)
-    return print_json(normalize_task_detail(soloboard_normalize_ticket(created, board_title=board_title, board_shell=board_shell), project_title=board_title))
+    return print_json(normalize_task_detail(kanbalone_normalize_ticket(created, board_title=board_title, board_shell=board_shell), project_title=board_title))
 
 
 def cmd_task_comment_list(args: argparse.Namespace) -> int:
@@ -1632,7 +1632,7 @@ def cmd_task_reorder(args: argparse.Namespace) -> int:
     if target_lane_id is None:
         target_lane_id = int(current.get("column_id") or 0)
     if args.status is not None:
-        target_lane_id = soloboard_find_lane_id(board_shell, args.status)
+        target_lane_id = kanbalone_find_lane_id(board_shell, args.status)
     reordered = reorder_task(
         base_url,
         token,

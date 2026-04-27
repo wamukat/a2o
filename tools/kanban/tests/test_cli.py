@@ -36,7 +36,7 @@ def patched_env(values: dict[str, str | None]):
                 os.environ[key] = value
 
 
-class SoloBoardCliTest(unittest.TestCase):
+class KanbaloneCliTest(unittest.TestCase):
     def test_normalize_task_watch_summary_preserves_parent_ref(self) -> None:
         task = {
             "id": 52,
@@ -174,7 +174,7 @@ class SoloBoardCliTest(unittest.TestCase):
         self.assertEqual("PATCH", request.get_method())
         self.assertEqual("application/json", request.headers["Content-type"])
 
-    def test_task_ref_resolution_uses_soloboard_index(self) -> None:
+    def test_task_ref_resolution_uses_kanbalone_short_ref_index(self) -> None:
         self.assertEqual(
             123,
             kanban_cli.resolve_task_id_from_ref(
@@ -198,7 +198,7 @@ class SoloBoardCliTest(unittest.TestCase):
             ),
         )
 
-    def test_parser_backend_choices_include_only_kanbalone(self) -> None:
+    def test_parser_accepts_removed_soloboard_backend_for_migration_diagnostic(self) -> None:
         parser = kanban_cli.build_parser()
         args = parser.parse_args(["--backend", "kanbalone", "task-get", "--task", "A2O#1"])
         self.assertEqual("kanbalone", args.backend)

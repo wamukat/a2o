@@ -16,7 +16,7 @@ if str(TOOLS_DIR) not in sys.path:
 from kanban import bootstrap_kanbalone
 
 
-class SoloBoardBootstrapTest(unittest.TestCase):
+class KanbaloneBootstrapTest(unittest.TestCase):
     def test_load_config_requires_boards_array(self) -> None:
         with tempfile.TemporaryDirectory(prefix="a3-kanban-bootstrap-") as temp_dir:
             config = Path(temp_dir) / "bootstrap.json"
