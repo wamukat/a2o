@@ -99,4 +99,4 @@ A2O core exposes metrics through repository storage and CLI exports (`metrics li
 
 ## 9. Presets
 
-The 0.5.36 public package format is single-file `project.yaml`. Internal presets may remain implementation details, but package authors should not have to manage separate preset or manifest files.
+The 0.5.37 public package format is single-file `project.yaml`. Internal presets may remain implementation details, but package authors should not have to manage separate preset or manifest files.

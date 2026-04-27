@@ -102,5 +102,5 @@ A2O core は repository storage と CLI export（`metrics list`、`metrics summa
 
 ## 9. プリセット
 
-0.5.36 の公開パッケージ形式は、単一ファイルの `project.yaml` である。
+0.5.37 の公開パッケージ形式は、単一ファイルの `project.yaml` である。
 内部プリセットは実装詳細として残りうるが、パッケージ作成者が追加のプリセットファイルを管理する必要はない。

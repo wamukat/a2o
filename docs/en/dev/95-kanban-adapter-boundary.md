@@ -63,7 +63,7 @@ Kanban access is organized around a Ruby operation client boundary:
 
 ## Runtime Python Dependency
 
-A2O 0.5.36 keeps `python3` in `docker/a3-runtime/Dockerfile`, but does not install `python3-venv`.
+A2O 0.5.37 keeps `python3` in `docker/a3-runtime/Dockerfile`, but does not install `python3-venv`.
 
 The runtime still has an Engine-owned Python dependency:
 
