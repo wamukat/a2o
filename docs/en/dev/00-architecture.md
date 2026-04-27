@@ -23,6 +23,7 @@ Read this document first to understand runtime flow and responsibility boundarie
 | Job boundary with `a2o-agent` | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
 | Automated ticket decomposition MVP | [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md) |
 | Boundary between core and project extensions | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
+| Multi-project runtime contexts | [85-multi-project-runtime-contexts.md](85-multi-project-runtime-contexts.md) |
 | Validation through reference products | [90-reference-product-suite.md](90-reference-product-suite.md) |
 | Release publish latency and distribution boundary | [98-release-publish-latency-and-distribution-build.md](98-release-publish-latency-and-distribution-build.md) |
 | Kanban adapter and Kanbalone boundary | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
@@ -31,6 +32,8 @@ Read this document first to understand runtime flow and responsibility boundarie
 ## Runtime Flow
 
 A2O is a runtime that turns kanban tasks into AI-executable jobs and keeps the path through verification and merge traceable.
+
+In a multi-project installation, this flow is scoped to one resolved `ProjectRuntimeContext`. The runtime must resolve project identity before scheduler, kanban, Git, storage, workspace, or agent side effects. Multiple projects repeat the same flow independently instead of sharing an implicit global project.
 
 1. A user prepares a project package and kanban task.
 2. The scheduler selects from kanban current tasks, excludes `Resolved` / `Archived`, applies parent-child and blocker gating, then chooses the highest-priority parent group first and selects a runnable task inside that group.
@@ -173,6 +176,7 @@ Covers fixed repo slots, synchronization, freshness, retention, garbage collecti
 - [58-metrics-data-access.md](58-metrics-data-access.md)
 - [../user/90-project-package-schema.md](../user/90-project-package-schema.md)
 - [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md)
+- [85-multi-project-runtime-contexts.md](85-multi-project-runtime-contexts.md)
 
 Covers the project package schema, project script contract, repo slots, verification, and initialization hook boundaries.
 

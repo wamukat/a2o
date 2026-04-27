@@ -23,6 +23,7 @@
 | a2o-agent とのジョブ境界 | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
 | 自動チケット分解 MVP | [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md) |
 | コアとプロジェクト拡張の境界 | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
+| マルチプロジェクト runtime context | [85-multi-project-runtime-contexts.md](85-multi-project-runtime-contexts.md) |
 | 参照用プロダクトによる検証 | [90-reference-product-suite.md](90-reference-product-suite.md) |
 | release publish の遅延と distribution 境界 | [98-release-publish-latency-and-distribution-build.md](98-release-publish-latency-and-distribution-build.md) |
 | カンバンアダプターと Kanbalone 境界 | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
@@ -31,6 +32,8 @@
 ## A2O が実現するランタイムの流れ
 
 A2O は「カンバンタスクを AI 実行可能なジョブに変換し、検証とマージまで追跡可能に進める」ランタイムである。
+
+マルチプロジェクト install では、この flow は1つの解決済み `ProjectRuntimeContext` に scoped される。runtime は scheduler、kanban、Git、storage、workspace、agent の副作用を起こす前に project identity を解決しなければならない。複数 project は implicit global project を共有せず、同じ flow を project ごとに独立して繰り返す。
 
 1. 利用者がプロジェクトパッケージとカンバンタスクを用意する。
 2. スケジューラが、カンバンの current task をもとに `Resolved` / `Archived` を除外し、親子制約と blocker 制約を適用したうえで、まず親 priority が最も高い親グループを選び、その中の runnable task を選ぶ。
@@ -173,6 +176,7 @@ A2O の全体像と導入手順を扱う。
 - [58-metrics-data-access.md](58-metrics-data-access.md)
 - [../user/90-project-package-schema.md](../user/90-project-package-schema.md)
 - [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md)
+- [85-multi-project-runtime-contexts.md](85-multi-project-runtime-contexts.md)
 
 プロジェクトパッケージスキーマ、プロジェクトスクリプト契約、リポジトリスロット、検証、初期化 hook の境界を扱う。
 
