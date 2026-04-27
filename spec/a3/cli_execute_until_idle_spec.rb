@@ -363,6 +363,7 @@ RSpec.describe A3::CLI do
       task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
       transitions = read_fake_kanban_transitions(fake_cli.fetch(:transitions_path))
       comments = read_fake_kanban_comments(fake_cli.fetch(:comments_path))
+      events = read_fake_kanban_events(fake_cli.fetch(:events_path))
 
       expect(out.string).to include("executed 6 task(s); idle=true stop_reason=idle")
       expect(out.string).to include(
@@ -376,9 +377,16 @@ RSpec.describe A3::CLI do
         ["In progress", "Inspection", "Inspection", "Merging", "Merging", "Done",
          "In progress", "Inspection", "Inspection", "Merging", "Merging", "Done"]
       )
-      expect(comments.fetch("5001").size).to eq(6)
-      expect(comments.fetch("5002").size).to eq(6)
+      expect(comments.fetch("5001").size).to eq(2)
+      expect(comments.fetch("5002").size).to eq(2)
       expect(comments).not_to have_key("5003")
+      expect(events.fetch("5001").map { |item| item.fetch("kind") }).to eq(
+        %w[task_started task_started task_started task_completed]
+      )
+      expect(events.fetch("5002").map { |item| item.fetch("kind") }).to eq(
+        %w[task_started task_started task_started task_completed]
+      )
+      expect(events).not_to have_key("5003")
     end
   end
 
@@ -480,6 +488,7 @@ RSpec.describe A3::CLI do
       child = task_repository.fetch("Sample#5101")
       transitions = read_fake_kanban_transitions(fake_cli.fetch(:transitions_path))
       comments = read_fake_kanban_comments(fake_cli.fetch(:comments_path))
+      events = read_fake_kanban_events(fake_cli.fetch(:events_path))
 
       expect(out.string).to include("executed 4 task(s); idle=false stop_reason=max_steps")
       expect(out.string).to include(
@@ -490,7 +499,10 @@ RSpec.describe A3::CLI do
       expect(parent.status).to eq(:merging)
       expect(child.status).to eq(:done)
       expect(transitions.map { |item| item.fetch("argv").last }).to include("Inspection", "Merging", "In review")
-      expect(comments.fetch("5101").size).to eq(4)
+      expect(comments.fetch("5101").size).to eq(1)
+      expect(events.fetch("5101").map { |item| item.fetch("kind") }).to eq(
+        %w[task_started task_started task_completed]
+      )
       expect(comments.fetch("5100").size).to be >= 2
     end
   end

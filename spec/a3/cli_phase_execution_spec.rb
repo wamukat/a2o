@@ -214,6 +214,8 @@ RSpec.describe A3::CLI do
             print(json.dumps([]))
           elif command == "task-comment-create":
             print(json.dumps({"id": 1, "comment": "ok"}))
+          elif command == "task-event-create":
+            print(json.dumps({"id": 1, "kind": "task_completed"}))
           else:
             raise SystemExit(f"unsupported command: {command}")
         PY
