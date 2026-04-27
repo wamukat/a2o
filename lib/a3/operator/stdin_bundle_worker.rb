@@ -7,15 +7,25 @@ require "open3"
 require "thread"
 require_relative "../domain/skill_feedback"
 
-ROOT_DIR = Pathname(ENV["A2O_ROOT_DIR"] || ENV.fetch("A3_ROOT_DIR", Dir.pwd)).expand_path.freeze
-def env_compat(public_name, legacy_name)
+def removed_legacy_env_error(public_name, legacy_name)
+  KeyError.new(
+    "removed A3 compatibility input: environment variable #{legacy_name}; " \
+    "migration_required=true replacement=environment variable #{public_name}"
+  )
+end
+
+def public_env(public_name, legacy_name)
   value = ENV[public_name]
   return value unless value.to_s.strip.empty?
 
-  ENV[legacy_name]
+  legacy_value = ENV[legacy_name]
+  raise removed_legacy_env_error(public_name, legacy_name) unless legacy_value.to_s.strip.empty?
+
+  nil
 end
 
-LAUNCHER_CONFIG_PATH = env_compat("A2O_WORKER_LAUNCHER_CONFIG_PATH", "A3_WORKER_LAUNCHER_CONFIG_PATH")
+ROOT_DIR = Pathname(ENV["A2O_ROOT_DIR"] || ENV.fetch("A3_ROOT_DIR", Dir.pwd)).expand_path.freeze
+LAUNCHER_CONFIG_PATH = public_env("A2O_WORKER_LAUNCHER_CONFIG_PATH", "A3_WORKER_LAUNCHER_CONFIG_PATH")
 KNOWN_EXECUTOR_PHASES = %w[implementation review parent_review].freeze
 ALLOWED_EXECUTOR_PLACEHOLDERS = {
   "result_path" => :result_path,
@@ -141,7 +151,7 @@ def bundle_for(request)
         ]
       },
       "operating_contract" => {
-        "workspace_root" => env_compat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT"),
+        "workspace_root" => public_env("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT"),
         "slot_paths" => request["slot_paths"] || {},
         "phase_runtime" => request["phase_runtime"] || {},
         "rules" => [
@@ -341,7 +351,7 @@ def resolve_executor_profile(request, executor:)
 end
 
 def expand_executor_placeholders(command, result_path:, schema_path:)
-  workspace_root = env_compat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT") || ROOT_DIR.to_s
+  workspace_root = public_env("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT") || ROOT_DIR.to_s
   root_dir = ENV["A2O_ROOT_DIR"] || ENV["A3_ROOT_DIR"] || workspace_root
   values = {
     "result_path" => result_path.to_s,
@@ -576,7 +586,7 @@ def safe_log_component(value)
 end
 
 def ai_raw_log_writer(request)
-  root = env_compat("A2O_AGENT_AI_RAW_LOG_ROOT", "A3_AGENT_AI_RAW_LOG_ROOT").to_s
+  root = public_env("A2O_AGENT_AI_RAW_LOG_ROOT", "A3_AGENT_AI_RAW_LOG_ROOT").to_s
   return nil if root.strip.empty?
 
   task_ref = safe_log_component(request["task_ref"])
@@ -625,8 +635,8 @@ def capture_executor_output(command_env, command, stdin_bundle:, chdir:, request
 end
 
 def main
-  request_path = Pathname(env_compat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH") || raise(KeyError, "A2O_WORKER_REQUEST_PATH is required"))
-  result_path = Pathname(env_compat("A2O_WORKER_RESULT_PATH", "A3_WORKER_RESULT_PATH") || raise(KeyError, "A2O_WORKER_RESULT_PATH is required"))
+  request_path = Pathname(public_env("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH") || raise(KeyError, "A2O_WORKER_REQUEST_PATH is required"))
+  result_path = Pathname(public_env("A2O_WORKER_RESULT_PATH", "A3_WORKER_RESULT_PATH") || raise(KeyError, "A2O_WORKER_RESULT_PATH is required"))
   request = load_json(request_path)
   result_path.dirname.mkpath
   result_path.delete if result_path.exist?
@@ -652,10 +662,10 @@ def main
       return 0
     end
     stdout, stderr, status = capture_executor_output(
-      { "PWD" => (env_compat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT") || ROOT_DIR.to_s) }.merge(command_env),
+      { "PWD" => (public_env("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT") || ROOT_DIR.to_s) }.merge(command_env),
       command,
       stdin_bundle: stdin_bundle,
-      chdir: env_compat("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT") || ROOT_DIR.to_s,
+      chdir: public_env("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT") || ROOT_DIR.to_s,
       request: request
     )
 

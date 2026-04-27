@@ -12,12 +12,14 @@ RSpec.describe "worker:stdin-bundle" do
   STDIN_WORKER_LIB_DIR = STDIN_WORKER_SPEC_ROOT_DIR.join("lib")
   STDIN_WORKER_LIB = STDIN_WORKER_LIB_DIR.join("a3", "operator", "stdin_bundle_worker.rb")
 
-  it "keeps legacy worker env as private compatibility fallback" do
+  it "rejects legacy worker env without the public replacement" do
     original_public = ENV.delete("A2O_WORKER_REQUEST_PATH")
     original_legacy = ENV["A3_WORKER_REQUEST_PATH"]
     ENV["A3_WORKER_REQUEST_PATH"] = "/tmp/legacy-request.json"
 
-    expect(env_compat("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH")).to eq("/tmp/legacy-request.json")
+    expect do
+      public_env("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH")
+    end.to raise_error(KeyError, /removed A3 compatibility input: environment variable A3_WORKER_REQUEST_PATH; migration_required=true replacement=environment variable A2O_WORKER_REQUEST_PATH/)
   ensure
     ENV["A2O_WORKER_REQUEST_PATH"] = original_public if original_public
     if original_legacy
@@ -25,6 +27,18 @@ RSpec.describe "worker:stdin-bundle" do
     else
       ENV.delete("A3_WORKER_REQUEST_PATH")
     end
+  end
+
+  it "prefers public worker env over removed legacy worker env" do
+    original_public = ENV["A2O_WORKER_REQUEST_PATH"]
+    original_legacy = ENV["A3_WORKER_REQUEST_PATH"]
+    ENV["A2O_WORKER_REQUEST_PATH"] = "/tmp/public-request.json"
+    ENV["A3_WORKER_REQUEST_PATH"] = "/tmp/legacy-request.json"
+
+    expect(public_env("A2O_WORKER_REQUEST_PATH", "A3_WORKER_REQUEST_PATH")).to eq("/tmp/public-request.json")
+  ensure
+    original_public ? ENV["A2O_WORKER_REQUEST_PATH"] = original_public : ENV.delete("A2O_WORKER_REQUEST_PATH")
+    original_legacy ? ENV["A3_WORKER_REQUEST_PATH"] = original_legacy : ENV.delete("A3_WORKER_REQUEST_PATH")
   end
 
   it "sanitizes internal diagnostic names before writing worker failure payloads" do
