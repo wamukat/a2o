@@ -3744,6 +3744,111 @@ runtime:
 	}
 }
 
+func TestProjectValidateAcceptsMetricsPhaseCommands(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - worker
+    verification:
+      commands:
+        - task test
+    metrics:
+      commands:
+        - task metrics
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	config, err := loadProjectPackageConfig(packageDir)
+	if err != nil {
+		t.Fatalf("loadProjectPackageConfig should accept metrics phase, got %v", err)
+	}
+	phaseProfiles, _ := config.Executor["phase_profiles"].(map[string]any)
+	if _, ok := phaseProfiles["metrics"]; ok {
+		t.Fatalf("metrics phase should not create an executor phase profile: %#v", phaseProfiles["metrics"])
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project validate should accept metrics phase, code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "lint_check name=project_package status=ok") ||
+		!strings.Contains(stdout.String(), "lint_status=ok") {
+		t.Fatalf("project validate should report ok, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateRejectsUnknownRuntimePhase(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    experiments:
+      commands:
+        - task experiment
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject unknown phase, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "invalid runtime.phases") ||
+		!strings.Contains(stdout.String(), "contains unknown phase: experiments") {
+		t.Fatalf("project validate should reject unknown phase, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
 func TestRuntimeRunOnceRejectsLegacyWorkspaceHook(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

@@ -141,7 +141,7 @@ func buildProjectExecutorConfig(phases map[string]projectPackagePhaseYAML) (map[
 		return nil, fmt.Errorf("runtime.phases must define implementation")
 	}
 	for phase := range phases {
-		if !containsString([]string{"implementation", "review", "parent_review", "verification", "remediation", "merge"}, phase) {
+		if !containsString([]string{"implementation", "review", "parent_review", "verification", "remediation", "metrics", "merge"}, phase) {
 			return nil, fmt.Errorf("contains unknown phase: %s", phase)
 		}
 	}
