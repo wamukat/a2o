@@ -61,6 +61,8 @@ module A3
       end
 
       def heartbeat(heartbeat_at:)
+        return self if state == :completed
+
         raise ConfigurationError, "agent job #{job_id} is not claimed" unless state == :claimed
 
         self.class.new(
@@ -73,8 +75,8 @@ module A3
       end
 
       def complete(result)
-        raise ConfigurationError, "agent job #{job_id} is already completed" if state == :completed
         raise ConfigurationError, "agent result job_id #{result.job_id} does not match #{job_id}" unless result.job_id == job_id
+        return self if state == :completed
 
         self.class.new(
           request: request,

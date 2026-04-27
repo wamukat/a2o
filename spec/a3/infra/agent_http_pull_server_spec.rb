@@ -51,6 +51,29 @@ RSpec.describe A3::Infra::AgentHttpPullServer do
     expect(store.fetch("job-1")).to have_attributes(state: :completed)
   end
 
+  it "treats terminal job heartbeats and duplicate results as idempotent" do
+    server_thread
+    base_uri = URI("http://127.0.0.1:#{server.bound_port}")
+
+    expect(post_json(base_uri + "/v1/agent/jobs", agent_job_request("job-1").request_form).code).to eq("201")
+    expect(Net::HTTP.get_response(base_uri + "/v1/agent/jobs/next?agent=host-local-agent").code).to eq("200")
+    result_payload = agent_job_result("job-1").result_form
+    expect(post_json(base_uri + "/v1/agent/jobs/job-1/result", result_payload).code).to eq("200")
+
+    heartbeat_response = post_json(
+      base_uri + "/v1/agent/jobs/job-1/heartbeat",
+      "heartbeat" => "2026-04-11T08:01:30Z"
+    )
+    duplicate_result_response = post_json(base_uri + "/v1/agent/jobs/job-1/result", result_payload)
+
+    expect(heartbeat_response.code).to eq("200")
+    expect(duplicate_result_response.code).to eq("200")
+    expect(store.fetch("job-1")).to have_attributes(
+      state: :completed,
+      heartbeat_at: nil
+    )
+  end
+
   it "serves artifact upload requests over HTTP" do
     server_thread
     base_uri = URI("http://127.0.0.1:#{server.bound_port}")

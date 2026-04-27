@@ -146,6 +146,7 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 				workspaceDescriptor = requestedWorkspaceDescriptor(runRequest, prepared.SlotDescriptors)
 			}
 			result := postExecutionFailureResult(*request, workspaceDescriptor, startedAt, finishedAt, logUpload, artifactUploads, "A2O agent workspace publish failed", "agent_workspace_publish", err)
+			stopHeartbeat()
 			submitErr := w.Client.SubmitResult(result)
 			cleanupErr := w.cleanupPrepared(*request, prepared)
 			if submitErr != nil {
@@ -174,6 +175,7 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 		WorkerProtocolResult: workerProtocolResult,
 		Heartbeat:            finishedAt,
 	}
+	stopHeartbeat()
 	submitErr := w.Client.SubmitResult(result)
 	cleanupErr := w.cleanupPrepared(runRequest, prepared)
 	if submitErr != nil {
