@@ -162,6 +162,44 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(request.workspace_request.slots.fetch("repo_alpha")).to include("access" => "read_only")
   end
 
+  it "concatenates metrics stdout and stderr across successful agent commands" do
+    call_count = 0
+    client.on_fetch = lambda do |job_id|
+      call_count += 1
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: {
+            "success" => true,
+            "summary" => "metrics part #{call_count}",
+            "diagnostics" => {
+              "stdout" => call_count == 1 ? "{\"tests\":" : "{\"passed_count\":3}}\n",
+              "stderr" => call_count == 1 ? "first warning\n" : "second warning\n"
+            }
+          }
+        )
+      )
+    end
+    runner = described_class.new(
+      control_plane_client: client,
+      runtime_profile: "docker-dev-env",
+      shared_workspace_mode: "same-path",
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_) {}
+    )
+
+    result = runner.run(["task metrics:begin", "task metrics:end"], workspace: workspace, task: task, run: run, command_intent: :metrics_collection)
+
+    expect(result).to have_attributes(success?: true, summary: "task metrics:begin ok; task metrics:end ok")
+    expect(result.diagnostics).to include(
+      "stdout" => "{\"tests\":{\"passed_count\":3}}\n",
+      "stderr" => "first warning\nsecond warning\n"
+    )
+  end
+
   it "passes public worker protocol requests to materialized command jobs" do
     client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :succeeded, 0)) }
     builder = A3::Infra::AgentWorkspaceRequestBuilder.new(source_aliases: {repo_alpha: "sample-catalog-service"})

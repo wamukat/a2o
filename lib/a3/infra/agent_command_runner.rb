@@ -32,7 +32,7 @@ module A3
 
         summaries = []
         artifacts = []
-        last_result = nil
+        metrics_outputs = []
         Array(commands).each do |command|
           command_env = default_env(@env.merge(env)).merge(workspace_automation_env(workspace)).merge(@env).merge(env)
           expanded_command = expand_command_placeholders(command, workspace: workspace, env: command_env)
@@ -44,17 +44,17 @@ module A3
           return completed if completed.is_a?(A3::Application::ExecutionResult)
 
           result = completed.result
-          last_result = result
           return failed_command_result(command: expanded_command, result: result) unless result.succeeded?
 
           summaries << "#{expanded_command} ok"
           artifacts.concat(agent_artifacts_from_result(result))
+          metrics_outputs << metrics_output_from_result(result) if command_intent&.to_sym == :metrics_collection
         end
 
         A3::Application::ExecutionResult.new(
           success: true,
           summary: summaries.join("; "),
-          diagnostics: success_diagnostics(artifacts: artifacts, result: last_result, command_intent: command_intent)
+          diagnostics: success_diagnostics(artifacts: artifacts, metrics_outputs: metrics_outputs, command_intent: command_intent)
         )
       end
 
@@ -165,14 +165,24 @@ module A3
         (result.log_uploads + result.artifact_uploads).map(&:persisted_form)
       end
 
-      def success_diagnostics(artifacts:, result:, command_intent:)
+      def success_diagnostics(artifacts:, metrics_outputs:, command_intent:)
         diagnostics = { "agent_artifacts" => artifacts }
         return diagnostics unless command_intent&.to_sym == :metrics_collection
 
-        worker_diagnostics = result.worker_protocol_result&.fetch("diagnostics", nil)
-        return diagnostics unless worker_diagnostics.is_a?(Hash)
+        diagnostics.merge(
+          "stdout" => metrics_outputs.map { |output| output.fetch("stdout") }.join,
+          "stderr" => metrics_outputs.map { |output| output.fetch("stderr") }.join
+        )
+      end
 
-        diagnostics.merge(worker_diagnostics.slice("stdout", "stderr"))
+      def metrics_output_from_result(result)
+        worker_diagnostics = result.worker_protocol_result&.fetch("diagnostics", nil)
+        return { "stdout" => "", "stderr" => "" } unless worker_diagnostics.is_a?(Hash)
+
+        {
+          "stdout" => worker_diagnostics.fetch("stdout", "").to_s,
+          "stderr" => worker_diagnostics.fetch("stderr", "").to_s
+        }
       end
 
       def unsupported_workspace_result
