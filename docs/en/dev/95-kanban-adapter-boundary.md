@@ -9,7 +9,8 @@ Read this to keep A2O domain state separate from Kanbalone API and CLI details. 
 The A2O engine talks to kanban through a command contract compatible with `tools/kanban/cli.py`. Runtime operations include:
 
 - read: `task-snapshot-list`, `task-watch-summary-list`, `task-get`, `task-label-list`, `task-relation-list`, `task-find`
-- write: `task-transition`, `task-comment-create`, `task-create`, `label-ensure`, `task-label-add`, `task-label-remove`, `task-relation-create`
+- read structured metadata when supported: `task-label-reason-list`, `task-event-list`
+- write: `task-transition`, `task-comment-create`, `task-create`, `label-ensure`, `task-label-add`, `task-label-remove`, `task-relation-create`, `task-event-create`
 - text transport: long descriptions and comments use `--*-file` options to avoid shell quoting and argument size limits
 
 The command contract is the external tooling surface. Internally, Ruby code reaches kanban through an operation client boundary instead of scattering subprocess calls across orchestration code.
@@ -91,6 +92,19 @@ Any native adapter must preserve:
 - JSON object/array shape validation and fail-fast errors
 
 No Kanbalone API or public kanban CLI changes are required to preserve the current command contract.
+
+## Reasoned Tags And Structured Events
+
+Kanbalone `v0.9.21` adds optional reason metadata for attached ticket tags and opaque structured ticket events. A2O keeps the same state model: lane/status and current tag presence remain authoritative, and historical events are not used to infer task state.
+
+The adapter exposes these APIs conservatively:
+
+- `task-label-add` accepts optional `--reason` and `--details-json` / `--details-file`. When the connected Kanbalone supports reasoned tag attach, the adapter sends the reason metadata. Older Kanbalone instances fall back to the existing `tagIds` update and silently drop reason metadata.
+- `task-label-reason-list` returns current tags with `reason`, `details`, `reason_comment_id`, and `attached_at` when supported. Older Kanbalone instances return the current tag list with null reason fields.
+- `task-event-create` writes an opaque structured event when supported. If the API is unavailable, callers must provide `--fallback-comment` or `--fallback-comment-file` so the adapter can preserve a human-readable timeline comment.
+- `task-event-list` returns structured events when supported and an empty list when the API is unavailable.
+
+Structured events are an automation log surface, not a replacement for the current status/tag model.
 
 ## Multiline Text Contract
 

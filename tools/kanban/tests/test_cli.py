@@ -174,6 +174,195 @@ class KanbaloneCliTest(unittest.TestCase):
         self.assertEqual("PATCH", request.get_method())
         self.assertEqual("application/json", request.headers["Content-type"])
 
+    def test_add_task_label_uses_reasoned_tag_api_when_reason_is_present(self) -> None:
+        with (
+            patch.object(kanban_cli, "resolve_tag", return_value={"id": 12, "name": "blocked"}),
+            patch.object(kanban_cli, "rest_request", return_value={"id": 12, "name": "blocked", "reason": "blocked by test"}) as request,
+        ):
+            result = kanban_cli.add_task_label(
+                "http://localhost:3460",
+                "",
+                42,
+                "blocked",
+                reason="blocked by test",
+                details={"resumeCondition": "clear blocker"},
+            )
+
+        self.assertEqual("blocked by test", result["reason"])
+        request.assert_called_once_with(
+            "http://localhost:3460",
+            "",
+            "POST",
+            "/api/tickets/42/tags/12",
+            payload={"reason": "blocked by test", "details": {"resumeCondition": "clear blocker"}},
+        )
+
+    def test_add_task_label_falls_back_to_tag_ids_when_reasoned_tag_api_is_absent(self) -> None:
+        with (
+            patch.object(kanban_cli, "resolve_tag", return_value={"id": 12, "name": "blocked"}),
+            patch.object(kanban_cli, "rest_request", side_effect=RuntimeError(json.dumps({"statusCode": 404}))),
+            patch.object(kanban_cli, "stable_task_label_titles", return_value=set()),
+            patch.object(kanban_cli, "tag_name_for_ref", return_value="blocked"),
+            patch.object(kanban_cli, "set_task_tags", return_value=True) as set_tags,
+        ):
+            result = kanban_cli.add_task_label(
+                "http://localhost:3460",
+                "",
+                42,
+                "blocked",
+                reason="blocked by test",
+            )
+
+        self.assertFalse(result["reason_supported"])
+        set_tags.assert_called_once_with("http://localhost:3460", "", task_id=42, names=["blocked"])
+
+    def test_list_task_label_reasons_falls_back_to_plain_labels_when_api_is_absent(self) -> None:
+        with (
+            patch.object(kanban_cli, "rest_request", side_effect=RuntimeError(json.dumps({"statusCode": 404}))),
+            patch.object(kanban_cli, "list_task_labels", return_value=[{"id": 12, "title": "blocked"}]),
+        ):
+            result = kanban_cli.list_task_label_reasons("http://localhost:3460", "", 42)
+
+        self.assertEqual(
+            [{"id": 12, "title": "blocked", "reason": None, "details": None, "reason_comment_id": None, "attached_at": None}],
+            result,
+        )
+
+    def test_list_task_label_reasons_normalizes_nested_kanbalone_tag_shape(self) -> None:
+        with patch.object(
+            kanban_cli,
+            "rest_request",
+            return_value={
+                "tags": [
+                    {
+                        "tag": {"id": 12, "name": "blocked", "color": "#cc3f3f"},
+                        "reason": "blocked by test",
+                        "details": {"resumeCondition": "clear blocker"},
+                        "reasonCommentId": None,
+                        "attachedAt": "2026-04-27T00:00:00Z",
+                    }
+                ]
+            },
+        ):
+            result = kanban_cli.list_task_label_reasons("http://localhost:3460", "", 42)
+
+        self.assertEqual(
+            [
+                {
+                    "id": 12,
+                    "title": "blocked",
+                    "description": "",
+                    "hex_color": "#cc3f3f",
+                    "reason": "blocked by test",
+                    "details": {"resumeCondition": "clear blocker"},
+                    "reason_comment_id": None,
+                    "attached_at": "2026-04-27T00:00:00Z",
+                }
+            ],
+            result,
+        )
+
+    def test_create_task_event_writes_structured_event_when_supported(self) -> None:
+        with patch.object(
+            kanban_cli,
+            "rest_request",
+            return_value={
+                "id": 7,
+                "ticketId": 42,
+                "source": "a2o",
+                "kind": "task_started",
+                "title": "Task started",
+                "summary": "Started implementation.",
+                "severity": "info",
+                "data": {"run_ref": "run-1"},
+                "createdAt": "2026-04-27T00:00:00Z",
+            },
+        ) as request:
+            result = kanban_cli.create_task_event(
+                "http://localhost:3460",
+                "",
+                42,
+                source="a2o",
+                kind="task_started",
+                title="Task started",
+                summary="Started implementation.",
+                data={"run_ref": "run-1"},
+            )
+
+        self.assertEqual("task_started", result["kind"])
+        self.assertEqual({"run_ref": "run-1"}, result["data"])
+        request.assert_called_once_with(
+            "http://localhost:3460",
+            "",
+            "POST",
+            "/api/tickets/42/events",
+            payload={
+                "source": "a2o",
+                "kind": "task_started",
+                "title": "Task started",
+                "summary": "Started implementation.",
+                "severity": "info",
+                "data": {"run_ref": "run-1"},
+            },
+        )
+
+    def test_create_task_event_falls_back_to_comment_when_api_is_absent(self) -> None:
+        with (
+            patch.object(kanban_cli, "rest_request", side_effect=RuntimeError(json.dumps({"statusCode": 404}))),
+            patch.object(kanban_cli, "create_task_comment", return_value={"id": 9, "bodyMarkdown": "Started implementation."}),
+        ):
+            result = kanban_cli.create_task_event(
+                "http://localhost:3460",
+                "",
+                42,
+                source="a2o",
+                kind="task_started",
+                title="Task started",
+                summary="Started implementation.",
+                fallback_comment="Started implementation.",
+            )
+
+        self.assertEqual("comment", result["fallback"])
+        self.assertEqual("Started implementation.", result["comment"]["comment"])
+
+    def test_list_task_events_returns_empty_list_when_api_is_absent(self) -> None:
+        with patch.object(kanban_cli, "rest_request", side_effect=RuntimeError(json.dumps({"statusCode": 404}))):
+            self.assertEqual([], kanban_cli.list_task_events("http://localhost:3460", "", 42))
+
+    def test_parser_accepts_reasoned_label_and_event_commands(self) -> None:
+        parser = kanban_cli.build_parser()
+        label_args = parser.parse_args(
+            [
+                "task-label-add",
+                "--task-id",
+                "42",
+                "--label",
+                "blocked",
+                "--reason",
+                "blocked by test",
+                "--details-json",
+                '{"resumeCondition":"clear blocker"}',
+            ]
+        )
+        event_args = parser.parse_args(
+            [
+                "task-event-create",
+                "--task-id",
+                "42",
+                "--source",
+                "a2o",
+                "--kind",
+                "task_started",
+                "--title",
+                "Task started",
+                "--summary",
+                "Started implementation.",
+            ]
+        )
+
+        self.assertEqual(kanban_cli.cmd_task_label_add, label_args.func)
+        self.assertEqual(kanban_cli.cmd_task_event_create, event_args.func)
+
     def test_task_ref_resolution_uses_kanbalone_short_ref_index(self) -> None:
         self.assertEqual(
             123,

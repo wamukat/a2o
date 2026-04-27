@@ -10,6 +10,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+import urllib.error
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -219,6 +220,29 @@ def load_text_arg(value: str | None, file_path: str | None) -> str | None:
             return sys.stdin.read()
         return Path(file_path).read_text(encoding="utf-8")
     return None
+
+
+def load_json_arg(value: str | None, file_path: str | None) -> Any:
+    raw = load_text_arg(value, file_path)
+    if raw is None or str(raw).strip() == "":
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("JSON argument is invalid.") from exc
+
+
+def api_error_status(error: RuntimeError) -> int | None:
+    try:
+        payload = json.loads(str(error))
+    except json.JSONDecodeError:
+        return None
+    status = payload.get("statusCode") if isinstance(payload, dict) else None
+    return int(status) if isinstance(status, int) or str(status).isdigit() else None
+
+
+def api_not_found(error: RuntimeError) -> bool:
+    return api_error_status(error) == 404
 
 
 def ensure_safe_text_arg(*, option_name: str, value: str | None, file_path: str | None) -> None:
@@ -671,6 +695,76 @@ def create_task_comment(base_url: str, token: str, task_id: int, comment: str) -
     return created
 
 
+def normalize_task_event(task_id: int, event: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": int(event.get("id")) if str(event.get("id") or "").strip() else event.get("id"),
+        "task_id": int(event.get("ticketId") or event.get("task_id") or task_id),
+        "source": event.get("source"),
+        "kind": event.get("kind"),
+        "title": event.get("title"),
+        "summary": event.get("summary"),
+        "severity": event.get("severity"),
+        "icon": event.get("icon"),
+        "data": event.get("data") if isinstance(event.get("data"), dict) else {},
+        "created": event.get("createdAt") or event.get("created"),
+    }
+
+
+def list_task_events(base_url: str, token: str, task_id: int) -> list[dict[str, Any]]:
+    try:
+        response = rest_request(base_url, token, "GET", f"/api/tickets/{task_id}/events")
+    except RuntimeError as error:
+        if api_not_found(error):
+            return []
+        raise
+    events = response.get("events") if isinstance(response, dict) else None
+    if not isinstance(events, list):
+        raise RuntimeError("Unexpected task events response.")
+    return [normalize_task_event(task_id, event) for event in events]
+
+
+def create_task_event(
+    base_url: str,
+    token: str,
+    task_id: int,
+    *,
+    source: str,
+    kind: str,
+    title: str,
+    summary: str,
+    severity: str = "info",
+    icon: str | None = None,
+    data: Any = None,
+    fallback_comment: str | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "source": source,
+        "kind": kind,
+        "title": title,
+        "summary": summary,
+        "severity": severity,
+        "data": data if isinstance(data, dict) else {},
+    }
+    if icon:
+        payload["icon"] = icon
+    try:
+        created = rest_request(base_url, token, "POST", f"/api/tickets/{task_id}/events", payload=payload)
+    except RuntimeError as error:
+        if not api_not_found(error):
+            raise
+        if fallback_comment is None:
+            raise RuntimeError("Kanbalone structured events are unavailable and no fallback comment was provided.") from error
+        comment = create_task_comment(base_url, token, task_id, fallback_comment)
+        return {
+            "fallback": "comment",
+            "comment": normalize_task_comment(task_id, comment),
+            "event": payload,
+        }
+    if not isinstance(created, dict):
+        raise RuntimeError("Unexpected task event creation response.")
+    return normalize_task_event(task_id, created)
+
+
 def list_task_labels(base_url: str, token: str, task_id: int) -> list[dict[str, Any]]:
     task = rest_request(base_url, token, "GET", f"/api/tickets/{task_id}")
     tags = task.get("tags") if isinstance(task, dict) else None
@@ -686,6 +780,19 @@ def resolve_label_id(base_url: str, token: str, *, label_id: int | None, title: 
     if not title:
         raise RuntimeError("--label-id or --title/--label is required.")
     return title
+
+
+def resolve_tag(base_url: str, token: str, *, task_id: int, label_ref: int | str) -> dict[str, Any]:
+    task = get_task(base_url, token, task_id)
+    project_id = int(task["project_id"])
+    labels = list_labels(base_url, token, project_id=project_id)
+    if isinstance(label_ref, str):
+        matched = [label for label in labels if (label.get("name") or label.get("title") or "") == label_ref]
+    else:
+        matched = [label for label in labels if int(label.get("id") or 0) == int(label_ref)]
+    if len(matched) != 1:
+        raise RuntimeError(f"Tag not found: {label_ref}")
+    return matched[0]
 
 
 def ensure_label(
@@ -708,13 +815,8 @@ def ensure_label(
 def tag_name_for_ref(base_url: str, token: str, *, task_id: int, label_ref: int | str) -> str:
     if isinstance(label_ref, str):
         return label_ref
-    task = get_task(base_url, token, task_id)
-    project_id = int(task["project_id"])
-    labels = list_labels(base_url, token, project_id=project_id)
-    matched = [label for label in labels if int(label.get("id") or 0) == int(label_ref)]
-    if len(matched) != 1:
-        raise RuntimeError(f"Tag not found: {label_ref}")
-    return str(matched[0].get("name") or matched[0].get("title") or "")
+    tag = resolve_tag(base_url, token, task_id=task_id, label_ref=label_ref)
+    return str(tag.get("name") or tag.get("title") or "")
 
 
 def set_task_tags(base_url: str, token: str, *, task_id: int, names: list[str]) -> bool:
@@ -764,12 +866,34 @@ def stable_task_label_titles(base_url: str, token: str, *, task_id: int) -> set[
     return {str(label.get("title") or "") for label in labels if str(label.get("title") or "")}
 
 
-def add_task_label(base_url: str, token: str, task_id: int, label_ref: int | str) -> dict[str, Any]:
+def add_task_label(
+    base_url: str,
+    token: str,
+    task_id: int,
+    label_ref: int | str,
+    *,
+    reason: str | None = None,
+    details: Any = None,
+) -> dict[str, Any]:
+    if reason is not None or details is not None:
+        tag = resolve_tag(base_url, token, task_id=task_id, label_ref=label_ref)
+        payload: dict[str, Any] = {}
+        if reason is not None:
+            payload["reason"] = reason
+        if details is not None:
+            payload["details"] = details
+        try:
+            created = rest_request(base_url, token, "POST", f"/api/tickets/{task_id}/tags/{int(tag['id'])}", payload=payload)
+            return created if isinstance(created, dict) else {"result": True}
+        except RuntimeError as error:
+            if not api_not_found(error):
+                raise
+
     current = stable_task_label_titles(base_url, token, task_id=task_id)
     current.add(tag_name_for_ref(base_url, token, task_id=task_id, label_ref=label_ref))
     if not set_task_tags(base_url, token, task_id=task_id, names=sorted(current)):
         raise RuntimeError(f"Task tag assignment failed. task={task_id} label={label_ref}")
-    return {"result": True}
+    return {"result": True, "reason_supported": False}
 
 
 def remove_task_label(base_url: str, token: str, task_id: int, label_ref: int | str) -> dict[str, Any]:
@@ -778,6 +902,34 @@ def remove_task_label(base_url: str, token: str, task_id: int, label_ref: int | 
     if not set_task_tags(base_url, token, task_id=task_id, names=sorted(current)):
         raise RuntimeError(f"Task tag deletion failed. task={task_id} label={label_ref}")
     return {"result": True}
+
+
+def list_task_label_reasons(base_url: str, token: str, task_id: int) -> list[dict[str, Any]]:
+    try:
+        response = rest_request(base_url, token, "GET", f"/api/tickets/{task_id}/tag-reasons")
+    except RuntimeError as error:
+        if not api_not_found(error):
+            raise
+        return [
+            {**label, "reason": None, "details": None, "reason_comment_id": None, "attached_at": None}
+            for label in list_task_labels(base_url, token, task_id)
+        ]
+    tags = response.get("tags") if isinstance(response, dict) else None
+    if not isinstance(tags, list):
+        raise RuntimeError("Unexpected task tag reasons response.")
+    normalized: list[dict[str, Any]] = []
+    for item in tags:
+        tag = item.get("tag") if isinstance(item.get("tag"), dict) else item
+        normalized.append(
+            {
+                **normalize_label(tag),
+                "reason": item.get("reason"),
+                "details": item.get("details"),
+                "reason_comment_id": item.get("reasonCommentId"),
+                "attached_at": item.get("attachedAt"),
+            }
+        )
+    return normalized
 
 
 def enrich_task(task: dict[str, Any]) -> dict[str, Any]:
@@ -1475,6 +1627,51 @@ def cmd_task_comment_create(args: argparse.Namespace) -> int:
     return print_json(normalize_task_comment(task_id, observed))
 
 
+def cmd_task_event_list(args: argparse.Namespace) -> int:
+    backend = resolve_backend_context(backend=getattr(args, "backend", None), base_url=args.base_url, token=args.token)
+    base_url = backend.base_url
+    token = backend.token
+    task_id = resolve_task_id_from_ref(
+        base_url,
+        token,
+        task_id=args.task_id,
+        task_ref=args.task,
+        project_id=args.project_id,
+        project_title=args.project,
+    )
+    return print_json(list_task_events(base_url, token, task_id))
+
+
+def cmd_task_event_create(args: argparse.Namespace) -> int:
+    backend = resolve_backend_context(backend=getattr(args, "backend", None), base_url=args.base_url, token=args.token)
+    base_url = backend.base_url
+    token = backend.token
+    task_id = resolve_task_id_from_ref(
+        base_url,
+        token,
+        task_id=args.task_id,
+        task_ref=args.task,
+        project_id=args.project_id,
+        project_title=args.project,
+    )
+    data = load_json_arg(args.data_json, args.data_file)
+    fallback_comment = load_text_arg(args.fallback_comment, args.fallback_comment_file)
+    created = create_task_event(
+        base_url,
+        token,
+        task_id,
+        source=args.source,
+        kind=args.kind,
+        title=args.title,
+        summary=args.summary,
+        severity=args.severity,
+        icon=args.icon,
+        data=data,
+        fallback_comment=fallback_comment,
+    )
+    return print_json(created)
+
+
 def cmd_task_label_list(args: argparse.Namespace) -> int:
     backend = resolve_backend_context(backend=getattr(args, "backend", None), base_url=args.base_url, token=args.token)
     base_url = backend.base_url
@@ -1490,6 +1687,21 @@ def cmd_task_label_list(args: argparse.Namespace) -> int:
     return print_json(list_task_labels(base_url, token, task_id))
 
 
+def cmd_task_label_reason_list(args: argparse.Namespace) -> int:
+    backend = resolve_backend_context(backend=getattr(args, "backend", None), base_url=args.base_url, token=args.token)
+    base_url = backend.base_url
+    token = backend.token
+    task_id = resolve_task_id_from_ref(
+        base_url,
+        token,
+        task_id=args.task_id,
+        task_ref=args.task,
+        project_id=args.project_id,
+        project_title=args.project,
+    )
+    return print_json(list_task_label_reasons(base_url, token, task_id))
+
+
 def cmd_task_label_add(args: argparse.Namespace) -> int:
     backend = resolve_backend_context(backend=getattr(args, "backend", None), base_url=args.base_url, token=args.token)
     base_url = backend.base_url
@@ -1503,7 +1715,8 @@ def cmd_task_label_add(args: argparse.Namespace) -> int:
         project_title=args.project,
     )
     resolved_label_id = resolve_label_id(base_url, token, label_id=args.label_id, title=args.title)
-    add_task_label(base_url, token, task_id, resolved_label_id)
+    details = load_json_arg(args.details_json, args.details_file)
+    add_task_label(base_url, token, task_id, resolved_label_id, reason=args.reason, details=details)
     expected_title = tag_name_for_ref(base_url, token, task_id=task_id, label_ref=resolved_label_id)
     observed = retry_observed_task_labels(
         base_url,
@@ -1837,6 +2050,34 @@ def build_parser() -> argparse.ArgumentParser:
     task_comment_create.add_argument("--comment-file")
     task_comment_create.set_defaults(func=cmd_task_comment_create)
 
+    task_event_list = subparsers.add_parser("task-event-list", help="List structured automation events for one task.")
+    task_event_list_group = task_event_list.add_mutually_exclusive_group(required=True)
+    task_event_list_group.add_argument("--task")
+    task_event_list_group.add_argument("--task-id", type=int)
+    task_event_list.add_argument("--project-id", type=int)
+    task_event_list.add_argument("--project")
+    task_event_list.set_defaults(func=cmd_task_event_list)
+
+    task_event_create = subparsers.add_parser("task-event-create", help="Create a structured automation event for one task.")
+    task_event_create_group = task_event_create.add_mutually_exclusive_group(required=True)
+    task_event_create_group.add_argument("--task")
+    task_event_create_group.add_argument("--task-id", type=int)
+    task_event_create.add_argument("--project-id", type=int)
+    task_event_create.add_argument("--project")
+    task_event_create.add_argument("--source", required=True)
+    task_event_create.add_argument("--kind", required=True)
+    task_event_create.add_argument("--title", required=True)
+    task_event_create.add_argument("--summary", required=True)
+    task_event_create.add_argument("--severity", choices=["info", "success", "warning", "error"], default="info")
+    task_event_create.add_argument("--icon")
+    task_event_create_data_group = task_event_create.add_mutually_exclusive_group()
+    task_event_create_data_group.add_argument("--data-json")
+    task_event_create_data_group.add_argument("--data-file")
+    task_event_create_fallback_group = task_event_create.add_mutually_exclusive_group()
+    task_event_create_fallback_group.add_argument("--fallback-comment")
+    task_event_create_fallback_group.add_argument("--fallback-comment-file")
+    task_event_create.set_defaults(func=cmd_task_event_create)
+
     task_label_list = subparsers.add_parser("task-label-list", help="List tags for one task.")
     task_label_list_group = task_label_list.add_mutually_exclusive_group(required=True)
     task_label_list_group.add_argument("--task")
@@ -1844,6 +2085,14 @@ def build_parser() -> argparse.ArgumentParser:
     task_label_list.add_argument("--project-id", type=int)
     task_label_list.add_argument("--project")
     task_label_list.set_defaults(func=cmd_task_label_list)
+
+    task_label_reason_list = subparsers.add_parser("task-label-reason-list", help="List tags for one task with reason metadata when available.")
+    task_label_reason_list_group = task_label_reason_list.add_mutually_exclusive_group(required=True)
+    task_label_reason_list_group.add_argument("--task")
+    task_label_reason_list_group.add_argument("--task-id", type=int)
+    task_label_reason_list.add_argument("--project-id", type=int)
+    task_label_reason_list.add_argument("--project")
+    task_label_reason_list.set_defaults(func=cmd_task_label_reason_list)
 
     task_label_add = subparsers.add_parser("task-label-add", help="Add a tag to one task.")
     task_label_add_group = task_label_add.add_mutually_exclusive_group(required=True)
@@ -1854,6 +2103,10 @@ def build_parser() -> argparse.ArgumentParser:
     task_label_add_label_group = task_label_add.add_mutually_exclusive_group(required=True)
     task_label_add_label_group.add_argument("--label-id", type=int)
     task_label_add_label_group.add_argument("--title", "--label", dest="title")
+    task_label_add.add_argument("--reason")
+    task_label_add_details_group = task_label_add.add_mutually_exclusive_group()
+    task_label_add_details_group.add_argument("--details-json")
+    task_label_add_details_group.add_argument("--details-file")
     task_label_add.set_defaults(func=cmd_task_label_add)
 
     task_label_remove = subparsers.add_parser("task-label-remove", help="Remove a tag from one task.")

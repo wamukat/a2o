@@ -9,7 +9,8 @@
 A2O Engine は現在、`tools/kanban/cli.py` と互換のコマンド契約を通じてカンバンと通信する。ランタイムは次の操作を使う。
 
 - 読み取り操作: `task-snapshot-list`、`task-watch-summary-list`、`task-get`、`task-label-list`、`task-relation-list`、`task-find`
-- 書き込み操作: `task-transition`、`task-comment-create`、`task-create`、`label-ensure`、`task-label-add`、`task-label-remove`、`task-relation-create`
+- 対応している場合に読む構造化メタデータ: `task-label-reason-list`、`task-event-list`
+- 書き込み操作: `task-transition`、`task-comment-create`、`task-create`、`label-ensure`、`task-label-add`、`task-label-remove`、`task-relation-create`、`task-event-create`
 - テキスト受け渡し: 長い説明文やコメントは、シェルクォートと引数長の問題を避けるため `--*-file` 形式のオプションを使う。
 
 コマンド契約は外部ツール向けの面である。内部では Ruby コードが進行処理の各所でサブプロセス呼び出しを散らさず、操作クライアント境界を通じてカンバンにアクセスする。
@@ -91,6 +92,19 @@ A2O 0.5.37 は `docker/a3-runtime/Dockerfile` に `python3` を残すが、`pyth
 - JSON オブジェクト / 配列の形の検証と即時失敗エラー
 
 現在のコマンド契約を維持するために、Kanbalone API や公開カンバン CLI の変更は不要である。
+
+## 理由付きタグと構造化イベント
+
+Kanbalone `v0.9.21` は、チケットに付与されたタグの任意の理由メタデータと、opaque な構造化チケットイベントを追加した。A2O の状態モデルは変えない。lane / status と現在付いているタグが引き続き authoritative であり、履歴イベントからタスク状態を推定しない。
+
+アダプターはこれらの API を保守的に公開する。
+
+- `task-label-add` は任意の `--reason` と `--details-json` / `--details-file` を受け取る。接続先 Kanbalone が理由付きタグ付与に対応している場合は理由メタデータを送る。古い Kanbalone では既存の `tagIds` 更新へ fallback し、理由メタデータは破棄する。
+- `task-label-reason-list` は対応時に現在のタグを `reason`、`details`、`reason_comment_id`、`attached_at` 付きで返す。古い Kanbalone では現在のタグ一覧に null の理由フィールドを付けて返す。
+- `task-event-create` は対応時に opaque な構造化イベントを書き込む。API がない場合、呼び出し側は `--fallback-comment` または `--fallback-comment-file` を渡し、アダプターが人間向け timeline comment を維持できるようにする。
+- `task-event-list` は対応時に構造化イベントを返し、API がない場合は空配列を返す。
+
+構造化イベントは automation log の surface であり、現在の status / tag モデルの置き換えではない。
 
 ## 複数行テキストの契約
 
