@@ -18,6 +18,7 @@
 | ワークスペース、リポジトリスロット、ブランチ名前空間 | [40-workspace-and-repo-slot-model.md](40-workspace-and-repo-slot-model.md) |
 | プロジェクトパッケージに公開する設定面 | [50-project-surface.md](50-project-surface.md) |
 | プロジェクトコマンド / ワーカー契約 | [55-project-script-contract.md](55-project-script-contract.md) |
+| メトリクス read 側データアクセス契約 | [58-metrics-data-access.md](58-metrics-data-access.md) |
 | 証跡、ブロック診断、再実行 | [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md) |
 | a2o-agent とのジョブ境界 | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
 | 自動チケット分解 MVP | [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md) |
@@ -169,6 +170,7 @@ A2O の全体像と導入手順を扱う。
 
 - [50-project-surface.md](50-project-surface.md)
 - [55-project-script-contract.md](55-project-script-contract.md)
+- [58-metrics-data-access.md](58-metrics-data-access.md)
 - [../user/90-project-package-schema.md](../user/90-project-package-schema.md)
 - [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md)
 

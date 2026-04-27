@@ -18,6 +18,7 @@ Read this document first to understand runtime flow and responsibility boundarie
 | Workspaces, repo slots, and branch namespace | [40-workspace-and-repo-slot-model.md](40-workspace-and-repo-slot-model.md) |
 | Configuration surface exposed to project packages | [50-project-surface.md](50-project-surface.md) |
 | Project command and worker contract | [55-project-script-contract.md](55-project-script-contract.md) |
+| Metrics read-side data access contract | [58-metrics-data-access.md](58-metrics-data-access.md) |
 | Evidence, blocked diagnosis, and reruns | [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md) |
 | Job boundary with `a2o-agent` | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
 | Automated ticket decomposition MVP | [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md) |
@@ -169,6 +170,7 @@ Covers fixed repo slots, synchronization, freshness, retention, garbage collecti
 
 - [50-project-surface.md](50-project-surface.md)
 - [55-project-script-contract.md](55-project-script-contract.md)
+- [58-metrics-data-access.md](58-metrics-data-access.md)
 - [../user/90-project-package-schema.md](../user/90-project-package-schema.md)
 - [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md)
 

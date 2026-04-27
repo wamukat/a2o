@@ -97,6 +97,8 @@ Projects may choose policy and live target ref, but they do not choose `merge_to
 
 A2O core exposes metrics through repository storage and CLI exports (`metrics list`, `metrics summary`). Grafana, spreadsheets, and BI dashboards are external consumers of those exports. The runtime core should not grow a dashboard server, Grafana provisioning layer, or product-specific reporting schema until the export contract proves insufficient.
 
+The read-side contract and follow-up dashboard/API boundary are defined in [58-metrics-data-access.md](58-metrics-data-access.md).
+
 ## 9. Presets
 
 The 0.5.37 public package format is single-file `project.yaml`. Internal presets may remain implementation details, but package authors should not have to manage separate preset or manifest files.

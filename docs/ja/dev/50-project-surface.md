@@ -100,6 +100,8 @@ runtime:
 
 A2O core は repository storage と CLI export（`metrics list`、`metrics summary`）でメトリクスを公開する。Grafana、表計算ソフト、BI ダッシュボードはこれらの export の外部 consumer である。export 契約が不足していると分かるまでは、runtime core に dashboard server、Grafana provisioning layer、プロダクト固有 reporting schema を持ち込まない。
 
+read 側の契約と後続 dashboard/API 境界は [58-metrics-data-access.md](58-metrics-data-access.md) で定義する。
+
 ## 9. プリセット
 
 0.5.37 の公開パッケージ形式は、単一ファイルの `project.yaml` である。
