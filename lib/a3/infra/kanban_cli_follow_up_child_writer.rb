@@ -161,7 +161,7 @@ module A3
         relation_exists = child_relation_exists?(relations, parent_task_id: parent_external_task_id, child_task_id: task.fetch("id"))
         return if actual_title == canonical.fetch("title") &&
                   actual_description == canonical.fetch("description") &&
-                  compatible_labels?(labels, expected_labels) &&
+                  labels == expected_labels &&
                   relation_exists
 
         raise A3::Domain::ConfigurationError, "follow-up child payload mismatch for #{task.fetch('ref')}"
@@ -170,14 +170,6 @@ module A3
       def ensure_label(task_id, label)
         @client.run_command("label-ensure", "--project", @project, "--title", label)
         @client.run_command("task-label-add", "--project", @project, "--task-id", task_id.to_s, "--label", label)
-      end
-
-      def compatible_labels?(actual_labels, expected_labels)
-        return true if actual_labels == expected_labels
-        return false unless @follow_up_label == "a2o:follow-up-child"
-
-        legacy_expected = expected_labels.map { |label| label == "a2o:follow-up-child" ? "a3:follow-up-child" : label }.sort
-        actual_labels == legacy_expected || (actual_labels - ["a3:follow-up-child"]).sort == expected_labels
       end
 
       def ensure_relation(parent_task_id, child_task_id)

@@ -116,7 +116,7 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
     expect(result.summary).to eq("follow-up child creation failed")
   end
 
-  it "accepts an existing child with the legacy follow-up label and adds the public label" do
+  it "blocks when an existing child only has the legacy follow-up label" do
     description = <<~DESC.strip
       Parent: Sample#3140
       Repo scope: repo_beta
@@ -128,23 +128,12 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
       Details:
       legacy malformed params should redirect
     DESC
-    captured_argv = []
     responses = [
       [JSON.generate([{ "id" => 3200, "ref" => "Sample#3200", "title" => "Follow-up for Sample#3140 (repo_beta): redirect regression", "description" => description }]), "", success_status],
       [JSON.generate([{ "title" => "a3:follow-up-child" }, { "title" => "repo:ui-app" }, { "title" => "trigger:auto-implement" }]), "", success_status],
-      [JSON.generate({ "subtask" => [{ "id" => 3200 }] }), "", success_status],
-      ["{}", "", success_status], # label-ensure repo
-      ["{}", "", success_status], # label-add repo
-      ["{}", "", success_status], # label-ensure trigger
-      ["{}", "", success_status], # label-add trigger
-      ["{}", "", success_status], # label-ensure public follow-up
-      ["{}", "", success_status], # label-add public follow-up
       [JSON.generate({ "subtask" => [{ "id" => 3200 }] }), "", success_status]
     ]
-    allow(Open3).to receive(:capture3) do |*args|
-      captured_argv << args
-      responses.shift
-    end
+    allow(Open3).to receive(:capture3).and_return(*responses)
 
     result = writer.call(
       parent_task_ref: "Sample#3140",
@@ -153,12 +142,11 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
       disposition: disposition
     )
 
-    expect(result.success?).to be(true)
-    expect(result.child_refs).to eq(["Sample#3200"])
-    expect(captured_argv.any? { |args| args.include?("task-label-add") && args.include?("a2o:follow-up-child") }).to be(true)
+    expect(result.success?).to be(false)
+    expect(result.summary).to eq("follow-up child creation failed")
   end
 
-  it "accepts an existing child that already has both legacy and public follow-up labels" do
+  it "blocks when an existing child mixes legacy and public follow-up labels" do
     description = <<~DESC.strip
       Parent: Sample#3140
       Repo scope: repo_beta
@@ -173,13 +161,6 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
     responses = [
       [JSON.generate([{ "id" => 3200, "ref" => "Sample#3200", "title" => "Follow-up for Sample#3140 (repo_beta): redirect regression", "description" => description }]), "", success_status],
       [JSON.generate([{ "title" => "a2o:follow-up-child" }, { "title" => "a3:follow-up-child" }, { "title" => "repo:ui-app" }, { "title" => "trigger:auto-implement" }]), "", success_status],
-      [JSON.generate({ "subtask" => [{ "id" => 3200 }] }), "", success_status],
-      ["{}", "", success_status], # label-ensure repo
-      ["{}", "", success_status], # label-add repo
-      ["{}", "", success_status], # label-ensure trigger
-      ["{}", "", success_status], # label-add trigger
-      ["{}", "", success_status], # label-ensure public follow-up
-      ["{}", "", success_status], # label-add public follow-up
       [JSON.generate({ "subtask" => [{ "id" => 3200 }] }), "", success_status]
     ]
     allow(Open3).to receive(:capture3).and_return(*responses)
@@ -191,8 +172,8 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
       disposition: disposition
     )
 
-    expect(result.success?).to be(true)
-    expect(result.child_refs).to eq(["Sample#3200"])
+    expect(result.success?).to be(false)
+    expect(result.summary).to eq("follow-up child creation failed")
   end
 
   it "fails closed when no repo label is configured for the disposition scope" do
