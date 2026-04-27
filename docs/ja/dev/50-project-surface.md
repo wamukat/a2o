@@ -98,7 +98,7 @@ runtime:
 
 ## 8. メトリクス export とダッシュボード境界
 
-A2O core は repository storage と CLI export（`metrics list`、`metrics summary`）でメトリクスを公開する。Grafana、表計算ソフト、BI ダッシュボードはこれらの export の外部 consumer である。export 契約が不足していると分かるまでは、runtime core に dashboard server、Grafana provisioning layer、プロダクト固有 reporting schema を持ち込まない。
+A2O core は CLI export（`metrics list`、`metrics summary`、`metrics trends`）でメトリクスを公開する。Grafana、表計算ソフト、BI ダッシュボードはこれらの export の外部 consumer である。runtime storage layout は公開 read 契約ではない。export 契約が不足していると分かるまでは、runtime core に dashboard server、Grafana provisioning layer、プロダクト固有 reporting schema を持ち込まない。
 
 read 側の契約と後続 dashboard/API 境界は [58-metrics-data-access.md](58-metrics-data-access.md) で定義する。
 

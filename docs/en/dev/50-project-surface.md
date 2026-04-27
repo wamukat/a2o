@@ -95,7 +95,7 @@ Projects may choose policy and live target ref, but they do not choose `merge_to
 
 ## 8. Metrics Export And Dashboard Boundary
 
-A2O core exposes metrics through repository storage and CLI exports (`metrics list`, `metrics summary`). Grafana, spreadsheets, and BI dashboards are external consumers of those exports. The runtime core should not grow a dashboard server, Grafana provisioning layer, or product-specific reporting schema until the export contract proves insufficient.
+A2O core exposes metrics through CLI exports (`metrics list`, `metrics summary`, `metrics trends`). Grafana, spreadsheets, and BI dashboards are external consumers of those exports. The runtime storage layout is not a public read contract. The runtime core should not grow a dashboard server, Grafana provisioning layer, or product-specific reporting schema until the export contract proves insufficient.
 
 The read-side contract and follow-up dashboard/API boundary are defined in [58-metrics-data-access.md](58-metrics-data-access.md).
 
