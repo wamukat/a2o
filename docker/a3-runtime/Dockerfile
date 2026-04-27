@@ -82,8 +82,16 @@ RUN cp /opt/a2o/share/docker/compose/a2o-kanbalone.release.yml /opt/a2o/share/do
 
 COPY --from=agent-builder /opt/a2o/agents /opt/a2o/agents
 
-RUN ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a3 \
-    && ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a2o
+RUN ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a2o \
+    && printf '%s\n' \
+      '#!/usr/bin/env sh' \
+      'if [ "$1" = "agent" ] && [ "$2" = "package" ]; then' \
+      '  echo "removed A3 runtime package command: a3 agent package; migration_required=true replacement_command=\"a2o agent package\"" >&2' \
+      '  exit 2' \
+      'fi' \
+      'exec /tmp/a3-engine/bin/a3 "$@"' \
+      > /usr/local/bin/a3 \
+    && chmod 0755 /usr/local/bin/a3
 
 ENV A3_ROOT_DIR=/workspace
 ENV A2O_ROOT_DIR=/workspace

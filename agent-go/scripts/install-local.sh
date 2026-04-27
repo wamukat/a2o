@@ -15,6 +15,7 @@ mkdir -p "${BIN_DIR}"
 )
 
 rm -f "${BIN_DIR}/a3-agent" "${BIN_DIR}/a3"
+find "${BIN_DIR}" -maxdepth 1 -type f -name 'a3-*' -exec rm -f {} +
 
 echo "installed ${BIN_DIR}/a2o-agent"
 echo "installed ${BIN_DIR}/a2o"

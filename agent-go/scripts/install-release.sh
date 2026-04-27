@@ -80,7 +80,8 @@ else
 fi
 
 install -m 0755 "${binary_source}" "${BIN_DIR}/a2o-agent"
-rm -f "${BIN_DIR}/a3-agent"
+rm -f "${BIN_DIR}/a3-agent" "${BIN_DIR}/a3"
+find "${BIN_DIR}" -maxdepth 1 -type f -name 'a3-*' -exec rm -f {} +
 echo "installed ${BIN_DIR}/a2o-agent"
 if ! command -v a2o-agent >/dev/null 2>&1; then
   echo "note: ${BIN_DIR} is not currently on PATH"
