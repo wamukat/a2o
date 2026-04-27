@@ -87,6 +87,7 @@ module A3
           append_review_disposition_lines(result, execution.review_disposition)
           append_skill_feedback_lines(result, execution.skill_feedback)
           append_inherited_parent_lines(result, execution.diagnostics)
+          append_validation_error_lines(result, "execution_validation_error", execution.diagnostics)
           result << "failing_command=#{FormattingHelpers.diagnostic_value(execution.failing_command)}" if execution.failing_command
           result << "observed_state=#{execution.observed_state}" if execution.observed_state
           result << "worker_response_bundle=#{FormattingHelpers.diagnostic_value(execution.worker_response_bundle)}" if execution.worker_response_bundle
@@ -197,9 +198,25 @@ module A3
           result << "blocked_expected=#{diagnosis.expected_state}"
           result << "blocked_observed=#{diagnosis.observed_state}"
           result << "blocked_failing_command=#{FormattingHelpers.diagnostic_value(diagnosis.failing_command)}" if diagnosis.failing_command
+          append_validation_error_lines(result, "blocked_validation_error", diagnosis.infra_diagnostics)
           public_diagnostics(diagnosis.infra_diagnostics).sort.each do |key, value|
             result << "blocked_diagnostic.#{key}=#{FormattingHelpers.diagnostic_value(value)}"
           end
+        end
+
+        def append_validation_error_lines(result, label, diagnostics)
+          Array(validation_errors_from(diagnostics)).each do |error|
+            next if error.to_s.strip.empty?
+
+            result << "#{label}=#{FormattingHelpers.diagnostic_value(error)}"
+          end
+        end
+
+        def validation_errors_from(diagnostics)
+          return [] unless diagnostics.is_a?(Hash)
+
+          errors = diagnostics["validation_errors"]
+          errors.is_a?(Array) ? errors : []
         end
 
         def append_inherited_parent_lines(result, diagnostics)

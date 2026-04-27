@@ -234,10 +234,21 @@ module A3
           if diagnosis
             lines << "error_category=#{diagnosis.error_category}"
             lines << "remediation=#{diagnosis.remediation_summary}"
+            append_validation_error_lines(lines, diagnosis.infra_diagnostics)
             lines.concat([diagnosis.diagnostic_summary || diagnosis.observed_state].compact.map(&:to_s).reject(&:empty?))
           end
         end
         lines.freeze
+      end
+
+      def append_validation_error_lines(lines, diagnostics)
+        return unless diagnostics.is_a?(Hash)
+
+        Array(diagnostics["validation_errors"]).each do |error|
+          next if error.to_s.strip.empty?
+
+          lines << "validation_error=#{single_line(error)}"
+        end
       end
 
       def append_review_disposition_lines(lines, task_runs)

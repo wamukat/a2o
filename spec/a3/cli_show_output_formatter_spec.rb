@@ -253,7 +253,12 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
         observed_state: "repo-beta missing",
         failing_command: "codex exec --json -",
         diagnostic_summary: "review launch could not resolve runtime workspace",
-        infra_diagnostics: { "missing_path" => "/tmp/repo-beta" }
+        infra_diagnostics: {
+          "missing_path" => "/tmp/repo-beta",
+          "validation_errors" => [
+            "observed_state must be a string when success is false unless rework_required is true"
+          ]
+        }
       ),
       evidence_summary: evidence_summary,
       recovery: recovery,
@@ -299,6 +304,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     expect(result).to include("runtime_package_networking_boundary=outbound=git,issue_api,package_registry,llm_gateway,verification_service secret_source=secret_store token_scope=project")
     expect(result).to include("runtime_package_upgrade_contract=image_upgrade=independent project_config_schema_version=1 preset_schema_version=1 state_migration=explicit")
     expect(result).to include("runtime_package_fail_fast_policy=project_config_schema_mismatch=fail_fast preset_schema_conflict=fail_fast writable_mount_missing=fail_fast secret_missing=fail_fast scheduler_store_migration_pending=fail_fast")
+    expect(result).to include("validation_error=observed_state must be a string when success is false unless rework_required is true")
     expect(result).to include("diagnostic.missing_path=/tmp/repo-beta")
   end
 
@@ -684,7 +690,12 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
         observed_state: "repo-beta missing",
         failing_command: "codex exec --json -",
         diagnostic_summary: "review launch could not resolve runtime workspace",
-        infra_diagnostics: { "missing_path" => "/tmp/repo-beta" }
+        infra_diagnostics: {
+          "missing_path" => "/tmp/repo-beta",
+          "validation_errors" => [
+            "failing_command must be a string when success is false unless rework_required is true"
+          ]
+        }
       ),
         execution_record: A3::Domain::PhaseExecutionRecord.new(
           summary: "review launch could not resolve runtime workspace",
@@ -692,6 +703,9 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
           observed_state: "repo-beta missing",
           diagnostics: {
             "missing_path" => "/tmp/repo-beta",
+            "validation_errors" => [
+              "observed_state must be a string when success is false unless rework_required is true"
+            ],
             "worker_response_bundle" => {
               "success" => false,
               "summary" => "review blocked",
@@ -745,6 +759,8 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     expect(result).to include("runtime_package_action=inspect_runtime_package")
     expect(result).to include("runtime_package_guidance=run doctor-runtime and inspect repo sources, secret delivery, and scheduler store migration before rerun")
     expect(result).to include("runtime merge_target=merge_to_parent merge_policy=ff_only")
+    expect(result).to include("execution_validation_error=observed_state must be a string when success is false unless rework_required is true")
+    expect(result).to include("blocked_validation_error=failing_command must be a string when success is false unless rework_required is true")
     expect(result).to include("blocked_diagnostic.missing_path=/tmp/repo-beta")
     expect(result).not_to include(a_string_matching(/control_plane_url/))
   end

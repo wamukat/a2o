@@ -138,7 +138,11 @@ RSpec.describe A3::Application::ShowWatchSummary do
         observed_state: "git add failed",
         failing_command: "git add",
         diagnostic_summary: "publish failed",
-        infra_diagnostics: {}
+        infra_diagnostics: {
+          "validation_errors" => [
+            "observed_state must be a string when success is false unless rework_required is true"
+          ]
+        }
       )
     )
     run_repository.save(blocked_run)
@@ -158,6 +162,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(result.tasks.find { |item| item.ref == "Sample#2" }.blocked_lines).to eq([
       "error_category=executor_failed",
       "remediation=executor command が agent 環境で実行可能か、必要な binary と認証、出力 JSON を確認してください。",
+      "validation_error=observed_state must be a string when success is false unless rework_required is true",
       "publish failed"
     ])
     expect(result.tasks.find { |item| item.ref == "Sample#3" }.waiting).to be(true)

@@ -33,6 +33,7 @@ module A3
               output << "inherited_parent_state ref=#{FormattingHelpers.diagnostic_value(inherited_ref)} fingerprint=#{FormattingHelpers.diagnostic_value(inherited_fingerprint)}"
             end
             output << "worker_response_bundle=#{FormattingHelpers.diagnostic_value(worker_response_bundle)}" if worker_response_bundle
+            append_validation_error_lines(output, diagnosis.infra_diagnostics)
             output << "recovery decision=#{recovery.decision} next_action=#{recovery.next_action} operator_action_required=#{recovery.operator_action_required}"
             output << "runtime_package_action=#{recovery.package_expectation}"
             output << "runtime_package_guidance=#{recovery.runtime_package_guidance}" if recovery.runtime_package_guidance
@@ -90,6 +91,16 @@ module A3
 
               output << "diagnostic.#{key}=#{FormattingHelpers.diagnostic_value(value)}"
             end
+          end
+        end
+
+        def append_validation_error_lines(output, diagnostics)
+          return unless diagnostics.is_a?(Hash)
+
+          Array(diagnostics["validation_errors"]).each do |error|
+            next if error.to_s.strip.empty?
+
+            output << "validation_error=#{FormattingHelpers.diagnostic_value(error)}"
           end
         end
       end
