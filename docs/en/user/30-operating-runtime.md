@@ -45,11 +45,13 @@ a2o runtime status
 a2o runtime watch-summary
 a2o runtime logs [task-ref] --follow
 a2o runtime clear-logs --task-ref <task-ref>
+a2o runtime metrics list --format json
+a2o runtime metrics summary --group-by parent
 a2o runtime skill-feedback list
 a2o runtime skill-feedback propose --format ticket
 ```
 
-`runtime status` shows scheduler state, runtime container state, kanban instance information, image digest, and the latest run. `runtime watch-summary` shows where board tasks currently are. `runtime logs` gathers per-phase logs for one task and prefers AI raw logs when they are available. With `--follow`, it follows the current phase AI raw live log first and falls back to the legacy live log when the worker does not expose AI raw output. If no task ref is given and exactly one task is running, `runtime logs --follow` selects that task automatically; use `--index N` when multiple tasks are running. When a parent task ref is given, `--follow` selects an active child when one is running; pass `--no-children` to follow the parent task itself. `runtime skill-feedback list` lists reusable skill improvement candidates reported by workers, with `--state`, `--target`, and `--group` for filtering and duplicate grouping. `runtime skill-feedback propose` converts candidates into a ticket body or draft patch, but it does not modify skill files automatically. `runtime clear-logs` is the explicit cleanup surface for persisted analysis logs; it is dry-run by default and only deletes when `--apply` is added.
+`runtime status` shows scheduler state, runtime container state, kanban instance information, image digest, and the latest run. `runtime watch-summary` shows where board tasks currently are. `runtime logs` gathers per-phase logs for one task and prefers AI raw logs when they are available. With `--follow`, it follows the current phase AI raw live log first and falls back to the legacy live log when the worker does not expose AI raw output. If no task ref is given and exactly one task is running, `runtime logs --follow` selects that task automatically; use `--index N` when multiple tasks are running. When a parent task ref is given, `--follow` selects an active child when one is running; pass `--no-children` to follow the parent task itself. `runtime metrics list` exports stored task metrics as JSON or CSV. `runtime metrics summary` prints a compact rollup by task, or by parent with `--group-by parent`. `runtime skill-feedback list` lists reusable skill improvement candidates reported by workers, with `--state`, `--target`, and `--group` for filtering and duplicate grouping. `runtime skill-feedback propose` converts candidates into a ticket body or draft patch, but it does not modify skill files automatically. `runtime clear-logs` is the explicit cleanup surface for persisted analysis logs; it is dry-run by default and only deletes when `--apply` is added.
 
 Use `describe-task` for one task.
 
@@ -175,6 +177,8 @@ Move from broad checks to narrow checks.
 | Progress across tasks | `a2o runtime watch-summary` |
 | Aggregated task logs | `a2o runtime logs <task-ref>` or `a2o runtime logs --follow` |
 | One task's run / evidence / logs | `a2o runtime describe-task <task-ref>` |
+| Metrics export | `a2o runtime metrics list --format json` or `a2o runtime metrics list --format csv` |
+| Metrics rollup | `a2o runtime metrics summary --group-by parent` |
 | Reusable skill improvement candidates | `a2o runtime skill-feedback list` |
 | Draft a skill improvement proposal | `a2o runtime skill-feedback propose --format ticket` |
 

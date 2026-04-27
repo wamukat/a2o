@@ -265,6 +265,42 @@ runtime:
 The simple list form remains the recommended default. Use variants when the package would otherwise hide task-kind or repo-slot policy in helper code.
 `default` may be specified at the top level, under a `task_kind`, or under a `repo_scope`; the most specific matching value wins.
 
+### Metrics Collection
+
+`runtime.phases.metrics.commands` is optional. When present, A2O runs these commands only after verification succeeds.
+
+```yaml
+runtime:
+  phases:
+    metrics:
+      commands:
+        - app/project-package/commands/collect-metrics.sh
+```
+
+The command is a project-owned reporting hook. It receives the normal worker request environment and `command_intent=metrics_collection`. It must print a JSON object to stdout. The object may contain:
+
+```json
+{
+  "code_changes": { "lines_added": 10, "lines_deleted": 2, "files_changed": 1 },
+  "tests": { "passed_count": 12, "failed_count": 0, "skipped_count": 1 },
+  "coverage": { "line_percent": 84.2 },
+  "timing": {},
+  "cost": {},
+  "custom": { "suite": "smoke" }
+}
+```
+
+A2O adds `task_ref`, `parent_ref`, and `timestamp` from runtime context when storing the record. If the command output includes these metadata fields, they must match the runtime context. Each top-level section must be a JSON object. Invalid JSON, unknown top-level sections, or invalid section shapes are recorded in the verification diagnostics under `metrics_collection`; they do not hide the successful verification result.
+
+Stored records can be exported with:
+
+```sh
+a2o runtime metrics list --format json
+a2o runtime metrics list --format csv
+a2o runtime metrics summary
+a2o runtime metrics summary --group-by parent --format json
+```
+
 ## Template Generator
 
 New packages should start from the generator instead of hand-writing executor blocks.

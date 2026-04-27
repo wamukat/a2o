@@ -24,6 +24,7 @@ The project package owns:
 - product build, test, verification, and remediation commands
 - project-specific bootstrap such as local dependency cache preparation
 - support repo setup required by that product
+- optional metrics collection commands
 - the AI or deterministic executor command selected for implementation and review
 
 Project scripts must not depend on private runtime files such as `.a2o/workspace.json`, `.a2o/slot.json`, `.a2o/worker-request.json`, `.a2o/worker-result.json`, generated `launcher.json`, or internal A3 environment names.
@@ -55,6 +56,8 @@ Verification and remediation commands may use:
 - `{{a2o_root_dir}}`
 - `{{root_dir}}`
 
+Metrics collection commands use the same command placeholder set as verification and remediation commands. They run only after successful verification.
+
 ## Worker Environment
 
 Project worker, verification, and remediation commands should use these environment variables:
@@ -74,6 +77,7 @@ The worker request JSON is the source of truth for project scripts. It includes:
 - `task_ref`, `run_ref`, and `phase`
 - `skill`
 - `command_intent` for verification and remediation command jobs
+- `command_intent=metrics_collection` for metrics jobs
 - `task_packet.title` and `task_packet.description`
 - `slot_paths`, keyed by repo slot alias
 - `phase_runtime`, including task kind and verification commands when relevant
@@ -82,6 +86,21 @@ The worker request JSON is the source of truth for project scripts. It includes:
 Scripts should read repo paths from `slot_paths` rather than assuming a workspace directory layout.
 For slot-local remediation, the command working directory may be a repo slot while `A2O_WORKSPACE_ROOT` and `slot_paths` still describe the full prepared workspace.
 Do not read private `.a2o/.a3` metadata directly; use `A2O_WORKER_REQUEST_PATH`.
+
+## Metrics Result Contract
+
+Metrics collection commands do not write a worker result file. They print one JSON object to stdout. A2O stores the object as a task metrics record after merging runtime-owned metadata.
+
+Allowed project-owned top-level sections are:
+
+- `code_changes`
+- `tests`
+- `coverage`
+- `timing`
+- `cost`
+- `custom`
+
+Each section must be a JSON object. If the command includes `task_ref`, `parent_ref`, or `timestamp`, those values must match runtime context; otherwise A2O supplies them. Invalid JSON, unsupported sections, and non-object section values are recorded as metrics diagnostics and do not hide the successful verification result.
 
 ## Result Contract
 

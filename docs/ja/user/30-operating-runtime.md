@@ -45,11 +45,13 @@ a2o runtime status
 a2o runtime watch-summary
 a2o runtime logs [task-ref] --follow
 a2o runtime clear-logs --task-ref <task-ref>
+a2o runtime metrics list --format json
+a2o runtime metrics summary --group-by parent
 a2o runtime skill-feedback list
 a2o runtime skill-feedback propose --format ticket
 ```
 
-`runtime status` はスケジューラ、ランタイムコンテナ、カンバン、イメージダイジェスト、最新実行の状態を見る。`runtime watch-summary` はタスク一覧の現在位置を見る。`runtime logs` は 1 タスクのフェーズ別ログをまとめて読み、AI raw log があればそれを優先して表示する。`--follow` を付けると現在フェーズの AI raw live log を優先して追い、未対応 worker では従来の live log にフォールバックする。task ref を省略して実行中タスクが 1 件だけなら、`runtime logs --follow` はそのタスクを自動選択する。実行中タスクが複数ある場合は `--index N` で選択する。親タスク ref を指定した場合、`--follow` は実行中の子タスクを優先して選び、親自身を追う場合は `--no-children` を指定する。`runtime skill-feedback list` は worker が報告した再利用可能な skill 改善候補を一覧表示し、`--state` / `--target` / `--group` で絞り込みや重複集約ができる。`runtime skill-feedback propose` は候補をチケット本文または draft patch に変換するが、skill ファイルは自動変更しない。`runtime clear-logs` は永続化された分析用ログを明示的に整理するコマンドで、デフォルトは dry-run、実削除は `--apply` 指定時だけである。
+`runtime status` はスケジューラ、ランタイムコンテナ、カンバン、イメージダイジェスト、最新実行の状態を見る。`runtime watch-summary` はタスク一覧の現在位置を見る。`runtime logs` は 1 タスクのフェーズ別ログをまとめて読み、AI raw log があればそれを優先して表示する。`--follow` を付けると現在フェーズの AI raw live log を優先して追い、未対応 worker では従来の live log にフォールバックする。task ref を省略して実行中タスクが 1 件だけなら、`runtime logs --follow` はそのタスクを自動選択する。実行中タスクが複数ある場合は `--index N` で選択する。親タスク ref を指定した場合、`--follow` は実行中の子タスクを優先して選び、親自身を追う場合は `--no-children` を指定する。`runtime metrics list` は保存済みタスクメトリクスを JSON または CSV で export する。`runtime metrics summary` はタスク単位の集計を表示し、`--group-by parent` で親単位の集計にできる。`runtime skill-feedback list` は worker が報告した再利用可能な skill 改善候補を一覧表示し、`--state` / `--target` / `--group` で絞り込みや重複集約ができる。`runtime skill-feedback propose` は候補をチケット本文または draft patch に変換するが、skill ファイルは自動変更しない。`runtime clear-logs` は永続化された分析用ログを明示的に整理するコマンドで、デフォルトは dry-run、実削除は `--apply` 指定時だけである。
 
 特定タスクを深く見る場合は `describe-task` を使う。
 
@@ -175,6 +177,8 @@ a2o runtime status
 | タスク一覧の進行状況を見る | `a2o runtime watch-summary` |
 | 1 タスクのログをまとめて見る | `a2o runtime logs <task-ref>` または `a2o runtime logs --follow` |
 | 1 タスクの実行 / 証跡 / ログを見る | `a2o runtime describe-task <task-ref>` |
+| メトリクスを export する | `a2o runtime metrics list --format json` または `a2o runtime metrics list --format csv` |
+| メトリクスを集計する | `a2o runtime metrics summary --group-by parent` |
 | 再利用可能な skill 改善候補を見る | `a2o runtime skill-feedback list` |
 | skill 改善候補を提案本文にする | `a2o runtime skill-feedback propose --format ticket` |
 

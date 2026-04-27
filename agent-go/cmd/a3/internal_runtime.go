@@ -102,6 +102,12 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
+	case "metrics":
+		if err := runRuntimeMetrics(args[1:], runner, stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
 	case "logs":
 		if err := runRuntimeLogs(args[1:], runner, stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)
@@ -1251,6 +1257,58 @@ func runRuntimeSkillFeedback(args []string, runner commandRunner, stdout io.Writ
 			runtimeArgs = append(runtimeArgs, "--format", format)
 		}
 		output, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "skill_feedback", runtimeArgs...)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(output) != "" {
+			fmt.Fprint(stdout, output)
+			if !strings.HasSuffix(output, "\n") {
+				fmt.Fprintln(stdout)
+			}
+		}
+		return nil
+	})
+}
+
+func runRuntimeMetrics(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	if len(args) == 0 || (args[0] != "list" && args[0] != "summary") {
+		return fmt.Errorf("usage: a2o runtime metrics (list|summary)")
+	}
+	subcommand := args[0]
+	flags := flag.NewFlagSet("a2o runtime metrics "+subcommand, flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	format := "json"
+	groupBy := "task"
+	if subcommand == "list" {
+		flags.StringVar(&format, "format", "json", "output format: json or csv")
+	}
+	if subcommand == "summary" {
+		format = "text"
+		flags.StringVar(&format, "format", "text", "output format: text or json")
+		flags.StringVar(&groupBy, "group-by", "task", "summary grouping: task or parent")
+	}
+	if err := flags.Parse(args[1:]); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
+	}
+
+	config, _, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	return withComposeEnv(effectiveConfig, func() error {
+		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
+		if err != nil {
+			return err
+		}
+		runtimeArgs := []string{"a3", "metrics", subcommand, "--storage-backend", "json", "--storage-dir", plan.StorageDir, "--format", format}
+		if subcommand == "summary" {
+			runtimeArgs = append(runtimeArgs, "--group-by", groupBy)
+		}
+		output, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "metrics", runtimeArgs...)
 		if err != nil {
 			return err
 		}

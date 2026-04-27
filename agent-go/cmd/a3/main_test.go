@@ -5441,6 +5441,84 @@ func TestRuntimeSkillFeedbackProposeUsesRuntimeStorage(t *testing.T) {
 	}
 }
 
+func TestRuntimeMetricsListUsesRuntimeStorage(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "metrics", "list", "--format", "csv"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "task_ref,parent_ref,timestamp") {
+		t.Fatalf("metrics list should print runtime output, got:\n%s", stdout.String())
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	want := "docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 metrics list --storage-backend json --storage-dir /var/lib/a3/test-runtime --format csv"
+	if !strings.Contains(joined, want) {
+		t.Fatalf("metrics list missing call %q in:\n%s", want, joined)
+	}
+}
+
+func TestRuntimeMetricsSummaryUsesRuntimeStorage(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "metrics", "summary", "--group-by", "parent", "--format", "json"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if !strings.Contains(stdout.String(), `"group_key":"A2O#100"`) {
+		t.Fatalf("metrics summary should print runtime output, got:\n%s", stdout.String())
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	want := "docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 metrics summary --storage-backend json --storage-dir /var/lib/a3/test-runtime --format json --group-by parent"
+	if !strings.Contains(joined, want) {
+		t.Fatalf("metrics summary missing call %q in:\n%s", want, joined)
+	}
+}
+
 func TestRuntimeWatchSummaryShowsStoppedWhenSchedulerPIDFileIsMissing(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -7333,6 +7411,10 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		return []byte("Scheduler: running\nTask Tree\nNext\nRunning\n"), nil
 	case strings.Contains(joined, "skill-feedback-list") || strings.Contains(joined, "skill-feedback-propose"):
 		return []byte("skill_feedback task=A2O#16 run=run-16 phase=implementation category=missing_context target=project_skill\nskill_feedback_summary=Add fixture update guidance.\n"), nil
+	case strings.Contains(joined, " a3 metrics list "):
+		return []byte("task_ref,parent_ref,timestamp,code_changes,tests,coverage,timing,cost,custom\nA2O#101,A2O#100,2026-04-27T01:00:00Z,{},{},{},{},{},{}\n"), nil
+	case strings.Contains(joined, " a3 metrics summary "):
+		return []byte(`[{"group_key":"A2O#100","record_count":1,"task_count":1}]` + "\n"), nil
 	case strings.Contains(joined, " task-get "):
 		return []byte(`{"task_ref":"A2O#16","status":"Blocked"}` + "\n"), nil
 	case strings.Contains(joined, " task-comment-list "):

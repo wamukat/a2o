@@ -25,6 +25,7 @@ Project packages may configure:
 - implementation/review executor commands
 - verification commands
 - remediation commands
+- optional metrics collection commands
 - repo slots and labels
 - merge policy and live target ref within A2O-supported choices
 
@@ -72,7 +73,13 @@ Verification and remediation commands are project-owned. They run in the materia
 
 Remediation commands are used when verification fails and the package has a deterministic formatting or repair command.
 
-## 6. Merge
+## 6. Metrics Collection
+
+Metrics collection is an optional project-owned phase surface. It is deliberately narrower than the evidence model: project commands may report lightweight JSON sections such as code changes, tests, coverage, timing, cost, and custom project fields. A2O owns runtime metadata (`task_ref`, `parent_ref`, `timestamp`) and stores the normalized record.
+
+Metrics commands run after successful verification. Invalid metrics output is diagnostic data for the operator and must not change verification success into a failure.
+
+## 7. Merge
 
 Merge is configured with a project-owned policy and live target ref. A2O derives the actual merge target from task topology:
 
@@ -86,6 +93,10 @@ runtime:
 
 Projects may choose policy and live target ref, but they do not choose `merge_to_live` or `merge_to_parent` inside `project.yaml`.
 
-## 7. Presets
+## 8. Metrics Export And Dashboard Boundary
+
+A2O core exposes metrics through repository storage and CLI exports (`metrics list`, `metrics summary`). Grafana, spreadsheets, and BI dashboards are external consumers of those exports. The runtime core should not grow a dashboard server, Grafana provisioning layer, or product-specific reporting schema until the export contract proves insufficient.
+
+## 9. Presets
 
 The 0.5.36 public package format is single-file `project.yaml`. Internal presets may remain implementation details, but package authors should not have to manage separate preset or manifest files.

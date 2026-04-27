@@ -258,6 +258,42 @@ runtime:
 単純なリスト形式を既定とする。ヘルパーコードにタスク種別やリポジトリスロット方針が隠れてしまう場合だけ variants を使う。
 `default` はトップレベル、`task_kind` 配下、`repo_scope` 配下に指定できる。より具体的に一致した値が優先される。
 
+### メトリクス収集
+
+`runtime.phases.metrics.commands` は任意設定である。指定した場合、A2O は検証が成功した後にだけこれらのコマンドを実行する。
+
+```yaml
+runtime:
+  phases:
+    metrics:
+      commands:
+        - app/project-package/commands/collect-metrics.sh
+```
+
+このコマンドはプロジェクト所有のレポート用 hook である。通常のワーカー要求環境を受け取り、`command_intent=metrics_collection` が入る。stdout に JSON オブジェクトを 1 つ出す必要がある。オブジェクトには次を含められる。
+
+```json
+{
+  "code_changes": { "lines_added": 10, "lines_deleted": 2, "files_changed": 1 },
+  "tests": { "passed_count": 12, "failed_count": 0, "skipped_count": 1 },
+  "coverage": { "line_percent": 84.2 },
+  "timing": {},
+  "cost": {},
+  "custom": { "suite": "smoke" }
+}
+```
+
+A2O は保存時に runtime context から `task_ref`、`parent_ref`、`timestamp` を追加する。コマンド出力にこれらのメタデータが含まれる場合は、runtime context と一致していなければならない。各トップレベルセクションは JSON オブジェクトでなければならない。不正 JSON、未知のトップレベルセクション、不正なセクション形状は、verification diagnostics の `metrics_collection` に記録される。成功済みの検証結果は隠さない。
+
+保存された record は次で export できる。
+
+```sh
+a2o runtime metrics list --format json
+a2o runtime metrics list --format csv
+a2o runtime metrics summary
+a2o runtime metrics summary --group-by parent --format json
+```
+
 通常のパッケージでは実装フェーズとレビューフェーズを定義する。
 
 ```yaml

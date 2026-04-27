@@ -215,6 +215,40 @@ Good remediation commands are conservative:
 - avoid changing product behavior
 - avoid committing, pushing, or editing kanban state
 
+## Optional Metrics Collection
+
+Projects may add an optional metrics command that runs after successful verification. This is for lightweight operational reporting; it does not affect whether verification passed.
+
+```yaml
+runtime:
+  phases:
+    metrics:
+      commands:
+        - app/project-package/commands/collect-metrics.sh
+```
+
+The command runs in the prepared workspace with `command_intent=metrics_collection` in the worker request. It should print one JSON object to stdout. A2O owns `task_ref`, `parent_ref`, and `timestamp`; the project may provide these sections:
+
+- `code_changes`
+- `tests`
+- `coverage`
+- `timing`
+- `cost`
+- `custom`
+
+Unsupported top-level sections or non-object section values are recorded as metrics collection diagnostics. They do not turn a successful verification into a failed verification.
+
+Use the runtime metrics exports for reporting:
+
+```sh
+a2o runtime metrics list --format json
+a2o runtime metrics list --format csv
+a2o runtime metrics summary
+a2o runtime metrics summary --group-by parent --format json
+```
+
+Grafana, spreadsheets, and BI tools should consume these exports or downstream copies of them. They are not required runtime dependencies for the first metrics implementation.
+
 ## Phase Skills
 
 Skills are project-owned instructions for workers. Keep them focused on decisions the worker cannot infer safely.

@@ -218,6 +218,40 @@ runtime:
 
 コマンドがタスク種別やリポジトリスロットによって変わる場合だけ、`project.yaml` の variants を使う。単純なパッケージでは既定のコマンドを優先する。
 
+## 任意のメトリクス収集
+
+プロジェクトは、検証成功後にだけ動く任意のメトリクス収集コマンドを追加できる。これは軽量な運用レポート用であり、検証が成功したかどうかの判定には影響しない。
+
+```yaml
+runtime:
+  phases:
+    metrics:
+      commands:
+        - app/project-package/commands/collect-metrics.sh
+```
+
+このコマンドは準備済みワークスペースで実行され、ワーカー要求には `command_intent=metrics_collection` が入る。コマンドは JSON オブジェクトを 1 つ stdout に出す。A2O は `task_ref`、`parent_ref`、`timestamp` を所有し、プロジェクトは次のセクションを返せる。
+
+- `code_changes`
+- `tests`
+- `coverage`
+- `timing`
+- `cost`
+- `custom`
+
+未対応のトップレベルセクションや、オブジェクトではないセクション値は、メトリクス収集診断として記録される。成功済みの検証を失敗にはしない。
+
+レポートにはランタイムのメトリクス export を使う。
+
+```sh
+a2o runtime metrics list --format json
+a2o runtime metrics list --format csv
+a2o runtime metrics summary
+a2o runtime metrics summary --group-by parent --format json
+```
+
+Grafana、表計算ソフト、BI ツールは、これらの export またはその下流コピーを読む。初期のメトリクス実装では、これらはランタイムの必須依存ではない。
+
 ## タスクテンプレートの位置づけ
 
 タスクテンプレートは、人間がカンバンタスクを作るときの入力例である。ランタイムがタスクテンプレートを読んで自動実行するわけではない。
