@@ -168,7 +168,20 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     )
     run_repository.save(review_run.append_blocked_diagnosis(blocked_diagnosis))
 
-    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :blocked, task_kind: :child)
+    expect(status_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      status: :blocked,
+      task_kind: :child,
+      status_reason: "review found runner-layout gap in repo-alpha",
+      status_details: hash_including(
+        "run_ref" => "run-1",
+        "phase" => "review",
+        "expected_state" => "review succeeds",
+        "observed_state" => "findings remain",
+        "failing_command" => "review_worker"
+      )
+    )
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
@@ -179,6 +192,67 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(result.task.status).to eq(:blocked)
     expect(result.task.current_run_ref).to be_nil
     expect(result.run.terminal_outcome).to eq(:blocked)
+  end
+
+  it "publishes clarification request details when a run needs clarification" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :in_progress,
+      current_run_ref: "run-1",
+      external_task_id: 3025
+    )
+    clarification = {
+      "question" => "Should this override existing retry behavior?",
+      "context" => "Requirement conflicts with the existing retry policy.",
+      "options" => ["override existing", "new tasks only"],
+      "recommended_option" => "new tasks only",
+      "impact" => "Blocks implementation until scope is clear."
+    }
+    execution = A3::Application::ExecutionResult.new(
+      success: false,
+      summary: "clarification required",
+      response_bundle: {
+        "rework_required" => false,
+        "clarification_request" => clarification
+      }
+    )
+    task_repository.save(task)
+    run_repository.save(
+      run.append_phase_evidence(
+        phase: run.phase,
+        source_descriptor: run.source_descriptor,
+        scope_snapshot: run.scope_snapshot,
+        execution_record: A3::Domain::PhaseExecutionRecord.from_execution_result(execution)
+      )
+    )
+
+    expect(status_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      status: :needs_clarification,
+      task_kind: :child,
+      status_reason: "Should this override existing retry behavior?",
+      status_details: hash_including(
+        "run_ref" => "run-1",
+        "phase" => "implementation",
+        "context" => "Requirement conflicts with the existing retry policy.",
+        "options" => ["override existing", "new tasks only"],
+        "recommended_option" => "new tasks only",
+        "impact" => "Blocks implementation until scope is clear."
+      )
+    )
+    expect(activity_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      body: a_string_matching(/確認依頼: Should this override existing retry behavior\?.*確認背景: Requirement conflicts with the existing retry policy/m)
+    )
+
+    result = use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :needs_clarification, execution: execution)
+
+    expect(result.task.status).to eq(:needs_clarification)
+    expect(result.run.terminal_outcome).to eq(:needs_clarification)
   end
 
   it "moves a completed merge run to done" do
@@ -328,7 +402,18 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       )
     )
 
-    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :blocked, task_kind: :child)
+    expect(status_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      status: :blocked,
+      task_kind: :child,
+      status_reason: "missing integration ref refs/heads/a2o/parent/A3-v2-3022 for slots repo_alpha",
+      status_details: hash_including(
+        "run_ref" => "run-9",
+        "phase" => "merge",
+        "failing_command" => "integration_ref_readiness_check"
+      )
+    )
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
@@ -547,7 +632,18 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     task_repository.save(parent_task)
     run_repository.save(parent_run)
 
-    expect(status_publisher).to receive(:publish).with(task_ref: parent_task.ref, external_task_id: 3140, status: :blocked, task_kind: :parent)
+    expect(status_publisher).to receive(:publish).with(
+      task_ref: parent_task.ref,
+      external_task_id: 3140,
+      status: :blocked,
+      task_kind: :parent,
+      status_reason: "parent review disposition handler is missing",
+      status_details: hash_including(
+        "run_ref" => "run-parent-review-1",
+        "phase" => "review",
+        "failing_command" => "parent_review_disposition"
+      )
+    )
 
     result = use_case.call(task_ref: parent_task.ref, run_ref: parent_run.ref, outcome: :rework)
 

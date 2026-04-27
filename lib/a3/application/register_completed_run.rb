@@ -38,12 +38,7 @@ module A3
 
         @run_repository.save(completed_run)
         @task_repository.save(completed_task)
-        @publish_external_task_status&.publish(
-          task_ref: completed_task.ref,
-          external_task_id: completed_task.external_task_id,
-          status: completed_task.status,
-          task_kind: completed_task.kind
-        )
+        publish_external_status(task: completed_task, run: completed_run)
         @publish_external_task_activity&.publish(
           task_ref: completed_task.ref,
           external_task_id: completed_task.external_task_id,
@@ -54,6 +49,66 @@ module A3
       end
 
       private
+
+      def publish_external_status(task:, run:)
+        return unless @publish_external_task_status
+
+        kwargs = {
+          task_ref: task.ref,
+          external_task_id: task.external_task_id,
+          status: task.status,
+          task_kind: task.kind
+        }
+        if %i[blocked needs_clarification].include?(task.status.to_sym)
+          reason_payload = external_status_reason_payload(run)
+          kwargs[:status_reason] = reason_payload.fetch(:reason) if reason_payload.fetch(:reason)
+          kwargs[:status_details] = reason_payload.fetch(:details) if reason_payload.fetch(:details)
+        end
+        @publish_external_task_status.publish(**kwargs)
+      end
+
+      def external_status_reason_payload(run)
+        phase_record = latest_phase_record(run)
+        blocked_diagnosis = phase_record&.blocked_diagnosis
+        if blocked_diagnosis
+          return {
+            reason: single_line(blocked_diagnosis.diagnostic_summary),
+            details: compact_hash(
+              "run_ref" => run.ref,
+              "phase" => run.phase.to_s,
+              "error_category" => blocked_diagnosis.error_category.to_s,
+              "expected_state" => blocked_diagnosis.expected_state,
+              "observed_state" => blocked_diagnosis.observed_state,
+              "failing_command" => blocked_diagnosis.failing_command,
+              "remediation" => blocked_diagnosis.remediation_summary
+            )
+          }
+        end
+
+        request = phase_record&.execution_record&.clarification_request
+        return { reason: nil, details: nil } unless request.is_a?(Hash)
+
+        {
+          reason: single_line(request["question"]),
+          details: compact_hash(
+            "run_ref" => run.ref,
+            "phase" => run.phase.to_s,
+            "context" => request["context"],
+            "options" => request["options"],
+            "recommended_option" => request["recommended_option"],
+            "impact" => request["impact"]
+          )
+        }
+      end
+
+      def compact_hash(hash)
+        hash.each_with_object({}) do |(key, value), memo|
+          next if value.nil?
+          next if value.respond_to?(:empty?) && value.empty?
+
+          memo[key] = value
+        end
+      end
 
       def resolve_parent_review_disposition(task:, run:, execution:, outcome:)
         return nil unless task.kind == :parent
@@ -109,12 +164,7 @@ module A3
 
         @run_repository.save(completed_run)
         @task_repository.save(completed_task)
-        @publish_external_task_status&.publish(
-          task_ref: completed_task.ref,
-          external_task_id: completed_task.external_task_id,
-          status: completed_task.status,
-          task_kind: completed_task.kind
-        )
+        publish_external_status(task: completed_task, run: completed_run)
         body = completed_run_comment(run: completed_run, task: completed_task, extra_lines: result.comment_lines)
         @publish_external_task_activity&.publish(
           task_ref: completed_task.ref,

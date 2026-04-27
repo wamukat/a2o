@@ -97,6 +97,49 @@ RSpec.describe A3::Infra::KanbanCliTaskStatusPublisher do
     expect(transitions.fetch(1).fetch("argv")).to include("task-transition", "--task-id", "5001", "--status", "To do")
   end
 
+  it "passes blocked reason metadata when publishing blocked" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 5011,
+          "ref" => "Sample#5011",
+          "status" => "To do",
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    publisher = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      publisher.publish(
+        task_ref: "Sample#5011",
+        status: :blocked,
+        status_reason: "review found a gap",
+        status_details: { "run_ref" => "run-1", "phase" => "review" }
+      )
+    end
+
+    transitions = read_fake_kanban_transitions(fake_cli.fetch(:transitions_path))
+    expect(transitions.fetch(0).fetch("argv")).to include(
+      "task-label-add",
+      "--task-id",
+      "5011",
+      "--label",
+      "blocked",
+      "--reason",
+      "review found a gap",
+      "--details-json",
+      "{\"run_ref\":\"run-1\",\"phase\":\"review\"}"
+    )
+  end
+
   it "adds the clarification label and returns the task to To do when publishing needs_clarification" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,
@@ -125,6 +168,49 @@ RSpec.describe A3::Infra::KanbanCliTaskStatusPublisher do
     expect(transitions.size).to eq(2)
     expect(transitions.fetch(0).fetch("argv")).to include("task-label-add", "--task-id", "5004", "--label", "needs:clarification")
     expect(transitions.fetch(1).fetch("argv")).to include("task-transition", "--task-id", "5004", "--status", "To do")
+  end
+
+  it "passes clarification reason metadata when publishing needs_clarification" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 5014,
+          "ref" => "Sample#5014",
+          "status" => "In review",
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    publisher = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      publisher.publish(
+        task_ref: "Sample#5014",
+        status: :needs_clarification,
+        status_reason: "Which scope should this use?",
+        status_details: { "run_ref" => "run-2", "phase" => "implementation" }
+      )
+    end
+
+    transitions = read_fake_kanban_transitions(fake_cli.fetch(:transitions_path))
+    expect(transitions.fetch(0).fetch("argv")).to include(
+      "task-label-add",
+      "--task-id",
+      "5014",
+      "--label",
+      "needs:clarification",
+      "--reason",
+      "Which scope should this use?",
+      "--details-json",
+      "{\"run_ref\":\"run-2\",\"phase\":\"implementation\"}"
+    )
   end
 
   it "clears a stale blocked label before transitioning back to an active status" do
