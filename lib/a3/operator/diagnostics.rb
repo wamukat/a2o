@@ -212,6 +212,12 @@ module A3Diagnostics
     [[], "#{Pathname(path).basename}: #{e}"]
   end
 
+  def agent_jobs(path)
+    [A3::Operator::ActivityEvidence.describe_activity(activity_file: path), nil]
+  rescue StandardError => e
+    [[], "#{Pathname(path).basename}: #{e}"]
+  end
+
   def scheduler_paths(root_dir, project)
     scheduler_dir = Pathname(root_dir).join(".work", "a3", "scheduler", project)
     files = []
@@ -266,20 +272,22 @@ module A3Diagnostics
     end
   end
 
-  def describe_state(project:, root_dir:, active_runs_file:, worker_runs_file:)
+  def describe_state(project:, root_dir:, active_runs_file:, worker_runs_file: nil, agent_jobs_file: nil)
     active_refs_value, active_error = active_refs(active_runs_file)
-    raw_records, worker_error = worker_runs(worker_runs_file)
+    legacy_worker_runs_file = worker_runs_file || Pathname(agent_jobs_file).dirname.join("worker-runs.json")
+    raw_records, worker_error = agent_jobs_file ? agent_jobs(agent_jobs_file) : worker_runs(legacy_worker_runs_file)
     runs = raw_records.map { |item| project_record_state(item.to_h) }
     running = raw_records.select { |record| record.state.to_s != "selected" && effectively_live_worker_run?(record) }.map { |record| project_record_state(record.to_h) }
     unavailable = []
     unavailable << active_error if active_error
     unavailable << worker_error if worker_error
-    legacy_diagnostic = A3::Operator::ActivityEvidence.legacy_state_diagnostic(worker_runs_file: worker_runs_file)
+    legacy_diagnostic = A3::Operator::ActivityEvidence.legacy_state_diagnostic(worker_runs_file: legacy_worker_runs_file)
     unavailable << legacy_diagnostic if legacy_diagnostic
     {
       "project" => project,
       "active_runs_file" => active_runs_file.to_s,
-      "worker_runs_file" => worker_runs_file.to_s,
+      "agent_jobs_file" => (agent_jobs_file || A3::Operator::ActivityEvidence.agent_jobs_path_from(worker_runs_file: legacy_worker_runs_file)).to_s,
+      "worker_runs_file" => legacy_worker_runs_file.to_s,
       "active_refs" => active_refs_value,
       "selected_pending_refs" => selected_pending_refs(active_refs_value, runs, raw_records),
       "state_unavailable" => unavailable,
@@ -334,15 +342,15 @@ module A3Diagnostics
     options = parse_args(argv.dup)
     case options[:command]
     when "describe-state"
-      worker_runs_file = Pathname(options.fetch(:agent_jobs_file)).dirname.join("worker-runs.json")
-      out.puts(JSON.pretty_generate(describe_state(project: options.fetch(:project), root_dir: Pathname(options.fetch(:root_dir)), active_runs_file: Pathname(options.fetch(:active_runs_file)), worker_runs_file: worker_runs_file)))
+      agent_jobs_file = Pathname(options.fetch(:agent_jobs_file))
+      out.puts(JSON.pretty_generate(describe_state(project: options.fetch(:project), root_dir: Pathname(options.fetch(:root_dir)), active_runs_file: Pathname(options.fetch(:active_runs_file)), agent_jobs_file: agent_jobs_file)))
       0
     when "watch"
-      worker_runs_file = Pathname(options.fetch(:agent_jobs_file)).dirname.join("worker-runs.json")
+      agent_jobs_file = Pathname(options.fetch(:agent_jobs_file))
       count = 0
       loop do
         out.puts("\n---\n") if count.positive?
-        out.puts(JSON.pretty_generate(describe_state(project: options.fetch(:project), root_dir: Pathname(options.fetch(:root_dir)), active_runs_file: Pathname(options.fetch(:active_runs_file)), worker_runs_file: worker_runs_file)))
+        out.puts(JSON.pretty_generate(describe_state(project: options.fetch(:project), root_dir: Pathname(options.fetch(:root_dir)), active_runs_file: Pathname(options.fetch(:active_runs_file)), agent_jobs_file: agent_jobs_file)))
         count += 1
         return 0 if options[:iterations].to_i.positive? && count >= options[:iterations]
         sleeper.sleep(options.fetch(:interval, 2.0))

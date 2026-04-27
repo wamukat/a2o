@@ -85,6 +85,10 @@ module A3Reconcile
     A3::Operator::ActivityEvidence.describe_activity(activity_file: A3::Operator::ActivityEvidence.agent_jobs_path_from(worker_runs_file: path))
   end
 
+  def describe_agent_jobs(path)
+    A3::Operator::ActivityEvidence.describe_activity(activity_file: path)
+  end
+
   def live_scheduler_processes(project, patterns: nil)
     result = IO.popen(["ps", "-axo", "command="], &:read)
     matches = []
@@ -105,10 +109,12 @@ module A3Reconcile
     matches
   end
 
-  def inspect_stale_active_runs(project:, active_runs_file:, worker_runs_file:, task_ref: nil, live_process_patterns: nil)
+  def inspect_stale_active_runs(project:, active_runs_file:, worker_runs_file: nil, agent_jobs_file: nil, task_ref: nil, live_process_patterns: nil)
     active_state = load_active_run_state(active_runs_file)
+    legacy_worker_runs_file = worker_runs_file || Pathname(agent_jobs_file).dirname.join("worker-runs.json")
     latest_runs = {}
-    describe_worker_runs(worker_runs_file).each do |record|
+    records = agent_jobs_file ? describe_agent_jobs(agent_jobs_file) : describe_worker_runs(legacy_worker_runs_file)
+    records.each do |record|
       latest_runs[record.task_ref] ||= record
     end
     live_processes = live_scheduler_processes(project, patterns: live_process_patterns)
@@ -142,7 +148,8 @@ module A3Reconcile
     {
       "project" => project,
       "active_runs_file" => active_runs_file.to_s,
-      "worker_runs_file" => worker_runs_file.to_s,
+      "agent_jobs_file" => (agent_jobs_file || A3::Operator::ActivityEvidence.agent_jobs_path_from(worker_runs_file: legacy_worker_runs_file)).to_s,
+      "worker_runs_file" => legacy_worker_runs_file.to_s,
       "live_processes" => live_processes,
       "active_refs_before" => active_state.task_refs,
       "stale_active_runs" => stale_runs.map(&:to_h),
@@ -154,10 +161,11 @@ module A3Reconcile
     nil
   end
 
-  def apply_stale_active_run_reconciliation(project:, active_runs_file:, worker_runs_file:, task_ref: nil, live_process_patterns: nil)
-    payload = inspect_stale_active_runs(project: project, active_runs_file: active_runs_file, worker_runs_file: worker_runs_file, task_ref: task_ref, live_process_patterns: live_process_patterns)
+  def apply_stale_active_run_reconciliation(project:, active_runs_file:, worker_runs_file: nil, agent_jobs_file: nil, task_ref: nil, live_process_patterns: nil)
+    legacy_worker_runs_file = worker_runs_file || Pathname(agent_jobs_file).dirname.join("worker-runs.json")
+    payload = inspect_stale_active_runs(project: project, active_runs_file: active_runs_file, worker_runs_file: worker_runs_file, agent_jobs_file: agent_jobs_file, task_ref: task_ref, live_process_patterns: live_process_patterns)
     save_active_run_state(active_runs_file, ActiveRunState.new(task_refs: payload.fetch("active_refs_after")))
-    mark_stale_worker_runs(worker_runs_file, payload.fetch("stale_active_runs"))
+    mark_stale_worker_runs(legacy_worker_runs_file, payload.fetch("stale_active_runs"))
     payload.merge("applied" => true)
   end
 
@@ -218,13 +226,13 @@ module A3Reconcile
   def main(argv = ARGV, out: $stdout)
     options = parse_args(argv.dup)
     active_runs_file = Pathname(options.fetch(:active_runs_file))
-    worker_runs_file = Pathname(options.fetch(:agent_jobs_file)).dirname.join("worker-runs.json")
+    agent_jobs_file = Pathname(options.fetch(:agent_jobs_file))
     payload =
       if options[:apply]
         result = apply_stale_active_run_reconciliation(
           project: options.fetch(:project),
           active_runs_file: active_runs_file,
-          worker_runs_file: worker_runs_file,
+          agent_jobs_file: agent_jobs_file,
           task_ref: options[:task_ref],
           live_process_patterns: options[:live_process_patterns]
         )
@@ -244,7 +252,7 @@ module A3Reconcile
         inspect_stale_active_runs(
           project: options.fetch(:project),
           active_runs_file: active_runs_file,
-          worker_runs_file: worker_runs_file,
+          agent_jobs_file: agent_jobs_file,
           task_ref: options[:task_ref],
           live_process_patterns: options[:live_process_patterns]
         ).merge("applied" => false)

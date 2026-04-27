@@ -40,12 +40,17 @@ module A3
         ActivityEvidence.latest_by_task_ref(activity_file: ActivityEvidence.agent_jobs_path_from(worker_runs_file: path)).transform_values(&:to_h)
       end
 
-      def latest_worker_run(worker_runs_file:, task_ref:)
-        load_worker_run_store(worker_runs_file)[task_ref]
+      def load_agent_job_store(path)
+        ActivityEvidence.latest_by_task_ref(activity_file: path).transform_values(&:to_h)
       end
 
-      def resolve_task_id(task_ref:, worker_runs_file:)
-        latest = latest_worker_run(worker_runs_file: worker_runs_file, task_ref: task_ref)
+      def latest_worker_run(worker_runs_file: nil, agent_jobs_file: nil, task_ref:)
+        store = agent_jobs_file ? load_agent_job_store(agent_jobs_file) : load_worker_run_store(worker_runs_file)
+        store[task_ref]
+      end
+
+      def resolve_task_id(task_ref:, worker_runs_file: nil, agent_jobs_file: nil)
+        latest = latest_worker_run(worker_runs_file: worker_runs_file, agent_jobs_file: agent_jobs_file, task_ref: task_ref)
         latest && latest["task_id"]
       end
 
@@ -103,17 +108,17 @@ module A3
         [nil, nil, []]
       end
 
-      def inspect_rerun_readiness(root_dir:, project:, task_ref:, active_runs_file:, worker_runs_file:, kanban_project: nil, kanban_working_dir: Dir.pwd, allow_blocked_label: false)
+      def inspect_rerun_readiness(root_dir:, project:, task_ref:, active_runs_file:, worker_runs_file: nil, agent_jobs_file: nil, kanban_project: nil, kanban_working_dir: Dir.pwd, allow_blocked_label: false)
         issue_workspace = RerunWorkspaceSupport.compute_issue_workspace(root_dir: root_dir, project: project, task_ref: task_ref)
         active_refs = load_active_run_state(active_runs_file)
-        latest = latest_worker_run(worker_runs_file: worker_runs_file, task_ref: task_ref)
+        latest = latest_worker_run(worker_runs_file: worker_runs_file, agent_jobs_file: agent_jobs_file, task_ref: task_ref)
         cleanup_paths = RerunWorkspaceSupport.collect_default_rerun_paths(issue_workspace: issue_workspace).map(&:to_s)
         broken_bridges = RerunWorkspaceSupport.top_level_broken_support_bridges(issue_workspace).map(&:to_s)
 
         task_status = nil
         task_done = nil
         label_titles = []
-        task_id = resolve_task_id(task_ref: task_ref, worker_runs_file: worker_runs_file)
+        task_id = resolve_task_id(task_ref: task_ref, worker_runs_file: worker_runs_file, agent_jobs_file: agent_jobs_file)
         if kanban_project && task_id
           task_status, task_done, label_titles = inspect_kanban_task(project: kanban_project, task_id: task_id, working_dir: kanban_working_dir)
         end
@@ -234,7 +239,7 @@ module A3
           project: options.fetch(:project),
           task_ref: options.fetch(:task_ref),
           active_runs_file: options.fetch(:active_runs_file),
-          worker_runs_file: Pathname(options.fetch(:agent_jobs_file)).dirname.join("worker-runs.json"),
+          agent_jobs_file: Pathname(options.fetch(:agent_jobs_file)),
           kanban_project: options[:kanban_project].to_s.strip.empty? ? nil : options[:kanban_project].strip,
           kanban_working_dir: kanban_working_dir,
           allow_blocked_label: options.fetch(:allow_blocked_label)

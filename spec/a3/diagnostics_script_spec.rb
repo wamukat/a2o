@@ -31,10 +31,10 @@ RSpec.describe A3Diagnostics do
       root = Pathname(dir)
       active_runs = root.join("active-runs.json")
       worker_runs = root.join("worker-runs.json")
-      agent_jobs = root.join("agent_jobs.json")
+      agent_jobs = root.join("custom_jobs.json")
       active_runs.write(JSON.generate({ "active_task_refs" => [] }))
       worker_runs.write(JSON.generate({ "runs" => {} }))
-      agent_jobs.write(JSON.generate({}))
+      write_agent_job(agent_jobs, job_id: "job-1", task_ref: "Sample#1", phase: "implementation", state: "running_command", heartbeat_at: Time.now.utc.iso8601)
 
       stdout = capture_stdout do
         expect(
@@ -50,7 +50,10 @@ RSpec.describe A3Diagnostics do
         ).to eq(0)
       end
 
-      expect(JSON.parse(stdout).fetch("active_refs")).to eq([])
+      payload = JSON.parse(stdout)
+      expect(payload.fetch("active_refs")).to eq([])
+      expect(payload.fetch("recent_runs").map { |item| item.fetch("task_ref") }).to include("Sample#1")
+      expect(payload.fetch("agent_jobs_file")).to eq(agent_jobs.to_s)
     end
   end
 

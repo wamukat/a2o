@@ -120,10 +120,11 @@ module A3Cleanup
     JSON.parse(stdout)
   end
 
-  def load_active_refs(active_runs_file:, worker_runs_file:)
+  def load_active_refs(active_runs_file:, worker_runs_file: nil, agent_jobs_file: nil)
     active_refs = Set.new
     active_path = Pathname(active_runs_file)
-    worker_path = Pathname(worker_runs_file)
+    worker_path = worker_runs_file ? Pathname(worker_runs_file) : Pathname(agent_jobs_file).dirname.join("worker-runs.json")
+    activity_file = agent_jobs_file ? Pathname(agent_jobs_file) : A3::Operator::ActivityEvidence.agent_jobs_path_from(worker_runs_file: worker_path)
     if active_path.exist?
       payload = JSON.parse(active_path.read)
       Array(payload["active_task_refs"]).each do |ref|
@@ -134,7 +135,7 @@ module A3Cleanup
     if worker_path.exist?
       warn "removed worker-runs.json state detected: #{worker_path}; migration_required=true replacement=#{A3::Operator::ActivityEvidence.agent_jobs_path_from(worker_runs_file: worker_path)}"
     end
-    A3::Operator::ActivityEvidence.describe_activity(activity_file: A3::Operator::ActivityEvidence.agent_jobs_path_from(worker_runs_file: worker_path)).each do |record|
+    A3::Operator::ActivityEvidence.describe_activity(activity_file: activity_file).each do |record|
       task_ref = record.task_ref.to_s.strip
       if !task_ref.empty? && NONTERMINAL_WORKER_STATES.include?(record.state.to_s)
         active_refs << task_ref
@@ -913,7 +914,7 @@ module A3Cleanup
     )
     active_refs = load_active_refs(
       active_runs_file: options.fetch(:active_runs_file),
-      worker_runs_file: Pathname(options.fetch(:agent_jobs_file)).dirname.join("worker-runs.json")
+      agent_jobs_file: Pathname(options.fetch(:agent_jobs_file))
     )
     now = Time.now.utc
     candidates = build_cleanup_candidates(
