@@ -135,7 +135,7 @@ module A3
         child_refs = normalize_relation_refs(relations.fetch("subtask", []))
         blocking_refs = normalize_blocking_relation_refs(relations.fetch("blocked", []))
 
-        resolved = task_resolved?(payload.fetch("status", nil), payload["done"])
+        resolved = task_closed?(payload.fetch("status", nil), payload["done"], payload["is_archived"])
 
         [
           normalize_topology_snapshot(
@@ -143,6 +143,7 @@ module A3
             task_ref: task_ref,
             raw_status: payload.fetch("status", nil),
             raw_done: payload["done"],
+            raw_archived: payload["is_archived"],
             raw_priority: payload["priority"],
             labels: labels,
             parent_ref: parent_refs.first&.first,
@@ -154,8 +155,8 @@ module A3
         ]
       end
 
-      def normalize_topology_snapshot(task_id:, task_ref:, raw_status:, raw_done:, raw_priority:, labels:, parent_ref:, blocking_task_refs:)
-        return nil if task_resolved?(raw_status, raw_done)
+      def normalize_topology_snapshot(task_id:, task_ref:, raw_status:, raw_done:, raw_archived:, raw_priority:, labels:, parent_ref:, blocking_task_refs:)
+        return nil if task_closed?(raw_status, raw_done, raw_archived)
 
         status = normalize_status(raw_status, labels: labels)
         return nil unless status
@@ -322,7 +323,7 @@ module A3
         labels = Array(raw_snapshot["labels"]).map(&:to_s).reject(&:empty?).freeze
         task_ref = String(raw_snapshot.fetch("ref")).strip
         return nil unless ignore_trigger_filter || @trigger_labels.empty? || (labels & @trigger_labels).any?
-        return nil if task_resolved?(raw_snapshot.fetch("status", nil), raw_snapshot["done"])
+        return nil if task_closed?(raw_snapshot.fetch("status", nil), raw_snapshot["done"], raw_snapshot["is_archived"])
 
         edit_scope = resolve_edit_scope(labels: labels, task_ref: task_ref)
 
@@ -377,6 +378,10 @@ module A3
 
       def task_resolved?(raw_status, raw_done)
         closed_status?(raw_status) || raw_done == true
+      end
+
+      def task_closed?(raw_status, raw_done, raw_archived)
+        task_resolved?(raw_status, raw_done) || raw_archived == true
       end
 
       def blocking_status_resolved?(raw_status)

@@ -97,6 +97,45 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
+  it "excludes archived tasks from the imported set" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 7051,
+          "ref" => "Sample#7051",
+          "status" => "To do",
+          "is_archived" => true,
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => nil
+        },
+        {
+          "id" => 7052,
+          "ref" => "Sample#7052",
+          "status" => "To do",
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-implement"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+
+      expect(tasks.map(&:ref)).to eq(["Sample#7052"])
+    end
+  end
+
   it "does not keep resolved done-lane children in parent topology" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,
@@ -134,6 +173,48 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
       parent = tasks.find { |task| task.ref == "Sample#7100" }
 
       expect(tasks.map(&:ref)).to eq(["Sample#7100"])
+      expect(parent.kind).to eq(:single)
+      expect(parent.child_refs).to eq([])
+    end
+  end
+
+  it "does not keep archived children in parent topology" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 7150,
+          "ref" => "Sample#7150",
+          "status" => "To do",
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => nil
+        },
+        {
+          "id" => 7151,
+          "ref" => "Sample#7151",
+          "status" => "To do",
+          "is_archived" => true,
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => "Sample#7150"
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-implement"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+      parent = tasks.find { |task| task.ref == "Sample#7150" }
+
+      expect(tasks.map(&:ref)).to eq(["Sample#7150"])
       expect(parent.kind).to eq(:single)
       expect(parent.child_refs).to eq([])
     end

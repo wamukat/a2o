@@ -286,6 +286,7 @@ def normalize_task_summary(task: dict[str, Any], *, project_title: str) -> dict[
         "description": task.get("description") or "",
         "status": task.get("status"),
         "done": bool(task.get("done", False)),
+        "is_archived": bool(task.get("is_archived", False)),
         "priority": int(task.get("priority") or 0),
         "reference": task.get("reference") or "",
         "date_modification": int(task.get("date_modification") or 0) if str(task.get("date_modification") or "").strip() else 0,
@@ -300,6 +301,7 @@ def normalize_task_detail(task: dict[str, Any], *, project_title: str) -> dict[s
     normalized["identifier"] = short_task_ref(task)
     normalized["index"] = task_index(task)
     normalized["done"] = bool(task.get("done", False))
+    normalized["is_archived"] = bool(task.get("is_archived", False))
     return normalized
 
 
@@ -414,6 +416,7 @@ def normalize_task_watch_summary(
         "title": task.get("title") or "",
         "status": task.get("status"),
         "done": bool(task.get("done", False)),
+        "is_archived": bool(task.get("is_archived", False)),
         "parent_ref": parent_refs[0] if parent_refs else None,
     }
 
@@ -474,6 +477,10 @@ def soloboard_resolved(ticket: dict[str, Any]) -> bool:
     return bool(ticket["isResolved"])
 
 
+def soloboard_archived(ticket: dict[str, Any]) -> bool:
+    return bool(ticket.get("isArchived", ticket.get("is_archived", False)))
+
+
 def soloboard_normalize_ticket(ticket: dict[str, Any], *, board_title: str, board_shell: dict[str, Any] | None = None) -> dict[str, Any]:
     lane_id = int(ticket.get("laneId") or 0)
     status = soloboard_find_lane_name(board_shell or {"lanes": []}, lane_id) if board_shell else None
@@ -484,6 +491,7 @@ def soloboard_normalize_ticket(ticket: dict[str, Any], *, board_title: str, boar
         "bucket_id": lane_id,
         "priority": int(ticket.get("priority") or 0),
         "done": soloboard_resolved(ticket),
+        "is_archived": soloboard_archived(ticket),
         "status": status,
         "title": ticket.get("title") or "",
         "description": ticket.get("bodyMarkdown") or "",
@@ -814,6 +822,8 @@ def iterate_kanban_tasks(
     enriched = []
     for task in tasks:
         item = soloboard_normalize_ticket(task, board_title=board_title, board_shell=board_shell)
+        if not include_closed and item.get("is_archived"):
+            continue
         enriched.append(item)
     enriched.sort(key=lambda task: (task_index(task) if task_index(task) is not None else 10**9, int(task["id"])))
     return {"id": project_id, "view_kind": "soloboard"}, columns, enriched
@@ -1326,7 +1336,11 @@ def cmd_task_watch_summary_list(args: argparse.Namespace) -> int:
         resolve_task_for_summary(task_ref=task_ref)
 
     items = sorted(
-        [item for item in normalized_by_id.values() if not bool(item.get("done", False))],
+        [
+            item
+            for item in normalized_by_id.values()
+            if not bool(item.get("done", False)) and not bool(item.get("is_archived", False))
+        ],
         key=lambda item: item["ref"],
     )
     return print_json(items)

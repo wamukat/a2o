@@ -33,7 +33,7 @@ module FakeKanbanCliHelper
           unless include_closed
             snapshots.select! do |item|
               current_status = String(item["status"])
-              !["Resolved", "Archived"].include?(current_status)
+              !["Resolved", "Archived"].include?(current_status) && item["is_archived"] != true
             end
           end
           snapshots.select! { |item| item["status"] == status } if status
@@ -71,9 +71,12 @@ module FakeKanbanCliHelper
               "id" => Integer(item["id"]),
               "ref" => item["ref"],
               "title" => item["title"] || "",
-              "status" => item["status"]
+              "status" => item["status"],
+              "done" => item["done"] == true,
+              "is_archived" => item["is_archived"] == true,
+              "parent_ref" => item["parent_ref"]
             }
-          end
+          end.reject { |item| item["done"] || item["is_archived"] }
           print JSON.generate(rendered)
         when "task-get"
           task_ref = ARGV.each_cons(2).find { |flag, _value| flag == "--task" }&.last
@@ -123,6 +126,7 @@ module FakeKanbanCliHelper
               "ref" => item["ref"],
               "title" => item["title"] || "",
               "status" => item["status"],
+              "is_archived" => item["is_archived"] == true,
               "project_id" => 1,
               "project_title" => item["ref"].split("#", 2).first
             }

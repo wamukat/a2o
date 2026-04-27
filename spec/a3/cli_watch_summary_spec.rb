@@ -391,6 +391,56 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "does not reintroduce archived child tasks through kanban topology expansion" do
+    Dir.mktmpdir do |dir|
+      fake_cli = create_fake_kanban_cli(
+        dir,
+        snapshots: [
+          {
+            "id" => 4138,
+            "ref" => "Sample#4138",
+            "title" => "Current parent task",
+            "status" => "Done",
+            "labels" => ["trigger:auto-implement", "repo:ui-app"]
+          },
+          {
+            "id" => 4999,
+            "ref" => "Sample#4999",
+            "title" => "Archived child task",
+            "status" => "To do",
+            "is_archived" => true,
+            "parent_ref" => "Sample#4138",
+            "labels" => ["trigger:auto-implement", "repo:ui-app"]
+          }
+        ]
+      )
+
+      out = StringIO.new
+      with_env(fake_cli.fetch(:env)) do
+        expect do
+          described_class.start(
+            [
+              "watch-summary",
+              "--storage-backend", "json",
+              "--storage-dir", dir,
+              "--kanban-command", "ruby",
+              "--kanban-command-arg", fake_cli.fetch(:script_path),
+              "--kanban-project", "Sample",
+              "--kanban-working-dir", dir,
+              "--kanban-trigger-label", "trigger:auto-implement",
+              "--kanban-repo-label", "repo:ui-app=repo_alpha"
+            ],
+            out: out
+          )
+        end.not_to raise_error
+      end
+
+      expect(out.string).to include("Current parent task")
+      expect(out.string).not_to include("Archived child task")
+      expect(out.string).not_to include("#4999")
+    end
+  end
+
   it "does not show resolved done-lane tasks that still have Done as their lane" do
     Dir.mktmpdir do |dir|
       fake_cli = create_fake_kanban_cli(

@@ -59,6 +59,62 @@ class SoloBoardCliTest(unittest.TestCase):
 
         self.assertEqual("A2O#51", normalized["parent_ref"])
 
+    def test_normalize_task_watch_summary_preserves_archived_flag(self) -> None:
+        task = {
+            "id": 52,
+            "ref": "A2O#52",
+            "title": "Archived task",
+            "status": "To do",
+            "is_archived": True,
+        }
+
+        with patch.object(kanban_cli, "relation_tasks_payload", return_value={"parenttask": []}):
+            normalized = kanban_cli.normalize_task_watch_summary(
+                "http://localhost:3000",
+                "",
+                task,
+                project_title="A2O",
+            )
+
+        self.assertTrue(normalized["is_archived"])
+
+    def test_task_watch_summary_list_excludes_archived_tasks(self) -> None:
+        args = SimpleNamespace(
+            backend="soloboard",
+            base_url="http://localhost:3460",
+            token="",
+            project_id=None,
+            project="A2O",
+            task_ids=[51, 52],
+            tasks=[],
+            ignore_missing=False,
+        )
+
+        def fake_get_task(_base_url, _token, task_id):
+            return {
+                "id": task_id,
+                "project_id": 2,
+                "column_id": 9,
+                "ref": f"A2O#{task_id}",
+                "reference": f"A2O#{task_id}",
+                "title": "Archived" if task_id == 52 else "Active",
+                "done": False,
+                "is_archived": task_id == 52,
+            }
+
+        with (
+            patch.object(kanban_cli, "get_task", side_effect=fake_get_task),
+            patch.object(kanban_cli, "resolve_project_id", return_value=2),
+            patch.object(kanban_cli, "resolve_project_title", return_value="A2O"),
+            patch.object(kanban_cli, "get_columns", return_value=[{"id": 9, "title": "To do"}]),
+            patch.object(kanban_cli, "relation_tasks_payload", return_value={"parenttask": []}),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            self.assertEqual(0, kanban_cli.cmd_task_watch_summary_list(args))
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(["A2O#51"], [item["ref"] for item in payload])
+
     def test_resolve_backend_rejects_non_soloboard(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "Unsupported kanban backend"):
             kanban_cli.resolve_backend_kind("unsupported-backend")
