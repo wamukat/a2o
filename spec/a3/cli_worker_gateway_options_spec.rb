@@ -433,6 +433,17 @@ RSpec.describe "A3 CLI worker gateway options" do
     end
   end
 
+  it "ignores blank legacy A3 agent token env placeholders" do
+    with_env(
+      "A2O_AGENT_TOKEN" => "agent-token",
+      "A3_AGENT_TOKEN" => ""
+    ) do
+      options = A3::CLI.send(:parse_agent_server_options, [])
+
+      expect(options.fetch(:agent_token)).to eq("agent-token")
+    end
+  end
+
   it "rejects legacy A3 agent token env defaults for worker gateway options" do
     with_env("A3_AGENT_CONTROL_TOKEN_FILE" => "/tmp/legacy-control-token") do
       parser = OptionParser.new

@@ -2604,7 +2604,7 @@ module A3
     end
 
     def canonical_agent_env(canonical_name, legacy_name)
-      if ENV.key?(legacy_name)
+      if ENV.fetch(legacy_name, "").strip != ""
         raise KeyError,
               "removed A3 compatibility input: environment variable #{legacy_name}; migration_required=true replacement=environment variable #{canonical_name}"
       end
