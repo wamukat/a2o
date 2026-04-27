@@ -17,6 +17,12 @@ COMPOSE_PROJECT="${COMPOSE_PROJECT:-"a2o-rc-smoke-${VERSION//./-}-$$"}"
 EXPECT_LOCAL_NO_DIGEST="${EXPECT_LOCAL_NO_DIGEST:-1}"
 
 cleanup() {
+  if [[ -n "${HOST_A2O:-}" && -x "${HOST_A2O}" && -n "${WORKSPACE_DIR:-}" && -f "${WORKSPACE_DIR}/.work/a2o/runtime-instance.json" ]]; then
+    (
+      cd "${WORKSPACE_DIR}"
+      A2O_RUNTIME_IMAGE="${IMAGE:-}" "${HOST_A2O}" runtime down >/dev/null 2>&1 || true
+    )
+  fi
   if [[ "${KEEP_WORK}" != "1" ]]; then
     rm -rf "${WORK_DIR}"
   fi
