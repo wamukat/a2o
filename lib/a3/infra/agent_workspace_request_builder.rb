@@ -63,6 +63,7 @@ module A3
       end
 
       def access_for(slot_name, run, command_intent)
+        return "read_only" if command_intent == :notification
         return "read_write" if %i[implementation review].include?(run.phase.to_sym) && run.scope_snapshot.edit_scope.include?(slot_name)
         return "read_write" if command_intent == :remediation && run.phase.to_sym == :verification && run.scope_snapshot.edit_scope.include?(slot_name)
 
@@ -136,6 +137,8 @@ module A3
       end
 
       def publish_policy_for(task:, run:, command_intent:)
+        return nil if command_intent == :notification
+
         if command_intent == :remediation && run.phase.to_sym == :verification
           return {
             mode: "commit_all_edit_target_changes_on_success",
@@ -154,7 +157,7 @@ module A3
         return nil if value.nil?
 
         normalized = value.to_sym
-        return normalized if %i[remediation metrics_collection].include?(normalized)
+        return normalized if %i[remediation metrics_collection notification].include?(normalized)
 
         raise A3::Domain::ConfigurationError, "unsupported agent command intent: #{value.inspect}"
       end

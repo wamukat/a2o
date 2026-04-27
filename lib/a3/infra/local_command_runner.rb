@@ -47,7 +47,7 @@ module A3
       private
 
       def success_diagnostics(results, command_intent:)
-        return {} unless command_intent&.to_sym == :metrics_collection
+        return {} unless %i[metrics_collection notification].include?(command_intent&.to_sym)
 
         {
           "stdout" => results.map { |result| result.fetch(:stdout) }.join,

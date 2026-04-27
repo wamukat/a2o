@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "tmpdir"
+require_relative "run_notification_hooks"
 require "a3/infra/workspace_trace_logger"
 
 module A3
@@ -8,12 +9,13 @@ module A3
     class PhaseExecutionFlow
       Result = Struct.new(:task, :run, :workspace, keyword_init: true)
 
-      def initialize(task_repository:, run_repository:, register_completed_run:, prepare_workspace:, inherited_parent_state_resolver: nil, blocked_diagnosis_factory: A3::Domain::BlockedDiagnosisFactory.new)
+      def initialize(task_repository:, run_repository:, register_completed_run:, prepare_workspace:, inherited_parent_state_resolver: nil, blocked_diagnosis_factory: A3::Domain::BlockedDiagnosisFactory.new, notification_hook_runner: A3::Application::RunNotificationHooks.new)
         @task_repository = task_repository
         @run_repository = run_repository
         @register_completed_run = register_completed_run
         @inherited_parent_state_resolver = inherited_parent_state_resolver
         @blocked_diagnosis_factory = blocked_diagnosis_factory
+        @notification_hook_runner = notification_hook_runner
         @orchestrator = A3::Application::PhaseExecutionOrchestrator.new(
           run_repository: run_repository,
           register_completed_run: register_completed_run,
@@ -74,6 +76,11 @@ module A3
           ),
           execution_record: execution_record || default_execution_record(task: task, run: run, execution: execution_with_context, runtime: runtime)
         )
+        completion = run_notification_hooks(
+          completion: completion,
+          runtime: runtime,
+          workspace: prepared_workspace.workspace
+        )
         A3::Infra::WorkspaceTraceLogger.log(
           workspace_root: prepared_workspace.workspace.root_path,
           event: "phase_execution.persist.finish",
@@ -91,6 +98,7 @@ module A3
       private
 
       def prepare_for_strategy(strategy:, task:, run:, runtime:)
+        return @orchestrator.prepare(task: task, run: run, runtime: runtime) if notification_hooks_required?(runtime)
         return @orchestrator.prepare(task: task, run: run, runtime: runtime) unless strategy.respond_to?(:requires_workspace?) && !strategy.requires_workspace?
 
         Struct.new(:workspace).new(
@@ -119,6 +127,45 @@ module A3
         inherited_parent_snapshot = @inherited_parent_state_resolver&.snapshot_for(task: task, phase: run.phase)
         diagnostics.merge!(inherited_parent_snapshot.to_h) if inherited_parent_snapshot
         execution.with_diagnostics(diagnostics)
+      end
+
+      def run_notification_hooks(completion:, runtime:, workspace:)
+        events = notification_events_for(task: completion.task, run: completion.run)
+        result = @notification_hook_runner.call(
+          events: events,
+          task: completion.task,
+          run: completion.run,
+          runtime: runtime,
+          workspace: workspace
+        )
+        return completion if result.hook_results.empty?
+
+        @run_repository.save(result.run)
+        if runtime.notification_config.blocking? && result.failed?
+          raise A3::Domain::ConfigurationError, "notification hook failed and runtime.notifications.failure_policy=blocking"
+        end
+
+        Result.new(task: completion.task, run: result.run, workspace: workspace)
+      end
+
+      def notification_events_for(task:, run:)
+        events = ["task.phase_completed"]
+        events << "task.blocked" if task.status == :blocked
+        events << "task.completed" if task.status == :done
+        events << "task.reworked" if run.terminal_outcome == :rework
+        events << "parent.follow_up_child_created" if run.terminal_outcome == :follow_up_child
+        events
+      end
+
+      def notification_hooks_required?(runtime)
+        emitted_events = %w[
+          task.phase_completed
+          task.blocked
+          task.completed
+          task.reworked
+          parent.follow_up_child_created
+        ]
+        emitted_events.any? { |event| runtime.notification_config.hooks_for(event).any? }
       end
     end
   end

@@ -162,6 +162,87 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(request.workspace_request.slots.fetch("repo_alpha")).to include("access" => "read_only")
   end
 
+  it "passes notification command output through diagnostics without a worker protocol request" do
+    client.on_fetch = ->(job_id) do
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: {
+            "success" => true,
+            "summary" => "notification sent",
+            "diagnostics" => {
+              "stdout" => "notified\n",
+              "stderr" => "warning\n"
+            }
+          }
+        )
+      )
+    end
+    builder = A3::Infra::AgentWorkspaceRequestBuilder.new(source_aliases: {repo_alpha: "sample-catalog-service"})
+    runner = described_class.new(
+      control_plane_client: client,
+      runtime_profile: "docker-dev-env",
+      shared_workspace_mode: "agent-materialized",
+      workspace_request_builder: builder,
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_) {}
+    )
+
+    result = runner.run(["notify"], workspace: workspace, task: task, run: run, command_intent: :notification)
+
+    request = client.records.values.first.request
+    expect(result).to have_attributes(success?: true, summary: "notify ok")
+    expect(result.diagnostics).to include(
+      "stdout" => "notified\n",
+      "stderr" => "warning\n"
+    )
+    expect(request.worker_protocol_request).to be_nil
+    expect(request.workspace_request.publish_policy).to be_nil
+    expect(request.workspace_request.slots.fetch("repo_alpha")).to include("access" => "read_only")
+  end
+
+  it "passes failed notification command output through diagnostics" do
+    client.on_fetch = ->(job_id) do
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :failed,
+          9,
+          worker_protocol_result: {
+            "success" => false,
+            "summary" => "notification failed",
+            "diagnostics" => {
+              "stdout" => "before failure\n",
+              "stderr" => "notify failed\n"
+            }
+          }
+        )
+      )
+    end
+    builder = A3::Infra::AgentWorkspaceRequestBuilder.new(source_aliases: {repo_alpha: "sample-catalog-service"})
+    runner = described_class.new(
+      control_plane_client: client,
+      runtime_profile: "docker-dev-env",
+      shared_workspace_mode: "agent-materialized",
+      workspace_request_builder: builder,
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_) {}
+    )
+
+    result = runner.run(["notify"], workspace: workspace, task: task, run: run, command_intent: :notification)
+
+    expect(result).to have_attributes(success?: false, summary: "notify failed")
+    expect(result.diagnostics).to include(
+      "stdout" => "before failure\n",
+      "stderr" => "notify failed\n"
+    )
+    expect(result.diagnostics.fetch("agent_job_result")).to include("status" => "failed", "exit_code" => 9)
+  end
+
   it "concatenates metrics stdout and stderr across successful agent commands" do
     call_count = 0
     client.on_fetch = lambda do |job_id|

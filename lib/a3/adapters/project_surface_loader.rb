@@ -44,6 +44,7 @@ module A3
           verification_commands: payload.fetch("verification_commands", []),
           remediation_commands: payload.fetch("remediation_commands", []),
           metrics_collection_commands: payload.fetch("metrics_collection_commands", []),
+          notification_config: A3::Domain::NotificationConfig.from_project_config(runtime.fetch("notifications", nil)),
           workspace_hook: nil,
           decomposition_investigate_command: decomposition_command(runtime, "investigate"),
           decomposition_author_command: decomposition_command(runtime, "author"),

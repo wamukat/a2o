@@ -301,6 +301,49 @@ a2o runtime metrics summary
 a2o runtime metrics summary --group-by parent --format json
 ```
 
+### Notification Hooks
+
+`runtime.notifications` is optional. It declares project-owned commands that receive structured notification events. A2O emits events; the project package decides whether and how to notify external systems.
+
+```yaml
+runtime:
+  notifications:
+    failure_policy: best_effort # best_effort or blocking
+    hooks:
+      - event: task.blocked
+        command: [app/project-package/commands/notify.sh]
+      - event: task.completed
+        command: [app/project-package/commands/notify.sh]
+```
+
+`failure_policy` defaults to `best_effort`. With `best_effort`, command failures are recorded in evidence and task progress continues. With `blocking`, command failures are recorded and the runtime command fails after the task/run transition has been persisted.
+
+Hook `command` must be a non-empty array of non-empty strings. A2O runs the command in the prepared workspace and exposes:
+
+- `A2O_NOTIFICATION_EVENT_PATH`: JSON event payload path
+
+The payload uses schema `a2o.notification/v1`:
+
+```json
+{
+  "schema": "a2o.notification/v1",
+  "event": "task.blocked",
+  "task_ref": "A2O#283",
+  "task_kind": "child",
+  "status": "blocked",
+  "run_ref": "run-123",
+  "phase": "review",
+  "terminal_outcome": "blocked",
+  "parent_ref": "A2O#280",
+  "summary": "worker result schema invalid",
+  "diagnostics": {}
+}
+```
+
+The initial emitted event set is `task.phase_completed`, `task.blocked`, `task.completed`, `task.reworked`, and `parent.follow_up_child_created`. `task.started`, `runtime.idle`, and `runtime.error` are reserved event names for later scheduler-level hook points.
+
+Hook execution records are stored in the latest phase execution diagnostics under `notification_hooks` with stdout, stderr, exit status, timing, command, event, and payload path.
+
 ## Template Generator
 
 New packages should start from the generator instead of hand-writing executor blocks.
@@ -373,7 +416,7 @@ For any AI CLI, the `source alias` main working tree is input for worktree creat
 ## Current Contract
 
 1. `project.yaml` schema version `1` is the public config contract.
-2. Runtime bridge data is derived from `runtime.phases`.
+2. Runtime bridge data is derived from `runtime.phases` and optional runtime extensions such as `runtime.notifications`.
 3. Reference product packages use only `project.yaml`.
 4. Package loading rejects unsupported split config files.
 5. Schema, docs, and diagnostics use A2O-facing names.

@@ -218,6 +218,53 @@ func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T)
 	}
 }
 
+func TestWorkerSynthesizesNotificationWorkerProtocolResult(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
+	request := testRequest(".")
+	request.Phase = "implementation"
+	request.SourceDescriptor.WorkspaceKind = "ticket_workspace"
+	request.WorkspaceRequest = ptr(testWorkspaceRequest("sample-catalog-service"))
+	request.WorkspaceRequest.PublishPolicy = nil
+	request.WorkspaceRequest.CleanupPolicy = "cleanup_after_job"
+	request.WorkerProtocolRequest = map[string]any{
+		"command_intent": "notification",
+		"schema":         "a2o.notification/v1",
+		"event":          "task.blocked",
+		"task_ref":       "Sample#42",
+	}
+	client := &fakeClient{request: &request}
+
+	result, idle, err := Worker{
+		AgentName: "host-local",
+		Client:    client,
+		Executor: outputExecutor{
+			stdout: "notification stdout\n",
+			stderr: "notification stderr\n",
+		},
+		Materializer: WorkspaceMaterializer{
+			WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+			SourceAliases: map[string]string{
+				"sample-catalog-service": sourceRoot,
+			},
+		},
+		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+	}.RunOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idle {
+		t.Fatal("expected job result, got idle")
+	}
+	diagnostics, ok := result.WorkerProtocolResult["diagnostics"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing diagnostics: %#v", result.WorkerProtocolResult)
+	}
+	if diagnostics["stdout"] != "notification stdout\n" || diagnostics["stderr"] != "notification stderr\n" {
+		t.Fatalf("unexpected notification diagnostics: %#v", diagnostics)
+	}
+}
+
 func TestWorkerUsesEngineProvidedAgentEnvironmentForMaterialization(t *testing.T) {
 	tmp := t.TempDir()
 	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
@@ -450,6 +497,22 @@ func (fakeExecutor) Execute(JobRequest) ExecutionResult {
 		Status:      "succeeded",
 		ExitCode:    &code,
 		CombinedLog: []byte("all checks passed\n"),
+	}
+}
+
+type outputExecutor struct {
+	stdout string
+	stderr string
+}
+
+func (executor outputExecutor) Execute(JobRequest) ExecutionResult {
+	code := 0
+	return ExecutionResult{
+		Status:      "succeeded",
+		ExitCode:    &code,
+		Stdout:      []byte(executor.stdout),
+		Stderr:      []byte(executor.stderr),
+		CombinedLog: []byte(executor.stdout + executor.stderr),
 	}
 }
 

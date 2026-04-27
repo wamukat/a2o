@@ -252,6 +252,33 @@ a2o runtime metrics summary --group-by parent --format json
 
 Grafana、表計算ソフト、BI ツールは、これらの export またはその下流コピーを読む。初期のメトリクス実装では、これらはランタイムの必須依存ではない。
 
+## 通知 hook
+
+プロジェクトは `runtime.notifications` に通知 hook を追加できる。A2O は phase 遷移が確定して保存された後、対象イベントに一致するコマンドを実行し、`A2O_NOTIFICATION_EVENT_PATH` にイベント payload の JSON パスを渡す。
+
+```yaml
+runtime:
+  notifications:
+    failure_policy: best_effort
+    hooks:
+      - event: task.blocked
+        command: [app/project-package/commands/notify.sh]
+      - event: task.completed
+        command: [app/project-package/commands/notify.sh]
+```
+
+A2O が所有するのは hook の発火タイミングと payload 形状だけである。Slack、Discord、GitHub comment、email、社内通知などの通知先は project package が所有する。A2O core には通知先固有の処理を入れない。
+
+初期実装で発火する phase 完了系イベントは次の通り。
+
+- `task.phase_completed`
+- `task.blocked`
+- `task.completed`
+- `task.reworked`
+- `parent.follow_up_child_created`
+
+`failure_policy` の既定値は `best_effort` で、hook が失敗してもタスク進行は変えず、失敗内容だけを記録する。`blocking` は同じ診断を記録したうえで、保存済み状態を見えるようにした後、runtime command を失敗させる。hook の stdout、stderr、exit status、実行時間、command、payload path は最新 phase execution diagnostics の `notification_hooks` に保存される。
+
 ## タスクテンプレートの位置づけ
 
 タスクテンプレートは、人間がカンバンタスクを作るときの入力例である。ランタイムがタスクテンプレートを読んで自動実行するわけではない。

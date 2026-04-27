@@ -127,6 +127,9 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
+	if workerProtocolResult == nil {
+		workerProtocolResult = notificationWorkerProtocolResult(runRequest, execution)
+	}
 	if metadataUpload, err := w.uploadExecutionMetadata(*request, execution, startedAt, finishedAt); err != nil {
 		return nil, false, err
 	} else if metadataUpload != nil {
@@ -432,6 +435,23 @@ func (w Worker) uploadArtifactsAndWorkerResult(request JobRequest) ([]ArtifactUp
 		}
 	}
 	return uploads, workerProtocolResult, nil
+}
+
+func notificationWorkerProtocolResult(request JobRequest, execution ExecutionResult) map[string]any {
+	if request.WorkerProtocolRequest == nil {
+		return nil
+	}
+	if request.WorkerProtocolRequest["command_intent"] != "notification" {
+		return nil
+	}
+	return map[string]any{
+		"success": execution.Status == "succeeded",
+		"summary": fmt.Sprintf("%s %v %s", request.Command, request.Args, execution.Status),
+		"diagnostics": map[string]any{
+			"stdout": string(execution.Stdout),
+			"stderr": string(execution.Stderr),
+		},
+	}
 }
 
 func (w Worker) uploadAIRawLog(request JobRequest) (*ArtifactUpload, error) {

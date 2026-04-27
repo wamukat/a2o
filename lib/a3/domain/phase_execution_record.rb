@@ -67,6 +67,19 @@ module A3
         )
       end
 
+      def with_diagnostics(value)
+        self.class.new(
+          summary: summary,
+          failing_command: failing_command,
+          observed_state: observed_state,
+          diagnostics: value,
+          runtime_snapshot: runtime_snapshot,
+          review_disposition: review_disposition,
+          skill_feedback: skill_feedback,
+          follow_up_child_fingerprints: follow_up_child_fingerprints
+        )
+      end
+
       def persisted_form
         {
           "summary" => summary,

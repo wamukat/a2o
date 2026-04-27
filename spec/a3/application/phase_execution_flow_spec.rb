@@ -299,4 +299,112 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
       "inherited_parent_state_fingerprint" => "repo_alpha=parent-head-alpha-1|repo_beta=parent-head-beta-1"
     )
   end
+
+  it "prepares a real workspace for notification hooks even when the strategy does not require one" do
+    Dir.mktmpdir do |dir|
+      prepared_workspace = A3::Domain::PreparedWorkspace.new(
+        workspace_kind: :ticket_workspace,
+        root_path: dir,
+        source_descriptor: run.source_descriptor,
+        slot_paths: { repo_alpha: dir }
+      )
+      execution = A3::Application::ExecutionResult.new(success: true, summary: "completed")
+      context = project_context_with_notifications(
+        failure_policy: "best_effort",
+        hooks: [
+          A3::Domain::NotificationConfig::Hook.new(
+            event: "task.phase_completed",
+            command: ["ruby", "-e", "puts 'phase hook'"]
+          )
+        ]
+      )
+
+      allow(strategy).to receive(:requires_workspace?).and_return(false)
+      allow(prepare_workspace).to receive(:call).and_return(
+        A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
+      )
+      allow(strategy).to receive(:execute).and_return(execution)
+      allow(strategy).to receive(:verification_summary).with(have_attributes(summary: "completed")).and_return(nil)
+      allow(strategy).to receive(:blocked_expected_state).and_return("phase succeeds")
+      allow(strategy).to receive(:blocked_default_failing_command).and_return("adapter")
+      allow(strategy).to receive(:blocked_extra_diagnostics).with(have_attributes(summary: "completed")).and_return(execution.diagnostics)
+
+      result = flow.call(
+        task_ref: task.ref,
+        run_ref: run.ref,
+        project_context: context,
+        strategy: strategy
+      )
+
+      hook_record = result.run.phase_records.last.execution_record.diagnostics.fetch("notification_hooks").first
+      expect(hook_record).to include("event" => "task.phase_completed", "success" => true, "stdout" => "phase hook\n")
+      expect(prepare_workspace).to have_received(:call)
+    end
+  end
+
+  it "records notification diagnostics before raising for blocking hook failures" do
+    Dir.mktmpdir do |dir|
+      prepared_workspace = A3::Domain::PreparedWorkspace.new(
+        workspace_kind: :ticket_workspace,
+        root_path: dir,
+        source_descriptor: run.source_descriptor,
+        slot_paths: { repo_alpha: dir }
+      )
+      execution = A3::Application::ExecutionResult.new(success: true, summary: "completed")
+      context = project_context_with_notifications(
+        failure_policy: "blocking",
+        hooks: [
+          A3::Domain::NotificationConfig::Hook.new(
+            event: "task.phase_completed",
+            command: ["ruby", "-e", "exit 9"]
+          )
+        ]
+      )
+
+      allow(prepare_workspace).to receive(:call).and_return(
+        A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
+      )
+      allow(strategy).to receive(:execute).and_return(execution)
+      allow(strategy).to receive(:verification_summary).with(have_attributes(summary: "completed")).and_return(nil)
+      allow(strategy).to receive(:blocked_expected_state).and_return("phase succeeds")
+      allow(strategy).to receive(:blocked_default_failing_command).and_return("adapter")
+      allow(strategy).to receive(:blocked_extra_diagnostics).with(have_attributes(summary: "completed")).and_return(execution.diagnostics)
+
+      expect do
+        flow.call(
+          task_ref: task.ref,
+          run_ref: run.ref,
+          project_context: context,
+          strategy: strategy
+        )
+      end.to raise_error(A3::Domain::ConfigurationError, /notification hook failed/)
+
+      hook_record = run_repository.fetch(run.ref).phase_records.last.execution_record.diagnostics.fetch("notification_hooks").first
+      expect(hook_record).to include(
+        "event" => "task.phase_completed",
+        "success" => false,
+        "exit_status" => 9
+      )
+    end
+  end
+
+  def project_context_with_notifications(failure_policy:, hooks:)
+    A3::Domain::ProjectContext.new(
+      surface: A3::Domain::ProjectSurface.new(
+        implementation_skill: "skills/implementation/base.md",
+        review_skill: "skills/review/base.md",
+        verification_commands: ["commands/verify-all"],
+        remediation_commands: ["commands/apply-remediation"],
+        notification_config: A3::Domain::NotificationConfig.new(
+          failure_policy: failure_policy,
+          hooks: hooks
+        ),
+        workspace_hook: "hooks/prepare-runtime.sh"
+      ),
+      merge_config: A3::Domain::MergeConfig.new(
+        target: :merge_to_parent,
+        policy: :ff_only
+      )
+    )
+  end
 end

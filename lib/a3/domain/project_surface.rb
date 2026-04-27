@@ -9,6 +9,7 @@ module A3
         verification_commands
         remediation_commands
         metrics_collection_commands
+        notification_config
         decomposition_investigate_command
         decomposition_author_command
         decomposition_review_commands
@@ -17,12 +18,13 @@ module A3
 
       attr_reader(*SURFACE_KEYS)
 
-      def initialize(implementation_skill:, review_skill:, verification_commands:, remediation_commands:, workspace_hook:, metrics_collection_commands: [], decomposition_investigate_command: nil, decomposition_author_command: nil, decomposition_review_commands: [])
+      def initialize(implementation_skill:, review_skill:, verification_commands:, remediation_commands:, workspace_hook:, metrics_collection_commands: [], notification_config: A3::Domain::NotificationConfig.empty, decomposition_investigate_command: nil, decomposition_author_command: nil, decomposition_review_commands: [])
         @implementation_skill = deep_freeze_value(implementation_skill)
         @review_skill = deep_freeze_value(review_skill)
         @verification_commands = deep_freeze_value(verification_commands)
         @remediation_commands = deep_freeze_value(remediation_commands)
         @metrics_collection_commands = deep_freeze_value(metrics_collection_commands)
+        @notification_config = notification_config || A3::Domain::NotificationConfig.empty
         @decomposition_investigate_command = deep_freeze_value(decomposition_investigate_command)
         @decomposition_author_command = deep_freeze_value(decomposition_author_command)
         @decomposition_review_commands = deep_freeze_value(decomposition_review_commands)

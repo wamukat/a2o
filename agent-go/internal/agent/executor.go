@@ -15,6 +15,8 @@ import (
 type ExecutionResult struct {
 	Status      string
 	ExitCode    *int
+	Stdout      []byte
+	Stderr      []byte
 	CombinedLog []byte
 }
 
@@ -43,41 +45,47 @@ func (Executor) Execute(request JobRequest) ExecutionResult {
 	cmd.Dir = request.WorkingDir
 	cmd.Env = mergeEnv(request.Env)
 	var combined bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	writer, cleanup := liveLogWriterFor(request)
 	defer cleanup()
 	if writer != nil {
-		multiWriter := io.MultiWriter(&combined, bestEffortWriter{writer: writer})
-		cmd.Stdout = multiWriter
-		cmd.Stderr = multiWriter
+		cmd.Stdout = io.MultiWriter(&stdout, &combined, bestEffortWriter{writer: writer})
+		cmd.Stderr = io.MultiWriter(&stderr, &combined, bestEffortWriter{writer: writer})
 	} else {
-		cmd.Stdout = &combined
-		cmd.Stderr = &combined
+		cmd.Stdout = io.MultiWriter(&stdout, &combined)
+		cmd.Stderr = io.MultiWriter(&stderr, &combined)
 	}
 
 	err := cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
 		combined.WriteString("A2O agent command timed out\n")
-		return ExecutionResult{Status: "timed_out", ExitCode: nil, CombinedLog: combined.Bytes()}
+		stderr.WriteString("A2O agent command timed out\n")
+		return ExecutionResult{Status: "timed_out", ExitCode: nil, Stdout: stdout.Bytes(), Stderr: stderr.Bytes(), CombinedLog: combined.Bytes()}
 	}
 	if err == nil {
 		code := 0
-		return ExecutionResult{Status: "succeeded", ExitCode: &code, CombinedLog: combined.Bytes()}
+		return ExecutionResult{Status: "succeeded", ExitCode: &code, Stdout: stdout.Bytes(), Stderr: stderr.Bytes(), CombinedLog: combined.Bytes()}
 	}
 	if errors.Is(err, exec.ErrNotFound) {
 		code := 127
 		combined.WriteString(err.Error())
 		combined.WriteByte('\n')
-		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: combined.Bytes()}
+		stderr.WriteString(err.Error())
+		stderr.WriteByte('\n')
+		return ExecutionResult{Status: "failed", ExitCode: &code, Stdout: stdout.Bytes(), Stderr: stderr.Bytes(), CombinedLog: combined.Bytes()}
 	}
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		code := exitErr.ExitCode()
-		return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: combined.Bytes()}
+		return ExecutionResult{Status: "failed", ExitCode: &code, Stdout: stdout.Bytes(), Stderr: stderr.Bytes(), CombinedLog: combined.Bytes()}
 	}
 	code := 1
 	combined.WriteString(err.Error())
 	combined.WriteByte('\n')
-	return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: combined.Bytes()}
+	stderr.WriteString(err.Error())
+	stderr.WriteByte('\n')
+	return ExecutionResult{Status: "failed", ExitCode: &code, Stdout: stdout.Bytes(), Stderr: stderr.Bytes(), CombinedLog: combined.Bytes()}
 }
 
 func liveLogWriterFor(request JobRequest) (io.Writer, func()) {

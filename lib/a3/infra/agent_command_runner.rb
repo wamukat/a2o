@@ -48,7 +48,7 @@ module A3
 
           summaries << "#{expanded_command} ok"
           artifacts.concat(agent_artifacts_from_result(result))
-          metrics_outputs << metrics_output_from_result(result) if command_intent&.to_sym == :metrics_collection
+          metrics_outputs << metrics_output_from_result(result) if command_output_diagnostics?(command_intent)
         end
 
         A3::Application::ExecutionResult.new(
@@ -146,6 +146,7 @@ module A3
       end
 
       def failed_command_result(command:, result:)
+        output = metrics_output_from_result(result)
         A3::Application::ExecutionResult.new(
           success: false,
           summary: "#{command} failed",
@@ -153,7 +154,9 @@ module A3
           observed_state: result.status.to_s,
           diagnostics: {
             "agent_job_result" => result.result_form,
-            "control_plane_url" => control_plane_url
+            "control_plane_url" => control_plane_url,
+            "stdout" => output.fetch("stdout"),
+            "stderr" => output.fetch("stderr")
           },
           response_bundle: {
             "agent_job_result" => result.result_form
@@ -167,12 +170,16 @@ module A3
 
       def success_diagnostics(artifacts:, metrics_outputs:, command_intent:)
         diagnostics = { "agent_artifacts" => artifacts }
-        return diagnostics unless command_intent&.to_sym == :metrics_collection
+        return diagnostics unless command_output_diagnostics?(command_intent)
 
         diagnostics.merge(
           "stdout" => metrics_outputs.map { |output| output.fetch("stdout") }.join,
           "stderr" => metrics_outputs.map { |output| output.fetch("stderr") }.join
         )
+      end
+
+      def command_output_diagnostics?(command_intent)
+        %i[metrics_collection notification].include?(command_intent&.to_sym)
       end
 
       def metrics_output_from_result(result)

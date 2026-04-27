@@ -8,7 +8,7 @@ module A3
     class RunMerge
       Result = Struct.new(:task, :run, :merge_plan, :workspace, keyword_init: true)
 
-      def initialize(task_repository:, run_repository:, register_completed_run:, build_merge_plan:, merge_runner:, prepare_workspace:, blocked_diagnosis_factory: A3::Domain::BlockedDiagnosisFactory.new)
+      def initialize(task_repository:, run_repository:, register_completed_run:, build_merge_plan:, merge_runner:, prepare_workspace:, command_runner: A3::Infra::LocalCommandRunner.new, blocked_diagnosis_factory: A3::Domain::BlockedDiagnosisFactory.new)
         @build_merge_plan = build_merge_plan
         @merge_runner = merge_runner
         @flow = A3::Application::PhaseExecutionFlow.new(
@@ -16,7 +16,8 @@ module A3
           run_repository: run_repository,
           register_completed_run: register_completed_run,
           prepare_workspace: prepare_workspace,
-          blocked_diagnosis_factory: blocked_diagnosis_factory
+          blocked_diagnosis_factory: blocked_diagnosis_factory,
+          notification_hook_runner: A3::Application::RunNotificationHooks.new(command_runner: command_runner)
         )
       end
 

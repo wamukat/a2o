@@ -48,6 +48,68 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     expect(surface.workspace_hook).to be_nil
   end
 
+  it "loads runtime notification hooks" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "notifications" => {
+          "failure_policy" => "blocking",
+          "hooks" => [
+            {
+              "event" => "task.blocked",
+              "command" => ["commands/notify"]
+            }
+          ]
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    surface = loader.load(project_config_path)
+
+    expect(surface.notification_config.failure_policy).to eq("blocking")
+    expect(surface.notification_config.hooks.map(&:persisted_form)).to eq(
+      [
+        {
+          "event" => "task.blocked",
+          "command" => ["commands/notify"]
+        }
+      ]
+    )
+  end
+
+  it "rejects malformed runtime notification hooks" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "notifications" => {
+          "hooks" => [
+            {
+              "event" => "task.blocked",
+              "command" => "commands/notify"
+            }
+          ]
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, /runtime\.notifications\.hooks\[0\]\.command/)
+  end
+
   it "maps parent_review phase skill to the parent review runtime variant" do
     project_config_path = write_project_config(
       "runtime" => {

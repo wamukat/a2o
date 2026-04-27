@@ -249,6 +249,33 @@ a2o runtime metrics summary --group-by parent --format json
 
 Grafana, spreadsheets, and BI tools should consume these exports or downstream copies of them. They are not required runtime dependencies for the first metrics implementation.
 
+## Notification Hooks
+
+Projects may add notification hooks under `runtime.notifications`. A2O invokes matching commands after a phase transition has been determined and persisted, then passes the event payload path in `A2O_NOTIFICATION_EVENT_PATH`.
+
+```yaml
+runtime:
+  notifications:
+    failure_policy: best_effort
+    hooks:
+      - event: task.blocked
+        command: [app/project-package/commands/notify.sh]
+      - event: task.completed
+        command: [app/project-package/commands/notify.sh]
+```
+
+A2O owns the hook timing and payload shape. The project package owns all destinations such as Slack, Discord, GitHub comments, email, or internal systems. A2O does not include destination-specific notifier logic.
+
+Supported phase-completion events are:
+
+- `task.phase_completed`
+- `task.blocked`
+- `task.completed`
+- `task.reworked`
+- `parent.follow_up_child_created`
+
+The default `failure_policy` is `best_effort`, which records hook failures without changing task progress. `blocking` records the same diagnostics and fails the runtime command after the committed state is visible. Hook stdout, stderr, exit status, timing, command, and payload path are stored in the latest phase execution diagnostics under `notification_hooks`.
+
 ## Phase Skills
 
 Skills are project-owned instructions for workers. Keep them focused on decisions the worker cannot infer safely.

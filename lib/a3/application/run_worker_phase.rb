@@ -8,7 +8,7 @@ module A3
     class RunWorkerPhase
       Result = Struct.new(:task, :run, :workspace, keyword_init: true)
 
-      def initialize(task_repository:, run_repository:, register_completed_run:, prepare_workspace:, worker_gateway:, task_packet_builder:, inherited_parent_state_resolver: nil, workspace_change_publisher: A3::Infra::DisabledWorkspaceChangePublisher.new, blocked_diagnosis_factory: A3::Domain::BlockedDiagnosisFactory.new)
+      def initialize(task_repository:, run_repository:, register_completed_run:, prepare_workspace:, worker_gateway:, task_packet_builder:, command_runner: A3::Infra::LocalCommandRunner.new, inherited_parent_state_resolver: nil, workspace_change_publisher: A3::Infra::DisabledWorkspaceChangePublisher.new, blocked_diagnosis_factory: A3::Domain::BlockedDiagnosisFactory.new)
         @task_repository = task_repository
         @run_repository = run_repository
         @strategy = A3::Application::WorkerPhaseExecutionStrategy.new(
@@ -22,7 +22,8 @@ module A3
           register_completed_run: register_completed_run,
           prepare_workspace: prepare_workspace,
           inherited_parent_state_resolver: inherited_parent_state_resolver,
-          blocked_diagnosis_factory: blocked_diagnosis_factory
+          blocked_diagnosis_factory: blocked_diagnosis_factory,
+          notification_hook_runner: A3::Application::RunNotificationHooks.new(command_runner: command_runner)
         )
       end
 

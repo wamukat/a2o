@@ -4,12 +4,12 @@ module A3
   module Domain
     class PhaseRuntimeSnapshot
       attr_reader :task_kind, :repo_scope, :phase, :implementation_skill, :review_skill,
-                  :verification_commands, :remediation_commands, :metrics_collection_commands, :workspace_hook, :merge_target, :merge_policy,
+                  :verification_commands, :remediation_commands, :metrics_collection_commands, :notification_config, :workspace_hook, :merge_target, :merge_policy,
                   :review_gate_required
 
       def initialize(task_kind:, repo_scope:, phase:, implementation_skill:, review_skill:,
                      verification_commands:, remediation_commands:, workspace_hook:, merge_target:, merge_policy:, metrics_collection_commands: [],
-                     review_gate_required: false)
+                     notification_config: A3::Domain::NotificationConfig.empty, review_gate_required: false)
         @task_kind = task_kind.to_sym
         @repo_scope = repo_scope.to_sym
         @phase = phase.to_sym
@@ -18,6 +18,7 @@ module A3
         @verification_commands = Array(verification_commands).freeze
         @remediation_commands = Array(remediation_commands).freeze
         @metrics_collection_commands = Array(metrics_collection_commands).freeze
+        @notification_config = notification_config || A3::Domain::NotificationConfig.empty
         @workspace_hook = workspace_hook
         @merge_target = merge_target.to_sym
         @merge_policy = merge_policy.to_sym
@@ -35,6 +36,7 @@ module A3
           verification_commands: runtime.verification_commands,
           remediation_commands: runtime.remediation_commands,
           metrics_collection_commands: runtime.metrics_collection_commands,
+          notification_config: runtime.notification_config,
           workspace_hook: runtime.workspace_hook,
           merge_target: runtime.merge_target,
           merge_policy: runtime.merge_policy,
@@ -54,6 +56,7 @@ module A3
           verification_commands: record.fetch("verification_commands", []),
           remediation_commands: record.fetch("remediation_commands", []),
           metrics_collection_commands: record.fetch("metrics_collection_commands", []),
+          notification_config: A3::Domain::NotificationConfig.from_persisted_form(record["notifications"]),
           workspace_hook: record["workspace_hook"],
           merge_target: record.fetch("merge_target"),
           merge_policy: record.fetch("merge_policy"),
@@ -71,6 +74,7 @@ module A3
           "verification_commands" => verification_commands,
           "remediation_commands" => remediation_commands,
           "metrics_collection_commands" => metrics_collection_commands,
+          "notifications" => notification_config.persisted_form,
           "workspace_hook" => workspace_hook,
           "merge_target" => merge_target.to_s,
           "merge_policy" => merge_policy.to_s,
@@ -88,6 +92,7 @@ module A3
           other.verification_commands == verification_commands &&
           other.remediation_commands == remediation_commands &&
           other.metrics_collection_commands == metrics_collection_commands &&
+          other.notification_config == notification_config &&
           other.workspace_hook == workspace_hook &&
           other.merge_target == merge_target &&
           other.merge_policy == merge_policy &&
