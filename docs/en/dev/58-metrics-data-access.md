@@ -114,12 +114,12 @@ The section columns contain JSON objects encoded as CSV fields. CSV is for repor
 ## Non-goals
 
 - No dashboard server in A2O runtime core for this phase.
-- No bundled Grafana provisioning until A2O#308 confirms the operational model.
+- No bundled Grafana provisioning. A2O#308 documents the out-of-core dashboard integration model in [../user/60-metrics-dashboard.md](../user/60-metrics-dashboard.md).
 - No provider-specific BI/report schema in core.
 - No REST API for v0.5.37 follow-up work unless A2O#306 is reopened with a concrete consumer requirement.
 
 ## Follow-up Ticket Guidance
 
 - A2O#307 implements trends and derived indicators as CLI/export features over the stable list JSON records.
-- A2O#308 should evaluate Grafana as an external consumer of JSON/CSV exports or a project-owned copied database. It should not assume a runtime REST API exists.
+- A2O#308 documents Grafana as an external consumer of JSON/CSV exports or a project-owned copied database. It does not assume a runtime REST API exists.
 - A2O#226 and GitHub #16 remain open until the trends and dashboard decisions are completed or explicitly descoped.

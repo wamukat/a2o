@@ -76,6 +76,7 @@ Git リポジトリは最終成果物の置き場である。A2O はブランチ
 1. [10-quickstart.md](10-quickstart.md): 最小手順で起動する。
 2. [20-project-package.md](20-project-package.md): 利用者が管理する入力を理解する。
 3. [30-operating-runtime.md](30-operating-runtime.md): スケジューラ、エージェント、カンバン、ランタイムイメージを運用する。
-4. [40-troubleshooting.md](40-troubleshooting.md): ブロック時や失敗時にどこを見るかを確認する。
+4. [60-metrics-dashboard.md](60-metrics-dashboard.md): metrics export を out-of-core dashboard へ接続する。
+5. [40-troubleshooting.md](40-troubleshooting.md): ブロック時や失敗時にどこを見るかを確認する。
 
 詳細なスキーマや内部互換名は、リファレンスとして後から読む。

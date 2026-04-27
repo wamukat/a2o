@@ -76,6 +76,7 @@ Start with these documents:
 1. [10-quickstart.md](10-quickstart.md): run the smallest working setup.
 2. [20-project-package.md](20-project-package.md): understand the inputs users own.
 3. [30-operating-runtime.md](30-operating-runtime.md): operate the scheduler, agent, kanban, and runtime image.
-4. [40-troubleshooting.md](40-troubleshooting.md): know where to look when a task blocks or fails.
+4. [60-metrics-dashboard.md](60-metrics-dashboard.md): wire metrics exports to an out-of-core dashboard.
+5. [40-troubleshooting.md](40-troubleshooting.md): know where to look when a task blocks or fails.
 
 Detailed schemas and compatibility names are references to read later.

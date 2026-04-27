@@ -114,12 +114,12 @@ section column には JSON object を CSV field として入れる。CSV は rep
 ## 非ゴール
 
 - この段階では A2O runtime core に dashboard server を持たない。
-- A2O#308 が運用モデルを確認するまで、Grafana provisioning を bundle しない。
+- Grafana provisioning は bundle しない。A2O#308 は out-of-core dashboard 連携モデルを [../user/60-metrics-dashboard.md](../user/60-metrics-dashboard.md) に記載する。
 - core に provider 固有の BI/report schema を持たない。
 - 具体的な consumer 要件で A2O#306 を再検討するまでは、v0.5.37 follow-up として REST API は実装しない。
 
 ## 後続チケットへの指針
 
 - A2O#307 は stable list JSON record の上に CLI/export feature として trends / derived indicators を実装する。
-- A2O#308 は Grafana を JSON/CSV export または project-owned copied database の外部 consumer として評価する。runtime REST API が存在する前提にしない。
+- A2O#308 は Grafana を JSON/CSV export または project-owned copied database の外部 consumer として記載する。runtime REST API が存在する前提にしない。
 - A2O#226 と GitHub #16 は、trends と dashboard の判断が完了するか明示的に descoped されるまで open のままにする。
