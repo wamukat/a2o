@@ -8,7 +8,7 @@ require "time"
 require "a3/operator/activity_evidence"
 
 module A3Diagnostics
-  TERMINAL_WORKER_RUN_STATES = A3::Operator::ActivityEvidence::TERMINAL_STATES
+  TERMINAL_AGENT_JOB_STATES = A3::Operator::ActivityEvidence::TERMINAL_STATES
   DISPLAY_PHASE_ALIASES = { "integration_judgment" => "merge" }.freeze
   STANDARD_PATH_DIRS = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"].freeze
 
@@ -65,11 +65,11 @@ module A3Diagnostics
     nil
   end
 
-  def effectively_live_worker_run?(record, stale_after_seconds: 120)
+  def effectively_live_agent_job?(record, stale_after_seconds: 120)
     A3::Operator::ActivityEvidence.effectively_live?(record, stale_after_seconds: stale_after_seconds)
   end
 
-  def describe_worker_runs(path)
+  def describe_legacy_worker_run_activity(path)
     A3::Operator::ActivityEvidence.describe_activity(activity_file: A3::Operator::ActivityEvidence.agent_jobs_path_from(worker_runs_file: path))
   end
 
@@ -206,8 +206,8 @@ module A3Diagnostics
     [raw_refs.map(&:to_s).select { |ref| !ref.strip.empty? }, error]
   end
 
-  def worker_runs(path)
-    [describe_worker_runs(path), nil]
+  def legacy_worker_run_activity(path)
+    [describe_legacy_worker_run_activity(path), nil]
   rescue StandardError => e
     [[], "#{Pathname(path).basename}: #{e}"]
   end
@@ -275,12 +275,12 @@ module A3Diagnostics
   def describe_state(project:, root_dir:, active_runs_file:, worker_runs_file: nil, agent_jobs_file: nil)
     active_refs_value, active_error = active_refs(active_runs_file)
     legacy_worker_runs_file = worker_runs_file || Pathname(agent_jobs_file).dirname.join("worker-runs.json")
-    raw_records, worker_error = agent_jobs_file ? agent_jobs(agent_jobs_file) : worker_runs(legacy_worker_runs_file)
+    raw_records, activity_error = agent_jobs_file ? agent_jobs(agent_jobs_file) : legacy_worker_run_activity(legacy_worker_runs_file)
     runs = raw_records.map { |item| project_record_state(item.to_h) }
-    running = raw_records.select { |record| record.state.to_s != "selected" && effectively_live_worker_run?(record) }.map { |record| project_record_state(record.to_h) }
+    running = raw_records.select { |record| record.state.to_s != "selected" && effectively_live_agent_job?(record) }.map { |record| project_record_state(record.to_h) }
     unavailable = []
     unavailable << active_error if active_error
-    unavailable << worker_error if worker_error
+    unavailable << activity_error if activity_error
     legacy_diagnostic = A3::Operator::ActivityEvidence.legacy_state_diagnostic(worker_runs_file: legacy_worker_runs_file)
     unavailable << legacy_diagnostic if legacy_diagnostic
     {

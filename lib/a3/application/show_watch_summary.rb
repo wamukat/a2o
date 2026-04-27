@@ -47,14 +47,14 @@ module A3
         keyword_init: true
       )
 
-      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_tasks: nil, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {}, worker_runs_by_task_ref: {}, upstream_line_guard: A3::Domain::UpstreamLineGuard.new, scheduler_selection_policy: A3::Domain::SchedulerSelectionPolicy.new, clock: -> { Time.now.utc })
+      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_tasks: nil, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {}, agent_jobs_by_task_ref: {}, upstream_line_guard: A3::Domain::UpstreamLineGuard.new, scheduler_selection_policy: A3::Domain::SchedulerSelectionPolicy.new, clock: -> { Time.now.utc })
         @task_repository = task_repository
         @run_repository = run_repository
         @scheduler_state_repository = scheduler_state_repository
         @kanban_tasks = kanban_tasks
         @kanban_snapshots_by_ref = kanban_snapshots_by_ref || {}
         @kanban_snapshots_by_id = kanban_snapshots_by_id || {}
-        @worker_runs_by_task_ref = worker_runs_by_task_ref || {}
+        @agent_jobs_by_task_ref = agent_jobs_by_task_ref || {}
         @upstream_line_guard = upstream_line_guard
         @scheduler_selection_policy = scheduler_selection_policy
         @clock = clock
@@ -186,7 +186,7 @@ module A3
       end
 
       def heartbeat_age_seconds_for(task_ref)
-        record = @worker_runs_by_task_ref[task_ref]
+        record = @agent_jobs_by_task_ref[task_ref]
         return nil unless record.is_a?(Hash)
 
         heartbeat_at = parse_heartbeat_time(record["heartbeat_at"])

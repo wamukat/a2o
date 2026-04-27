@@ -884,7 +884,7 @@ module A3
         kanban_tasks: tasks,
         kanban_snapshots_by_ref: kanban_snapshot_index.by_ref,
         kanban_snapshots_by_id: kanban_snapshot_index.by_id,
-        worker_runs_by_task_ref: load_watch_summary_worker_runs(options.fetch(:storage_dir))
+        agent_jobs_by_task_ref: load_watch_summary_agent_jobs_by_task_ref(options.fetch(:storage_dir))
       ).call
       attach_decomposition_entries(summary, tasks: tasks, storage_dir: options.fetch(:storage_dir))
 
@@ -2152,7 +2152,7 @@ module A3
       )
     end
 
-    def load_watch_summary_worker_runs(storage_dir)
+    def load_watch_summary_agent_jobs_by_task_ref(storage_dir)
       records = load_watch_summary_agent_job_runs(storage_dir)
 
       records.each_with_object({}) do |record, memo|

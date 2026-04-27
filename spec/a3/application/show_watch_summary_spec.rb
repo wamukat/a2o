@@ -3,7 +3,7 @@
 RSpec.describe A3::Application::ShowWatchSummary do
   let(:inherited_parent_state_resolver) { instance_double("InheritedParentStateResolver") }
   let(:upstream_line_guard) { A3::Domain::UpstreamLineGuard.new(inherited_parent_state_resolver: inherited_parent_state_resolver) }
-  let(:worker_runs_by_task_ref) { {} }
+  let(:agent_jobs_by_task_ref) { {} }
   let(:clock) { -> { Time.utc(2026, 4, 24, 1, 0, 0) } }
   subject(:use_case) do
     described_class.new(
@@ -15,7 +15,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
         "Sample#2" => { "title" => "Blocked task", "status" => "To do" },
         "Sample#3" => { "title" => "Parent task", "status" => "To do" }
       },
-      worker_runs_by_task_ref: worker_runs_by_task_ref,
+      agent_jobs_by_task_ref: agent_jobs_by_task_ref,
       upstream_line_guard: upstream_line_guard,
       clock: clock
     )
@@ -166,7 +166,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(result.tasks.find { |item| item.ref == "Sample#2" }.title).to include("[kanban=To do internal=Blocked]")
   end
 
-  it "uses worker run heartbeat data for running entries when available" do
+  it "uses agent job heartbeat data for running entries when available" do
     task = A3::Domain::Task.new(
       ref: "Sample#1",
       kind: :child,
@@ -201,7 +201,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
       )
     )
 
-    worker_runs_by_task_ref["Sample#1"] = {
+    agent_jobs_by_task_ref["Sample#1"] = {
       "task_ref" => "Sample#1",
       "heartbeat_at" => "2026-04-24T00:59:30Z",
       "updated_at_epoch_ms" => 1

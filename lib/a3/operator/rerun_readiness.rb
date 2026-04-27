@@ -11,7 +11,7 @@ require "a3/operator/rerun_workspace_support"
 module A3
   module Operator
     module RerunReadiness
-      TERMINAL_WORKER_RUN_STATES = ActivityEvidence::TERMINAL_STATES
+      TERMINAL_AGENT_JOB_STATES = ActivityEvidence::TERMINAL_STATES
       ReadinessCheck = Struct.new(:name, :ok, :blocking, :detail, keyword_init: true) do
         def to_h
           {
@@ -36,7 +36,7 @@ module A3
         raw_refs.map { |item| item.to_s.strip }.reject(&:empty?).uniq.sort
       end
 
-      def load_worker_run_store(path)
+      def load_legacy_worker_run_activity(path)
         ActivityEvidence.latest_by_task_ref(activity_file: ActivityEvidence.agent_jobs_path_from(worker_runs_file: path)).transform_values(&:to_h)
       end
 
@@ -44,13 +44,13 @@ module A3
         ActivityEvidence.latest_by_task_ref(activity_file: path).transform_values(&:to_h)
       end
 
-      def latest_worker_run(worker_runs_file: nil, agent_jobs_file: nil, task_ref:)
-        store = agent_jobs_file ? load_agent_job_store(agent_jobs_file) : load_worker_run_store(worker_runs_file)
+      def latest_agent_job(worker_runs_file: nil, agent_jobs_file: nil, task_ref:)
+        store = agent_jobs_file ? load_agent_job_store(agent_jobs_file) : load_legacy_worker_run_activity(worker_runs_file)
         store[task_ref]
       end
 
       def resolve_task_id(task_ref:, worker_runs_file: nil, agent_jobs_file: nil)
-        latest = latest_worker_run(worker_runs_file: worker_runs_file, agent_jobs_file: agent_jobs_file, task_ref: task_ref)
+        latest = latest_agent_job(worker_runs_file: worker_runs_file, agent_jobs_file: agent_jobs_file, task_ref: task_ref)
         latest && latest["task_id"]
       end
 
@@ -111,7 +111,7 @@ module A3
       def inspect_rerun_readiness(root_dir:, project:, task_ref:, active_runs_file:, worker_runs_file: nil, agent_jobs_file: nil, kanban_project: nil, kanban_working_dir: Dir.pwd, allow_blocked_label: false)
         issue_workspace = RerunWorkspaceSupport.compute_issue_workspace(root_dir: root_dir, project: project, task_ref: task_ref)
         active_refs = load_active_run_state(active_runs_file)
-        latest = latest_worker_run(worker_runs_file: worker_runs_file, agent_jobs_file: agent_jobs_file, task_ref: task_ref)
+        latest = latest_agent_job(worker_runs_file: worker_runs_file, agent_jobs_file: agent_jobs_file, task_ref: task_ref)
         cleanup_paths = RerunWorkspaceSupport.collect_default_rerun_paths(issue_workspace: issue_workspace).map(&:to_s)
         broken_bridges = RerunWorkspaceSupport.top_level_broken_support_bridges(issue_workspace).map(&:to_s)
 
@@ -131,10 +131,10 @@ module A3
           detail: "task is not present in active-runs.json"
         )
         checks << ReadinessCheck.new(
-          name: "latest_worker_run_terminal_or_absent",
-          ok: latest.nil? || TERMINAL_WORKER_RUN_STATES.include?(latest["state"].to_s.strip),
+          name: "latest_agent_job_terminal_or_absent",
+          ok: latest.nil? || TERMINAL_AGENT_JOB_STATES.include?(latest["state"].to_s.strip),
           blocking: true,
-          detail: "latest worker run is terminal or missing"
+          detail: "latest agent job is terminal or missing"
         )
         checks << ReadinessCheck.new(
           name: "broken_support_bridges_cleared",
@@ -168,8 +168,8 @@ module A3
           detail = item.detail
           if item.name == "active_run_cleared" && !item.ok
             detail = "task is still active: #{task_ref}"
-          elsif item.name == "latest_worker_run_terminal_or_absent" && !item.ok && latest
-            detail = "latest worker run is non-terminal: #{latest['state']}"
+          elsif item.name == "latest_agent_job_terminal_or_absent" && !item.ok && latest
+            detail = "latest agent job is non-terminal: #{latest['state']}"
           elsif item.name == "broken_support_bridges_cleared" && !item.ok
             detail = "broken top-level support bridges remain: #{broken_bridges.join(', ')}"
           elsif item.name == "rerun_cleanup_paths_cleared" && !item.ok
@@ -193,7 +193,7 @@ module A3
           "task_ref" => task_ref,
           "issue_workspace" => issue_workspace.to_s,
           "ready" => ready,
-          "latest_worker_run" => latest,
+          "latest_agent_job" => latest,
           "cleanup_paths" => cleanup_paths,
           "checks" => annotated_checks.map(&:to_h),
           "task_status" => task_status,

@@ -213,7 +213,7 @@ RSpec.describe A3Cleanup do
     end
   end
 
-  it "includes nonterminal worker runs in active refs" do
+  it "includes nonterminal agent jobs in active refs" do
     Dir.mktmpdir("a3-cleanup-") do |dir|
       root = Pathname(dir)
       active_runs = root.join("active-runs.json")

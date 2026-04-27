@@ -9,7 +9,7 @@ require "a3/operator/activity_evidence"
 require "a3/operator/diagnostics"
 
 module A3Reconcile
-  TERMINAL_WORKER_RUN_STATES = A3Diagnostics::TERMINAL_WORKER_RUN_STATES
+  TERMINAL_AGENT_JOB_STATES = A3Diagnostics::TERMINAL_AGENT_JOB_STATES
 
   ActiveRunState = Struct.new(:task_refs, keyword_init: true) do
     def normalized
@@ -81,7 +81,7 @@ module A3Reconcile
     normalized
   end
 
-  def describe_worker_runs(path)
+  def describe_legacy_worker_run_activity(path)
     A3::Operator::ActivityEvidence.describe_activity(activity_file: A3::Operator::ActivityEvidence.agent_jobs_path_from(worker_runs_file: path))
   end
 
@@ -113,7 +113,7 @@ module A3Reconcile
     active_state = load_active_run_state(active_runs_file)
     legacy_worker_runs_file = worker_runs_file || Pathname(agent_jobs_file).dirname.join("worker-runs.json")
     latest_runs = {}
-    records = agent_jobs_file ? describe_agent_jobs(agent_jobs_file) : describe_worker_runs(legacy_worker_runs_file)
+    records = agent_jobs_file ? describe_agent_jobs(agent_jobs_file) : describe_legacy_worker_run_activity(legacy_worker_runs_file)
     records.each do |record|
       latest_runs[record.task_ref] ||= record
     end
@@ -121,22 +121,22 @@ module A3Reconcile
     stale_runs = []
     candidate_refs = active_state.task_refs.to_set
     latest_runs.each do |ref, latest|
-      candidate_refs << ref unless TERMINAL_WORKER_RUN_STATES.include?(latest.state)
+      candidate_refs << ref unless TERMINAL_AGENT_JOB_STATES.include?(latest.state)
     end
     candidate_refs = Set[task_ref] if task_ref
 
     candidate_refs.to_a.sort.each do |candidate_ref|
       latest = latest_runs[candidate_ref]
       if latest.nil?
-        stale_runs << StaleActiveRun.new(task_ref: candidate_ref, task_id: nil, reason: "missing_worker_run", latest_state: nil)
+        stale_runs << StaleActiveRun.new(task_ref: candidate_ref, task_id: nil, reason: "missing_agent_job", latest_state: nil)
         next
       end
-      if TERMINAL_WORKER_RUN_STATES.include?(latest.state)
-        stale_runs << StaleActiveRun.new(task_ref: candidate_ref, task_id: latest.task_id, reason: "latest_run_terminal", latest_state: latest.state)
+      if TERMINAL_AGENT_JOB_STATES.include?(latest.state)
+        stale_runs << StaleActiveRun.new(task_ref: candidate_ref, task_id: latest.task_id, reason: "latest_agent_job_terminal", latest_state: latest.state)
         next
       end
-      unless A3Diagnostics.effectively_live_worker_run?(latest)
-        stale_runs << StaleActiveRun.new(task_ref: candidate_ref, task_id: latest.task_id, reason: "stale_worker_run", latest_state: latest.state)
+      unless A3Diagnostics.effectively_live_agent_job?(latest)
+        stale_runs << StaleActiveRun.new(task_ref: candidate_ref, task_id: latest.task_id, reason: "stale_agent_job", latest_state: latest.state)
         next
       end
       if live_processes.empty?
@@ -157,7 +157,7 @@ module A3Reconcile
     }
   end
 
-  def mark_stale_worker_runs(worker_runs_file, stale_active_runs)
+  def mark_stale_agent_jobs(_legacy_worker_runs_file, _stale_active_runs)
     nil
   end
 
@@ -165,7 +165,7 @@ module A3Reconcile
     legacy_worker_runs_file = worker_runs_file || Pathname(agent_jobs_file).dirname.join("worker-runs.json")
     payload = inspect_stale_active_runs(project: project, active_runs_file: active_runs_file, worker_runs_file: worker_runs_file, agent_jobs_file: agent_jobs_file, task_ref: task_ref, live_process_patterns: live_process_patterns)
     save_active_run_state(active_runs_file, ActiveRunState.new(task_refs: payload.fetch("active_refs_after")))
-    mark_stale_worker_runs(legacy_worker_runs_file, payload.fetch("stale_active_runs"))
+    mark_stale_agent_jobs(legacy_worker_runs_file, payload.fetch("stale_active_runs"))
     payload.merge("applied" => true)
   end
 

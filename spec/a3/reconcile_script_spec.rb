@@ -69,8 +69,8 @@ RSpec.describe A3Reconcile do
       reasons = payload.fetch("stale_active_runs").each_with_object({}) { |item, acc| acc[item.fetch("task_ref")] = item.fetch("reason") }
       ids = payload.fetch("stale_active_runs").each_with_object({}) { |item, acc| acc[item.fetch("task_ref")] = item["task_id"] }
 
-      expect(reasons["Sample#1"]).to eq("latest_run_terminal")
-      expect(reasons["Sample#2"]).to eq("missing_worker_run")
+      expect(reasons["Sample#1"]).to eq("latest_agent_job_terminal")
+      expect(reasons["Sample#2"]).to eq("missing_agent_job")
       expect(ids["Sample#1"]).to eq(1)
       expect(ids["Sample#2"]).to be_nil
       expect(payload.fetch("active_refs_after")).to eq([])
@@ -95,7 +95,7 @@ RSpec.describe A3Reconcile do
     end
   end
 
-  it "flags worker run without active ref as stale" do
+  it "flags agent job without active ref as stale" do
     Dir.mktmpdir("a3-reconcile-") do |dir|
       root = Pathname(dir)
       active_runs = root.join("active-runs.json")
@@ -106,7 +106,7 @@ RSpec.describe A3Reconcile do
 
       payload = described_class.inspect_stale_active_runs(project: "sample", active_runs_file: active_runs, worker_runs_file: worker_runs)
       expect(payload.fetch("stale_active_runs")).to eq([
-        { "task_ref" => "Sample#2561", "task_id" => 2561, "reason" => "stale_worker_run", "latest_state" => "running_command" }
+        { "task_ref" => "Sample#2561", "task_id" => 2561, "reason" => "stale_agent_job", "latest_state" => "running_command" }
       ])
     end
   end
