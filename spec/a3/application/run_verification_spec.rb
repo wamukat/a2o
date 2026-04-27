@@ -276,10 +276,11 @@ RSpec.describe A3::Application::RunVerification do
     allow(command_runner).to receive(:run).with(
       ["commands/collect-metrics"],
       workspace: prepared_workspace,
-      env: {},
+      env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: task,
       run: run,
-      command_intent: :metrics_collection
+      command_intent: :metrics_collection,
+      worker_protocol_request: hash_including("command_intent" => "metrics_collection")
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: true,
@@ -333,10 +334,11 @@ RSpec.describe A3::Application::RunVerification do
     allow(command_runner).to receive(:run).with(
       ["commands/collect-metrics"],
       workspace: prepared_workspace,
-      env: {},
+      env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: task,
       run: run,
-      command_intent: :metrics_collection
+      command_intent: :metrics_collection,
+      worker_protocol_request: hash_including("command_intent" => "metrics_collection")
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: true,
@@ -375,10 +377,11 @@ RSpec.describe A3::Application::RunVerification do
     allow(command_runner).to receive(:run).with(
       ["commands/collect-metrics"],
       workspace: prepared_workspace,
-      env: {},
+      env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: task,
       run: run,
-      command_intent: :metrics_collection
+      command_intent: :metrics_collection,
+      worker_protocol_request: hash_including("command_intent" => "metrics_collection")
     ).and_return(
       A3::Application::ExecutionResult.new(
         success: true,

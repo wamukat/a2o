@@ -2,6 +2,7 @@
 
 require "json"
 require "time"
+require_relative "build_worker_task_packet"
 
 module A3
   module Application
@@ -12,22 +13,31 @@ module A3
         end
       end
 
-      def initialize(command_runner:, task_metrics_repository:, clock: -> { Time.now.utc })
+      def initialize(command_runner:, task_metrics_repository:, task_packet_builder: A3::Application::BuildWorkerTaskPacket.new(external_task_source: A3::Infra::NullExternalTaskSource.new), worker_protocol: A3::Infra::WorkerProtocol.new, clock: -> { Time.now.utc })
         @command_runner = command_runner
         @task_metrics_repository = task_metrics_repository
+        @task_packet_builder = task_packet_builder
+        @worker_protocol = worker_protocol
         @clock = clock
       end
 
       def call(task:, run:, runtime:, workspace:)
         return Result.new(collected: false) if runtime.metrics_collection_commands.empty?
 
+        command_context = command_request_context(
+          task: task,
+          run: run,
+          runtime: runtime,
+          workspace: workspace
+        )
         execution = @command_runner.run(
           runtime.metrics_collection_commands,
           workspace: workspace,
-          env: {},
+          env: command_context.fetch(:env),
           task: task,
           run: run,
-          command_intent: :metrics_collection
+          command_intent: :metrics_collection,
+          worker_protocol_request: command_context.fetch(:request)
         )
         return failure_result(execution.summary, execution.failing_command, execution.observed_state) unless execution.success?
 
@@ -47,6 +57,33 @@ module A3
       end
 
       private
+
+      def command_request_context(task:, run:, runtime:, workspace:)
+        task_packet = @task_packet_builder.call(task: task)
+        request = @worker_protocol.request_form(
+          skill: nil,
+          workspace: workspace,
+          task: task,
+          run: run,
+          phase_runtime: runtime,
+          task_packet: task_packet,
+          command_intent: :metrics_collection
+        )
+        @worker_protocol.write_request(
+          skill: nil,
+          workspace: workspace,
+          task: task,
+          run: run,
+          phase_runtime: runtime,
+          task_packet: task_packet,
+          command_intent: :metrics_collection
+        )
+
+        {
+          env: @worker_protocol.env_for(workspace),
+          request: request
+        }
+      end
 
       def parse_payload(stdout)
         JSON.parse(stdout.to_s)
