@@ -8,7 +8,7 @@ require "a3/infra/agent_workspace_repo_policy"
 module A3
   module Infra
     class AgentWorkspaceRequestBuilder
-      def initialize(source_aliases:, repo_slot_policy: nil, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, support_ref: nil, support_refs: {}, branch_namespace: ENV.fetch("A2O_BRANCH_NAMESPACE", ENV.fetch("A3_BRANCH_NAMESPACE", nil)))
+      def initialize(source_aliases:, repo_slot_policy: nil, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, support_ref: nil, support_refs: {}, branch_namespace: A3::Domain::BranchNamespace.from_env)
         @source_aliases = source_aliases.transform_keys(&:to_sym).transform_values(&:to_s).freeze
         @branch_namespace = A3::Domain::BranchNamespace.normalize(branch_namespace)
         @repo_slot_policy = repo_slot_policy || A3::Infra::AgentWorkspaceRepoPolicy.new(available_slots: @source_aliases.keys)

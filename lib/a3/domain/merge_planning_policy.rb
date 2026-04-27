@@ -5,7 +5,7 @@ require "a3/domain/branch_namespace"
 module A3
   module Domain
     class MergePlanningPolicy
-      def initialize(branch_namespace: ENV.fetch("A2O_BRANCH_NAMESPACE", ENV.fetch("A3_BRANCH_NAMESPACE", nil)))
+      def initialize(branch_namespace: A3::Domain::BranchNamespace.from_env)
         @branch_namespace = BranchNamespace.normalize(branch_namespace)
       end
 

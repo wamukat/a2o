@@ -7,7 +7,7 @@ module A3
     class RegisterCompletedRun
       Result = Struct.new(:task, :run, keyword_init: true)
 
-      def initialize(task_repository:, run_repository:, plan_next_phase:, publish_external_task_status: nil, publish_external_task_activity: nil, integration_ref_readiness_checker:, handle_parent_review_disposition: nil, branch_namespace: ENV.fetch("A2O_BRANCH_NAMESPACE", ENV.fetch("A3_BRANCH_NAMESPACE", nil)))
+      def initialize(task_repository:, run_repository:, plan_next_phase:, publish_external_task_status: nil, publish_external_task_activity: nil, integration_ref_readiness_checker:, handle_parent_review_disposition: nil, branch_namespace: A3::Domain::BranchNamespace.from_env)
         @task_repository = task_repository
         @run_repository = run_repository
         @plan_next_phase = plan_next_phase

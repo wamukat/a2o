@@ -17,7 +17,7 @@ module A3
         end
       end
 
-      def initialize(repo_sources:, branch_namespace: ENV.fetch("A2O_BRANCH_NAMESPACE", ENV.fetch("A3_BRANCH_NAMESPACE", nil)))
+      def initialize(repo_sources:, branch_namespace: A3::Domain::BranchNamespace.from_env)
         @repo_sources = repo_sources.transform_keys(&:to_sym).transform_values { |value| Pathname(value) }.freeze
         @branch_namespace = A3::Domain::BranchNamespace.normalize(branch_namespace)
       end
