@@ -110,6 +110,32 @@ func TestWorkerReportsHeartbeatErrorsWithoutFailingJob(t *testing.T) {
 	}
 }
 
+func TestWorkerStopsHeartbeatBeforeSubmittingResult(t *testing.T) {
+	tmp := t.TempDir()
+	request := testRequest(tmp)
+	client := &fakeClient{request: &request}
+
+	_, idle, err := Worker{
+		AgentName:         "host-local",
+		Client:            client,
+		Executor:          fakeExecutor{},
+		Now:               func() time.Time { return time.Now().UTC() },
+		HeartbeatInterval: time.Millisecond,
+	}.RunOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idle {
+		t.Fatal("expected job result, got idle")
+	}
+	client.mu.Lock()
+	heartbeatsAfterResult := client.heartbeatsAfterResult
+	client.mu.Unlock()
+	if heartbeatsAfterResult != 0 {
+		t.Fatalf("heartbeat should stop before result submission, got %d after result", heartbeatsAfterResult)
+	}
+}
+
 func TestWorkerUploadsAIRawLogWhenPresent(t *testing.T) {
 	tmp := t.TempDir()
 	request := testRequest(tmp)
@@ -623,13 +649,14 @@ func (failingExecutor) Execute(JobRequest) ExecutionResult {
 }
 
 type fakeClient struct {
-	mu           sync.Mutex
-	request      *JobRequest
-	requests     []*JobRequest
-	uploads      []ArtifactUpload
-	heartbeats   []string
-	heartbeatErr error
-	result       *JobResult
+	mu                    sync.Mutex
+	request               *JobRequest
+	requests              []*JobRequest
+	uploads               []ArtifactUpload
+	heartbeats            []string
+	heartbeatsAfterResult int
+	heartbeatErr          error
+	result                *JobResult
 }
 
 func (f *fakeClient) ClaimNext(string) (*JobRequest, error) {
@@ -654,11 +681,16 @@ func (f *fakeClient) UploadArtifact(upload ArtifactUpload, content []byte) (Arti
 func (f *fakeClient) Heartbeat(jobID string, heartbeat string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.result != nil {
+		f.heartbeatsAfterResult++
+	}
 	f.heartbeats = append(f.heartbeats, jobID+"="+heartbeat)
 	return f.heartbeatErr
 }
 
 func (f *fakeClient) SubmitResult(result JobResult) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.result = &result
 	return nil
 }
