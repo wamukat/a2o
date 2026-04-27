@@ -705,25 +705,30 @@ func printRuntimeImageStatus(config *runtimeInstanceConfig, runner commandRunner
 }
 
 type runtimeImageReport struct {
-	ConfiguredRef     string
-	ConfiguredDigest  string
-	LocalLatestRef    string
-	LocalLatestDigest string
-	RunningContainer  string
-	RunningImageID    string
-	RunningDigest     string
+	ConfiguredRef      string
+	ConfiguredDigest   string
+	ConfiguredImageID  string
+	LocalLatestRef     string
+	LocalLatestDigest  string
+	LocalLatestImageID string
+	RunningContainer   string
+	RunningImageID     string
+	RunningDigest      string
 }
 
 func runtimeImageDigestReport(config *runtimeInstanceConfig, runner commandRunner) runtimeImageReport {
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
 	configuredRef := runtimeImageReference(config)
+	configuredIdentity := runtimeImageIdentity(&effectiveConfig, runner)
 	report := runtimeImageReport{
-		ConfiguredRef:    configuredRef,
-		ConfiguredDigest: runtimeImageDigest(&effectiveConfig, runner),
-		LocalLatestRef:   latestRuntimeImageReference(configuredRef),
+		ConfiguredRef:     configuredRef,
+		ConfiguredDigest:  configuredIdentity.Digest,
+		ConfiguredImageID: configuredIdentity.ImageID,
+		LocalLatestRef:    latestRuntimeImageReference(configuredRef),
 	}
 	if report.LocalLatestRef != "" {
 		report.LocalLatestDigest = imageDigestForReference(report.LocalLatestRef, runner)
+		report.LocalLatestImageID = imageIDForReference(report.LocalLatestRef, runner)
 	}
 	report.RunningContainer, report.RunningImageID, report.RunningDigest = runningRuntimeImageDigest(effectiveConfig, runner)
 	return report
@@ -733,31 +738,41 @@ func printRuntimeImageDigestReport(report runtimeImageReport, stdout io.Writer) 
 	fmt.Fprintf(stdout, "runtime_image_digest=%s\n", valueOrUnavailable(report.ConfiguredDigest))
 	fmt.Fprintf(stdout, "runtime_image_pinned_ref=%s\n", valueOrUnavailable(report.ConfiguredRef))
 	fmt.Fprintf(stdout, "runtime_image_pinned_digest=%s\n", valueOrUnavailable(report.ConfiguredDigest))
+	fmt.Fprintf(stdout, "runtime_image_pinned_image_id=%s\n", valueOrUnavailable(report.ConfiguredImageID))
 	fmt.Fprintf(stdout, "runtime_image_local_latest_ref=%s\n", valueOrUnavailable(report.LocalLatestRef))
 	fmt.Fprintf(stdout, "runtime_image_local_latest_digest=%s\n", valueOrUnavailable(report.LocalLatestDigest))
+	fmt.Fprintf(stdout, "runtime_image_local_latest_image_id=%s\n", valueOrUnavailable(report.LocalLatestImageID))
 	if report.RunningContainer == "" {
 		fmt.Fprintln(stdout, "runtime_image_running_container=unavailable")
 	} else {
 		fmt.Fprintf(stdout, "runtime_image_running_container=%s image_id=%s digest=%s\n", report.RunningContainer, valueOrUnavailable(report.RunningImageID), valueOrUnavailable(report.RunningDigest))
 	}
-	fmt.Fprintf(stdout, "runtime_image_latest_status=%s action=%s\n", runtimeImageComparisonStatus(report.ConfiguredDigest, report.LocalLatestDigest), runtimeImageLatestAction(report.ConfiguredDigest, report.LocalLatestDigest, report.LocalLatestRef))
-	fmt.Fprintf(stdout, "runtime_image_running_status=%s action=%s\n", runtimeImageComparisonStatus(report.ConfiguredDigest, report.RunningDigest), runtimeImageRunningAction(report.ConfiguredDigest, report.RunningDigest))
+	latestStatus := runtimeImageComparisonStatus(report.ConfiguredDigest, report.LocalLatestDigest, report.ConfiguredImageID, report.LocalLatestImageID)
+	runningStatus := runtimeImageComparisonStatus(report.ConfiguredDigest, report.RunningDigest, report.ConfiguredImageID, report.RunningImageID)
+	fmt.Fprintf(stdout, "runtime_image_latest_status=%s action=%s\n", latestStatus, runtimeImageLatestAction(latestStatus, report.LocalLatestRef))
+	fmt.Fprintf(stdout, "runtime_image_running_status=%s action=%s\n", runningStatus, runtimeImageRunningAction(runningStatus))
 }
 
-func runtimeImageComparisonStatus(expected string, actual string) string {
+func runtimeImageComparisonStatus(expected string, actual string, expectedImageID string, actualImageID string) string {
 	expectedDigest := digestIdentity(expected)
 	actualDigest := digestIdentity(actual)
-	if expectedDigest == "" || actualDigest == "" {
-		return "unknown"
+	if expectedDigest != "" && actualDigest != "" {
+		if expectedDigest == actualDigest {
+			return "current"
+		}
+		return "mismatch"
 	}
-	if expectedDigest == actualDigest {
-		return "current"
+	if expectedDigest == "" && actualDigest == "" && strings.TrimSpace(expectedImageID) != "" && strings.TrimSpace(actualImageID) != "" {
+		if strings.TrimSpace(expectedImageID) == strings.TrimSpace(actualImageID) {
+			return "current"
+		}
+		return "mismatch"
 	}
-	return "mismatch"
+	return "unknown"
 }
 
-func runtimeImageLatestAction(configuredDigest string, latestDigest string, latestRef string) string {
-	switch runtimeImageComparisonStatus(configuredDigest, latestDigest) {
+func runtimeImageLatestAction(status string, latestRef string) string {
+	switch status {
 	case "current":
 		return "none"
 	case "mismatch":
@@ -770,8 +785,8 @@ func runtimeImageLatestAction(configuredDigest string, latestDigest string, late
 	}
 }
 
-func runtimeImageRunningAction(configuredDigest string, runningDigest string) string {
-	switch runtimeImageComparisonStatus(configuredDigest, runningDigest) {
+func runtimeImageRunningAction(status string) string {
+	switch status {
 	case "current":
 		return "none"
 	case "mismatch":

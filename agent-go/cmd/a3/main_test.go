@@ -2175,6 +2175,85 @@ func TestDoctorReportsReleaseReadinessChecks(t *testing.T) {
 	}
 }
 
+func TestDoctorAcceptsLocalRuntimeImageWithoutRepoDigest(t *testing.T) {
+	t.Setenv("A2O_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine:0.5.37-local")
+	tempDir := t.TempDir()
+	setEmptyDockerConfig(t)
+	packageDir := filepath.Join(tempDir, "package")
+	repoDir := filepath.Join(tempDir, "repo")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(repoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectYaml := strings.Join([]string{
+		"schema_version: 1",
+		"package:",
+		"  name: local-rc",
+		"kanban:",
+		"  project: LocalRC",
+		"repos:",
+		"  app:",
+		"    path: ../repo",
+		"agent:",
+		"  required_bins: [\"sh\"]",
+		"runtime:",
+		"  phases:",
+		"    implementation:",
+		"      skill: skills/implementation/base.md",
+		"      executor:",
+		"        command: [\"sh\", \"-c\", \"echo ok\"]",
+		"    review:",
+		"      skill: skills/review/default.md",
+		"    merge:",
+		"      policy: ff_only",
+		"      target_ref: refs/heads/main",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(projectYaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-local-rc",
+		RuntimeService: "a2o-runtime",
+	})
+	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
+	if err := os.MkdirAll(filepath.Dir(agentPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(agentPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{
+		imageInspectDigests: map[string]string{
+			"image-123": "",
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"doctor"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s stdout=%s", code, stderr.String(), stdout.String())
+		}
+	})
+
+	for _, want := range []string{
+		"doctor_check name=runtime_image_digest status=ok detail=digest unavailable image_id=image-123 action=local image has no registry digest; verify the GHCR digest before final release",
+		"doctor_status=ok",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("doctor output missing %q in:\n%s", want, stdout.String())
+		}
+	}
+}
+
 func TestDoctorExternalKanbanSkipsBundledServiceChecks(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/health" {
@@ -6562,11 +6641,60 @@ func TestRuntimeImageDigestReportsUnavailableWithoutFailing(t *testing.T) {
 		"runtime_image_digest=unavailable",
 		"runtime_image_pinned_ref=registry.example.com/team/a2o-runtime@sha256:pinned",
 		"runtime_image_pinned_digest=unavailable",
+		"runtime_image_pinned_image_id=image-123",
 		"runtime_image_local_latest_ref=registry.example.com/team/a2o-runtime:latest",
 		"runtime_image_local_latest_digest=unavailable",
+		"runtime_image_local_latest_image_id=unavailable",
 		"runtime_image_running_container=runtime-container image_id=running-image-123 digest=unavailable",
 		"runtime_image_latest_status=unknown action=pull registry.example.com/team/a2o-runtime:latest or inspect the configured runtime image, then rerun a2o runtime image-digest",
-		"runtime_image_running_status=unknown action=run a2o runtime up, then rerun a2o runtime status",
+		"runtime_image_running_status=mismatch action=restart runtime with a2o runtime up after confirming the desired pinned digest",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("stdout should include %q in:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestRuntimeImageDigestUsesImageIDFallbackForLocalImages(t *testing.T) {
+	t.Setenv("A2O_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine:0.5.37-local")
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-digest",
+		RuntimeService: "a2o-runtime",
+	})
+	runner := &fakeRunner{
+		containerImageIDs: map[string]string{
+			"runtime-container": "image-123",
+		},
+		imageInspectDigests: map[string]string{
+			"image-123": "",
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "image-digest"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s stdout=%s", code, stderr.String(), stdout.String())
+		}
+	})
+
+	for _, want := range []string{
+		"runtime_image_digest=unavailable",
+		"runtime_image_pinned_ref=ghcr.io/wamukat/a2o-engine:0.5.37-local",
+		"runtime_image_pinned_digest=unavailable",
+		"runtime_image_pinned_image_id=image-123",
+		"runtime_image_running_container=runtime-container image_id=image-123 digest=unavailable",
+		"runtime_image_running_status=current action=none",
 	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("stdout should include %q in:\n%s", want, stdout.String())
@@ -7333,6 +7461,7 @@ type fakeRunner struct {
 	processCommands          map[int]string
 	errorOutput              string
 	imageInspectDigests      map[string]string
+	imageInspectIDs          map[string]string
 	containerImageIDs        map[string]string
 	logManifestOutput        string
 	logManifestOutputs       []string
@@ -7414,6 +7543,15 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		}
 		return []byte("running-image-123\n"), nil
 	case name == "docker" && len(args) >= 4 && args[0] == "image" && args[1] == "inspect":
+		if containsArg(args, "{{.Id}}") {
+			if r.imageInspectIDs != nil {
+				if imageID, ok := r.imageInspectIDs[args[2]]; ok {
+					return []byte(imageID + "\n"), nil
+				}
+				return []byte("image not found\n"), errors.New("image not found")
+			}
+			return []byte("image not found\n"), errors.New("image not found")
+		}
 		if digest, ok := r.imageInspectDigests[args[2]]; ok {
 			return []byte(digest + "\n"), nil
 		}

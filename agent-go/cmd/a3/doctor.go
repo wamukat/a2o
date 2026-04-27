@@ -109,8 +109,11 @@ func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.
 		report("runtime_container", true, "A2O runtime container="+strings.TrimSpace(string(output)), "none")
 	}
 
-	if digest := runtimeImageDigest(config, runner); digest != "" {
-		report("runtime_image_digest", true, digest, "pin this digest for release smoke")
+	imageIdentity := runtimeImageIdentity(config, runner)
+	if imageIdentity.Digest != "" {
+		report("runtime_image_digest", true, imageIdentity.Digest, "pin this digest for release smoke")
+	} else if imageIdentity.ImageID != "" {
+		report("runtime_image_digest", true, "digest unavailable image_id="+imageIdentity.ImageID, "local image has no registry digest; verify the GHCR digest before final release")
 	} else {
 		report("runtime_image_digest", false, "digest unavailable", "pull or build the runtime image, then rerun a2o doctor")
 	}
@@ -418,21 +421,30 @@ func checkRepoClean(packagePath string, config projectPackageConfig, runner comm
 	}
 }
 
+type runtimeImageIdentityResult struct {
+	Digest  string
+	ImageID string
+}
+
 func runtimeImageDigest(config *runtimeInstanceConfig, runner commandRunner) string {
+	return runtimeImageIdentity(config, runner).Digest
+}
+
+func runtimeImageIdentity(config *runtimeInstanceConfig, runner commandRunner) runtimeImageIdentityResult {
 	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
 	imageID, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "images", "--quiet", effectiveConfig.RuntimeService)...)
 	if err != nil {
-		return ""
+		return runtimeImageIdentityResult{}
 	}
 	id := strings.TrimSpace(string(imageID))
 	if id == "" {
-		return ""
+		return runtimeImageIdentityResult{}
 	}
 	digest, err := runExternal(runner, "docker", "image", "inspect", id, "--format", "{{index .RepoDigests 0}}")
 	if err != nil {
-		return ""
+		return runtimeImageIdentityResult{ImageID: id}
 	}
-	return strings.TrimSpace(string(digest))
+	return runtimeImageIdentityResult{Digest: strings.TrimSpace(string(digest)), ImageID: id}
 }
 
 func imageDigestForReference(reference string, runner commandRunner) string {
@@ -444,6 +456,17 @@ func imageDigestForReference(reference string, runner commandRunner) string {
 		return ""
 	}
 	return strings.TrimSpace(string(digest))
+}
+
+func imageIDForReference(reference string, runner commandRunner) string {
+	if strings.TrimSpace(reference) == "" {
+		return ""
+	}
+	imageID, err := runExternal(runner, "docker", "image", "inspect", reference, "--format", "{{.Id}}")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(imageID))
 }
 
 func runningRuntimeImageDigest(config runtimeInstanceConfig, runner commandRunner) (string, string, string) {
