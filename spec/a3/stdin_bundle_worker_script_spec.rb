@@ -41,6 +41,19 @@ RSpec.describe "worker:stdin-bundle" do
     original_legacy ? ENV["A3_WORKER_REQUEST_PATH"] = original_legacy : ENV.delete("A3_WORKER_REQUEST_PATH")
   end
 
+  it "rejects legacy A3_ROOT_DIR without the public root replacement" do
+    original_public = ENV.delete("A2O_ROOT_DIR")
+    original_legacy = ENV["A3_ROOT_DIR"]
+    ENV["A3_ROOT_DIR"] = "/tmp/legacy-root"
+
+    expect do
+      public_env("A2O_ROOT_DIR", "A3_ROOT_DIR")
+    end.to raise_error(KeyError, /removed A3 compatibility input: environment variable A3_ROOT_DIR; migration_required=true replacement=environment variable A2O_ROOT_DIR/)
+  ensure
+    original_public ? ENV["A2O_ROOT_DIR"] = original_public : ENV.delete("A2O_ROOT_DIR")
+    original_legacy ? ENV["A3_ROOT_DIR"] = original_legacy : ENV.delete("A3_ROOT_DIR")
+  end
+
   it "sanitizes internal diagnostic names before writing worker failure payloads" do
     sanitized = sanitize_diagnostic_value(
       "A3_WORKER_REQUEST_PATH /tmp/a3-engine/lib/a3/bootstrap.rb /usr/local/bin/a3 .a2o/workspace.json"

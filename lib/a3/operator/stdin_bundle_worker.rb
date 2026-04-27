@@ -24,7 +24,7 @@ def public_env(public_name, legacy_name)
   nil
 end
 
-ROOT_DIR = Pathname(ENV["A2O_ROOT_DIR"] || ENV.fetch("A3_ROOT_DIR", Dir.pwd)).expand_path.freeze
+ROOT_DIR = Pathname(public_env("A2O_ROOT_DIR", "A3_ROOT_DIR") || Dir.pwd).expand_path.freeze
 LAUNCHER_CONFIG_PATH = public_env("A2O_WORKER_LAUNCHER_CONFIG_PATH", "A3_WORKER_LAUNCHER_CONFIG_PATH")
 KNOWN_EXECUTOR_PHASES = %w[implementation review parent_review].freeze
 ALLOWED_EXECUTOR_PLACEHOLDERS = {
@@ -352,7 +352,7 @@ end
 
 def expand_executor_placeholders(command, result_path:, schema_path:)
   workspace_root = public_env("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT") || ROOT_DIR.to_s
-  root_dir = ENV["A2O_ROOT_DIR"] || ENV["A3_ROOT_DIR"] || workspace_root
+  root_dir = public_env("A2O_ROOT_DIR", "A3_ROOT_DIR") || workspace_root
   values = {
     "result_path" => result_path.to_s,
     "schema_path" => schema_path.to_s,

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "a3/domain/configuration_error"
+
 module A3
   module Domain
     module BranchNamespace

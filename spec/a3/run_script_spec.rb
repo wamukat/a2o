@@ -6,6 +6,7 @@ require "pathname"
 require "tmpdir"
 
 RUN_SCRIPT_SPEC_ROOT_DIR = Pathname(__dir__).join("..", "..").expand_path
+ENV["A2O_ROOT_DIR"] ||= RUN_SCRIPT_SPEC_ROOT_DIR.to_s
 ENV["A3_ROOT_DIR"] ||= RUN_SCRIPT_SPEC_ROOT_DIR.to_s
 ENV["A3_ROOT_DEFAULT_PROJECT"] ||= "a2o-reference"
 ENV["A3_ROOT_RUNTIME_CONFIG_PATH"] ||= ".work/a3/config/a2o-reference-runtime.json"
