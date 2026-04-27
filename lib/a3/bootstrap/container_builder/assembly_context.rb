@@ -21,6 +21,10 @@ module A3
           @repositories.fetch(:run_repository)
         end
 
+        def task_metrics_repository
+          @repositories.fetch(:task_metrics_repository)
+        end
+
         def scheduler_state_repository
           @repositories.fetch(:scheduler_state_repository)
         end

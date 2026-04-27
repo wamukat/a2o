@@ -42,6 +42,9 @@ module A3
             generate_skill_feedback_proposal: A3::Application::GenerateSkillFeedbackProposal.new(
               list_skill_feedback: list_skill_feedback
             ),
+            report_task_metrics: A3::Application::ReportTaskMetrics.new(
+              task_metrics_repository: context.task_metrics_repository
+            ),
             reconcile_manual_merge_recovery: context.reconcile_manual_merge_recovery
           }
         end

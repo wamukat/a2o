@@ -18,6 +18,7 @@ RSpec.describe A3::Bootstrap::RepositoryBuilder do
 
       expect(repositories.fetch(:task_repository)).to be(task_repository)
       expect(repositories.fetch(:run_repository)).to be(run_repository)
+      expect(repositories.fetch(:task_metrics_repository)).to be_a(A3::Infra::JsonTaskMetricsRepository)
       expect(repositories.fetch(:scheduler_state_repository)).to be_a(A3::Infra::JsonSchedulerStateRepository)
       expect(repositories.fetch(:scheduler_cycle_repository)).to be_a(A3::Infra::JsonSchedulerCycleRepository)
     end
@@ -32,6 +33,7 @@ RSpec.describe A3::Bootstrap::RepositoryBuilder do
 
     expect(repositories.fetch(:scheduler_state_repository)).to be_a(A3::Infra::InMemorySchedulerStateRepository)
     expect(repositories.fetch(:scheduler_cycle_repository)).to be_a(A3::Infra::InMemorySchedulerCycleRepository)
+    expect(repositories.fetch(:task_metrics_repository)).to be_a(A3::Infra::InMemoryTaskMetricsRepository)
   end
 
   it "wires sqlite scheduler state/cycle repositories to the same shared sqlite store" do
@@ -49,6 +51,7 @@ RSpec.describe A3::Bootstrap::RepositoryBuilder do
 
       expect(scheduler_state_repository).to be_a(A3::Infra::SqliteSchedulerStateRepository)
       expect(scheduler_cycle_repository).to be_a(A3::Infra::SqliteSchedulerCycleRepository)
+      expect(repositories.fetch(:task_metrics_repository)).to be_a(A3::Infra::SqliteTaskMetricsRepository)
       expect(scheduler_cycle_repository.instance_variable_get(:@store)).to be(shared_store)
 
       previous_state = A3::Domain::SchedulerState.new(

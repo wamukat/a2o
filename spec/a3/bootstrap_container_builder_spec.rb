@@ -16,6 +16,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder do
       storage_dir: "/tmp/a3-v2-test",
       task_repository: task_repository,
       run_repository: run_repository,
+      task_metrics_repository: A3::Infra::InMemoryTaskMetricsRepository.new,
       scheduler_state_repository: A3::Infra::InMemorySchedulerStateRepository.new(scheduler_store),
       scheduler_cycle_repository: A3::Infra::InMemorySchedulerCycleRepository.new(scheduler_store)
     }
@@ -96,6 +97,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder do
     expect(container.fetch(:show_scheduler_history)).to be_a(A3::Application::ShowSchedulerHistory)
     expect(container.fetch(:pause_scheduler)).to be_a(A3::Application::PauseScheduler)
     expect(container.fetch(:resume_scheduler)).to be_a(A3::Application::ResumeScheduler)
+    expect(container.fetch(:report_task_metrics)).to be_a(A3::Application::ReportTaskMetrics)
   end
 
   it "preserves the public container API across execution operator and scheduler groupings" do
@@ -110,6 +112,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder do
     expect(container.keys).to include(
       :task_repository,
       :run_repository,
+      :task_metrics_repository,
       :storage_dir,
       :scheduler_state_repository,
       :scheduler_cycle_repository,
@@ -126,6 +129,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder do
       :show_state,
       :repair_runs,
       :show_scheduler_history,
+      :report_task_metrics,
       :pause_scheduler,
       :resume_scheduler,
       :plan_next_runnable_task,

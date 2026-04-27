@@ -3,7 +3,7 @@
 module A3
   module Bootstrap
     class RepositoryRegistry
-      def self.build(task_repository:, run_repository:, storage_dir:, task_metrics_repository: A3::Infra::InMemoryTaskMetricsRepository.new)
+      def self.build(task_repository:, run_repository:, storage_dir:, task_metrics_repository: nil)
         new(
           task_repository: task_repository,
           run_repository: run_repository,
@@ -12,7 +12,7 @@ module A3
         ).build
       end
 
-      def initialize(task_repository:, run_repository:, storage_dir:, task_metrics_repository: A3::Infra::InMemoryTaskMetricsRepository.new)
+      def initialize(task_repository:, run_repository:, storage_dir:, task_metrics_repository: nil)
         @task_repository = task_repository
         @run_repository = run_repository
         @task_metrics_repository = task_metrics_repository
@@ -25,13 +25,25 @@ module A3
           storage_dir: @storage_dir,
           task_repository: @task_repository,
           run_repository: @run_repository,
-          task_metrics_repository: @task_metrics_repository,
+          task_metrics_repository: task_metrics_repository,
           scheduler_state_repository: scheduler_state_repository(store),
           scheduler_cycle_repository: scheduler_cycle_repository(store)
         }.freeze
       end
 
       private
+
+      def task_metrics_repository
+        @task_metrics_repository ||=
+          case @task_repository
+          when A3::Infra::JsonTaskRepository
+            A3::Infra::JsonTaskMetricsRepository.new(File.join(@storage_dir, "task_metrics.json"))
+          when A3::Infra::SqliteTaskRepository
+            A3::Infra::SqliteTaskMetricsRepository.new(File.join(@storage_dir, "a3.sqlite3"))
+          else
+            A3::Infra::InMemoryTaskMetricsRepository.new
+          end
+      end
 
       def scheduler_store
         @scheduler_store ||=

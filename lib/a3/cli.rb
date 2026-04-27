@@ -4,6 +4,7 @@ require "optparse"
 require "pathname"
 require "shellwords"
 require "json"
+require "csv"
 require "time"
 require "a3/domain/phase_source_policy"
 require "a3/cli/command_router"
@@ -857,6 +858,29 @@ module A3
             format: options.fetch(:format)
           )
         )
+      end
+    end
+
+    def handle_metrics(argv, out:, run_id_generator:, command_runner:, merge_runner:)
+      action = argv.shift
+      unless %w[list summary].include?(action)
+        raise ArgumentError, "usage: a2o metrics list|summary"
+      end
+
+      with_storage_container(
+        argv: argv,
+        parse_with: action == "list" ? :parse_metrics_list_options : :parse_metrics_summary_options,
+        run_id_generator: run_id_generator,
+        command_runner: command_runner,
+        merge_runner: merge_runner
+      ) do |options, container|
+        reporter = container.fetch(:report_task_metrics)
+        case action
+        when "list"
+          write_metrics_list(out, reporter.list, format: options.fetch(:format))
+        when "summary"
+          write_metrics_summary(out, reporter.summary(group_by: options.fetch(:group_by)), format: options.fetch(:format))
+        end
       end
     end
 
@@ -1996,6 +2020,54 @@ module A3
       options
     end
 
+    def parse_metrics_list_options(argv)
+      options = {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        repo_sources: {},
+        format: :json
+      }
+      parser = OptionParser.new
+      parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      parser.on("--format FORMAT") { |value| options[:format] = metrics_format(value, allowed: %i[json csv]) }
+      parser.parse(argv)
+      options
+    end
+
+    def parse_metrics_summary_options(argv)
+      options = {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        repo_sources: {},
+        format: :text,
+        group_by: :task
+      }
+      parser = OptionParser.new
+      parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      parser.on("--format FORMAT") { |value| options[:format] = metrics_format(value, allowed: %i[text json]) }
+      parser.on("--group-by GROUP") { |value| options[:group_by] = metrics_group_by(value) }
+      parser.parse(argv)
+      options
+    end
+
+    def metrics_format(value, allowed:)
+      format = value.to_s.to_sym
+      return format if allowed.include?(format)
+
+      raise ArgumentError, "unsupported metrics format: #{value}"
+    end
+
+    def metrics_group_by(value)
+      group_by = value.to_s.to_sym
+      return group_by if %i[task parent].include?(group_by)
+
+      raise ArgumentError, "unsupported metrics summary group-by: #{value}"
+    end
+
     def session_filter(value)
       value.to_s.empty? ? nil : value
     end
@@ -2053,6 +2125,52 @@ module A3
       parts << "skill_path=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.skill_path)}" if entry.skill_path
       parts << "confidence=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(entry.confidence)}" if entry.confidence
       parts
+    end
+
+    def write_metrics_list(out, records, format:)
+      case format
+      when :json
+        out.puts(JSON.pretty_generate(records.map(&:persisted_form)))
+      when :csv
+        out.print(CSV.generate(headers: true) do |csv|
+          csv << %w[task_ref parent_ref timestamp code_changes tests coverage timing cost custom]
+          records.each do |record|
+            csv << [
+              record.task_ref,
+              record.parent_ref,
+              record.timestamp,
+              JSON.generate(record.code_changes),
+              JSON.generate(record.tests),
+              JSON.generate(record.coverage),
+              JSON.generate(record.timing),
+              JSON.generate(record.cost),
+              JSON.generate(record.custom)
+            ]
+          end
+        end)
+      else
+        raise ArgumentError, "unsupported metrics list format: #{format}"
+      end
+    end
+
+    def write_metrics_summary(out, entries, format:)
+      case format
+      when :json
+        out.puts(JSON.pretty_generate(entries.map(&:persisted_form)))
+      when :text
+        if entries.empty?
+          out.puts("metrics_summary=none")
+        else
+          entries.each do |entry|
+            parts = entry.persisted_form.map do |key, value|
+              "#{key}=#{ShowOutputFormatter::FormattingHelpers.diagnostic_value(value)}"
+            end
+            out.puts("metrics_summary #{parts.join(' ')}")
+          end
+        end
+      else
+        raise ArgumentError, "unsupported metrics summary format: #{format}"
+      end
     end
 
     def build_storage_container(options:, run_id_generator:, command_runner:, merge_runner:, worker_gateway: nil)

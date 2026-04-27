@@ -15,6 +15,7 @@ RSpec.describe A3::Bootstrap::Container do
 
       expect(container.fetch(:task_repository)).to be_a(A3::Infra::SqliteTaskRepository)
       expect(container.fetch(:run_repository)).to be_a(A3::Infra::SqliteRunRepository)
+      expect(container.fetch(:task_metrics_repository)).to be_a(A3::Infra::SqliteTaskMetricsRepository)
       expect(container.fetch(:scheduler_state_repository)).to be_a(A3::Infra::SqliteSchedulerStateRepository)
       expect(container.fetch(:scheduler_cycle_repository)).to be_a(A3::Infra::SqliteSchedulerCycleRepository)
     end
@@ -31,10 +32,12 @@ RSpec.describe A3::Bootstrap::Container do
       expect(container).to include(
         :task_repository,
         :run_repository,
+        :task_metrics_repository,
         :scheduler_state_repository,
         :scheduler_cycle_repository,
         :show_task,
         :show_run,
+        :report_task_metrics,
         :show_scheduler_history,
         :plan_next_runnable_task,
         :schedule_next_run,

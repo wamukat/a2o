@@ -17,6 +17,7 @@ module A3
             storage_dir: @context.storage_dir,
             task_repository: @context.task_repository,
             run_repository: @context.run_repository,
+            task_metrics_repository: @context.task_metrics_repository,
             scheduler_state_repository: @context.scheduler_state_repository,
             scheduler_cycle_repository: @context.scheduler_cycle_repository,
             build_scope_snapshot: @context.build_scope_snapshot,

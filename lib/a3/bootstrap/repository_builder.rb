@@ -14,6 +14,7 @@ module A3
         {
           task_repository: task_repository,
           run_repository: run_repository,
+          task_metrics_repository: task_metrics_repository,
           scheduler_state_repository: scheduler_state_repository(store),
           scheduler_cycle_repository: scheduler_cycle_repository(store)
         }
@@ -54,6 +55,17 @@ module A3
           A3::Infra::SqliteSchedulerCycleRepository.new(store)
         else
           A3::Infra::InMemorySchedulerCycleRepository.new(store)
+        end
+      end
+
+      def task_metrics_repository
+        case task_repository
+        when A3::Infra::JsonTaskRepository
+          A3::Infra::JsonTaskMetricsRepository.new(File.join(storage_dir, "task_metrics.json"))
+        when A3::Infra::SqliteTaskRepository
+          A3::Infra::SqliteTaskMetricsRepository.new(File.join(storage_dir, "a3.sqlite3"))
+        else
+          A3::Infra::InMemoryTaskMetricsRepository.new
         end
       end
     end

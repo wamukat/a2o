@@ -63,6 +63,7 @@ module A3
         "show-run" => Definition.new(handler: :handle_show_run, session_kind: :storage_runtime_package),
         "skill-feedback-list" => Definition.new(handler: :handle_skill_feedback_list, session_kind: :storage),
         "skill-feedback-propose" => Definition.new(handler: :handle_skill_feedback_propose, session_kind: :storage),
+        "metrics" => Definition.new(handler: :handle_metrics, session_kind: :storage),
         "watch-summary" => Definition.new(handler: :handle_watch_summary, session_kind: :storage),
         "host" => Definition.new(handler: :handle_host, session_kind: :host_distribution),
         "agent" => Definition.new(handler: :handle_agent, session_kind: :agent_distribution),

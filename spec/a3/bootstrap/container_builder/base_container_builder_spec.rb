@@ -9,6 +9,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder::BaseContainerBuilder do
       storage_dir: "/tmp/a3",
       task_repository: A3::Infra::InMemoryTaskRepository.new,
       run_repository: A3::Infra::InMemoryRunRepository.new,
+      task_metrics_repository: A3::Infra::InMemoryTaskMetricsRepository.new,
       scheduler_state_repository: A3::Infra::InMemorySchedulerStateRepository.new(scheduler_store),
       scheduler_cycle_repository: A3::Infra::InMemorySchedulerCycleRepository.new(scheduler_store)
     }
@@ -30,6 +31,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder::BaseContainerBuilder do
       task_repository: context.task_repository,
       storage_dir: context.storage_dir,
       run_repository: context.run_repository,
+      task_metrics_repository: context.task_metrics_repository,
       scheduler_state_repository: context.scheduler_state_repository,
       scheduler_cycle_repository: context.scheduler_cycle_repository,
       build_scope_snapshot: context.build_scope_snapshot,

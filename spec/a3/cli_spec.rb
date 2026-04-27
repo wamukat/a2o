@@ -81,6 +81,85 @@ RSpec.describe A3::CLI do
     expect(out.string).to include("skill_feedback task=A2O#204 run=run-1 phase=implementation category=missing_context target=project_skill state=new")
   end
 
+  it "prints task metrics list as JSON and CSV" do
+    Dir.mktmpdir do |dir|
+      repository = A3::Infra::JsonTaskMetricsRepository.new(File.join(dir, "task_metrics.json"))
+      repository.save(
+        A3::Domain::TaskMetricsRecord.new(
+          task_ref: "A2O#101",
+          parent_ref: "A2O#100",
+          timestamp: "2026-04-27T01:00:00Z",
+          code_changes: { "lines_added" => 10 },
+          tests: { "passed_count" => 3 }
+        )
+      )
+
+      json_out = StringIO.new
+      described_class.start(["metrics", "list", "--storage-dir", dir, "--format", "json"], out: json_out)
+
+      expect(JSON.parse(json_out.string)).to contain_exactly(
+        hash_including(
+          "task_ref" => "A2O#101",
+          "parent_ref" => "A2O#100",
+          "code_changes" => { "lines_added" => 10 },
+          "tests" => { "passed_count" => 3 }
+        )
+      )
+
+      csv_out = StringIO.new
+      described_class.start(["metrics", "list", "--storage-dir", dir, "--format", "csv"], out: csv_out)
+
+      rows = CSV.parse(csv_out.string, headers: true)
+      expect(rows.first["task_ref"]).to eq("A2O#101")
+      expect(rows.first["parent_ref"]).to eq("A2O#100")
+      expect(JSON.parse(rows.first["code_changes"])).to eq("lines_added" => 10)
+    end
+  end
+
+  it "prints task metrics summary by task and by parent" do
+    Dir.mktmpdir do |dir|
+      repository = A3::Infra::JsonTaskMetricsRepository.new(File.join(dir, "task_metrics.json"))
+      repository.save(
+        A3::Domain::TaskMetricsRecord.new(
+          task_ref: "A2O#101",
+          parent_ref: "A2O#100",
+          timestamp: "2026-04-27T01:00:00Z",
+          code_changes: { "lines_added" => 10 },
+          tests: { "passed_count" => 3 }
+        )
+      )
+      repository.save(
+        A3::Domain::TaskMetricsRecord.new(
+          task_ref: "A2O#102",
+          parent_ref: "A2O#100",
+          timestamp: "2026-04-27T02:00:00Z",
+          code_changes: { "lines_added" => 5 },
+          tests: { "passed_count" => 4, "failed_count" => 1 }
+        )
+      )
+
+      task_out = StringIO.new
+      described_class.start(["metrics", "summary", "--storage-dir", dir], out: task_out)
+
+      expect(task_out.string).to include("metrics_summary group_key=A2O#101")
+      expect(task_out.string).to include("metrics_summary group_key=A2O#102")
+
+      parent_out = StringIO.new
+      described_class.start(["metrics", "summary", "--storage-dir", dir, "--group-by", "parent", "--format", "json"], out: parent_out)
+
+      expect(JSON.parse(parent_out.string)).to contain_exactly(
+        hash_including(
+          "group_key" => "A2O#100",
+          "record_count" => 2,
+          "task_count" => 2,
+          "lines_added" => 15,
+          "tests_passed" => 7,
+          "tests_failed" => 1
+        )
+      )
+    end
+  end
+
   it "routes manifest-driven runtime commands through the shared runtime session helper" do
     out = StringIO.new
     session = Struct.new(:options, :container, :project_context, :project_surface, keyword_init: true).new(

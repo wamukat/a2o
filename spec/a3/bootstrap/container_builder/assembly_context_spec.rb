@@ -8,6 +8,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder::AssemblyContext do
     repositories = {
       task_repository: A3::Infra::InMemoryTaskRepository.new,
       run_repository: A3::Infra::InMemoryRunRepository.new,
+      task_metrics_repository: A3::Infra::InMemoryTaskMetricsRepository.new,
       scheduler_state_repository: A3::Infra::InMemorySchedulerStateRepository.new(scheduler_store),
       scheduler_cycle_repository: A3::Infra::InMemorySchedulerCycleRepository.new(scheduler_store)
     }
@@ -28,6 +29,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder::AssemblyContext do
 
     expect(context.task_repository).to be(repositories.fetch(:task_repository))
     expect(context.run_repository).to be(repositories.fetch(:run_repository))
+    expect(context.task_metrics_repository).to be(repositories.fetch(:task_metrics_repository))
     expect(context.scheduler_state_repository).to be(repositories.fetch(:scheduler_state_repository))
     expect(context.scheduler_cycle_repository).to be(repositories.fetch(:scheduler_cycle_repository))
     expect(context.build_scope_snapshot).to be(runtime_services.fetch(:build_scope_snapshot))
