@@ -1531,6 +1531,8 @@ runtime:
 func TestUnsupportedRuntimeCommandsAreNotPublicEntrypoints(t *testing.T) {
 	for _, command := range [][]string{
 		{"runtime", "command-plan"},
+		{"runtime", "start"},
+		{"runtime", "stop"},
 	} {
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
@@ -1638,8 +1640,6 @@ func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
 		{name: "runtime down", args: []string{"runtime", "down", "-bad"}, want: "Usage of a2o runtime down:"},
 		{name: "runtime resume", args: []string{"runtime", "resume", "-bad"}, want: "Usage of a2o runtime resume:"},
 		{name: "runtime pause", args: []string{"runtime", "pause", "-bad"}, want: "Usage of a2o runtime pause:"},
-		{name: "runtime start compatibility alias", args: []string{"runtime", "start", "-bad"}, want: "Usage of a2o runtime resume:"},
-		{name: "runtime stop compatibility alias", args: []string{"runtime", "stop", "-bad"}, want: "Usage of a2o runtime pause:"},
 		{name: "runtime status", args: []string{"runtime", "status", "-bad"}, want: "Usage of a2o runtime status:"},
 		{name: "runtime image-digest", args: []string{"runtime", "image-digest", "-bad"}, want: "Usage of a2o runtime image-digest:"},
 		{name: "runtime doctor", args: []string{"runtime", "doctor", "-bad"}, want: "Usage of a2o runtime doctor:"},

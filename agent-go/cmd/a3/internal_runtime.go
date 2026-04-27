@@ -54,18 +54,6 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
-	case "start":
-		if err := runRuntimeResume(args[1:], runner, stdout, stderr); err != nil {
-			printUserFacingError(stderr, err)
-			return 1
-		}
-		return 0
-	case "stop":
-		if err := runRuntimePause(args[1:], runner, stdout, stderr); err != nil {
-			printUserFacingError(stderr, err)
-			return 1
-		}
-		return 0
 	case "status":
 		if err := runRuntimeStatus(args[1:], runner, stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)
