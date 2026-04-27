@@ -389,32 +389,39 @@ RSpec.describe A3RootUtilityLauncher do
       root = Pathname(temp_dir)
       active_runs = root.join(".work", "a3", "state", "a2o-reference", "active-runs.json")
       worker_runs = root.join(".work", "a3", "state", "a2o-reference", "worker-runs.json")
+      agent_jobs = root.join(".work", "a3", "state", "a2o-reference", "agent_jobs.json")
       active_runs.dirname.mkpath
       active_runs.write(JSON.generate({ "active_task_refs" => ["A2OReferenceMultiRepo#1"] }))
-      worker_runs.write(
+      agent_jobs.write(
         JSON.generate(
           {
-            "runs" => {
-              "A2OReferenceMultiRepo#1" => {
+            "job-1" => {
+              "state" => "completed",
+              "claimed_at" => "2026-03-30T00:00:00+00:00",
+              "heartbeat_at" => "2026-03-30T00:00:01+00:00",
+              "request" => {
+                "job_id" => "job-1",
                 "task_ref" => "A2OReferenceMultiRepo#1",
-                "task_id" => 1,
-                "team" => "implementation",
                 "phase" => "implementation",
-                "state" => "selected",
-                "started_at" => "2026-03-30T00:00:00+00:00",
-                "heartbeat_at" => "2026-03-30T00:00:01+00:00",
-                "updated_at_epoch_ms" => 20
+                "command" => "worker",
+                "args" => [],
+                "working_dir" => root.to_s
               },
-              "A2OReferenceMultiRepo#2" => {
+              "result" => { "status" => "succeeded", "activity_state" => "selected" }
+            },
+            "job-2" => {
+              "state" => "completed",
+              "claimed_at" => "2026-03-30T00:00:00+00:00",
+              "heartbeat_at" => "2026-03-30T00:00:01+00:00",
+              "request" => {
+                "job_id" => "job-2",
                 "task_ref" => "A2OReferenceMultiRepo#2",
-                "task_id" => 2,
-                "team" => "planner",
-                "phase" => nil,
-                "state" => "blocked_task_failure",
-                "started_at" => "2026-03-30T00:00:00+00:00",
-                "heartbeat_at" => "2026-03-30T00:00:01+00:00",
-                "updated_at_epoch_ms" => 10
-              }
+                "phase" => "planner",
+                "command" => "worker",
+                "args" => [],
+                "working_dir" => root.to_s
+              },
+              "result" => { "status" => "failed", "activity_state" => "blocked_task_failure" }
             }
           }
         )

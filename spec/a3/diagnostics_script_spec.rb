@@ -166,6 +166,31 @@ RSpec.describe A3Diagnostics do
     end
   end
 
+  it "treats cancelled and stale completed agent jobs as terminal" do
+    Dir.mktmpdir("a3-diagnostics-") do |dir|
+      root = Pathname(dir)
+      active_runs = root.join("active-runs.json")
+      worker_runs = root.join("worker-runs.json")
+      now = Time.now.utc.iso8601
+      active_runs.write(JSON.generate({ "active_task_refs" => %w[Sample#32 Sample#33] }))
+      agent_jobs = root.join("agent_jobs.json")
+      write_agent_job(agent_jobs, job_id: "job-32", task_ref: "Sample#32", phase: "implementation", state: "completed", heartbeat_at: now)
+      payload = JSON.parse(agent_jobs.read)
+      payload.fetch("job-32").fetch("result")["status"] = "cancelled"
+      payload["job-33"] = payload.fetch("job-32").merge(
+        "request" => payload.fetch("job-32").fetch("request").merge("job_id" => "job-33", "task_ref" => "Sample#33"),
+        "result" => payload.fetch("job-32").fetch("result").merge("status" => "stale")
+      )
+      agent_jobs.write(JSON.generate(payload))
+
+      report = described_class.describe_state(project: "sample", root_dir: root, active_runs_file: active_runs, worker_runs_file: worker_runs)
+
+      expect(report.fetch("running_runs")).to eq([])
+      states = report.fetch("recent_runs").to_h { |item| [item.fetch("task_ref"), item.fetch("state")] }
+      expect(states).to include("Sample#32" => "cancelled", "Sample#33" => "stale")
+    end
+  end
+
   it "projects integration_judgment as merge and keeps internal phase" do
     Dir.mktmpdir("a3-diagnostics-") do |dir|
       root = Pathname(dir)

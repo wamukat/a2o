@@ -8,7 +8,7 @@ require "time"
 module A3
   module Operator
     module ActivityEvidence
-      TERMINAL_STATES = Set.new(%w[completed failed timed_out blocked kanban_apply_failed blocked_task_failure blocked_refresh_failure launch_failed needs_commit_retry needs_handoff_retry needs_rework_retry no_op_terminal]).freeze
+      TERMINAL_STATES = Set.new(%w[completed failed timed_out cancelled stale blocked kanban_apply_failed blocked_task_failure blocked_refresh_failure launch_failed needs_commit_retry needs_handoff_retry needs_rework_retry no_op_terminal]).freeze
 
       Record = Struct.new(
         :task_ref, :task_id, :team, :phase, :state, :started_at, :heartbeat_at, :updated_at_epoch_ms,
