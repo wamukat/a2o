@@ -79,11 +79,13 @@ module A3
         return activity_state unless activity_state.empty?
 
         case agent_job_state.to_s.strip
+        when "queued"
+          "selected"
         when "claimed"
           "running_command"
         when "completed"
           result_state = result.is_a?(Hash) ? result["status"].to_s.strip : ""
-          result_state.empty? || result_state == "success" ? "completed" : result_state
+          result_state.empty? || %w[success succeeded].include?(result_state) ? "completed" : result_state
         else
           agent_job_state.to_s.strip
         end
@@ -140,6 +142,7 @@ module A3
 
       def effectively_live?(record, stale_after_seconds: 120)
         return false if TERMINAL_STATES.include?(record.state)
+        return false if record.state.to_s == "selected"
 
         heartbeat_at = parse_time(record.heartbeat_at)
         return true if heartbeat_at.nil?

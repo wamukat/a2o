@@ -20,7 +20,7 @@ RSpec.describe A3RerunReadiness do
           "claimed_at" => "2026-04-02T14:24:20+09:00",
           "heartbeat_at" => "2026-04-02T14:24:20+09:00",
           "request" => { "job_id" => "job-#{task_ref.delete('#')}", "task_ref" => task_ref, "phase" => phase },
-          "result" => { "status" => "success", "activity_state" => state }
+          "result" => { "status" => "succeeded", "activity_state" => state }
         }
       }
     )

@@ -21,7 +21,7 @@ RSpec.describe A3Diagnostics do
         "args" => [],
         "working_dir" => path.dirname.to_s
       },
-      "result" => activity_state || state == "completed" ? { "status" => "success", "activity_state" => activity_state }.compact : nil
+      "result" => activity_state || state == "completed" ? { "status" => "succeeded", "activity_state" => activity_state }.compact : nil
     }.compact
     path.write(JSON.generate(payload))
   end
@@ -118,6 +118,51 @@ RSpec.describe A3Diagnostics do
 
       expect(report.fetch("selected_pending_refs")).to eq(["Sample#10"])
       expect(report.fetch("running_runs").first.fetch("state")).to eq("launch_started")
+    end
+  end
+
+  it "treats queued agent jobs as selected pending but not running" do
+    Dir.mktmpdir("a3-diagnostics-") do |dir|
+      root = Pathname(dir)
+      active_runs = root.join("active-runs.json")
+      worker_runs = root.join("worker-runs.json")
+      active_runs.write(JSON.generate({ "active_task_refs" => [] }))
+      root.join("agent_jobs.json").write(
+        JSON.generate(
+          "job-30" => {
+            "state" => "queued",
+            "request" => {
+              "job_id" => "job-30",
+              "task_ref" => "Sample#30",
+              "phase" => "implementation",
+              "command" => "worker",
+              "args" => [],
+              "working_dir" => root.to_s
+            }
+          }
+        )
+      )
+
+      report = described_class.describe_state(project: "sample", root_dir: root, active_runs_file: active_runs, worker_runs_file: worker_runs)
+
+      expect(report.fetch("selected_pending_refs")).to eq(["Sample#30"])
+      expect(report.fetch("running_runs")).to eq([])
+    end
+  end
+
+  it "treats succeeded completed agent jobs as terminal" do
+    Dir.mktmpdir("a3-diagnostics-") do |dir|
+      root = Pathname(dir)
+      active_runs = root.join("active-runs.json")
+      worker_runs = root.join("worker-runs.json")
+      current_iso = Time.now.utc.iso8601
+      active_runs.write(JSON.generate({ "active_task_refs" => ["Sample#31"] }))
+      write_agent_job(root.join("agent_jobs.json"), job_id: "job-31", task_ref: "Sample#31", phase: "implementation", state: "completed", heartbeat_at: current_iso)
+
+      report = described_class.describe_state(project: "sample", root_dir: root, active_runs_file: active_runs, worker_runs_file: worker_runs)
+
+      expect(report.fetch("running_runs")).to eq([])
+      expect(report.fetch("recent_runs").first.fetch("state")).to eq("completed")
     end
   end
 
