@@ -106,6 +106,15 @@ Kanbalone `v0.9.21` は、チケットに付与されたタグの任意の理由
 
 構造化イベントは automation log の surface であり、現在の status / tag モデルの置き換えではない。
 
+A2O は接続先アダプターが `task-event-create` に対応している場合、次の lifecycle point を構造化 Kanbalone event として書き込む。
+
+- `task_started`: run 開始時。
+- `task_blocked`: run 完了後にタスクが blocked になった時。
+- `clarification_requested`: run 完了後に利用者確認が必要になった時。
+- `task_completed`: run 完了後にタスクが done になった時。
+
+activity publisher は既存の Markdown activity 本文を常に fallback comment として渡す。そのため古い Kanbalone では構造化 event row は保存されないが、人間が読むコメントは従来どおり残る。
+
 ## 複数行テキストの契約
 
 自動処理はタスク説明とコメントを `--description-file`、`--append-description-file`、`--comment-file` のようなファイル指定オプションで渡す。カンバン CLI の書き込み成功時は stdout に JSON だけを返すため、呼び出し側はテキスト抽出ではなく JSON パーサーでタスク ID / 参照を取得する。

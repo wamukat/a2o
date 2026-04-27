@@ -185,7 +185,13 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
-      body: a_string_matching(/A2O 実行完了: review.*エラー分類: executor_failed.*主要失敗要約: review found runner-layout gap in repo-alpha.*主要失敗コマンド: review_worker.*継承元親状態: refs\/heads\/a2o\/parent\/A3-v2-3022.*次の対応: executor command.*観測状態: findings remain/m)
+      body: a_string_matching(/A2O 実行完了: review.*エラー分類: executor_failed.*主要失敗要約: review found runner-layout gap in repo-alpha.*主要失敗コマンド: review_worker.*継承元親状態: refs\/heads\/a2o\/parent\/A3-v2-3022.*次の対応: executor command.*観測状態: findings remain/m),
+      event: hash_including(
+        "kind" => "task_blocked",
+        "severity" => "error",
+        "summary" => "review found runner-layout gap in repo-alpha",
+        "data" => hash_including("run_ref" => "run-1", "phase" => "review", "task_status" => "blocked")
+      )
     )
     result = use_case.call(task_ref: task.ref, run_ref: review_run.ref, outcome: :blocked)
 
@@ -246,7 +252,13 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
-      body: a_string_matching(/確認依頼: Should this override existing retry behavior\?.*確認背景: Requirement conflicts with the existing retry policy/m)
+      body: a_string_matching(/確認依頼: Should this override existing retry behavior\?.*確認背景: Requirement conflicts with the existing retry policy/m),
+      event: hash_including(
+        "kind" => "clarification_requested",
+        "severity" => "warning",
+        "summary" => "Should this override existing retry behavior?",
+        "data" => hash_including("run_ref" => "run-1", "phase" => "implementation", "task_status" => "needs_clarification")
+      )
     )
 
     result = use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :needs_clarification, execution: execution)
@@ -292,7 +304,16 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     run_repository.save(merge_run)
 
     expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :done, task_kind: :child)
-    expect(activity_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, body: /A2O 実行完了: merge/)
+    expect(activity_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      body: /A2O 実行完了: merge/,
+      event: hash_including(
+        "kind" => "task_completed",
+        "severity" => "success",
+        "data" => hash_including("run_ref" => "run-9", "phase" => "merge", "task_status" => "done")
+      )
+    )
     result = use_case.call(task_ref: task.ref, run_ref: merge_run.ref, outcome: :completed)
 
     expect(result.task.status).to eq(:done)
@@ -417,7 +438,13 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
-      body: a_string_matching(/主要失敗要約: missing integration ref refs\/heads\/a2o\/parent\/A3-v2-3022 for slots repo_alpha/)
+      body: a_string_matching(/主要失敗要約: missing integration ref refs\/heads\/a2o\/parent\/A3-v2-3022 for slots repo_alpha/),
+      event: hash_including(
+        "kind" => "task_blocked",
+        "severity" => "error",
+        "summary" => "missing integration ref refs/heads/a2o/parent/A3-v2-3022 for slots repo_alpha",
+        "data" => hash_including("run_ref" => "run-9", "phase" => "merge", "task_status" => "blocked")
+      )
     )
 
     result = use_case.call(task_ref: task.ref, run_ref: merge_run.ref, outcome: :completed)

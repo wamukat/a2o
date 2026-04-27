@@ -106,6 +106,15 @@ The adapter exposes these APIs conservatively:
 
 Structured events are an automation log surface, not a replacement for the current status/tag model.
 
+A2O emits structured Kanbalone events for these lifecycle points when the connected adapter supports `task-event-create`:
+
+- `task_started` when a run is started.
+- `task_blocked` when a completed run leaves the task blocked.
+- `clarification_requested` when a completed run asks for user clarification.
+- `task_completed` when a completed run leaves the task done.
+
+The activity publisher always supplies the existing Markdown activity body as the fallback comment. Older Kanbalone instances therefore keep the same human-readable comments even though they do not store structured event rows.
+
 ## Multiline Text Contract
 
 Automation must pass task descriptions and comments with file-backed options such as `--description-file`, `--append-description-file`, and `--comment-file`. The kanban CLI returns only JSON on stdout for successful write operations, so callers should parse the returned task id/ref with a JSON parser instead of scraping text.

@@ -26,7 +26,8 @@ module A3
         @publish_external_task_activity&.publish(
           task_ref: updated_task.ref,
           external_task_id: updated_task.external_task_id,
-          body: started_run_comment(run: run)
+          body: started_run_comment(run: run),
+          event: started_run_event(run: run)
         )
 
         Result.new(task: updated_task, run: run)
@@ -40,6 +41,21 @@ module A3
           "run_ref: #{run.ref}",
           "source_ref: #{run.source_descriptor.ref}"
         ].join("\n")
+      end
+
+      def started_run_event(run:)
+        {
+          "source" => "a2o",
+          "kind" => "task_started",
+          "title" => "A2O run started",
+          "summary" => "Started #{run.phase} run #{run.ref}.",
+          "severity" => "info",
+          "data" => {
+            "run_ref" => run.ref,
+            "phase" => run.phase.to_s,
+            "source_ref" => run.source_descriptor.ref
+          }
+        }
       end
     end
   end

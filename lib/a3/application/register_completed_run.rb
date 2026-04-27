@@ -42,7 +42,8 @@ module A3
         @publish_external_task_activity&.publish(
           task_ref: completed_task.ref,
           external_task_id: completed_task.external_task_id,
-          body: completed_run_comment(run: completed_run, task: completed_task, execution: execution)
+          body: completed_run_comment(run: completed_run, task: completed_task, execution: execution),
+          **activity_event_kwargs(run: completed_run, task: completed_task)
         )
 
         Result.new(task: completed_task, run: completed_run)
@@ -169,9 +170,86 @@ module A3
         @publish_external_task_activity&.publish(
           task_ref: completed_task.ref,
           external_task_id: completed_task.external_task_id,
-          body: body
+          body: body,
+          **activity_event_kwargs(run: completed_run, task: completed_task)
         )
         Result.new(task: completed_task, run: completed_run)
+      end
+
+      def activity_event_kwargs(run:, task:)
+        event = completed_run_event(run: run, task: task)
+        event ? { event: event } : {}
+      end
+
+      def completed_run_event(run:, task:)
+        case task.status.to_sym
+        when :blocked
+          blocked_task_event(run: run, task: task)
+        when :needs_clarification
+          clarification_task_event(run: run, task: task)
+        when :done
+          completed_task_event(run: run, task: task)
+        end
+      end
+
+      def blocked_task_event(run:, task:)
+        phase_record = latest_phase_record(run)
+        blocked_diagnosis = phase_record&.blocked_diagnosis
+        summary = single_line(blocked_diagnosis&.diagnostic_summary)
+        summary = "Task blocked during #{run.phase}." unless present?(summary)
+        {
+          "source" => "a2o",
+          "kind" => "task_blocked",
+          "title" => "A2O task blocked",
+          "summary" => summary,
+          "severity" => "error",
+          "data" => compact_hash(
+            "run_ref" => run.ref,
+            "phase" => run.phase.to_s,
+            "terminal_outcome" => run.terminal_outcome.to_s,
+            "task_status" => task.status.to_s,
+            "error_category" => blocked_diagnosis&.error_category&.to_s,
+            "failing_command" => blocked_diagnosis&.failing_command
+          )
+        }
+      end
+
+      def clarification_task_event(run:, task:)
+        request = latest_phase_record(run)&.execution_record&.clarification_request
+        summary = request.is_a?(Hash) ? single_line(request["question"]) : nil
+        summary = "Clarification requested during #{run.phase}." unless present?(summary)
+        {
+          "source" => "a2o",
+          "kind" => "clarification_requested",
+          "title" => "Clarification requested",
+          "summary" => summary,
+          "severity" => "warning",
+          "data" => compact_hash(
+            "run_ref" => run.ref,
+            "phase" => run.phase.to_s,
+            "terminal_outcome" => run.terminal_outcome.to_s,
+            "task_status" => task.status.to_s,
+            "question" => request.is_a?(Hash) ? request["question"] : nil,
+            "context" => request.is_a?(Hash) ? request["context"] : nil,
+            "options" => request.is_a?(Hash) ? request["options"] : nil
+          )
+        }
+      end
+
+      def completed_task_event(run:, task:)
+        {
+          "source" => "a2o",
+          "kind" => "task_completed",
+          "title" => "A2O task completed",
+          "summary" => "Completed #{run.phase} run #{run.ref}.",
+          "severity" => "success",
+          "data" => compact_hash(
+            "run_ref" => run.ref,
+            "phase" => run.phase.to_s,
+            "terminal_outcome" => run.terminal_outcome.to_s,
+            "task_status" => task.status.to_s
+          )
+        }
       end
 
       def enrich_follow_up_child_evidence(run, child_fingerprints:)

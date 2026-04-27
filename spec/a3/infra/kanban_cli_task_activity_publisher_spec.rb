@@ -82,6 +82,53 @@ RSpec.describe A3::Infra::KanbanCliTaskActivityPublisher do
     )
   end
 
+  it "creates a structured event with the comment as fallback when event metadata is provided" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 5004,
+          "ref" => "Sample#5004",
+          "status" => "To do",
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    publisher = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      publisher.publish(
+        task_ref: "Sample#5004",
+        body: "A3-v2 started implementation",
+        event: {
+          "kind" => "task_started",
+          "title" => "A2O run started",
+          "summary" => "Started implementation run run-1.",
+          "severity" => "info",
+          "data" => { "run_ref" => "run-1", "phase" => "implementation" }
+        }
+      )
+    end
+
+    events = read_fake_kanban_events(fake_cli.fetch(:events_path)).fetch("5004")
+    expect(events.fetch(0)).to include(
+      "source" => "a2o",
+      "kind" => "task_started",
+      "title" => "A2O run started",
+      "summary" => "Started implementation run run-1.",
+      "severity" => "info",
+      "data" => { "run_ref" => "run-1", "phase" => "implementation" },
+      "fallback_comment" => "A3-v2 started implementation"
+    )
+    expect(read_fake_kanban_comments(fake_cli.fetch(:comments_path))).to eq({})
+  end
+
   it "resolves the external task id from the canonical reference when task id differs" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,

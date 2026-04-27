@@ -5,10 +5,12 @@ module FakeKanbanCliHelper
     state_path = File.join(base_dir, "kanban-snapshots.json")
     transitions_path = File.join(base_dir, "kanban-transitions.jsonl")
     comments_path = File.join(base_dir, "kanban-comments.json")
+    events_path = File.join(base_dir, "kanban-events.json")
     script_path = File.join(base_dir, "fake-kanban-cli.rb")
 
     File.write(state_path, JSON.pretty_generate(snapshots))
     File.write(comments_path, JSON.pretty_generate({}))
+    File.write(events_path, JSON.pretty_generate({}))
     File.write(
       script_path,
       <<~RUBY
@@ -21,6 +23,7 @@ module FakeKanbanCliHelper
         state_path = ENV.fetch("FAKE_KANBAN_STATE_PATH")
         transitions_path = ENV.fetch("FAKE_KANBAN_TRANSITIONS_PATH")
         comments_path = ENV.fetch("FAKE_KANBAN_COMMENTS_PATH")
+        events_path = ENV.fetch("FAKE_KANBAN_EVENTS_PATH")
         mutate_state_on_transition = ENV.fetch("FAKE_KANBAN_MUTATE_STATE_ON_TRANSITION", "0") == "1"
         task_get_includes_labels = ENV.fetch("FAKE_KANBAN_TASK_GET_INCLUDES_LABELS", "1") == "1"
         command = ARGV.fetch(0)
@@ -214,6 +217,34 @@ module FakeKanbanCliHelper
           comments_by_task[String(task_id)] = task_comments
           File.write(comments_path, JSON.pretty_generate(comments_by_task))
           print JSON.generate(created)
+        when "task-event-list"
+          task_id = ARGV.each_cons(2).find { |flag, _value| flag == "--task-id" }&.last
+          events_by_task = JSON.parse(File.read(events_path))
+          print JSON.generate(events_by_task.fetch(String(task_id), []))
+        when "task-event-create"
+          task_id = ARGV.each_cons(2).find { |flag, _value| flag == "--task-id" }&.last
+          fallback_comment = ARGV.each_cons(2).find { |flag, _value| flag == "--fallback-comment" }&.last
+          fallback_comment_file = ARGV.each_cons(2).find { |flag, _value| flag == "--fallback-comment-file" }&.last
+          fallback_comment = File.read(fallback_comment_file) if fallback_comment.nil? && fallback_comment_file
+          data_json = ARGV.each_cons(2).find { |flag, _value| flag == "--data-json" }&.last
+          events_by_task = JSON.parse(File.read(events_path))
+          task_events = events_by_task.fetch(String(task_id), [])
+          next_id = (task_events.map { |item| Integer(item["id"]) }.max || 0) + 1
+          created = {
+            "id" => next_id,
+            "source" => ARGV.each_cons(2).find { |flag, _value| flag == "--source" }&.last,
+            "kind" => ARGV.each_cons(2).find { |flag, _value| flag == "--kind" }&.last,
+            "title" => ARGV.each_cons(2).find { |flag, _value| flag == "--title" }&.last,
+            "summary" => ARGV.each_cons(2).find { |flag, _value| flag == "--summary" }&.last,
+            "severity" => ARGV.each_cons(2).find { |flag, _value| flag == "--severity" }&.last,
+            "icon" => ARGV.each_cons(2).find { |flag, _value| flag == "--icon" }&.last,
+            "data" => data_json ? JSON.parse(data_json) : {},
+            "fallback_comment" => String(fallback_comment)
+          }
+          task_events << created
+          events_by_task[String(task_id)] = task_events
+          File.write(events_path, JSON.pretty_generate(events_by_task))
+          print JSON.generate(created)
         else
           warn("unsupported command: \#{command}")
           exit 1
@@ -227,10 +258,12 @@ module FakeKanbanCliHelper
       state_path: state_path,
       transitions_path: transitions_path,
       comments_path: comments_path,
+      events_path: events_path,
       env: {
         "FAKE_KANBAN_STATE_PATH" => state_path,
         "FAKE_KANBAN_TRANSITIONS_PATH" => transitions_path,
         "FAKE_KANBAN_COMMENTS_PATH" => comments_path,
+        "FAKE_KANBAN_EVENTS_PATH" => events_path,
         "FAKE_KANBAN_MUTATE_STATE_ON_TRANSITION" => (mutate_state_on_transition ? "1" : "0"),
         "FAKE_KANBAN_TASK_GET_INCLUDES_LABELS" => (task_get_includes_labels ? "1" : "0")
       }
@@ -244,6 +277,12 @@ module FakeKanbanCliHelper
   end
 
   def read_fake_kanban_comments(path)
+    return {} unless File.exist?(path)
+
+    JSON.parse(File.read(path))
+  end
+
+  def read_fake_kanban_events(path)
     return {} unless File.exist?(path)
 
     JSON.parse(File.read(path))

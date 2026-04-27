@@ -62,7 +62,12 @@ RSpec.describe A3::Application::RegisterStartedRun do
     expect(activity_publisher).to have_received(:publish).with(
       task_ref: "A3-v2#3025",
       external_task_id: 3025,
-      body: /A2O 実行開始: implementation/
+      body: /A2O 実行開始: implementation/,
+      event: hash_including(
+        "kind" => "task_started",
+        "summary" => "Started implementation run run-1.",
+        "data" => hash_including("run_ref" => "run-1", "phase" => "implementation")
+      )
     )
   end
 
@@ -112,7 +117,12 @@ RSpec.describe A3::Application::RegisterStartedRun do
     expect(activity_publisher).to have_received(:publish).with(
       task_ref: "A3-v2#3022",
       external_task_id: 3022,
-      body: /A2O 実行開始: review/
+      body: /A2O 実行開始: review/,
+      event: hash_including(
+        "kind" => "task_started",
+        "summary" => "Started review run run-2.",
+        "data" => hash_including("run_ref" => "run-2", "phase" => "review")
+      )
     )
   end
 end
