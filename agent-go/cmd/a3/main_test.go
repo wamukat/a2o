@@ -4037,7 +4037,7 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 		"export A2O_INTERNAL_SECRET_REFERENCE=\"${A2O_INTERNAL_SECRET_REFERENCE:-a2o-runtime-secret}\"",
 		"show-run",
 		filepath.Join(packageDir, "project.yaml"),
-		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime python3 /opt/a2o/share/tools/kanban/cli.py --backend soloboard --base-url http://soloboard:3000 task-comment-list --project A2OReferenceMultiRepo --task A2O#16",
+		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime python3 /opt/a2o/share/tools/kanban/cli.py --backend kanbalone --base-url http://soloboard:3000 task-comment-list --project A2OReferenceMultiRepo --task A2O#16",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("describe-task missing call %q in:\n%s", want, joined)
@@ -5103,7 +5103,7 @@ func TestRuntimeWatchSummaryRunsContainerSummaryWithKanbanContext(t *testing.T) 
 	joined := strings.Join(runner.joinedCalls(), "\n")
 	for _, want := range []string{
 		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 watch-summary --storage-backend json --storage-dir /var/lib/a3/test-runtime",
-		"--kanban-command python3 --kanban-command-arg /opt/a2o/share/tools/kanban/cli.py --kanban-command-arg --backend --kanban-command-arg soloboard --kanban-command-arg --base-url --kanban-command-arg http://soloboard:3000",
+		"--kanban-command python3 --kanban-command-arg /opt/a2o/share/tools/kanban/cli.py --kanban-command-arg --backend --kanban-command-arg kanbalone --kanban-command-arg --base-url --kanban-command-arg http://soloboard:3000",
 		"--kanban-project A2OReferenceMultiRepo --kanban-working-dir /workspace",
 		"--kanban-repo-label repo:catalog=repo_alpha",
 		"--kanban-repo-label repo:storefront=repo_beta",

@@ -40,7 +40,8 @@ RELATION_KIND_TO_LABEL = {
 }
 LABEL_TO_RELATION_KIND = {label: kind for kind, label in RELATION_KIND_TO_LABEL.items()}
 DEFAULT_TRACE_LOG_PATH = Path(".work/kanban/trace.log")
-SUPPORTED_BACKENDS = ("soloboard",)
+SUPPORTED_BACKENDS = ("kanbalone", "soloboard")
+KANBALONE_COMPAT_BACKENDS = {"kanbalone", "soloboard"}
 
 
 @dataclass(frozen=True)
@@ -86,26 +87,27 @@ def trace_log(event: str, **payload: Any) -> None:
 
 
 def resolve_backend_kind(cli_value: str | None) -> str:
-    value = str(cli_value or os.environ.get("KANBAN_BACKEND") or "soloboard").strip().lower()
+    value = str(cli_value or os.environ.get("KANBAN_BACKEND") or "kanbalone").strip().lower()
     if value not in SUPPORTED_BACKENDS:
         raise RuntimeError(f"Unsupported kanban backend: {value}. Supported: {', '.join(SUPPORTED_BACKENDS)}")
     return value
 
 
-def resolve_base_url(cli_value: str | None, *, backend_kind: str = "soloboard") -> str:
-    if backend_kind != "soloboard":
+def resolve_base_url(cli_value: str | None, *, backend_kind: str = "kanbalone") -> str:
+    if backend_kind not in KANBALONE_COMPAT_BACKENDS:
         raise RuntimeError(f"Unsupported kanban backend: {backend_kind}")
     return (
         cli_value
+        or os.environ.get("KANBALONE_BASE_URL")
         or os.environ.get("SOLOBOARD_BASE_URL")
         or "http://localhost:3000"
     ).rstrip("/")
 
 
-def resolve_token(cli_value: str | None, *, backend_kind: str = "soloboard") -> str:
-    if backend_kind != "soloboard":
+def resolve_token(cli_value: str | None, *, backend_kind: str = "kanbalone") -> str:
+    if backend_kind not in KANBALONE_COMPAT_BACKENDS:
         raise RuntimeError(f"Unsupported kanban backend: {backend_kind}")
-    return cli_value or os.environ.get("SOLOBOARD_API_TOKEN") or ""
+    return cli_value or os.environ.get("KANBALONE_API_TOKEN") or os.environ.get("SOLOBOARD_API_TOKEN") or ""
 
 
 def resolve_backend_context(*, backend: str | None, base_url: str | None, token: str | None) -> BackendContext:

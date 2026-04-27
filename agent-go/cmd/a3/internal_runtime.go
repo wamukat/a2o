@@ -341,7 +341,7 @@ func runtimeDecompositionKanbanWriteOptions(plan runtimeRunOncePlan) []string {
 		"--kanban-command", "python3",
 		"--kanban-command-arg", packagedKanbanCLIPath,
 		"--kanban-command-arg", "--backend",
-		"--kanban-command-arg", "soloboard",
+		"--kanban-command-arg", "kanbalone",
 		"--kanban-command-arg", "--base-url",
 		"--kanban-command-arg", plan.SoloBoardInternalURL,
 		"--kanban-project", plan.KanbanProject,
@@ -2013,7 +2013,7 @@ func runtimeWatchSummaryArgs(plan runtimeRunOncePlan, details bool) []string {
 		"--kanban-command", "python3",
 		"--kanban-command-arg", packagedKanbanCLIPath,
 		"--kanban-command-arg", "--backend",
-		"--kanban-command-arg", "soloboard",
+		"--kanban-command-arg", "kanbalone",
 		"--kanban-command-arg", "--base-url",
 		"--kanban-command-arg", plan.SoloBoardInternalURL,
 		"--kanban-project", plan.KanbanProject,
@@ -2278,14 +2278,14 @@ func printDescribeSection(stdout io.Writer, name string, output string) {
 }
 
 func printDescribeKanbanSection(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, taskRef string) {
-	taskOutput, taskErr := runtimeDescribeSectionOutput(config, plan, runner, "kanban_task", "python3", packagedKanbanCLIPath, "--backend", "soloboard", "--base-url", plan.SoloBoardInternalURL, "task-get", "--project", plan.KanbanProject, "--task", taskRef)
+	taskOutput, taskErr := runtimeDescribeSectionOutput(config, plan, runner, "kanban_task", "python3", packagedKanbanCLIPath, "--backend", "kanbalone", "--base-url", plan.SoloBoardInternalURL, "task-get", "--project", plan.KanbanProject, "--task", taskRef)
 	if taskErr != nil {
 		fmt.Fprintf(stdout, "describe_section name=kanban_task status=blocked action=check kanban service detail=%s\n", singleLine(taskErr.Error()))
 	} else {
 		printDescribeSection(stdout, "kanban_task", taskOutput)
 	}
 
-	commentOutput, commentErr := runtimeDescribeSectionOutput(config, plan, runner, "kanban_comments", "python3", packagedKanbanCLIPath, "--backend", "soloboard", "--base-url", plan.SoloBoardInternalURL, "task-comment-list", "--project", plan.KanbanProject, "--task", taskRef)
+	commentOutput, commentErr := runtimeDescribeSectionOutput(config, plan, runner, "kanban_comments", "python3", packagedKanbanCLIPath, "--backend", "kanbalone", "--base-url", plan.SoloBoardInternalURL, "task-comment-list", "--project", plan.KanbanProject, "--task", taskRef)
 	if commentErr != nil {
 		fmt.Fprintf(stdout, "describe_section name=kanban_comments status=blocked action=check kanban service detail=%s\n", singleLine(commentErr.Error()))
 		return
@@ -2628,7 +2628,7 @@ func startRuntimeExecuteUntilIdle(config runtimeInstanceConfig, plan runtimeRunO
 		Env: map[string]string{
 			"A2O_BRANCH_NAMESPACE": plan.BranchNamespace,
 			"A2O_ROOT_DIR":         "/workspace",
-			"KANBAN_BACKEND":       "soloboard",
+			"KANBAN_BACKEND":       "kanbalone",
 		},
 		EnvShell: map[string]string{
 			"A3_SECRET":           "${A3_SECRET:-a2o-runtime-secret}",
@@ -2680,7 +2680,7 @@ func executeUntilIdleArgs(plan runtimeRunOncePlan) []string {
 		"--kanban-command", "python3",
 		"--kanban-command-arg", packagedKanbanCLIPath,
 		"--kanban-command-arg", "--backend",
-		"--kanban-command-arg", "soloboard",
+		"--kanban-command-arg", "kanbalone",
 		"--kanban-command-arg", "--base-url",
 		"--kanban-command-arg", plan.SoloBoardInternalURL,
 		"--kanban-project", plan.KanbanProject,

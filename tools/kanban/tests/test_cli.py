@@ -115,21 +115,33 @@ class SoloBoardCliTest(unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertEqual(["A2O#51"], [item["ref"] for item in payload])
 
-    def test_resolve_backend_rejects_non_soloboard(self) -> None:
+    def test_resolve_backend_rejects_unsupported_backend(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "Unsupported kanban backend"):
             kanban_cli.resolve_backend_kind("unsupported-backend")
 
-    def test_resolve_base_url_uses_soloboard_default(self) -> None:
-        with patched_env({"SOLOBOARD_BASE_URL": None, "KANBAN_BACKEND": None}):
+    def test_resolve_backend_defaults_to_kanbalone(self) -> None:
+        with patched_env({"KANBAN_BACKEND": None}):
+            self.assertEqual("kanbalone", kanban_cli.resolve_backend_kind(None))
+
+    def test_resolve_base_url_uses_kanbalone_default(self) -> None:
+        with patched_env({"KANBALONE_BASE_URL": None, "SOLOBOARD_BASE_URL": None, "KANBAN_BACKEND": None}):
             self.assertEqual("http://localhost:3000", kanban_cli.resolve_base_url(None))
 
-    def test_resolve_base_url_uses_soloboard_env(self) -> None:
-        with patched_env({"SOLOBOARD_BASE_URL": "http://localhost:3460/"}):
+    def test_resolve_base_url_uses_kanbalone_env(self) -> None:
+        with patched_env({"KANBALONE_BASE_URL": "http://localhost:3470/", "SOLOBOARD_BASE_URL": "http://localhost:3460/"}):
+            self.assertEqual("http://localhost:3470", kanban_cli.resolve_base_url(None))
+
+    def test_resolve_base_url_keeps_soloboard_env_fallback(self) -> None:
+        with patched_env({"KANBALONE_BASE_URL": None, "SOLOBOARD_BASE_URL": "http://localhost:3460/"}):
             self.assertEqual("http://localhost:3460", kanban_cli.resolve_base_url(None))
 
-    def test_resolve_token_allows_empty_soloboard_token(self) -> None:
-        with patched_env({"SOLOBOARD_API_TOKEN": None}):
+    def test_resolve_token_allows_empty_kanbalone_token(self) -> None:
+        with patched_env({"KANBALONE_API_TOKEN": None, "SOLOBOARD_API_TOKEN": None}):
             self.assertEqual("", kanban_cli.resolve_token(None))
+
+    def test_resolve_token_uses_kanbalone_env_before_soloboard_fallback(self) -> None:
+        with patched_env({"KANBALONE_API_TOKEN": "public-token", "SOLOBOARD_API_TOKEN": "legacy-token"}):
+            self.assertEqual("public-token", kanban_cli.resolve_token(None))
 
     def test_rest_request_sends_patch_payload(self) -> None:
         response = Mock()
@@ -176,8 +188,10 @@ class SoloBoardCliTest(unittest.TestCase):
             ),
         )
 
-    def test_parser_backend_choice_is_soloboard_only(self) -> None:
+    def test_parser_backend_choices_include_kanbalone_and_soloboard_alias(self) -> None:
         parser = kanban_cli.build_parser()
+        args = parser.parse_args(["--backend", "kanbalone", "task-get", "--task", "A2O#1"])
+        self.assertEqual("kanbalone", args.backend)
         args = parser.parse_args(["--backend", "soloboard", "task-get", "--task", "A2O#1"])
         self.assertEqual("soloboard", args.backend)
         with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
