@@ -101,7 +101,7 @@ agent_bindings:
     default_project: kanbalone
 ```
 
-The exact file name can be decided during implementation. The important constraint is that this config is runtime-owned installation metadata. A project package remains portable and describes one product's execution surface.
+The Phase 1 host launcher registry file is `.work/a2o/project-registry.json`. The important constraint is that this config is runtime-owned installation metadata. A project package remains portable and describes one product's execution surface.
 
 Kanban identity must include both the stable board identity and the adapter/display identity needed by the current provider. `board_id` identifies the board when the provider exposes one. `project` and `task_ref_prefix` preserve the existing Kanban CLI/ref contract, where selection and refs may still use names such as `A2O` and `A2O#297`.
 

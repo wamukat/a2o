@@ -590,6 +590,145 @@ func TestRuntimeCommandsReadLegacyInstanceConfig(t *testing.T) {
 	}
 }
 
+func TestProjectRegistryDefaultProjectResolvesRuntimeContext(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeProjectRegistry(t, tempDir, map[string]any{
+		"version":         1,
+		"default_project": "a2o",
+		"projects": map[string]any{
+			"a2o": map[string]any{
+				"package_path":    packageDir,
+				"workspace_root":  tempDir,
+				"compose_file":    filepath.Join(tempDir, "compose.yml"),
+				"compose_project": "a2o-runtime",
+				"runtime_service": "a2o-runtime",
+				"agent_port":      "7393",
+				"storage_dir":     "/var/lib/a2o/a2o-runtime",
+				"runtime_image":   "ghcr.io/wamukat/a2o-engine@sha256:pinned",
+				"kanban": map[string]any{
+					"mode":            "external",
+					"url":             "http://127.0.0.1:3470",
+					"runtime_url":     "http://host.docker.internal:3470",
+					"board_id":        2,
+					"project":         "A2O",
+					"task_ref_prefix": "A2O",
+				},
+			},
+		},
+	})
+
+	var context *projectRuntimeContext
+	var configPath string
+	var err error
+	withChdir(t, tempDir, func() {
+		context, configPath, err = loadProjectRuntimeContextFromWorkingTree("")
+	})
+	if err != nil {
+		t.Fatalf("registry context should load: %v", err)
+	}
+	if !strings.HasSuffix(configPath, filepath.Join(filepath.Base(tempDir), ".work", "a2o", "project-registry.json")) {
+		t.Fatalf("configPath=%q", configPath)
+	}
+	if context.ProjectKey != "a2o" {
+		t.Fatalf("ProjectKey=%q", context.ProjectKey)
+	}
+	if context.Config.PackagePath != packageDir {
+		t.Fatalf("PackagePath=%q", context.Config.PackagePath)
+	}
+	if context.Config.KanbanMode != "external" || context.Config.KanbanURL != "http://127.0.0.1:3470" || context.Config.KanbanRuntimeURL != "http://host.docker.internal:3470" {
+		t.Fatalf("unexpected kanban config: %#v", context.Config)
+	}
+	if context.KanbanIdentity.BoardID != 2 || context.KanbanIdentity.Project != "A2O" || context.KanbanIdentity.TaskRefPrefix != "A2O" {
+		t.Fatalf("unexpected kanban identity: %#v", context.KanbanIdentity)
+	}
+}
+
+func TestRuntimeStatusAcceptsProjectForRegistryReadOnlyContext(t *testing.T) {
+	t.Setenv("A2O_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, map[string]any{
+		"version":         1,
+		"default_project": "a2o",
+		"projects": map[string]any{
+			"a2o": map[string]any{
+				"package_path":    packageDir,
+				"workspace_root":  tempDir,
+				"compose_file":    filepath.Join(tempDir, "compose.yml"),
+				"compose_project": "a3-test",
+				"runtime_service": "a2o-runtime",
+				"storage_dir":     "/var/lib/a2o/a2o-runtime",
+				"kanban": map[string]any{
+					"mode":            "external",
+					"url":             "http://127.0.0.1:3470",
+					"runtime_url":     "http://host.docker.internal:3470",
+					"board_id":        2,
+					"project":         "A2O",
+					"task_ref_prefix": "A2O",
+				},
+			},
+		},
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "status", "--project", "a2o"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	if !strings.Contains(output, "runtime_project_key=a2o") {
+		t.Fatalf("stdout should include project key, got:\n%s", output)
+	}
+	if !strings.Contains(output, "runtime_project_kanban board_id=2 project=A2O task_ref_prefix=A2O") {
+		t.Fatalf("stdout should include kanban identity, got:\n%s", output)
+	}
+	if !strings.Contains(output, "kanban_mode=external") || !strings.Contains(output, "kanban_url=http://127.0.0.1:3470") {
+		t.Fatalf("stdout should use registry kanban config, got:\n%s", output)
+	}
+	if runner.lastEnv["A2O_KANBALONE_INTERNAL_URL"] != "http://host.docker.internal:3470" {
+		t.Fatalf("runtime status should evaluate compose with registry kanban runtime url, got %#v", runner.lastEnv)
+	}
+}
+
+func TestRuntimeStatusRejectsProjectWithoutRegistry(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion: 1,
+		PackagePath:   packageDir,
+		WorkspaceRoot: tempDir,
+	})
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "status", "--project", "a2o"}, &fakeRunner{}, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail without a project registry")
+		}
+	})
+	if !strings.Contains(stderr.String(), "--project requires .work/a2o/project-registry.json") {
+		t.Fatalf("stderr should explain registry requirement, got %q", stderr.String())
+	}
+}
+
 func TestProjectTemplatePrintsValidMinimalProjectYaml(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -8098,6 +8237,21 @@ func writeLegacyTestInstanceConfig(t *testing.T, dir string, config runtimeInsta
 		t.Fatal(err)
 	}
 	body, err := json.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeProjectRegistry(t *testing.T, dir string, payload map[string]any) {
+	t.Helper()
+	path := filepath.Join(dir, ".work", "a2o", "project-registry.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(payload)
 	if err != nil {
 		t.Fatal(err)
 	}

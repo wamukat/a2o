@@ -14,6 +14,7 @@ var version = "dev"
 
 const instanceConfigRelativePath = ".work/a2o/runtime-instance.json"
 const legacyInstanceConfigRelativePath = ".a3/runtime-instance.json"
+const projectRegistryRelativePath = ".work/a2o/project-registry.json"
 const runtimeHostAgentRelativePath = ".work/a2o/runtime-host-agent"
 const hostAgentBinRelativePath = ".work/a2o/agent/bin/a2o-agent"
 
@@ -130,7 +131,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o runtime down")
 	fmt.Fprintln(w, "  a2o runtime resume [--interval DURATION] [--agent-poll-interval DURATION] # resume scheduler")
 	fmt.Fprintln(w, "  a2o runtime pause                        # pause scheduler after current work")
-	fmt.Fprintln(w, "  a2o runtime status")
+	fmt.Fprintln(w, "  a2o runtime status [--project KEY]")
 	fmt.Fprintln(w, "  a2o runtime image-digest")
 	fmt.Fprintln(w, "  a2o runtime doctor")
 	fmt.Fprintln(w, "  a2o runtime describe-task TASK_REF")

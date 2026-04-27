@@ -99,7 +99,7 @@ agent_bindings:
     default_project: kanbalone
 ```
 
-実際のファイル名は実装時に決めてよい。重要なのは、この config が runtime-owned installation metadata であること。project package は portable なまま、1 product の execution surface を記述する。
+Phase 1 の host launcher registry file は `.work/a2o/project-registry.json` とする。重要なのは、この config が runtime-owned installation metadata であること。project package は portable なまま、1 product の execution surface を記述する。
 
 Kanban identity は、安定した board identity と、現行 provider/adapter が必要とする表示・ref 用 identity の両方を持つ。`board_id` は provider が board id を公開する場合の安定 identity である。`project` と `task_ref_prefix` は、`A2O` や `A2O#297` のような名前を使う既存 Kanban CLI/ref 契約を保つために必要である。
 

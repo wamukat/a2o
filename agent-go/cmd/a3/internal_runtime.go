@@ -574,6 +574,7 @@ func runRuntimePause(args []string, runner commandRunner, stdout io.Writer, stde
 func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
 	flags := flag.NewFlagSet("a2o runtime status", flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	projectKey := flags.String("project", "", "runtime project key for read-only status")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -581,13 +582,17 @@ func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, std
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
 
-	config, configPath, err := loadInstanceConfigFromWorkingTree()
+	context, configPath, err := loadProjectRuntimeContextFromWorkingTree(*projectKey)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	paths := schedulerPaths(effectiveConfig)
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
+	fmt.Fprintf(stdout, "runtime_project_key=%s\n", context.ProjectKey)
+	if context.KanbanIdentity.BoardID != 0 {
+		fmt.Fprintf(stdout, "runtime_project_kanban board_id=%d project=%s task_ref_prefix=%s\n", context.KanbanIdentity.BoardID, context.KanbanIdentity.Project, context.KanbanIdentity.TaskRefPrefix)
+	}
 	fmt.Fprintf(stdout, "runtime_package=%s\n", effectiveConfig.PackagePath)
 	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
 	fmt.Fprintf(stdout, "kanban_mode=%s\n", kanbanMode(effectiveConfig))
