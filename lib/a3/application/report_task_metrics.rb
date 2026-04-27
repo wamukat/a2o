@@ -73,7 +73,7 @@ module A3
         when :task
           record.task_ref
         when :parent
-          record.parent_ref || "(none)"
+          record.parent_ref || record.task_ref
         else
           raise ArgumentError, "unsupported metrics summary group_by: #{group_by}"
         end
@@ -84,11 +84,8 @@ module A3
       end
 
       def latest_line_coverage(records)
-        records.reverse_each do |record|
-          value = record.coverage["line_percent"]
-          return numeric(value) unless value.nil?
-        end
-        nil
+        value = records.max_by(&:timestamp)&.coverage&.fetch("line_percent", nil)
+        value.nil? ? nil : numeric(value)
       end
 
       def numeric(value)
