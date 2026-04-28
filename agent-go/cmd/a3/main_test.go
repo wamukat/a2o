@@ -591,6 +591,7 @@ func TestRuntimeCommandsReadLegacyInstanceConfig(t *testing.T) {
 }
 
 func TestProjectRegistryDefaultProjectResolvesRuntimeContext(t *testing.T) {
+	t.Setenv("A2O_PROJECT_KEY", "")
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -647,6 +648,139 @@ func TestProjectRegistryDefaultProjectResolvesRuntimeContext(t *testing.T) {
 	}
 	if context.KanbanIdentity.BoardID != 2 || context.KanbanIdentity.Project != "A2O" || context.KanbanIdentity.TaskRefPrefix != "A2O" {
 		t.Fatalf("unexpected kanban identity: %#v", context.KanbanIdentity)
+	}
+}
+
+func TestProjectRegistryDefaultsStorageDirByProjectKey(t *testing.T) {
+	t.Setenv("A2O_PROJECT_KEY", "")
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeProjectRegistry(t, tempDir, map[string]any{
+		"version":         1,
+		"default_project": "portal",
+		"projects": map[string]any{
+			"portal": map[string]any{
+				"package_path": packageDir,
+				"kanban": map[string]any{
+					"mode": "external",
+				},
+			},
+		},
+	})
+
+	context, err := readProjectRuntimeContext(filepath.Join(tempDir, projectRegistryRelativePath), "")
+	if err != nil {
+		t.Fatalf("registry context should load: %v", err)
+	}
+	if want := "/var/lib/a2o/projects/portal"; context.Config.StorageDir != want {
+		t.Fatalf("StorageDir=%q, want %q", context.Config.StorageDir, want)
+	}
+}
+
+func TestProjectRegistryEnvProjectKeySelectsDefaultContext(t *testing.T) {
+	t.Setenv("A2O_PROJECT_KEY", "beta")
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeProjectRegistry(t, tempDir, map[string]any{
+		"version":         1,
+		"default_project": "alpha",
+		"projects": map[string]any{
+			"alpha": map[string]any{
+				"package_path": packageDir,
+				"storage_dir":  "/var/lib/a2o/projects/alpha",
+				"kanban":       map[string]any{"mode": "external"},
+			},
+			"beta": map[string]any{
+				"package_path": packageDir,
+				"storage_dir":  "/var/lib/a2o/projects/beta",
+				"kanban":       map[string]any{"mode": "external"},
+			},
+		},
+	})
+
+	context, err := readProjectRuntimeContext(filepath.Join(tempDir, projectRegistryRelativePath), "")
+	if err != nil {
+		t.Fatalf("registry context should load: %v", err)
+	}
+	if context.ProjectKey != "beta" {
+		t.Fatalf("ProjectKey=%q, want env-selected beta", context.ProjectKey)
+	}
+	if want := "/var/lib/a2o/projects/beta"; context.Config.StorageDir != want {
+		t.Fatalf("StorageDir=%q, want %q", context.Config.StorageDir, want)
+	}
+}
+
+func TestProjectRegistryExplicitProjectKeyBeatsEnvOverride(t *testing.T) {
+	t.Setenv("A2O_PROJECT_KEY", "beta")
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeProjectRegistry(t, tempDir, map[string]any{
+		"version":         1,
+		"default_project": "alpha",
+		"projects": map[string]any{
+			"alpha": map[string]any{
+				"package_path": packageDir,
+				"storage_dir":  "/var/lib/a2o/projects/alpha",
+				"kanban":       map[string]any{"mode": "external"},
+			},
+			"beta": map[string]any{
+				"package_path": packageDir,
+				"storage_dir":  "/var/lib/a2o/projects/beta",
+				"kanban":       map[string]any{"mode": "external"},
+			},
+		},
+	})
+
+	context, err := readProjectRuntimeContext(filepath.Join(tempDir, projectRegistryRelativePath), "alpha")
+	if err != nil {
+		t.Fatalf("registry context should load: %v", err)
+	}
+	if context.ProjectKey != "alpha" {
+		t.Fatalf("ProjectKey=%q, want explicit alpha", context.ProjectKey)
+	}
+	if want := "/var/lib/a2o/projects/alpha"; context.Config.StorageDir != want {
+		t.Fatalf("StorageDir=%q, want %q", context.Config.StorageDir, want)
+	}
+}
+
+func TestProjectRegistryRejectsDuplicateStorageDir(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeProjectRegistry(t, tempDir, map[string]any{
+		"version":         1,
+		"default_project": "alpha",
+		"projects": map[string]any{
+			"alpha": map[string]any{
+				"package_path": packageDir,
+				"storage_dir":  "/var/lib/a2o/shared",
+				"kanban":       map[string]any{"mode": "external"},
+			},
+			"beta": map[string]any{
+				"package_path": packageDir,
+				"storage_dir":  "/var/lib/a2o/shared/.",
+				"kanban":       map[string]any{"mode": "external"},
+			},
+		},
+	})
+
+	_, err := readProjectRuntimeContext(filepath.Join(tempDir, projectRegistryRelativePath), "alpha")
+	if err == nil {
+		t.Fatalf("duplicate storage_dir should be rejected")
+	}
+	if !strings.Contains(err.Error(), "same storage_dir") {
+		t.Fatalf("error should explain duplicate storage_dir, got %q", err.Error())
 	}
 }
 
@@ -5683,6 +5817,44 @@ func TestRuntimeLogsFollowWaitsAcrossPhaseTransition(t *testing.T) {
 	}
 }
 
+func TestSchedulerPathsScopesMultiProjectState(t *testing.T) {
+	tempDir := t.TempDir()
+	paths := schedulerPaths(runtimeInstanceConfig{
+		WorkspaceRoot:    tempDir,
+		ProjectKey:       "portal-ui",
+		MultiProjectMode: true,
+	})
+
+	wantDir := filepath.Join(tempDir, ".work", "a2o", "projects", "portal-ui", "scheduler")
+	if paths.Dir != wantDir {
+		t.Fatalf("Dir=%q, want %q", paths.Dir, wantDir)
+	}
+	if want := filepath.Join(wantDir, "scheduler.pid"); paths.PIDFile != want {
+		t.Fatalf("PIDFile=%q, want %q", paths.PIDFile, want)
+	}
+	if want := filepath.Join(wantDir, "scheduler.command"); paths.CommandFile != want {
+		t.Fatalf("CommandFile=%q, want %q", paths.CommandFile, want)
+	}
+	if want := filepath.Join(wantDir, "scheduler.log"); paths.LogFile != want {
+		t.Fatalf("LogFile=%q, want %q", paths.LogFile, want)
+	}
+}
+
+func TestSchedulerPathsUseResolvedConfigProjectKey(t *testing.T) {
+	t.Setenv("A2O_PROJECT_KEY", "portal-env")
+	tempDir := t.TempDir()
+	paths := schedulerPaths(runtimeInstanceConfig{
+		WorkspaceRoot:    tempDir,
+		ProjectKey:       "portal-config",
+		MultiProjectMode: true,
+	})
+
+	wantDir := filepath.Join(tempDir, ".work", "a2o", "projects", "portal-config", "scheduler")
+	if paths.Dir != wantDir {
+		t.Fatalf("Dir=%q, want %q", paths.Dir, wantDir)
+	}
+}
+
 func TestRuntimeLogsFollowReturnsForQueuedTaskWithoutRun(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -7812,6 +7984,48 @@ func TestRuntimeRunOnceEnvDoesNotGenerateRemovedA3CompatibilityInputs(t *testing
 	}
 }
 
+func TestRuntimeRunOnceEnvScopesMultiProjectHostRootAndBranchNamespace(t *testing.T) {
+	env := runtimeRunOnceEnv(runtimeInstanceConfig{
+		WorkspaceRoot:    "/tmp/a2o-workspace",
+		ProjectKey:       "portal-ui",
+		ComposeFile:      "compose.yml",
+		ComposeProject:   "a2o-runtime",
+		StorageDir:       "/var/lib/a2o/projects/portal-ui",
+		RuntimeImage:     "ghcr.io/wamukat/a2o-engine:test",
+		MultiProjectMode: true,
+	}, "", "")
+
+	if want := "/tmp/a2o-workspace/.work/a2o/projects/portal-ui/runtime-host-agent"; env["A2O_RUNTIME_RUN_ONCE_HOST_ROOT"] != want {
+		t.Fatalf("A2O_RUNTIME_RUN_ONCE_HOST_ROOT=%q, want %q", env["A2O_RUNTIME_RUN_ONCE_HOST_ROOT"], want)
+	}
+	if want := "a2o-runtime-portal-ui"; env["A2O_BRANCH_NAMESPACE"] != want {
+		t.Fatalf("A2O_BRANCH_NAMESPACE=%q, want %q", env["A2O_BRANCH_NAMESPACE"], want)
+	}
+}
+
+func TestRuntimeRunOnceEnvUsesResolvedConfigProjectKey(t *testing.T) {
+	t.Setenv("A2O_PROJECT_KEY", "portal-env")
+	env := runtimeRunOnceEnv(runtimeInstanceConfig{
+		WorkspaceRoot:    "/tmp/a2o-workspace",
+		ProjectKey:       "portal-config",
+		ComposeFile:      "compose.yml",
+		ComposeProject:   "a2o-runtime",
+		StorageDir:       "/var/lib/a2o/projects/portal-config",
+		RuntimeImage:     "ghcr.io/wamukat/a2o-engine:test",
+		MultiProjectMode: true,
+	}, "", "")
+
+	if env["A2O_PROJECT_KEY"] != "portal-config" {
+		t.Fatalf("A2O_PROJECT_KEY=%q, want resolved config key", env["A2O_PROJECT_KEY"])
+	}
+	if want := "/tmp/a2o-workspace/.work/a2o/projects/portal-config/runtime-host-agent"; env["A2O_RUNTIME_RUN_ONCE_HOST_ROOT"] != want {
+		t.Fatalf("A2O_RUNTIME_RUN_ONCE_HOST_ROOT=%q, want %q", env["A2O_RUNTIME_RUN_ONCE_HOST_ROOT"], want)
+	}
+	if want := "a2o-runtime-portal-config"; env["A2O_BRANCH_NAMESPACE"] != want {
+		t.Fatalf("A2O_BRANCH_NAMESPACE=%q, want %q", env["A2O_BRANCH_NAMESPACE"], want)
+	}
+}
+
 func TestRuntimeRunOncePlanPropagatesProjectKeyToAgentEnv(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -7839,6 +8053,106 @@ func TestRuntimeRunOncePlanPropagatesProjectKeyToAgentEnv(t *testing.T) {
 	}
 	if !containsString(plan.AgentEnv, "A2O_MULTI_PROJECT_MODE=1") {
 		t.Fatalf("agent env should include multi-project mode, got %#v", plan.AgentEnv)
+	}
+}
+
+func TestRuntimeRunOncePlanScopesMultiProjectSideEffects(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+
+	plan, err := buildRuntimeRunOncePlan(runtimeInstanceConfig{
+		ProjectKey:       "portal-ui",
+		MultiProjectMode: true,
+		PackagePath:      packageDir,
+		WorkspaceRoot:    tempDir,
+		ComposeProject:   "a2o-runtime",
+	}, runtimeRunOnceOverrides{}, "")
+	if err != nil {
+		t.Fatalf("buildRuntimeRunOncePlan failed: %v", err)
+	}
+
+	projectRoot := filepath.Join(tempDir, ".work", "a2o", "projects", "portal-ui")
+	if want := filepath.Join(projectRoot, "runtime-host-agent"); plan.HostRoot != want {
+		t.Fatalf("HostRoot=%q, want %q", plan.HostRoot, want)
+	}
+	if want := filepath.Join(projectRoot, ".work", "a2o", "agent", "workspaces"); plan.WorkspaceRoot != want {
+		t.Fatalf("WorkspaceRoot=%q, want %q", plan.WorkspaceRoot, want)
+	}
+	if want := "/var/lib/a2o/projects/portal-ui"; plan.StorageDir != want {
+		t.Fatalf("StorageDir=%q, want %q", plan.StorageDir, want)
+	}
+	if want := filepath.Join(projectRoot, "runtime-host-agent", "agent.log"); plan.HostAgentLog != want {
+		t.Fatalf("HostAgentLog=%q, want %q", plan.HostAgentLog, want)
+	}
+	if want := filepath.Join(projectRoot, "runtime-host-agent", "live-logs"); plan.LiveLogRoot != want {
+		t.Fatalf("LiveLogRoot=%q, want %q", plan.LiveLogRoot, want)
+	}
+	if want := "/tmp/a2o-runtime-portal-ui-run-once.log"; plan.RuntimeLog != want {
+		t.Fatalf("RuntimeLog=%q, want %q", plan.RuntimeLog, want)
+	}
+	if want := "/tmp/a2o-runtime-portal-ui-run-once-agent-server.pid"; plan.ServerPIDFile != want {
+		t.Fatalf("ServerPIDFile=%q, want %q", plan.ServerPIDFile, want)
+	}
+	if want := "a2o-runtime-portal-ui"; plan.BranchNamespace != want {
+		t.Fatalf("BranchNamespace=%q, want %q", plan.BranchNamespace, want)
+	}
+}
+
+func TestRuntimeRunOncePlanRejectsUnsafeMultiProjectKey(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+
+	_, err := buildRuntimeRunOncePlan(runtimeInstanceConfig{
+		ProjectKey:       "portal/ui",
+		MultiProjectMode: true,
+		PackagePath:      packageDir,
+		WorkspaceRoot:    tempDir,
+		ComposeProject:   "a2o-runtime",
+	}, runtimeRunOnceOverrides{}, "")
+	if err == nil {
+		t.Fatalf("unsafe project key should be rejected")
+	}
+	if !strings.Contains(err.Error(), "safe project key") {
+		t.Fatalf("error should mention safe project key, got %q", err.Error())
+	}
+}
+
+func TestRuntimeRunOncePlanUsesResolvedConfigProjectKey(t *testing.T) {
+	t.Setenv("A2O_PROJECT_KEY", "portal-env")
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+
+	plan, err := buildRuntimeRunOncePlan(runtimeInstanceConfig{
+		ProjectKey:       "portal-config",
+		MultiProjectMode: true,
+		PackagePath:      packageDir,
+		WorkspaceRoot:    tempDir,
+		ComposeProject:   "a2o-runtime",
+	}, runtimeRunOnceOverrides{}, "")
+	if err != nil {
+		t.Fatalf("buildRuntimeRunOncePlan failed: %v", err)
+	}
+
+	if plan.ProjectKey != "portal-config" {
+		t.Fatalf("ProjectKey=%q, want resolved config key", plan.ProjectKey)
+	}
+	if want := filepath.Join(tempDir, ".work", "a2o", "projects", "portal-config", "runtime-host-agent"); plan.HostRoot != want {
+		t.Fatalf("HostRoot=%q, want %q", plan.HostRoot, want)
+	}
+	if want := "/tmp/a2o-runtime-portal-config-run-once.log"; plan.RuntimeLog != want {
+		t.Fatalf("RuntimeLog=%q, want %q", plan.RuntimeLog, want)
 	}
 }
 

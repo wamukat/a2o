@@ -415,10 +415,13 @@ func removedA3EnvironmentNames() []string {
 }
 
 func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttempts string) map[string]string {
+	if config.MultiProjectMode {
+		config.ProjectKey = effectiveRuntimeProjectKey(config)
+	}
 	overrides := composeEnv(config)
 	overrides["A2O_BUNDLE_COMPOSE_FILE"] = config.ComposeFile
 	overrides["A2O_BUNDLE_PROJECT"] = config.ComposeProject
-	if projectKey := envDefault("A2O_PROJECT_KEY", config.ProjectKey); strings.TrimSpace(projectKey) != "" {
+	if projectKey := strings.TrimSpace(config.ProjectKey); projectKey != "" {
 		overrides["A2O_PROJECT_KEY"] = strings.TrimSpace(projectKey)
 	}
 	if config.MultiProjectMode {
@@ -429,11 +432,11 @@ func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttem
 	}
 	if strings.TrimSpace(config.WorkspaceRoot) != "" {
 		overrides["A2O_RUNTIME_RUN_ONCE_HOST_ROOT_DIR"] = config.WorkspaceRoot
-		overrides["A2O_RUNTIME_RUN_ONCE_HOST_ROOT"] = filepath.Join(config.WorkspaceRoot, runtimeHostAgentRelativePath)
+		overrides["A2O_RUNTIME_RUN_ONCE_HOST_ROOT"] = runtimeProjectHostRoot(config.WorkspaceRoot, config)
 		overrides["A2O_HOST_AGENT_BIN"] = filepath.Join(config.WorkspaceRoot, hostAgentBinRelativePath)
 	}
 	if strings.TrimSpace(config.ComposeProject) != "" {
-		overrides["A2O_BRANCH_NAMESPACE"] = defaultBranchNamespace(config.ComposeProject)
+		overrides["A2O_BRANCH_NAMESPACE"] = defaultProjectBranchNamespace(config)
 	}
 	if strings.TrimSpace(maxSteps) != "" {
 		overrides["A2O_RUNTIME_RUN_ONCE_MAX_STEPS"] = strings.TrimSpace(maxSteps)

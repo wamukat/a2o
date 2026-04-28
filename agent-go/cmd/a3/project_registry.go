@@ -115,7 +115,7 @@ func readProjectRuntimeContext(path string, projectKey string) (*projectRuntimeC
 	}
 	resolvedKey := strings.TrimSpace(projectKey)
 	if resolvedKey == "" {
-		resolvedKey = strings.TrimSpace(registry.DefaultProject)
+		resolvedKey = strings.TrimSpace(envDefault("A2O_PROJECT_KEY", registry.DefaultProject))
 	}
 	if resolvedKey == "" {
 		return nil, fmt.Errorf("project registry %s has no default_project; pass --project", path)
@@ -124,7 +124,7 @@ func readProjectRuntimeContext(path string, projectKey string) (*projectRuntimeC
 	if !ok {
 		return nil, fmt.Errorf("project %q not found in registry %s", resolvedKey, path)
 	}
-	config, err := runtimeInstanceConfigFromProjectDefinition(path, definition)
+	config, err := runtimeInstanceConfigFromProjectDefinition(path, resolvedKey, definition)
 	if err != nil {
 		return nil, err
 	}
@@ -153,10 +153,32 @@ func readProjectRegistry(path string) (*runtimeProjectRegistry, error) {
 	if len(registry.Projects) == 0 {
 		return nil, fmt.Errorf("project registry %s has no projects", path)
 	}
+	if err := validateProjectRegistry(path, registry); err != nil {
+		return nil, err
+	}
 	return &registry, nil
 }
 
-func runtimeInstanceConfigFromProjectDefinition(registryPath string, definition runtimeProjectDefinition) (runtimeInstanceConfig, error) {
+func validateProjectRegistry(path string, registry runtimeProjectRegistry) error {
+	storageOwners := map[string]string{}
+	for key, definition := range registry.Projects {
+		projectKey := strings.TrimSpace(key)
+		if projectKey == "" {
+			return fmt.Errorf("project registry %s has an empty project key", path)
+		}
+		if safeRuntimeLogComponent(projectKey) != projectKey {
+			return fmt.Errorf("project registry %s has unsafe project key %q; use ASCII letters, numbers, '.', '_', '-', or ':'", path, key)
+		}
+		storageDir := projectStorageDir(projectKey, definition.StorageDir)
+		if owner, exists := storageOwners[storageDir]; exists {
+			return fmt.Errorf("project registry %s maps projects %q and %q to the same storage_dir %q", path, owner, projectKey, storageDir)
+		}
+		storageOwners[storageDir] = projectKey
+	}
+	return nil
+}
+
+func runtimeInstanceConfigFromProjectDefinition(registryPath string, projectKey string, definition runtimeProjectDefinition) (runtimeInstanceConfig, error) {
 	workspaceRoot := strings.TrimSpace(definition.WorkspaceRoot)
 	if workspaceRoot == "" {
 		workspaceRoot = projectRegistryWorkspaceRoot(registryPath)
@@ -180,9 +202,20 @@ func runtimeInstanceConfigFromProjectDefinition(registryPath string, definition 
 		KanbanURL:        strings.TrimSpace(definition.Kanban.URL),
 		KanbanRuntimeURL: strings.TrimSpace(definition.Kanban.RuntimeURL),
 		AgentPort:        strings.TrimSpace(definition.AgentPort),
-		StorageDir:       strings.TrimSpace(definition.StorageDir),
+		StorageDir:       projectStorageDir(projectKey, definition.StorageDir),
 		RuntimeImage:     strings.TrimSpace(definition.RuntimeImage),
 	}, nil
+}
+
+func projectStorageDir(projectKey string, configured string) string {
+	if value := strings.TrimSpace(configured); value != "" {
+		return filepath.Clean(value)
+	}
+	safeKey := safeRuntimeLogComponent(strings.TrimSpace(projectKey))
+	if safeKey == "" {
+		safeKey = "default"
+	}
+	return filepath.Join("/var/lib/a2o/projects", safeKey)
 }
 
 func projectRegistryWorkspaceRoot(registryPath string) string {

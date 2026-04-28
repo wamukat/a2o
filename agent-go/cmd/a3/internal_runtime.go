@@ -406,6 +406,10 @@ type runtimeSchedulerPaths struct {
 
 func schedulerPaths(config runtimeInstanceConfig) runtimeSchedulerPaths {
 	dir := filepath.Join(config.WorkspaceRoot, ".work", "a2o-runtime")
+	if config.MultiProjectMode {
+		config.ProjectKey = effectiveRuntimeProjectKey(config)
+		dir = filepath.Join(config.WorkspaceRoot, ".work", "a2o", "projects", safeProjectKeyComponent(config.ProjectKey), "scheduler")
+	}
 	return runtimeSchedulerPaths{
 		Dir:         dir,
 		PIDFile:     filepath.Join(dir, "scheduler.pid"),
@@ -1987,6 +1991,12 @@ func ensureRuntimeLauncherConfig(plan runtimeRunOncePlan, stdout io.Writer) erro
 }
 
 func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunOnceOverrides, projectConfig string) (runtimeRunOncePlan, error) {
+	if err := validateRuntimeProjectSideEffectScope(config); err != nil {
+		return runtimeRunOncePlan{}, err
+	}
+	if config.MultiProjectMode {
+		config.ProjectKey = effectiveRuntimeProjectKey(config)
+	}
 	hostRootDir := envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_ROOT_DIR", "A3_RUNTIME_RUN_ONCE_HOST_ROOT_DIR", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_ROOT_DIR", "A3_RUNTIME_SCHEDULER_HOST_ROOT_DIR", config.WorkspaceRoot))
 	if strings.TrimSpace(hostRootDir) == "" {
 		hostRootDir = "."
@@ -2006,10 +2016,10 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 		return runtimeRunOncePlan{}, err
 	}
 	effectivePackagePath := filepath.Dir(projectConfigPath)
-	hostRoot := envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_ROOT", "A3_RUNTIME_RUN_ONCE_HOST_ROOT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_ROOT", "A3_RUNTIME_SCHEDULER_HOST_ROOT", filepath.Join(hostRootDir, runtimeHostAgentRelativePath)))
+	hostRoot := envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_ROOT", "A3_RUNTIME_RUN_ONCE_HOST_ROOT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_ROOT", "A3_RUNTIME_SCHEDULER_HOST_ROOT", runtimeProjectHostRoot(hostRootDir, config)))
 	defaultWorkspaceRoot := filepath.Join(hostRoot, "workspaces")
 	if strings.TrimSpace(packageConfig.AgentWorkspaceRoot) != "" {
-		defaultWorkspaceRoot = resolvePackagePath(hostRootDir, packageConfig.AgentWorkspaceRoot)
+		defaultWorkspaceRoot = runtimeProjectAgentWorkspaceRoot(hostRootDir, config, packageConfig.AgentWorkspaceRoot)
 	}
 	workspaceRoot := envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_WORKSPACE_ROOT", "A3_RUNTIME_RUN_ONCE_AGENT_WORKSPACE_ROOT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_WORKSPACE_ROOT", "A3_RUNTIME_SCHEDULER_AGENT_WORKSPACE_ROOT", defaultWorkspaceRoot))
 	hostAgentBin := envDefaultCompat("A2O_HOST_AGENT_BIN", "A3_HOST_AGENT_BIN", resolveDefaultHostAgentBin(config, hostRootDir))
@@ -2079,7 +2089,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 	defaultKanbanProject := packageConfig.KanbanProject
 	defaultKanbanStatus := envDefaultValue(packageConfig.KanbanStatus, "To do")
 	launcherConfigPath := envDefaultCompat("A2O_WORKER_LAUNCHER_CONFIG_PATH", "A3_WORKER_LAUNCHER_CONFIG_PATH", filepath.Join(hostRoot, "launcher.json"))
-	projectKey := strings.TrimSpace(envDefault("A2O_PROJECT_KEY", config.ProjectKey))
+	projectKey := effectiveRuntimeProjectKey(config)
 	if len(packageConfig.Executor) == 0 {
 		return runtimeRunOncePlan{}, fmt.Errorf("project.yaml runtime.phases.implementation.executor.command is required for packaged a2o-agent worker execution")
 	}
@@ -2097,7 +2107,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 		AgentControlPlaneRetryDelay:     agentControlPlaneRetryDelay,
 		AgentPort:                       envDefaultCompat("A2O_BUNDLE_AGENT_PORT", "A3_BUNDLE_AGENT_PORT", envDefaultValue(config.AgentPort, "7393")),
 		AgentInternalPort:               envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_INTERNAL_PORT", "A3_RUNTIME_RUN_ONCE_AGENT_INTERNAL_PORT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_INTERNAL_PORT", "A3_RUNTIME_SCHEDULER_AGENT_INTERNAL_PORT", "7393")),
-		StorageDir:                      envDefaultCompat("A2O_BUNDLE_STORAGE_DIR", "A3_BUNDLE_STORAGE_DIR", envDefaultValue(config.StorageDir, "/var/lib/a2o/a2o-runtime")),
+		StorageDir:                      envDefaultCompat("A2O_BUNDLE_STORAGE_DIR", "A3_BUNDLE_STORAGE_DIR", envDefaultValue(config.StorageDir, runtimeDefaultStorageDir(config))),
 		HostRootDir:                     hostRootDir,
 		HostRoot:                        hostRoot,
 		WorkspaceRoot:                   workspaceRoot,
@@ -2109,11 +2119,11 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 		AIRawLogRoot:                    envDefaultCompat("A2O_AGENT_AI_RAW_LOG_ROOT", "A3_AGENT_AI_RAW_LOG_ROOT", filepath.Join(hostRoot, "ai-raw-logs")),
 		LauncherConfigPath:              launcherConfigPath,
 		LauncherConfig:                  packageConfig.Executor,
-		ServerLog:                       envDefaultCompat("A2O_RUNTIME_RUN_ONCE_SERVER_LOG", "A3_RUNTIME_RUN_ONCE_SERVER_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_SERVER_LOG", "A3_RUNTIME_SCHEDULER_SERVER_LOG", "/tmp/a2o-runtime-run-once-agent-server.log")),
-		RuntimeLog:                      envDefaultCompat("A2O_RUNTIME_RUN_ONCE_LOG", "A3_RUNTIME_RUN_ONCE_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_LOG", "A3_RUNTIME_SCHEDULER_LOG", "/tmp/a2o-runtime-run-once.log")),
-		RuntimeExitFile:                 envDefaultCompat("A2O_RUNTIME_RUN_ONCE_EXIT_FILE", "A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_EXIT_FILE", "A3_RUNTIME_SCHEDULER_EXIT_FILE", "/tmp/a2o-runtime-run-once.exit")),
-		RuntimePIDFile:                  envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PID_FILE", "A3_RUNTIME_RUN_ONCE_PID_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PID_FILE", "A3_RUNTIME_SCHEDULER_PID_FILE", "/tmp/a2o-runtime-run-once.pid")),
-		ServerPIDFile:                   envDefaultCompat("A2O_RUNTIME_RUN_ONCE_SERVER_PID_FILE", "A3_RUNTIME_RUN_ONCE_SERVER_PID_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_SERVER_PID_FILE", "A3_RUNTIME_SCHEDULER_SERVER_PID_FILE", "/tmp/a2o-runtime-run-once-agent-server.pid")),
+		ServerLog:                       envDefaultCompat("A2O_RUNTIME_RUN_ONCE_SERVER_LOG", "A3_RUNTIME_RUN_ONCE_SERVER_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_SERVER_LOG", "A3_RUNTIME_SCHEDULER_SERVER_LOG", runtimeProjectTempPath(config, "run-once-agent-server.log"))),
+		RuntimeLog:                      envDefaultCompat("A2O_RUNTIME_RUN_ONCE_LOG", "A3_RUNTIME_RUN_ONCE_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_LOG", "A3_RUNTIME_SCHEDULER_LOG", runtimeProjectTempPath(config, "run-once.log"))),
+		RuntimeExitFile:                 envDefaultCompat("A2O_RUNTIME_RUN_ONCE_EXIT_FILE", "A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_EXIT_FILE", "A3_RUNTIME_SCHEDULER_EXIT_FILE", runtimeProjectTempPath(config, "run-once.exit"))),
+		RuntimePIDFile:                  envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PID_FILE", "A3_RUNTIME_RUN_ONCE_PID_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PID_FILE", "A3_RUNTIME_SCHEDULER_PID_FILE", runtimeProjectTempPath(config, "run-once.pid"))),
+		ServerPIDFile:                   envDefaultCompat("A2O_RUNTIME_RUN_ONCE_SERVER_PID_FILE", "A3_RUNTIME_RUN_ONCE_SERVER_PID_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_SERVER_PID_FILE", "A3_RUNTIME_SCHEDULER_SERVER_PID_FILE", runtimeProjectTempPath(config, "run-once-agent-server.pid"))),
 		PresetDir:                       envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PRESET_DIR", "A3_RUNTIME_RUN_ONCE_PRESET_DIR", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PRESET_DIR", "A3_RUNTIME_SCHEDULER_PRESET_DIR", "/tmp/a3-engine/config/presets")),
 		ManifestPath:                    projectConfigPath,
 		SoloBoardInternalURL:            kanbanInternalURL(config),
@@ -2136,8 +2146,78 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 		WorkerCommand:      workerCommand,
 		WorkerArgs:         workerArgs,
 		JobTimeoutSeconds:  envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_JOB_TIMEOUT_SECONDS", "A3_RUNTIME_RUN_ONCE_AGENT_JOB_TIMEOUT_SECONDS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_JOB_TIMEOUT_SECONDS", "A3_RUNTIME_SCHEDULER_AGENT_JOB_TIMEOUT_SECONDS", "7200")),
-		BranchNamespace:    defaultBranchNamespace(config.ComposeProject),
+		BranchNamespace:    defaultProjectBranchNamespace(config),
 	}, nil
+}
+
+func validateRuntimeProjectSideEffectScope(config runtimeInstanceConfig) error {
+	if !config.MultiProjectMode {
+		return nil
+	}
+	projectKey := effectiveRuntimeProjectKey(config)
+	if projectKey == "" {
+		return fmt.Errorf("multi-project runtime side effects require a resolved project key")
+	}
+	if safeRuntimeLogComponent(projectKey) != projectKey {
+		return fmt.Errorf("multi-project runtime side effects require a safe project key %q; use ASCII letters, numbers, '.', '_', '-', or ':'", projectKey)
+	}
+	return nil
+}
+
+func effectiveRuntimeProjectKey(config runtimeInstanceConfig) string {
+	return strings.TrimSpace(config.ProjectKey)
+}
+
+func safeProjectKeyComponent(projectKey string) string {
+	safeKey := safeRuntimeLogComponent(strings.TrimSpace(projectKey))
+	if safeKey == "" {
+		return "default"
+	}
+	return safeKey
+}
+
+func runtimeDefaultStorageDir(config runtimeInstanceConfig) string {
+	if !config.MultiProjectMode {
+		return "/var/lib/a2o/a2o-runtime"
+	}
+	return filepath.Join("/var/lib/a2o/projects", safeProjectKeyComponent(config.ProjectKey))
+}
+
+func runtimeProjectHostRoot(hostRootDir string, config runtimeInstanceConfig) string {
+	if !config.MultiProjectMode {
+		return filepath.Join(hostRootDir, runtimeHostAgentRelativePath)
+	}
+	return filepath.Join(runtimeProjectHostSideEffectRoot(hostRootDir, config), "runtime-host-agent")
+}
+
+func runtimeProjectAgentWorkspaceRoot(hostRootDir string, config runtimeInstanceConfig, configured string) string {
+	trimmed := strings.TrimSpace(configured)
+	if trimmed == "" {
+		return filepath.Join(runtimeProjectHostRoot(hostRootDir, config), "workspaces")
+	}
+	if !config.MultiProjectMode || filepath.IsAbs(trimmed) {
+		return resolvePackagePath(hostRootDir, trimmed)
+	}
+	return filepath.Join(runtimeProjectHostSideEffectRoot(hostRootDir, config), trimmed)
+}
+
+func runtimeProjectHostSideEffectRoot(hostRootDir string, config runtimeInstanceConfig) string {
+	return filepath.Join(hostRootDir, ".work", "a2o", "projects", safeProjectKeyComponent(config.ProjectKey))
+}
+
+func runtimeProjectTempPath(config runtimeInstanceConfig, suffix string) string {
+	if !config.MultiProjectMode {
+		return filepath.Join("/tmp", "a2o-runtime-"+suffix)
+	}
+	return filepath.Join("/tmp", "a2o-runtime-"+safeProjectKeyComponent(config.ProjectKey)+"-"+suffix)
+}
+
+func defaultProjectBranchNamespace(config runtimeInstanceConfig) string {
+	base := defaultBranchNamespace(config.ComposeProject)
+	if !config.MultiProjectMode {
+		return base
+	}
+	return base + "-" + safeProjectKeyComponent(config.ProjectKey)
 }
 
 func projectAgentEnv(projectKey string, multiProjectMode bool) []string {
@@ -2152,6 +2232,12 @@ func projectAgentEnv(projectKey string, multiProjectMode bool) []string {
 }
 
 func buildRuntimeDescribeTaskPlan(config runtimeInstanceConfig) (runtimeRunOncePlan, error) {
+	if err := validateRuntimeProjectSideEffectScope(config); err != nil {
+		return runtimeRunOncePlan{}, err
+	}
+	if config.MultiProjectMode {
+		config.ProjectKey = effectiveRuntimeProjectKey(config)
+	}
 	hostRootDir := envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_ROOT_DIR", "A3_RUNTIME_RUN_ONCE_HOST_ROOT_DIR", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_ROOT_DIR", "A3_RUNTIME_SCHEDULER_HOST_ROOT_DIR", config.WorkspaceRoot))
 	if strings.TrimSpace(hostRootDir) == "" {
 		hostRootDir = "."
@@ -2164,17 +2250,17 @@ func buildRuntimeDescribeTaskPlan(config runtimeInstanceConfig) (runtimeRunOnceP
 	if err != nil {
 		return runtimeRunOncePlan{}, err
 	}
-	hostRoot := envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_ROOT", "A3_RUNTIME_RUN_ONCE_HOST_ROOT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_ROOT", "A3_RUNTIME_SCHEDULER_HOST_ROOT", filepath.Join(hostRootDir, runtimeHostAgentRelativePath)))
+	hostRoot := envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_ROOT", "A3_RUNTIME_RUN_ONCE_HOST_ROOT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_ROOT", "A3_RUNTIME_SCHEDULER_HOST_ROOT", runtimeProjectHostRoot(hostRootDir, config)))
 	_, _, _, _, repoLabels := packageRuntimeRepoArgs(hostRootDir, referencePackagePath, packageConfig)
 	return runtimeRunOncePlan{
 		ComposePrefix:        composeArgs(config),
-		StorageDir:           envDefaultCompat("A2O_BUNDLE_STORAGE_DIR", "A3_BUNDLE_STORAGE_DIR", envDefaultValue(config.StorageDir, "/var/lib/a2o/a2o-runtime")),
+		StorageDir:           envDefaultCompat("A2O_BUNDLE_STORAGE_DIR", "A3_BUNDLE_STORAGE_DIR", envDefaultValue(config.StorageDir, runtimeDefaultStorageDir(config))),
 		HostAgentLog:         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_HOST_AGENT_LOG", "A3_RUNTIME_RUN_ONCE_HOST_AGENT_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_HOST_AGENT_LOG", "A3_RUNTIME_SCHEDULER_HOST_AGENT_LOG", filepath.Join(hostRoot, "agent.log"))),
 		LiveLogRoot:          envDefaultCompat("A2O_AGENT_LIVE_LOG_ROOT", "A3_AGENT_LIVE_LOG_ROOT", filepath.Join(hostRoot, "live-logs")),
 		AIRawLogRoot:         envDefaultCompat("A2O_AGENT_AI_RAW_LOG_ROOT", "A3_AGENT_AI_RAW_LOG_ROOT", filepath.Join(hostRoot, "ai-raw-logs")),
-		ServerLog:            envDefaultCompat("A2O_RUNTIME_RUN_ONCE_SERVER_LOG", "A3_RUNTIME_RUN_ONCE_SERVER_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_SERVER_LOG", "A3_RUNTIME_SCHEDULER_SERVER_LOG", "/tmp/a2o-runtime-run-once-agent-server.log")),
-		RuntimeLog:           envDefaultCompat("A2O_RUNTIME_RUN_ONCE_LOG", "A3_RUNTIME_RUN_ONCE_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_LOG", "A3_RUNTIME_SCHEDULER_LOG", "/tmp/a2o-runtime-run-once.log")),
-		RuntimeExitFile:      envDefaultCompat("A2O_RUNTIME_RUN_ONCE_EXIT_FILE", "A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_EXIT_FILE", "A3_RUNTIME_SCHEDULER_EXIT_FILE", "/tmp/a2o-runtime-run-once.exit")),
+		ServerLog:            envDefaultCompat("A2O_RUNTIME_RUN_ONCE_SERVER_LOG", "A3_RUNTIME_RUN_ONCE_SERVER_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_SERVER_LOG", "A3_RUNTIME_SCHEDULER_SERVER_LOG", runtimeProjectTempPath(config, "run-once-agent-server.log"))),
+		RuntimeLog:           envDefaultCompat("A2O_RUNTIME_RUN_ONCE_LOG", "A3_RUNTIME_RUN_ONCE_LOG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_LOG", "A3_RUNTIME_SCHEDULER_LOG", runtimeProjectTempPath(config, "run-once.log"))),
+		RuntimeExitFile:      envDefaultCompat("A2O_RUNTIME_RUN_ONCE_EXIT_FILE", "A3_RUNTIME_RUN_ONCE_EXIT_FILE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_EXIT_FILE", "A3_RUNTIME_SCHEDULER_EXIT_FILE", runtimeProjectTempPath(config, "run-once.exit"))),
 		PresetDir:            envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PRESET_DIR", "A3_RUNTIME_RUN_ONCE_PRESET_DIR", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PRESET_DIR", "A3_RUNTIME_SCHEDULER_PRESET_DIR", "/tmp/a3-engine/config/presets")),
 		ManifestPath:         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PROJECT_CONFIG", "A3_RUNTIME_RUN_ONCE_PROJECT_CONFIG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PROJECT_CONFIG", "A3_RUNTIME_SCHEDULER_PROJECT_CONFIG", filepath.Join(referencePackagePath, "project.yaml"))),
 		SoloBoardInternalURL: kanbanInternalURL(config),
