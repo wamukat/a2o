@@ -722,6 +722,37 @@ func validateWorkerPayload(payload map[string]any, request map[string]any) []str
 					errors = append(errors, "review_disposition."+key+" must be a string")
 				}
 			}
+			errors = append(errors, validateWorkerReviewDisposition(disposition, request, success)...)
+		}
+	}
+	return errors
+}
+
+func validateWorkerReviewDisposition(disposition map[string]any, request map[string]any, success bool) []string {
+	phase := stringValue(request["phase"])
+	parentReview := phase == "review" && nestedString(request, "phase_runtime", "task_kind") == "parent"
+	validScopes := validWorkerReviewDispositionRepoScopes(request, parentReview)
+	repoScope := stringValue(disposition["repo_scope"])
+	errors := []string{}
+	if parentReview {
+		validKinds := []string{"completed", "follow_up_child", "blocked"}
+		if !containsString(validKinds, stringValue(disposition["kind"])) {
+			errors = append(errors, "review_disposition.kind must be one of "+strings.Join(validKinds, ", "))
+		}
+		if !containsString(validScopes, repoScope) {
+			errors = append(errors, "review_disposition.repo_scope must be one of "+strings.Join(validScopes, ", "))
+		}
+		if success && stringValue(disposition["kind"]) != "completed" {
+			errors = append(errors, "review_disposition.kind must be completed when success is true for parent review")
+		}
+		return errors
+	}
+	if phase == "implementation" {
+		if stringValue(disposition["kind"]) != "completed" {
+			errors = append(errors, "review_disposition.kind must be completed for implementation evidence")
+		}
+		if !containsString(validScopes, repoScope) {
+			errors = append(errors, "review_disposition.repo_scope must be one of "+strings.Join(validScopes, ", "))
 		}
 	}
 	return errors
@@ -867,14 +898,39 @@ func mapValue(value any) map[string]any {
 }
 
 func validWorkerReviewDispositionRepoScopes(request map[string]any, includeUnresolved bool) []string {
-	scopes := []string{}
-	for scope := range mapValue(request["slot_paths"]) {
-		if scope != "" && !containsString(scopes, scope) {
-			scopes = append(scopes, scope)
+	scopes := configuredWorkerReviewDispositionRepoScopes()
+	if len(scopes) == 0 {
+		for scope := range mapValue(request["slot_paths"]) {
+			if scope != "" && !containsString(scopes, scope) {
+				scopes = append(scopes, scope)
+			}
 		}
 	}
 	if includeUnresolved && !containsString(scopes, "unresolved") {
 		scopes = append(scopes, "unresolved")
+	}
+	return scopes
+}
+
+func configuredWorkerReviewDispositionRepoScopes() []string {
+	config := map[string]any{}
+	if err := readJSONFile(workerLauncherConfigPath(), &config); err != nil {
+		return nil
+	}
+	executor, ok := config["executor"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	rawScopes, ok := executor["review_disposition_repo_scopes"].([]any)
+	if !ok {
+		return nil
+	}
+	scopes := []string{}
+	for _, rawScope := range rawScopes {
+		scope := stringValue(rawScope)
+		if scope != "" && !containsString(scopes, scope) {
+			scopes = append(scopes, scope)
+		}
 	}
 	return scopes
 }

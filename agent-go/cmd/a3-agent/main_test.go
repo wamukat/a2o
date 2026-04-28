@@ -646,6 +646,7 @@ func TestWorkerPayloadCanonicalizesIdentityBeforeValidation(t *testing.T) {
 		"phase_runtime": map[string]any{
 			"task_kind": "parent",
 		},
+		"slot_paths": map[string]any{"repo_alpha": "/tmp/repo-alpha"},
 	}
 	payload := map[string]any{
 		"task_ref":        "wrong-task",
@@ -680,6 +681,73 @@ func TestWorkerPayloadCanonicalizesIdentityBeforeValidation(t *testing.T) {
 	}
 }
 
+func TestWorkerPayloadRejectsInvalidParentReviewDisposition(t *testing.T) {
+	request := map[string]any{
+		"task_ref": "A2O#7",
+		"run_ref":  "run-1",
+		"phase":    "review",
+		"phase_runtime": map[string]any{
+			"task_kind": "parent",
+		},
+		"slot_paths": map[string]any{"repo_alpha": "/tmp/repo-alpha"},
+	}
+	basePayload := map[string]any{
+		"task_ref":        "A2O#7",
+		"run_ref":         "run-1",
+		"phase":           "review",
+		"success":         true,
+		"summary":         "parent review clean",
+		"failing_command": nil,
+		"observed_state":  nil,
+		"rework_required": false,
+		"review_disposition": map[string]any{
+			"kind":        "completed",
+			"repo_scope":  "repo_alpha",
+			"summary":     "No findings",
+			"description": "The parent integration branch is ready.",
+			"finding_key": "no-findings",
+		},
+	}
+	tests := []struct {
+		name     string
+		mutate   func(map[string]any)
+		expected string
+	}{
+		{
+			name: "success follow-up child",
+			mutate: func(payload map[string]any) {
+				payload["review_disposition"].(map[string]any)["kind"] = "follow_up_child"
+			},
+			expected: "review_disposition.kind must be completed when success is true for parent review",
+		},
+		{
+			name: "invalid kind",
+			mutate: func(payload map[string]any) {
+				payload["review_disposition"].(map[string]any)["kind"] = "done"
+			},
+			expected: "review_disposition.kind must be one of completed, follow_up_child, blocked",
+		},
+		{
+			name: "invalid repo scope",
+			mutate: func(payload map[string]any) {
+				payload["review_disposition"].(map[string]any)["repo_scope"] = "repo_beta"
+			},
+			expected: "review_disposition.repo_scope must be one of repo_alpha, unresolved",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			payload := cloneMap(basePayload)
+			payload["review_disposition"] = cloneMap(basePayload["review_disposition"].(map[string]any))
+			tc.mutate(payload)
+			errors := validateWorkerPayload(payload, request)
+			if !containsString(errors, tc.expected) {
+				t.Fatalf("expected %q in %#v", tc.expected, errors)
+			}
+		})
+	}
+}
+
 func stringSet(values []any) map[string]bool {
 	result := map[string]bool{}
 	for _, value := range values {
@@ -698,6 +766,14 @@ func anyStrings(values []any) []string {
 		}
 	}
 	return result
+}
+
+func cloneMap(values map[string]any) map[string]any {
+	copied := map[string]any{}
+	for key, value := range values {
+		copied[key] = value
+	}
+	return copied
 }
 
 func writeJSONForTest(t *testing.T, path string, payload any) {
