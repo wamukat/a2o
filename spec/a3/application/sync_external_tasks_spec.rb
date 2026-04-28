@@ -52,6 +52,7 @@ RSpec.describe A3::Application::SyncExternalTasks do
   it "preserves active local execution while refreshing external identity and topology" do
     local_task = A3::Domain::Task.new(
       ref: "Sample#3046",
+      project_key: "a2o",
       kind: :child,
       edit_scope: [:repo_beta],
       status: :in_progress,
@@ -60,6 +61,7 @@ RSpec.describe A3::Application::SyncExternalTasks do
     )
     imported_task = A3::Domain::Task.new(
       ref: "Sample#3046",
+      project_key: "a2o",
       kind: :parent,
       edit_scope: %i[repo_alpha repo_beta],
       verification_scope: %i[repo_alpha repo_beta],
@@ -80,6 +82,7 @@ RSpec.describe A3::Application::SyncExternalTasks do
     expect(reconciled.child_refs).to eq(["Sample#3047"])
     expect(reconciled.external_task_id).to eq(4100)
     expect(reconciled.labels).to eq(["repo:both", "review:formal"])
+    expect(reconciled.project_key).to eq("a2o")
     expect(result.preserved_active_task_refs).to eq(["Sample#3046"])
   end
 

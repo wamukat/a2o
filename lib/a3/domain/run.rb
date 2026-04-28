@@ -3,11 +3,12 @@
 module A3
   module Domain
     class Run
-      attr_reader :ref, :task_ref, :phase, :workspace_kind, :source_descriptor, :scope_snapshot, :artifact_owner, :evidence, :terminal_outcome
+      attr_reader :ref, :task_ref, :phase, :workspace_kind, :source_descriptor, :scope_snapshot, :artifact_owner, :evidence, :terminal_outcome, :project_key
 
-      def initialize(ref:, task_ref:, phase:, workspace_kind:, source_descriptor:, scope_snapshot:, review_target: nil, artifact_owner:, evidence: nil, terminal_outcome: nil)
+      def initialize(ref:, task_ref:, phase:, workspace_kind:, source_descriptor:, scope_snapshot:, review_target: nil, artifact_owner:, evidence: nil, terminal_outcome: nil, project_key: A3::Domain::ProjectIdentity.current)
         assign_state(
           ref: ref,
+          project_key: project_key,
           task_ref: task_ref,
           phase: phase,
           workspace_kind: workspace_kind,
@@ -17,6 +18,7 @@ module A3
           terminal_outcome: terminal_outcome,
           evidence: evidence || build_initial_evidence(
             task_ref: task_ref,
+            project_key: project_key,
             phase: phase,
             source_descriptor: source_descriptor,
             scope_snapshot: scope_snapshot,
@@ -27,9 +29,10 @@ module A3
         freeze
       end
 
-      def self.restore(ref:, task_ref:, phase:, workspace_kind:, source_descriptor:, scope_snapshot:, artifact_owner:, evidence:, terminal_outcome: nil)
+      def self.restore(ref:, task_ref:, phase:, workspace_kind:, source_descriptor:, scope_snapshot:, artifact_owner:, evidence:, terminal_outcome: nil, project_key: A3::Domain::ProjectIdentity.current)
         new(
           ref: ref,
+          project_key: project_key,
           task_ref: task_ref,
           phase: phase,
           workspace_kind: workspace_kind,
@@ -60,6 +63,7 @@ module A3
 
         self.class.restore(
           ref: ref,
+          project_key: project_key,
           task_ref: task_ref,
           phase: phase,
           workspace_kind: source_descriptor.workspace_kind,
@@ -82,6 +86,7 @@ module A3
 
         self.class.restore(
           ref: ref,
+          project_key: project_key,
           task_ref: task_ref,
           phase: phase,
           workspace_kind: workspace_kind,
@@ -96,6 +101,7 @@ module A3
       def complete(outcome:)
         self.class.restore(
           ref: ref,
+          project_key: project_key,
           task_ref: task_ref,
           phase: phase,
           workspace_kind: workspace_kind,
@@ -110,6 +116,7 @@ module A3
       def replace_latest_phase_record(phase_record)
         self.class.restore(
           ref: ref,
+          project_key: project_key,
           task_ref: task_ref,
           phase: phase,
           workspace_kind: workspace_kind,
@@ -124,6 +131,7 @@ module A3
       def ==(other)
         other.is_a?(self.class) &&
           other.ref == ref &&
+          other.project_key == project_key &&
           other.task_ref == task_ref &&
           other.phase == phase &&
           other.workspace_kind == workspace_kind &&
@@ -137,19 +145,21 @@ module A3
 
       private
 
-      def assign_state(ref:, task_ref:, phase:, workspace_kind:, source_descriptor:, scope_snapshot:, artifact_owner:, terminal_outcome:, evidence:)
+      def assign_state(ref:, task_ref:, phase:, workspace_kind:, source_descriptor:, scope_snapshot:, artifact_owner:, terminal_outcome:, evidence:, project_key:)
         validate_workspace_kind_alignment!(
           workspace_kind: workspace_kind,
           source_descriptor: source_descriptor
         )
         validate_evidence_alignment!(
           task_ref: task_ref,
+          project_key: project_key,
           source_descriptor: source_descriptor,
           scope_snapshot: scope_snapshot,
           artifact_owner: artifact_owner,
           evidence: evidence
         )
         @ref = ref
+        @project_key = A3::Domain::ProjectIdentity.normalize(project_key)
         @task_ref = task_ref
         @phase = phase.to_sym
         @workspace_kind = workspace_kind.to_sym
@@ -166,9 +176,10 @@ module A3
         raise ConfigurationError, "run evidence mismatch for workspace_kind"
       end
 
-      def build_initial_evidence(task_ref:, phase:, source_descriptor:, scope_snapshot:, review_target:, artifact_owner:)
+      def build_initial_evidence(task_ref:, phase:, source_descriptor:, scope_snapshot:, review_target:, artifact_owner:, project_key:)
         EvidenceRecord.build_initial(
           task_ref: task_ref,
+          project_key: project_key,
           phase: phase,
           source_descriptor: source_descriptor,
           scope_snapshot: scope_snapshot,
@@ -186,8 +197,9 @@ module A3
         )
       end
 
-      def validate_evidence_alignment!(task_ref:, source_descriptor:, scope_snapshot:, artifact_owner:, evidence:)
+      def validate_evidence_alignment!(task_ref:, project_key:, source_descriptor:, scope_snapshot:, artifact_owner:, evidence:)
         ensure_matching_evidence!(:task_ref, expected: task_ref, actual: evidence.task_ref)
+        ensure_matching_evidence!(:project_key, expected: project_key, actual: evidence.project_key)
         ensure_matching_evidence!(:source_descriptor, expected: source_descriptor, actual: evidence.source_descriptor)
         ensure_matching_evidence!(:scope_snapshot, expected: scope_snapshot, actual: evidence.scope_snapshot)
         ensure_matching_evidence!(:artifact_owner, expected: artifact_owner, actual: evidence.artifact_owner)

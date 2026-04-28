@@ -25,6 +25,7 @@ module A3
         artifact_uploads = [upload_execution_metadata(request: request, execution: execution, started_at: started_at, finished_at: finished_at)] + upload_rule_artifacts(request)
         result = A3::Domain::AgentJobResult.new(
           job_id: request.job_id,
+          project_key: request.project_key,
           status: execution.status,
           exit_code: execution.exit_code,
           started_at: started_at,
@@ -44,6 +45,7 @@ module A3
 
       def upload_combined_log(request:, content:)
         upload = upload_metadata(
+          request: request,
           artifact_id: safe_artifact_id("#{request.job_id}-combined-log"),
           role: "combined-log",
           content: content,
@@ -72,6 +74,7 @@ module A3
         content = JSON.pretty_generate(
           {
             "job_id" => request.job_id,
+            "project_key" => request.project_key,
             "task_ref" => request.task_ref,
             "run_ref" => request.run_ref,
             "phase" => request.phase,
@@ -93,6 +96,7 @@ module A3
           }
         ) + "\n"
         upload = upload_metadata(
+          request: request,
           artifact_id: safe_artifact_id("#{request.job_id}-execution-metadata"),
           role: "execution-metadata",
           content: content,
@@ -107,6 +111,7 @@ module A3
           Dir.glob(File.join(request.working_dir, rule.fetch("glob"))).sort.map do |path|
             content = File.binread(path)
             upload = upload_metadata(
+              request: request,
               artifact_id: safe_artifact_id("#{request.job_id}-#{rule.fetch("role")}-#{File.basename(path)}-#{SecureRandom.hex(4)}"),
               role: rule.fetch("role"),
               content: content,
@@ -118,19 +123,21 @@ module A3
         end
       end
 
-      def upload_metadata(artifact_id:, role:, content:, retention_class:, media_type:)
+      def upload_metadata(request:, artifact_id:, role:, content:, retention_class:, media_type:)
         A3::Domain::AgentArtifactUpload.new(
           artifact_id: artifact_id,
           role: role,
           digest: "sha256:#{Digest::SHA256.hexdigest(content)}",
           byte_size: content.bytesize,
           retention_class: retention_class,
-          media_type: media_type
+          media_type: media_type,
+          project_key: request.project_key
         )
       end
 
       def workspace_descriptor_for(request)
         A3::Domain::AgentWorkspaceDescriptor.new(
+          project_key: request.project_key,
           workspace_kind: request.source_descriptor.workspace_kind,
           runtime_profile: request.runtime_profile,
           workspace_id: safe_artifact_id("#{request.runtime_profile}-#{request.job_id}"),

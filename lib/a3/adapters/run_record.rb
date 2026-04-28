@@ -8,6 +8,7 @@ module A3
       def dump(run)
         {
           "ref" => run.ref,
+          "project_key" => run.project_key,
           "task_ref" => run.task_ref,
           "phase" => run.phase.to_s,
           "workspace_kind" => run.workspace_kind.to_s,
@@ -16,12 +17,14 @@ module A3
           "artifact_owner" => run.artifact_owner&.persisted_form,
           "terminal_outcome" => run.terminal_outcome&.to_s,
           "evidence" => run.evidence.persisted_form
-        }
+        }.compact
       end
 
       def load(record)
+        A3::Domain::ProjectIdentity.require_readable!(project_key: record["project_key"], record_type: "run")
         A3::Domain::Run.restore(
           ref: record.fetch("ref"),
+          project_key: record["project_key"],
           task_ref: record.fetch("task_ref"),
           phase: record.fetch("phase"),
           workspace_kind: record.fetch("workspace_kind"),

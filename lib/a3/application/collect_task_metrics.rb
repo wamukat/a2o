@@ -45,6 +45,7 @@ module A3
         record = A3::Domain::TaskMetricsRecord.from_project_metrics(
           task_ref: task.ref,
           parent_ref: task.parent_ref,
+          project_key: run.project_key || task.project_key,
           timestamp: @clock.call.iso8601,
           payload: payload
         )

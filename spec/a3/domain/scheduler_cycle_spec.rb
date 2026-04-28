@@ -52,4 +52,18 @@ RSpec.describe A3::Domain::SchedulerCycle do
       [A3::Domain::SchedulerCycleStep.new(task_ref: "A3-v2#3030", phase: :review)]
     )
   end
+
+  it "preserves project identity across persisted and numbered copies" do
+    cycle = described_class.new(
+      project_key: "a2o",
+      executed_count: 1,
+      idle_reached: true,
+      stop_reason: :idle,
+      quarantined_count: 0
+    )
+
+    expect(cycle.persisted_form.fetch("project_key")).to eq("a2o")
+    expect(described_class.from_persisted_form(cycle.persisted_form)).to eq(cycle)
+    expect(cycle.with_cycle_number(4).project_key).to eq("a2o")
+  end
 end

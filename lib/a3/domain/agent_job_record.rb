@@ -5,10 +5,11 @@ module A3
     class AgentJobRecord
       STATES = %i[queued claimed completed].freeze
 
-      attr_reader :request, :state, :claimed_by, :claimed_at, :heartbeat_at, :result
+      attr_reader :request, :project_key, :state, :claimed_by, :claimed_at, :heartbeat_at, :result
 
-      def initialize(request:, state:, claimed_by: nil, claimed_at: nil, heartbeat_at: nil, result: nil)
+      def initialize(request:, state:, claimed_by: nil, claimed_at: nil, heartbeat_at: nil, result: nil, project_key: request.project_key)
         @request = request
+        @project_key = A3::Domain::ProjectIdentity.normalize(project_key)
         @state = normalize_state(state)
         @claimed_by = claimed_by&.to_s
         @claimed_at = claimed_at&.to_s
@@ -16,12 +17,16 @@ module A3
         @result = result
         validate_claim!
         validate_result!
+        validate_project_identity!
         freeze
       end
 
       def self.from_persisted_form(record)
+        project_key = record["project_key"] || record.dig("request", "project_key")
+        A3::Domain::ProjectIdentity.require_readable!(project_key: project_key, record_type: "agent job record")
         new(
           request: AgentJobRequest.from_request_form(record.fetch("request")),
+          project_key: project_key,
           state: record.fetch("state"),
           claimed_by: record["claimed_by"],
           claimed_at: record["claimed_at"],
@@ -32,6 +37,7 @@ module A3
 
       def persisted_form
         {
+          "project_key" => project_key,
           "request" => request.request_form,
           "state" => state.to_s,
           "claimed_by" => claimed_by,
@@ -54,6 +60,7 @@ module A3
 
         self.class.new(
           request: request,
+          project_key: project_key,
           state: :claimed,
           claimed_by: agent_name,
           claimed_at: claimed_at
@@ -67,6 +74,7 @@ module A3
 
         self.class.new(
           request: request,
+          project_key: project_key,
           state: state,
           claimed_by: claimed_by,
           claimed_at: claimed_at,
@@ -80,6 +88,7 @@ module A3
 
         self.class.new(
           request: request,
+          project_key: project_key,
           state: :completed,
           claimed_by: claimed_by,
           claimed_at: claimed_at,
@@ -115,6 +124,18 @@ module A3
         return if result
 
         raise ConfigurationError, "completed agent jobs require result"
+      end
+
+      def validate_project_identity!
+        validate_nested_project_identity!("agent job request", request.project_key)
+        validate_nested_project_identity!("agent job result", result.project_key) if result
+      end
+
+      def validate_nested_project_identity!(record_type, nested_project_key)
+        normalized_nested = A3::Domain::ProjectIdentity.normalize(nested_project_key)
+        return if project_key == normalized_nested
+
+        raise ConfigurationError, "agent job record project_key mismatch for #{record_type}"
       end
     end
   end

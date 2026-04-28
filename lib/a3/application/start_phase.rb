@@ -28,6 +28,7 @@ module A3
         Result.new(
           run: A3::Domain::Run.new(
             ref: @run_id_generator.call,
+            project_key: task.project_key,
             task_ref: task.ref,
             phase: phase_name,
             workspace_kind: workspace_plan.workspace_kind,

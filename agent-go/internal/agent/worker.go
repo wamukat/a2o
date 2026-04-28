@@ -119,7 +119,7 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 
 	execution := w.executor().Execute(runRequest)
 	finishedAt := w.now().Format(time.RFC3339)
-	logUpload, err := w.upload("combined-log", safeID(request.JobID+"-combined-log"), "analysis", "text/plain", execution.CombinedLog)
+	logUpload, err := w.upload(*request, "combined-log", safeID(request.JobID+"-combined-log"), "analysis", "text/plain", execution.CombinedLog)
 	if err != nil {
 		return nil, false, err
 	}
@@ -164,6 +164,7 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 
 	result := JobResult{
 		JobID:                request.JobID,
+		ProjectKey:           request.ProjectKey,
 		Status:               execution.Status,
 		ExitCode:             execution.ExitCode,
 		StartedAt:            startedAt,
@@ -228,12 +229,13 @@ func (w Worker) logHeartbeatError(jobID string, err error) {
 func (w Worker) runMergeJob(request JobRequest, startedAt string) (*JobResult, bool, error) {
 	descriptor, execution := w.mergeRequest(request)
 	finishedAt := w.now().Format(time.RFC3339)
+	descriptor.ProjectKey = request.ProjectKey
 	descriptor.RuntimeProfile = request.RuntimeProfile
 	descriptor.SourceDescriptor = request.SourceDescriptor
 	if descriptor.WorkspaceKind == "" {
 		descriptor.WorkspaceKind = request.SourceDescriptor.WorkspaceKind
 	}
-	logUpload, err := w.upload("combined-log", safeID(request.JobID+"-combined-log"), "analysis", "text/plain", execution.CombinedLog)
+	logUpload, err := w.upload(request, "combined-log", safeID(request.JobID+"-combined-log"), "analysis", "text/plain", execution.CombinedLog)
 	if err != nil {
 		return nil, false, err
 	}
@@ -245,6 +247,7 @@ func (w Worker) runMergeJob(request JobRequest, startedAt string) (*JobResult, b
 	}
 	result := JobResult{
 		JobID:               request.JobID,
+		ProjectKey:          request.ProjectKey,
 		Status:              execution.Status,
 		ExitCode:            execution.ExitCode,
 		StartedAt:           startedAt,
@@ -265,12 +268,13 @@ func (w Worker) runMergeJob(request JobRequest, startedAt string) (*JobResult, b
 func (w Worker) runMergeRecoveryJob(request JobRequest, startedAt string) (*JobResult, bool, error) {
 	descriptor, execution := w.mergeRecoveryRequest(request)
 	finishedAt := w.now().Format(time.RFC3339)
+	descriptor.ProjectKey = request.ProjectKey
 	descriptor.RuntimeProfile = request.RuntimeProfile
 	descriptor.SourceDescriptor = request.SourceDescriptor
 	if descriptor.WorkspaceKind == "" {
 		descriptor.WorkspaceKind = request.SourceDescriptor.WorkspaceKind
 	}
-	logUpload, err := w.upload("combined-log", safeID(request.JobID+"-combined-log"), "analysis", "text/plain", execution.CombinedLog)
+	logUpload, err := w.upload(request, "combined-log", safeID(request.JobID+"-combined-log"), "analysis", "text/plain", execution.CombinedLog)
 	if err != nil {
 		return nil, false, err
 	}
@@ -282,6 +286,7 @@ func (w Worker) runMergeRecoveryJob(request JobRequest, startedAt string) (*JobR
 	}
 	result := JobResult{
 		JobID:               request.JobID,
+		ProjectKey:          request.ProjectKey,
 		Status:              execution.Status,
 		ExitCode:            execution.ExitCode,
 		StartedAt:           startedAt,
@@ -327,6 +332,7 @@ func postExecutionFailureResult(request JobRequest, descriptor WorkspaceDescript
 	code := 1
 	return JobResult{
 		JobID:               request.JobID,
+		ProjectKey:          request.ProjectKey,
 		Status:              "failed",
 		ExitCode:            &code,
 		StartedAt:           startedAt,
@@ -370,12 +376,13 @@ func (w Worker) prepareRequest(request JobRequest) (JobRequest, *PreparedWorkspa
 func (w Worker) submitFailure(request JobRequest, descriptor WorkspaceDescriptor, startedAt string, message string) (*JobResult, bool, error) {
 	code := 1
 	finishedAt := w.now().Format(time.RFC3339)
-	logUpload, err := w.upload("combined-log", safeID(request.JobID+"-combined-log"), "diagnostic", "text/plain", []byte(message))
+	logUpload, err := w.upload(request, "combined-log", safeID(request.JobID+"-combined-log"), "diagnostic", "text/plain", []byte(message))
 	if err != nil {
 		return nil, false, err
 	}
 	result := JobResult{
 		JobID:               request.JobID,
+		ProjectKey:          request.ProjectKey,
 		Status:              "failed",
 		ExitCode:            &code,
 		StartedAt:           startedAt,
@@ -429,7 +436,7 @@ func (w Worker) uploadArtifactsAndWorkerResult(request JobRequest) ([]ArtifactUp
 				return nil, nil, err
 			}
 			id := safeID(fmt.Sprintf("%s-%s-%s", request.JobID, role, filepath.Base(path)))
-			upload, err := w.upload(role, id, retentionClass, rule["media_type"], content)
+			upload, err := w.upload(request, role, id, retentionClass, rule["media_type"], content)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -468,7 +475,7 @@ func (w Worker) uploadAIRawLog(request JobRequest) (*ArtifactUpload, error) {
 	if err != nil {
 		return nil, err
 	}
-	upload, err := w.upload("ai-raw-log", safeID(request.JobID+"-ai-raw-log"), "analysis", "text/plain", content)
+	upload, err := w.upload(request, "ai-raw-log", safeID(request.JobID+"-ai-raw-log"), "analysis", "text/plain", content)
 	if err != nil {
 		return nil, err
 	}
@@ -486,6 +493,7 @@ func (w Worker) uploadExecutionMetadata(request JobRequest, execution ExecutionR
 	}
 	payload := map[string]any{
 		"job_id":           request.JobID,
+		"project_key":      request.ProjectKey,
 		"task_ref":         request.TaskRef,
 		"run_ref":          request.RunRef,
 		"phase":            request.Phase,
@@ -511,7 +519,7 @@ func (w Worker) uploadExecutionMetadata(request JobRequest, execution ExecutionR
 	if err != nil {
 		return nil, err
 	}
-	upload, err := w.upload("execution-metadata", safeID(request.JobID+"-execution-metadata"), "analysis", "application/json", append(content, '\n'))
+	upload, err := w.upload(request, "execution-metadata", safeID(request.JobID+"-execution-metadata"), "analysis", "application/json", append(content, '\n'))
 	if err != nil {
 		return nil, err
 	}
@@ -530,7 +538,7 @@ func (w Worker) uploadWorkerProtocolResult(request JobRequest) (*ArtifactUpload,
 	if err != nil {
 		return nil, nil, err
 	}
-	upload, err := w.upload("worker-result", safeID(request.JobID+"-worker-result"), "evidence", "application/json", content)
+	upload, err := w.upload(request, "worker-result", safeID(request.JobID+"-worker-result"), "evidence", "application/json", content)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -544,10 +552,11 @@ func (w Worker) uploadWorkerProtocolResult(request JobRequest) (*ArtifactUpload,
 	return &upload, parsed, nil
 }
 
-func (w Worker) upload(role, artifactID, retentionClass, mediaType string, content []byte) (ArtifactUpload, error) {
+func (w Worker) upload(request JobRequest, role, artifactID, retentionClass, mediaType string, content []byte) (ArtifactUpload, error) {
 	sum := sha256.Sum256(content)
 	upload := ArtifactUpload{
 		ArtifactID:     artifactID,
+		ProjectKey:     request.ProjectKey,
 		Role:           role,
 		Digest:         "sha256:" + hex.EncodeToString(sum[:]),
 		ByteSize:       len(content),
@@ -598,6 +607,7 @@ func (w Worker) now() time.Time {
 
 func legacyWorkspaceDescriptor(request JobRequest) WorkspaceDescriptor {
 	return WorkspaceDescriptor{
+		ProjectKey:       request.ProjectKey,
 		WorkspaceKind:    request.SourceDescriptor.WorkspaceKind,
 		RuntimeProfile:   request.RuntimeProfile,
 		WorkspaceID:      safeID(request.RuntimeProfile + "-" + request.JobID),
@@ -622,6 +632,7 @@ func requestedWorkspaceDescriptor(request JobRequest, slots map[string]map[strin
 		slots = map[string]map[string]any{}
 	}
 	descriptor := WorkspaceDescriptor{
+		ProjectKey:       request.ProjectKey,
 		WorkspaceKind:    workspaceKind,
 		RuntimeProfile:   request.RuntimeProfile,
 		WorkspaceID:      workspaceID,

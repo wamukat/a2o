@@ -61,6 +61,7 @@ func loadProjectRuntimeContextFromWorkingTree(projectKey string) (*projectRuntim
 		return nil, "", err
 	}
 	effectiveProjectKey := legacyProjectKey(*config)
+	config.ProjectKey = effectiveProjectKey
 	return &projectRuntimeContext{
 		ProjectKey: effectiveProjectKey,
 		Definition: runtimeProjectDefinition{
@@ -127,6 +128,8 @@ func readProjectRuntimeContext(path string, projectKey string) (*projectRuntimeC
 	if err != nil {
 		return nil, err
 	}
+	config.ProjectKey = resolvedKey
+	config.MultiProjectMode = true
 	return &projectRuntimeContext{
 		ProjectKey:     resolvedKey,
 		Definition:     definition,

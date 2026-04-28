@@ -4,11 +4,12 @@ module A3
   module Domain
     class TaskMetricsRecord
       SECTIONS = %w[code_changes tests coverage timing cost custom].freeze
-      PROJECT_METADATA_KEYS = %w[task_ref parent_ref timestamp].freeze
+      PROJECT_METADATA_KEYS = %w[project_key task_ref parent_ref timestamp].freeze
 
-      attr_reader :task_ref, :parent_ref, :timestamp, :code_changes, :tests, :coverage, :timing, :cost, :custom
+      attr_reader :project_key, :task_ref, :parent_ref, :timestamp, :code_changes, :tests, :coverage, :timing, :cost, :custom
 
-      def initialize(task_ref:, timestamp:, parent_ref: nil, code_changes: {}, tests: {}, coverage: {}, timing: {}, cost: {}, custom: {})
+      def initialize(task_ref:, timestamp:, parent_ref: nil, project_key: A3::Domain::ProjectIdentity.current, code_changes: {}, tests: {}, coverage: {}, timing: {}, cost: {}, custom: {})
+        @project_key = A3::Domain::ProjectIdentity.normalize(project_key)
         @task_ref = required_string(task_ref, "task_ref")
         @parent_ref = optional_string(parent_ref, "parent_ref")
         @timestamp = required_string(timestamp, "timestamp")
@@ -21,17 +22,19 @@ module A3
         freeze
       end
 
-      def self.from_project_metrics(payload:, task_ref: nil, timestamp: nil, parent_ref: nil, timing: {}, cost: {})
+      def self.from_project_metrics(payload:, task_ref: nil, timestamp: nil, parent_ref: nil, project_key: A3::Domain::ProjectIdentity.current, timing: {}, cost: {})
         raise ArgumentError, "task metrics payload must be a JSON object" unless payload.is_a?(Hash)
 
         unknown_sections = payload.keys.map(&:to_s) - SECTIONS - PROJECT_METADATA_KEYS
         raise ArgumentError, "task metrics payload contains unsupported section(s): #{unknown_sections.join(', ')}" unless unknown_sections.empty?
 
         resolved_task_ref = resolve_payload_metadata(payload, "task_ref", task_ref)
+        resolved_project_key = resolve_payload_metadata(payload, "project_key", project_key)
         resolved_parent_ref = resolve_payload_metadata(payload, "parent_ref", parent_ref)
         resolved_timestamp = resolve_payload_metadata(payload, "timestamp", timestamp)
         new(
           task_ref: resolved_task_ref,
+          project_key: resolved_project_key,
           parent_ref: resolved_parent_ref,
           timestamp: resolved_timestamp,
           code_changes: payload.fetch("code_changes", payload.fetch(:code_changes, {})),
@@ -46,8 +49,10 @@ module A3
       def self.from_persisted_form(record)
         raise ArgumentError, "task metrics record must be a Hash" unless record.is_a?(Hash)
 
+        A3::Domain::ProjectIdentity.require_readable!(project_key: record["project_key"], record_type: "task metrics")
         new(
           task_ref: record.fetch("task_ref"),
+          project_key: record["project_key"],
           parent_ref: record["parent_ref"],
           timestamp: record.fetch("timestamp"),
           code_changes: record.fetch("code_changes", {}),
@@ -76,6 +81,7 @@ module A3
       def persisted_form
         {
           "task_ref" => task_ref,
+          "project_key" => project_key,
           "parent_ref" => parent_ref,
           "timestamp" => timestamp,
           "code_changes" => code_changes,
@@ -84,7 +90,7 @@ module A3
           "timing" => timing,
           "cost" => cost,
           "custom" => custom
-        }
+        }.compact
       end
 
       def ==(other)

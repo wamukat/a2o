@@ -8,12 +8,13 @@ module A3
       STATUSES = %i[succeeded failed timed_out cancelled stale].freeze
       MAX_WORKER_PROTOCOL_PAYLOAD_BYTES = 1024 * 1024
 
-      attr_reader :job_id, :status, :exit_code, :started_at, :finished_at, :summary,
+      attr_reader :job_id, :project_key, :status, :exit_code, :started_at, :finished_at, :summary,
                   :log_uploads, :artifact_uploads, :workspace_descriptor, :heartbeat
       attr_reader :worker_protocol_result
 
-      def initialize(job_id:, status:, exit_code:, started_at:, finished_at:, summary:, log_uploads:, artifact_uploads:, workspace_descriptor:, heartbeat:, worker_protocol_result: nil)
+      def initialize(job_id:, status:, exit_code:, started_at:, finished_at:, summary:, log_uploads:, artifact_uploads:, workspace_descriptor:, heartbeat:, worker_protocol_result: nil, project_key: A3::Domain::ProjectIdentity.current)
         @job_id = required_string(job_id, "job_id")
+        @project_key = A3::Domain::ProjectIdentity.normalize(project_key)
         @status = normalize_status(status)
         @exit_code = exit_code.nil? ? nil : Integer(exit_code)
         @started_at = required_string(started_at, "started_at")
@@ -25,13 +26,16 @@ module A3
         @worker_protocol_result = normalize_optional_json_object(worker_protocol_result, "worker_protocol_result")
         @heartbeat = heartbeat&.to_s
         validate_exit_code!
+        validate_project_identity!
         freeze
       end
 
       def self.from_result_form(record)
         reject_local_path_result!(record)
+        A3::Domain::ProjectIdentity.require_readable!(project_key: record["project_key"], record_type: "agent job result")
         new(
           job_id: record.fetch("job_id"),
+          project_key: record["project_key"],
           status: record.fetch("status"),
           exit_code: record["exit_code"],
           started_at: record.fetch("started_at"),
@@ -48,6 +52,7 @@ module A3
       def result_form
         {
           "job_id" => job_id,
+          "project_key" => project_key,
           "status" => status.to_s,
           "exit_code" => exit_code,
           "started_at" => started_at,
@@ -116,6 +121,20 @@ module A3
         return if status == :timed_out || status == :cancelled || !exit_code.nil?
 
         raise ConfigurationError, "exit_code must be provided for agent job status #{status}"
+      end
+
+      def validate_project_identity!
+        validate_nested_project_identity!("agent workspace descriptor", workspace_descriptor.project_key)
+        (log_uploads + artifact_uploads).each do |upload|
+          validate_nested_project_identity!("agent artifact upload", upload.project_key)
+        end
+      end
+
+      def validate_nested_project_identity!(record_type, nested_project_key)
+        normalized_nested = A3::Domain::ProjectIdentity.normalize(nested_project_key)
+        return if project_key == normalized_nested
+
+        raise ConfigurationError, "agent job result project_key mismatch for #{record_type}"
       end
     end
   end

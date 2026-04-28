@@ -11,6 +11,8 @@ import (
 
 type runtimeInstanceConfig struct {
 	SchemaVersion    int    `json:"schema_version"`
+	ProjectKey       string `json:"project_key,omitempty"`
+	MultiProjectMode bool   `json:"multi_project_mode,omitempty"`
 	PackagePath      string `json:"package_path"`
 	WorkspaceRoot    string `json:"workspace_root"`
 	ComposeFile      string `json:"compose_file"`
@@ -416,6 +418,12 @@ func runtimeRunOnceEnv(config runtimeInstanceConfig, maxSteps string, agentAttem
 	overrides := composeEnv(config)
 	overrides["A2O_BUNDLE_COMPOSE_FILE"] = config.ComposeFile
 	overrides["A2O_BUNDLE_PROJECT"] = config.ComposeProject
+	if projectKey := envDefault("A2O_PROJECT_KEY", config.ProjectKey); strings.TrimSpace(projectKey) != "" {
+		overrides["A2O_PROJECT_KEY"] = strings.TrimSpace(projectKey)
+	}
+	if config.MultiProjectMode {
+		overrides["A2O_MULTI_PROJECT_MODE"] = "1"
+	}
 	if storageDir := envDefault("A2O_BUNDLE_STORAGE_DIR", config.StorageDir); strings.TrimSpace(storageDir) != "" {
 		overrides["A2O_BUNDLE_STORAGE_DIR"] = storageDir
 	}

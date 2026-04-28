@@ -66,6 +66,7 @@ RSpec.describe A3::Adapters::RunRecord do
     restored = described_class.load(record)
 
     expect(record["ref"]).to eq("run-1")
+    expect(record["project_key"]).to be_nil
     expect(record["phase"]).to eq("verification")
     expect(record["artifact_owner"]["snapshot_version"]).to eq("snap-1")
     expect(record["evidence"]["review_target"]["head_commit"]).to eq("head456")
@@ -79,6 +80,33 @@ RSpec.describe A3::Adapters::RunRecord do
       remediation_commands: ["commands/apply-remediation"],
       merge_target: :merge_to_parent
     )
+  end
+
+  it "serializes project identity across the run and its evidence" do
+    run = A3::Domain::Run.new(
+      ref: "run-1",
+      task_ref: "A2O#312",
+      phase: :implementation,
+      workspace_kind: :runtime_workspace,
+      project_key: "a2o",
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "A2O#312", ref: "head456"),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:a2o],
+        verification_scope: [:a2o],
+        ownership_scope: :task
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: "A2O#312",
+        owner_scope: :task,
+        snapshot_version: "snap-1"
+      )
+    )
+
+    record = described_class.dump(run)
+
+    expect(record.fetch("project_key")).to eq("a2o")
+    expect(record.fetch("evidence").fetch("project_key")).to eq("a2o")
+    expect(described_class.load(record)).to eq(run)
   end
 
   it "fails fast when persisted run-level fields and evidence drift" do

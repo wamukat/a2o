@@ -20,11 +20,13 @@ module A3
           "external_task_id" => task.external_task_id,
           "verification_source_ref" => task.verification_source_ref,
           "automation_enabled" => task.automation_enabled,
-          "labels" => task.labels
-        }
+          "labels" => task.labels,
+          "project_key" => task.project_key
+        }.compact
       end
 
       def load(record)
+        A3::Domain::ProjectIdentity.require_readable!(project_key: record["project_key"], record_type: "task")
         A3::Domain::Task.new(
           ref: record.fetch("ref"),
           kind: record.fetch("kind"),
@@ -39,7 +41,8 @@ module A3
           external_task_id: record["external_task_id"],
           verification_source_ref: record["verification_source_ref"],
           automation_enabled: record.fetch("automation_enabled", true),
-          labels: record.fetch("labels", [])
+          labels: record.fetch("labels", []),
+          project_key: record["project_key"]
         )
       end
     end

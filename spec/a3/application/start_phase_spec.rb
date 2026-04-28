@@ -46,6 +46,7 @@ RSpec.describe A3::Application::StartPhase do
   it "starts implementation on the ticket workspace" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",
+      project_key: "a2o",
       kind: :child,
       edit_scope: [:repo_alpha]
     )
@@ -62,6 +63,8 @@ RSpec.describe A3::Application::StartPhase do
     expect(result.run.phase).to eq(:implementation)
     expect(result.run.ref).to eq("run-1")
     expect(result.run.workspace_kind).to eq(:ticket_workspace)
+    expect(result.run.project_key).to eq("a2o")
+    expect(result.run.evidence.project_key).to eq("a2o")
     expect(result.run.phase_records.size).to eq(1)
     expect(result.run.phase_records.first.phase).to eq(:implementation)
   end

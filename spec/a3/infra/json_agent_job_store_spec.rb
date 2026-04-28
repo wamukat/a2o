@@ -63,9 +63,37 @@ RSpec.describe A3::Infra::JsonAgentJobStore do
     expect(fetched.result).to eq(result)
   end
 
-  def agent_job_request(job_id)
+  it "persists project identity at the agent job record boundary" do
+    request = agent_job_request("job-1", project_key: "a2o")
+
+    store.enqueue(request)
+    claimed = store.claim_next(agent_name: "host-local-agent", claimed_at: "2026-04-11T08:00:00Z")
+    completed = store.complete(agent_job_result("job-1", project_key: "a2o"))
+
+    raw_record = JSON.parse(File.read(File.join(tmpdir, "agent-jobs.json"))).fetch("job-1")
+    expect(raw_record.fetch("project_key")).to eq("a2o")
+    expect(raw_record.fetch("request").fetch("project_key")).to eq("a2o")
+    expect(raw_record.fetch("result").fetch("project_key")).to eq("a2o")
+    expect(raw_record.fetch("result").fetch("workspace_descriptor").fetch("project_key")).to eq("a2o")
+    expect(claimed.project_key).to eq("a2o")
+    expect(completed.project_key).to eq("a2o")
+    expect(described_class.new(File.join(tmpdir, "agent-jobs.json")).fetch("job-1")).to eq(completed)
+  end
+
+  it "rejects project identity mismatches between job requests and results" do
+    request = agent_job_request("job-1", project_key: "a2o")
+    store.enqueue(request)
+    store.claim_next(agent_name: "host-local-agent", claimed_at: "2026-04-11T08:00:00Z")
+
+    expect do
+      store.complete(agent_job_result("job-1", project_key: "other"))
+    end.to raise_error(A3::Domain::ConfigurationError, /project_key mismatch/)
+  end
+
+  def agent_job_request(job_id, project_key: nil)
     A3::Domain::AgentJobRequest.new(
       job_id: job_id,
+      project_key: project_key,
       task_ref: "Sample#42",
       phase: :verification,
       runtime_profile: "host-local-agent",
@@ -79,9 +107,10 @@ RSpec.describe A3::Infra::JsonAgentJobStore do
     )
   end
 
-  def agent_job_result(job_id)
+  def agent_job_result(job_id, project_key: nil)
     A3::Domain::AgentJobResult.new(
       job_id: job_id,
+      project_key: project_key,
       status: :succeeded,
       exit_code: 0,
       started_at: "2026-04-11T08:00:00Z",
@@ -89,7 +118,7 @@ RSpec.describe A3::Infra::JsonAgentJobStore do
       summary: "all checks passed",
       log_uploads: [],
       artifact_uploads: [],
-      workspace_descriptor: workspace_descriptor,
+      workspace_descriptor: workspace_descriptor(project_key: project_key),
       heartbeat: nil
     )
   end
@@ -98,8 +127,9 @@ RSpec.describe A3::Infra::JsonAgentJobStore do
     A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: "Sample#42", ref: "abc123")
   end
 
-  def workspace_descriptor
+  def workspace_descriptor(project_key: nil)
     A3::Domain::AgentWorkspaceDescriptor.new(
+      project_key: project_key,
       workspace_kind: :runtime_workspace,
       runtime_profile: "host-local-agent",
       workspace_id: "workspace-sample-42",

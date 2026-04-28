@@ -31,10 +31,11 @@ RSpec.describe A3::Infra::AgentCommandRunner do
       slot_paths: {}
     )
   end
-  let(:task) { A3::Domain::Task.new(ref: "Sample#42", kind: :single, edit_scope: [:repo_alpha], status: :verifying) }
+  let(:task) { A3::Domain::Task.new(ref: "Sample#42", project_key: "a2o", kind: :single, edit_scope: [:repo_alpha], status: :verifying) }
   let(:run) do
     A3::Domain::Run.new(
       ref: "run-1",
+      project_key: "a2o",
       task_ref: task.ref,
       phase: :verification,
       workspace_kind: :runtime_workspace,
@@ -60,6 +61,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(request.command).to eq("sh")
     expect(request.args).to eq(["-lc", "task test:all"])
     expect(request.phase).to eq(:verification)
+    expect(request.project_key).to eq("a2o")
     expect(request.runtime_profile).to eq("docker-dev-env")
     expect(request.env).to include(
       "AUTOMATION_ISSUE_WORKSPACE" => "/tmp/a3-workspace",
@@ -421,6 +423,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
   def agent_result(job_id, status, exit_code, worker_protocol_result: nil)
     A3::Domain::AgentJobResult.new(
       job_id: job_id,
+      project_key: "a2o",
       status: status,
       exit_code: exit_code,
       started_at: "2026-04-11T08:00:00Z",
@@ -429,6 +432,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
       log_uploads: [
         A3::Domain::AgentArtifactUpload.new(
           artifact_id: "#{job_id}-combined-log",
+          project_key: "a2o",
           role: "combined-log",
           digest: "sha256:#{Digest::SHA256.hexdigest('agent log')}",
           byte_size: "agent log".bytesize,
@@ -439,6 +443,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
       artifact_uploads: [],
       workspace_descriptor: A3::Domain::AgentWorkspaceDescriptor.new(
         workspace_kind: :runtime_workspace,
+        project_key: "a2o",
         runtime_profile: "docker-dev-env",
         workspace_id: "workspace-1",
         source_descriptor: source_descriptor,

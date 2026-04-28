@@ -63,6 +63,7 @@ module A3
       def build_job_request(command:, workspace:, env:, task:, run:, command_intent:, worker_protocol_request:)
         A3::Domain::AgentJobRequest.new(
           job_id: job_id_for(run),
+          project_key: run.project_key || task.project_key,
           task_ref: task.ref,
           run_ref: run.ref,
           phase: run.phase,

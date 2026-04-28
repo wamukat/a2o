@@ -120,6 +120,26 @@ RSpec.describe A3::Domain::AgentJobRequest do
     expect(described_class.from_request_form(request.request_form)).to eq(request)
   end
 
+  it "serializes project identity for durable agent job requests" do
+    request = described_class.new(
+      job_id: "job-a2o-312-implementation",
+      project_key: "a2o",
+      task_ref: "A2O#312",
+      phase: :implementation,
+      runtime_profile: "host-local",
+      source_descriptor: A3::Domain::SourceDescriptor.implementation(task_ref: "A2O#312", ref: "refs/heads/work"),
+      working_dir: ".",
+      command: "ruby",
+      args: ["worker.rb"],
+      env: {},
+      timeout_seconds: 600,
+      artifact_rules: []
+    )
+
+    expect(request.request_form.fetch("project_key")).to eq("a2o")
+    expect(described_class.from_request_form(request.request_form)).to eq(request)
+  end
+
   it "round-trips merge requests" do
     merge_request = {
       "workspace_id" => "merge-Sample-42",

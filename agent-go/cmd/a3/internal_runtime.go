@@ -1809,6 +1809,8 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 }
 
 type runtimeRunOncePlan struct {
+	ProjectKey                      string
+	MultiProjectMode                bool
 	ComposePrefix                   []string
 	MaxSteps                        string
 	AgentAttempts                   int
@@ -2039,10 +2041,13 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 	defaultKanbanProject := packageConfig.KanbanProject
 	defaultKanbanStatus := envDefaultValue(packageConfig.KanbanStatus, "To do")
 	launcherConfigPath := envDefaultCompat("A2O_WORKER_LAUNCHER_CONFIG_PATH", "A3_WORKER_LAUNCHER_CONFIG_PATH", filepath.Join(hostRoot, "launcher.json"))
+	projectKey := strings.TrimSpace(envDefault("A2O_PROJECT_KEY", config.ProjectKey))
 	if len(packageConfig.Executor) == 0 {
 		return runtimeRunOncePlan{}, fmt.Errorf("project.yaml runtime.phases.implementation.executor.command is required for packaged a2o-agent worker execution")
 	}
 	return runtimeRunOncePlan{
+		ProjectKey:                      projectKey,
+		MultiProjectMode:                config.MultiProjectMode,
 		ComposePrefix:                   composeArgs(config),
 		MaxSteps:                        envDefaultValue(overrides.MaxSteps, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_MAX_STEPS", "A3_RUNTIME_RUN_ONCE_MAX_STEPS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_MAX_STEPS", "A3_RUNTIME_SCHEDULER_MAX_STEPS", defaultMaxSteps))),
 		AgentAttempts:                   agentAttemptCount,
@@ -2075,13 +2080,13 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 		ManifestPath:                    projectConfigPath,
 		SoloBoardInternalURL:            kanbanInternalURL(config),
 		LiveRef:                         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_LIVE_REF", "A3_RUNTIME_RUN_ONCE_LIVE_REF", envDefaultCompat("A2O_RUNTIME_SCHEDULER_LIVE_REF", "A3_RUNTIME_SCHEDULER_LIVE_REF", defaultLiveRef)),
-		AgentEnv: []string{
+		AgentEnv: append([]string{
 			"A2O_ROOT_DIR=" + hostRootDir,
 			"A2O_WORKER_LAUNCHER_CONFIG_PATH=" + launcherConfigPath,
 			"A2O_AGENT_LIVE_LOG_ROOT=" + envDefaultCompat("A2O_AGENT_LIVE_LOG_ROOT", "A3_AGENT_LIVE_LOG_ROOT", filepath.Join(hostRoot, "live-logs")),
 			"A2O_AGENT_AI_RAW_LOG_ROOT=" + envDefaultCompat("A2O_AGENT_AI_RAW_LOG_ROOT", "A3_AGENT_AI_RAW_LOG_ROOT", filepath.Join(hostRoot, "ai-raw-logs")),
 			"A3_MAVEN_WORKSPACE_BOOTSTRAP_MODE=" + envDefaultCompat("A2O_RUNTIME_RUN_ONCE_MAVEN_WORKSPACE_BOOTSTRAP_MODE", "A3_RUNTIME_RUN_ONCE_MAVEN_WORKSPACE_BOOTSTRAP_MODE", envDefaultCompat("A2O_RUNTIME_SCHEDULER_MAVEN_WORKSPACE_BOOTSTRAP_MODE", "A3_RUNTIME_SCHEDULER_MAVEN_WORKSPACE_BOOTSTRAP_MODE", "empty")),
-		},
+		}, projectAgentEnv(projectKey, config.MultiProjectMode)...),
 		AgentSourcePaths:   envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS", "A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS", "A2O_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS", agentSourcePaths),
 		AgentRequiredBins:  envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_AGENT_REQUIRED_BINS", "A3_RUNTIME_RUN_ONCE_AGENT_REQUIRED_BINS", "A2O_RUNTIME_SCHEDULER_AGENT_REQUIRED_BINS", "A3_RUNTIME_SCHEDULER_AGENT_REQUIRED_BINS", requiredBins),
 		AgentSourceAliases: envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_AGENT_SOURCE_ALIASES", "A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_ALIASES", "A2O_RUNTIME_SCHEDULER_AGENT_SOURCE_ALIASES", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_ALIASES", agentSourceAliases),
@@ -2095,6 +2100,17 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 		JobTimeoutSeconds:  envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_JOB_TIMEOUT_SECONDS", "A3_RUNTIME_RUN_ONCE_AGENT_JOB_TIMEOUT_SECONDS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_JOB_TIMEOUT_SECONDS", "A3_RUNTIME_SCHEDULER_AGENT_JOB_TIMEOUT_SECONDS", "7200")),
 		BranchNamespace:    defaultBranchNamespace(config.ComposeProject),
 	}, nil
+}
+
+func projectAgentEnv(projectKey string, multiProjectMode bool) []string {
+	env := []string{}
+	if strings.TrimSpace(projectKey) != "" {
+		env = append(env, "A2O_PROJECT_KEY="+strings.TrimSpace(projectKey))
+	}
+	if multiProjectMode {
+		env = append(env, "A2O_MULTI_PROJECT_MODE=1")
+	}
+	return env
 }
 
 func buildRuntimeDescribeTaskPlan(config runtimeInstanceConfig) (runtimeRunOncePlan, error) {
@@ -2774,13 +2790,20 @@ func waitForRuntimeControlPlane(plan runtimeRunOncePlan, runner commandRunner) e
 
 func startRuntimeExecuteUntilIdle(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
 	fmt.Fprintf(stdout, "runtime_execute_until_idle_start max_steps=%s\n", plan.MaxSteps)
+	env := map[string]string{
+		"A2O_BRANCH_NAMESPACE": plan.BranchNamespace,
+		"A2O_ROOT_DIR":         "/workspace",
+		"KANBAN_BACKEND":       "kanbalone",
+	}
+	if strings.TrimSpace(plan.ProjectKey) != "" {
+		env["A2O_PROJECT_KEY"] = strings.TrimSpace(plan.ProjectKey)
+	}
+	if plan.MultiProjectMode {
+		env["A2O_MULTI_PROJECT_MODE"] = "1"
+	}
 	return dockerComposeExecShell(config, plan, runner, runtimeContainerProcess{
 		WorkingDir: "/workspace",
-		Env: map[string]string{
-			"A2O_BRANCH_NAMESPACE": plan.BranchNamespace,
-			"A2O_ROOT_DIR":         "/workspace",
-			"KANBAN_BACKEND":       "kanbalone",
-		},
+		Env:        env,
 		EnvShell: map[string]string{
 			"A3_SECRET":           "${A3_SECRET:-a2o-runtime-secret}",
 			"A3_SECRET_REFERENCE": "${A3_SECRET_REFERENCE:-A3_SECRET}",

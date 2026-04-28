@@ -10,9 +10,10 @@ RSpec.describe A3::Domain::AgentJobResult do
     )
   end
 
-  let(:workspace_descriptor) do
+  def workspace_descriptor(project_key: nil)
     A3::Domain::AgentWorkspaceDescriptor.new(
       workspace_kind: :runtime_workspace,
+      project_key: project_key,
       runtime_profile: "host-local-agent",
       workspace_id: "workspace-sample-42",
       source_descriptor: source_descriptor,
@@ -29,6 +30,7 @@ RSpec.describe A3::Domain::AgentJobResult do
   it "serializes upload-backed logs and artifacts" do
     log_upload = A3::Domain::AgentArtifactUpload.new(
       artifact_id: "art-log-1",
+      project_key: "a2o",
       role: "combined-log",
       digest: "sha256:abc",
       byte_size: 128,
@@ -37,6 +39,7 @@ RSpec.describe A3::Domain::AgentJobResult do
     )
     junit_upload = A3::Domain::AgentArtifactUpload.new(
       artifact_id: "art-junit-1",
+      project_key: "a2o",
       role: "junit",
       digest: "sha256:def",
       byte_size: 256,
@@ -46,6 +49,7 @@ RSpec.describe A3::Domain::AgentJobResult do
 
     result = described_class.new(
       job_id: "job-sample-42-verification",
+      project_key: "a2o",
       status: :failed,
       exit_code: 1,
       started_at: "2026-04-11T08:00:00+09:00",
@@ -53,19 +57,47 @@ RSpec.describe A3::Domain::AgentJobResult do
       summary: "task ops:flow:standard failed",
       log_uploads: [log_upload],
       artifact_uploads: [junit_upload],
-      workspace_descriptor: workspace_descriptor,
+      workspace_descriptor: workspace_descriptor(project_key: "a2o"),
       heartbeat: "2026-04-11T08:00:30+09:00"
     )
 
     expect(result.result_form).to include(
       "job_id" => "job-sample-42-verification",
+      "project_key" => "a2o",
       "status" => "failed",
       "exit_code" => 1,
       "summary" => "task ops:flow:standard failed"
     )
     expect(result.result_form.fetch("log_uploads")).to eq([log_upload.persisted_form])
     expect(result.result_form.fetch("artifact_uploads")).to eq([junit_upload.persisted_form])
-    expect(result.result_form.fetch("workspace_descriptor")).to eq(workspace_descriptor.persisted_form)
+    expect(result.result_form.fetch("workspace_descriptor")).to eq(workspace_descriptor(project_key: "a2o").persisted_form)
+  end
+
+  it "rejects project identity mismatches inside job results" do
+    log_upload = A3::Domain::AgentArtifactUpload.new(
+      artifact_id: "art-log-1",
+      project_key: "other",
+      role: "combined-log",
+      digest: "sha256:abc",
+      byte_size: 128,
+      retention_class: :analysis
+    )
+
+    expect do
+      described_class.new(
+        job_id: "job-a2o-312",
+        project_key: "a2o",
+        status: :succeeded,
+        exit_code: 0,
+        started_at: "2026-04-11T08:00:00Z",
+        finished_at: "2026-04-11T08:01:00Z",
+        summary: "ok",
+        log_uploads: [log_upload],
+        artifact_uploads: [],
+        workspace_descriptor: workspace_descriptor(project_key: "a2o"),
+        heartbeat: nil
+      )
+    end.to raise_error(A3::Domain::ConfigurationError, /project_key mismatch/)
   end
 
   it "round-trips from the result form" do
@@ -129,6 +161,45 @@ RSpec.describe A3::Domain::AgentJobResult do
       "parent_workspace_id" => "Sample-134-parent",
       "relative_path" => "children/Sample-135/ticket_workspace"
     )
+  end
+
+  it "serializes project identity in job results, workspace descriptors, and artifact uploads" do
+    descriptor = A3::Domain::AgentWorkspaceDescriptor.new(
+      workspace_kind: :runtime_workspace,
+      project_key: "a2o",
+      runtime_profile: "host-local-agent",
+      workspace_id: "workspace-a2o-312",
+      source_descriptor: source_descriptor,
+      slot_descriptors: {}
+    )
+    upload = A3::Domain::AgentArtifactUpload.new(
+      artifact_id: "art-log-1",
+      project_key: "a2o",
+      role: "combined-log",
+      digest: "sha256:abc",
+      byte_size: 128,
+      retention_class: :analysis
+    )
+    result = described_class.new(
+      job_id: "job-a2o-312",
+      project_key: "a2o",
+      status: :succeeded,
+      exit_code: 0,
+      started_at: "2026-04-11T08:00:00Z",
+      finished_at: "2026-04-11T08:01:00Z",
+      summary: "ok",
+      log_uploads: [upload],
+      artifact_uploads: [],
+      workspace_descriptor: descriptor,
+      heartbeat: nil
+    )
+
+    expect(result.result_form.fetch("project_key")).to eq("a2o")
+    expect(described_class.from_result_form(result.result_form)).to eq(result)
+    expect(descriptor.persisted_form.fetch("project_key")).to eq("a2o")
+    expect(A3::Domain::AgentWorkspaceDescriptor.from_persisted_form(descriptor.persisted_form)).to eq(descriptor)
+    expect(upload.persisted_form.fetch("project_key")).to eq("a2o")
+    expect(A3::Domain::AgentArtifactUpload.from_persisted_form(upload.persisted_form)).to eq(upload)
   end
 
   it "rejects local path-only log and artifact result fields" do

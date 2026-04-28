@@ -636,6 +636,9 @@ func TestProjectRegistryDefaultProjectResolvesRuntimeContext(t *testing.T) {
 	if context.ProjectKey != "a2o" {
 		t.Fatalf("ProjectKey=%q", context.ProjectKey)
 	}
+	if !context.Config.MultiProjectMode {
+		t.Fatalf("registry context should enable multi-project mode")
+	}
 	if context.Config.PackagePath != packageDir {
 		t.Fatalf("PackagePath=%q", context.Config.PackagePath)
 	}
@@ -7609,12 +7612,14 @@ func TestRuntimeLoopRunsConfiguredCycles(t *testing.T) {
 
 func TestRuntimeRunOnceEnvDoesNotGenerateRemovedA3CompatibilityInputs(t *testing.T) {
 	env := runtimeRunOnceEnv(runtimeInstanceConfig{
-		WorkspaceRoot:  "/tmp/a2o-workspace",
-		ComposeFile:    "compose.yml",
-		ComposeProject: "a2o-test",
-		AgentPort:      "7394",
-		StorageDir:     "/var/lib/a2o/runtime",
-		RuntimeImage:   "ghcr.io/wamukat/a2o-engine:test",
+		WorkspaceRoot:    "/tmp/a2o-workspace",
+		ProjectKey:       "a2o",
+		ComposeFile:      "compose.yml",
+		ComposeProject:   "a2o-test",
+		AgentPort:        "7394",
+		StorageDir:       "/var/lib/a2o/runtime",
+		RuntimeImage:     "ghcr.io/wamukat/a2o-engine:test",
+		MultiProjectMode: true,
 	}, "3", "4")
 
 	for _, removed := range removedA3EnvironmentNames() {
@@ -7632,12 +7637,44 @@ func TestRuntimeRunOnceEnvDoesNotGenerateRemovedA3CompatibilityInputs(t *testing
 		"A2O_RUNTIME_RUN_ONCE_HOST_ROOT_DIR",
 		"A2O_RUNTIME_RUN_ONCE_HOST_ROOT",
 		"A2O_HOST_AGENT_BIN",
+		"A2O_PROJECT_KEY",
+		"A2O_MULTI_PROJECT_MODE",
 		"A2O_RUNTIME_RUN_ONCE_MAX_STEPS",
 		"A2O_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS",
 	} {
 		if strings.TrimSpace(env[required]) == "" {
 			t.Fatalf("runtime env missing public input %s in %#v", required, env)
 		}
+	}
+}
+
+func TestRuntimeRunOncePlanPropagatesProjectKeyToAgentEnv(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+
+	plan, err := buildRuntimeRunOncePlan(runtimeInstanceConfig{
+		ProjectKey:       "a2o",
+		MultiProjectMode: true,
+		PackagePath:      packageDir,
+		WorkspaceRoot:    tempDir,
+		ComposeProject:   "a2o-test",
+	}, runtimeRunOnceOverrides{}, "")
+	if err != nil {
+		t.Fatalf("buildRuntimeRunOncePlan failed: %v", err)
+	}
+
+	if plan.ProjectKey != "a2o" {
+		t.Fatalf("plan should carry project key, got %q", plan.ProjectKey)
+	}
+	if !containsString(plan.AgentEnv, "A2O_PROJECT_KEY=a2o") {
+		t.Fatalf("agent env should include project key, got %#v", plan.AgentEnv)
+	}
+	if !containsString(plan.AgentEnv, "A2O_MULTI_PROJECT_MODE=1") {
+		t.Fatalf("agent env should include multi-project mode, got %#v", plan.AgentEnv)
 	}
 }
 

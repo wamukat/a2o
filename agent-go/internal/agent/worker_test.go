@@ -23,6 +23,7 @@ func TestWorkerUploadsLogsArtifactsAndResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := testRequest(tmp)
+	request.ProjectKey = "a2o"
 	client := &fakeClient{request: &request}
 
 	result, idle, err := Worker{
@@ -49,8 +50,16 @@ func TestWorkerUploadsLogsArtifactsAndResult(t *testing.T) {
 	if client.uploads[0].RetentionClass != "analysis" || client.uploads[2].RetentionClass != "analysis" {
 		t.Fatalf("expected analysis retention for persisted execution logs: %#v", client.uploads)
 	}
+	for _, upload := range client.uploads {
+		if upload.ProjectKey != "a2o" {
+			t.Fatalf("upload should carry project key: %#v", upload)
+		}
+	}
 	if client.result == nil || client.result.JobID != "job-1" {
 		t.Fatalf("missing submitted result: %#v", client.result)
+	}
+	if client.result.ProjectKey != "a2o" || client.result.WorkspaceDescriptor.ProjectKey != "a2o" {
+		t.Fatalf("result should carry project key: %#v", client.result)
 	}
 }
 

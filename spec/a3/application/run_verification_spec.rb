@@ -287,6 +287,7 @@ RSpec.describe A3::Application::RunVerification do
         summary: "commands/collect-metrics ok",
         diagnostics: {
           "stdout" => JSON.generate(
+            "project_key" => "a2o",
             "code_changes" => { "lines_added" => 10 },
             "tests" => { "passed_count" => 5 },
             "coverage" => { "line_percent" => 80.0 },
@@ -301,6 +302,7 @@ RSpec.describe A3::Application::RunVerification do
     expect(result.task.status).to eq(:merging)
     expect(task_metrics_repository.all.map(&:persisted_form)).to contain_exactly(
       hash_including(
+        "project_key" => "a2o",
         "task_ref" => task.ref,
         "parent_ref" => task.parent_ref,
         "code_changes" => { "lines_added" => 10 },

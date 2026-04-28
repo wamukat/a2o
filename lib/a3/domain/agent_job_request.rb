@@ -8,12 +8,13 @@ module A3
       PHASES = %i[implementation review verification merge].freeze
       MAX_WORKER_PROTOCOL_PAYLOAD_BYTES = 1024 * 1024
 
-      attr_reader :job_id, :task_ref, :phase, :runtime_profile, :source_descriptor, :workspace_request, :merge_request, :merge_recovery_request, :worker_protocol_request, :agent_environment,
+      attr_reader :job_id, :project_key, :task_ref, :phase, :runtime_profile, :source_descriptor, :workspace_request, :merge_request, :merge_recovery_request, :worker_protocol_request, :agent_environment,
                   :run_ref,
                   :working_dir, :command, :args, :env, :timeout_seconds, :artifact_rules
 
-      def initialize(job_id:, task_ref:, phase:, runtime_profile:, source_descriptor:, working_dir:, command:, args:, env:, timeout_seconds:, artifact_rules:, workspace_request: nil, merge_request: nil, merge_recovery_request: nil, worker_protocol_request: nil, agent_environment: nil, run_ref: nil)
+      def initialize(job_id:, task_ref:, phase:, runtime_profile:, source_descriptor:, working_dir:, command:, args:, env:, timeout_seconds:, artifact_rules:, workspace_request: nil, merge_request: nil, merge_recovery_request: nil, worker_protocol_request: nil, agent_environment: nil, run_ref: nil, project_key: A3::Domain::ProjectIdentity.current)
         @job_id = required_string(job_id, "job_id")
+        @project_key = A3::Domain::ProjectIdentity.normalize(project_key)
         @task_ref = required_string(task_ref, "task_ref")
         @phase = normalize_phase(phase)
         @runtime_profile = required_string(runtime_profile, "runtime_profile")
@@ -35,8 +36,10 @@ module A3
       end
 
       def self.from_request_form(record)
+        A3::Domain::ProjectIdentity.require_readable!(project_key: record["project_key"], record_type: "agent job request")
         new(
           job_id: record.fetch("job_id"),
+          project_key: record["project_key"],
           task_ref: record.fetch("task_ref"),
           phase: record.fetch("phase"),
           runtime_profile: record.fetch("runtime_profile"),
@@ -59,6 +62,7 @@ module A3
       def request_form
         {
           "job_id" => job_id,
+          "project_key" => project_key,
           "task_ref" => task_ref,
           "phase" => phase.to_s,
           "runtime_profile" => runtime_profile,

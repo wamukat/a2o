@@ -3,9 +3,10 @@
 module A3
   module Domain
     class MergePlan
-      attr_reader :task_ref, :run_ref, :merge_source, :integration_target, :merge_policy, :merge_slots
+      attr_reader :project_key, :task_ref, :run_ref, :merge_source, :integration_target, :merge_policy, :merge_slots
 
-      def initialize(task_ref:, run_ref:, merge_source:, integration_target:, merge_policy:, merge_slots:)
+      def initialize(task_ref:, run_ref:, merge_source:, integration_target:, merge_policy:, merge_slots:, project_key: A3::Domain::ProjectIdentity.current)
+        @project_key = A3::Domain::ProjectIdentity.normalize(project_key)
         @task_ref = task_ref
         @run_ref = run_ref
         @merge_source = merge_source

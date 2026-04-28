@@ -36,6 +36,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
   let(:task) do
     A3::Domain::Task.new(
       ref: "A3-v2#3028",
+      project_key: "a2o",
       kind: :child,
       edit_scope: [:repo_beta],
       verification_scope: [:repo_beta]
@@ -44,6 +45,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
   let(:run) do
     A3::Domain::Run.new(
       ref: "run-1",
+      project_key: "a2o",
       task_ref: task.ref,
       phase: :implementation,
       workspace_kind: :runtime_workspace,
@@ -110,6 +112,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     execution = run_gateway(gateway)
 
     request = client.records.values.first.request
+    expect(request.project_key).to eq("a2o")
     expect(request.command).to eq("ruby")
     expect(request.args).to eq(["worker.rb"])
     expect(request.env).to include(
@@ -846,6 +849,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
   def agent_result(job_id, status, exit_code, worker_protocol_result: nil, workspace_descriptor: self.workspace_descriptor)
     A3::Domain::AgentJobResult.new(
       job_id: job_id,
+      project_key: "a2o",
       status: status,
       exit_code: exit_code,
       started_at: "2026-04-11T08:00:00Z",
@@ -866,6 +870,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
   def workspace_descriptor(slot_descriptors = {})
     A3::Domain::AgentWorkspaceDescriptor.new(
       workspace_kind: :runtime_workspace,
+      project_key: "a2o",
       runtime_profile: "host-local",
       workspace_id: "host-local-job-1",
       source_descriptor: source_descriptor,

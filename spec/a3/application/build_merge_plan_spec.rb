@@ -14,12 +14,14 @@ RSpec.describe A3::Application::BuildMergePlan do
   it "builds a persisted merge plan from task, run and project context" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",
+      project_key: "a2o",
       kind: :child,
       edit_scope: [:repo_alpha],
       parent_ref: "A3-v2#3022"
     )
     run = A3::Domain::Run.new(
       ref: "run-1",
+      project_key: "a2o",
       task_ref: task.ref,
       phase: :merge,
       workspace_kind: :runtime_workspace,
@@ -69,5 +71,6 @@ RSpec.describe A3::Application::BuildMergePlan do
     expect(result.merge_plan.integration_target.bootstrap_ref).to eq("refs/heads/live")
     expect(result.merge_plan.merge_policy).to eq(:ff_only)
     expect(result.merge_plan.merge_slots).to eq([:repo_alpha])
+    expect(result.merge_plan.project_key).to eq("a2o")
   end
 end

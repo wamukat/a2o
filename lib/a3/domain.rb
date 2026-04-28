@@ -8,6 +8,7 @@ end
 require "a3/domain/repository_error"
 require "a3/domain/configuration_error"
 require "a3/domain/notification_config"
+require "a3/domain/project_identity"
 require "a3/domain/merge_config"
 require "a3/domain/merge_config_resolver"
 require "a3/domain/project_context"

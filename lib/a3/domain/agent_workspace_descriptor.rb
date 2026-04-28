@@ -3,9 +3,10 @@
 module A3
   module Domain
     class AgentWorkspaceDescriptor
-      attr_reader :workspace_kind, :runtime_profile, :workspace_id, :source_descriptor, :slot_descriptors, :topology
+      attr_reader :workspace_kind, :runtime_profile, :workspace_id, :source_descriptor, :slot_descriptors, :topology, :project_key
 
-      def initialize(workspace_kind:, runtime_profile:, workspace_id:, source_descriptor:, slot_descriptors:, topology: nil)
+      def initialize(workspace_kind:, runtime_profile:, workspace_id:, source_descriptor:, slot_descriptors:, topology: nil, project_key: A3::Domain::ProjectIdentity.current)
+        @project_key = A3::Domain::ProjectIdentity.normalize(project_key)
         @workspace_kind = workspace_kind.to_sym
         @runtime_profile = required_string(runtime_profile, "runtime_profile")
         @workspace_id = required_string(workspace_id, "workspace_id")
@@ -17,8 +18,10 @@ module A3
       end
 
       def self.from_persisted_form(record)
+        A3::Domain::ProjectIdentity.require_readable!(project_key: record["project_key"], record_type: "agent workspace descriptor")
         new(
           workspace_kind: record.fetch("workspace_kind"),
+          project_key: record["project_key"],
           runtime_profile: record.fetch("runtime_profile"),
           workspace_id: record.fetch("workspace_id"),
           source_descriptor: SourceDescriptor.from_persisted_form(record.fetch("source_descriptor")),
@@ -30,11 +33,12 @@ module A3
       def persisted_form
         {
           "workspace_kind" => workspace_kind.to_s,
+          "project_key" => project_key,
           "runtime_profile" => runtime_profile,
           "workspace_id" => workspace_id,
           "source_descriptor" => source_descriptor.persisted_form,
           "slot_descriptors" => slot_descriptors
-        }.tap do |form|
+        }.compact.tap do |form|
           form["topology"] = topology if topology
         end
       end
@@ -42,6 +46,7 @@ module A3
       def ==(other)
         other.is_a?(self.class) &&
           other.workspace_kind == workspace_kind &&
+          other.project_key == project_key &&
           other.runtime_profile == runtime_profile &&
           other.workspace_id == workspace_id &&
           other.source_descriptor == source_descriptor &&

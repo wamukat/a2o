@@ -148,4 +148,20 @@ RSpec.describe A3::Domain::TaskMetricsRecord do
 
     expect(described_class.from_persisted_form(record.persisted_form)).to eq(record)
   end
+
+  it "carries project identity from runtime context or payload" do
+    record = described_class.from_project_metrics(
+      task_ref: "MemberPortal#65",
+      project_key: "portal",
+      timestamp: timestamp,
+      payload: {
+        "project_key" => "portal",
+        "code_changes" => { "files_changed" => 2 }
+      }
+    )
+
+    expect(record.project_key).to eq("portal")
+    expect(record.persisted_form.fetch("project_key")).to eq("portal")
+    expect(described_class.from_persisted_form(record.persisted_form)).to eq(record)
+  end
 end

@@ -36,4 +36,31 @@ RSpec.describe A3::Adapters::TaskRecord do
     )
     expect(restored).to eq(task)
   end
+
+  it "serializes project identity and keeps legacy records readable in single-project mode" do
+    task = A3::Domain::Task.new(
+      ref: "A2O#312",
+      kind: :single,
+      edit_scope: [:a2o],
+      project_key: "a2o"
+    )
+
+    record = described_class.dump(task)
+
+    expect(record.fetch("project_key")).to eq("a2o")
+    expect(described_class.load(record).project_key).to eq("a2o")
+    expect(described_class.load(record.except("project_key")).project_key).to be_nil
+  end
+
+  it "rejects ambiguous legacy task records in multi-project mode" do
+    legacy_record = described_class.dump(
+      A3::Domain::Task.new(ref: "A2O#312", kind: :single, edit_scope: [:a2o])
+    )
+
+    with_env("A2O_MULTI_PROJECT_MODE" => "1") do
+      expect do
+        described_class.load(legacy_record)
+      end.to raise_error(A3::Domain::ConfigurationError, /legacy record without project_key is ambiguous/)
+    end
+  end
 end

@@ -132,6 +132,7 @@ module A3
 
         upload = A3::Domain::AgentArtifactUpload.new(
           artifact_id: path.split("/").last,
+          project_key: query["project_key"],
           role: required_query(query, "role"),
           digest: required_query(query, "digest"),
           byte_size: required_query(query, "byte_size"),

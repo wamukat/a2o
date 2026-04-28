@@ -11,6 +11,7 @@ module A3
 
       def build(task:, run:, merge_config:)
         MergePlan.new(
+          project_key: run.project_key || task.project_key,
           task_ref: task.ref,
           run_ref: run.ref,
           merge_source: MergeSource.new(source_ref: run.source_descriptor.ref),

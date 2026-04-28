@@ -61,6 +61,7 @@ module A3
       def build_job_request(merge_plan)
         A3::Domain::AgentJobRequest.new(
           job_id: job_id_for(merge_plan),
+          project_key: merge_plan.project_key,
           task_ref: merge_plan.task_ref,
           phase: :merge,
           runtime_profile: @runtime_profile,
@@ -212,6 +213,7 @@ module A3
         working_dir = first_recovery_runtime_path(recovery_candidate) || "."
         A3::Domain::AgentJobRequest.new(
           job_id: recovery_worker_job_id_for(merge_plan),
+          project_key: merge_plan.project_key,
           task_ref: merge_plan.task_ref,
           phase: :merge,
           runtime_profile: @runtime_profile,
@@ -232,6 +234,7 @@ module A3
       def build_merge_recovery_finalizer_request(merge_plan, recovery_candidate)
         A3::Domain::AgentJobRequest.new(
           job_id: recovery_finalizer_job_id_for(merge_plan),
+          project_key: merge_plan.project_key,
           task_ref: merge_plan.task_ref,
           phase: :merge,
           runtime_profile: @runtime_profile,

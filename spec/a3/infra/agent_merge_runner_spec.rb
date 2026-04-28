@@ -33,6 +33,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
   end
   let(:merge_plan) do
     A3::Domain::MergePlan.new(
+      project_key: "a2o",
       task_ref: "Sample#42",
       run_ref: "run-merge-1",
       merge_source: A3::Domain::MergeSource.new(source_ref: "refs/heads/a2o/work/Sample-42"),
@@ -72,6 +73,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     execution = runner.run(merge_plan, workspace: workspace)
 
     request = client.records.values.first.request
+    expect(request.project_key).to eq("a2o")
     expect(request.phase).to eq(:merge)
     expect(request.command).to eq("a2o-agent-merge")
     expect(request.merge_request).to include(
@@ -297,6 +299,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
   it "recovers a Sample#245-style validation docs conflict before verification" do
     sequence = 0
     sample_merge_plan = A3::Domain::MergePlan.new(
+      project_key: "a2o",
       task_ref: "Sample#245",
       run_ref: "run-merge-245",
       merge_source: A3::Domain::MergeSource.new(source_ref: "refs/heads/a2o/work/Sample-245"),
@@ -552,6 +555,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
   def agent_result(job_id, workspace_descriptor, status: :succeeded, exit_code: 0, summary: "merge succeeded")
     A3::Domain::AgentJobResult.new(
       job_id: job_id,
+      project_key: "a2o",
       status: status,
       exit_code: exit_code,
       started_at: "2026-04-12T00:00:00Z",
@@ -569,6 +573,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
 
     A3::Domain::AgentWorkspaceDescriptor.new(
       workspace_kind: :runtime_workspace,
+      project_key: "a2o",
       runtime_profile: "host-local",
       workspace_id: workspace_id,
       source_descriptor: A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: task_ref, ref: "refs/heads/main"),

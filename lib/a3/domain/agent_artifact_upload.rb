@@ -5,9 +5,10 @@ module A3
     class AgentArtifactUpload
       RETENTION_CLASSES = %i[analysis diagnostic evidence temporary].freeze
 
-      attr_reader :artifact_id, :role, :digest, :byte_size, :retention_class, :media_type
+      attr_reader :artifact_id, :role, :digest, :byte_size, :retention_class, :media_type, :project_key
 
-      def initialize(artifact_id:, role:, digest:, byte_size:, retention_class:, media_type: nil)
+      def initialize(artifact_id:, role:, digest:, byte_size:, retention_class:, media_type: nil, project_key: A3::Domain::ProjectIdentity.current)
+        @project_key = A3::Domain::ProjectIdentity.normalize(project_key)
         @artifact_id = required_string(artifact_id, "artifact_id")
         @role = required_string(role, "role")
         @digest = required_string(digest, "digest")
@@ -19,8 +20,10 @@ module A3
 
       def self.from_persisted_form(record)
         reject_local_path_reference!(record)
+        A3::Domain::ProjectIdentity.require_readable!(project_key: record["project_key"], record_type: "agent artifact upload")
         new(
           artifact_id: record.fetch("artifact_id"),
+          project_key: record["project_key"],
           role: record.fetch("role"),
           digest: record.fetch("digest"),
           byte_size: record.fetch("byte_size"),
@@ -32,6 +35,7 @@ module A3
       def persisted_form
         {
           "artifact_id" => artifact_id,
+          "project_key" => project_key,
           "role" => role,
           "digest" => digest,
           "byte_size" => byte_size,
@@ -43,6 +47,7 @@ module A3
       def ==(other)
         other.is_a?(self.class) &&
           other.artifact_id == artifact_id &&
+          other.project_key == project_key &&
           other.role == role &&
           other.digest == digest &&
           other.byte_size == byte_size &&

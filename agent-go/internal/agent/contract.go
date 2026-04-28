@@ -9,6 +9,7 @@ type SourceDescriptor struct {
 
 type JobRequest struct {
 	JobID                 string                `json:"job_id"`
+	ProjectKey            string                `json:"project_key,omitempty"`
 	TaskRef               string                `json:"task_ref"`
 	RunRef                string                `json:"run_ref,omitempty"`
 	Phase                 string                `json:"phase"`
@@ -105,6 +106,7 @@ type WorkspaceSourceRequest struct {
 
 type ArtifactUpload struct {
 	ArtifactID     string `json:"artifact_id"`
+	ProjectKey     string `json:"project_key,omitempty"`
 	Role           string `json:"role"`
 	Digest         string `json:"digest"`
 	ByteSize       int    `json:"byte_size"`
@@ -113,6 +115,7 @@ type ArtifactUpload struct {
 }
 
 type WorkspaceDescriptor struct {
+	ProjectKey       string                    `json:"project_key,omitempty"`
 	WorkspaceKind    string                    `json:"workspace_kind"`
 	RuntimeProfile   string                    `json:"runtime_profile"`
 	WorkspaceID      string                    `json:"workspace_id"`
@@ -123,6 +126,7 @@ type WorkspaceDescriptor struct {
 
 type JobResult struct {
 	JobID                string              `json:"job_id"`
+	ProjectKey           string              `json:"project_key,omitempty"`
 	Status               string              `json:"status"`
 	ExitCode             *int                `json:"exit_code,omitempty"`
 	StartedAt            string              `json:"started_at"`
