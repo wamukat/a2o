@@ -6247,6 +6247,43 @@ func TestRunHostAgentLoopFailsAfterConsecutiveIdleAttempts(t *testing.T) {
 	}
 }
 
+func TestRunHostAgentLoopResetsAttemptBudgetAfterCompletedJob(t *testing.T) {
+	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
+	plan := runtimeRunOncePlan{
+		ComposePrefix:     []string{"compose", "-p", "a3-test", "-f", "compose.yml"},
+		AgentAttempts:     2,
+		AgentIdleLimit:    0,
+		AgentPollInterval: 0,
+		AgentPort:         "7394",
+		HostAgentBin:      "a2o-agent",
+		RuntimeExitFile:   "/tmp/a2o-runtime-run-once.exit",
+	}
+	runner := &fakeRunner{
+		runtimeExitMissing: true,
+		hostAgentOutputs: []string{
+			"agent idle\n",
+			"agent completed command-run-verification-remediation status=succeeded\n",
+			"agent idle\n",
+			"agent idle\n",
+		},
+	}
+	var stdout bytes.Buffer
+
+	err := runHostAgentLoop(config, plan, runner, &stdout)
+	if err == nil {
+		t.Fatalf("expected attempt budget error")
+	}
+	if !strings.Contains(err.Error(), "did not finish within 2 agent attempts after last host-agent progress") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count := runner.callCountContains("a2o-agent -agent host-local"); count != 4 {
+		t.Fatalf("host agent attempts=%d, want 4\ncalls:\n%s", count, strings.Join(runner.joinedCalls(), "\n"))
+	}
+	if !strings.Contains(stdout.String(), "runtime_host_agent_attempt=4") {
+		t.Fatalf("stdout should show attempts continued after completion, got:\n%s", stdout.String())
+	}
+}
+
 func TestRuntimeRunOnceDefaultsIdleLimitToAgentAttemptBudget(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -7991,6 +8028,8 @@ type fakeRunner struct {
 	watchSummaryOutput       string
 	taskStatus               string
 	hostAgentOutput          string
+	hostAgentOutputs         []string
+	hostAgentOutputIndex     int
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -8021,6 +8060,13 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	}
 	joined := strings.Join(call, " ")
 	switch {
+	case name == "a2o-agent" && len(r.hostAgentOutputs) > 0:
+		index := r.hostAgentOutputIndex
+		if index >= len(r.hostAgentOutputs) {
+			index = len(r.hostAgentOutputs) - 1
+		}
+		r.hostAgentOutputIndex++
+		return []byte(r.hostAgentOutputs[index]), nil
 	case name == "a2o-agent" && r.hostAgentOutput != "":
 		return []byte(r.hostAgentOutput), nil
 	case strings.Contains(joined, " a3 pause-scheduler "):

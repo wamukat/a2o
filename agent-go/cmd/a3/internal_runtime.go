@@ -2896,7 +2896,9 @@ func runHostAgentLoop(config runtimeInstanceConfig, plan runtimeRunOncePlan, run
 	)))
 	var agentStatus error
 	consecutiveIdle := 0
-	for attempt := 1; attempt <= plan.AgentAttempts; attempt++ {
+	attemptsSinceProgress := 0
+	for attempt := 1; ; attempt++ {
+		attemptsSinceProgress++
 		fmt.Fprintf(stdout, "runtime_host_agent_attempt=%d\n", attempt)
 		args := []string{"-agent", "host-local", "-control-plane-url", "http://127.0.0.1:" + plan.AgentPort}
 		if plan.AgentControlPlaneConnectTimeout > 0 {
@@ -2932,12 +2934,15 @@ func runHostAgentLoop(config runtimeInstanceConfig, plan runtimeRunOncePlan, run
 			}
 		case "completed":
 			consecutiveIdle = 0
+			attemptsSinceProgress = 0
+		}
+		if attemptsSinceProgress >= plan.AgentAttempts {
+			return fmt.Errorf("runtime run-once did not finish within %d agent attempts after last host-agent progress", plan.AgentAttempts)
 		}
 		if plan.AgentPollInterval > 0 {
 			time.Sleep(plan.AgentPollInterval)
 		}
 	}
-	return fmt.Errorf("runtime run-once did not finish within %d agent attempts", plan.AgentAttempts)
 }
 
 func agentAttemptState(output []byte, err error) string {
