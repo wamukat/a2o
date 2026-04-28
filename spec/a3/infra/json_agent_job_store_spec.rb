@@ -43,6 +43,26 @@ RSpec.describe A3::Infra::JsonAgentJobStore do
     end.to raise_error(A3::Domain::ConfigurationError, /already exists/)
   end
 
+  it "keeps completed results stable when heartbeat and result updates race across store instances" do
+    request = agent_job_request("job-1")
+    store.enqueue(request)
+    store.claim_next(agent_name: "host-local-agent", claimed_at: "2026-04-11T08:00:00Z")
+
+    result_store = described_class.new(File.join(tmpdir, "agent-jobs.json"))
+    heartbeat_store = described_class.new(File.join(tmpdir, "agent-jobs.json"))
+    result = agent_job_result("job-1")
+
+    threads = [
+      Thread.new { 20.times { result_store.complete(result) } },
+      Thread.new { 20.times { heartbeat_store.heartbeat(job_id: "job-1", heartbeat_at: "2026-04-11T08:00:30Z") } }
+    ]
+    threads.each(&:join)
+
+    fetched = store.fetch("job-1")
+    expect(fetched.state).to eq(:completed)
+    expect(fetched.result).to eq(result)
+  end
+
   def agent_job_request(job_id)
     A3::Domain::AgentJobRequest.new(
       job_id: job_id,
