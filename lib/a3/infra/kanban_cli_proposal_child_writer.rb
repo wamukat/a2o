@@ -76,7 +76,7 @@ module A3
         payload = canonical_task_payload(parent_task_ref: parent_task_ref, proposal_fingerprint: proposal_fingerprint, child: child)
         existing = find_existing_child(child_key)
         task = existing || create_child(payload)
-        labels_for(child).each { |label| ensure_label(task.fetch("id"), label) }
+        labels_for(child, created: !existing).each { |label| ensure_label(task.fetch("id"), label) }
         ensure_relation(parent_external_task_id, task.fetch("id")) if parent_external_task_id
         ensure_comment(task.fetch("id"), payload.fetch("comment"))
         { "ref" => task.fetch("ref"), "child_key" => child_key, "id" => task.fetch("id") }
@@ -118,9 +118,11 @@ module A3
         }
       end
 
-      def labels_for(child)
+      def labels_for(child, created:)
         labels = proposal_labels(child)
         if draft_mode?
+          return [DRAFT_LABEL] unless created
+
           ([DRAFT_LABEL] + labels.reject { |label| label == RUNNABLE_LABEL }).uniq
         else
           ([RUNNABLE_LABEL] + labels).uniq
@@ -183,7 +185,10 @@ module A3
       def find_existing_child(child_key)
         matches = @client.run_json_command("task-find", "--project", @project, "--query", child_key)
         exact = Array(matches).select { |task| task.fetch("description", "").include?("Child key: #{child_key}") }
-        raise A3::Domain::ConfigurationError, "duplicate decomposition children for child key #{child_key}" if exact.size > 1
+        if exact.size > 1
+          duplicates = exact.map { |task| "#{task["ref"] || "unknown-ref"}(id=#{task["id"] || "unknown"})" }.join(", ")
+          raise A3::Domain::ConfigurationError, "duplicate decomposition children for child key #{child_key}: #{duplicates}"
+        end
 
         exact.first
       end

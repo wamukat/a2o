@@ -132,6 +132,7 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     expect(existing.first.fetch("title")).to eq("Human title")
     expect(existing.first.fetch("description")).to eq("Human body\nChild key: child-key-1")
     expect(client.labels.any? { |args| args.include?("a2o:draft-child") }).to be(true)
+    expect(client.labels.any? { |args| args.include?("repo:alpha") }).to be(false)
     expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(false)
   end
 
@@ -159,6 +160,8 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
 
     expect(result.success?).to be(false)
     expect(result.diagnostics.fetch("error")).to include("duplicate decomposition children for child key child-key-1")
+    expect(result.diagnostics.fetch("error")).to include("A3-v2#5301(id=5301)")
+    expect(result.diagnostics.fetch("error")).to include("A3-v2#5302(id=5302)")
   end
 
   it "creates blocker relations for child dependencies" do
