@@ -3097,8 +3097,16 @@ func killRuntimePIDFile(config runtimeInstanceConfig, plan runtimeRunOncePlan, r
 
 func startRuntimeAgentServer(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
 	fmt.Fprintf(stdout, "runtime_agent_server_start port=%s host_port=%s\n", plan.AgentInternalPort, plan.AgentPort)
+	env := map[string]string{}
+	if strings.TrimSpace(plan.ProjectKey) != "" {
+		env["A2O_PROJECT_KEY"] = strings.TrimSpace(plan.ProjectKey)
+	}
+	if plan.MultiProjectMode {
+		env["A2O_MULTI_PROJECT_MODE"] = "1"
+	}
 	return dockerComposeExecShell(config, plan, runner, runtimeContainerProcess{
 		WorkingDir:  "/workspace",
+		Env:         env,
 		Args:        []string{"a3", "agent-server", "--storage-dir", plan.StorageDir, "--host", "0.0.0.0", "--port", plan.AgentInternalPort},
 		StdoutPath:  plan.ServerLog,
 		StderrToOut: true,

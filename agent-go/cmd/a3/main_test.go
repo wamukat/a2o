@@ -6954,6 +6954,33 @@ func TestWaitForRuntimeControlPlanePassesProjectKey(t *testing.T) {
 	}
 }
 
+func TestStartRuntimeAgentServerPassesProjectEnvironment(t *testing.T) {
+	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
+	plan := runtimeRunOncePlan{
+		ComposePrefix:     []string{"compose", "-p", "a3-test", "-f", "compose.yml"},
+		AgentInternalPort: "7393",
+		AgentPort:         "7394",
+		StorageDir:        "/var/lib/a2o/projects/portal",
+		ServerLog:         "/tmp/a2o-runtime-agent-server.log",
+		ServerPIDFile:     "/tmp/a2o-runtime-agent-server.pid",
+		ProjectKey:        "portal",
+		MultiProjectMode:  true,
+	}
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+
+	if err := startRuntimeAgentServer(config, plan, runner, &stdout); err != nil {
+		t.Fatalf("startRuntimeAgentServer failed: %v", err)
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(joined, "export A2O_MULTI_PROJECT_MODE='1' A2O_PROJECT_KEY='portal'") {
+		t.Fatalf("agent-server should receive project env, calls:\n%s", joined)
+	}
+	if !strings.Contains(joined, "'a3' 'agent-server' '--storage-dir' '/var/lib/a2o/projects/portal'") {
+		t.Fatalf("agent-server command missing, calls:\n%s", joined)
+	}
+}
+
 func TestRunHostAgentLoopFailsAfterConsecutiveIdleAttempts(t *testing.T) {
 	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
 	plan := runtimeRunOncePlan{
