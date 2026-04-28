@@ -109,7 +109,7 @@ func runWorkerStdinBundle(args []string) int {
 			}
 			return writeWorkerFailureResult(resultPath, request, workerFailure(request, issue.Message, command, observedState, diagnostics))
 		}
-		normalizeReviewDisposition(payload)
+		normalizeReviewDisposition(payload, request)
 		canonicalizeWorkerIdentity(payload, request)
 		if validationErrors := validateWorkerPayload(payload, request); len(validationErrors) > 0 {
 			issues := structuredWorkerValidationIssues(validationErrors)
@@ -1053,7 +1053,9 @@ func needsReviewDisposition(request map[string]any, success bool) bool {
 	return (phase == "implementation" && success) || (phase == "review" && nestedString(request, "phase_runtime", "task_kind") == "parent")
 }
 
-func normalizeReviewDisposition(payload map[string]any) {
+func normalizeReviewDisposition(payload map[string]any, request map[string]any) {
+	normalizeParentReviewSuccess(payload, request)
+
 	disposition, ok := payload["review_disposition"].(map[string]any)
 	if !ok {
 		return
@@ -1074,6 +1076,51 @@ func normalizeReviewDisposition(payload map[string]any) {
 	if replacement := stringValue(aliases[scope]); replacement != "" {
 		disposition["repo_scope"] = replacement
 	}
+}
+
+func normalizeParentReviewSuccess(payload map[string]any, request map[string]any) {
+	if stringValue(request["phase"]) != "review" || nestedString(request, "phase_runtime", "task_kind") != "parent" {
+		return
+	}
+	if success, _ := payload["success"].(bool); !success {
+		return
+	}
+	if reworkRequired, ok := payload["rework_required"].(bool); !ok || reworkRequired {
+		return
+	}
+
+	disposition, _ := payload["review_disposition"].(map[string]any)
+	if kind := stringValue(disposition["kind"]); kind != "" && kind != "completed" {
+		return
+	}
+	normalized := map[string]any{}
+	for key, value := range disposition {
+		normalized[key] = value
+	}
+	normalized["kind"] = "completed"
+	if stringValue(normalized["repo_scope"]) == "" {
+		normalized["repo_scope"] = defaultParentReviewRepoScope(request)
+	}
+	if stringValue(normalized["summary"]) == "" {
+		normalized["summary"] = stringValue(payload["summary"])
+	}
+	if stringValue(normalized["description"]) == "" {
+		normalized["description"] = stringValue(payload["summary"])
+	}
+	if stringValue(normalized["finding_key"]) == "" {
+		normalized["finding_key"] = "parent-review-completed"
+	}
+	payload["review_disposition"] = normalized
+}
+
+func defaultParentReviewRepoScope(request map[string]any) string {
+	scopes := validWorkerReviewDispositionRepoScopes(request, true)
+	for _, scope := range scopes {
+		if scope != "unresolved" {
+			return scope
+		}
+	}
+	return "unresolved"
 }
 
 func normalizeStringMap(raw any, label string) (map[string]string, error) {

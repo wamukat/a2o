@@ -1023,6 +1023,75 @@ func TestWorkerPayloadAcceptsParentReviewClarificationWithoutReviewDisposition(t
 	}
 }
 
+func TestWorkerPayloadNormalizesParentReviewSuccessWithoutReviewDisposition(t *testing.T) {
+	request := map[string]any{
+		"task_ref": "A2O#7",
+		"run_ref":  "run-1",
+		"phase":    "review",
+		"phase_runtime": map[string]any{
+			"task_kind": "parent",
+		},
+		"slot_paths": map[string]any{"repo_alpha": "/tmp/repo-alpha"},
+	}
+	payload := map[string]any{
+		"task_ref":        "A2O#7",
+		"run_ref":         "run-1",
+		"phase":           "review",
+		"success":         true,
+		"summary":         "parent review clean",
+		"rework_required": false,
+	}
+
+	normalizeReviewDisposition(payload, request)
+	if errors := validateWorkerPayload(payload, request); len(errors) != 0 {
+		t.Fatalf("parent review success without disposition should be normalized, got %#v", errors)
+	}
+	disposition := payload["review_disposition"].(map[string]any)
+	expected := map[string]any{
+		"kind":        "completed",
+		"repo_scope":  "repo_alpha",
+		"summary":     "parent review clean",
+		"description": "parent review clean",
+		"finding_key": "parent-review-completed",
+	}
+	if !reflect.DeepEqual(disposition, expected) {
+		t.Fatalf("unexpected normalized disposition: %#v", disposition)
+	}
+}
+
+func TestWorkerPayloadCompletesIncompleteParentReviewSuccessDisposition(t *testing.T) {
+	request := map[string]any{
+		"task_ref": "A2O#7",
+		"run_ref":  "run-1",
+		"phase":    "review",
+		"phase_runtime": map[string]any{
+			"task_kind": "parent",
+		},
+		"slot_paths": map[string]any{"repo_alpha": "/tmp/repo-alpha"},
+	}
+	payload := map[string]any{
+		"task_ref":        "A2O#7",
+		"run_ref":         "run-1",
+		"phase":           "review",
+		"success":         true,
+		"summary":         "parent review clean",
+		"rework_required": false,
+		"review_disposition": map[string]any{
+			"kind":       "completed",
+			"repo_scope": "repo_alpha",
+		},
+	}
+
+	normalizeReviewDisposition(payload, request)
+	if errors := validateWorkerPayload(payload, request); len(errors) != 0 {
+		t.Fatalf("incomplete parent review success disposition should be completed, got %#v", errors)
+	}
+	disposition := payload["review_disposition"].(map[string]any)
+	if disposition["summary"] != "parent review clean" || disposition["description"] != "parent review clean" || disposition["finding_key"] != "parent-review-completed" {
+		t.Fatalf("missing normalized parent review fields: %#v", disposition)
+	}
+}
+
 func TestWorkerPayloadCanonicalizesIdentityBeforeValidation(t *testing.T) {
 	request := map[string]any{
 		"task_ref": "A2O#7",
