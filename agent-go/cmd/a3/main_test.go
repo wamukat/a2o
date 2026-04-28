@@ -6215,6 +6215,35 @@ func TestRunHostAgentLoopPreservesExistingLogAcrossRestarts(t *testing.T) {
 	}
 }
 
+func TestRunHostAgentLoopFailsAfterConsecutiveIdleAttempts(t *testing.T) {
+	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
+	plan := runtimeRunOncePlan{
+		ComposePrefix:     []string{"compose", "-p", "a3-test", "-f", "compose.yml"},
+		AgentAttempts:     5,
+		AgentIdleLimit:    2,
+		AgentPollInterval: 0,
+		AgentPort:         "7394",
+		HostAgentBin:      "a2o-agent",
+		RuntimeExitFile:   "/tmp/a2o-runtime-run-once.exit",
+	}
+	runner := &fakeRunner{runtimeExitMissing: true, hostAgentOutput: "agent idle\n"}
+	var stdout bytes.Buffer
+
+	err := runHostAgentLoop(config, plan, runner, &stdout)
+	if err == nil {
+		t.Fatalf("expected idle stall error")
+	}
+	if !strings.Contains(err.Error(), "stalled after 2 consecutive idle agent attempts") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "runtime_host_agent_idle_stall idle_attempts=2 limit=2") {
+		t.Fatalf("stdout should report idle stall, got:\n%s", stdout.String())
+	}
+	if count := runner.callCountContains("a2o-agent -agent host-local"); count != 2 {
+		t.Fatalf("host agent attempts=%d, want 2\ncalls:\n%s", count, strings.Join(runner.joinedCalls(), "\n"))
+	}
+}
+
 func TestRuntimeLoopPreservesHostAgentLogAcrossRunOnceCycles(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -7892,6 +7921,7 @@ type fakeRunner struct {
 	runtimeLogTargetsOutput  string
 	watchSummaryOutput       string
 	taskStatus               string
+	hostAgentOutput          string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -7922,6 +7952,8 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	}
 	joined := strings.Join(call, " ")
 	switch {
+	case name == "a2o-agent" && r.hostAgentOutput != "":
+		return []byte(r.hostAgentOutput), nil
 	case strings.Contains(joined, " a3 pause-scheduler "):
 		r.schedulerPaused = true
 		return []byte("scheduler paused=true\n"), nil

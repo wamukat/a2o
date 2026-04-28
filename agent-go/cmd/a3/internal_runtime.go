@@ -1812,6 +1812,7 @@ type runtimeRunOncePlan struct {
 	ComposePrefix                   []string
 	MaxSteps                        string
 	AgentAttempts                   int
+	AgentIdleLimit                  int
 	AgentPollInterval               time.Duration
 	AgentControlPlaneConnectTimeout time.Duration
 	AgentControlPlaneRequestTimeout time.Duration
@@ -1983,6 +1984,10 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 	if err != nil {
 		return runtimeRunOncePlan{}, err
 	}
+	agentIdleLimit, err := parseNonNegativeInt(envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_IDLE_LIMIT", "A3_RUNTIME_RUN_ONCE_AGENT_IDLE_LIMIT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_IDLE_LIMIT", "A3_RUNTIME_SCHEDULER_AGENT_IDLE_LIMIT", "30")), "agent idle limit")
+	if err != nil {
+		return runtimeRunOncePlan{}, err
+	}
 	agentPollDuration, err := parseNonNegativeDuration(envDefaultValue(overrides.AgentPollInterval, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_POLL_INTERVAL", "A3_RUNTIME_RUN_ONCE_AGENT_POLL_INTERVAL", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_POLL_INTERVAL", "A3_RUNTIME_SCHEDULER_AGENT_POLL_INTERVAL", defaultAgentPollInterval))), "agent poll interval")
 	if err != nil {
 		return runtimeRunOncePlan{}, err
@@ -2041,6 +2046,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 		ComposePrefix:                   composeArgs(config),
 		MaxSteps:                        envDefaultValue(overrides.MaxSteps, envDefaultCompat("A2O_RUNTIME_RUN_ONCE_MAX_STEPS", "A3_RUNTIME_RUN_ONCE_MAX_STEPS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_MAX_STEPS", "A3_RUNTIME_SCHEDULER_MAX_STEPS", defaultMaxSteps))),
 		AgentAttempts:                   agentAttemptCount,
+		AgentIdleLimit:                  agentIdleLimit,
 		AgentPollInterval:               agentPollDuration,
 		AgentControlPlaneConnectTimeout: agentControlPlaneConnectTimeout,
 		AgentControlPlaneRequestTimeout: agentControlPlaneRequestTimeout,
@@ -2865,6 +2871,7 @@ func runHostAgentLoop(config runtimeInstanceConfig, plan runtimeRunOncePlan, run
 		plan.AgentControlPlaneRetryDelay,
 	)))
 	var agentStatus error
+	consecutiveIdle := 0
 	for attempt := 1; attempt <= plan.AgentAttempts; attempt++ {
 		fmt.Fprintf(stdout, "runtime_host_agent_attempt=%d\n", attempt)
 		args := []string{"-agent", "host-local", "-control-plane-url", "http://127.0.0.1:" + plan.AgentPort}
@@ -2892,11 +2899,35 @@ func runHostAgentLoop(config runtimeInstanceConfig, plan runtimeRunOncePlan, run
 		if runtimeExitExists(config, plan, runner) {
 			return agentStatus
 		}
+		switch agentAttemptState(output, err) {
+		case "idle":
+			consecutiveIdle++
+			if plan.AgentIdleLimit > 0 && consecutiveIdle >= plan.AgentIdleLimit {
+				fmt.Fprintf(stdout, "runtime_host_agent_idle_stall idle_attempts=%d limit=%d\n", consecutiveIdle, plan.AgentIdleLimit)
+				return fmt.Errorf("runtime run-once stalled after %d consecutive idle agent attempts while runtime exit file was still missing", consecutiveIdle)
+			}
+		case "completed":
+			consecutiveIdle = 0
+		}
 		if plan.AgentPollInterval > 0 {
 			time.Sleep(plan.AgentPollInterval)
 		}
 	}
 	return fmt.Errorf("runtime run-once did not finish within %d agent attempts", plan.AgentAttempts)
+}
+
+func agentAttemptState(output []byte, err error) string {
+	if err != nil {
+		return "error"
+	}
+	text := string(output)
+	if strings.Contains(text, "agent idle") {
+		return "idle"
+	}
+	if strings.Contains(text, "agent completed ") {
+		return "completed"
+	}
+	return "unknown"
 }
 
 func runtimeExitExists(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner) bool {
