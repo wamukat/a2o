@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "json"
 require "securerandom"
 require "a3/infra/workspace_trace_logger"
 
@@ -64,12 +65,16 @@ module A3
         )
 
         request = build_job_request(workspace: workspace, task: task, run: run)
+        log_agent_job_event("enqueue_start", request: request, skill: skill)
         record = enqueue(request)
         return record if record.is_a?(A3::Application::ExecutionResult)
 
+        log_agent_job_event("enqueue_done", request: request, skill: skill, state: record.state)
+        log_agent_job_event("wait_start", request: request, skill: skill)
         completed = wait_for_completion(request.job_id)
         return completed if completed.is_a?(A3::Application::ExecutionResult)
 
+        log_agent_job_event("wait_done", request: request, skill: skill, state: completed.state, result_status: completed.result&.status)
         worker_response = @worker_protocol.load_result(result_path)
         return worker_response if worker_response.is_a?(A3::Application::ExecutionResult)
 
@@ -104,11 +109,15 @@ module A3
             task_packet: task_packet
           )
         )
+        log_agent_job_event("enqueue_start", request: request, skill: skill)
         record = enqueue(request)
         return record if record.is_a?(A3::Application::ExecutionResult)
 
+        log_agent_job_event("enqueue_done", request: request, skill: skill, state: record.state)
+        log_agent_job_event("wait_start", request: request, skill: skill)
         completed = wait_for_completion(request.job_id)
         return completed if completed.is_a?(A3::Application::ExecutionResult)
+        log_agent_job_event("wait_done", request: request, skill: skill, state: completed.state, result_status: completed.result&.status)
         return agent_result_execution(completed.result) unless completed.result.succeeded?
 
         descriptor_validation = materialized_changed_files_evidence(
@@ -415,6 +424,28 @@ module A3
 
       def control_plane_url
         @control_plane_client.respond_to?(:base_url) ? @control_plane_client.base_url : nil
+      end
+
+      def log_agent_job_event(stage, request:, skill:, state: nil, result_status: nil)
+        warn(
+          "runtime_agent_worker_event " + JSON.generate(
+            {
+              "stage" => stage,
+              "job_id" => request.job_id,
+              "task_ref" => request.task_ref,
+              "run_ref" => request.run_ref,
+              "phase" => request.phase.to_s,
+              "skill" => skill.to_s,
+              "runtime_profile" => request.runtime_profile,
+              "workspace_id" => request.workspace_request&.workspace_id,
+              "state" => state&.to_s,
+              "result_status" => result_status&.to_s,
+              "control_plane_url" => control_plane_url
+            }.compact
+          )
+        )
+      rescue StandardError => e
+        warn("runtime_agent_worker_event stage=#{stage} job_id=#{request.job_id} log_error=#{e.class}:#{e.message}")
       end
     end
   end

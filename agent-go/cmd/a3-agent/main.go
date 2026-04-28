@@ -85,6 +85,7 @@ func run(args []string) int {
 		AgentName:         *agentName,
 		Client:            client,
 		HeartbeatErrorLog: os.Stderr,
+		EventLog:          os.Stdout,
 	}
 	if *workspaceRoot != "" || len(sourceAliases) > 0 {
 		worker.Materializer = agent.WorkspaceMaterializer{

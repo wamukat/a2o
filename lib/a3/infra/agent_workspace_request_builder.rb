@@ -157,7 +157,7 @@ module A3
         return nil if value.nil?
 
         normalized = value.to_sym
-        return normalized if %i[remediation metrics_collection notification].include?(normalized)
+        return normalized if %i[verification remediation metrics_collection notification].include?(normalized)
 
         raise A3::Domain::ConfigurationError, "unsupported agent command intent: #{value.inspect}"
       end

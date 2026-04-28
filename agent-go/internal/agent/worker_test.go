@@ -63,6 +63,60 @@ func TestWorkerUploadsLogsArtifactsAndResult(t *testing.T) {
 	}
 }
 
+func TestWorkerEmitsStructuredJobLifecycleEvents(t *testing.T) {
+	tmp := t.TempDir()
+	request := testRequest(tmp)
+	request.RunRef = "run-1"
+	request.WorkerProtocolRequest = map[string]any{"command_intent": "verification"}
+	client := &fakeClient{request: &request}
+	var events bytes.Buffer
+
+	_, idle, err := Worker{
+		AgentName: "host-local",
+		Client:    client,
+		Executor:  fakeExecutor{},
+		Now:       func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+		EventLog:  &events,
+	}.RunOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idle {
+		t.Fatal("expected job result, got idle")
+	}
+	text := events.String()
+	for _, want := range []string{
+		`"stage":"claimed"`,
+		`"stage":"command_start"`,
+		`"stage":"command_done"`,
+		`"stage":"submit_start"`,
+		`"stage":"submit_done"`,
+		`"command_intent":"verification"`,
+		`"run_ref":"run-1"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing %s in events:\n%s", want, text)
+		}
+	}
+}
+
+func TestWorkerLifecycleEventPreservesCanonicalStage(t *testing.T) {
+	request := testRequest(".")
+	var events bytes.Buffer
+
+	Worker{EventLog: &events}.logJobEvent(request, "materialize_error", map[string]any{
+		"stage": "refresh_workspace_evidence",
+	})
+
+	text := events.String()
+	if !strings.Contains(text, `"stage":"materialize_error"`) {
+		t.Fatalf("canonical stage was not preserved:\n%s", text)
+	}
+	if !strings.Contains(text, `"detail_stage":"refresh_workspace_evidence"`) {
+		t.Fatalf("overridden stage was not moved to detail_stage:\n%s", text)
+	}
+}
+
 func TestWorkerEmitsInProgressHeartbeats(t *testing.T) {
 	tmp := t.TempDir()
 	request := testRequest(tmp)
@@ -405,6 +459,7 @@ func TestWorkerSubmitsFailedResultWhenMaterializationFails(t *testing.T) {
 	request.SourceDescriptor.WorkspaceKind = "ticket_workspace"
 	request.WorkspaceRequest = ptr(testWorkspaceRequest("sample-catalog-service"))
 	client := &fakeClient{request: &request}
+	var events bytes.Buffer
 
 	result, idle, err := Worker{
 		AgentName: "host-local",
@@ -416,7 +471,8 @@ func TestWorkerSubmitsFailedResultWhenMaterializationFails(t *testing.T) {
 				"sample-catalog-service": sourceRoot,
 			},
 		},
-		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+		Now:      func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+		EventLog: &events,
 	}.RunOnce()
 	if err != nil {
 		t.Fatal(err)
@@ -429,6 +485,20 @@ func TestWorkerSubmitsFailedResultWhenMaterializationFails(t *testing.T) {
 	}
 	if client.result == nil || client.result.Status != "failed" {
 		t.Fatalf("failed result was not submitted: %#v", client.result)
+	}
+	text := events.String()
+	for _, want := range []string{
+		`"stage":"materialize_error"`,
+		`"stage":"upload_start"`,
+		`"stage":"upload_done"`,
+		`"stage":"submit_start"`,
+		`"stage":"submit_done"`,
+		`"stage":"cleanup_start"`,
+		`"stage":"cleanup_done"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing %s in events:\n%s", want, text)
+		}
 	}
 }
 

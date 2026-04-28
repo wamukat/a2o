@@ -163,6 +163,7 @@ RSpec.describe A3::Application::RunVerification do
       env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: anything,
       run: anything,
+      command_intent: :verification,
       worker_protocol_request: hash_including("command_intent" => "verification")
     ).and_return(
       A3::Application::ExecutionResult.new(
@@ -228,6 +229,7 @@ RSpec.describe A3::Application::RunVerification do
       env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: anything,
       run: anything,
+      command_intent: :verification,
       worker_protocol_request: hash_including("command_intent" => "verification")
     ).and_return(
       A3::Application::ExecutionResult.new(
@@ -266,6 +268,7 @@ RSpec.describe A3::Application::RunVerification do
       env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: anything,
       run: anything,
+      command_intent: :verification,
       worker_protocol_request: hash_including("command_intent" => "verification")
     ).and_return(
       A3::Application::ExecutionResult.new(
@@ -326,6 +329,7 @@ RSpec.describe A3::Application::RunVerification do
       env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: anything,
       run: anything,
+      command_intent: :verification,
       worker_protocol_request: hash_including("command_intent" => "verification")
     ).and_return(
       A3::Application::ExecutionResult.new(
@@ -369,6 +373,7 @@ RSpec.describe A3::Application::RunVerification do
       env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: anything,
       run: anything,
+      command_intent: :verification,
       worker_protocol_request: hash_including("command_intent" => "verification")
     ).and_return(
       A3::Application::ExecutionResult.new(
@@ -438,7 +443,8 @@ RSpec.describe A3::Application::RunVerification do
       workspace: prepared_workspace,
       env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: anything,
-      run: anything
+      run: anything,
+      command_intent: :verification
     )
 
     result = use_case.call(task_ref: task.ref, run_ref: run.ref, project_context: project_context)
@@ -549,6 +555,7 @@ RSpec.describe A3::Application::RunVerification do
       env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: anything,
       run: anything,
+      command_intent: :verification,
       worker_protocol_request: hash_including("command_intent" => "verification")
     ).and_return(
       A3::Application::ExecutionResult.new(

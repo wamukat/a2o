@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "json"
 require "securerandom"
 require "shellwords"
 
@@ -37,12 +38,16 @@ module A3
           command_env = default_env(@env.merge(env)).merge(workspace_automation_env(workspace)).merge(@env).merge(env)
           expanded_command = expand_command_placeholders(command, workspace: workspace, env: command_env)
           request = build_job_request(command: expanded_command, workspace: workspace, env: command_env, task: task, run: run, command_intent: command_intent, worker_protocol_request: worker_protocol_request)
+          log_agent_job_event("enqueue_start", request: request, command_intent: command_intent)
           record = enqueue(request)
           return record if record.is_a?(A3::Application::ExecutionResult)
 
+          log_agent_job_event("enqueue_done", request: request, command_intent: command_intent, state: record.state)
+          log_agent_job_event("wait_start", request: request, command_intent: command_intent)
           completed = wait_for_completion(request.job_id)
           return completed if completed.is_a?(A3::Application::ExecutionResult)
 
+          log_agent_job_event("wait_done", request: request, command_intent: command_intent, state: completed.state, result_status: completed.result&.status)
           result = completed.result
           return failed_command_result(command: expanded_command, result: result) unless result.succeeded?
 
@@ -263,6 +268,28 @@ module A3
 
       def control_plane_url
         @control_plane_client.respond_to?(:base_url) ? @control_plane_client.base_url : nil
+      end
+
+      def log_agent_job_event(stage, request:, command_intent:, state: nil, result_status: nil)
+        warn(
+          "runtime_agent_command_event " + JSON.generate(
+            {
+              "stage" => stage,
+              "job_id" => request.job_id,
+              "task_ref" => request.task_ref,
+              "run_ref" => request.run_ref,
+              "phase" => request.phase.to_s,
+              "command_intent" => command_intent&.to_s,
+              "runtime_profile" => request.runtime_profile,
+              "workspace_id" => request.workspace_request&.workspace_id,
+              "state" => state&.to_s,
+              "result_status" => result_status&.to_s,
+              "control_plane_url" => control_plane_url
+            }.compact
+          )
+        )
+      rescue StandardError => e
+        warn("runtime_agent_command_event stage=#{stage} job_id=#{request.job_id} log_error=#{e.class}:#{e.message}")
       end
     end
   end

@@ -46,6 +46,7 @@ type Worker struct {
 	Now               func() time.Time
 	HeartbeatInterval time.Duration
 	HeartbeatErrorLog io.Writer
+	EventLog          io.Writer
 }
 
 type LoopOptions struct {
@@ -97,6 +98,7 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 		return nil, true, nil
 	}
 
+	w.logJobEvent(*request, "claimed", nil)
 	now := w.now()
 	startedAt := now.Format(time.RFC3339)
 	stopHeartbeat := w.startHeartbeat(request.JobID)
@@ -107,56 +109,89 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 	if request.MergeRecoveryRequest != nil {
 		return w.runMergeRecoveryJob(*request, startedAt)
 	}
+	w.logJobEvent(*request, "materialize_start", nil)
 	runRequest, prepared, workspaceDescriptor, err := w.prepareRequest(*request)
 	if err != nil {
+		w.logJobEvent(*request, "materialize_error", map[string]any{"error": err.Error()})
 		result, idle, submitErr := w.submitFailure(*request, workspaceDescriptor, startedAt, fmt.Sprintf("A2O agent workspace preparation failed: %v\n", err))
+		w.logJobEvent(*request, "cleanup_start", nil)
 		cleanupErr := w.cleanupPrepared(*request, prepared)
+		if cleanupErr != nil {
+			w.logJobEvent(*request, "cleanup_error", map[string]any{"error": cleanupErr.Error()})
+		} else {
+			w.logJobEvent(*request, "cleanup_done", nil)
+		}
 		if submitErr != nil {
 			return result, idle, submitErr
 		}
 		return result, idle, cleanupErr
 	}
+	w.logJobEvent(runRequest, "materialize_done", map[string]any{"workspace_id": workspaceDescriptor.WorkspaceID})
 
+	w.logJobEvent(runRequest, "command_start", nil)
 	execution := w.executor().Execute(runRequest)
 	finishedAt := w.now().Format(time.RFC3339)
+	w.logJobEvent(runRequest, "command_done", map[string]any{"status": execution.Status, "exit_code": execution.ExitCode})
+	w.logJobEvent(runRequest, "upload_start", nil)
 	logUpload, err := w.upload(*request, "combined-log", safeID(request.JobID+"-combined-log"), "analysis", "text/plain", execution.CombinedLog)
 	if err != nil {
+		w.logJobEvent(*request, "upload_error", map[string]any{"role": "combined-log", "error": err.Error()})
 		return nil, false, err
 	}
 	artifactUploads, workerProtocolResult, err := w.uploadArtifactsAndWorkerResult(runRequest)
 	if err != nil {
+		w.logJobEvent(runRequest, "upload_error", map[string]any{"error": err.Error()})
 		return nil, false, err
 	}
 	if workerProtocolResult == nil {
 		workerProtocolResult = notificationWorkerProtocolResult(runRequest, execution)
 	}
 	if metadataUpload, err := w.uploadExecutionMetadata(*request, execution, startedAt, finishedAt); err != nil {
+		w.logJobEvent(*request, "upload_error", map[string]any{"role": "execution-metadata", "error": err.Error()})
 		return nil, false, err
 	} else if metadataUpload != nil {
 		artifactUploads = append(artifactUploads, *metadataUpload)
 	}
 	if rawLogUpload, err := w.uploadAIRawLog(runRequest); err != nil {
+		w.logJobEvent(runRequest, "upload_error", map[string]any{"role": "ai-raw-log", "error": err.Error()})
 		return nil, false, err
 	} else if rawLogUpload != nil {
 		artifactUploads = append(artifactUploads, *rawLogUpload)
 	}
+	w.logJobEvent(runRequest, "upload_done", map[string]any{"artifact_count": len(artifactUploads) + 1})
 	if prepared != nil && request.WorkspaceRequest != nil {
+		w.logJobEvent(runRequest, "publish_start", nil)
 		if err := w.publishPrepared(*prepared, *request, workerProtocolResult, execution.Status == "succeeded"); err != nil {
 			if refreshErr := RefreshWorkspaceEvidence(*prepared); refreshErr == nil {
 				workspaceDescriptor = requestedWorkspaceDescriptor(runRequest, prepared.SlotDescriptors)
 			}
+			w.logJobEvent(runRequest, "publish_error", map[string]any{"error": err.Error()})
 			result := postExecutionFailureResult(*request, workspaceDescriptor, startedAt, finishedAt, logUpload, artifactUploads, "A2O agent workspace publish failed", "agent_workspace_publish", err)
+			w.logJobEvent(runRequest, "submit_start", map[string]any{"status": result.Status})
 			stopHeartbeat()
 			submitErr := w.Client.SubmitResult(result)
+			if submitErr != nil {
+				w.logJobEvent(runRequest, "submit_error", map[string]any{"error": submitErr.Error()})
+			} else {
+				w.logJobEvent(runRequest, "submit_done", map[string]any{"status": result.Status})
+			}
+			w.logJobEvent(runRequest, "cleanup_start", nil)
 			cleanupErr := w.cleanupPrepared(*request, prepared)
+			if cleanupErr != nil {
+				w.logJobEvent(runRequest, "cleanup_error", map[string]any{"error": cleanupErr.Error()})
+			} else {
+				w.logJobEvent(runRequest, "cleanup_done", nil)
+			}
 			if submitErr != nil {
 				return &result, false, submitErr
 			}
 			return &result, false, cleanupErr
 		}
+		w.logJobEvent(runRequest, "publish_done", nil)
 	}
 	if prepared != nil {
 		if err := RefreshWorkspaceEvidence(*prepared); err != nil {
+			w.logJobEvent(runRequest, "materialize_error", map[string]any{"operation": "refresh_workspace_evidence", "error": err.Error()})
 			return nil, false, err
 		}
 		workspaceDescriptor = requestedWorkspaceDescriptor(runRequest, prepared.SlotDescriptors)
@@ -176,13 +211,68 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 		WorkerProtocolResult: workerProtocolResult,
 		Heartbeat:            finishedAt,
 	}
+	w.logJobEvent(runRequest, "submit_start", map[string]any{"status": result.Status})
 	stopHeartbeat()
 	submitErr := w.Client.SubmitResult(result)
+	if submitErr != nil {
+		w.logJobEvent(runRequest, "submit_error", map[string]any{"error": submitErr.Error()})
+	} else {
+		w.logJobEvent(runRequest, "submit_done", map[string]any{"status": result.Status})
+	}
+	w.logJobEvent(runRequest, "cleanup_start", nil)
 	cleanupErr := w.cleanupPrepared(runRequest, prepared)
+	if cleanupErr != nil {
+		w.logJobEvent(runRequest, "cleanup_error", map[string]any{"error": cleanupErr.Error()})
+	} else {
+		w.logJobEvent(runRequest, "cleanup_done", nil)
+	}
 	if submitErr != nil {
 		return &result, false, submitErr
 	}
 	return &result, false, cleanupErr
+}
+
+func (w Worker) logJobEvent(request JobRequest, stage string, fields map[string]any) {
+	if w.EventLog == nil {
+		return
+	}
+	payload := map[string]any{
+		"stage":          stage,
+		"job_id":         request.JobID,
+		"task_ref":       request.TaskRef,
+		"run_ref":        request.RunRef,
+		"phase":          request.Phase,
+		"command_intent": commandIntent(request),
+		"workspace_id":   workspaceID(request),
+	}
+	for key, value := range fields {
+		if key == "stage" {
+			payload["detail_stage"] = value
+			continue
+		}
+		payload[key] = value
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Fprintf(w.EventLog, "a2o_agent_job_event {\"stage\":\"%s\",\"job_id\":\"%s\",\"encoding_error\":\"%s\"}\n", stage, request.JobID, err.Error())
+		return
+	}
+	fmt.Fprintf(w.EventLog, "a2o_agent_job_event %s\n", encoded)
+}
+
+func commandIntent(request JobRequest) string {
+	if request.WorkerProtocolRequest == nil {
+		return ""
+	}
+	value, _ := request.WorkerProtocolRequest["command_intent"].(string)
+	return value
+}
+
+func workspaceID(request JobRequest) string {
+	if request.WorkspaceRequest == nil {
+		return ""
+	}
+	return request.WorkspaceRequest.WorkspaceID
 }
 
 func (w Worker) startHeartbeat(jobID string) func() {
@@ -376,10 +466,13 @@ func (w Worker) prepareRequest(request JobRequest) (JobRequest, *PreparedWorkspa
 func (w Worker) submitFailure(request JobRequest, descriptor WorkspaceDescriptor, startedAt string, message string) (*JobResult, bool, error) {
 	code := 1
 	finishedAt := w.now().Format(time.RFC3339)
+	w.logJobEvent(request, "upload_start", map[string]any{"role": "combined-log", "retention_class": "diagnostic"})
 	logUpload, err := w.upload(request, "combined-log", safeID(request.JobID+"-combined-log"), "diagnostic", "text/plain", []byte(message))
 	if err != nil {
+		w.logJobEvent(request, "upload_error", map[string]any{"role": "combined-log", "error": err.Error()})
 		return nil, false, err
 	}
+	w.logJobEvent(request, "upload_done", map[string]any{"artifact_count": 1})
 	result := JobResult{
 		JobID:               request.JobID,
 		ProjectKey:          request.ProjectKey,
@@ -393,7 +486,14 @@ func (w Worker) submitFailure(request JobRequest, descriptor WorkspaceDescriptor
 		WorkspaceDescriptor: descriptor,
 		Heartbeat:           finishedAt,
 	}
-	return &result, false, w.Client.SubmitResult(result)
+	w.logJobEvent(request, "submit_start", map[string]any{"status": result.Status})
+	submitErr := w.Client.SubmitResult(result)
+	if submitErr != nil {
+		w.logJobEvent(request, "submit_error", map[string]any{"error": submitErr.Error()})
+	} else {
+		w.logJobEvent(request, "submit_done", map[string]any{"status": result.Status})
+	}
+	return &result, false, submitErr
 }
 
 func (w Worker) cleanupPrepared(request JobRequest, prepared *PreparedWorkspace) error {

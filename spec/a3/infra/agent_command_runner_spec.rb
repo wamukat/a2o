@@ -74,6 +74,30 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     )
   end
 
+  it "emits runtime-side command job lifecycle diagnostics" do
+    client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :succeeded, 0)) }
+    runner = described_class.new(
+      control_plane_client: client,
+      runtime_profile: "docker-dev-env",
+      shared_workspace_mode: "same-path",
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_) {}
+    )
+
+    expect do
+      runner.run(["task test:all"], workspace: workspace, task: task, run: run, command_intent: :verification)
+    end.to output(
+      a_string_including(
+        "runtime_agent_command_event",
+        "\"stage\":\"enqueue_start\"",
+        "\"stage\":\"wait_done\"",
+        "\"job_id\":\"command-run-1-verification-job-1\"",
+        "\"command_intent\":\"verification\"",
+        "\"result_status\":\"succeeded\""
+      )
+    ).to_stderr
+  end
+
   it "returns agent result diagnostics when a verification command fails" do
     client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :failed, 1)) }
     runner = described_class.new(

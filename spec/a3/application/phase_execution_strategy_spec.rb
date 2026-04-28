@@ -244,6 +244,7 @@ RSpec.describe "phase execution strategies" do
       env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: task,
       run: implementation_run,
+      command_intent: :verification,
       worker_protocol_request: hash_including("command_intent" => "verification")
     ).ordered.and_return(verification_execution)
 
@@ -283,6 +284,7 @@ RSpec.describe "phase execution strategies" do
       env: hash_including("A2O_WORKER_REQUEST_PATH", "A2O_WORKSPACE_ROOT"),
       task: task,
       run: implementation_run,
+      command_intent: :verification,
       worker_protocol_request: hash_including("command_intent" => "verification")
     ).ordered.and_return(verification_execution)
 
@@ -329,7 +331,7 @@ RSpec.describe "phase execution strategies" do
       command_intent: :remediation,
       worker_protocol_request: anything
     )
-    expect(command_runner).not_to receive(:run).with(runtime.verification_commands, workspace: slot_workspace, env: anything, task: task, run: implementation_run, worker_protocol_request: anything)
+    expect(command_runner).not_to receive(:run).with(runtime.verification_commands, workspace: slot_workspace, env: anything, task: task, run: implementation_run, command_intent: :verification, worker_protocol_request: anything)
 
     result = strategy.execute(task: task, run: implementation_run, runtime: runtime, workspace: slot_workspace)
 

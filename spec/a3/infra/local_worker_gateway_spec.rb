@@ -863,7 +863,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     )
   end
 
-  it "fails fast when worker result identity fields do not match the worker request" do
+  it "canonicalizes worker result identity fields that do not match the worker request" do
     result_path = workspace.root_path.join(".a2o", "worker-result.json")
     invalid_bundle = {
       "task_ref" => task.ref,
@@ -896,16 +896,26 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     )
 
     expect(execution.success?).to be(false)
-    expect(execution.summary).to eq("worker result schema invalid")
-    expect(execution.failing_command).to eq("worker_result_schema")
-    expect(execution.observed_state).to eq("invalid_worker_result")
-    expect(execution.diagnostics).to eq(
-      "validation_errors" => [
-        "run_ref must match the worker request",
-        "phase must match the worker request"
-      ]
+    expect(execution.summary).to eq("review blocked")
+    expect(execution.failing_command).to eq("worker review")
+    expect(execution.observed_state).to eq("blocked_refresh_failure")
+    expect(execution.diagnostics).to include(
+      "stderr" => "refresh failed",
+      "canonicalized_identity" => {
+        "run_ref" => {
+          "provided" => "run-other",
+          "canonical" => run.ref
+        },
+        "phase" => {
+          "provided" => "review",
+          "canonical" => "implementation"
+        }
+      }
     )
-    expect(execution.response_bundle).to eq(invalid_bundle)
+    expect(execution.response_bundle).to include(
+      "run_ref" => run.ref,
+      "phase" => "implementation"
+    )
   end
 
   it "fails fast when a worker result bundle is present but violates the expected schema" do

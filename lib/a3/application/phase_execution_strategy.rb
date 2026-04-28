@@ -190,6 +190,7 @@ module A3
           env: command_context.fetch(:env),
           task: task,
           run: run,
+          command_intent: :verification,
           worker_protocol_request: command_context.fetch(:request)
         )
       end
