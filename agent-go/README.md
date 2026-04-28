@@ -14,7 +14,7 @@ go build -o /tmp/a2o ./cmd/a3
 For release-style builds:
 
 ```sh
-VERSION=0.5.49 ./scripts/build-release.sh
+VERSION=0.5.50 ./scripts/build-release.sh
 ```
 
 This writes binaries and release archives under `dist/` for:
@@ -27,11 +27,11 @@ This writes binaries and release archives under `dist/` for:
 Release output includes:
 
 - platform binary directories, for example `dist/linux-amd64/a2o-agent` and `dist/linux-amd64/a2o`; `a2o host install` writes public `a2o-*` launcher names from these binaries
-- archives, for example `dist/a2o-agent-0.5.49-linux-amd64.tar.gz`
+- archives, for example `dist/a2o-agent-0.5.50-linux-amd64.tar.gz`
 - `dist/checksums.txt`
 - `dist/release-manifest.jsonl`
 - `dist/package-compatibility.json`
-- `dist/a2o-agent-packages-0.5.49.tar.gz`
+- `dist/a2o-agent-packages-0.5.50.tar.gz`
 - `dist/package-publication.json` when `PACKAGE_ARCHIVES=1`
 
 Use `TARGETS="linux/amd64 darwin/arm64"` to build a subset. Set `PACKAGE_ARCHIVES=0` to build binaries only.
@@ -44,10 +44,10 @@ Before tagging a behavior-changing release, validate a local runtime image throu
 ```sh
 docker build \
   -f ../docker/a3-runtime/Dockerfile \
-  -t ghcr.io/wamukat/a2o-engine:0.5.49-local \
+  -t ghcr.io/wamukat/a2o-engine:0.5.50-local \
   ..
 
-VERSION=0.5.49 ./scripts/validation-local-rc-smoke.sh
+VERSION=0.5.50 ./scripts/validation-local-rc-smoke.sh
 ```
 
 The smoke exports the host launcher from the local image, creates a temporary project package with `runtime.phases.metrics.commands`, bootstraps an isolated runtime instance, runs `runtime up`, installs the agent, runs `doctor`, and checks `runtime image-digest`. Local images normally have no registry `RepoDigests`; the smoke expects `doctor` to accept the local image ID while still requiring the final GHCR digest check during publish.
@@ -77,14 +77,14 @@ By default this installs `a2o` and `a2o-agent` under `$HOME/.local/bin`. Public 
 Install from a release archive when Go is not required on the target host:
 
 ```sh
-./scripts/install-release.sh dist/a2o-agent-0.5.49-linux-amd64.tar.gz
+./scripts/install-release.sh dist/a2o-agent-0.5.50-linux-amd64.tar.gz
 ```
 
 Verify the release checksum before installing:
 
 ```sh
 CHECKSUM_FILE=dist/checksums.txt \
-./scripts/install-release.sh dist/a2o-agent-0.5.49-linux-amd64.tar.gz
+./scripts/install-release.sh dist/a2o-agent-0.5.50-linux-amd64.tar.gz
 ```
 
 The installer installs `a2o-agent`. It does not install legacy `a3-agent` aliases or OS service definitions. Standard A2O operation uses `a2o host install`, `a2o project bootstrap`, `a2o kanban ...`, `a2o agent install`, and `a2o runtime ...`.
@@ -99,11 +99,11 @@ Install the host launcher from a published A2O Engine image:
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share"
 docker run --rm \
   -v "$HOME/.local:/install" \
-  ghcr.io/wamukat/a2o-engine:0.5.49 \
+  ghcr.io/wamukat/a2o-engine:0.5.50 \
   a2o host install \
     --output-dir /install/bin \
     --share-dir /install/share/a2o \
-    --runtime-image ghcr.io/wamukat/a2o-engine:0.5.49
+    --runtime-image ghcr.io/wamukat/a2o-engine:0.5.50
 ```
 
 The container command copies platform binaries such as `a2o-darwin-amd64` and `a2o-linux-amd64`, copies A2O distribution assets such as the standard compose file under `$HOME/.local/share/a2o`, records the runtime image used by later `a2o kanban ...` commands, then writes a host-side `a2o` shell wrapper that selects the right binary with `uname`. Legacy `a3` launchers are not installed; existing files are removed during host install. Mount the install prefix, not only the `bin` directory, so the share assets are exported to the host. The host does not need Ruby.

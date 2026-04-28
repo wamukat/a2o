@@ -1,6 +1,6 @@
 # 現在の公開機能
 
-A2O 0.5.49 で現在利用できる公開機能と検証範囲を示す。
+A2O 0.5.50 で現在利用できる公開機能と検証範囲を示す。
 
 この文書は、リリース時点で「利用者に案内してよい機能」と「検証済みとして扱える範囲」を確認するための一覧である。導入手順を知りたい場合は [10-quickstart.md](10-quickstart.md)、設定項目を知りたい場合は [90-project-package-schema.md](90-project-package-schema.md) を読む。
 
@@ -16,13 +16,13 @@ A2O 0.5.49 で現在利用できる公開機能と検証範囲を示す。
 - ランタイムコンテナの起動・停止: `a2o runtime up`、`down`
 - 手動でのランタイム実行: `a2o runtime run-once`、`a2o runtime loop`
 - 常駐スケジューラの再開・停止予約・状態確認: `a2o runtime resume`、`pause`、`status`
-- ランタイム診断・復旧: `a2o runtime image-digest`、`doctor`、`watch-summary`、`logs [task-ref] --follow [--no-children]`、`describe-task <task-ref>`、`skill-feedback list`、`skill-feedback propose`、`reset-task <task-ref>`、`show-artifact <artifact-id>`
+- ランタイム診断・復旧: `a2o runtime image-digest`、`doctor`、`watch-summary`、`logs [task-ref] --follow [--no-children]`、`describe-task <task-ref>`、`skill-feedback list`、`skill-feedback propose`、`reset-task <task-ref>`、`force-stop-task <task-ref> --dangerous`、`force-stop-run <run-ref> --dangerous`、`show-artifact <artifact-id>`
 - 親タスクの log follow は、実行中の子タスクが完了して別の子または親タスク側へ処理が移っても、親グループを追跡し続ける。
 - `watch-summary` は review の rework / reject を `x` として表示し、後続の正常な review 完了後は成功 marker に戻す。
 - correction retry を使い切った invalid worker result は salvage 診断として保持されるため、operator は拒否された payload を失わずに確認できる。
 - review rework 後の implementation retry には、直前の review feedback が worker runtime context として渡される。
 - operator が付与した `blocked` label は phase 完了時にも保持され、runtime status publication によって暗黙に外されない。
-- parent review の clean success result は、worker が `review_disposition` を省略または一部だけ返しても completed disposition に正規化される。明示的に矛盾する disposition は引き続き拒否される。
+- parent review の clean success result は、worker が `review_disposition` を省略または一部だけ返しても completed disposition に正規化される。明示的に矛盾する disposition は引き続き拒否される。frozen worker payload でも、この正規化で scheduler がクラッシュしない。
 - multi-project runtime context の土台として、manual multi-project lifecycle command を有効化する前に、runtime storage、host log / workspace、scheduler pid / log file、temp file、branch namespace を解決済み project key ごとに分離する。
 - アップグレード診断: `a2o upgrade check`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
@@ -38,7 +38,7 @@ A2O 0.5.49 で現在利用できる公開機能と検証範囲を示す。
 - エージェント HTTP ワーカー境界。取得済みジョブの heartbeat を含む
 - エージェントが具体化するワークスペース方式
 - TypeScript、Go、Python、複数リポジトリタスクテンプレートの参照用プロダクトパッケージ
-- GHCR ランタイムイメージタグ: `latest`、`0.5.49`、`sha-*`
+- GHCR ランタイムイメージタグ: `latest`、`0.5.50`、`sha-*`
 - タグリリースでは `latest` も同時に公開する。そのため、公開完了後はリリース版タグと `latest` が同じランタイムイメージを指す前提で確認する。
 - ローカルリリース判定: RSpec 全体、release package doctor、local RC host smoke、および runtime 実行 / worker launcher / scheduler / Kanban / env generation 変更時の real-task local RC smoke
 
