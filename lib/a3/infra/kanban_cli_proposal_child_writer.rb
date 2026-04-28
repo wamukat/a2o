@@ -123,10 +123,14 @@ module A3
         if draft_mode?
           return [DRAFT_LABEL] unless created
 
-          ([DRAFT_LABEL] + labels.reject { |label| label == RUNNABLE_LABEL }).uniq
+          ([DRAFT_LABEL] + labels.reject { |label| trigger_label?(label) }).uniq
         else
           ([RUNNABLE_LABEL] + labels).uniq
         end
+      end
+
+      def trigger_label?(label)
+        label.to_s.start_with?("trigger:")
       end
 
       def proposal_labels(child)

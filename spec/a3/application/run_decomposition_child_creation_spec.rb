@@ -82,6 +82,7 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
       expect(evidence.fetch("child_refs_by_key")).to eq("child-key-1" => "A3-v2#5301")
       expect(evidence.fetch("source_ticket_summary")).to include("Decomposition draft child creation: completed")
       expect(evidence.fetch("source_ticket_summary")).to include("Accept: add trigger:auto-implement")
+      expect(evidence.fetch("source_ticket_summary")).to include("Parent automation: add trigger:auto-parent")
     end
   end
 

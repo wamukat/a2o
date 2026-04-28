@@ -120,6 +120,37 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     expect(client.comments.any? { |args| args.include?("task-comment-create") }).to be(true)
   end
 
+  it "creates non-runnable local draft children for a remote source without marking the source parent runnable" do
+    client = FakeProposalClient.new
+    writer = described_class.new(project: "Portal", client: client, mode: :draft)
+
+    result = writer.call(parent_task_ref: "wamukat/a2o#16", parent_external_task_id: 240, proposal_evidence: proposal_evidence)
+
+    expect(result.success?).to be(true)
+    expect(result.child_refs).to eq(["A3-v2#5301"])
+    expect(client.created.first.fetch("description")).to include("Parent: wamukat/a2o#16")
+    expect(client.labels.any? { |args| args.include?("a2o:draft-child") }).to be(true)
+    expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(false)
+    expect(client.labels.any? { |args| args.include?("trigger:auto-parent") }).to be(false)
+    expect(client.relations).to include(
+      array_including("task-relation-create", "--task-id", "240", "--other-task-id", "5301", "--relation-kind", "subtask")
+    )
+  end
+
+  it "filters proposed automation trigger labels from draft children" do
+    client = FakeProposalClient.new
+    writer = described_class.new(project: "Portal", client: client, mode: :draft)
+    payload = proposal_evidence
+    payload["proposal"]["children"].first["labels"] = ["repo:alpha", "trigger:auto-implement", "trigger:auto-parent"]
+
+    result = writer.call(parent_task_ref: "wamukat/a2o#16", parent_external_task_id: 240, proposal_evidence: payload)
+
+    expect(result.success?).to be(true)
+    expect(client.labels.any? { |args| args.include?("a2o:draft-child") }).to be(true)
+    expect(client.labels.any? { |args| args.include?("repo:alpha") }).to be(true)
+    expect(client.labels.any? { |args| args.any? { |value| value.to_s.start_with?("trigger:") } }).to be(false)
+  end
+
   it "reconciles draft children without overwriting existing edited content" do
     existing = [{ "id" => 5301, "ref" => "A3-v2#5301", "title" => "Human title", "description" => "Human body\nChild key: child-key-1" }]
     client = FakeProposalClient.new(existing: existing)

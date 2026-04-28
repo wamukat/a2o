@@ -153,7 +153,10 @@ module A3
         lines = ["Decomposition draft child creation: #{stage_state}"]
         lines << "Summary: #{summary}"
         lines << "Draft children: #{child_refs.empty? ? 'none' : child_refs.join(', ')}"
-        lines << "Accept: add trigger:auto-implement to a draft child when it is ready for implementation." if success == true
+        if success == true
+          lines << "Accept: add trigger:auto-implement to a draft child when it is ready for implementation."
+          lines << "Parent automation: add trigger:auto-parent to the source parent after accepted child work is ready."
+        end
         lines << "Evidence: #{evidence_path}"
         lines.join("\n")
       end
