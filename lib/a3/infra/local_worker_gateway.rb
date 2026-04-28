@@ -14,7 +14,7 @@ module A3
         @worker_protocol = worker_protocol
       end
 
-      def run(skill:, workspace:, task:, run:, phase_runtime:, task_packet:)
+      def run(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, prior_review_feedback: nil)
         result_path = @worker_protocol.result_path(workspace)
         FileUtils.rm_f(result_path)
         A3::Infra::WorkspaceTraceLogger.log(
@@ -33,7 +33,8 @@ module A3
           task: task,
           run: run,
           phase_runtime: phase_runtime,
-          task_packet: task_packet
+          task_packet: task_packet,
+          prior_review_feedback: prior_review_feedback
         )
         command = worker_command_for(skill)
         A3::Infra::WorkspaceTraceLogger.log(

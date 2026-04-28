@@ -155,8 +155,6 @@ RSpec.describe A3::Infra::KanbanCommandClient do
     expect(client.json_calls).to include(["task-label-list", "--project", "Sample", "--task-id", "42"])
     expect(client.json_calls).to include(["task-find", "--project", "Sample", "--query", "Sample#42|review-run-1|repo_beta|finding-contract"])
     expect(client.json_calls).to include(["task-relation-list", "--project", "Sample", "--task-id", "42"])
-    expect(client.command_calls).to include(["task-label-remove", "--project", "Sample", "--task-id", "42", "--label", "blocked"])
-    expect(client.command_calls).to include(["task-transition", "--project", "Sample", "--task-id", "42", "--status", "In progress"])
     expect(client.command_calls).to include(["task-label-add", "--project", "Sample", "--task-id", "42", "--label", "blocked"])
     expect(client.command_calls).to include(["task-transition", "--project", "Sample", "--task-id", "42", "--status", "To do"])
     expect(client.command_calls).to include(["label-ensure", "--project", "Sample", "--title", "repo:ui-app"])

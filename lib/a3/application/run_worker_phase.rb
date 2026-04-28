@@ -14,7 +14,8 @@ module A3
         @strategy = A3::Application::WorkerPhaseExecutionStrategy.new(
           worker_gateway: worker_gateway,
           task_packet_builder: task_packet_builder,
-          workspace_change_publisher: workspace_change_publisher
+          workspace_change_publisher: workspace_change_publisher,
+          run_repository: run_repository
         )
         @flow = A3::Application::PhaseExecutionFlow.new(
           task_repository: task_repository,

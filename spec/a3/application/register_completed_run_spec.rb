@@ -16,7 +16,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
   let(:task_repository) { A3::Infra::InMemoryTaskRepository.new }
   let(:run_repository) { A3::Infra::InMemoryRunRepository.new }
   let(:plan_next_phase) { A3::Application::PlanNextPhase.new }
-  let(:status_publisher) { instance_double(A3::Infra::NullExternalTaskStatusPublisher, publish: nil) }
+  let(:status_publisher) { instance_double(A3::Infra::NullExternalTaskStatusPublisher, publish: nil, blocked?: false) }
   let(:activity_publisher) { instance_double("ExternalTaskActivityPublisher", publish: nil) }
   let(:handle_parent_review_disposition) { nil }
   let(:integration_ref_readiness_checker) { instance_double(A3::Infra::IntegrationRefReadinessChecker, check: readiness_result) }
@@ -107,6 +107,35 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(result.task.status).to eq(:verifying)
     expect(result.task.current_run_ref).to be_nil
     expect(result.run.terminal_outcome).to eq(:completed)
+  end
+
+  it "stops phase advancement when the external task has an operator blocked label" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :in_progress,
+      current_run_ref: "run-1",
+      external_task_id: 3025
+    )
+    task_repository.save(task)
+    run_repository.save(
+      run.append_phase_evidence(
+        phase: run.phase,
+        source_descriptor: run.source_descriptor,
+        scope_snapshot: run.scope_snapshot,
+        execution_record: implementation_execution_record
+      )
+    )
+
+    allow(status_publisher).to receive(:blocked?).with(task_ref: task.ref, external_task_id: 3025).and_return(true)
+    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :blocked, task_kind: :child)
+
+    result = use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :completed)
+
+    expect(result.task.status).to eq(:blocked)
+    expect(result.task.current_run_ref).to be_nil
+    expect(result.run.terminal_outcome).to eq(:blocked)
   end
 
   it "moves a blocked review run to blocked" do

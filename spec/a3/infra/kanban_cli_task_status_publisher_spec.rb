@@ -213,7 +213,7 @@ RSpec.describe A3::Infra::KanbanCliTaskStatusPublisher do
     )
   end
 
-  it "clears a stale blocked label before transitioning back to an active status" do
+  it "preserves an operator blocked label instead of transitioning back to an active status" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,
       snapshots: [
@@ -238,9 +238,32 @@ RSpec.describe A3::Infra::KanbanCliTaskStatusPublisher do
     end
 
     transitions = read_fake_kanban_transitions(fake_cli.fetch(:transitions_path))
-    expect(transitions.size).to eq(2)
-    expect(transitions.fetch(0).fetch("argv")).to include("task-label-remove", "--task-id", "5002", "--label", "blocked")
-    expect(transitions.fetch(1).fetch("argv")).to include("task-transition", "--task-id", "5002", "--status", "In progress")
+    expect(transitions).to be_empty
+  end
+
+  it "reports whether the external task currently has a blocked label" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 5022,
+          "ref" => "Sample#5022",
+          "status" => "To do",
+          "labels" => ["repo:ui-app", "blocked"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    publisher = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      expect(publisher.blocked?(task_ref: "Sample#5022")).to eq(true)
+    end
   end
 
   it "clears stale clarification labels before transitioning back to an active status" do

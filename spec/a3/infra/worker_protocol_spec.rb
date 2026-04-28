@@ -137,6 +137,31 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
+  it "embeds prior review feedback in phase_runtime when provided" do
+    protocol = described_class.new
+    request_form = protocol.request_form(
+      skill: phase_runtime.implementation_skill,
+      workspace: workspace,
+      task: task,
+      run: run,
+      phase_runtime: phase_runtime,
+      task_packet: task_packet,
+      prior_review_feedback: {
+        "run_ref" => "run-review-1",
+        "summary" => "Review found missing assertion coverage.",
+        "observed_state" => "Only the happy path is asserted."
+      }
+    )
+
+    expect(request_form.fetch("phase_runtime")).to include(
+      "prior_review_feedback" => {
+        "run_ref" => "run-review-1",
+        "summary" => "Review found missing assertion coverage.",
+        "observed_state" => "Only the happy path is asserted."
+      }
+    )
+  end
+
   it "normalizes project repo labels in review_disposition repo_scope" do
     result = described_class.new(
       repo_scope_aliases: { "repo:both" => "both" },

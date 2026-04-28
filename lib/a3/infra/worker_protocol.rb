@@ -30,8 +30,10 @@ module A3
         }.merge(workspace_automation_env(workspace_root))
       end
 
-      def request_form(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, command_intent: nil)
+      def request_form(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, command_intent: nil, prior_review_feedback: nil)
         review_target = run.evidence.review_target
+        phase_runtime_form = phase_runtime.worker_request_form
+        phase_runtime_form = phase_runtime_form.merge("prior_review_feedback" => prior_review_feedback) if prior_review_feedback
         payload = {
           "task_ref" => task.ref,
           "run_ref" => run.ref,
@@ -61,18 +63,18 @@ module A3
             "task_ref" => review_target.task_ref,
             "phase_ref" => review_target.phase_ref.to_s
           },
-          "phase_runtime" => phase_runtime.worker_request_form,
+          "phase_runtime" => phase_runtime_form,
           "slot_paths" => workspace.slot_paths.transform_keys(&:to_s).transform_values(&:to_s)
         }
         payload["command_intent"] = command_intent.to_s if command_intent
         payload
       end
 
-      def write_request(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, command_intent: nil)
+      def write_request(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, command_intent: nil, prior_review_feedback: nil)
         request_dir = metadata_dir(workspace)
         FileUtils.mkdir_p(request_dir)
         request_dir.join("worker-request.json").write(
-          JSON.pretty_generate(request_form(skill: skill, workspace: workspace, task: task, run: run, phase_runtime: phase_runtime, task_packet: task_packet, command_intent: command_intent))
+          JSON.pretty_generate(request_form(skill: skill, workspace: workspace, task: task, run: run, phase_runtime: phase_runtime, task_packet: task_packet, command_intent: command_intent, prior_review_feedback: prior_review_feedback))
         )
       end
 

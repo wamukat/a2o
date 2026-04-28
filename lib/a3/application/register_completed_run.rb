@@ -23,11 +23,12 @@ module A3
       def call(task_ref:, run_ref:, outcome:, execution: nil, phase_runtime: nil)
         task = @task_repository.fetch(task_ref)
         run = @run_repository.fetch(run_ref)
-        disposition_result = resolve_parent_review_disposition(task: task, run: run, execution: execution, outcome: outcome)
+        operator_blocked = external_task_blocked?(task)
+        disposition_result = operator_blocked ? nil : resolve_parent_review_disposition(task: task, run: run, execution: execution, outcome: outcome)
         return disposition_result if disposition_result
 
         artifact_violation = artifact_contract_violation?(task: task, run: run, outcome: outcome)
-        terminal_outcome = artifact_violation ? :blocked : outcome
+        terminal_outcome = (artifact_violation || operator_blocked) ? :blocked : outcome
         phase_result = @plan_next_phase.call(task: task, run: run, outcome: terminal_outcome, phase_runtime: phase_runtime)
         completed_run = completed_run_for(task: task, run: run, outcome: terminal_outcome, artifact_violation: artifact_violation)
         completed_task = task.complete_run(
@@ -66,6 +67,15 @@ module A3
           kwargs[:status_details] = reason_payload.fetch(:details) if reason_payload.fetch(:details)
         end
         @publish_external_task_status.publish(**kwargs)
+      end
+
+      def external_task_blocked?(task)
+        return false unless @publish_external_task_status&.respond_to?(:blocked?)
+
+        @publish_external_task_status.blocked?(
+          task_ref: task.ref,
+          external_task_id: task.external_task_id
+        )
       end
 
       def external_status_reason_payload(run)

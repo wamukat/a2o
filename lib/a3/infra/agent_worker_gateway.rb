@@ -26,10 +26,10 @@ module A3
         @agent_environment = agent_environment
       end
 
-      def run(skill:, workspace:, task:, run:, phase_runtime:, task_packet:)
+      def run(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, prior_review_feedback: nil)
         return invalid_configuration_result("worker_command must be provided") if @worker_command.empty?
-        return run_same_path(skill: skill, workspace: workspace, task: task, run: run, phase_runtime: phase_runtime, task_packet: task_packet) if @shared_workspace_mode == "same-path"
-        return run_agent_materialized(skill: skill, workspace: workspace, task: task, run: run, phase_runtime: phase_runtime, task_packet: task_packet) if @shared_workspace_mode == "agent-materialized"
+        return run_same_path(skill: skill, workspace: workspace, task: task, run: run, phase_runtime: phase_runtime, task_packet: task_packet, prior_review_feedback: prior_review_feedback) if @shared_workspace_mode == "same-path"
+        return run_agent_materialized(skill: skill, workspace: workspace, task: task, run: run, phase_runtime: phase_runtime, task_packet: task_packet, prior_review_feedback: prior_review_feedback) if @shared_workspace_mode == "agent-materialized"
 
         unsupported_workspace_result
       end
@@ -51,7 +51,7 @@ module A3
               "removed A3 root utility input: environment variable A3_ROOT_DIR; migration_required=true replacement=environment variable A2O_ROOT_DIR"
       end
 
-      def run_same_path(skill:, workspace:, task:, run:, phase_runtime:, task_packet:)
+      def run_same_path(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, prior_review_feedback:)
         result_path = @worker_protocol.result_path(workspace)
         FileUtils.rm_f(result_path)
         log_request_start(workspace: workspace, task: task, run: run, skill: skill)
@@ -61,7 +61,8 @@ module A3
           task: task,
           run: run,
           phase_runtime: phase_runtime,
-          task_packet: task_packet
+          task_packet: task_packet,
+          prior_review_feedback: prior_review_feedback
         )
 
         request = build_job_request(workspace: workspace, task: task, run: run)
@@ -91,7 +92,7 @@ module A3
         @worker_protocol.missing_result
       end
 
-      def run_agent_materialized(skill:, workspace:, task:, run:, phase_runtime:, task_packet:)
+      def run_agent_materialized(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, prior_review_feedback:)
         return invalid_configuration_result("workspace_request_builder must be provided for agent-materialized mode") unless @workspace_request_builder
 
         log_request_start(workspace: workspace, task: task, run: run, skill: skill)
@@ -106,7 +107,8 @@ module A3
             task: task,
             run: run,
             phase_runtime: phase_runtime,
-            task_packet: task_packet
+            task_packet: task_packet,
+            prior_review_feedback: prior_review_feedback
           )
         )
         log_agent_job_event("enqueue_start", request: request, skill: skill)

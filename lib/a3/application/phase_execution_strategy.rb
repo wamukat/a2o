@@ -3,10 +3,11 @@
 module A3
   module Application
     class WorkerPhaseExecutionStrategy
-      def initialize(worker_gateway:, task_packet_builder:, workspace_change_publisher: A3::Infra::DisabledWorkspaceChangePublisher.new)
+      def initialize(worker_gateway:, task_packet_builder:, workspace_change_publisher: A3::Infra::DisabledWorkspaceChangePublisher.new, run_repository: nil)
         @worker_gateway = worker_gateway
         @task_packet_builder = task_packet_builder
         @workspace_change_publisher = workspace_change_publisher
+        @run_repository = run_repository
       end
 
       def execute(task:, run:, runtime:, workspace:)
@@ -16,7 +17,8 @@ module A3
           task: task,
           run: run,
           phase_runtime: runtime,
-          task_packet: @task_packet_builder.call(task: task)
+          task_packet: @task_packet_builder.call(task: task),
+          prior_review_feedback: prior_review_feedback_for(task: task, run: run)
         )
         execution = append_worker_response_bundle(execution)
         return execution unless execution.success?
@@ -100,6 +102,35 @@ module A3
         else
           raise A3::Domain::InvalidPhaseError, "worker phase unsupported for #{phase}"
         end
+      end
+
+      def prior_review_feedback_for(task:, run:)
+        return nil unless @run_repository
+        return nil unless run.phase.to_sym == :implementation
+
+        review_run = @run_repository.all.reverse.find do |candidate|
+          candidate.task_ref == task.ref &&
+            candidate.phase.to_sym == :review &&
+            candidate.terminal_outcome == :rework
+        end
+        return nil unless review_run
+
+        execution_record = review_run.phase_records.reverse
+          .find { |record| record.phase.to_sym == :review && record.execution_record }
+          &.execution_record
+        return nil unless execution_record
+
+        feedback = {
+          "run_ref" => review_run.ref,
+          "phase" => "review",
+          "summary" => execution_record.summary,
+          "observed_state" => execution_record.observed_state,
+          "failing_command" => execution_record.failing_command
+        }.compact
+        feedback["review_disposition"] = execution_record.review_disposition if execution_record.review_disposition
+        worker_response = execution_record.diagnostics["worker_response_bundle"] if execution_record.diagnostics.is_a?(Hash)
+        feedback["worker_response_bundle"] = worker_response if worker_response.is_a?(Hash)
+        feedback
       end
     end
 

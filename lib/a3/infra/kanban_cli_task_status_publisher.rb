@@ -35,21 +35,26 @@ module A3
           return nil
         end
 
+        return nil if blocked_label_present?(task_id)
+
         if normalized_status == :needs_clarification
-          remove_blocked_label(task_id)
           add_clarification_label(task_id, reason: status_reason, details: status_details)
           target_status = STATUS_MAP.fetch(:needs_clarification)
           run_command("task-transition", "--project", @project, "--task-id", task_id.to_s, "--status", target_status)
           return nil
         end
 
-        remove_blocked_label(task_id)
         remove_clarification_label(task_id)
 
         target_status = STATUS_MAP[normalized_status]
         return nil unless target_status
 
         run_command("task-transition", "--project", @project, "--task-id", task_id.to_s, "--status", target_status)
+      end
+
+      def blocked?(task_ref:, external_task_id: nil)
+        task_id = resolve_task_id(task_ref, external_task_id: external_task_id)
+        blocked_label_present?(task_id)
       end
 
       private

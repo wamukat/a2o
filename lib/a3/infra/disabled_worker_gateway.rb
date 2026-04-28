@@ -3,11 +3,12 @@
 module A3
   module Infra
     class DisabledWorkerGateway
-      def run(skill:, workspace:, task:, run:, phase_runtime:, task_packet:)
+      def run(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, prior_review_feedback: nil)
         skill
         workspace
         phase_runtime
         task_packet
+        prior_review_feedback
         A3::Application::ExecutionResult.new(
           success: false,
           summary: "worker phase must be executed by a2o-agent; configure --worker-gateway agent-http",

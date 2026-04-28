@@ -208,6 +208,76 @@ RSpec.describe A3::Application::RunWorkerPhase do
     )
   end
 
+  it "passes the latest review rework feedback into the retried implementation request" do
+    review_rework_run = A3::Domain::Run.new(
+      ref: "run-review-rework-1",
+      task_ref: task.ref,
+      phase: :review,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :branch_head,
+        ref: "refs/heads/a2o/work/3025",
+        task_ref: task.ref
+      ),
+      scope_snapshot: run.scope_snapshot,
+      review_target: A3::Domain::ReviewTarget.new(
+        base_commit: "base123",
+        head_commit: "head456",
+        task_ref: task.ref,
+        phase_ref: :review
+      ),
+      artifact_owner: run.artifact_owner,
+      terminal_outcome: :rework
+    ).append_phase_evidence(
+      phase: :review,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :branch_head,
+        ref: "refs/heads/a2o/work/3025",
+        task_ref: task.ref
+      ),
+      scope_snapshot: run.scope_snapshot,
+      execution_record: A3::Domain::PhaseExecutionRecord.new(
+        summary: "Review found missing assertion coverage.",
+        failing_command: nil,
+        observed_state: "Only the happy path is asserted.",
+        diagnostics: {
+          "worker_response_bundle" => {
+            "success" => false,
+            "summary" => "Review found missing assertion coverage.",
+            "observed_state" => "Only the happy path is asserted.",
+            "rework_required" => true
+          }
+        }
+      )
+    )
+    run_repository.save(review_rework_run)
+    allow(prepare_workspace).to receive(:call).and_return(
+      A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
+    )
+    allow(worker_gateway).to receive(:run).with(
+      hash_including(
+        skill: "skills/implementation/base.md",
+        task: task,
+        run: run,
+        prior_review_feedback: hash_including(
+          "run_ref" => "run-review-rework-1",
+          "phase" => "review",
+          "summary" => "Review found missing assertion coverage.",
+          "observed_state" => "Only the happy path is asserted.",
+          "worker_response_bundle" => hash_including("rework_required" => true)
+        )
+      )
+    ).and_return(
+      A3::Application::ExecutionResult.new(success: true, summary: "implementation reworked")
+    )
+
+    use_case.call(task_ref: task.ref, run_ref: run.ref, project_context: project_context)
+
+    expect(worker_gateway).to have_received(:run)
+  end
+
   it "skips Engine workspace preparation when the worker gateway owns workspace materialization" do
     allow(worker_gateway).to receive(:agent_owned_workspace?).and_return(true)
     allow(worker_gateway).to receive(:agent_owned_publication?).and_return(true)

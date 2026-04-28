@@ -114,6 +114,7 @@ def bundle_for(request)
   if phase == "implementation"
     instruction << " For implementation success, make the required code change, leave git staging/commit publication to the outer A2O runtime, and include changed_files keyed by slot name with relative paths to publish."
     instruction << " After you finish implementation, perform a final self-review before returning. When that self-review is clean, include review_disposition with kind=completed so the outer runtime can preserve review evidence without a separate review phase."
+    instruction << " If request.phase_runtime.prior_review_feedback is present, treat it as mandatory rework input from the previous review and directly address each finding before returning."
   elsif phase == "review"
     if request.dig("phase_runtime", "task_kind").to_s == "parent"
       instruction << " For parent review, include review_disposition unless you return clarification_request. Use kind=completed when review is clean, kind=follow_up_child with a configured slot repo_scope for code follow-up, and kind=blocked with repo_scope unresolved when the finding should block the parent. Use clarification_request instead when the finding needs requester input rather than code follow-up or technical blocking. Valid repo_scope values for this request: #{review_scopes.join(', ')}. Parent review must not rely on rework_required routing."
