@@ -271,6 +271,8 @@ module A3
       end
 
       def log_agent_job_event(stage, request:, command_intent:, state: nil, result_status: nil)
+        return unless agent_job_trace_enabled?
+
         warn(
           "runtime_agent_command_event " + JSON.generate(
             {
@@ -290,6 +292,10 @@ module A3
         )
       rescue StandardError => e
         warn("runtime_agent_command_event stage=#{stage} job_id=#{request.job_id} log_error=#{e.class}:#{e.message}")
+      end
+
+      def agent_job_trace_enabled?
+        ENV.fetch("A2O_RUNTIME_AGENT_JOB_TRACE", "").strip == "1"
       end
     end
   end

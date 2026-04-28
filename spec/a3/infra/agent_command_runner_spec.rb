@@ -74,7 +74,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     )
   end
 
-  it "emits runtime-side command job lifecycle diagnostics" do
+  it "does not emit runtime-side command job lifecycle diagnostics by default" do
     client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :succeeded, 0)) }
     runner = described_class.new(
       control_plane_client: client,
@@ -86,16 +86,33 @@ RSpec.describe A3::Infra::AgentCommandRunner do
 
     expect do
       runner.run(["task test:all"], workspace: workspace, task: task, run: run, command_intent: :verification)
-    end.to output(
-      a_string_including(
-        "runtime_agent_command_event",
-        "\"stage\":\"enqueue_start\"",
-        "\"stage\":\"wait_done\"",
-        "\"job_id\":\"command-run-1-verification-job-1\"",
-        "\"command_intent\":\"verification\"",
-        "\"result_status\":\"succeeded\""
-      )
-    ).to_stderr
+    end.not_to output(a_string_including("runtime_agent_command_event")).to_stderr
+  end
+
+  it "emits runtime-side command job lifecycle diagnostics when trace is enabled" do
+    client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :succeeded, 0)) }
+    runner = described_class.new(
+      control_plane_client: client,
+      runtime_profile: "docker-dev-env",
+      shared_workspace_mode: "same-path",
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_) {}
+    )
+
+    with_env("A2O_RUNTIME_AGENT_JOB_TRACE" => "1") do
+      expect do
+        runner.run(["task test:all"], workspace: workspace, task: task, run: run, command_intent: :verification)
+      end.to output(
+        a_string_including(
+          "runtime_agent_command_event",
+          "\"stage\":\"enqueue_start\"",
+          "\"stage\":\"wait_done\"",
+          "\"job_id\":\"command-run-1-verification-job-1\"",
+          "\"command_intent\":\"verification\"",
+          "\"result_status\":\"succeeded\""
+        )
+      ).to_stderr
+    end
   end
 
   it "returns agent result diagnostics when a verification command fails" do
@@ -476,5 +493,15 @@ RSpec.describe A3::Infra::AgentCommandRunner do
       worker_protocol_result: worker_protocol_result,
       heartbeat: "2026-04-11T08:00:01Z"
     )
+  end
+
+  def with_env(values)
+    previous = values.to_h { |key, _value| [key, ENV.fetch(key, nil)] }
+    values.each { |key, value| ENV[key] = value }
+    yield
+  ensure
+    previous.each do |key, value|
+      value.nil? ? ENV.delete(key) : ENV[key] = value
+    end
   end
 end

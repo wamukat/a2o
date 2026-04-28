@@ -125,6 +125,41 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     expect(execution.response_bundle.fetch("changed_files")).to eq({})
   end
 
+  it "does not emit runtime-side worker job lifecycle diagnostics by default" do
+    client.on_fetch = lambda do |job_id|
+      workspace.root_path.join(".a2o", "worker-result.json").write(JSON.generate(worker_success))
+      client.complete(job_id, agent_result(job_id, :succeeded, 0))
+    end
+    gateway = gateway_for(client)
+
+    expect do
+      run_gateway(gateway)
+    end.not_to output(a_string_including("runtime_agent_worker_event")).to_stderr
+  end
+
+  it "emits runtime-side worker job lifecycle diagnostics when trace is enabled" do
+    client.on_fetch = lambda do |job_id|
+      workspace.root_path.join(".a2o", "worker-result.json").write(JSON.generate(worker_success))
+      client.complete(job_id, agent_result(job_id, :succeeded, 0))
+    end
+    gateway = gateway_for(client)
+
+    with_env("A2O_RUNTIME_AGENT_JOB_TRACE" => "1") do
+      expect do
+        run_gateway(gateway)
+      end.to output(
+        a_string_including(
+          "runtime_agent_worker_event",
+          "\"stage\":\"enqueue_start\"",
+          "\"stage\":\"wait_done\"",
+          "\"job_id\":\"worker-run-1-implementation-job-1\"",
+          "\"skill\":\"task implementation\"",
+          "\"result_status\":\"succeeded\""
+        )
+      ).to_stderr
+    end
+  end
+
   it "requires a worker result when an agent job succeeds" do
     client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :succeeded, 0)) }
     gateway = gateway_for(client)
@@ -834,6 +869,16 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       raise "condition was not met within #{timeout_seconds}s" if Time.now >= deadline
 
       sleep 0.02
+    end
+  end
+
+  def with_env(values)
+    previous = values.to_h { |key, _value| [key, ENV.fetch(key, nil)] }
+    values.each { |key, value| ENV[key] = value }
+    yield
+  ensure
+    previous.each do |key, value|
+      value.nil? ? ENV.delete(key) : ENV[key] = value
     end
   end
 
