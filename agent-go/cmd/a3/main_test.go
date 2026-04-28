@@ -5573,6 +5573,69 @@ func TestRuntimeLogsFollowParentSelectsActiveChildUnlessNoChildren(t *testing.T)
 	}
 }
 
+func TestRuntimeLogsFollowParentReResolvesAfterChildCompletes(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		runtimeLogTargetsOutputs: []string{
+			`{"requested_task_ref":"Sample#41","selected_task_ref":"","dynamic_follow":true,"candidates":[{"task_ref":"Sample#42","run_ref":"run-child","phase":"implementation","kind":"child","parent_ref":"Sample#41"}]}`,
+			`{"requested_task_ref":"Sample#41","selected_task_ref":"Sample#41","dynamic_follow":true,"candidates":[]}`,
+			`{"requested_task_ref":"Sample#41","selected_task_ref":"Sample#41","dynamic_follow":true,"candidates":[]}`,
+		},
+		logManifestOutputs: []string{
+			`{"run_ref":"run-child","current_run":"run-child","phase":"implementation","source_type":"detached_commit","source_ref":"child","task_status":"in_progress","active":true,"live_mode":"ai-raw-log","artifacts":[]}`,
+			`{"run_ref":"run-child","current_run":"run-child","phase":"implementation","source_type":"detached_commit","source_ref":"child","task_status":"Done","active":false,"live_mode":"ai-raw-log","artifacts":[]}`,
+			`{"run_ref":"run-parent","current_run":"run-parent","phase":"review","source_type":"detached_commit","source_ref":"parent","task_status":"In review","active":true,"live_mode":"ai-raw-log","artifacts":[]}`,
+			`{"run_ref":"run-parent","current_run":"run-parent","phase":"review","source_type":"detached_commit","source_ref":"parent","task_status":"Done","active":false,"live_mode":"ai-raw-log","artifacts":[]}`,
+		},
+	}
+	childLiveRoot := filepath.Join(tempDir, runtimeHostAgentRelativePath, "ai-raw-logs", "Sample-42")
+	if err := os.MkdirAll(childLiveRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(childLiveRoot, "implementation.log"), []byte("child live output\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	parentLiveRoot := filepath.Join(tempDir, runtimeHostAgentRelativePath, "ai-raw-logs", "Sample-41")
+	if err := os.MkdirAll(parentLiveRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(parentLiveRoot, "review.log"), []byte("parent runner output\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		if err := runRuntimeLogs([]string{"--follow", "--poll-interval", "1ms", "Sample#41"}, runner, &stdout, io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	output := stdout.String()
+	if !strings.Contains(output, "=== phase: implementation (ai-raw-live) task=Sample#42 run=run-child") || !strings.Contains(output, "child live output") {
+		t.Fatalf("runtime logs should start by following active child, got:\n%s", output)
+	}
+	if !strings.Contains(output, "=== switching: task=Sample#42 -> task=Sample#41 ===") {
+		t.Fatalf("runtime logs should announce parent follow target switch, got:\n%s", output)
+	}
+	if !strings.Contains(output, "=== phase: review (ai-raw-live) task=Sample#41 run=run-parent") || !strings.Contains(output, "parent runner output") {
+		t.Fatalf("runtime logs should continue with parent stream after child completion, got:\n%s", output)
+	}
+}
+
 func TestRuntimeLogsFollowWaitsAcrossPhaseTransition(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -8057,6 +8120,7 @@ type fakeRunner struct {
 	logManifestOutput        string
 	logManifestOutputs       []string
 	runtimeLogTargetsOutput  string
+	runtimeLogTargetsOutputs []string
 	watchSummaryOutput       string
 	taskStatus               string
 	hostAgentOutput          string
@@ -8192,6 +8256,11 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "runtime_latest_run"):
 		return []byte("runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation state=terminal outcome=blocked\n"), nil
 	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "requested_task_ref"):
+		if len(r.runtimeLogTargetsOutputs) > 0 {
+			output := r.runtimeLogTargetsOutputs[0]
+			r.runtimeLogTargetsOutputs = r.runtimeLogTargetsOutputs[1:]
+			return []byte(output + "\n"), nil
+		}
 		if r.runtimeLogTargetsOutput != "" {
 			return []byte(r.runtimeLogTargetsOutput + "\n"), nil
 		}

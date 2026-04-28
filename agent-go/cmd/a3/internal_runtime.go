@@ -1452,12 +1452,15 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 		if err != nil {
 			return err
 		}
+		requestedTaskRef := taskRef
+		dynamicFollow := false
 		if *follow {
-			resolvedTaskRef, err := resolveRuntimeLogsFollowTaskRef(effectiveConfig, plan, runner, stderr, taskRef, *index, *noChildren)
+			resolvedTarget, err := resolveRuntimeLogsFollowTarget(effectiveConfig, plan, runner, stderr, requestedTaskRef, *index, *noChildren)
 			if err != nil {
 				return err
 			}
-			taskRef = resolvedTaskRef
+			taskRef = resolvedTarget.TaskRef
+			dynamicFollow = resolvedTarget.Dynamic
 		} else if err := validateRuntimeLogsTaskRef(effectiveConfig, plan, runner, taskRef); err != nil {
 			return err
 		}
@@ -1508,6 +1511,23 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 			}
 			if !manifest.Active || manifest.CurrentRunRef == "" || manifest.CurrentPhase == "" {
 				if !runtimeLogsShouldKeepFollowing(manifest.TaskStatus) {
+					if dynamicFollow {
+						resolvedTarget, err := resolveRuntimeLogsFollowTarget(effectiveConfig, plan, runner, stderr, requestedTaskRef, -1, *noChildren)
+						if err != nil {
+							if strings.TrimSpace(requestedTaskRef) == "" && strings.Contains(err.Error(), "no running task found for --follow") {
+								return nil
+							}
+							return err
+						}
+						nextTaskRef := strings.TrimSpace(resolvedTarget.TaskRef)
+						if nextTaskRef != "" && nextTaskRef != taskRef {
+							fmt.Fprintf(stdout, "=== switching: task=%s -> task=%s ===\n", taskRef, nextTaskRef)
+							taskRef = nextTaskRef
+							lastLiveKey = ""
+							lastWaitingKey = ""
+							continue
+						}
+					}
 					return nil
 				}
 				waitingKey := manifest.TaskStatus + "|" + manifest.CurrentRunRef + "|" + manifest.CurrentPhase
@@ -1578,46 +1598,60 @@ type runtimeLogFollowTarget struct {
 type runtimeLogFollowTargetPayload struct {
 	RequestedTaskRef string                   `json:"requested_task_ref"`
 	SelectedTaskRef  string                   `json:"selected_task_ref"`
+	DynamicFollow    bool                     `json:"dynamic_follow"`
 	Candidates       []runtimeLogFollowTarget `json:"candidates"`
 }
 
+type resolvedRuntimeLogsFollowTarget struct {
+	TaskRef string
+	Dynamic bool
+}
+
 func resolveRuntimeLogsFollowTaskRef(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stderr io.Writer, requestedTaskRef string, index int, noChildren bool) (string, error) {
-	payload, err := runtimeLogsFollowTargets(config, plan, runner, requestedTaskRef, noChildren)
+	target, err := resolveRuntimeLogsFollowTarget(config, plan, runner, stderr, requestedTaskRef, index, noChildren)
 	if err != nil {
 		return "", err
+	}
+	return target.TaskRef, nil
+}
+
+func resolveRuntimeLogsFollowTarget(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stderr io.Writer, requestedTaskRef string, index int, noChildren bool) (resolvedRuntimeLogsFollowTarget, error) {
+	payload, err := runtimeLogsFollowTargets(config, plan, runner, requestedTaskRef, noChildren)
+	if err != nil {
+		return resolvedRuntimeLogsFollowTarget{}, err
 	}
 	selected := strings.TrimSpace(payload.SelectedTaskRef)
 	if index >= 0 {
 		if len(payload.Candidates) == 0 && selected != "" {
-			return selected, nil
+			return resolvedRuntimeLogsFollowTarget{TaskRef: selected, Dynamic: payload.DynamicFollow}, nil
 		}
 		if index >= len(payload.Candidates) {
 			printRuntimeLogsFollowCandidates(stderr, payload.Candidates)
-			return "", fmt.Errorf("--index %d is out of range for %d running task(s)", index, len(payload.Candidates))
+			return resolvedRuntimeLogsFollowTarget{}, fmt.Errorf("--index %d is out of range for %d running task(s)", index, len(payload.Candidates))
 		}
 		selected := strings.TrimSpace(payload.Candidates[index].TaskRef)
 		if selected == "" {
-			return "", fmt.Errorf("selected running task has empty task ref")
+			return resolvedRuntimeLogsFollowTarget{}, fmt.Errorf("selected running task has empty task ref")
 		}
-		return selected, nil
+		return resolvedRuntimeLogsFollowTarget{TaskRef: selected, Dynamic: payload.DynamicFollow}, nil
 	}
 	if selected != "" {
-		return selected, nil
+		return resolvedRuntimeLogsFollowTarget{TaskRef: selected, Dynamic: payload.DynamicFollow}, nil
 	}
 	if len(payload.Candidates) == 1 {
 		selected = strings.TrimSpace(payload.Candidates[0].TaskRef)
 		if selected != "" {
-			return selected, nil
+			return resolvedRuntimeLogsFollowTarget{TaskRef: selected, Dynamic: payload.DynamicFollow}, nil
 		}
 	}
 	if len(payload.Candidates) > 1 {
 		printRuntimeLogsFollowCandidates(stderr, payload.Candidates)
-		return "", fmt.Errorf("multiple running tasks match; pass --index N to select one")
+		return resolvedRuntimeLogsFollowTarget{}, fmt.Errorf("multiple running tasks match; pass --index N to select one")
 	}
 	if strings.TrimSpace(requestedTaskRef) != "" {
-		return strings.TrimSpace(requestedTaskRef), nil
+		return resolvedRuntimeLogsFollowTarget{TaskRef: strings.TrimSpace(requestedTaskRef), Dynamic: payload.DynamicFollow}, nil
 	}
-	return "", fmt.Errorf("no running task found for --follow")
+	return resolvedRuntimeLogsFollowTarget{}, fmt.Errorf("no running task found for --follow")
 }
 
 func printRuntimeLogsFollowCandidates(stderr io.Writer, candidates []runtimeLogFollowTarget) {
@@ -1654,16 +1688,19 @@ func runtimeLogsFollowTargets(config runtimeInstanceConfig, plan runtimeRunOnceP
 		"end.sort_by { |item| [item['task_ref'], item['run_ref']] }",
 		"selected = ''",
 		"candidates = []",
+		"dynamic_follow = false",
 		"if requested.empty?",
 		"  candidates = targets",
+		"  dynamic_follow = true",
 		"elsif (task = tasks[requested]) && task['kind'].to_s == 'parent' && !no_children",
 		"  child_refs = Array(task['child_refs']).map(&:to_s)",
 		"  candidates = targets.select { |item| child_refs.include?(item['task_ref']) || item['parent_ref'] == requested }",
 		"  selected = requested if candidates.empty?",
+		"  dynamic_follow = true",
 		"else",
 		"  selected = requested",
 		"end",
-		"puts JSON.generate({'requested_task_ref' => requested, 'selected_task_ref' => selected, 'candidates' => candidates})",
+		"puts JSON.generate({'requested_task_ref' => requested, 'selected_task_ref' => selected, 'dynamic_follow' => dynamic_follow, 'candidates' => candidates})",
 	}, "; ")
 	output, err := dockerComposeExecOutput(config, plan, runner, "ruby", "-rjson", "-e", script, path.Join(plan.StorageDir, "tasks.json"), path.Join(plan.StorageDir, "runs.json"), requestedTaskRef, fmt.Sprintf("%t", noChildren))
 	if err != nil {

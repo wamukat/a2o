@@ -871,6 +871,145 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(result.running_entries.first.phase).to eq("review")
   end
 
+  it "marks review rework separately from clean review completion" do
+    task = A3::Domain::Task.new(
+      ref: "Sample#rework",
+      kind: :single,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :in_progress
+    )
+    task_repository.save(task)
+    implementation_source_descriptor = A3::Domain::SourceDescriptor.new(
+      workspace_kind: :ticket_workspace,
+      source_type: :branch_head,
+      ref: "refs/heads/a2o/work/Sample-rework",
+      task_ref: task.ref
+    )
+    review_source_descriptor = A3::Domain::SourceDescriptor.new(
+      workspace_kind: :runtime_workspace,
+      source_type: :detached_commit,
+      ref: "head-review",
+      task_ref: task.ref
+    )
+    scope_snapshot = A3::Domain::ScopeSnapshot.new(
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      ownership_scope: :task
+    )
+    artifact_owner = A3::Domain::ArtifactOwner.new(
+      owner_ref: task.ref,
+      owner_scope: :task,
+      snapshot_version: "head-review"
+    )
+    run_repository.save(
+      A3::Domain::Run.new(
+        ref: "run-implementation",
+        task_ref: task.ref,
+        phase: :implementation,
+        workspace_kind: :ticket_workspace,
+        source_descriptor: implementation_source_descriptor,
+        scope_snapshot: scope_snapshot,
+        artifact_owner: artifact_owner,
+        terminal_outcome: :completed
+      )
+    )
+    run_repository.save(
+      A3::Domain::Run.new(
+        ref: "run-review",
+        task_ref: task.ref,
+        phase: :review,
+        workspace_kind: :runtime_workspace,
+        source_descriptor: review_source_descriptor,
+        scope_snapshot: scope_snapshot,
+        artifact_owner: artifact_owner,
+        terminal_outcome: :rework
+      )
+    )
+
+    result = use_case.call
+    task_entry = result.tasks.find { |item| item.ref == task.ref }
+
+    expect(task_entry.phase_counts).to eq("implementation" => 1, "review" => 1)
+    expect(task_entry.phase_states).to include("implementation" => :done, "review" => :failed)
+  end
+
+  it "lets a later clean review completion clear an earlier review rework marker" do
+    task = A3::Domain::Task.new(
+      ref: "Sample#review-recovered",
+      kind: :single,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :done
+    )
+    task_repository.save(task)
+    implementation_source_descriptor = A3::Domain::SourceDescriptor.new(
+      workspace_kind: :ticket_workspace,
+      source_type: :branch_head,
+      ref: "refs/heads/a2o/work/Sample-review-recovered",
+      task_ref: task.ref
+    )
+    review_source_descriptor = A3::Domain::SourceDescriptor.new(
+      workspace_kind: :runtime_workspace,
+      source_type: :detached_commit,
+      ref: "head-review",
+      task_ref: task.ref
+    )
+    scope_snapshot = A3::Domain::ScopeSnapshot.new(
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      ownership_scope: :task
+    )
+    artifact_owner = A3::Domain::ArtifactOwner.new(
+      owner_ref: task.ref,
+      owner_scope: :task,
+      snapshot_version: "head-review"
+    )
+
+    run_repository.save(
+      A3::Domain::Run.new(
+        ref: "run-implementation-recovered",
+        task_ref: task.ref,
+        phase: :implementation,
+        workspace_kind: :ticket_workspace,
+        source_descriptor: implementation_source_descriptor,
+        scope_snapshot: scope_snapshot,
+        artifact_owner: artifact_owner,
+        terminal_outcome: :completed
+      )
+    )
+    run_repository.save(
+      A3::Domain::Run.new(
+        ref: "run-review-rework",
+        task_ref: task.ref,
+        phase: :review,
+        workspace_kind: :runtime_workspace,
+        source_descriptor: review_source_descriptor,
+        scope_snapshot: scope_snapshot,
+        artifact_owner: artifact_owner,
+        terminal_outcome: :rework
+      )
+    )
+    run_repository.save(
+      A3::Domain::Run.new(
+        ref: "run-review-clean",
+        task_ref: task.ref,
+        phase: :review,
+        workspace_kind: :runtime_workspace,
+        source_descriptor: review_source_descriptor,
+        scope_snapshot: scope_snapshot,
+        artifact_owner: artifact_owner,
+        terminal_outcome: :completed
+      )
+    )
+
+    result = use_case.call
+    task_entry = result.tasks.find { |item| item.ref == task.ref }
+
+    expect(task_entry.phase_counts).to eq("implementation" => 1, "review" => 2)
+    expect(task_entry.phase_states).to include("implementation" => :done, "review" => :done)
+  end
+
   it "marks todo children as waiting when a sibling under the same parent is blocked" do
     parent_ref = "refs/heads/a2o/parent/Sample-10"
     blocked_task = A3::Domain::Task.new(

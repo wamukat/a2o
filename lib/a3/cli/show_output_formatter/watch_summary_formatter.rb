@@ -25,6 +25,7 @@ module A3
         PHASE_SYMBOLS = {
           pending: ".",
           done: "o",
+          failed: "x",
           running: ">",
           blocked: "!",
           not_applicable: "-"
@@ -143,7 +144,7 @@ module A3
             "[#{TASK_SYMBOLS.fetch(:idle)}] idle     [#{TASK_SYMBOLS.fetch(:waiting)}] waiting  |  #{PHASE_SYMBOLS.fetch(:pending)} : none     |",
             "[#{TASK_SYMBOLS.fetch(:next)}] next     [#{TASK_SYMBOLS.fetch(:running)}] running  |  #{PHASE_SYMBOLS.fetch(:running)} : running  |",
             "[#{TASK_SYMBOLS.fetch(:done)}] done     [#{TASK_SYMBOLS.fetch(:blocked)}] blocked  |  #{PHASE_SYMBOLS.fetch(:done)} : done     |",
-            "#{' ' * 26}|  #{PHASE_SYMBOLS.fetch(:blocked)} : blocked  |"
+            "#{' ' * 26}|  #{PHASE_SYMBOLS.fetch(:failed)} : failed   #{PHASE_SYMBOLS.fetch(:blocked)} : blocked |"
           ]
           lines = ["Task Tree"]
           phase_rows.each_with_index do |phase_row, index|
@@ -212,6 +213,8 @@ module A3
               PHASE_SYMBOLS.fetch(:running)
             elsif task.blocked && latest_phase == phase
               PHASE_SYMBOLS.fetch(:blocked)
+            elsif task_phase_state(task, phase) == :failed
+              PHASE_SYMBOLS.fetch(:failed)
             elsif task.phase_counts.fetch(phase, 0).positive?
               PHASE_SYMBOLS.fetch(:done)
             elsif latest_phase && PHASE_ORDER.index(latest_phase) && PHASE_ORDER.index(latest_phase) > PHASE_ORDER.index(phase)
@@ -220,6 +223,13 @@ module A3
               PHASE_SYMBOLS.fetch(:pending)
             end
           end.join("/")
+        end
+
+        def task_phase_state(task, phase)
+          return nil unless task.respond_to?(:phase_states)
+
+          states = task.phase_states || {}
+          states[phase] || states[phase.to_sym]
         end
 
         def build_depths(tasks)

@@ -45,6 +45,7 @@ module A3
         :blocked_lines,
         :running_entry,
         :phase_counts,
+        :phase_states,
         :latest_phase,
         keyword_init: true
       )
@@ -126,6 +127,7 @@ module A3
           blocked_lines: blocked_lines,
           running_entry: running_entry,
           phase_counts: phase_counts_for(task, task_runs),
+          phase_states: phase_states_for(task, task_runs),
           latest_phase: latest_phase
         )
       end
@@ -326,6 +328,20 @@ module A3
         task_runs.each_with_object(Hash.new(0)) do |run, counts|
           phase = normalize_phase(canonical_phase_for(task, run.phase).to_s)
           counts[phase] += 1 if phase
+        end
+      end
+
+      def phase_states_for(task, task_runs)
+        task_runs.each_with_object({}) do |run, states|
+          phase = normalize_phase(canonical_phase_for(task, run.phase).to_s)
+          next unless phase
+
+          outcome = run.terminal_outcome&.to_sym
+          if phase == "review" && outcome == :rework
+            states[phase] = :failed
+          else
+            states[phase] = :done
+          end
         end
       end
 

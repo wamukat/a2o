@@ -45,12 +45,42 @@ RSpec.describe A3::CLI::ShowOutputFormatter::WatchSummaryFormatter do
     expect(lines).to include("[_] idle     [.] waiting  |  . : none     |                  Merging -----------+")
     expect(lines).to include("[*] next     [>] running  |  > : running  |               Inspecting ---------+ |")
     expect(lines).to include("[o] done     [!] blocked  |  o : done     |                   Review -------+ | |")
-    expect(lines).to include("                          |  ! : blocked  |           Implementation -----+ | | |")
+    expect(lines).to include(a_string_including("x : failed"))
+    expect(lines).to include(a_string_including("! : blocked"))
     expect(lines).to include("\e[36mTask Tree\e[0m")
     expect(lines).to include(a_string_including("\e[36m[*] #1"))
     expect(lines).to include(a_string_including("\e[31m[!]   #2"))
     expect(lines).to include(a_string_including("-/././."))
     expect(lines.join("\n")).not_to include("review blocked")
+  end
+
+  it "renders review rework as a failed review phase marker" do
+    task = Struct.new(:ref, :parent_ref, :title, :task_kind, :blocked, :running, :next_candidate, :waiting, :done, :latest_phase, :phase_counts, :phase_states, :blocked_lines).new(
+      "Sample#2",
+      nil,
+      "Review rejected task",
+      :single,
+      false,
+      false,
+      false,
+      false,
+      false,
+      "implementation",
+      { "implementation" => 2, "review" => 1 },
+      { "review" => :failed },
+      []
+    )
+    summary = Struct.new(:scheduler_paused, :scheduler_paused_at, :tasks, :next_candidates, :running_entries).new(
+      false,
+      nil,
+      [task],
+      [],
+      []
+    )
+
+    row = described_class.lines(summary).find { |line| line.include?("Review rejected task") }
+
+    expect(row).to include("o/x/./.")
   end
 
   it "renders per-task detail lines only when details are requested" do
