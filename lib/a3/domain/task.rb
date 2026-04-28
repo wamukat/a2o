@@ -6,6 +6,8 @@ module A3
 
     class Task
       DECOMPOSITION_TRIGGER_LABEL = "trigger:investigate"
+      DRAFT_CHILD_LABEL = "a2o:draft-child"
+      AUTO_IMPLEMENT_TRIGGER_LABEL = "trigger:auto-implement"
 
       attr_reader :ref, :kind, :edit_scope, :verification_scope, :status, :current_run_ref, :parent_ref, :child_refs, :blocking_task_refs, :priority, :external_task_id, :verification_source_ref, :automation_enabled, :labels, :project_key
 
@@ -134,6 +136,14 @@ module A3
 
       def decomposition_requested?
         labels.include?(DECOMPOSITION_TRIGGER_LABEL)
+      end
+
+      def draft_child?
+        labels.include?(DRAFT_CHILD_LABEL)
+      end
+
+      def auto_implement_requested?
+        labels.include?(AUTO_IMPLEMENT_TRIGGER_LABEL)
       end
 
       def ==(other)

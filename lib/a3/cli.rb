@@ -386,6 +386,13 @@ module A3
         out.puts("summary=#{result.summary}")
         out.puts("critical_findings=#{result.critical_findings.size}")
         out.puts("evidence_path=#{result.evidence_path}")
+
+        draft_result = run_automatic_decomposition_draft_child_creation(
+          session: session,
+          task: task,
+          review_result: result
+        )
+        write_automatic_decomposition_draft_child_creation_result(out, task: task, result: draft_result)
       end
     end
 
@@ -451,6 +458,53 @@ module A3
         out.puts("blocked_reason=#{status.blocked_reason}") if status.blocked_reason && status.state == "blocked"
         status.evidence_paths.each { |key, path| out.puts("evidence.#{key}=#{path}") }
       end
+    end
+
+    def run_automatic_decomposition_draft_child_creation(session:, task:, review_result:)
+      return AutomaticDraftChildCreationResult.skipped("proposal_review_not_eligible") unless review_result.success && review_result.disposition == "eligible"
+      return AutomaticDraftChildCreationResult.skipped("kanban_child_writer_not_configured") unless kanban_child_writer_configured?(session.options)
+
+      writer = A3::Infra::KanbanCliProposalChildWriter.new(
+        command_argv: kanban_command_argv(session.options),
+        project: session.options.fetch(:kanban_project),
+        working_dir: session.options[:kanban_working_dir],
+        mode: :draft
+      )
+      result = A3::Application::RunDecompositionChildCreation.new(
+        storage_dir: session.options.fetch(:storage_dir),
+        child_writer: writer
+      ).call(
+        task: task,
+        gate: true,
+        proposal_evidence_path: session.options[:proposal_evidence_path],
+        review_evidence_path: review_result.evidence_path
+      )
+      AutomaticDraftChildCreationResult.executed(result)
+    end
+
+    AutomaticDraftChildCreationResult = Struct.new(:executed?, :skip_reason, :child_creation_result, keyword_init: true) do
+      def self.skipped(reason)
+        new(executed?: false, skip_reason: reason)
+      end
+
+      def self.executed(result)
+        new(executed?: true, child_creation_result: result)
+      end
+    end
+
+    def write_automatic_decomposition_draft_child_creation_result(out, task:, result:)
+      unless result.executed?
+        out.puts("decomposition draft child creation #{task.ref} skipped=#{result.skip_reason}")
+        return
+      end
+
+      child_creation = result.child_creation_result
+      out.puts("decomposition draft child creation #{task.ref} success=#{child_creation.success}")
+      out.puts("draft_status=#{child_creation.status}") if child_creation.status
+      out.puts("draft_summary=#{child_creation.summary}")
+      out.puts("draft_child_refs=#{child_creation.child_refs.join(',')}")
+      out.puts("draft_child_keys=#{child_creation.child_keys.join(',')}")
+      out.puts("draft_evidence_path=#{child_creation.evidence_path}")
     end
 
     def handle_cleanup_decomposition_trial(argv, out:, run_id_generator:, command_runner:, merge_runner:)
@@ -2967,6 +3021,10 @@ module A3
       options[:kanban_command] && options[:kanban_project] && !options.fetch(:kanban_repo_label_map, {}).empty?
     end
 
+    def kanban_child_writer_configured?(options)
+      options[:kanban_command] && options[:kanban_project]
+    end
+
     def kanban_command_argv(options)
       [options.fetch(:kanban_command), *Array(options[:kanban_command_args])]
     end
@@ -2983,6 +3041,8 @@ module A3
       provided_keys << :kanban_blocked_label if options[:kanban_blocked_label]
       provided_keys << :kanban_clarification_label if options[:kanban_clarification_label]
       return if provided_keys.empty? || kanban_bridge_enabled?(options)
+      child_writer_only_keys = %i[kanban_backend kanban_command kanban_project kanban_working_dir]
+      return if kanban_child_writer_configured?(options) && (provided_keys - child_writer_only_keys).empty?
 
       raise ArgumentError,
         "kanban bridge options require --kanban-command, --kanban-project, and at least one --kanban-repo-label"

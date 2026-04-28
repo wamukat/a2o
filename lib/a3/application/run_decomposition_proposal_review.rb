@@ -39,7 +39,7 @@ module A3
         critical_findings.concat(review_results.flat_map { |result| result.fetch("findings") }.select { |finding| finding.fetch("severity") == "critical" })
         disposition = critical_findings.empty? ? "eligible" : "blocked"
         success = disposition == "eligible"
-        summary = success ? "proposal review clean; eligible for next gate" : "proposal review blocked by #{critical_findings.size} critical finding(s)"
+        summary = success ? "proposal review eligible for next gate" : "proposal review blocked by #{critical_findings.size} critical finding(s)"
         source_ticket_summary = source_ticket_summary_for(summary: summary, disposition: disposition, critical_findings: critical_findings, review_results: review_results)
         evidence_path = persist_evidence(
           task: task,

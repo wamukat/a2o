@@ -379,6 +379,119 @@ RSpec.describe A3::CLI do
     expect(out.string).not_to include("success=")
   end
 
+  it "automatically creates draft children after an eligible proposal review when Kanban writing is configured" do
+    out = StringIO.new
+    task = A3::Domain::Task.new(ref: "A3-v2#5300", kind: :single, edit_scope: [:repo_alpha], labels: ["trigger:investigate"])
+    session = Struct.new(:options, :container, :project_context, :project_surface, keyword_init: true).new(
+      options: {
+        task_ref: "A3-v2#5300",
+        storage_dir: "/tmp/a2o-state",
+        manifest_path: "/tmp/project.yaml",
+        proposal_evidence_path: "/tmp/proposal.json",
+        kanban_command: "kanban",
+        kanban_command_args: ["--json"],
+        kanban_project: "A3-v2",
+        kanban_working_dir: "/tmp"
+      },
+      container: { external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new },
+      project_context: Object.new,
+      project_surface: Object.new
+    )
+    review_result = A3::Application::RunDecompositionProposalReview::Result.new(
+      success: true,
+      summary: "proposal review eligible for next gate",
+      disposition: "eligible",
+      critical_findings: [],
+      review_results: [],
+      evidence_path: "/tmp/proposal-review.json"
+    )
+    child_result = A3::Application::RunDecompositionChildCreation::Result.new(
+      success: true,
+      status: "created",
+      summary: "created or reconciled 1 decomposition child ticket(s)",
+      child_refs: ["A3-v2#5301"],
+      child_keys: ["child-key-1"],
+      evidence_path: "/tmp/child-creation.json"
+    )
+    review_service = instance_double(A3::Application::RunDecompositionProposalReview, call: review_result)
+    child_service = instance_double(A3::Application::RunDecompositionChildCreation)
+    writer = instance_double(A3::Infra::KanbanCliProposalChildWriter)
+    allow(described_class).to receive(:with_runtime_session).and_yield(session)
+    allow(described_class).to receive(:resolve_direct_task).and_return(task)
+    allow(A3::Application::RunDecompositionProposalReview).to receive(:new).and_return(review_service)
+    expect(A3::Infra::KanbanCliProposalChildWriter).to receive(:new).with(
+      command_argv: ["kanban", "--json"],
+      project: "A3-v2",
+      working_dir: "/tmp",
+      mode: :draft
+    ).and_return(writer)
+    expect(A3::Application::RunDecompositionChildCreation).to receive(:new).with(
+      storage_dir: "/tmp/a2o-state",
+      child_writer: writer
+    ).and_return(child_service)
+    expect(child_service).to receive(:call).with(
+      task: task,
+      gate: true,
+      proposal_evidence_path: "/tmp/proposal.json",
+      review_evidence_path: "/tmp/proposal-review.json"
+    ).and_return(child_result)
+
+    described_class.start(["run-decomposition-proposal-review", "A3-v2#5300", "/tmp/project.yaml"], out: out)
+
+    expect(out.string).to include("decomposition proposal review A3-v2#5300 disposition=eligible success=true")
+    expect(out.string).to include("decomposition draft child creation A3-v2#5300 success=true")
+    expect(out.string).to include("draft_child_refs=A3-v2#5301")
+  end
+
+  it "does not attempt automatic draft creation when proposal review is not eligible" do
+    out = StringIO.new
+    task = A3::Domain::Task.new(ref: "A3-v2#5300", kind: :single, edit_scope: [:repo_alpha], labels: ["trigger:investigate"])
+    session = Struct.new(:options, :container, :project_context, :project_surface, keyword_init: true).new(
+      options: {
+        task_ref: "A3-v2#5300",
+        storage_dir: "/tmp/a2o-state",
+        manifest_path: "/tmp/project.yaml",
+        proposal_evidence_path: "/tmp/proposal.json",
+        kanban_command: "kanban",
+        kanban_project: "A3-v2"
+      },
+      container: { external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new },
+      project_context: Object.new,
+      project_surface: Object.new
+    )
+    review_result = A3::Application::RunDecompositionProposalReview::Result.new(
+      success: false,
+      summary: "proposal review blocked by 1 critical finding(s)",
+      disposition: "blocked",
+      critical_findings: [{ "severity" => "critical", "summary" => "missing dependency" }],
+      review_results: [],
+      evidence_path: "/tmp/proposal-review.json"
+    )
+    review_service = instance_double(A3::Application::RunDecompositionProposalReview, call: review_result)
+    allow(described_class).to receive(:with_runtime_session).and_yield(session)
+    allow(described_class).to receive(:resolve_direct_task).and_return(task)
+    allow(A3::Application::RunDecompositionProposalReview).to receive(:new).and_return(review_service)
+    expect(A3::Application::RunDecompositionChildCreation).not_to receive(:new)
+
+    described_class.start(["run-decomposition-proposal-review", "A3-v2#5300", "/tmp/project.yaml"], out: out)
+
+    expect(out.string).to include("decomposition draft child creation A3-v2#5300 skipped=proposal_review_not_eligible")
+  end
+
+  it "allows child-writer-only Kanban options without repo label mapping" do
+    bridge = described_class.send(
+      :build_external_task_bridge,
+      {
+        kanban_command: "kanban",
+        kanban_project: "A3-v2",
+        kanban_repo_label_map: {},
+        kanban_trigger_labels: []
+      }
+    )
+
+    expect(bridge.task_source).to be_a(A3::Infra::NullExternalTaskSource)
+  end
+
   it "imports an external Kanban task before gated child creation uses the parent external id" do
     Dir.mktmpdir do |dir|
       evidence_dir = File.join(dir, "decomposition-evidence", "Portal-240")

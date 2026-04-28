@@ -175,6 +175,43 @@ RSpec.describe A3::Application::PlanNextRunnableTask do
     expect(routed_assessment.reason).to eq(:decomposition_requested)
   end
 
+  it "does not select draft decomposition children until they receive trigger:auto-implement" do
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#5102",
+        kind: :child,
+        edit_scope: [:repo_alpha],
+        status: :todo,
+        priority: 5,
+        labels: ["a2o:draft-child"]
+      )
+    )
+
+    result = use_case.call
+
+    expect(result.task).to be_nil
+    assessment = result.assessments.find { |candidate| candidate.task_ref == "A3-v2#5102" }
+    expect(assessment.reason).to eq(:draft_child_not_accepted)
+  end
+
+  it "selects accepted draft children that have trigger:auto-implement" do
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#5103",
+        kind: :child,
+        edit_scope: [:repo_alpha],
+        status: :todo,
+        priority: 5,
+        labels: ["a2o:draft-child", "trigger:auto-implement"]
+      )
+    )
+
+    result = use_case.call
+
+    expect(result.task&.ref).to eq("A3-v2#5103")
+    expect(result.selected_assessment.reason).to eq(:runnable)
+  end
+
   it "keeps ref ordering as the tie-breaker for equal priority tasks" do
     task_repository.save(
       A3::Domain::Task.new(

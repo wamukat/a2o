@@ -20,6 +20,7 @@ module A3
         return new(task: task, phase: nil, reason: :already_running, blocking_task_refs: [task.current_run_ref]) if task.current_run_ref
         return new(task: task, phase: nil, reason: :not_runnable_status) unless phase
         return new(task: task, phase: phase, reason: :decomposition_requested) if task.decomposition_requested?
+        return new(task: task, phase: phase, reason: :draft_child_not_accepted) if task.draft_child? && !task.auto_implement_requested?
         return new(task: task, phase: phase, reason: :not_trigger_selected) unless task.automation_enabled
         if blocker_waiting?(task, tasks)
           return new(

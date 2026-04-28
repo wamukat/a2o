@@ -20,7 +20,7 @@ RSpec.describe A3::Application::RunDecompositionProposalReview do
     )
   end
 
-  it "marks a clean proposal review eligible and persists evidence" do
+  it "marks an eligible proposal review and persists evidence" do
     Dir.mktmpdir do |dir|
       proposal_path = File.join(dir, "proposal.json")
       File.write(proposal_path, JSON.generate(
@@ -41,7 +41,7 @@ RSpec.describe A3::Application::RunDecompositionProposalReview do
 
       expect(result.success).to be(true)
       expect(result.disposition).to eq("eligible")
-      expect(result.summary).to eq("proposal review clean; eligible for next gate")
+      expect(result.summary).to eq("proposal review eligible for next gate")
       evidence = JSON.parse(File.read(result.evidence_path))
       expect(evidence).to include("phase" => "proposal_review", "disposition" => "eligible")
       expect(evidence.fetch("critical_findings")).to eq([])
