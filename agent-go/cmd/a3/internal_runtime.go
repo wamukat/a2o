@@ -1986,7 +1986,8 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 	if err != nil {
 		return runtimeRunOncePlan{}, err
 	}
-	agentIdleLimit, err := parseNonNegativeInt(envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_IDLE_LIMIT", "A3_RUNTIME_RUN_ONCE_AGENT_IDLE_LIMIT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_IDLE_LIMIT", "A3_RUNTIME_SCHEDULER_AGENT_IDLE_LIMIT", "30")), "agent idle limit")
+	defaultAgentIdleLimit := strconv.Itoa(agentAttemptCount)
+	agentIdleLimit, err := parseNonNegativeInt(envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_IDLE_LIMIT", "A3_RUNTIME_RUN_ONCE_AGENT_IDLE_LIMIT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_IDLE_LIMIT", "A3_RUNTIME_SCHEDULER_AGENT_IDLE_LIMIT", defaultAgentIdleLimit)), "agent idle limit")
 	if err != nil {
 		return runtimeRunOncePlan{}, err
 	}

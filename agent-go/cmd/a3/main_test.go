@@ -6247,6 +6247,38 @@ func TestRunHostAgentLoopFailsAfterConsecutiveIdleAttempts(t *testing.T) {
 	}
 }
 
+func TestRuntimeRunOnceDefaultsIdleLimitToAgentAttemptBudget(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	config := runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	}
+
+	plan, err := buildRuntimeRunOncePlan(config, runtimeRunOnceOverrides{AgentAttempts: "3"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if plan.AgentAttempts != 3 {
+		t.Fatalf("agent attempts=%d, want 3", plan.AgentAttempts)
+	}
+	if plan.AgentIdleLimit != 3 {
+		t.Fatalf("idle limit=%d, want default to agent attempts", plan.AgentIdleLimit)
+	}
+}
+
 func TestRuntimeLoopPreservesHostAgentLogAcrossRunOnceCycles(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
