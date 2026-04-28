@@ -6218,6 +6218,38 @@ func TestRunHostAgentLoopPreservesExistingLogAcrossRestarts(t *testing.T) {
 	}
 }
 
+func TestRunHostAgentLoopStreamsHostAgentOutputToLog(t *testing.T) {
+	tempDir := t.TempDir()
+	hostAgentLog := filepath.Join(tempDir, ".work", "a2o", "runtime-host-agent", "agent.log")
+	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
+	plan := runtimeRunOncePlan{
+		ComposePrefix:   []string{"compose", "-p", "a3-test", "-f", "compose.yml"},
+		AgentAttempts:   1,
+		AgentPort:       "7394",
+		HostAgentBin:    "a2o-agent",
+		HostAgentLog:    hostAgentLog,
+		RuntimeExitFile: "/tmp/a2o-runtime-run-once.exit",
+	}
+	runner := &fakeRunner{hostAgentOutput: "a2o_agent_job_event {\"stage\":\"claimed\",\"job_id\":\"job-1\"}\nagent completed job-1 status=succeeded\n"}
+	var stdout bytes.Buffer
+
+	if err := runHostAgentLoop(config, plan, runner, &stdout); err != nil {
+		t.Fatalf("loop failed: %v", err)
+	}
+
+	body, err := os.ReadFile(hostAgentLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(body)
+	if !strings.Contains(text, "===== host agent attempt 001 ") {
+		t.Fatalf("expected attempt header in host agent log, got:\n%s", text)
+	}
+	if !strings.Contains(text, "a2o_agent_job_event {\"stage\":\"claimed\",\"job_id\":\"job-1\"}") {
+		t.Fatalf("expected streamed host agent event in log, got:\n%s", text)
+	}
+}
+
 func TestRunHostAgentLoopFailsAfterConsecutiveIdleAttempts(t *testing.T) {
 	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
 	plan := runtimeRunOncePlan{
@@ -8231,6 +8263,19 @@ func containsArg(args []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func (r *fakeRunner) RunWithLog(name string, args []string, logPath string) ([]byte, error) {
+	output, err := r.Run(name, args...)
+	if logPath != "" {
+		if mkdirErr := os.MkdirAll(filepath.Dir(logPath), 0o755); mkdirErr != nil {
+			return output, mkdirErr
+		}
+		if writeErr := appendFile(logPath, output); writeErr != nil {
+			return output, writeErr
+		}
+	}
+	return output, err
 }
 
 func (r *fakeRunner) StartBackground(name string, args []string, logPath string) (int, error) {

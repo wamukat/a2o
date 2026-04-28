@@ -2917,8 +2917,8 @@ func runHostAgentLoop(config runtimeInstanceConfig, plan runtimeRunOncePlan, run
 				args = append(args, "-source-alias", sourceAlias)
 			}
 		}
-		output, err := runExternal(runner, plan.HostAgentBin, args...)
-		_ = appendFile(plan.HostAgentLog, []byte(fmt.Sprintf("\n===== host agent attempt %03d %s =====\n%s", attempt, time.Now().UTC().Format(time.RFC3339), string(output))))
+		_ = appendFile(plan.HostAgentLog, []byte(fmt.Sprintf("\n===== host agent attempt %03d %s =====\n", attempt, time.Now().UTC().Format(time.RFC3339))))
+		output, err := runner.RunWithLog(plan.HostAgentBin, args, plan.HostAgentLog)
 		if err != nil {
 			agentStatus = err
 		}

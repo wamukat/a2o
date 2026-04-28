@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 )
 
@@ -20,6 +22,7 @@ const hostAgentBinRelativePath = ".work/a2o/agent/bin/a2o-agent"
 
 type commandRunner interface {
 	Run(name string, args ...string) ([]byte, error)
+	RunWithLog(name string, args []string, logPath string) ([]byte, error)
 	StartBackground(name string, args []string, logPath string) (int, error)
 	ProcessRunning(pid int) bool
 	ProcessCommand(pid int) string
@@ -28,9 +31,38 @@ type commandRunner interface {
 
 type execRunner struct{}
 
+type lockedWriter struct {
+	mu     sync.Mutex
+	writer io.Writer
+}
+
+func (w *lockedWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.writer.Write(p)
+}
+
 func (execRunner) Run(name string, args ...string) ([]byte, error) {
 	cmd := exec.Command(name, args...)
 	return cmd.CombinedOutput()
+}
+
+func (execRunner) RunWithLog(name string, args []string, logPath string) ([]byte, error) {
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+		return nil, err
+	}
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return nil, err
+	}
+	defer logFile.Close()
+	var output bytes.Buffer
+	writer := &lockedWriter{writer: io.MultiWriter(&output, logFile)}
+	cmd := exec.Command(name, args...)
+	cmd.Stdout = writer
+	cmd.Stderr = writer
+	err = cmd.Run()
+	return output.Bytes(), err
 }
 
 func (execRunner) StartBackground(name string, args []string, logPath string) (int, error) {
