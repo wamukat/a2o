@@ -200,6 +200,155 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(result.run.terminal_outcome).to eq(:blocked)
   end
 
+  it "publishes worker result validation details in blocked comments" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :in_review,
+      current_run_ref: "run-1",
+      external_task_id: 3025
+    )
+    task_repository.save(task)
+    review_run = A3::Domain::Run.new(
+      ref: "run-1",
+      task_ref: task.ref,
+      phase: :review,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :detached_commit,
+        ref: "head456",
+        task_ref: task.ref
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        ownership_scope: :task
+      ),
+      review_target: A3::Domain::ReviewTarget.new(
+        base_commit: "base123",
+        head_commit: "head456",
+        task_ref: task.ref,
+        phase_ref: :review
+      ),
+      artifact_owner: artifact_owner
+    )
+    execution_record = A3::Domain::PhaseExecutionRecord.new(
+      summary: "worker result schema invalid",
+      failing_command: "worker_result_schema",
+      observed_state: "invalid_worker_result",
+      diagnostics: {
+        "validation_errors" => ["summary must be a string", "run_ref must match the worker request"],
+        "worker_response_bundle" => {
+          "success" => true,
+          "run_ref" => "ProjectName-10-parent",
+          "phase" => "review",
+          "rework_required" => false,
+          "review_disposition" => {
+            "kind" => "completed",
+            "repo_scope" => "repo_alpha",
+            "finding_key" => "no-findings"
+          }
+        }
+      }
+    )
+    blocked_diagnosis = A3::Domain::BlockedDiagnosis.new(
+      task_ref: task.ref,
+      run_ref: review_run.ref,
+      phase: :review,
+      outcome: :blocked,
+      review_target: review_run.evidence.review_target,
+      source_descriptor: review_run.source_descriptor,
+      scope_snapshot: review_run.scope_snapshot,
+      artifact_owner: artifact_owner,
+      expected_state: "worker phase succeeds",
+      observed_state: "invalid_worker_result",
+      failing_command: "worker_result_schema",
+      diagnostic_summary: "worker result schema invalid",
+      infra_diagnostics: execution_record.diagnostics
+    )
+    run_repository.save(
+      review_run.append_blocked_diagnosis(blocked_diagnosis, execution_record: execution_record)
+    )
+
+    expect(status_publisher).to receive(:publish)
+    expect(activity_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      body: a_string_matching(/worker_result_validation_error: summary must be a string.*worker_result_validation_error: run_ref must match the worker request.*worker_response: success=true run_ref=ProjectName-10-parent phase=review rework_required=false review_disposition=kind=completed repo_scope=repo_alpha finding_key=no-findings/m),
+      event: hash_including("kind" => "task_blocked")
+    )
+
+    result = use_case.call(task_ref: task.ref, run_ref: review_run.ref, outcome: :blocked)
+
+    expect(result.task.status).to eq(:blocked)
+  end
+
+  it "does not label unrelated validation errors as worker result validation errors" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :verifying,
+      current_run_ref: "run-1",
+      external_task_id: 3025
+    )
+    task_repository.save(task)
+    verification_run = A3::Domain::Run.new(
+      ref: "run-1",
+      task_ref: task.ref,
+      phase: :merge,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :branch_head,
+        ref: "refs/heads/a2o/work/3025",
+        task_ref: task.ref
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        ownership_scope: :task
+      ),
+      artifact_owner: artifact_owner
+    )
+    execution_record = A3::Domain::PhaseExecutionRecord.new(
+      summary: "merge artifact invalid",
+      failing_command: "agent_merge",
+      observed_state: "agent_merge_evidence_invalid",
+      diagnostics: { "validation_errors" => ["merge evidence missing changed_files"] }
+    )
+    blocked_diagnosis = A3::Domain::BlockedDiagnosis.new(
+      task_ref: task.ref,
+      run_ref: verification_run.ref,
+      phase: :merge,
+      outcome: :blocked,
+      review_target: verification_run.evidence.review_target,
+      source_descriptor: verification_run.source_descriptor,
+      scope_snapshot: verification_run.scope_snapshot,
+      artifact_owner: artifact_owner,
+      expected_state: "merge succeeds",
+      observed_state: "agent_merge_evidence_invalid",
+      failing_command: "agent_merge",
+      diagnostic_summary: "merge artifact invalid",
+      infra_diagnostics: execution_record.diagnostics
+    )
+    run_repository.save(
+      verification_run.append_blocked_diagnosis(blocked_diagnosis, execution_record: execution_record)
+    )
+
+    expect(status_publisher).to receive(:publish)
+    expect(activity_publisher).to receive(:publish) do |kwargs|
+      expect(kwargs.fetch(:body)).not_to include("worker_result_validation_error")
+      expect(kwargs.fetch(:body)).not_to include("worker_response:")
+    end
+
+    result = use_case.call(task_ref: task.ref, run_ref: verification_run.ref, outcome: :blocked)
+
+    expect(result.task.status).to eq(:blocked)
+  end
+
   it "publishes clarification request details when a run needs clarification" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",

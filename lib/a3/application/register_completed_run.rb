@@ -338,6 +338,11 @@ module A3
         append_review_disposition_comment_lines(lines, execution_record&.review_disposition)
         append_clarification_request_comment_lines(lines, execution_record&.clarification_request)
         append_merge_recovery_comment_lines(lines, execution_record&.diagnostics || execution&.diagnostics)
+        append_worker_result_diagnostic_comment_lines(
+          lines,
+          execution_record&.diagnostics || execution&.diagnostics || blocked_diagnosis&.infra_diagnostics,
+          worker_result_context: worker_result_diagnostic_context?(execution_record: execution_record, execution: execution, blocked_diagnosis: blocked_diagnosis)
+        )
 
         if blocked_diagnosis
           lines << "エラー分類: #{single_line(blocked_diagnosis.error_category)}"
@@ -377,6 +382,51 @@ module A3
         lines << "選択肢: #{options.each_with_index.map { |option, index| "#{index + 1}. #{option}" }.join(' / ')}" unless options.empty?
         lines << "推奨: #{single_line(request['recommended_option'])}" if present?(request["recommended_option"])
         lines << "影響: #{single_line(request['impact'])}" if present?(request["impact"])
+      end
+
+      def append_worker_result_diagnostic_comment_lines(lines, diagnostics, worker_result_context:)
+        return unless diagnostics.is_a?(Hash)
+        return unless worker_result_context || diagnostics.key?("worker_response_bundle")
+
+        Array(diagnostics["validation_errors"]).first(5).each do |error|
+          next unless present?(error)
+
+          lines << "worker_result_validation_error: #{single_line(error)}"
+        end
+
+        bundle = diagnostics["worker_response_bundle"]
+        lines << "worker_response: #{worker_response_summary(bundle)}" if bundle
+      end
+
+      def worker_result_diagnostic_context?(execution_record:, execution:, blocked_diagnosis:)
+        failing_command = execution_record&.failing_command || execution&.failing_command || blocked_diagnosis&.failing_command
+        observed_state = execution_record&.observed_state || execution&.observed_state || blocked_diagnosis&.observed_state
+        %w[worker_result_schema worker_result_json].include?(failing_command.to_s) ||
+          observed_state.to_s == "invalid_worker_result"
+      end
+
+      def worker_response_summary(bundle)
+        return truncate_comment_value(single_line(bundle.inspect)) unless bundle.is_a?(Hash)
+
+        fields = []
+        %w[success task_ref run_ref phase summary failing_command observed_state rework_required].each do |key|
+          fields << "#{key}=#{single_line(bundle[key])}" if bundle.key?(key)
+        end
+        disposition = bundle["review_disposition"]
+        if disposition.is_a?(Hash)
+          review_fields = %w[kind repo_scope finding_key].filter_map do |key|
+            "#{key}=#{single_line(disposition[key])}" if present?(disposition[key])
+          end
+          fields << "review_disposition=#{review_fields.join(' ')}" unless review_fields.empty?
+        end
+        truncate_comment_value(fields.reject(&:empty?).join(" "))
+      end
+
+      def truncate_comment_value(value, limit = 600)
+        text = value.to_s
+        return text if text.length <= limit
+
+        "#{text[0, limit]}..."
       end
 
       def append_merge_recovery_comment_lines(lines, diagnostics)
