@@ -24,6 +24,10 @@ module A3
 
       def claim_next(agent_name:, claimed_at:, project_key: nil)
         requested_project_key = project_key.to_s.strip
+        if requested_project_key.empty? && ENV["A2O_MULTI_PROJECT_MODE"].to_s == "1"
+          raise A3::Domain::ConfigurationError,
+            "agent job claim requires project_key in multi-project mode; bind the agent session with --project, A2O_AGENT_PROJECT_KEY, or runtime profile project_key"
+        end
         with_records_lock do
           records = load_records
           job_id, record_payload = records.find do |_id, payload|

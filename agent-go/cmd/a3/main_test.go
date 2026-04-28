@@ -6942,6 +6942,18 @@ func TestRunHostAgentLoopPassesProjectBindingToHostAgent(t *testing.T) {
 	}
 }
 
+func TestWaitForRuntimeControlPlanePassesProjectKey(t *testing.T) {
+	runner := &fakeRunner{}
+	plan := runtimeRunOncePlan{AgentPort: "7394", ProjectKey: "portal"}
+
+	if err := waitForRuntimeControlPlane(plan, runner); err != nil {
+		t.Fatalf("waitForRuntimeControlPlane failed: %v", err)
+	}
+	if !strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "curl -fsS http://127.0.0.1:7394/v1/agent/jobs/next?agent=probe&project_key=portal") {
+		t.Fatalf("readiness probe should include project_key, calls:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+	}
+}
+
 func TestRunHostAgentLoopFailsAfterConsecutiveIdleAttempts(t *testing.T) {
 	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
 	plan := runtimeRunOncePlan{

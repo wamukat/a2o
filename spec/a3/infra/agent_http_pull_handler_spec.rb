@@ -126,6 +126,22 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
     expect(store.fetch("job-a").state).to eq(:queued)
   end
 
+  it "rejects unbound projectless agent claims in multi-project mode" do
+    store.enqueue(agent_job_request("job-a", project_key: "a2o"))
+
+    with_env("A2O_MULTI_PROJECT_MODE" => "1") do
+      response = handler.handle(
+        method: "GET",
+        path: "/v1/agent/jobs/next",
+        query: {"agent" => "host-local-agent"}
+      )
+
+      expect(response.status).to eq(400)
+      expect(JSON.parse(response.body).fetch("error")).to include("requires project_key in multi-project mode")
+    end
+    expect(store.fetch("job-a").state).to eq(:queued)
+  end
+
   it "requires a bearer token when configured" do
     secured_handler = described_class.new(
       job_store: store,

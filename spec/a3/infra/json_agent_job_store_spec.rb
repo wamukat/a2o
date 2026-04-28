@@ -97,6 +97,17 @@ RSpec.describe A3::Infra::JsonAgentJobStore do
     expect(store.fetch("job-a").state).to eq(:queued)
   end
 
+  it "rejects projectless claims in multi-project mode" do
+    store.enqueue(agent_job_request("job-a", project_key: "a2o"))
+
+    with_env("A2O_MULTI_PROJECT_MODE" => "1") do
+      expect do
+        store.claim_next(agent_name: "unbound-agent", claimed_at: "2026-04-11T08:00:00Z")
+      end.to raise_error(A3::Domain::ConfigurationError, /requires project_key in multi-project mode/)
+    end
+    expect(store.fetch("job-a").state).to eq(:queued)
+  end
+
   it "persists project identity at the agent job record boundary" do
     request = agent_job_request("job-1", project_key: "a2o")
 

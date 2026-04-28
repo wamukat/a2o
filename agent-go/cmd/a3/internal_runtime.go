@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -3106,10 +3107,13 @@ func startRuntimeAgentServer(config runtimeInstanceConfig, plan runtimeRunOncePl
 }
 
 func waitForRuntimeControlPlane(plan runtimeRunOncePlan, runner commandRunner) error {
-	url := fmt.Sprintf("http://127.0.0.1:%s/v1/agent/jobs/next?agent=probe", plan.AgentPort)
+	probeURL := fmt.Sprintf("http://127.0.0.1:%s/v1/agent/jobs/next?agent=probe", plan.AgentPort)
+	if strings.TrimSpace(plan.ProjectKey) != "" {
+		probeURL = probeURL + "&project_key=" + url.QueryEscape(strings.TrimSpace(plan.ProjectKey))
+	}
 	var lastErr error
 	for i := 0; i < 80; i++ {
-		if _, err := runExternal(runner, "curl", "-fsS", url); err == nil {
+		if _, err := runExternal(runner, "curl", "-fsS", probeURL); err == nil {
 			return nil
 		} else {
 			lastErr = err
