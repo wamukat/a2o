@@ -22,6 +22,7 @@ Read this document first to understand runtime flow and responsibility boundarie
 | Evidence, blocked diagnosis, and reruns | [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md) |
 | Job boundary with `a2o-agent` | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
 | Automated ticket decomposition MVP | [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md) |
+| Kanban-first decomposition draft children | [76-kanban-first-decomposition-drafts.md](76-kanban-first-decomposition-drafts.md) |
 | Boundary between core and project extensions | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
 | Multi-project runtime contexts | [85-multi-project-runtime-contexts.md](85-multi-project-runtime-contexts.md) |
 | Validation through reference products | [90-reference-product-suite.md](90-reference-product-suite.md) |
@@ -197,8 +198,10 @@ Covers the Docker runtime image, host launcher, bundled or external Kanbalone bo
 ### 8. Ticket Decomposition
 
 - [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md)
+- [76-kanban-first-decomposition-drafts.md](76-kanban-first-decomposition-drafts.md)
 
 Covers the MVP for `trigger:investigate` ticket decomposition, including the independent scheduler domain, investigation command contract, proposal review, and gated child-ticket creation.
+The Kanban-first draft design covers early draft child creation, `a2o:draft-child`, human acceptance through `trigger:auto-implement`, and reconciliation without overwriting human edits.
 
 ### 9. Reference Validation
 
