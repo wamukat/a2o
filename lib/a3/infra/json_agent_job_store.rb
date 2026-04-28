@@ -22,11 +22,13 @@ module A3
         end
       end
 
-      def claim_next(agent_name:, claimed_at:)
+      def claim_next(agent_name:, claimed_at:, project_key: nil)
+        requested_project_key = project_key.to_s.strip
         with_records_lock do
           records = load_records
           job_id, record_payload = records.find do |_id, payload|
-            A3::Domain::AgentJobRecord.from_persisted_form(payload).queued?
+            record = A3::Domain::AgentJobRecord.from_persisted_form(payload)
+            record.queued? && (requested_project_key.empty? || record.project_key == requested_project_key)
           end
           return nil unless job_id
 

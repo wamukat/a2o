@@ -19,6 +19,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
   let(:task) do
     A3::Domain::Task.new(
       ref: "A3-v2#3028",
+      project_key: "portal",
       kind: :child,
       edit_scope: [:repo_beta],
       verification_scope: [:repo_beta]
@@ -27,6 +28,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
   let(:run) do
     A3::Domain::Run.new(
       ref: "run-1",
+      project_key: "portal",
       task_ref: task.ref,
       phase: :review,
       workspace_kind: :runtime_workspace,
@@ -107,6 +109,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(request_path.read).to include("\n  \"task_ref\":")
     expect(request_form).to include(
       "task_ref" => task.ref,
+      "project_key" => "portal",
       "run_ref" => run.ref,
       "phase" => "review",
       "skill" => "task review"

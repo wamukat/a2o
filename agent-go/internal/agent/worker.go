@@ -239,6 +239,7 @@ func (w Worker) logJobEvent(request JobRequest, stage string, fields map[string]
 	payload := map[string]any{
 		"stage":          stage,
 		"job_id":         request.JobID,
+		"project_key":    request.ProjectKey,
 		"task_ref":       request.TaskRef,
 		"run_ref":        request.RunRef,
 		"phase":          request.Phase,

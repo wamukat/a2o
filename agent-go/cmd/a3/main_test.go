@@ -6921,6 +6921,27 @@ func TestRunHostAgentLoopStreamsHostAgentOutputToLog(t *testing.T) {
 	}
 }
 
+func TestRunHostAgentLoopPassesProjectBindingToHostAgent(t *testing.T) {
+	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
+	plan := runtimeRunOncePlan{
+		ComposePrefix:   []string{"compose", "-p", "a3-test", "-f", "compose.yml"},
+		AgentAttempts:   1,
+		AgentPort:       "7394",
+		HostAgentBin:    "a2o-agent",
+		ProjectKey:      "portal",
+		RuntimeExitFile: "/tmp/a2o-runtime-run-once.exit",
+	}
+	runner := &fakeRunner{hostAgentOutput: "agent completed job-1 status=succeeded\n"}
+	var stdout bytes.Buffer
+
+	if err := runHostAgentLoop(config, plan, runner, &stdout); err != nil {
+		t.Fatalf("loop failed: %v", err)
+	}
+	if !strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "a2o-agent -agent host-local -control-plane-url http://127.0.0.1:7394 -project portal") {
+		t.Fatalf("host agent call should include project binding, calls:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+	}
+}
+
 func TestRunHostAgentLoopFailsAfterConsecutiveIdleAttempts(t *testing.T) {
 	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
 	plan := runtimeRunOncePlan{

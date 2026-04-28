@@ -3231,6 +3231,9 @@ func runHostAgentLoop(config runtimeInstanceConfig, plan runtimeRunOncePlan, run
 		attemptsSinceProgress++
 		fmt.Fprintf(stdout, "runtime_host_agent_attempt=%d\n", attempt)
 		args := []string{"-agent", "host-local", "-control-plane-url", "http://127.0.0.1:" + plan.AgentPort}
+		if strings.TrimSpace(plan.ProjectKey) != "" {
+			args = append(args, "-project", strings.TrimSpace(plan.ProjectKey))
+		}
 		if plan.AgentControlPlaneConnectTimeout > 0 {
 			args = append(args, "-control-plane-connect-timeout", plan.AgentControlPlaneConnectTimeout.String())
 		}

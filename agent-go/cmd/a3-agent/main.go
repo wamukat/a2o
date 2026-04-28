@@ -51,6 +51,7 @@ func run(args []string) int {
 	flags.Usage = printAgentUsage
 	configFlag := flags.String("config", configPath, "runtime profile JSON file")
 	agentName := flags.String("agent", defaultString("A2O_AGENT_NAME", config.AgentName, "local-agent"), "agent name used when polling the A2O control plane")
+	projectKey := flags.String("project", defaultString("A2O_AGENT_PROJECT_KEY", config.ProjectKey, envDefault("A2O_PROJECT_KEY", "")), "agent/session default project key used when claiming jobs")
 	controlPlaneURL := defaultString("A2O_CONTROL_PLANE_URL", config.ControlPlaneURL, "http://127.0.0.1:7393")
 	flags.StringVar(&controlPlaneURL, "control-plane-url", controlPlaneURL, "A2O control plane base URL")
 	flags.StringVar(&controlPlaneURL, "engine", controlPlaneURL, "alias for --control-plane-url")
@@ -73,6 +74,7 @@ func run(args []string) int {
 
 	client := agent.HTTPClient{
 		BaseURL:        controlPlaneURL,
+		ProjectKey:     *projectKey,
 		Token:          *agentToken,
 		TokenFile:      *agentTokenFile,
 		FallbackToken:  config.AgentToken,

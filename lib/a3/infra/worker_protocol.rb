@@ -34,6 +34,7 @@ module A3
         review_target = run.evidence.review_target
         phase_runtime_form = phase_runtime.worker_request_form
         phase_runtime_form = phase_runtime_form.merge("prior_review_feedback" => prior_review_feedback) if prior_review_feedback
+        project_key = run.project_key || task.project_key
         payload = {
           "task_ref" => task.ref,
           "run_ref" => run.ref,
@@ -66,6 +67,7 @@ module A3
           "phase_runtime" => phase_runtime_form,
           "slot_paths" => workspace.slot_paths.transform_keys(&:to_s).transform_values(&:to_s)
         }
+        payload["project_key"] = project_key if project_key
         payload["command_intent"] = command_intent.to_s if command_intent
         payload
       end

@@ -22,6 +22,9 @@ func TestHTTPClientUsesAgentProtocol(t *testing.T) {
 			if r.URL.Query().Get("agent") != "host-local" {
 				t.Fatalf("agent query = %q", r.URL.Query().Get("agent"))
 			}
+			if r.URL.Query().Get("project_key") != "a2o" {
+				t.Fatalf("project_key query = %q", r.URL.Query().Get("project_key"))
+			}
 			writeJSON(w, http.StatusOK, map[string]any{"job": testRequest(t.TempDir())})
 		case r.Method == http.MethodPut && r.URL.Path == "/v1/agent/artifacts/art-log-1":
 			uploaded = true
@@ -56,7 +59,7 @@ func TestHTTPClientUsesAgentProtocol(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := HTTPClient{BaseURL: server.URL}
+	client := HTTPClient{BaseURL: server.URL, ProjectKey: "a2o"}
 	job, err := client.ClaimNext("host-local")
 	if err != nil {
 		t.Fatal(err)

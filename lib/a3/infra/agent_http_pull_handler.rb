@@ -96,7 +96,7 @@ module A3
 
       def claim_next(query)
         agent_name = required_query(query, "agent")
-        record = @job_store.claim_next(agent_name: agent_name, claimed_at: @clock.call)
+        record = @job_store.claim_next(agent_name: agent_name, claimed_at: @clock.call, project_key: optional_query(query, "project_key"))
         return json_response(204, {}) unless record
 
         json_response(200, "job" => record.request.request_form)
@@ -152,6 +152,11 @@ module A3
         raise A3::Domain::ConfigurationError, "missing query parameter: #{key}" if value.empty?
 
         value
+      end
+
+      def optional_query(query, key)
+        value = query[key].to_s.strip
+        value.empty? ? nil : value
       end
 
       def json_response(status, payload)

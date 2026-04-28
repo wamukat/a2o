@@ -23,6 +23,7 @@ type ControlPlane interface {
 
 type HTTPClient struct {
 	BaseURL        string
+	ProjectKey     string
 	Token          string
 	TokenFile      string
 	FallbackToken  string
@@ -34,7 +35,11 @@ type HTTPClient struct {
 }
 
 func (c HTTPClient) ClaimNext(agentName string) (*JobRequest, error) {
-	resp, err := c.do(http.MethodGet, "/v1/agent/jobs/next", url.Values{"agent": []string{agentName}}, nil, "")
+	query := url.Values{"agent": []string{agentName}}
+	if strings.TrimSpace(c.ProjectKey) != "" {
+		query.Set("project_key", strings.TrimSpace(c.ProjectKey))
+	}
+	resp, err := c.do(http.MethodGet, "/v1/agent/jobs/next", query, nil, "")
 	if err != nil {
 		return nil, err
 	}

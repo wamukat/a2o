@@ -12,6 +12,7 @@ import (
 
 type RuntimeProfileConfig struct {
 	AgentName                  string            `json:"agent"`
+	ProjectKey                 string            `json:"project_key"`
 	ControlPlaneURL            string            `json:"control_plane_url"`
 	AgentToken                 string            `json:"agent_token"`
 	AgentTokenFile             string            `json:"agent_token_file"`

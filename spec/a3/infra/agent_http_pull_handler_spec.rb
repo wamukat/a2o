@@ -107,6 +107,25 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
     expect(JSON.parse(response.body).fetch("error")).to include("missing query parameter: agent")
   end
 
+  it "claims only jobs matching the requested project key" do
+    store.enqueue(agent_job_request("job-a", project_key: "a2o"))
+    store.enqueue(agent_job_request("job-b", project_key: "portal"))
+
+    claim_response = handler.handle(
+      method: "GET",
+      path: "/v1/agent/jobs/next",
+      query: {"agent" => "host-local-agent", "project_key" => "portal"}
+    )
+    claimed_payload = JSON.parse(claim_response.body)
+
+    expect(claim_response.status).to eq(200)
+    expect(claimed_payload.fetch("job")).to include(
+      "job_id" => "job-b",
+      "project_key" => "portal"
+    )
+    expect(store.fetch("job-a").state).to eq(:queued)
+  end
+
   it "requires a bearer token when configured" do
     secured_handler = described_class.new(
       job_store: store,
@@ -228,9 +247,10 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
     expect(artifact_store.read("art-log-1")).to eq(content)
   end
 
-  def agent_job_request(job_id)
+  def agent_job_request(job_id, project_key: nil)
     A3::Domain::AgentJobRequest.new(
       job_id: job_id,
+      project_key: project_key,
       task_ref: "Sample#42",
       phase: :verification,
       runtime_profile: "host-local-agent",

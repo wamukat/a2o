@@ -29,6 +29,7 @@ func TestPreScanConfigPath(t *testing.T) {
 func TestPublicAgentEnvironmentConfig(t *testing.T) {
 	t.Setenv("A2O_AGENT_CONFIG", "/tmp/public-profile.json")
 	t.Setenv("A2O_AGENT_NAME", "public-agent")
+	t.Setenv("A2O_AGENT_PROJECT_KEY", "portal")
 	t.Setenv("A2O_AGENT_POLL_INTERVAL", "3s")
 	t.Setenv("A2O_AGENT_MAX_ITERATIONS", "4")
 
@@ -37,6 +38,9 @@ func TestPublicAgentEnvironmentConfig(t *testing.T) {
 	}
 	if got := defaultString("A2O_AGENT_NAME", "", "local-agent"); got != "public-agent" {
 		t.Fatalf("agent name env = %q", got)
+	}
+	if got := defaultString("A2O_AGENT_PROJECT_KEY", "", envDefault("A2O_PROJECT_KEY", "")); got != "portal" {
+		t.Fatalf("agent project env = %q", got)
 	}
 	if got := envDuration("A2O_AGENT_POLL_INTERVAL", 0); got.String() != "3s" {
 		t.Fatalf("poll interval env = %s", got)

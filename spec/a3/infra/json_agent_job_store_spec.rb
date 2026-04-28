@@ -86,6 +86,17 @@ RSpec.describe A3::Infra::JsonAgentJobStore do
     expect(store.claim_next(agent_name: "host-local-agent", claimed_at: "2026-04-11T08:01:00Z")).to be_nil
   end
 
+  it "filters claimed jobs by project key when the agent session is project-bound" do
+    store.enqueue(agent_job_request("job-a", project_key: "a2o"))
+    store.enqueue(agent_job_request("job-b", project_key: "portal"))
+
+    claimed = store.claim_next(agent_name: "portal-agent", claimed_at: "2026-04-11T08:00:00Z", project_key: "portal")
+
+    expect(claimed.job_id).to eq("job-b")
+    expect(claimed.project_key).to eq("portal")
+    expect(store.fetch("job-a").state).to eq(:queued)
+  end
+
   it "persists project identity at the agent job record boundary" do
     request = agent_job_request("job-1", project_key: "a2o")
 

@@ -10,6 +10,7 @@ func TestLoadRuntimeProfileConfig(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "agent-profile.json")
 	if err := os.WriteFile(path, []byte(`{
   "agent": "dev-env",
+  "project_key": "portal",
   "control_plane_url": "http://a3-runtime:7393",
   "agent_token": "secret-token",
   "agent_token_file": "/run/secrets/a3-agent-token",
@@ -33,6 +34,9 @@ func TestLoadRuntimeProfileConfig(t *testing.T) {
 
 	if config.AgentName != "dev-env" {
 		t.Fatalf("agent = %s", config.AgentName)
+	}
+	if config.ProjectKey != "portal" {
+		t.Fatalf("project_key = %s", config.ProjectKey)
 	}
 	if config.ControlPlaneURL != "http://a3-runtime:7393" {
 		t.Fatalf("control plane url = %s", config.ControlPlaneURL)
