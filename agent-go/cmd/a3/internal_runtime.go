@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -602,17 +603,67 @@ func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, std
 	flags := flag.NewFlagSet("a2o runtime status", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	projectKey := flags.String("project", "", "runtime project key for read-only status")
+	allProjects := flags.Bool("all-projects", false, "show read-only status for every project in the runtime project registry")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
+	if *allProjects {
+		if strings.TrimSpace(*projectKey) != "" {
+			return fmt.Errorf("--all-projects cannot be combined with --project")
+		}
+		return runRuntimeStatusAllProjects(runner, stdout)
+	}
 
 	context, configPath, err := loadProjectRuntimeContextFromWorkingTree(*projectKey)
 	if err != nil {
 		return err
 	}
+	return printRuntimeStatusForContext(context, configPath, runner, stdout)
+}
+
+func runRuntimeStatusAllProjects(runner commandRunner, stdout io.Writer) error {
+	start, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+	registryPath, err := findProjectRegistry(start)
+	if err != nil {
+		return fmt.Errorf("--all-projects requires %s: %w", projectRegistryRelativePath, err)
+	}
+	registry, err := readProjectRegistry(registryPath)
+	if err != nil {
+		return err
+	}
+	keys := make([]string, 0, len(registry.Projects))
+	for key := range registry.Projects {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		context, err := projectRuntimeContextFromRegistry(registryPath, registry, key)
+		if err != nil {
+			fmt.Fprintf(stdout, "project_key=%s runtime_status_error=%s\n", key, singleLine(err.Error()))
+			continue
+		}
+		var projectOutput bytes.Buffer
+		if err := printRuntimeStatusForContext(context, registryPath, runner, &projectOutput); err != nil {
+			fmt.Fprintf(stdout, "project_key=%s runtime_status_error=%s\n", context.ProjectKey, singleLine(err.Error()))
+			continue
+		}
+		for _, line := range strings.Split(strings.TrimRight(projectOutput.String(), "\n"), "\n") {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			fmt.Fprintf(stdout, "project_key=%s %s\n", context.ProjectKey, line)
+		}
+	}
+	return nil
+}
+
+func printRuntimeStatusForContext(context *projectRuntimeContext, configPath string, runner commandRunner, stdout io.Writer) error {
 	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	paths := schedulerPaths(effectiveConfig)
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))

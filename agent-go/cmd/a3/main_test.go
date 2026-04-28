@@ -840,6 +840,79 @@ func TestRuntimeStatusAcceptsProjectForRegistryReadOnlyContext(t *testing.T) {
 	}
 }
 
+func TestRuntimeStatusAllProjectsLabelsRowsAndContinuesAfterProjectError(t *testing.T) {
+	t.Setenv("A2O_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, map[string]any{
+		"version":         1,
+		"default_project": "alpha",
+		"projects": map[string]any{
+			"alpha": map[string]any{
+				"package_path":    packageDir,
+				"workspace_root":  tempDir,
+				"compose_file":    filepath.Join(tempDir, "compose.yml"),
+				"compose_project": "a2o-alpha",
+				"runtime_service": "a2o-runtime",
+				"storage_dir":     "/var/lib/a2o/projects/alpha",
+				"kanban":          map[string]any{"mode": "internal"},
+			},
+			"beta": map[string]any{
+				"package_path": "",
+				"storage_dir":  "/var/lib/a2o/projects/beta",
+				"kanban":       map[string]any{"mode": "internal"},
+			},
+		},
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "status", "--all-projects"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	for _, want := range []string{
+		"project_key=alpha runtime_project_key=alpha",
+		"project_key=alpha runtime_status_check name=runtime_container status=running container=runtime-container",
+		"project_key=alpha runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation state=terminal outcome=blocked",
+		"project_key=beta runtime_status_error=project definition package_path is required",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout should include %q in:\n%s", want, output)
+		}
+	}
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, "project_key=") {
+			t.Fatalf("all-projects row should be project-labelled, got %q in:\n%s", line, output)
+		}
+	}
+}
+
+func TestRuntimeStatusAllProjectsRejectsProjectFilter(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"runtime", "status", "--all-projects", "--project", "alpha"}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("combined --all-projects and --project should fail")
+	}
+	if !strings.Contains(stderr.String(), "--all-projects cannot be combined with --project") {
+		t.Fatalf("stderr should explain invalid option combination, got:\n%s", stderr.String())
+	}
+}
+
 func TestRuntimeStatusRejectsProjectWithoutRegistry(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

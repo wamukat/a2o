@@ -163,7 +163,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o runtime down [--project KEY]")
 	fmt.Fprintln(w, "  a2o runtime resume [--project KEY] [--interval DURATION] [--agent-poll-interval DURATION] # resume scheduler")
 	fmt.Fprintln(w, "  a2o runtime pause [--project KEY]         # pause scheduler after current work")
-	fmt.Fprintln(w, "  a2o runtime status [--project KEY]")
+	fmt.Fprintln(w, "  a2o runtime status [--project KEY|--all-projects]")
 	fmt.Fprintln(w, "  a2o runtime image-digest [--project KEY]")
 	fmt.Fprintln(w, "  a2o runtime doctor [--project KEY]")
 	fmt.Fprintln(w, "  a2o runtime describe-task [--project KEY] TASK_REF")
