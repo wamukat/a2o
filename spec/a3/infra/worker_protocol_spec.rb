@@ -223,6 +223,42 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
+  it "canonicalizes optional worker identity fields instead of blocking on invented refs" do
+    result = described_class.new(review_disposition_repo_scopes: %w[repo_beta]).build_execution_result(
+      {
+        "success" => true,
+        "summary" => "parent review completed",
+        "task_ref" => "invented-task",
+        "run_ref" => "invented-run",
+        "phase" => "ProjectName-10-parent",
+        "rework_required" => false,
+        "review_disposition" => {
+          "kind" => "completed",
+          "repo_scope" => "repo_beta",
+          "summary" => "No findings",
+          "description" => "The parent integration branch is ready.",
+          "finding_key" => "no-findings"
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: run.ref,
+      expected_phase: :review
+    )
+
+    expect(result).to have_attributes(success?: true)
+    expect(result.response_bundle).to include(
+      "task_ref" => task.ref,
+      "run_ref" => run.ref,
+      "phase" => "review"
+    )
+    expect(result.diagnostics.fetch("canonicalized_identity")).to include(
+      "task_ref" => hash_including("provided" => "invented-task", "canonical" => task.ref),
+      "run_ref" => hash_including("provided" => "invented-run", "canonical" => run.ref),
+      "phase" => hash_including("provided" => "ProjectName-10-parent", "canonical" => "review")
+    )
+  end
+
   it "accepts a clarification request without blocked failure diagnostics" do
     result = described_class.new.build_execution_result(
       {

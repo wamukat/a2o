@@ -77,6 +77,7 @@ func runWorkerStdinBundle(args []string) int {
 		return writeWorkerFailureResult(resultPath, request, workerFailure(request, "stdin worker returned invalid json", command, "invalid_worker_json", map[string]any{"stdout": stdout, "stderr": stderr, "error": err.Error()}))
 	}
 	normalizeReviewDisposition(payload)
+	canonicalizeWorkerIdentity(payload, request)
 	if validationErrors := validateWorkerPayload(payload, request); len(validationErrors) > 0 {
 		return writeWorkerFailureResult(resultPath, request, workerFailure(request, "worker result schema invalid", command, "invalid_worker_result", map[string]any{
 			"validation_errors":      validationErrors,
@@ -510,6 +511,10 @@ func workerAIRawLogWriter() (io.Writer, func()) {
 func workerBundle() string {
 	request := map[string]any{}
 	_ = readJSONFile(envPublic("A2O_WORKER_REQUEST_PATH"), &request)
+	examples := []map[string]any{}
+	if stringValue(request["phase"]) == "review" && nestedString(request, "phase_runtime", "task_kind") == "parent" {
+		examples = parentReviewResponseExamples(request)
+	}
 	bundle := map[string]any{
 		"type":        "a2o-worker-stdin-bundle",
 		"instruction": workerInstruction(request),
@@ -527,7 +532,12 @@ func workerBundle() string {
 				"For implementation success, include review_disposition with kind=completed when self-review is clean.",
 				"For review failures caused by findings, include rework_required=true.",
 				"For parent review, include review_disposition with kind, repo_scope, summary, description, and finding_key unless you return clarification_request.",
+				"Copy task_ref, run_ref, and phase exactly from request. If you are uncertain, omit them rather than inventing values.",
+				"For parent review success with no findings, set success=true, observed_state=null, rework_required=false, and review_disposition.kind=completed.",
+				"For parent review code follow-up findings, set success=false, observed_state to a concise string such as review_findings, rework_required=false, and review_disposition.kind=follow_up_child with a configured repo_scope.",
+				"For parent review blocked findings, set success=false, observed_state to a concise string such as blocked_finding, rework_required=false, and review_disposition.kind=blocked with repo_scope=unresolved.",
 			},
+			"examples": examples,
 		},
 		"operating_contract": map[string]any{
 			"workspace_root": envPublic("A2O_WORKSPACE_ROOT"),
@@ -542,6 +552,74 @@ func workerBundle() string {
 	}
 	body, _ := json.MarshalIndent(bundle, "", "  ")
 	return string(body)
+}
+
+func parentReviewResponseExamples(request map[string]any) []map[string]any {
+	repoScope := "repo_alpha"
+	scopes := validWorkerReviewDispositionRepoScopes(request, true)
+	for _, scope := range scopes {
+		if scope != "unresolved" {
+			repoScope = scope
+			break
+		}
+	}
+	base := map[string]any{
+		"task_ref": request["task_ref"],
+		"run_ref":  request["run_ref"],
+		"phase":    request["phase"],
+	}
+	clean := copyMap(base)
+	clean["success"] = true
+	clean["summary"] = "Parent review found no findings."
+	clean["failing_command"] = nil
+	clean["observed_state"] = nil
+	clean["rework_required"] = false
+	clean["review_disposition"] = map[string]any{
+		"kind":        "completed",
+		"repo_scope":  repoScope,
+		"summary":     "No findings",
+		"description": "The parent integration branch is ready to complete.",
+		"finding_key": "no-findings",
+	}
+	followUp := copyMap(base)
+	followUp["success"] = false
+	followUp["summary"] = "A follow-up child task is required."
+	followUp["failing_command"] = nil
+	followUp["observed_state"] = "review_findings"
+	followUp["rework_required"] = false
+	followUp["review_disposition"] = map[string]any{
+		"kind":        "follow_up_child",
+		"repo_scope":  repoScope,
+		"summary":     "Follow-up child required",
+		"description": "The finding is scoped to one configured slot and should be implemented as a child task.",
+		"finding_key": "parent-review-follow-up",
+	}
+	blocked := copyMap(base)
+	blocked["success"] = false
+	blocked["summary"] = "Parent review is blocked."
+	blocked["failing_command"] = "parent_review"
+	blocked["observed_state"] = "blocked_finding"
+	blocked["rework_required"] = false
+	blocked["review_disposition"] = map[string]any{
+		"kind":        "blocked",
+		"repo_scope":  "unresolved",
+		"summary":     "Parent review blocked",
+		"description": "The finding cannot be routed to a configured child scope without requester input or technical resolution.",
+		"finding_key": "parent-review-blocked",
+	}
+	return []map[string]any{
+		{"name": "parent_review_clean", "response": clean},
+		{"name": "parent_review_follow_up_child", "response": followUp},
+		{"name": "parent_review_blocked", "response": blocked},
+	}
+}
+
+func copyMap(values map[string]any) map[string]any {
+	copied := map[string]any{}
+	for key, value := range values {
+		copied[key] = value
+	}
+	return copied
 }
 
 func workerRequestValue(key string) any {
@@ -647,6 +725,30 @@ func validateWorkerPayload(payload map[string]any, request map[string]any) []str
 		}
 	}
 	return errors
+}
+
+func canonicalizeWorkerIdentity(payload map[string]any, request map[string]any) {
+	for _, key := range []string{"task_ref", "run_ref", "phase"} {
+		value, ok := payload[key]
+		if !ok || value == request[key] {
+			continue
+		}
+		diagnostics, _ := payload["diagnostics"].(map[string]any)
+		if diagnostics == nil {
+			diagnostics = map[string]any{}
+		}
+		corrections, _ := diagnostics["canonicalized_identity"].(map[string]any)
+		if corrections == nil {
+			corrections = map[string]any{}
+		}
+		corrections[key] = map[string]any{
+			"provided":  value,
+			"canonical": request[key],
+		}
+		diagnostics["canonicalized_identity"] = corrections
+		payload["diagnostics"] = diagnostics
+		payload[key] = request[key]
+	}
 }
 
 func clarificationRequestPresent(payload map[string]any) bool {
@@ -762,6 +864,19 @@ func mapValue(value any) map[string]any {
 		return map[string]any{}
 	}
 	return values
+}
+
+func validWorkerReviewDispositionRepoScopes(request map[string]any, includeUnresolved bool) []string {
+	scopes := []string{}
+	for scope := range mapValue(request["slot_paths"]) {
+		if scope != "" && !containsString(scopes, scope) {
+			scopes = append(scopes, scope)
+		}
+	}
+	if includeUnresolved && !containsString(scopes, "unresolved") {
+		scopes = append(scopes, "unresolved")
+	}
+	return scopes
 }
 
 func fileExists(path string) bool {

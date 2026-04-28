@@ -780,6 +780,58 @@ RSpec.describe "worker:stdin-bundle" do
     end
   end
 
+  it "includes complete parent review response examples in the stdin bundle" do
+    request = {
+      "task_ref" => "Sample#3140",
+      "run_ref" => "run-parent-review-1",
+      "phase" => "review",
+      "phase_runtime" => { "task_kind" => "parent", "review_skill" => "skill.md" },
+      "slot_paths" => { "repo_alpha" => "/tmp/workspace/repo-alpha", "repo_beta" => "/tmp/workspace/repo-beta" }
+    }
+    Dir.mktmpdir("a3-stdin-worker-parent-review-examples-") do |temp_dir_text|
+      temp_dir = Pathname(temp_dir_text)
+      launcher_config = temp_dir.join("launcher.json")
+      request_path = temp_dir.join("request.json")
+      result_path = temp_dir.join("result.json")
+      request_path.write(JSON.generate(request))
+      write_launcher_config(launcher_config, command: ["runner"])
+
+      ruby = <<~RUBY
+        require #{STDIN_WORKER_LIB.to_s.inspect}
+        request = load_json(#{request_path.to_s.inspect})
+        print bundle_for(request)
+      RUBY
+
+      stdout, stderr, status = run_ruby(
+        ruby,
+        env: {
+          "A2O_WORKER_LAUNCHER_CONFIG_PATH" => launcher_config.to_s,
+          "A2O_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A2O_WORKER_RESULT_PATH" => result_path.to_s
+        }
+      )
+
+      expect(status.success?).to eq(true), "#{stdout}\n#{stderr}"
+      contract = JSON.parse(stdout).fetch("response_contract")
+      examples = contract.fetch("examples")
+      expect(examples.map { |entry| entry.fetch("name") }).to include(
+        "parent_review_clean",
+        "parent_review_follow_up_child",
+        "parent_review_blocked"
+      )
+      expect(contract.fetch("notes")).to include(a_string_matching(/Copy task_ref, run_ref, and phase exactly/))
+      expect(examples.fetch(1).fetch("response")).to include(
+        "success" => false,
+        "observed_state" => "review_findings",
+        "rework_required" => false
+      )
+      expect(examples.fetch(1).fetch("response").fetch("review_disposition")).to include(
+        "kind" => "follow_up_child",
+        "repo_scope" => "repo_alpha"
+      )
+    end
+  end
+
   it "accepts parent review clarification requests without review_disposition" do
     request = {
       "task_ref" => "Sample#3140",
@@ -802,6 +854,73 @@ RSpec.describe "worker:stdin-bundle" do
     }
 
     expect(validate_payload(payload, request: request)).to eq([])
+  end
+
+  it "canonicalizes parent review identity fields before validating payloads" do
+    request = {
+      "task_ref" => "Sample#3140",
+      "run_ref" => "run-parent-review-1",
+      "phase" => "review",
+      "phase_runtime" => { "task_kind" => "parent", "review_skill" => "skill.md" },
+      "slot_paths" => { "repo_alpha" => "/tmp/workspace/repo-alpha" }
+    }
+    payload = {
+      "task_ref" => "wrong-task",
+      "run_ref" => "ProjectName-10-parent",
+      "phase" => "wrong-phase",
+      "success" => true,
+      "summary" => "parent review clean",
+      "failing_command" => nil,
+      "observed_state" => nil,
+      "rework_required" => false,
+      "review_disposition" => {
+        "kind" => "completed",
+        "repo_scope" => "repo_alpha",
+        "summary" => "No findings",
+        "description" => "The parent integration branch is ready.",
+        "finding_key" => "no-findings"
+      }
+    }
+
+    Dir.mktmpdir("a3-stdin-worker-parent-review-identity-") do |temp_dir_text|
+      temp_dir = Pathname(temp_dir_text)
+      launcher_config = temp_dir.join("launcher.json")
+      request_path = temp_dir.join("request.json")
+      payload_path = temp_dir.join("payload.json")
+      request_path.write(JSON.generate(request))
+      payload_path.write(JSON.generate(payload))
+      write_launcher_config(launcher_config, command: ["runner"])
+
+      ruby = <<~RUBY
+        require #{STDIN_WORKER_LIB.to_s.inspect}
+        request = load_json(#{request_path.to_s.inspect})
+        payload = load_json(#{payload_path.to_s.inspect})
+        errors = validate_payload(payload, request: request)
+        print JSON.generate({ "errors" => errors, "payload" => payload })
+      RUBY
+
+      stdout, stderr, status = run_ruby(
+        ruby,
+        env: {
+          "A2O_WORKER_LAUNCHER_CONFIG_PATH" => launcher_config.to_s,
+          "A2O_WORKER_REQUEST_PATH" => request_path.to_s,
+          "A2O_WORKER_RESULT_PATH" => temp_dir.join("result.json").to_s
+        }
+      )
+
+      expect(status.success?).to eq(true), "#{stdout}\n#{stderr}"
+      result = JSON.parse(stdout)
+      expect(result.fetch("errors")).to eq([])
+      expect(result.fetch("payload")).to include(
+        "task_ref" => "Sample#3140",
+        "run_ref" => "run-parent-review-1",
+        "phase" => "review"
+      )
+      expect(result.dig("payload", "diagnostics", "canonicalized_identity", "run_ref")).to include(
+        "provided" => "ProjectName-10-parent",
+        "canonical" => "run-parent-review-1"
+      )
+    end
   end
 
   it "rejects parent review success with follow-up child disposition in helper validation" do

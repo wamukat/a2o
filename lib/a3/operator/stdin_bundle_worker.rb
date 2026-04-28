@@ -107,6 +107,7 @@ end
 
 def bundle_for(request)
   phase = request["phase"].to_s
+  parent_review = phase == "review" && request.dig("phase_runtime", "task_kind").to_s == "parent"
   review_scopes = valid_review_disposition_repo_scopes(request, include_unresolved: phase == "review")
   instruction = +"You are the A2O worker. Work only under slot_paths. Follow AGENTS.md and repo Taskfile conventions. "
   instruction << "Do not update kanban directly. Treat request.task_packet as the primary source of truth for what to implement or review before inferring from repository context. Return only the final JSON object required by response_contract."
@@ -146,9 +147,14 @@ def bundle_for(request)
           "For implementation success, include changed_files as an object like {\"repo_alpha\": [\"src/main.rb\"]} using only relative paths under each slot.",
           "For implementation success, you may include review_disposition when the final self-review is clean.",
           "For review failures caused by findings, include rework_required=true.",
+          "Copy task_ref, run_ref, and phase exactly from request. If you are uncertain, omit them rather than inventing values.",
           "For parent review, include review_disposition with kind, repo_scope, summary, description, and finding_key unless you return clarification_request.",
+          "For parent review success with no findings, set success=true, observed_state=null, rework_required=false, and review_disposition.kind=completed.",
+          "For parent review code follow-up findings, set success=false, observed_state to a concise string such as review_findings, rework_required=false, and review_disposition.kind=follow_up_child with a configured repo_scope.",
+          "For parent review blocked findings, set success=false, observed_state to a concise string such as blocked_finding, rework_required=false, and review_disposition.kind=blocked with repo_scope=unresolved.",
           "Optionally include skill_feedback when this run revealed reusable project or A2O skill guidance. Use category, summary, proposal.target, and optional repo_scope, skill_path, confidence, evidence, and proposal.suggested_patch. Do not edit skill files directly from this field."
-        ]
+        ],
+        "examples" => parent_review ? parent_review_response_examples(request) : []
       },
       "operating_contract" => {
         "workspace_root" => public_env("A2O_WORKSPACE_ROOT", "A3_WORKSPACE_ROOT"),
@@ -162,6 +168,76 @@ def bundle_for(request)
       }
     }
   )
+end
+
+def parent_review_response_examples(request)
+  task_ref = request["task_ref"]
+  run_ref = request["run_ref"]
+  phase = request["phase"] || "review"
+  scopes = valid_review_disposition_repo_scopes(request, include_unresolved: true).reject { |scope| scope == "unresolved" }
+  repo_scope = scopes.first || "repo_alpha"
+  [
+    {
+      "name" => "parent_review_clean",
+      "response" => {
+        "task_ref" => task_ref,
+        "run_ref" => run_ref,
+        "phase" => phase,
+        "success" => true,
+        "summary" => "Parent review found no findings.",
+        "failing_command" => nil,
+        "observed_state" => nil,
+        "rework_required" => false,
+        "review_disposition" => {
+          "kind" => "completed",
+          "repo_scope" => repo_scope,
+          "summary" => "No findings",
+          "description" => "The parent integration branch is ready to complete.",
+          "finding_key" => "no-findings"
+        }
+      }
+    },
+    {
+      "name" => "parent_review_follow_up_child",
+      "response" => {
+        "task_ref" => task_ref,
+        "run_ref" => run_ref,
+        "phase" => phase,
+        "success" => false,
+        "summary" => "A follow-up child task is required.",
+        "failing_command" => nil,
+        "observed_state" => "review_findings",
+        "rework_required" => false,
+        "review_disposition" => {
+          "kind" => "follow_up_child",
+          "repo_scope" => repo_scope,
+          "summary" => "Follow-up child required",
+          "description" => "The finding is scoped to one configured slot and should be implemented as a child task.",
+          "finding_key" => "parent-review-follow-up"
+        }
+      }
+    },
+    {
+      "name" => "parent_review_blocked",
+      "response" => {
+        "task_ref" => task_ref,
+        "run_ref" => run_ref,
+        "phase" => phase,
+        "success" => false,
+        "summary" => "Parent review is blocked.",
+        "failing_command" => "parent_review",
+        "observed_state" => "blocked_finding",
+        "rework_required" => false,
+        "review_disposition" => {
+          "kind" => "blocked",
+          "repo_scope" => "unresolved",
+          "summary" => "Parent review blocked",
+          "description" => "The finding cannot be routed to a configured child scope without requester input or technical resolution.",
+          "finding_key" => "parent-review-blocked"
+        }
+      }
+    }
+  ]
 end
 
 def response_schema(request)
@@ -438,6 +514,7 @@ def validate_payload(payload, request:)
   return ["worker result payload must be an object"] unless payload.is_a?(Hash)
 
   normalize_payload!(payload)
+  canonicalize_identity!(payload, request: request)
   errors = []
   implementation_phase = request["phase"] == "implementation"
   parent_review = request["phase"] == "review" && request.dig("phase_runtime", "task_kind").to_s == "parent"
@@ -511,6 +588,23 @@ def validate_payload(payload, request:)
     errors << "review_disposition must be present for implementation success"
   end
   errors
+end
+
+def canonicalize_identity!(payload, request:)
+  %w[task_ref run_ref phase].each do |key|
+    next unless payload.key?(key)
+    next if payload[key] == request[key]
+
+    diagnostics = payload["diagnostics"].is_a?(Hash) ? payload["diagnostics"] : {}
+    corrections = diagnostics["canonicalized_identity"].is_a?(Hash) ? diagnostics["canonicalized_identity"] : {}
+    corrections[key] = {
+      "provided" => payload[key],
+      "canonical" => request[key]
+    }
+    diagnostics["canonicalized_identity"] = corrections
+    payload["diagnostics"] = diagnostics
+    payload[key] = request[key]
+  end
 end
 
 def validate_clarification_request(value, success:)

@@ -508,6 +508,46 @@ func TestWorkerResponseSchemaIncludesPhaseSpecificProperties(t *testing.T) {
 	}
 }
 
+func TestWorkerBundleIncludesParentReviewExamples(t *testing.T) {
+	tmp := t.TempDir()
+	requestPath := filepath.Join(tmp, "request.json")
+	request := map[string]any{
+		"task_ref": "A2O#42",
+		"run_ref":  "run-parent-review-1",
+		"phase":    "review",
+		"phase_runtime": map[string]any{
+			"task_kind": "parent",
+		},
+		"slot_paths": map[string]any{
+			"repo_alpha": filepath.Join(tmp, "repo-alpha"),
+		},
+	}
+	writeJSONForTest(t, requestPath, request)
+	t.Setenv("A2O_WORKER_REQUEST_PATH", requestPath)
+
+	var bundle map[string]any
+	if err := json.Unmarshal([]byte(workerBundle()), &bundle); err != nil {
+		t.Fatal(err)
+	}
+	contract := bundle["response_contract"].(map[string]any)
+	notes := strings.Join(anyStrings(contract["notes"].([]any)), "\n")
+	if !strings.Contains(notes, "Copy task_ref, run_ref, and phase exactly") {
+		t.Fatalf("parent review notes should explain identity copying: %s", notes)
+	}
+	examples := contract["examples"].([]any)
+	if len(examples) != 3 {
+		t.Fatalf("expected three parent review examples, got %#v", examples)
+	}
+	followUp := examples[1].(map[string]any)["response"].(map[string]any)
+	if followUp["success"] != false || followUp["observed_state"] != "review_findings" {
+		t.Fatalf("follow-up example should include failure diagnostics: %#v", followUp)
+	}
+	disposition := followUp["review_disposition"].(map[string]any)
+	if disposition["kind"] != "follow_up_child" || disposition["repo_scope"] != "repo_alpha" {
+		t.Fatalf("unexpected follow-up disposition example: %#v", disposition)
+	}
+}
+
 func TestWorkerPayloadRequiresReviewDispositionOnlyForImplementationSuccess(t *testing.T) {
 	request := map[string]any{
 		"task_ref":   "A2O#7",
@@ -598,6 +638,48 @@ func TestWorkerPayloadAcceptsParentReviewClarificationWithoutReviewDisposition(t
 	}
 }
 
+func TestWorkerPayloadCanonicalizesIdentityBeforeValidation(t *testing.T) {
+	request := map[string]any{
+		"task_ref": "A2O#7",
+		"run_ref":  "run-1",
+		"phase":    "review",
+		"phase_runtime": map[string]any{
+			"task_kind": "parent",
+		},
+	}
+	payload := map[string]any{
+		"task_ref":        "wrong-task",
+		"run_ref":         "ProjectName-10-parent",
+		"phase":           "wrong-phase",
+		"success":         true,
+		"summary":         "parent review clean",
+		"failing_command": nil,
+		"observed_state":  nil,
+		"rework_required": false,
+		"review_disposition": map[string]any{
+			"kind":        "completed",
+			"repo_scope":  "repo_alpha",
+			"summary":     "No findings",
+			"description": "The parent integration branch is ready.",
+			"finding_key": "no-findings",
+		},
+	}
+
+	canonicalizeWorkerIdentity(payload, request)
+	if errors := validateWorkerPayload(payload, request); len(errors) != 0 {
+		t.Fatalf("canonicalized parent review payload should be valid, got %#v", errors)
+	}
+	if payload["task_ref"] != "A2O#7" || payload["run_ref"] != "run-1" || payload["phase"] != "review" {
+		t.Fatalf("identity fields were not canonicalized: %#v", payload)
+	}
+	diagnostics := payload["diagnostics"].(map[string]any)
+	corrections := diagnostics["canonicalized_identity"].(map[string]any)
+	runRef := corrections["run_ref"].(map[string]any)
+	if runRef["provided"] != "ProjectName-10-parent" || runRef["canonical"] != "run-1" {
+		t.Fatalf("missing run_ref correction: %#v", corrections)
+	}
+}
+
 func stringSet(values []any) map[string]bool {
 	result := map[string]bool{}
 	for _, value := range values {
@@ -606,6 +688,27 @@ func stringSet(values []any) map[string]bool {
 		}
 	}
 	return result
+}
+
+func anyStrings(values []any) []string {
+	result := []string{}
+	for _, value := range values {
+		if text, ok := value.(string); ok {
+			result = append(result, text)
+		}
+	}
+	return result
+}
+
+func writeJSONForTest(t *testing.T, path string, payload any) {
+	t.Helper()
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func createDoctorGitSource(t *testing.T, root string) string {

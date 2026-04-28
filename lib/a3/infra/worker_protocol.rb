@@ -121,6 +121,12 @@ module A3
             response_bundle: worker_response
           )
         end
+        identity_corrections = canonicalize_worker_identity!(
+          worker_response,
+          expected_task_ref: expected_task_ref,
+          expected_run_ref: expected_run_ref,
+          expected_phase: expected_phase
+        )
         validation_errors = validate_worker_response(
           worker_response,
           workspace: workspace,
@@ -150,6 +156,7 @@ module A3
         end
 
         diagnostics = worker_response["diagnostics"].is_a?(Hash) ? worker_response["diagnostics"].dup : {}
+        diagnostics["canonicalized_identity"] = identity_corrections unless identity_corrections.empty?
         response_bundle = canonicalize_response_bundle(
           worker_response,
           workspace: workspace,
@@ -199,6 +206,25 @@ module A3
         end
 
         worker_response.merge("changed_files" => canonical_changed_files)
+      end
+
+      def canonicalize_worker_identity!(worker_response, expected_task_ref:, expected_run_ref:, expected_phase:)
+        corrections = {}
+        {
+          "task_ref" => expected_task_ref,
+          "run_ref" => expected_run_ref,
+          "phase" => expected_phase.to_s
+        }.each do |key, expected|
+          next unless worker_response.key?(key)
+          next if worker_response[key] == expected
+
+          corrections[key] = {
+            "provided" => worker_response[key],
+            "canonical" => expected
+          }
+          worker_response[key] = expected
+        end
+        corrections
       end
 
       def validate_worker_response(worker_response, workspace:, expected_task_ref:, expected_run_ref:, expected_phase:)
