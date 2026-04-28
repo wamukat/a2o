@@ -64,7 +64,7 @@ An optional helper command may convert draft children in bulk, but it is only a 
 | `a2o:draft-child` | A2O | Child ticket was generated from a decomposition proposal and is still a draft for planning purposes. |
 | `trigger:auto-implement` | operator or helper | Child is accepted and may enter the implementation scheduler domain. |
 | `a2o:ready-child` | optional operator convention | Selection helper for a future bulk accept command; it is not a scheduler gate. |
-| `trigger:auto-parent` | operator or project policy | Parent automation is explicitly requested; it is not implied by decomposition. |
+| `trigger:auto-parent` | operator, helper, or project policy after child acceptance | Parent automation is explicitly requested. It is not added by draft creation, but the A2O#286 remote issue flow needs a path to add it after accepted children become runnable. |
 
 The scheduler must continue to use `trigger:auto-implement` as the implementation gate. A ticket with `a2o:draft-child` and no `trigger:auto-implement` is visible in Kanban but non-runnable.
 
@@ -157,6 +157,10 @@ Child tickets should include enough metadata for operators and reruns:
 
 For remote issue intake from A2O#286, the remote issue can be the source ticket that receives `trigger:investigate`. Draft children are still Kanban planning artifacts and must not become runnable until accepted with `trigger:auto-implement`.
 
+Draft creation must not add `trigger:auto-parent` to the source ticket. That would make the remote issue parent runnable before the operator has accepted any child implementation work.
+
+After one or more draft children are accepted and receive `trigger:auto-implement`, the workflow needs a parent-automation path for the remote issue parent. That path may be a manual operator label, a helper command, or explicit project policy, but it happens after child acceptance rather than during draft creation. When it is applied, the parent receives `trigger:auto-parent` so the A2O#286 parent flow can observe accepted child delivery work.
+
 The implementation should avoid provider-specific logic in orchestration. Remote/local differences belong behind the kanban adapter and child writer boundary. If the adapter cannot create provider-backed children, A2O may create local Kanban children linked to the remote source and record that mapping in evidence.
 
 ## 10. Optional Accept-Drafts Helper
@@ -186,6 +190,7 @@ Implementation should include tests for:
 - duplicate child keys block with an actionable diagnostic
 - parent/source evidence records created and reconciled draft refs
 - remote-source decomposition creates non-runnable draft children through the adapter boundary
+- remote-source parent does not receive `trigger:auto-parent` during draft creation, but has a tested path to receive it after child acceptance
 - optional accept-drafts conversion changes only labels
 
 ## 12. Ticket Split
