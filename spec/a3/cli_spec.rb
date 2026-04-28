@@ -427,7 +427,8 @@ RSpec.describe A3::CLI do
     ).and_return(writer)
     expect(A3::Application::RunDecompositionChildCreation).to receive(:new).with(
       storage_dir: "/tmp/a2o-state",
-      child_writer: writer
+      child_writer: writer,
+      publish_external_task_activity: an_instance_of(A3::Infra::KanbanCliTaskActivityPublisher)
     ).and_return(child_service)
     expect(child_service).to receive(:call).with(
       task: task,
@@ -492,6 +493,21 @@ RSpec.describe A3::CLI do
     expect(bridge.task_source).to be_a(A3::Infra::NullExternalTaskSource)
   end
 
+  it "builds a source activity publisher for child-writer-only decomposition options" do
+    publisher = described_class.send(
+      :build_decomposition_source_activity_publisher,
+      {
+        kanban_command: "task",
+        kanban_command_args: ["kanban:api", "--"],
+        kanban_project: "A3-v2",
+        kanban_repo_label_map: {},
+        kanban_trigger_labels: []
+      }
+    )
+
+    expect(publisher).to be_a(A3::Infra::KanbanCliTaskActivityPublisher)
+  end
+
   it "imports an external Kanban task before gated child creation uses the parent external id" do
     Dir.mktmpdir do |dir|
       evidence_dir = File.join(dir, "decomposition-evidence", "Portal-240")
@@ -545,6 +561,7 @@ RSpec.describe A3::CLI do
       source = double("ExternalTaskSource")
       allow(source).to receive(:fetch_by_ref).with("Portal#240").and_return(external_task)
       allow(described_class).to receive(:build_external_task_source).and_return(source)
+      allow(described_class).to receive(:build_decomposition_source_activity_publisher).and_return(A3::Infra::NullExternalTaskActivityPublisher.new)
       writer = instance_double(A3::Infra::KanbanCliProposalChildWriter)
       write_result = A3::Infra::KanbanCliProposalChildWriter::Result.new(
         success?: true,

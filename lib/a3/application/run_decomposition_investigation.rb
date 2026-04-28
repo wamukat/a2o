@@ -9,7 +9,7 @@ require "tmpdir"
 module A3
   module Application
     class RunDecompositionInvestigation
-      Result = Struct.new(:success, :summary, :result, :request_path, :result_path, :workspace_root, :evidence_path, :failing_command, :observed_state, keyword_init: true)
+      Result = Struct.new(:success, :summary, :result, :source_ticket_summary, :source_ticket_summary_published, :request_path, :result_path, :workspace_root, :evidence_path, :failing_command, :observed_state, keyword_init: true)
       DEFAULT_SLOT_EXCLUDES = %w[
         .git
         node_modules
@@ -22,12 +22,13 @@ module A3
         vendor/bundle
       ].freeze
 
-      def initialize(storage_dir:, project_root: Dir.pwd, process_runner: nil, clock: -> { Time.now.utc }, progress_io: nil)
+      def initialize(storage_dir:, project_root: Dir.pwd, process_runner: nil, clock: -> { Time.now.utc }, progress_io: nil, publish_external_task_activity: nil)
         @storage_dir = storage_dir
         @project_root = project_root
         @process_runner = process_runner || method(:run_process)
         @clock = clock
         @progress_io = progress_io
+        @publish_external_task_activity = publish_external_task_activity
       end
 
       def call(task:, project_surface:, slot_paths: {}, task_snapshot: nil, previous_evidence_path: nil)
@@ -56,6 +57,7 @@ module A3
         result = load_result(result_path)
         success = status.success? && valid_result?(result)
         summary = summary_for(success: success, command: command, status: status, result: result, stderr: stderr)
+        source_ticket_summary = source_ticket_summary_for(success: success, summary: summary)
         evidence_path = persist_evidence(
           task: task,
           command: command,
@@ -63,6 +65,7 @@ module A3
           result: result,
           success: success,
           summary: summary,
+          source_ticket_summary: source_ticket_summary,
           stdout: stdout,
           stderr: stderr,
           status: status,
@@ -70,11 +73,14 @@ module A3
           request_path: request_path,
           result_path: result_path
         )
+        summary_published = publish_source_ticket_summary(task: task, body: source_ticket_summary)
 
         Result.new(
           success: success,
           summary: summary,
           result: result,
+          source_ticket_summary: source_ticket_summary,
+          source_ticket_summary_published: summary_published,
           request_path: request_path,
           result_path: result_path,
           workspace_root: workspace_root,
@@ -258,7 +264,20 @@ module A3
         "investigation result summary must be a non-empty string"
       end
 
-      def persist_evidence(task:, command:, request:, result:, success:, summary:, stdout:, stderr:, status:, workspace_root:, request_path:, result_path:)
+      def source_ticket_summary_for(success:, summary:)
+        lines = ["Decomposition investigation: #{success ? 'completed' : 'blocked'}"]
+        lines << "Summary: #{summary}"
+        lines.join("\n")
+      end
+
+      def publish_source_ticket_summary(task:, body:)
+        return false unless @publish_external_task_activity && task.external_task_id
+
+        @publish_external_task_activity.publish(task_ref: task.ref, external_task_id: task.external_task_id, body: body)
+        true
+      end
+
+      def persist_evidence(task:, command:, request:, result:, success:, summary:, source_ticket_summary:, stdout:, stderr:, status:, workspace_root:, request_path:, result_path:)
         evidence_dir = File.join(@storage_dir, "decomposition-evidence", slugify(task.ref))
         FileUtils.mkdir_p(evidence_dir)
         evidence_path = File.join(evidence_dir, "investigation.json")
@@ -269,6 +288,7 @@ module A3
             "phase" => "investigation",
             "success" => success,
             "summary" => summary,
+            "source_ticket_summary" => source_ticket_summary,
             "command" => command,
             "exit_status" => status.exitstatus,
             "request_path" => request_path,

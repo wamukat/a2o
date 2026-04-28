@@ -317,7 +317,8 @@ module A3
         result = A3::Application::RunDecompositionInvestigation.new(
           storage_dir: session.options.fetch(:storage_dir),
           project_root: File.dirname(session.options.fetch(:manifest_path)),
-          progress_io: out
+          progress_io: out,
+          publish_external_task_activity: session.container.fetch(:external_task_activity_publisher)
         ).call(
           task: task,
           project_surface: session.project_surface,
@@ -422,7 +423,8 @@ module A3
         end
       result = A3::Application::RunDecompositionChildCreation.new(
         storage_dir: options.fetch(:storage_dir),
-        child_writer: writer
+        child_writer: writer,
+        publish_external_task_activity: build_decomposition_source_activity_publisher(options)
       ).call(
         task: task,
         gate: options.fetch(:gate),
@@ -472,7 +474,11 @@ module A3
       )
       result = A3::Application::RunDecompositionChildCreation.new(
         storage_dir: session.options.fetch(:storage_dir),
-        child_writer: writer
+        child_writer: writer,
+        publish_external_task_activity: build_decomposition_source_activity_publisher(
+          session.options,
+          fallback: session.container.fetch(:external_task_activity_publisher)
+        )
       ).call(
         task: task,
         gate: true,
@@ -2796,6 +2802,25 @@ module A3
 
     def build_external_task_activity_publisher(options)
       build_external_task_bridge(options).task_activity_publisher
+    end
+
+    def build_decomposition_source_activity_publisher(options, fallback: nil)
+      return build_kanban_cli_task_activity_publisher(options) if kanban_child_writer_configured?(options)
+
+      fallback || A3::Infra::NullExternalTaskActivityPublisher.new
+    end
+
+    def build_kanban_cli_task_activity_publisher(options)
+      case kanban_backend(options)
+      when "subprocess-cli"
+        A3::Infra::KanbanCliTaskActivityPublisher.new(
+          command_argv: kanban_command_argv(options),
+          project: options.fetch(:kanban_project),
+          working_dir: options[:kanban_working_dir]
+        )
+      else
+        raise ArgumentError, "Unsupported kanban backend: #{kanban_backend(options)}"
+      end
     end
 
     def kanban_backend(options)

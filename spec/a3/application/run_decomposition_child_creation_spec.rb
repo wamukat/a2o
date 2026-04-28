@@ -77,7 +77,36 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
       evidence = JSON.parse(File.read(result.evidence_path))
       expect(evidence.fetch("status")).to eq("created")
       expect(evidence.fetch("proposal_fingerprint")).to eq("fp-1")
+      expect(evidence.fetch("review_disposition")).to eq("eligible")
       expect(evidence.fetch("child_keys")).to eq(["child-key-1"])
+      expect(evidence.fetch("child_refs_by_key")).to eq("child-key-1" => "A3-v2#5301")
+      expect(evidence.fetch("source_ticket_summary")).to include("Decomposition draft child creation: completed")
+      expect(evidence.fetch("source_ticket_summary")).to include("Accept: add trigger:auto-implement")
+    end
+  end
+
+  it "publishes a concise source-ticket audit comment after creating draft children" do
+    Dir.mktmpdir do |dir|
+      write_evidence(dir)
+      writer = instance_double("ProposalChildWriter")
+      allow(writer).to receive(:call).and_return(
+        WriterResult.new(success?: true, child_refs: ["A3-v2#5301"], child_keys: ["child-key-1"], summary: "created 1 draft child")
+      )
+      publisher = instance_double("ExternalTaskActivityPublisher")
+      expect(publisher).to receive(:publish).with(
+        task_ref: "A3-v2#5300",
+        external_task_id: 5300,
+        body: a_string_including(
+          "Decomposition draft child creation: completed",
+          "Draft children: A3-v2#5301",
+          "trigger:auto-implement"
+        )
+      )
+
+      result = described_class.new(storage_dir: dir, child_writer: writer, publish_external_task_activity: publisher).call(task: task, gate: true)
+
+      expect(result.source_ticket_summary_published).to be(true)
+      expect(result.source_ticket_summary).to include("Draft children: A3-v2#5301")
     end
   end
 
@@ -91,6 +120,8 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
       expect(result.success).to be(false)
       expect(result.status).to eq("blocked")
       expect(result.summary).to include("proposal review is not eligible")
+      evidence = JSON.parse(File.read(result.evidence_path))
+      expect(evidence.fetch("source_ticket_summary")).to include("Decomposition draft child creation: blocked")
     end
   end
 

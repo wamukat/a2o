@@ -11,6 +11,7 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
       ref: "A3-v2#5300",
       kind: :single,
       edit_scope: [:repo_alpha],
+      external_task_id: 5300,
       status: :todo,
       labels: ["trigger:investigate"],
       priority: 3,
@@ -114,10 +115,48 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
           "success" => true,
           "summary" => "investigated Split workflow"
         )
+        expect(evidence.fetch("source_ticket_summary")).to include("Decomposition investigation: completed")
         expect(evidence.fetch("workspace_root")).to eq(result.workspace_root)
       ensure
         FileUtils.chmod_R("u+w", result.workspace_root) if result
       end
+    end
+  end
+
+  it "publishes a concise source-ticket audit comment after investigation completes" do
+    Dir.mktmpdir do |dir|
+      project_surface = A3::Domain::ProjectSurface.new(
+        implementation_skill: "skills/implementation.md",
+        review_skill: "skills/review.md",
+        verification_commands: [],
+        remediation_commands: [],
+        workspace_hook: nil,
+        decomposition_investigate_command: ["investigate"]
+      )
+      process_runner = lambda do |_command, env:, **|
+        File.write(env.fetch("A2O_DECOMPOSITION_RESULT_PATH"), JSON.generate("summary" => "investigated"))
+        ["", "", FakeStatus.new(true, 0)]
+      end
+      publisher = instance_double("ExternalTaskActivityPublisher")
+      expect(publisher).to receive(:publish).with(
+        task_ref: "A3-v2#5300",
+        external_task_id: 5300,
+        body: "Decomposition investigation: completed\nSummary: investigated"
+      )
+
+      result = described_class.new(
+        storage_dir: dir,
+        process_runner: process_runner,
+        publish_external_task_activity: publisher
+      ).call(
+        task: task,
+        project_surface: project_surface,
+        task_snapshot: source_task_snapshot
+      )
+
+      expect(result.source_ticket_summary_published).to be(true)
+      evidence = JSON.parse(File.read(result.evidence_path))
+      expect(evidence.fetch("source_ticket_summary")).to eq("Decomposition investigation: completed\nSummary: investigated")
     end
   end
 

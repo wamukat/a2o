@@ -100,7 +100,7 @@ module A3
       end
 
       def run_json_command(*args)
-        stdout, stderr, status = Open3.capture3(*@command_argv, *args, chdir: @working_dir)
+        stdout, stderr, status = Open3.capture3(*@command_argv, *args, **capture_options)
         raise A3::Domain::ConfigurationError, build_command_error(stderr, status.exitstatus) unless status.success?
 
         JSON.parse(stdout)
@@ -109,13 +109,17 @@ module A3
       end
 
       def run_command(*args)
-        _stdout, stderr, status = Open3.capture3(*@command_argv, *args, chdir: @working_dir)
+        _stdout, stderr, status = Open3.capture3(*@command_argv, *args, **capture_options)
         raise A3::Domain::ConfigurationError, build_command_error(stderr, status.exitstatus) unless status.success?
 
         nil
       end
 
       private
+
+      def capture_options
+        @working_dir ? { chdir: @working_dir } : {}
+      end
 
       def tempfile_dir
         @working_dir || Dir.tmpdir
