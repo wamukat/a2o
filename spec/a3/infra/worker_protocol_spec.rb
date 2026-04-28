@@ -284,6 +284,33 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
+  it "normalizes parent review success without an explicit review_disposition" do
+    result = described_class.new(review_disposition_repo_scopes: %w[repo_beta]).build_execution_result(
+      {
+        "success" => true,
+        "summary" => "parent review completed",
+        "task_ref" => task.ref,
+        "run_ref" => run.ref,
+        "phase" => "review",
+        "rework_required" => false
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: run.ref,
+      expected_phase: :review,
+      expected_task_kind: :parent
+    )
+
+    expect(result).to have_attributes(success?: true)
+    expect(result.response_bundle.fetch("review_disposition")).to eq(
+      "kind" => "completed",
+      "repo_scope" => "repo_beta",
+      "summary" => "parent review completed",
+      "description" => "parent review completed",
+      "finding_key" => "parent-review-completed"
+    )
+  end
+
   it "accepts a clarification request without blocked failure diagnostics" do
     result = described_class.new.build_execution_result(
       {

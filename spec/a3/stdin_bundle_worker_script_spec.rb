@@ -856,6 +856,42 @@ RSpec.describe "worker:stdin-bundle" do
     expect(validate_payload(payload, request: request)).to eq([])
   end
 
+  it "normalizes parent review success without review_disposition" do
+    request = {
+      "task_ref" => "Sample#3140",
+      "run_ref" => "run-parent-review-1",
+      "phase" => "review",
+      "phase_runtime" => { "task_kind" => "parent", "review_skill" => "skill.md" },
+      "slot_paths" => { "repo_alpha" => "/tmp/workspace/repo-alpha", "repo_beta" => "/tmp/workspace/repo-beta" }
+    }
+    payload = {
+      "task_ref" => "Sample#3140",
+      "run_ref" => "run-parent-review-1",
+      "phase" => "review",
+      "success" => true,
+      "summary" => "parent review clean",
+      "failing_command" => nil,
+      "observed_state" => nil,
+      "rework_required" => false
+    }
+
+    Dir.mktmpdir("a3-stdin-worker-parent-review-normalize-") do |temp_dir_text|
+      launcher_config = Pathname(temp_dir_text).join("launcher.json")
+      write_launcher_config(launcher_config, command: ["runner"])
+
+      with_env("A2O_WORKER_LAUNCHER_CONFIG_PATH" => launcher_config.to_s) do
+        expect(validate_payload(payload, request: request)).to eq([])
+        expect(payload.fetch("review_disposition")).to eq(
+          "kind" => "completed",
+          "repo_scope" => "repo_alpha",
+          "summary" => "parent review clean",
+          "description" => "parent review clean",
+          "finding_key" => "parent-review-completed"
+        )
+      end
+    end
+  end
+
   it "canonicalizes parent review identity fields before validating payloads" do
     request = {
       "task_ref" => "Sample#3140",

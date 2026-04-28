@@ -596,6 +596,97 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     expect(execution.response_bundle).to eq(bundle)
   end
 
+  it "accepts and normalizes a parent review success without review_disposition" do
+    result_path = workspace.root_path.join(".a2o", "worker-result.json")
+    parent_workspace = A3::Domain::PreparedWorkspace.new(
+      workspace_kind: workspace.workspace_kind,
+      root_path: workspace.root_path,
+      source_descriptor: workspace.source_descriptor,
+      slot_paths: {
+        repo_alpha: Pathname(tmpdir).join("workspace", "repo-alpha"),
+        repo_beta: Pathname(tmpdir).join("workspace", "repo-beta")
+      }
+    )
+    FileUtils.mkdir_p(parent_workspace.slot_paths.fetch(:repo_alpha))
+    parent_task = A3::Domain::Task.new(
+      ref: "Sample#3140",
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      verification_scope: %i[repo_alpha repo_beta]
+    )
+    parent_run = A3::Domain::Run.new(
+      ref: "run-parent-review-lenient-1",
+      task_ref: parent_task.ref,
+      phase: :review,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: workspace.source_descriptor,
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: %i[repo_alpha repo_beta],
+        verification_scope: %i[repo_alpha repo_beta],
+        ownership_scope: :parent
+      ),
+      review_target: A3::Domain::ReviewTarget.new(
+        base_commit: "base-1",
+        head_commit: "head-1",
+        task_ref: parent_task.ref,
+        phase_ref: :review
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: parent_task.ref,
+        owner_scope: :parent,
+        snapshot_version: "head-1"
+      )
+    )
+    parent_phase_runtime = A3::Domain::PhaseRuntimeConfig.new(
+      task_kind: :parent,
+      repo_scope: :both,
+      phase: :review,
+      implementation_skill: "task implementation",
+      review_skill: "task review",
+      verification_commands: [],
+      remediation_commands: [],
+      workspace_hook: "bootstrap",
+      merge_target: :merge_to_parent,
+      merge_policy: :squash
+    )
+    bundle = {
+      "task_ref" => parent_task.ref,
+      "run_ref" => parent_run.ref,
+      "phase" => "review",
+      "success" => true,
+      "summary" => "parent review clean",
+      "failing_command" => nil,
+      "observed_state" => nil,
+      "rework_required" => false
+    }
+    gateway = described_class.new(
+      command_runner: command_runner,
+      worker_protocol: A3::Infra::WorkerProtocol.new(review_disposition_repo_scopes: %w[repo_alpha repo_beta both])
+    )
+
+    allow(command_runner).to receive(:run) do
+      result_path.write(JSON.pretty_generate(bundle))
+      A3::Application::ExecutionResult.new(success: true, summary: "command runner succeeded")
+    end
+
+    execution = gateway.run(
+      skill: parent_phase_runtime.review_skill,
+      workspace: parent_workspace,
+      task: parent_task,
+      run: parent_run,
+      phase_runtime: parent_phase_runtime,
+      task_packet: task_packet
+    )
+
+    expect(execution.success?).to be(true)
+    expect(execution.response_bundle.fetch("review_disposition")).to include(
+      "kind" => "completed",
+      "repo_scope" => "repo_alpha",
+      "summary" => "parent review clean",
+      "finding_key" => "parent-review-completed"
+    )
+  end
+
   it "accepts a parent review result with changed_files null when review_disposition is present" do
     result_path = workspace.root_path.join(".a2o", "worker-result.json")
     parent_workspace = A3::Domain::PreparedWorkspace.new(

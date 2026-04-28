@@ -110,7 +110,7 @@ module A3
         invalid_result("worker result file is missing", {})
       end
 
-      def build_execution_result(worker_response, workspace:, expected_task_ref:, expected_run_ref:, expected_phase:, canonical_changed_files: nil)
+      def build_execution_result(worker_response, workspace:, expected_task_ref:, expected_run_ref:, expected_phase:, expected_task_kind: nil, canonical_changed_files: nil)
         return nil if worker_response.nil?
 
         unless worker_response.is_a?(Hash)
@@ -134,7 +134,8 @@ module A3
           workspace: workspace,
           expected_task_ref: expected_task_ref,
           expected_run_ref: expected_run_ref,
-          expected_phase: expected_phase
+          expected_phase: expected_phase,
+          expected_task_kind: expected_task_kind
         )
         unless validation_errors.empty?
           A3::Infra::WorkspaceTraceLogger.log(
@@ -229,10 +230,10 @@ module A3
         corrections
       end
 
-      def validate_worker_response(worker_response, workspace:, expected_task_ref:, expected_run_ref:, expected_phase:)
-        normalize_worker_response!(worker_response)
+      def validate_worker_response(worker_response, workspace:, expected_task_ref:, expected_run_ref:, expected_phase:, expected_task_kind: nil)
+        normalize_worker_response!(worker_response, workspace: workspace, expected_phase: expected_phase, expected_task_kind: expected_task_kind)
         implementation_phase = expected_phase.to_s == "implementation"
-        parent_review = expected_phase.to_s == "review"
+        parent_review = parent_review?(expected_phase: expected_phase, expected_task_kind: expected_task_kind)
         errors = []
         errors << "success must be true or false" unless [true, false].include?(worker_response["success"])
         errors << "summary must be a string" unless worker_response["summary"].is_a?(String)
@@ -320,12 +321,40 @@ module A3
         errors
       end
 
-      def normalize_worker_response!(worker_response)
+      def normalize_worker_response!(worker_response, workspace:, expected_phase:, expected_task_kind:)
         disposition = worker_response["review_disposition"]
         normalize_skill_feedback!(worker_response)
+        normalize_parent_review_success!(worker_response, workspace: workspace) if parent_review?(expected_phase: expected_phase, expected_task_kind: expected_task_kind)
+        disposition = worker_response["review_disposition"]
         return unless disposition.is_a?(Hash)
 
         disposition["repo_scope"] = @repo_scope_aliases.fetch(disposition["repo_scope"], disposition["repo_scope"])
+      end
+
+      def parent_review?(expected_phase:, expected_task_kind:)
+        expected_phase.to_s == "review" && (expected_task_kind.nil? || expected_task_kind.to_sym == :parent)
+      end
+
+      def normalize_parent_review_success!(worker_response, workspace:)
+        return unless worker_response["success"] == true
+        return unless worker_response["rework_required"] == false
+
+        disposition = worker_response["review_disposition"]
+        return if disposition.is_a?(Hash) && present_string?(disposition["kind"]) && disposition["kind"] != "completed"
+
+        normalized_disposition = disposition.is_a?(Hash) ? disposition.dup : {}
+        normalized_disposition["kind"] = "completed"
+        normalized_disposition["repo_scope"] = default_parent_review_repo_scope(workspace) unless present_string?(normalized_disposition["repo_scope"])
+        normalized_disposition["summary"] = worker_response["summary"] unless present_string?(normalized_disposition["summary"])
+        normalized_disposition["description"] = worker_response["summary"] unless present_string?(normalized_disposition["description"])
+        normalized_disposition["finding_key"] = "parent-review-completed" unless present_string?(normalized_disposition["finding_key"])
+        worker_response["review_disposition"] = normalized_disposition
+      end
+
+      def default_parent_review_repo_scope(workspace)
+        valid_review_disposition_repo_scopes(workspace, include_unresolved: true)
+          .reject { |scope| scope == "unresolved" }
+          .fetch(0, "unresolved")
       end
 
       def normalize_skill_feedback!(worker_response)

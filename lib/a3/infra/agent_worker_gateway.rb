@@ -84,7 +84,8 @@ module A3
           workspace: workspace,
           expected_task_ref: task.ref,
           expected_run_ref: run.ref,
-          expected_phase: run.phase
+          expected_phase: run.phase,
+          expected_task_kind: task.kind
         )
         return with_agent_job_result(execution, completed.result) if execution
         return agent_result_execution(completed.result) unless completed.result.succeeded?
@@ -152,6 +153,7 @@ module A3
           expected_task_ref: task.ref,
           expected_run_ref: run.ref,
           expected_phase: run.phase,
+          expected_task_kind: task.kind,
           canonical_changed_files: canonical_changed_files
         )
         return with_agent_job_result(execution, completed.result) if execution

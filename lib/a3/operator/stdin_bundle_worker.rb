@@ -491,6 +491,8 @@ def review_disposition_repo_scope_aliases
 end
 
 def configured_review_disposition_repo_scopes
+  return nil if LAUNCHER_CONFIG_PATH.to_s.strip.empty?
+
   scopes = load_executor_config["review_disposition_repo_scopes"]
   return nil if scopes.nil?
   unless scopes.is_a?(Array) && scopes.all? { |scope| scope.is_a?(String) && !scope.empty? }
@@ -514,7 +516,7 @@ end
 def validate_payload(payload, request:)
   return ["worker result payload must be an object"] unless payload.is_a?(Hash)
 
-  normalize_payload!(payload)
+  normalize_payload!(payload, request: request)
   canonicalize_identity!(payload, request: request)
   errors = []
   implementation_phase = request["phase"] == "implementation"
@@ -631,16 +633,45 @@ def clarification_request_present?(payload)
   payload["clarification_request"].is_a?(Hash)
 end
 
-def normalize_payload!(payload)
+def normalize_payload!(payload, request:)
   disposition = payload["review_disposition"]
   needs_aliases = disposition.is_a?(Hash) || skill_feedback_entries(payload["skill_feedback"]).any? { |entry| entry.is_a?(Hash) && entry["repo_scope"].is_a?(String) }
-  return unless needs_aliases
-
-  aliases = review_disposition_repo_scope_aliases
+  aliases = needs_aliases ? review_disposition_repo_scope_aliases : {}
   normalize_skill_feedback!(payload, aliases: aliases)
+  normalize_parent_review_success!(payload, request: request) if payload["success"] == true
+  disposition = payload["review_disposition"]
+  return unless needs_aliases || disposition.is_a?(Hash)
+
   return unless disposition.is_a?(Hash)
 
   disposition["repo_scope"] = aliases.fetch(disposition["repo_scope"], disposition["repo_scope"])
+end
+
+def normalize_parent_review_success!(payload, request:)
+  return unless request.dig("phase_runtime", "task_kind").to_s == "parent"
+  return unless request["phase"] == "review"
+  return unless payload["rework_required"] == false
+
+  disposition = payload["review_disposition"]
+  return if disposition.is_a?(Hash) && present_string?(disposition["kind"]) && disposition["kind"] != "completed"
+
+  normalized_disposition = disposition.is_a?(Hash) ? disposition.dup : {}
+  normalized_disposition["kind"] = "completed"
+  normalized_disposition["repo_scope"] = default_parent_review_repo_scope(request) unless present_string?(normalized_disposition["repo_scope"])
+  normalized_disposition["summary"] = payload["summary"] unless present_string?(normalized_disposition["summary"])
+  normalized_disposition["description"] = payload["summary"] unless present_string?(normalized_disposition["description"])
+  normalized_disposition["finding_key"] = "parent-review-completed" unless present_string?(normalized_disposition["finding_key"])
+  payload["review_disposition"] = normalized_disposition
+end
+
+def default_parent_review_repo_scope(request)
+  (inferred_review_disposition_repo_scopes(request) + ["unresolved"]).uniq
+    .reject { |scope| scope == "unresolved" }
+    .fetch(0, "unresolved")
+end
+
+def present_string?(value)
+  value.is_a?(String) && !value.strip.empty?
 end
 
 def normalize_skill_feedback!(payload, aliases:)
