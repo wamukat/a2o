@@ -64,6 +64,9 @@ func (c HTTPClient) UploadArtifact(upload ArtifactUpload, content []byte) (Artif
 	if upload.MediaType != "" {
 		query.Set("media_type", upload.MediaType)
 	}
+	if strings.TrimSpace(upload.ProjectKey) != "" {
+		query.Set("project_key", strings.TrimSpace(upload.ProjectKey))
+	}
 	resp, err := c.do(http.MethodPut, "/v1/agent/artifacts/"+url.PathEscape(upload.ArtifactID), query, content, "")
 	if err != nil {
 		return ArtifactUpload{}, err

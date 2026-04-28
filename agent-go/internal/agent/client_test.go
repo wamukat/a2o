@@ -25,8 +25,12 @@ func TestHTTPClientUsesAgentProtocol(t *testing.T) {
 			writeJSON(w, http.StatusOK, map[string]any{"job": testRequest(t.TempDir())})
 		case r.Method == http.MethodPut && r.URL.Path == "/v1/agent/artifacts/art-log-1":
 			uploaded = true
+			if r.URL.Query().Get("project_key") != "a2o" {
+				t.Fatalf("project_key query = %q", r.URL.Query().Get("project_key"))
+			}
 			writeJSON(w, http.StatusCreated, map[string]any{"artifact": ArtifactUpload{
 				ArtifactID:     "art-log-1",
+				ProjectKey:     r.URL.Query().Get("project_key"),
 				Role:           "combined-log",
 				Digest:         r.URL.Query().Get("digest"),
 				ByteSize:       3,
@@ -62,6 +66,7 @@ func TestHTTPClientUsesAgentProtocol(t *testing.T) {
 	}
 	_, err = client.UploadArtifact(ArtifactUpload{
 		ArtifactID:     "art-log-1",
+		ProjectKey:     "a2o",
 		Role:           "combined-log",
 		Digest:         "sha256:abc",
 		ByteSize:       3,

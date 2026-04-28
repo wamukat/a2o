@@ -129,6 +129,30 @@ RSpec.describe A3::Infra::FileAgentArtifactStore do
     expect(store.read("diagnostic-2")).to eq("222")
   end
 
+  it "raises clearly for legacy artifact metadata in multi-project mode when listing" do
+    store.put(upload_for("legacy-log", "legacy"), "legacy")
+
+    with_env("A2O_MULTI_PROJECT_MODE" => "1") do
+      expect { store.list_metadata }.to raise_error(
+        A3::Domain::ConfigurationError,
+        /agent artifact upload legacy record without project_key is ambiguous/
+      )
+    end
+  end
+
+  it "raises clearly for legacy artifact metadata in multi-project mode during cleanup" do
+    store.put(upload_for("legacy-log", "legacy"), "legacy")
+
+    with_env("A2O_MULTI_PROJECT_MODE" => "1") do
+      expect do
+        store.cleanup(retention_seconds_by_class: {diagnostic: 60})
+      end.to raise_error(
+        A3::Domain::ConfigurationError,
+        /agent artifact upload legacy record without project_key is ambiguous/
+      )
+    end
+  end
+
   def upload_for(artifact_id, content, retention_class: :diagnostic)
     A3::Domain::AgentArtifactUpload.new(
       artifact_id: artifact_id,

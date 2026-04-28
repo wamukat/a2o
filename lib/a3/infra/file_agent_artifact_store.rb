@@ -66,7 +66,11 @@ module A3
         metadata_paths.filter_map do |path|
           artifact_id = artifact_id_from_metadata_path(path)
           fetch_metadata(artifact_id)
-        rescue A3::Domain::ConfigurationError, JSON::ParserError
+        rescue A3::Domain::ConfigurationError => error
+          raise if legacy_project_identity_error?(error)
+
+          nil
+        rescue JSON::ParserError
           nil
         end
       end
@@ -116,7 +120,11 @@ module A3
               mtime: newest_mtime(path, blob)
             }
           end
-        rescue A3::Domain::ConfigurationError, JSON::ParserError
+        rescue A3::Domain::ConfigurationError => error
+          raise if legacy_project_identity_error?(error)
+
+          retained << File.basename(path, ".json")
+        rescue JSON::ParserError
           retained << File.basename(path, ".json")
         end
 
@@ -146,6 +154,10 @@ module A3
 
       def artifact_id_from_metadata_path(path)
         File.basename(path, ".json")
+      end
+
+      def legacy_project_identity_error?(error)
+        error.message.include?("legacy record without project_key is ambiguous")
       end
 
       def expired?(metadata, blob, now:, ttl:)
