@@ -84,7 +84,8 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("\e[33m[>] #3138")
       expect(out.string).to include("[.] #3141")
       expect(out.string).to include("Merging -----------+")
-      expect(out.string).to include("Implementation -----+")
+      expect(out.string).to include("x : failed")
+      expect(out.string).to include(">/././.")
       expect(out.string).to match(/- #3138 implementation\/implementation\/running_command hb=\d+s/)
     end
   end
