@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/wamukat/a3-engine/agent-go/internal/errorpolicy"
 	"os"
 	"os/exec"
@@ -454,6 +455,20 @@ JSON
 	if first["path"] != "/review_disposition" || first["keyword"] != "required" {
 		t.Fatalf("diagnostics should preserve structured validation errors: %#v", validationErrors)
 	}
+	salvage := diagnostics["invalid_worker_result_salvage"].(map[string]any)
+	if salvage["schema_name"] != "a2o-worker-response" || salvage["artifact_relative_path"] == "" {
+		t.Fatalf("diagnostics should point to invalid worker result salvage: %#v", salvage)
+	}
+	var salvageBody map[string]any
+	if err := json.Unmarshal([]byte(readFileForTest(t, stringValue(salvage["artifact_path"]))), &salvageBody); err != nil {
+		t.Fatal(err)
+	}
+	if salvageBody["invalid_result_accepted"] != false || salvageBody["parsed_result"] == nil {
+		t.Fatalf("salvage should retain parsed invalid result without accepting it: %#v", salvageBody)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(resultPath), "invalid-worker-results", "latest.json")); err != nil {
+		t.Fatalf("latest salvage pointer should exist: %v", err)
+	}
 }
 
 func TestRunWorkerStdinBundlePreservesRawInvalidJSONAfterRetriesExhausted(t *testing.T) {
@@ -524,6 +539,125 @@ printf '{"task_ref":"A2O#342","broken":' > "$1"
 	first := validationErrors[0].(map[string]any)
 	if first["keyword"] != "type" {
 		t.Fatalf("invalid JSON should be reported as type validation error: %#v", validationErrors)
+	}
+	salvage := diagnostics["invalid_worker_result_salvage"].(map[string]any)
+	salvageBody := readFileForTest(t, stringValue(salvage["artifact_path"]))
+	if !strings.Contains(salvageBody, `"raw_worker_output": "{\"task_ref\":\"A2O#342\",\"broken\":"`) {
+		t.Fatalf("salvage should preserve raw invalid JSON, got:\n%s", salvageBody)
+	}
+}
+
+func TestRunWorkerStdinBundleIncludesPreviousInvalidWorkerResultSalvage(t *testing.T) {
+	tmp := t.TempDir()
+	workspace := filepath.Join(tmp, "workspace")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	requestPath := filepath.Join(tmp, "request.json")
+	resultPath := filepath.Join(tmp, "result.json")
+	launcherPath := filepath.Join(tmp, "launcher.json")
+	scriptPath := filepath.Join(tmp, "executor.sh")
+	promptPath := filepath.Join(tmp, "prompt.json")
+	salvageDir := filepath.Join(filepath.Dir(resultPath), "invalid-worker-results")
+	if err := os.MkdirAll(salvageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(requestPath, []byte(`{
+  "task_ref": "A2O#343",
+  "run_ref": "run-2",
+  "phase": "implementation",
+  "phase_runtime": {},
+  "slot_paths": {"repo_alpha": "/tmp/repo-alpha"},
+  "task_packet": {"title": "implement"}
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeJSONForTest(t, filepath.Join(salvageDir, "latest.json"), map[string]any{
+		"schema_name":            "a2o-worker-response",
+		"artifact_relative_path": "invalid-worker-results/A2O-343-run-1-implementation-attempt-03.json",
+		"validation_errors": []map[string]any{{
+			"path":    "/review_disposition",
+			"keyword": "required",
+			"message": "review_disposition must be present",
+		}},
+	})
+	if err := os.WriteFile(scriptPath, []byte(`#!/bin/sh
+set -eu
+cat > "$2"
+cat > "$1" <<'JSON'
+{
+  "task_ref": "A2O#343",
+  "run_ref": "run-2",
+  "phase": "implementation",
+  "success": true,
+  "summary": "implemented",
+  "failing_command": null,
+  "observed_state": null,
+  "rework_required": false,
+  "changed_files": {"repo_alpha": ["main.go"]},
+  "review_disposition": {
+    "kind": "completed",
+    "repo_scope": "repo_alpha",
+    "summary": "clean",
+    "description": "self-review clean",
+    "finding_key": "clean"
+  }
+}
+JSON
+`), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeWorkerLauncherForTest(t, launcherPath, []string{scriptPath, "{{result_path}}", promptPath})
+
+	t.Setenv("A2O_WORKER_REQUEST_PATH", requestPath)
+	t.Setenv("A2O_WORKER_RESULT_PATH", resultPath)
+	t.Setenv("A2O_ROOT_DIR", tmp)
+	t.Setenv("A2O_WORKSPACE_ROOT", workspace)
+	t.Setenv("A2O_WORKER_LAUNCHER_CONFIG_PATH", launcherPath)
+
+	if code := run([]string{"worker", "stdin-bundle"}); code != 0 {
+		t.Fatalf("worker exit code = %d", code)
+	}
+	prompt := readFileForTest(t, promptPath)
+	if !strings.Contains(prompt, `"previous_invalid_worker_result"`) || !strings.Contains(prompt, `"path": "/review_disposition"`) {
+		t.Fatalf("worker bundle should include previous invalid result salvage, got:\n%s", prompt)
+	}
+}
+
+func TestPersistInvalidWorkerResultSalvageRetainsNewestFive(t *testing.T) {
+	tmp := t.TempDir()
+	resultPath := filepath.Join(tmp, ".a2o", "worker-result.json")
+	request := map[string]any{
+		"task_ref": "A2O#343",
+		"phase":    "implementation",
+	}
+	for i := 0; i < maxInvalidWorkerResultSalvageArtifacts+2; i++ {
+		request["run_ref"] = fmt.Sprintf("run-%d", i)
+		if _, err := persistInvalidWorkerResultSalvage(request, resultPath, "/tmp/schema.json", i+1, []workerValidationIssue{{
+			Path:    "/review_disposition",
+			Keyword: "required",
+			Message: "review_disposition must be present",
+		}}, map[string]any{"task_ref": "A2O#343"}, "{}", "", ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	salvageDir := filepath.Join(filepath.Dir(resultPath), "invalid-worker-results")
+	entries, err := os.ReadDir(salvageDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifactCount := 0
+	for _, entry := range entries {
+		if entry.Name() != "latest.json" && strings.HasSuffix(entry.Name(), ".json") {
+			artifactCount++
+		}
+	}
+	if artifactCount != maxInvalidWorkerResultSalvageArtifacts {
+		t.Fatalf("expected newest %d salvage artifacts, got %d in %#v", maxInvalidWorkerResultSalvageArtifacts, artifactCount, entries)
+	}
+	if _, err := os.Stat(filepath.Join(salvageDir, "latest.json")); err != nil {
+		t.Fatalf("latest salvage pointer should remain: %v", err)
 	}
 }
 

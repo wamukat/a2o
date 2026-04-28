@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 type executorProfile struct {
@@ -19,6 +20,7 @@ type executorProfile struct {
 }
 
 const maxWorkerResultCorrectionAttempts = 2
+const maxInvalidWorkerResultSalvageArtifacts = 5
 
 func envPublic(publicName string) string {
 	return strings.TrimSpace(os.Getenv(publicName))
@@ -100,6 +102,11 @@ func runWorkerStdinBundle(args []string) int {
 				diagnostics["error"] = readErr.Error()
 				diagnostics["worker_response_raw"] = tailString(string(rawResultBody), 4000)
 			}
+			if salvage, err := persistInvalidWorkerResultSalvage(request, resultPath, schemaPath, attempt+1, []workerValidationIssue{issue}, nil, string(rawResultBody), stdout, stderr); err == nil {
+				diagnostics["invalid_worker_result_salvage"] = salvage
+			} else {
+				diagnostics["invalid_worker_result_salvage_error"] = err.Error()
+			}
 			return writeWorkerFailureResult(resultPath, request, workerFailure(request, issue.Message, command, observedState, diagnostics))
 		}
 		normalizeReviewDisposition(payload)
@@ -110,13 +117,20 @@ func runWorkerStdinBundle(args []string) int {
 				correction = newWorkerResultCorrection(attempt+1, issues, payload, "", stdout, stderr)
 				continue
 			}
-			return writeWorkerFailureResult(resultPath, request, workerFailure(request, "worker result schema invalid", command, "invalid_worker_result", map[string]any{
+			salvage, salvageErr := persistInvalidWorkerResultSalvage(request, resultPath, schemaPath, attempt+1, issues, payload, string(rawResultBody), stdout, stderr)
+			diagnostics := map[string]any{
 				"validation_errors":      issues,
 				"worker_response_bundle": payload,
 				"correction_attempts":    maxWorkerResultCorrectionAttempts,
 				"stdout":                 stdout,
 				"stderr":                 stderr,
-			}))
+			}
+			if salvageErr == nil {
+				diagnostics["invalid_worker_result_salvage"] = salvage
+			} else {
+				diagnostics["invalid_worker_result_salvage_error"] = salvageErr.Error()
+			}
+			return writeWorkerFailureResult(resultPath, request, workerFailure(request, "worker result schema invalid", command, "invalid_worker_result", diagnostics))
 		}
 		if err := writeJSONFile(resultPath, payload); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -183,6 +197,104 @@ func newWorkerResultCorrection(attempt int, issues []workerValidationIssue, prev
 		StdoutTail:     tailString(stdout, 4000),
 		StderrTail:     tailString(stderr, 4000),
 	}
+}
+
+func persistInvalidWorkerResultSalvage(request map[string]any, resultPath string, schemaPath string, attempt int, issues []workerValidationIssue, parsed map[string]any, raw string, stdout string, stderr string) (map[string]any, error) {
+	root := filepath.Join(filepath.Dir(resultPath), "invalid-worker-results")
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		return nil, err
+	}
+	taskRef := stringValue(request["task_ref"])
+	runRef := stringValue(request["run_ref"])
+	phase := stringValue(request["phase"])
+	fileName := fmt.Sprintf("%s-%s-%s-attempt-%02d.json", safeID(taskRef), safeID(runRef), safeID(phase), attempt)
+	if fileName == "---attempt-00.json" {
+		fileName = fmt.Sprintf("unknown-%d.json", attempt)
+	}
+	artifactPath := filepath.Join(root, fileName)
+	salvage := map[string]any{
+		"schema_name":             "a2o-worker-response",
+		"schema_path":             schemaPath,
+		"task_ref":                taskRef,
+		"run_ref":                 runRef,
+		"phase":                   phase,
+		"worker_attempt":          attempt,
+		"correction_attempts":     maxWorkerResultCorrectionAttempts,
+		"created_at":              time.Now().UTC().Format(time.RFC3339),
+		"artifact_path":           artifactPath,
+		"artifact_relative_path":  filepath.ToSlash(filepath.Join("invalid-worker-results", fileName)),
+		"latest_relative_path":    filepath.ToSlash(filepath.Join("invalid-worker-results", "latest.json")),
+		"validation_errors":       issues,
+		"raw_worker_output":       tailString(raw, 4000),
+		"stdout_tail":             tailString(stdout, 4000),
+		"stderr_tail":             tailString(stderr, 4000),
+		"retention_policy":        "latest pointer plus newest 5 invalid worker result salvage files per worker metadata directory",
+		"invalid_result_accepted": false,
+	}
+	if parsed != nil {
+		salvage["parsed_result"] = parsed
+	}
+	if err := writeJSONFile(artifactPath, salvage); err != nil {
+		return nil, err
+	}
+	latestPath := filepath.Join(root, "latest.json")
+	if err := writeJSONFile(latestPath, salvage); err != nil {
+		return nil, err
+	}
+	cleanupInvalidWorkerResultSalvage(root, fileName)
+	return map[string]any{
+		"schema_name":            salvage["schema_name"],
+		"task_ref":               taskRef,
+		"run_ref":                runRef,
+		"phase":                  phase,
+		"worker_attempt":         attempt,
+		"artifact_path":          artifactPath,
+		"artifact_relative_path": salvage["artifact_relative_path"],
+		"latest_relative_path":   salvage["latest_relative_path"],
+		"validation_errors":      issues,
+		"retention_policy":       salvage["retention_policy"],
+	}, nil
+}
+
+func cleanupInvalidWorkerResultSalvage(root string, keepName string) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return
+	}
+	type salvageFile struct {
+		name    string
+		modTime time.Time
+	}
+	files := []salvageFile{}
+	for _, entry := range entries {
+		if entry.IsDir() || entry.Name() == "latest.json" || entry.Name() == keepName || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		files = append(files, salvageFile{name: entry.Name(), modTime: info.ModTime()})
+	}
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].modTime.After(files[j].modTime)
+	})
+	retainedOtherFiles := maxInvalidWorkerResultSalvageArtifacts - 1
+	if len(files) <= retainedOtherFiles {
+		return
+	}
+	for _, file := range files[retainedOtherFiles:] {
+		_ = os.Remove(filepath.Join(root, file.name))
+	}
+}
+
+func latestInvalidWorkerResultSalvage(resultPath string) map[string]any {
+	latestPath := filepath.Join(filepath.Dir(resultPath), "invalid-worker-results", "latest.json")
+	payload := map[string]any{}
+	if err := readJSONFile(latestPath, &payload); err != nil {
+		return nil
+	}
+	return payload
 }
 
 func structuredWorkerValidationIssues(messages []string) []workerValidationIssue {
@@ -658,6 +770,8 @@ func workerBundle(correction *workerResultCorrection) string {
 	}
 	if correction != nil {
 		bundle["result_correction"] = correction
+	} else if salvage := latestInvalidWorkerResultSalvage(envPublic("A2O_WORKER_RESULT_PATH")); salvage != nil {
+		bundle["previous_invalid_worker_result"] = salvage
 	}
 	body, _ := json.MarshalIndent(bundle, "", "  ")
 	return string(body)
