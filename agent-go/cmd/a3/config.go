@@ -22,6 +22,7 @@ type runtimeInstanceConfig struct {
 	KanbanMode       string `json:"kanban_mode,omitempty"`
 	KanbanURL        string `json:"kanban_url,omitempty"`
 	KanbanRuntimeURL string `json:"kanban_runtime_url,omitempty"`
+	KanbanProject    string `json:"kanban_project,omitempty"`
 	AgentPort        string `json:"agent_port"`
 	StorageDir       string `json:"storage_dir"`
 	RuntimeImage     string `json:"runtime_image,omitempty"`

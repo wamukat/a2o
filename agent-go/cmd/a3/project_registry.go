@@ -78,6 +78,7 @@ func loadProjectRuntimeContextFromWorkingTree(projectKey string) (*projectRuntim
 				URL:        config.KanbanURL,
 				RuntimeURL: config.KanbanRuntimeURL,
 				Port:       config.KanbalonePort,
+				Project:    config.KanbanProject,
 			},
 		},
 		KanbanIdentity: runtimeProjectKanbanIdentity{
@@ -85,9 +86,33 @@ func loadProjectRuntimeContextFromWorkingTree(projectKey string) (*projectRuntim
 			URL:        config.KanbanURL,
 			RuntimeURL: config.KanbanRuntimeURL,
 			Port:       config.KanbalonePort,
+			Project:    config.KanbanProject,
 		},
 		Config: *config,
 	}, configPath, nil
+}
+
+func loadProjectRuntimeContextForCommand(projectKey string, requireExplicitForMultiple bool) (*projectRuntimeContext, string, error) {
+	start, err := os.Getwd()
+	if err != nil {
+		return nil, "", fmt.Errorf("get working directory: %w", err)
+	}
+	registryPath, registryErr := findProjectRegistry(start)
+	if registryErr != nil {
+		if strings.TrimSpace(projectKey) != "" {
+			return nil, "", fmt.Errorf("runtime project registry not found; --project requires %s", projectRegistryRelativePath)
+		}
+		return loadProjectRuntimeContextFromWorkingTree("")
+	}
+	registry, err := readProjectRegistry(registryPath)
+	if err != nil {
+		return nil, "", err
+	}
+	if requireExplicitForMultiple && len(registry.Projects) > 1 && strings.TrimSpace(projectKey) == "" {
+		return nil, "", fmt.Errorf("multi-project runtime command requires --project when %s defines multiple projects", projectRegistryRelativePath)
+	}
+	context, err := projectRuntimeContextFromRegistry(registryPath, registry, projectKey)
+	return context, registryPath, err
 }
 
 func findProjectRegistry(start string) (string, error) {
@@ -113,6 +138,10 @@ func readProjectRuntimeContext(path string, projectKey string) (*projectRuntimeC
 	if err != nil {
 		return nil, err
 	}
+	return projectRuntimeContextFromRegistry(path, registry, projectKey)
+}
+
+func projectRuntimeContextFromRegistry(path string, registry *runtimeProjectRegistry, projectKey string) (*projectRuntimeContext, error) {
 	resolvedKey := strings.TrimSpace(projectKey)
 	if resolvedKey == "" {
 		resolvedKey = strings.TrimSpace(envDefault("A2O_PROJECT_KEY", registry.DefaultProject))
@@ -136,6 +165,31 @@ func readProjectRuntimeContext(path string, projectKey string) (*projectRuntimeC
 		KanbanIdentity: definition.Kanban,
 		Config:         config,
 	}, nil
+}
+
+func resolveRuntimeProjectTaskRef(projectKey string, taskRef string) (string, string, error) {
+	qualifiedProject, bareTaskRef, ok := splitRuntimeQualifiedTaskRef(taskRef)
+	if !ok {
+		return strings.TrimSpace(projectKey), strings.TrimSpace(taskRef), nil
+	}
+	if strings.TrimSpace(projectKey) != "" && strings.TrimSpace(projectKey) != qualifiedProject {
+		return "", "", fmt.Errorf("task ref project %q conflicts with --project %q", qualifiedProject, strings.TrimSpace(projectKey))
+	}
+	return qualifiedProject, bareTaskRef, nil
+}
+
+func splitRuntimeQualifiedTaskRef(taskRef string) (string, string, bool) {
+	trimmed := strings.TrimSpace(taskRef)
+	index := strings.Index(trimmed, ":")
+	if index <= 0 || index == len(trimmed)-1 {
+		return "", trimmed, false
+	}
+	qualifiedProject := strings.TrimSpace(trimmed[:index])
+	bareTaskRef := strings.TrimSpace(trimmed[index+1:])
+	if qualifiedProject == "" || bareTaskRef == "" || !strings.Contains(bareTaskRef, "#") {
+		return "", trimmed, false
+	}
+	return qualifiedProject, bareTaskRef, true
 }
 
 func readProjectRegistry(path string) (*runtimeProjectRegistry, error) {
@@ -201,6 +255,7 @@ func runtimeInstanceConfigFromProjectDefinition(registryPath string, projectKey 
 		KanbanMode:       strings.TrimSpace(definition.Kanban.Mode),
 		KanbanURL:        strings.TrimSpace(definition.Kanban.URL),
 		KanbanRuntimeURL: strings.TrimSpace(definition.Kanban.RuntimeURL),
+		KanbanProject:    strings.TrimSpace(definition.Kanban.Project),
 		AgentPort:        strings.TrimSpace(definition.AgentPort),
 		StorageDir:       projectStorageDir(projectKey, definition.StorageDir),
 		RuntimeImage:     strings.TrimSpace(definition.RuntimeImage),

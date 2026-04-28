@@ -866,6 +866,112 @@ func TestRuntimeStatusRejectsProjectWithoutRegistry(t *testing.T) {
 	}
 }
 
+func TestRuntimeRunOnceRequiresProjectWhenRegistryHasMultipleProjects(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, multiProjectRegistryPayload(packageDir, tempDir))
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once", "--max-steps", "1"}, &fakeRunner{}, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run-once should require --project with multiple projects")
+		}
+	})
+	if !strings.Contains(stderr.String(), "requires --project") {
+		t.Fatalf("stderr should explain explicit project requirement, got:\n%s", stderr.String())
+	}
+}
+
+func TestRuntimeRunOnceProjectSelectsOneRegistryProject(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, multiProjectRegistryPayload(packageDir, tempDir))
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once", "--project", "beta", "--max-steps", "1", "--agent-attempts", "1"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "runtime_project_key=beta") {
+		t.Fatalf("stdout should include selected project key, got:\n%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "describe_task=a2o runtime describe-task --project beta <task-ref>") {
+		t.Fatalf("stdout should include project-qualified follow-up command, got:\n%s", stdout.String())
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(joined, "docker compose -p a3-beta -f "+filepath.Join(tempDir, "compose-beta.yml")) {
+		t.Fatalf("run-once should use selected project compose config, calls:\n%s", joined)
+	}
+}
+
+func TestRuntimeDescribeTaskAcceptsQualifiedProjectRef(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, multiProjectRegistryPayload(packageDir, tempDir))
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "describe-task", "beta:A2O#16"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "runtime_project_key=beta") {
+		t.Fatalf("stdout should include selected project key, got:\n%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "operator_next=a2o runtime describe-task --project beta A2O#16") {
+		t.Fatalf("stdout should include project-qualified operator_next, got:\n%s", stdout.String())
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(joined, " a3 show-task --storage-backend json --storage-dir /var/lib/a2o/projects/beta A2O#16") {
+		t.Fatalf("describe-task should strip project qualifier and use beta storage, calls:\n%s", joined)
+	}
+}
+
+func TestRuntimeDescribeTaskRejectsAmbiguousUnqualifiedRef(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, multiProjectRegistryPayload(packageDir, tempDir))
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "describe-task", "A2O#16"}, &fakeRunner{}, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("describe-task should fail for unqualified refs with multiple projects")
+		}
+	})
+	if !strings.Contains(stderr.String(), "requires --project") {
+		t.Fatalf("stderr should explain ambiguous project requirement, got:\n%s", stderr.String())
+	}
+}
+
 func TestProjectTemplatePrintsValidMinimalProjectYaml(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -1995,25 +2101,25 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o kanban up [--build]",
 		"a2o kanban doctor",
 		"a2o kanban url",
-		"a2o runtime up [--build] [--pull]",
-		"a2o runtime down",
-		"a2o runtime resume [--interval DURATION] [--agent-poll-interval DURATION] # resume scheduler",
-		"a2o runtime pause                        # pause scheduler after current work",
+		"a2o runtime up [--project KEY] [--build] [--pull]",
+		"a2o runtime down [--project KEY]",
+		"a2o runtime resume [--project KEY] [--interval DURATION] [--agent-poll-interval DURATION] # resume scheduler",
+		"a2o runtime pause [--project KEY]",
 		"a2o runtime status",
-		"a2o runtime image-digest",
-		"a2o runtime doctor",
-		"a2o runtime describe-task TASK_REF",
-		"a2o runtime reset-task TASK_REF",
-		"a2o runtime force-stop-task TASK_REF --dangerous",
-		"a2o runtime force-stop-run RUN_REF --dangerous",
-		"a2o runtime watch-summary [--details]",
-		"a2o runtime skill-feedback list",
-		"a2o runtime skill-feedback propose",
-		"a2o runtime logs [TASK_REF] [--follow] [--index N] [--no-children]",
-		"a2o runtime show-artifact ARTIFACT_ID",
-		"a2o runtime clear-logs (--task-ref TASK_REF | --run-ref RUN_REF | --all-analysis) [--phase PHASE] [--role ROLE] [--apply]",
-		"a2o runtime run-once [--max-steps N] [--agent-attempts N] [--agent-poll-interval DURATION]",
-		"a2o runtime loop [--interval DURATION] [--max-cycles N] [--agent-poll-interval DURATION]",
+		"a2o runtime image-digest [--project KEY]",
+		"a2o runtime doctor [--project KEY]",
+		"a2o runtime describe-task [--project KEY] TASK_REF",
+		"a2o runtime reset-task [--project KEY] TASK_REF",
+		"a2o runtime force-stop-task [--project KEY] TASK_REF --dangerous",
+		"a2o runtime force-stop-run [--project KEY] RUN_REF --dangerous",
+		"a2o runtime watch-summary [--project KEY] [--details]",
+		"a2o runtime skill-feedback list [--project KEY]",
+		"a2o runtime skill-feedback propose [--project KEY]",
+		"a2o runtime logs [--project KEY] [TASK_REF] [--follow] [--index N] [--no-children]",
+		"a2o runtime show-artifact [--project KEY] ARTIFACT_ID",
+		"a2o runtime clear-logs [--project KEY] (--task-ref TASK_REF | --run-ref RUN_REF | --all-analysis) [--phase PHASE] [--role ROLE] [--apply]",
+		"a2o runtime run-once [--project KEY] [--max-steps N] [--agent-attempts N] [--agent-poll-interval DURATION]",
+		"a2o runtime loop [--project KEY] [--interval DURATION] [--max-cycles N] [--agent-poll-interval DURATION]",
 		"a2o agent install [--target auto] [--output PATH] [--package-source auto|package-dir|runtime-image] [--package-dir DIR] [--build]",
 	} {
 		if !strings.Contains(output, want) {
@@ -4493,6 +4599,63 @@ func TestRuntimeUpStartsContainersWithoutScheduler(t *testing.T) {
 	}
 }
 
+func TestRuntimeUpRequiresProjectWhenRegistryHasMultipleProjects(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, multiProjectRegistryPayload(packageDir, tempDir))
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "up"}, &fakeRunner{}, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("runtime up should require --project with multiple projects")
+		}
+	})
+	if !strings.Contains(stderr.String(), "requires --project") {
+		t.Fatalf("stderr should explain explicit project requirement, got:\n%s", stderr.String())
+	}
+}
+
+func TestRuntimeUpDownProjectSelectsOneRegistryProject(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, multiProjectRegistryPayload(packageDir, tempDir))
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "up", "--project", "beta"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("runtime up returned %d, stderr=%s", code, stderr.String())
+		}
+		code = run([]string{"runtime", "down", "--project", "beta"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("runtime down returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := runner.joinedCalls()
+	assertCallContains(t, joined, "docker compose -p a3-beta -f "+filepath.Join(tempDir, "compose-beta.yml")+" up -d a2o-runtime")
+	assertCallContains(t, joined, "docker compose -p a3-beta -f "+filepath.Join(tempDir, "compose-beta.yml")+" down")
+	if strings.Contains(strings.Join(joined, "\n"), " up -d a2o-runtime kanbalone") {
+		t.Fatalf("external registry kanban project should not start local kanbalone, got:\n%s", strings.Join(joined, "\n"))
+	}
+	if !strings.Contains(stdout.String(), "runtime_up compose_project=a3-beta project_key=beta") ||
+		!strings.Contains(stdout.String(), "runtime_down compose_project=a3-beta project_key=beta") {
+		t.Fatalf("stdout should report selected project, got:\n%s", stdout.String())
+	}
+}
+
 func TestRuntimeUpFailsWhenLegacySoloBoardVolumeWouldBeOrphaned(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
@@ -4888,7 +5051,7 @@ func TestRuntimeDecompositionActionHelpDoesNotStartRuntime(t *testing.T) {
 		t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 	}
 
-	if got := stdout.String(); !strings.Contains(got, "usage: a2o runtime decomposition status TASK_REF") {
+	if got := stdout.String(); !strings.Contains(got, "usage: a2o runtime decomposition status [--project KEY] TASK_REF") {
 		t.Fatalf("stdout should include action usage, got:\n%s", got)
 	}
 	if len(runner.calls) != 0 {
@@ -5126,6 +5289,40 @@ func TestRuntimeResetTaskPrintsBlockedRecoveryPlan(t *testing.T) {
 	}
 }
 
+func TestRuntimeResetTaskAcceptsQualifiedProjectRef(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, multiProjectRegistryPayload(packageDir, tempDir))
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "reset-task", "beta:A2O#16"}, &fakeRunner{}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	for _, want := range []string{
+		"reset_task_plan task_ref=A2O#16 mode=dry-run",
+		"runtime_project_key=beta",
+		"kanban_project=Beta kanban_url=http://127.0.0.1:3471",
+		"runtime_storage=internal-managed project_config=" + filepath.Join(packageDir, "project.yaml"),
+		"recovery_step 1 command=a2o runtime describe-task --project beta A2O#16",
+		"recovery_step 2 command=a2o runtime watch-summary --project beta",
+		"recovery_step 6 command=a2o runtime run-once --project beta",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("reset-task should use qualified project; missing %q in:\n%s", want, output)
+		}
+	}
+}
+
 func TestRuntimeForceStopTaskRequiresDangerousFlag(t *testing.T) {
 	runner := &fakeRunner{}
 	var stdout bytes.Buffer
@@ -5265,6 +5462,44 @@ func TestRuntimeShowArtifactReadsContainerArtifact(t *testing.T) {
 	}
 }
 
+func TestRuntimeStorageInspectionCommandsSelectRegistryProject(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, multiProjectRegistryPayload(packageDir, tempDir))
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		for _, args := range [][]string{
+			{"runtime", "show-artifact", "--project", "beta", "worker-run-16-implementation-combined-log"},
+			{"runtime", "skill-feedback", "list", "--project", "beta"},
+			{"runtime", "metrics", "list", "--project", "beta", "--format", "csv"},
+		} {
+			code := run(args, runner, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("run %v returned %d, stderr=%s", args, code, stderr.String())
+			}
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"docker compose -p a3-beta -f " + filepath.Join(tempDir, "compose-beta.yml"),
+		" a3 agent-artifact-read --storage-dir /var/lib/a2o/projects/beta worker-run-16-implementation-combined-log",
+		" a3 skill-feedback-list --storage-backend json --storage-dir /var/lib/a2o/projects/beta",
+		" a3 metrics list --storage-backend json --storage-dir /var/lib/a2o/projects/beta --format csv",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("storage inspection command should use selected project; missing %q in:\n%s", want, joined)
+		}
+	}
+}
+
 func TestRuntimeClearLogsRunsContainerClearInDryRunModeByDefault(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -5356,6 +5591,71 @@ func TestRuntimeLogsPrintsCompletedPhaseArtifacts(t *testing.T) {
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("runtime logs missing call %q in:\n%s", want, joined)
+		}
+	}
+}
+
+func TestRuntimeLogsProjectSelectsOneRegistryProject(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, multiProjectRegistryPayload(packageDir, tempDir))
+	runner := &fakeRunner{
+		logManifestOutput: `{"run_ref":"run-16","current_run":"run-16","phase":"implementation","source_type":"detached_commit","source_ref":"abc","active":false,"artifacts":[{"phase":"implementation","artifact_id":"worker-run-16-implementation-ai-raw-log","mode":"ai-raw-log"}]}`,
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "logs", "--project", "beta", "A2O#16"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"docker compose -p a3-beta -f " + filepath.Join(tempDir, "compose-beta.yml"),
+		" a3 show-task --storage-backend json --storage-dir /var/lib/a2o/projects/beta A2O#16",
+		" a3 agent-artifact-read --storage-dir /var/lib/a2o/projects/beta worker-run-16-implementation-ai-raw-log",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("runtime logs should use selected project; missing %q in:\n%s", want, joined)
+		}
+	}
+}
+
+func TestRuntimeLogsAcceptsQualifiedProjectRef(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, multiProjectRegistryPayload(packageDir, tempDir))
+	runner := &fakeRunner{
+		logManifestOutput: `{"run_ref":"run-16","current_run":"run-16","phase":"implementation","source_type":"detached_commit","source_ref":"abc","active":false,"artifacts":[{"phase":"implementation","artifact_id":"worker-run-16-implementation-ai-raw-log","mode":"ai-raw-log"}]}`,
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "logs", "beta:A2O#16"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"docker compose -p a3-beta -f " + filepath.Join(tempDir, "compose-beta.yml"),
+		" a3 show-task --storage-backend json --storage-dir /var/lib/a2o/projects/beta A2O#16",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("runtime logs should strip project qualifier and use selected project; missing %q in:\n%s", want, joined)
 		}
 	}
 }
@@ -6093,6 +6393,38 @@ func TestRuntimeWatchSummaryPassesDetailsFlag(t *testing.T) {
 	joined := strings.Join(runner.joinedCalls(), "\n")
 	if !strings.Contains(joined, "a3 watch-summary --storage-backend json --storage-dir /var/lib/a3/test-runtime --details") {
 		t.Fatalf("watch-summary should pass --details to the runtime command, got:\n%s", joined)
+	}
+}
+
+func TestRuntimeWatchSummaryProjectSelectsOneRegistryProject(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, multiProjectRegistryPayload(packageDir, tempDir))
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "watch-summary", "--project", "beta"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"docker compose -p a3-beta -f " + filepath.Join(tempDir, "compose-beta.yml"),
+		" a3 watch-summary --storage-backend json --storage-dir /var/lib/a2o/projects/beta",
+		"--kanban-project Beta",
+		"--kanban-command-arg http://host.docker.internal:3471",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("watch-summary should use selected project; missing %q in:\n%s", want, joined)
+		}
 	}
 }
 
@@ -7284,6 +7616,60 @@ func TestRuntimeImageDigestUsesInstanceRuntimeImageWhenEnvIsAbsent(t *testing.T)
 	}
 	if runner.lastEnv["A2O_RUNTIME_IMAGE"] != "ghcr.io/wamukat/a2o-engine@sha256:instance" {
 		t.Fatalf("image-digest should evaluate compose with instance runtime image env, got %#v", runner.lastEnv)
+	}
+}
+
+func TestRuntimeDoctorAndImageDigestSelectRegistryProject(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	registry := multiProjectRegistryPayload(packageDir, tempDir)
+	beta := registry["projects"].(map[string]any)["beta"].(map[string]any)
+	beta["kanban"] = map[string]any{
+		"mode":    "internal",
+		"port":    "3471",
+		"project": "Beta",
+	}
+	writeProjectRegistry(t, tempDir, registry)
+	runner := &fakeRunner{emptyContainer: true}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		for _, args := range [][]string{
+			{"runtime", "doctor", "--project", "beta"},
+			{"runtime", "image-digest", "--project", "beta"},
+		} {
+			code := run(args, runner, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("run %v returned %d, stderr=%s", args, code, stderr.String())
+			}
+		}
+	})
+
+	output := stdout.String()
+	if !strings.Contains(output, "runtime_project_key=beta") {
+		t.Fatalf("doctor should report selected project, got:\n%s", output)
+	}
+	for _, want := range []string{
+		"runtime_doctor_check name=runtime_container status=blocked action=run a2o runtime up --project beta",
+		"runtime_image_running_status=unknown action=run a2o runtime up --project beta, then rerun a2o runtime status --project beta",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("project-aware remediation missing %q in:\n%s", want, output)
+		}
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"docker compose -p a3-beta -f " + filepath.Join(tempDir, "compose-beta.yml") + " ps --status running -q a2o-runtime",
+		"docker compose -p a3-beta -f " + filepath.Join(tempDir, "compose-beta.yml") + " images --quiet a2o-runtime",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("doctor/image-digest should use selected project; missing %q in:\n%s", want, joined)
+		}
 	}
 }
 
@@ -8619,8 +9005,14 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	case strings.Contains(joined, " compose ") && strings.Contains(joined, " images --quiet "):
 		return []byte("image-123\n"), nil
 	case strings.Contains(joined, " compose ") && strings.Contains(joined, " ps --status running -q kanbalone"):
+		if r.emptyContainer {
+			return []byte("\n"), nil
+		}
 		return []byte("kanbalone-container\n"), nil
 	case strings.Contains(joined, " compose ") && (strings.Contains(joined, " ps --status running -q a2o-runtime") || strings.Contains(joined, " ps --status running -q a2o-runtime")):
+		if r.emptyContainer {
+			return []byte("\n"), nil
+		}
 		return []byte("runtime-container\n"), nil
 	case name == "docker" && len(args) >= 4 && args[0] == "inspect":
 		if imageID, ok := r.containerImageIDs[args[1]]; ok {
@@ -8729,7 +9121,7 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		return []byte(`[{"id":61,"comment":"blocked evidence is available","updated":"2026-04-18T07:46:17.996Z"}]` + "\n"), nil
 	case strings.Contains(joined, " date -u +%Y%m%dT%H%M%SZ"):
 		return []byte("20260417T000000Z\n"), nil
-	case strings.Contains(joined, " cat /tmp/a2o-runtime-run-once.exit"):
+	case strings.Contains(joined, " cat /tmp/a2o-runtime-run-once.exit") || strings.Contains(joined, " cat /tmp/a2o-runtime-") && strings.Contains(joined, "-run-once.exit"):
 		return []byte("0\n"), nil
 	case name == "docker" && len(args) >= 1 && args[0] == "cp":
 		destination := args[len(args)-1]
@@ -8938,6 +9330,47 @@ func writeProjectRegistry(t *testing.T, dir string, payload map[string]any) {
 	}
 	if err := os.WriteFile(path, body, 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func multiProjectRegistryPayload(packageDir string, workspaceRoot string) map[string]any {
+	return map[string]any{
+		"version":         1,
+		"default_project": "a2o",
+		"projects": map[string]any{
+			"a2o": map[string]any{
+				"package_path":    packageDir,
+				"workspace_root":  workspaceRoot,
+				"compose_file":    filepath.Join(workspaceRoot, "compose-a2o.yml"),
+				"compose_project": "a3-a2o",
+				"runtime_service": "a2o-runtime",
+				"storage_dir":     "/var/lib/a2o/projects/a2o",
+				"kanban": map[string]any{
+					"mode":            "external",
+					"url":             "http://127.0.0.1:3470",
+					"runtime_url":     "http://host.docker.internal:3470",
+					"board_id":        2,
+					"project":         "A2O",
+					"task_ref_prefix": "A2O",
+				},
+			},
+			"beta": map[string]any{
+				"package_path":    packageDir,
+				"workspace_root":  workspaceRoot,
+				"compose_file":    filepath.Join(workspaceRoot, "compose-beta.yml"),
+				"compose_project": "a3-beta",
+				"runtime_service": "a2o-runtime",
+				"storage_dir":     "/var/lib/a2o/projects/beta",
+				"kanban": map[string]any{
+					"mode":            "external",
+					"url":             "http://127.0.0.1:3471",
+					"runtime_url":     "http://host.docker.internal:3471",
+					"board_id":        3,
+					"project":         "Beta",
+					"task_ref_prefix": "BETA",
+				},
+			},
+		},
 	}
 }
 

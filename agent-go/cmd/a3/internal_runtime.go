@@ -182,6 +182,7 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 	}
 	flags := flag.NewFlagSet("a2o runtime decomposition "+action, flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	projectKey := flags.String("project", "", "runtime project key")
 	projectConfig := flags.String("project-config", "", "explicit project config file, for example project-test.yaml")
 	gate := flags.Bool("gate", false, "allow create-children to write child tickets")
 	applyCleanup := flags.Bool("apply", false, "apply decomposition cleanup")
@@ -204,13 +205,16 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 	if len(positionals) != 1 {
 		return fmt.Errorf("usage: a2o runtime decomposition %s TASK_REF", action)
 	}
-	taskRef := positionals[0]
-
-	config, configPath, err := loadInstanceConfigFromWorkingTree()
+	resolvedProject, taskRef, err := resolveRuntimeProjectTaskRef(*projectKey, positionals[0])
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+
+	context, configPath, err := loadProjectRuntimeContextForCommand(resolvedProject, true)
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	plan, err := buildRuntimeRunOncePlan(effectiveConfig, runtimeRunOnceOverrides{}, *projectConfig)
 	if err != nil {
 		return err
@@ -227,6 +231,7 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 	}
 
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
+	fmt.Fprintf(stdout, "runtime_project_key=%s\n", context.ProjectKey)
 	fmt.Fprintf(stdout, "runtime_storage=internal-managed project_config=%s surface_source=project-package\n", plan.ManifestPath)
 	output, err := dockerComposeExecOutput(effectiveConfig, plan, runner, runtimeInspectionArgs(command...)...)
 	if err != nil {
@@ -249,13 +254,13 @@ func splitRuntimeDecompositionArgs(action string, args []string) ([]string, []st
 			flagArgs = append(flagArgs, arg)
 		case action == "cleanup" && (arg == "--apply" || arg == "--dry-run"):
 			flagArgs = append(flagArgs, arg)
-		case arg == "--project-config" || arg == "--repo-source" || arg == "--investigation-evidence-path" || arg == "--proposal-evidence-path" || arg == "--review-evidence-path":
+		case arg == "--project" || arg == "--project-config" || arg == "--repo-source" || arg == "--investigation-evidence-path" || arg == "--proposal-evidence-path" || arg == "--review-evidence-path":
 			if i+1 >= len(args) {
 				return nil, nil, fmt.Errorf("%s requires a value", arg)
 			}
 			flagArgs = append(flagArgs, arg, args[i+1])
 			i++
-		case strings.HasPrefix(arg, "--project-config=") || strings.HasPrefix(arg, "--repo-source=") || strings.HasPrefix(arg, "--investigation-evidence-path=") || strings.HasPrefix(arg, "--proposal-evidence-path=") || strings.HasPrefix(arg, "--review-evidence-path="):
+		case strings.HasPrefix(arg, "--project=") || strings.HasPrefix(arg, "--project-config=") || strings.HasPrefix(arg, "--repo-source=") || strings.HasPrefix(arg, "--investigation-evidence-path=") || strings.HasPrefix(arg, "--proposal-evidence-path=") || strings.HasPrefix(arg, "--review-evidence-path="):
 			flagArgs = append(flagArgs, arg)
 		case strings.HasPrefix(arg, "-"):
 			return nil, nil, fmt.Errorf("unknown runtime decomposition option: %s", arg)
@@ -325,7 +330,7 @@ func runtimeDecompositionCommand(action string, taskRef string, plan runtimeRunO
 }
 
 func printRuntimeDecompositionUsage(w io.Writer) {
-	fmt.Fprintln(w, "usage: a2o runtime decomposition investigate|propose|review|create-children|status|cleanup TASK_REF [--project-config project-test.yaml]")
+	fmt.Fprintln(w, "usage: a2o runtime decomposition investigate|propose|review|create-children|status|cleanup [--project KEY] TASK_REF [--project-config project-test.yaml]")
 	fmt.Fprintln(w, "actions:")
 	fmt.Fprintln(w, "  investigate       run the configured decomposition investigation command")
 	fmt.Fprintln(w, "  propose           create proposal evidence from investigation evidence")
@@ -338,17 +343,17 @@ func printRuntimeDecompositionUsage(w io.Writer) {
 func printRuntimeDecompositionActionUsage(w io.Writer, action string) error {
 	switch action {
 	case "investigate":
-		fmt.Fprintln(w, "usage: a2o runtime decomposition investigate TASK_REF [--project-config project-test.yaml] [--repo-source SLOT=PATH]")
+		fmt.Fprintln(w, "usage: a2o runtime decomposition investigate [--project KEY] TASK_REF [--project-config project-test.yaml] [--repo-source SLOT=PATH]")
 	case "propose":
-		fmt.Fprintln(w, "usage: a2o runtime decomposition propose TASK_REF [--project-config project-test.yaml] [--investigation-evidence-path PATH]")
+		fmt.Fprintln(w, "usage: a2o runtime decomposition propose [--project KEY] TASK_REF [--project-config project-test.yaml] [--investigation-evidence-path PATH]")
 	case "review":
-		fmt.Fprintln(w, "usage: a2o runtime decomposition review TASK_REF [--project-config project-test.yaml] [--proposal-evidence-path PATH]")
+		fmt.Fprintln(w, "usage: a2o runtime decomposition review [--project KEY] TASK_REF [--project-config project-test.yaml] [--proposal-evidence-path PATH]")
 	case "create-children":
-		fmt.Fprintln(w, "usage: a2o runtime decomposition create-children TASK_REF [--project-config project-test.yaml] [--proposal-evidence-path PATH] [--review-evidence-path PATH] [--gate]")
+		fmt.Fprintln(w, "usage: a2o runtime decomposition create-children [--project KEY] TASK_REF [--project-config project-test.yaml] [--proposal-evidence-path PATH] [--review-evidence-path PATH] [--gate]")
 	case "status":
-		fmt.Fprintln(w, "usage: a2o runtime decomposition status TASK_REF [--project-config project-test.yaml]")
+		fmt.Fprintln(w, "usage: a2o runtime decomposition status [--project KEY] TASK_REF [--project-config project-test.yaml]")
 	case "cleanup":
-		fmt.Fprintln(w, "usage: a2o runtime decomposition cleanup TASK_REF [--project-config project-test.yaml] [--dry-run|--apply]")
+		fmt.Fprintln(w, "usage: a2o runtime decomposition cleanup [--project KEY] TASK_REF [--project-config project-test.yaml] [--dry-run|--apply]")
 	default:
 		return fmt.Errorf("unknown runtime decomposition subcommand: %s", action)
 	}
@@ -441,6 +446,7 @@ func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, std
 	agentControlPlaneRequestTimeout := flags.String("agent-control-plane-request-timeout", "", "per-request timeout for host agent control plane requests during each cycle")
 	agentControlPlaneRetries := flags.String("agent-control-plane-retries", "", "retry count for transient host agent control plane request failures during each cycle")
 	agentControlPlaneRetryDelay := flags.String("agent-control-plane-retry-delay", "", "delay between transient host agent control plane retries during each cycle")
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -482,11 +488,11 @@ func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, std
 		return err
 	}
 
-	config, _, err := loadInstanceConfigFromWorkingTree()
+	context, _, err := loadProjectRuntimeContextForCommand(*projectKey, true)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	if _, err := buildRuntimeRunOncePlan(effectiveConfig, runtimeRunOnceOverrides{
 		MaxSteps:                        *maxSteps,
 		AgentAttempts:                   *agentAttempts,
@@ -509,7 +515,7 @@ func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, std
 			return err
 		}
 		fmt.Fprintf(stdout, "runtime_scheduler_resumed pid=%d paused=false pid_file=%s log=%s\n", pid, paths.PIDFile, paths.LogFile)
-		fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
+		fmt.Fprintf(stdout, "describe_task=a2o runtime describe-task%s <task-ref>\n", runtimeProjectCommandArg(context.ProjectKey, effectiveConfig.MultiProjectMode))
 		return nil
 	}
 	if err := runtimeSchedulerStateCommand(effectiveConfig, runner, "resume-scheduler"); err != nil {
@@ -526,6 +532,9 @@ func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, std
 		return fmt.Errorf("resolve executable: %w", err)
 	}
 	loopArgs := []string{"runtime", "loop", "--interval", *interval}
+	if effectiveConfig.MultiProjectMode && context.ProjectKey != "" {
+		loopArgs = append(loopArgs, "--project", context.ProjectKey)
+	}
 	loopArgs = append(loopArgs, buildRunOnceArgs(runtimeRunOnceOverrides{
 		MaxSteps:                        *maxSteps,
 		AgentAttempts:                   *agentAttempts,
@@ -551,13 +560,14 @@ func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, std
 	}
 	resumed = true
 	fmt.Fprintf(stdout, "runtime_scheduler_resumed pid_file=%s log=%s paused=false\n", paths.PIDFile, paths.LogFile)
-	fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
+	fmt.Fprintf(stdout, "describe_task=a2o runtime describe-task%s <task-ref>\n", runtimeProjectCommandArg(context.ProjectKey, effectiveConfig.MultiProjectMode))
 	return nil
 }
 
 func runRuntimePause(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
 	flags := flag.NewFlagSet("a2o runtime pause", flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -565,11 +575,11 @@ func runRuntimePause(args []string, runner commandRunner, stdout io.Writer, stde
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
 
-	config, _, err := loadInstanceConfigFromWorkingTree()
+	context, _, err := loadProjectRuntimeContextForCommand(*projectKey, true)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	if err := runtimeSchedulerStateCommand(effectiveConfig, runner, "pause-scheduler"); err != nil {
 		return err
 	}
@@ -703,17 +713,18 @@ func runtimeSchedulerPauseSummary(config runtimeInstanceConfig, runner commandRu
 func runRuntimeImageDigest(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
 	flags := flag.NewFlagSet("a2o runtime image-digest", flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
-	config, _, err := loadInstanceConfigFromWorkingTree()
+	context, _, err := loadProjectRuntimeContextForCommand(*projectKey, true)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	return withComposeEnv(effectiveConfig, func() error {
 		report := runtimeImageDigestReport(&effectiveConfig, runner)
 		printRuntimeImageDigestReport(report, stdout)
@@ -744,7 +755,7 @@ func printRuntimeServiceStatus(config runtimeInstanceConfig, runner commandRunne
 		}
 		containerID := strings.TrimSpace(string(output))
 		if containerID == "" {
-			fmt.Fprintf(stdout, "runtime_status_check name=%s status=stopped action=run a2o runtime up\n", check.name)
+			fmt.Fprintf(stdout, "runtime_status_check name=%s status=stopped action=run a2o runtime up%s\n", check.name, runtimeProjectCommandArg(config.ProjectKey, config.MultiProjectMode))
 			continue
 		}
 		fmt.Fprintf(stdout, "runtime_status_check name=%s status=running container=%s\n", check.name, containerID)
@@ -770,6 +781,8 @@ type runtimeImageReport struct {
 	RunningContainer   string
 	RunningImageID     string
 	RunningDigest      string
+	ProjectKey         string
+	MultiProjectMode   bool
 }
 
 func runtimeImageDigestReport(config *runtimeInstanceConfig, runner commandRunner) runtimeImageReport {
@@ -781,6 +794,8 @@ func runtimeImageDigestReport(config *runtimeInstanceConfig, runner commandRunne
 		ConfiguredDigest:  configuredIdentity.Digest,
 		ConfiguredImageID: configuredIdentity.ImageID,
 		LocalLatestRef:    latestRuntimeImageReference(configuredRef),
+		ProjectKey:        effectiveConfig.ProjectKey,
+		MultiProjectMode:  effectiveConfig.MultiProjectMode,
 	}
 	if report.LocalLatestRef != "" {
 		report.LocalLatestDigest = imageDigestForReference(report.LocalLatestRef, runner)
@@ -805,8 +820,8 @@ func printRuntimeImageDigestReport(report runtimeImageReport, stdout io.Writer) 
 	}
 	latestStatus := runtimeImageComparisonStatus(report.ConfiguredDigest, report.LocalLatestDigest, report.ConfiguredImageID, report.LocalLatestImageID)
 	runningStatus := runtimeImageComparisonStatus(report.ConfiguredDigest, report.RunningDigest, report.ConfiguredImageID, report.RunningImageID)
-	fmt.Fprintf(stdout, "runtime_image_latest_status=%s action=%s\n", latestStatus, runtimeImageLatestAction(latestStatus, report.LocalLatestRef))
-	fmt.Fprintf(stdout, "runtime_image_running_status=%s action=%s\n", runningStatus, runtimeImageRunningAction(runningStatus))
+	fmt.Fprintf(stdout, "runtime_image_latest_status=%s action=%s\n", latestStatus, runtimeImageLatestAction(latestStatus, report.LocalLatestRef, report))
+	fmt.Fprintf(stdout, "runtime_image_running_status=%s action=%s\n", runningStatus, runtimeImageRunningAction(runningStatus, report))
 }
 
 func runtimeImageComparisonStatus(expected string, actual string, expectedImageID string, actualImageID string) string {
@@ -833,7 +848,8 @@ func imageIDIdentity(imageID string) string {
 	return strings.TrimPrefix(strings.TrimSpace(imageID), "sha256:")
 }
 
-func runtimeImageLatestAction(status string, latestRef string) string {
+func runtimeImageLatestAction(status string, latestRef string, report runtimeImageReport) string {
+	imageDigestCommand := "a2o runtime image-digest" + runtimeProjectCommandArg(report.ProjectKey, report.MultiProjectMode)
 	switch status {
 	case "current":
 		return "none"
@@ -841,20 +857,22 @@ func runtimeImageLatestAction(status string, latestRef string) string {
 		return "validate local latest, then update the package runtime image pin if you want this version"
 	default:
 		if latestRef == "" {
-			return "configure A2O_RUNTIME_IMAGE, pull or inspect the configured runtime image, then rerun a2o runtime image-digest"
+			return "configure A2O_RUNTIME_IMAGE, pull or inspect the configured runtime image, then rerun " + imageDigestCommand
 		}
-		return "pull " + latestRef + " or inspect the configured runtime image, then rerun a2o runtime image-digest"
+		return "pull " + latestRef + " or inspect the configured runtime image, then rerun " + imageDigestCommand
 	}
 }
 
-func runtimeImageRunningAction(status string) string {
+func runtimeImageRunningAction(status string, report runtimeImageReport) string {
+	runtimeUpCommand := "a2o runtime up" + runtimeProjectCommandArg(report.ProjectKey, report.MultiProjectMode)
+	runtimeStatusCommand := "a2o runtime status" + runtimeProjectCommandArg(report.ProjectKey, report.MultiProjectMode)
 	switch status {
 	case "current":
 		return "none"
 	case "mismatch":
-		return "restart runtime with a2o runtime up after confirming the desired pinned digest"
+		return "restart runtime with " + runtimeUpCommand + " after confirming the desired pinned digest"
 	default:
-		return "run a2o runtime up, then rerun a2o runtime status"
+		return "run " + runtimeUpCommand + ", then rerun " + runtimeStatusCommand
 	}
 }
 
@@ -967,6 +985,7 @@ func runRuntimeUp(args []string, runner commandRunner, stdout io.Writer, stderr 
 	flags.SetOutput(stderr)
 	build := flags.Bool("build", false, "build the runtime image before starting services")
 	pull := flags.Bool("pull", false, "pull the configured runtime image before starting services")
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -974,11 +993,11 @@ func runRuntimeUp(args []string, runner commandRunner, stdout io.Writer, stderr 
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
 
-	config, _, err := loadInstanceConfigFromWorkingTree()
+	context, _, err := loadProjectRuntimeContextForCommand(*projectKey, true)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	composePrefix := composeArgs(effectiveConfig)
 	return withComposeEnv(effectiveConfig, func() error {
 		if *pull && !*build {
@@ -1004,7 +1023,7 @@ func runRuntimeUp(args []string, runner commandRunner, stdout io.Writer, stderr 
 		if _, err := runExternal(runner, "docker", append(composePrefix, append([]string{"up", "-d"}, services...)...)...); err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "runtime_up compose_project=%s package=%s kanban_mode=%s\n", effectiveConfig.ComposeProject, effectiveConfig.PackagePath, kanbanMode(effectiveConfig))
+		fmt.Fprintf(stdout, "runtime_up compose_project=%s project_key=%s package=%s kanban_mode=%s\n", effectiveConfig.ComposeProject, context.ProjectKey, effectiveConfig.PackagePath, kanbanMode(effectiveConfig))
 		return nil
 	})
 }
@@ -1047,6 +1066,7 @@ func cleanupLegacyRuntimeServiceOrphans(config runtimeInstanceConfig, runner com
 func runRuntimeDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
 	flags := flag.NewFlagSet("a2o runtime doctor", flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -1054,12 +1074,13 @@ func runRuntimeDoctor(args []string, runner commandRunner, stdout io.Writer, std
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
 
-	config, configPath, err := loadInstanceConfigFromWorkingTree()
+	context, configPath, err := loadProjectRuntimeContextForCommand(*projectKey, true)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
+	fmt.Fprintf(stdout, "runtime_project_key=%s\n", context.ProjectKey)
 	fmt.Fprintf(stdout, "package=%s\n", effectiveConfig.PackagePath)
 	fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
 	fmt.Fprintf(stdout, "kanban_mode=%s\n", kanbanMode(effectiveConfig))
@@ -1083,7 +1104,7 @@ func runRuntimeDoctor(args []string, runner commandRunner, stdout io.Writer, std
 		}
 		containerID := strings.TrimSpace(string(output))
 		if containerID == "" {
-			fmt.Fprintf(stdout, "runtime_doctor_check name=%s status=blocked action=run a2o runtime up\n", check.name)
+			fmt.Fprintf(stdout, "runtime_doctor_check name=%s status=blocked action=run a2o runtime up%s\n", check.name, runtimeProjectCommandArg(context.ProjectKey, effectiveConfig.MultiProjectMode))
 			continue
 		}
 		fmt.Fprintf(stdout, "runtime_doctor_check name=%s status=ok container=%s\n", check.name, containerID)
@@ -1094,6 +1115,7 @@ func runRuntimeDoctor(args []string, runner commandRunner, stdout io.Writer, std
 func runRuntimeDown(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
 	flags := flag.NewFlagSet("a2o runtime down", flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -1101,20 +1123,22 @@ func runRuntimeDown(args []string, runner commandRunner, stdout io.Writer, stder
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
 
-	config, _, err := loadInstanceConfigFromWorkingTree()
+	context, _, err := loadProjectRuntimeContextForCommand(*projectKey, true)
 	if err != nil {
 		return err
 	}
-	if _, err := runExternal(runner, "docker", append(composeArgs(*config), "down")...); err != nil {
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
+	if _, err := runExternal(runner, "docker", append(composeArgs(effectiveConfig), "down")...); err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "runtime_down compose_project=%s\n", config.ComposeProject)
+	fmt.Fprintf(stdout, "runtime_down compose_project=%s project_key=%s\n", effectiveConfig.ComposeProject, context.ProjectKey)
 	return nil
 }
 
 func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) error {
 	flags := flag.NewFlagSet("a2o runtime command-plan", flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -1122,15 +1146,16 @@ func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) er
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
 
-	config, configPath, err := loadInstanceConfigFromWorkingTree()
+	context, configPath, err := loadProjectRuntimeContextForCommand(*projectKey, true)
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
+	fmt.Fprintf(stdout, "runtime_project_key=%s\n", context.ProjectKey)
 	fmt.Fprintln(stdout, "kanban_up=a2o kanban up")
 	fmt.Fprintln(stdout, "kanban_doctor=a2o kanban doctor")
-	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(*config))
-	fmt.Fprintln(stdout, "runtime_up=a2o runtime up")
+	fmt.Fprintf(stdout, "kanban_url=%s\n", kanbanPublicURL(context.Config))
+	fmt.Fprintf(stdout, "runtime_up=a2o runtime up%s\n", runtimeProjectCommandArg(context.ProjectKey, context.Config.MultiProjectMode))
 	fmt.Fprintln(stdout, "agent_install=a2o agent install")
 	return nil
 }
@@ -1138,6 +1163,7 @@ func runRuntimeCommandPlan(args []string, stdout io.Writer, stderr io.Writer) er
 func runRuntimeDescribeTask(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
 	flags := flag.NewFlagSet("a2o runtime describe-task", flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -1148,12 +1174,17 @@ func runRuntimeDescribeTask(args []string, runner commandRunner, stdout io.Write
 	if taskRef == "" {
 		return fmt.Errorf("task ref is required")
 	}
-
-	config, configPath, err := loadInstanceConfigFromWorkingTree()
+	resolvedProject, resolvedTaskRef, err := resolveRuntimeProjectTaskRef(*projectKey, taskRef)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	taskRef = resolvedTaskRef
+
+	context, configPath, err := loadProjectRuntimeContextForCommand(resolvedProject, true)
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	return withComposeEnv(effectiveConfig, func() error {
 		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
 		if err != nil {
@@ -1161,16 +1192,18 @@ func runRuntimeDescribeTask(args []string, runner commandRunner, stdout io.Write
 		}
 		fmt.Fprintf(stdout, "describe_task task_ref=%s\n", taskRef)
 		fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
+		fmt.Fprintf(stdout, "runtime_project_key=%s\n", context.ProjectKey)
 		fmt.Fprintf(stdout, "package=%s\n", effectiveConfig.PackagePath)
 		fmt.Fprintf(stdout, "compose_project=%s\n", effectiveConfig.ComposeProject)
 		fmt.Fprintf(stdout, "kanban_project=%s kanban_url=%s\n", plan.KanbanProject, kanbanPublicURL(effectiveConfig))
 		fmt.Fprintf(stdout, "runtime_storage=internal-managed project_config=%s surface_source=project-package\n", plan.ManifestPath)
-		fmt.Fprintf(stdout, "operator_next=a2o runtime describe-task %s\n", taskRef)
+		projectArg := runtimeProjectCommandArg(context.ProjectKey, effectiveConfig.MultiProjectMode)
+		fmt.Fprintf(stdout, "operator_next=a2o runtime describe-task%s %s\n", projectArg, taskRef)
 
 		runRef := ""
 		taskOutput, err := runtimeDescribeSectionOutput(effectiveConfig, plan, runner, "task", "a3", "show-task", "--storage-backend", "json", "--storage-dir", plan.StorageDir, taskRef)
 		if err != nil {
-			fmt.Fprintf(stdout, "describe_section name=task status=blocked action=run a2o runtime run-once or verify task ref detail=%s\n", singleLine(err.Error()))
+			fmt.Fprintf(stdout, "describe_section name=task status=blocked action=run a2o runtime run-once%s or verify task ref detail=%s\n", projectArg, singleLine(err.Error()))
 		} else {
 			printDescribeSection(stdout, "task", taskOutput)
 			runRef = parseOutputValue(taskOutput, "current_run")
@@ -1209,22 +1242,28 @@ func runRuntimeDescribeTask(args []string, runner commandRunner, stdout io.Write
 func runRuntimeResetTask(args []string, stdout io.Writer, stderr io.Writer) error {
 	flags := flag.NewFlagSet("a2o runtime reset-task", flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 1 {
-		return fmt.Errorf("usage: a2o runtime reset-task TASK_REF")
+		return fmt.Errorf("usage: a2o runtime reset-task [--project KEY] TASK_REF")
 	}
 	taskRef := strings.TrimSpace(flags.Arg(0))
 	if taskRef == "" {
 		return fmt.Errorf("task ref is required")
 	}
-
-	config, configPath, err := loadInstanceConfigFromWorkingTree()
+	resolvedProject, resolvedTaskRef, err := resolveRuntimeProjectTaskRef(*projectKey, taskRef)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	taskRef = resolvedTaskRef
+
+	context, configPath, err := loadProjectRuntimeContextForCommand(resolvedProject, true)
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	plan, err := buildRuntimeRunOncePlan(effectiveConfig, runtimeRunOnceOverrides{}, "")
 	if err != nil {
 		return err
@@ -1232,6 +1271,7 @@ func runRuntimeResetTask(args []string, stdout io.Writer, stderr io.Writer) erro
 
 	fmt.Fprintf(stdout, "reset_task_plan task_ref=%s mode=dry-run\n", taskRef)
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
+	fmt.Fprintf(stdout, "runtime_project_key=%s\n", context.ProjectKey)
 	fmt.Fprintf(stdout, "kanban_project=%s kanban_url=%s\n", plan.KanbanProject, kanbanPublicURL(effectiveConfig))
 	fmt.Fprintf(stdout, "runtime_storage=internal-managed project_config=%s surface_source=project-package\n", plan.ManifestPath)
 	fmt.Fprintf(stdout, "runtime_logs runtime=%s server=%s host_agent=%s\n", plan.RuntimeLog, plan.ServerLog, plan.HostAgentLog)
@@ -1242,14 +1282,23 @@ func runRuntimeResetTask(args []string, stdout io.Writer, stderr io.Writer) erro
 	fmt.Fprintln(stdout, "affected_artifact kind=blocked_diagnosis directory=blocked_diagnoses action=preserve until the rerun is accepted")
 	fmt.Fprintf(stdout, "affected_artifact kind=workspace path=%s action=quarantine or remove only after preserving needed manual changes\n", plan.WorkspaceRoot)
 	fmt.Fprintf(stdout, "affected_artifact kind=branch namespace=%s action=inspect task branches and remove stale branches only after preserving needed commits\n", plan.BranchNamespace)
-	fmt.Fprintf(stdout, "recovery_step 1 command=a2o runtime describe-task %s purpose=read blocked reason, run, evidence, kanban comments, and logs\n", taskRef)
-	fmt.Fprintln(stdout, "recovery_step 2 command=a2o runtime watch-summary purpose=confirm the scheduler sees the task as blocked and no sibling task is still running")
+	projectArg := runtimeProjectCommandArg(context.ProjectKey, effectiveConfig.MultiProjectMode)
+	fmt.Fprintf(stdout, "recovery_step 1 command=a2o runtime describe-task%s %s purpose=read blocked reason, run, evidence, kanban comments, and logs\n", projectArg, taskRef)
+	fmt.Fprintf(stdout, "recovery_step 2 command=a2o runtime watch-summary%s purpose=confirm the scheduler sees the task as blocked and no sibling task is still running\n", projectArg)
 	fmt.Fprintln(stdout, "recovery_step 3 action=fix_root_cause purpose=repair executor config, dirty repo, missing command, merge conflict, or product failure reported by describe-task")
 	fmt.Fprintln(stdout, "recovery_step 4 action=preserve_manual_changes purpose=commit, patch, or discard any useful changes in the listed workspace and branches")
 	fmt.Fprintln(stdout, "recovery_step 5 action=clear_blocked_label purpose=remove the kanban blocked label only after the root cause is fixed")
-	fmt.Fprintln(stdout, "recovery_step 6 command=a2o runtime run-once purpose=let A2O resync kanban state and start a fresh run")
+	fmt.Fprintf(stdout, "recovery_step 6 command=a2o runtime run-once%s purpose=let A2O resync kanban state and start a fresh run\n", projectArg)
 	fmt.Fprintln(stdout, "apply_supported=false")
 	return nil
+}
+
+func runtimeProjectCommandArg(projectKey string, multiProjectMode bool) string {
+	trimmed := strings.TrimSpace(projectKey)
+	if !multiProjectMode || trimmed == "" {
+		return ""
+	}
+	return " --project " + trimmed
 }
 
 func runRuntimeForceStop(kind string, args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
@@ -1258,6 +1307,7 @@ func runRuntimeForceStop(kind string, args []string, runner commandRunner, stdou
 	flags.SetOutput(stderr)
 	dangerous := flags.Bool("dangerous", false, "confirm intentional destructive intervention")
 	outcome := flags.String("outcome", "cancelled", "terminal outcome to write for the force-stopped run")
+	projectKey := flags.String("project", "", "runtime project key")
 	flagArgs, positionals, err := splitRuntimeForceStopArgs(args)
 	if err != nil {
 		return err
@@ -1275,12 +1325,20 @@ func runRuntimeForceStop(kind string, args []string, runner commandRunner, stdou
 	if targetRef == "" {
 		return fmt.Errorf("%s ref is required", kind)
 	}
+	resolvedProject := strings.TrimSpace(*projectKey)
+	if kind == "task" {
+		var err error
+		resolvedProject, targetRef, err = resolveRuntimeProjectTaskRef(*projectKey, targetRef)
+		if err != nil {
+			return err
+		}
+	}
 
-	config, configPath, err := loadInstanceConfigFromWorkingTree()
+	context, configPath, err := loadProjectRuntimeContextForCommand(resolvedProject, true)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	return withComposeEnv(effectiveConfig, func() error {
 		plan, err := buildRuntimeRunOncePlan(effectiveConfig, runtimeRunOnceOverrides{}, "")
 		if err != nil {
@@ -1288,6 +1346,7 @@ func runRuntimeForceStop(kind string, args []string, runner commandRunner, stdou
 		}
 		fmt.Fprintf(stdout, "runtime_force_stop target=%s ref=%s mode=dangerous\n", kind, targetRef)
 		fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
+		fmt.Fprintf(stdout, "runtime_project_key=%s\n", context.ProjectKey)
 		fmt.Fprintf(stdout, "runtime_storage=internal-managed project_config=%s surface_source=project-package\n", plan.ManifestPath)
 		output, err := dockerComposeExecOutput(
 			effectiveConfig,
@@ -1335,6 +1394,14 @@ func splitRuntimeForceStopArgs(args []string) ([]string, []string, error) {
 			i++
 		case strings.HasPrefix(arg, "--outcome="):
 			flagArgs = append(flagArgs, arg)
+		case arg == "--project":
+			if i+1 >= len(args) {
+				return nil, nil, fmt.Errorf("flag needs an argument: --project")
+			}
+			flagArgs = append(flagArgs, arg, args[i+1])
+			i++
+		case strings.HasPrefix(arg, "--project="):
+			flagArgs = append(flagArgs, arg)
 		case strings.HasPrefix(arg, "-"):
 			flagArgs = append(flagArgs, arg)
 		default:
@@ -1348,6 +1415,7 @@ func runRuntimeWatchSummary(args []string, runner commandRunner, stdout io.Write
 	flags := flag.NewFlagSet("a2o runtime watch-summary", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	details := flags.Bool("details", false, "show per-task waiting and review detail lines")
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -1355,11 +1423,11 @@ func runRuntimeWatchSummary(args []string, runner commandRunner, stdout io.Write
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
 
-	config, _, err := loadInstanceConfigFromWorkingTree()
+	context, _, err := loadProjectRuntimeContextForCommand(*projectKey, false)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	paths := schedulerPaths(effectiveConfig)
 	return withComposeEnv(effectiveConfig, func() error {
 		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
@@ -1385,6 +1453,7 @@ func runRuntimeSkillFeedback(args []string, runner commandRunner, stdout io.Writ
 	subcommand := args[0]
 	flags := flag.NewFlagSet("a2o runtime skill-feedback "+subcommand, flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	projectKey := flags.String("project", "", "runtime project key")
 	state := flags.String("state", "", "filter by feedback lifecycle state")
 	target := flags.String("target", "", "filter by feedback target")
 	group := false
@@ -1402,11 +1471,11 @@ func runRuntimeSkillFeedback(args []string, runner commandRunner, stdout io.Writ
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
 
-	config, _, err := loadInstanceConfigFromWorkingTree()
+	context, _, err := loadProjectRuntimeContextForCommand(*projectKey, true)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	return withComposeEnv(effectiveConfig, func() error {
 		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
 		if err != nil {
@@ -1446,6 +1515,7 @@ func runRuntimeMetrics(args []string, runner commandRunner, stdout io.Writer, st
 	subcommand := args[0]
 	flags := flag.NewFlagSet("a2o runtime metrics "+subcommand, flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	projectKey := flags.String("project", "", "runtime project key")
 	format := "json"
 	groupBy := "task"
 	if subcommand == "list" {
@@ -1469,11 +1539,11 @@ func runRuntimeMetrics(args []string, runner commandRunner, stdout io.Writer, st
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
 
-	config, _, err := loadInstanceConfigFromWorkingTree()
+	context, _, err := loadProjectRuntimeContextForCommand(*projectKey, true)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	return withComposeEnv(effectiveConfig, func() error {
 		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
 		if err != nil {
@@ -1536,6 +1606,7 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 	flags.IntVar(index, "i", -1, "select a running task by index when --follow has multiple candidates")
 	noChildren := flags.Bool("no-children", false, "when following a parent task, follow the parent itself instead of active children")
 	pollInterval := flags.Duration("poll-interval", time.Second, "poll interval for --follow")
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(normalizedArgs); err != nil {
 		return err
 	}
@@ -1549,12 +1620,20 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 			return fmt.Errorf("task ref is required")
 		}
 	}
+	resolvedProject := strings.TrimSpace(*projectKey)
+	if taskRef != "" {
+		var err error
+		resolvedProject, taskRef, err = resolveRuntimeProjectTaskRef(*projectKey, taskRef)
+		if err != nil {
+			return err
+		}
+	}
 
-	config, _, err := loadInstanceConfigFromWorkingTree()
+	context, _, err := loadProjectRuntimeContextForCommand(resolvedProject, taskRef != "" || *follow)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	return withComposeEnv(effectiveConfig, func() error {
 		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
 		if err != nil {
@@ -1669,6 +1748,14 @@ func normalizeRuntimeLogsArgs(args []string) ([]string, error) {
 			normalized = append(normalized, arg, args[index+1])
 			index++
 		case strings.HasPrefix(arg, "--poll-interval="):
+			normalized = append(normalized, arg)
+		case arg == "--project":
+			if index+1 >= len(args) {
+				return nil, fmt.Errorf("flag needs an argument: --project")
+			}
+			normalized = append(normalized, arg, args[index+1])
+			index++
+		case strings.HasPrefix(arg, "--project="):
 			normalized = append(normalized, arg)
 		case arg == "--index" || arg == "-i":
 			if index+1 >= len(args) {
@@ -1824,22 +1911,23 @@ func runtimeLogsFollowTargets(config runtimeInstanceConfig, plan runtimeRunOnceP
 func runRuntimeShowArtifact(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
 	flags := flag.NewFlagSet("a2o runtime show-artifact", flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 1 {
-		return fmt.Errorf("usage: a2o runtime show-artifact ARTIFACT_ID")
+		return fmt.Errorf("usage: a2o runtime show-artifact [--project KEY] ARTIFACT_ID")
 	}
 	artifactID := strings.TrimSpace(flags.Arg(0))
 	if artifactID == "" {
 		return fmt.Errorf("artifact id is required")
 	}
 
-	config, _, err := loadInstanceConfigFromWorkingTree()
+	context, _, err := loadProjectRuntimeContextForCommand(*projectKey, true)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	return withComposeEnv(effectiveConfig, func() error {
 		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
 		if err != nil {
@@ -1866,18 +1954,27 @@ func runRuntimeClearLogs(args []string, runner commandRunner, stdout io.Writer, 
 	role := flags.String("role", "", "limit clear to one role")
 	allAnalysis := flags.Bool("all-analysis", false, "clear all persisted analysis logs")
 	apply := flags.Bool("apply", false, "apply deletion; defaults to dry-run")
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if *taskRef == "" && *runRef == "" && !*allAnalysis {
 		return fmt.Errorf("usage: a2o runtime clear-logs (--task-ref TASK_REF | --run-ref RUN_REF | --all-analysis) [--phase PHASE] [--role ROLE] [--apply]")
 	}
+	resolvedProject := strings.TrimSpace(*projectKey)
+	if *taskRef != "" {
+		var err error
+		resolvedProject, *taskRef, err = resolveRuntimeProjectTaskRef(*projectKey, *taskRef)
+		if err != nil {
+			return err
+		}
+	}
 
-	config, _, err := loadInstanceConfigFromWorkingTree()
+	context, _, err := loadProjectRuntimeContextForCommand(resolvedProject, true)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	return withComposeEnv(effectiveConfig, func() error {
 		plan, err := buildRuntimeDescribeTaskPlan(effectiveConfig)
 		if err != nil {
@@ -1924,6 +2021,7 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 	agentControlPlaneRetries := flags.String("agent-control-plane-retries", "", "retry count for transient host agent control plane request failures for this cycle")
 	agentControlPlaneRetryDelay := flags.String("agent-control-plane-retry-delay", "", "delay between transient host agent control plane retries for this cycle")
 	projectConfig := flags.String("project-config", "", "explicit project config file, for example project-test.yaml")
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -1931,11 +2029,11 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
 
-	config, configPath, err := loadInstanceConfigFromWorkingTree()
+	context, configPath, err := loadProjectRuntimeContextForCommand(*projectKey, true)
 	if err != nil {
 		return err
 	}
-	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	overrides := runtimeRunOnceOverrides{
 		MaxSteps:                        *maxSteps,
 		AgentAttempts:                   *agentAttempts,
@@ -1947,7 +2045,8 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 	}
 
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
-	fmt.Fprintln(stdout, "describe_task=a2o runtime describe-task <task-ref>")
+	fmt.Fprintf(stdout, "runtime_project_key=%s\n", context.ProjectKey)
+	fmt.Fprintf(stdout, "describe_task=a2o runtime describe-task%s <task-ref>\n", runtimeProjectCommandArg(context.ProjectKey, effectiveConfig.MultiProjectMode))
 	return withRuntimeRunOnceEnv(effectiveConfig, overrides.MaxSteps, overrides.AgentAttempts, func() error {
 		return runGenericRuntimeRunOnce(effectiveConfig, overrides, *projectConfig, runner, stdout)
 	})
@@ -2190,7 +2289,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 	}
 	defaultMaxSteps := envDefaultValue(packageConfig.MaxSteps, "16")
 	defaultLiveRef := envDefaultValue(packageConfig.LiveRef, "refs/heads/feature/prototype")
-	defaultKanbanProject := packageConfig.KanbanProject
+	defaultKanbanProject := envDefaultValue(config.KanbanProject, packageConfig.KanbanProject)
 	defaultKanbanStatus := envDefaultValue(packageConfig.KanbanStatus, "To do")
 	launcherConfigPath := envDefaultCompat("A2O_WORKER_LAUNCHER_CONFIG_PATH", "A3_WORKER_LAUNCHER_CONFIG_PATH", filepath.Join(hostRoot, "launcher.json"))
 	projectKey := effectiveRuntimeProjectKey(config)
@@ -2368,7 +2467,7 @@ func buildRuntimeDescribeTaskPlan(config runtimeInstanceConfig) (runtimeRunOnceP
 		PresetDir:            envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PRESET_DIR", "A3_RUNTIME_RUN_ONCE_PRESET_DIR", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PRESET_DIR", "A3_RUNTIME_SCHEDULER_PRESET_DIR", "/tmp/a3-engine/config/presets")),
 		ManifestPath:         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_PROJECT_CONFIG", "A3_RUNTIME_RUN_ONCE_PROJECT_CONFIG", envDefaultCompat("A2O_RUNTIME_SCHEDULER_PROJECT_CONFIG", "A3_RUNTIME_SCHEDULER_PROJECT_CONFIG", filepath.Join(referencePackagePath, "project.yaml"))),
 		SoloBoardInternalURL: kanbanInternalURL(config),
-		KanbanProject:        envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_PROJECT", "A3_RUNTIME_RUN_ONCE_KANBAN_PROJECT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_PROJECT", "A3_RUNTIME_SCHEDULER_KANBAN_PROJECT", packageConfig.KanbanProject)),
+		KanbanProject:        envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_PROJECT", "A3_RUNTIME_RUN_ONCE_KANBAN_PROJECT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_PROJECT", "A3_RUNTIME_SCHEDULER_KANBAN_PROJECT", envDefaultValue(config.KanbanProject, packageConfig.KanbanProject))),
 		KanbanStatus:         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_STATUS", "A3_RUNTIME_RUN_ONCE_KANBAN_STATUS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_STATUS", "A3_RUNTIME_SCHEDULER_KANBAN_STATUS", envDefaultValue(packageConfig.KanbanStatus, "To do"))),
 		KanbanRepoLabels:     envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A3_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A2O_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", "A3_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", repoLabels),
 	}, nil
@@ -2882,7 +2981,7 @@ func runtimeContainerID(config runtimeInstanceConfig, plan runtimeRunOncePlan, r
 	}
 	containerID := strings.TrimSpace(string(output))
 	if containerID == "" {
-		return "", fmt.Errorf("A2O runtime container not found; run a2o runtime up")
+		return "", fmt.Errorf("A2O runtime container not found; run a2o runtime up%s", runtimeProjectCommandArg(plan.ProjectKey, plan.MultiProjectMode))
 	}
 	return containerID, nil
 }
@@ -3233,6 +3332,7 @@ func runRuntimeLoop(args []string, runner commandRunner, stdout io.Writer, stder
 	agentControlPlaneRequestTimeout := flags.String("agent-control-plane-request-timeout", "", "per-request timeout for host agent control plane requests during each cycle")
 	agentControlPlaneRetries := flags.String("agent-control-plane-retries", "", "retry count for transient host agent control plane request failures during each cycle")
 	agentControlPlaneRetryDelay := flags.String("agent-control-plane-retry-delay", "", "delay between transient host agent control plane retries during each cycle")
+	projectKey := flags.String("project", "", "runtime project key")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -3271,7 +3371,7 @@ func runRuntimeLoop(args []string, runner commandRunner, stdout io.Writer, stder
 	for {
 		cycle++
 		fmt.Fprintf(stdout, "kanban_loop_cycle_start cycle=%d\n", cycle)
-		if err := runRuntimeRunOnce(buildRunOnceArgs(runtimeRunOnceOverrides{
+		runOnceArgs := buildRunOnceArgs(runtimeRunOnceOverrides{
 			MaxSteps:                        *maxSteps,
 			AgentAttempts:                   *agentAttempts,
 			AgentPollInterval:               *agentPollInterval,
@@ -3279,7 +3379,11 @@ func runRuntimeLoop(args []string, runner commandRunner, stdout io.Writer, stder
 			AgentControlPlaneRequestTimeout: *agentControlPlaneRequestTimeout,
 			AgentControlPlaneRetries:        *agentControlPlaneRetries,
 			AgentControlPlaneRetryDelay:     *agentControlPlaneRetryDelay,
-		}), runner, stdout, stderr); err != nil {
+		})
+		if strings.TrimSpace(*projectKey) != "" {
+			runOnceArgs = append(runOnceArgs, "--project", strings.TrimSpace(*projectKey))
+		}
+		if err := runRuntimeRunOnce(runOnceArgs, runner, stdout, stderr); err != nil {
 			return fmt.Errorf("runtime loop cycle %d failed: %w", cycle, err)
 		}
 		fmt.Fprintf(stdout, "kanban_loop_cycle_done cycle=%d\n", cycle)
