@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe "A3 version" do
-  it "matches the A2O 0.5.46 release version" do
-    expect(A3::VERSION).to eq("0.5.46")
+  it "matches the A2O 0.5.47 release version" do
+    expect(A3::VERSION).to eq("0.5.47")
   end
 
   it "keeps release workflow version aligned" do
@@ -22,6 +22,12 @@ RSpec.describe "A3 version" do
     gemspec = File.read(File.expand_path("../../a2o.gemspec", __dir__))
 
     expect(gemspec).to include(%(spec.version = "#{A3::VERSION}"))
+  end
+
+  it "keeps lockfile path spec version aligned" do
+    lockfile = File.read(File.expand_path("../../Gemfile.lock", __dir__))
+
+    expect(lockfile).to include("a2o (#{A3::VERSION})")
   end
 
   it "keeps bundled Kanbalone default image aligned with the documented release surface" do
