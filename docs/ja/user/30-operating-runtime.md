@@ -86,6 +86,15 @@ a2o runtime pause
 
 `runtime resume` はタスク処理を常駐実行する。`runtime pause` は現在の作業が終わったあとにスケジューラを止め、新しいタスクを拾わない。`runtime status` はスケジューラが動いているか、pause 済みか、ランタイムイメージが期待通りか、最新実行がどう終わったかを確認する。
 
+すでに実行中のタスクをすぐ止める必要がある場合は、dangerous な強制停止コマンドを使う。
+
+```sh
+a2o runtime force-stop-task <task-ref> --dangerous
+a2o runtime force-stop-run <run-ref> --dangerous
+```
+
+これらのコマンドは、active run を既定で `cancelled` terminal として記録し、task の runtime binding を解除して再度スケジュール可能にし、該当 agent job を stale にし、内部 runtime workspace があればクリーンアップし、runtime 実行プロセスを best-effort で止める。必要な手動変更を保存してから、意図的な運用介入としてだけ使う。
+
 スケジューラの選択基準は、カンバンを正本として次の通り固定する。
 
 - `Resolved` / `Archived` のタスクは選択対象にせず、`watch-summary` にも出さない。

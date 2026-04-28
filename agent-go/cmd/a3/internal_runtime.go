@@ -84,6 +84,18 @@ func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io
 			return 1
 		}
 		return 0
+	case "force-stop-task":
+		if err := runRuntimeForceStop("task", args[1:], runner, stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
+	case "force-stop-run":
+		if err := runRuntimeForceStop("run", args[1:], runner, stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
 	case "watch-summary":
 		if err := runRuntimeWatchSummary(args[1:], runner, stdout, stderr); err != nil {
 			printUserFacingError(stderr, err)
@@ -1238,6 +1250,98 @@ func runRuntimeResetTask(args []string, stdout io.Writer, stderr io.Writer) erro
 	fmt.Fprintln(stdout, "recovery_step 6 command=a2o runtime run-once purpose=let A2O resync kanban state and start a fresh run")
 	fmt.Fprintln(stdout, "apply_supported=false")
 	return nil
+}
+
+func runRuntimeForceStop(kind string, args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
+	commandName := "force-stop-" + kind
+	flags := flag.NewFlagSet("a2o runtime "+commandName, flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	dangerous := flags.Bool("dangerous", false, "confirm intentional destructive intervention")
+	outcome := flags.String("outcome", "cancelled", "terminal outcome to write for the force-stopped run")
+	flagArgs, positionals, err := splitRuntimeForceStopArgs(args)
+	if err != nil {
+		return err
+	}
+	if err := flags.Parse(flagArgs); err != nil {
+		return err
+	}
+	if !*dangerous {
+		return fmt.Errorf("usage: a2o runtime %s <%s-ref> --dangerous", commandName, kind)
+	}
+	if len(positionals) != 1 {
+		return fmt.Errorf("usage: a2o runtime %s <%s-ref> --dangerous", commandName, kind)
+	}
+	targetRef := strings.TrimSpace(positionals[0])
+	if targetRef == "" {
+		return fmt.Errorf("%s ref is required", kind)
+	}
+
+	config, configPath, err := loadInstanceConfigFromWorkingTree()
+	if err != nil {
+		return err
+	}
+	effectiveConfig := applyAgentInstallOverrides(*config, "", "", "")
+	return withComposeEnv(effectiveConfig, func() error {
+		plan, err := buildRuntimeRunOncePlan(effectiveConfig, runtimeRunOnceOverrides{}, "")
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "runtime_force_stop target=%s ref=%s mode=dangerous\n", kind, targetRef)
+		fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
+		fmt.Fprintf(stdout, "runtime_storage=internal-managed project_config=%s surface_source=project-package\n", plan.ManifestPath)
+		output, err := dockerComposeExecOutput(
+			effectiveConfig,
+			plan,
+			runner,
+			"a3",
+			commandName,
+			"--storage-backend",
+			"json",
+			"--storage-dir",
+			plan.StorageDir,
+			"--outcome",
+			*outcome,
+			"--dangerous",
+			targetRef,
+		)
+		if strings.TrimSpace(string(output)) != "" {
+			fmt.Fprint(stdout, string(output))
+			if !strings.HasSuffix(string(output), "\n") {
+				fmt.Fprintln(stdout)
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("runtime %s: %w", commandName, err)
+		}
+		stopRuntimeActiveProcesses(effectiveConfig, plan, runner)
+		fmt.Fprintln(stdout, "runtime_force_stop_process_cleanup=best_effort")
+		return nil
+	})
+}
+
+func splitRuntimeForceStopArgs(args []string) ([]string, []string, error) {
+	flagArgs := []string{}
+	positionals := []string{}
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--dangerous":
+			flagArgs = append(flagArgs, arg)
+		case arg == "--outcome":
+			if i+1 >= len(args) {
+				return nil, nil, fmt.Errorf("flag needs an argument: --outcome")
+			}
+			flagArgs = append(flagArgs, arg, args[i+1])
+			i++
+		case strings.HasPrefix(arg, "--outcome="):
+			flagArgs = append(flagArgs, arg)
+		case strings.HasPrefix(arg, "-"):
+			flagArgs = append(flagArgs, arg)
+		default:
+			positionals = append(positionals, arg)
+		}
+	}
+	return flagArgs, positionals, nil
 }
 
 func runRuntimeWatchSummary(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
@@ -2711,11 +2815,15 @@ func archiveRuntimeStateIfRequested(config runtimeInstanceConfig, plan runtimeRu
 }
 
 func cleanupRuntimeProcesses(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner) error {
+	stopRuntimeActiveProcesses(config, plan, runner)
+	return dockerComposeExec(config, plan, runner, "rm", "-f", plan.RuntimeExitFile, plan.ServerLog, plan.RuntimeLog)
+}
+
+func stopRuntimeActiveProcesses(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner) {
 	killRuntimeProcessesByPattern(config, plan, runner, "a3 execute-until-idle")
 	killRuntimeProcessesByPattern(config, plan, runner, "a3 agent-server")
 	killRuntimePIDFile(config, plan, runner, plan.RuntimePIDFile)
 	killRuntimePIDFile(config, plan, runner, plan.ServerPIDFile)
-	return dockerComposeExec(config, plan, runner, "rm", "-f", plan.RuntimeExitFile, plan.ServerLog, plan.RuntimeLog)
 }
 
 func repairRuntimeRuns(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, reason string) error {

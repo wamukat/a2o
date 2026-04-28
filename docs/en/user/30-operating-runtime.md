@@ -86,6 +86,15 @@ a2o runtime pause
 
 `runtime resume` runs task processing as a resident scheduler. `runtime pause` reserves scheduler pause after current work finishes and prevents the next task from starting. `runtime status` confirms whether the scheduler is running, whether it is paused, whether the runtime image matches expectations, and how the latest run ended.
 
+If an already-running task must be interrupted immediately, use the dangerous force-stop commands:
+
+```sh
+a2o runtime force-stop-task <task-ref> --dangerous
+a2o runtime force-stop-run <run-ref> --dangerous
+```
+
+These commands mark the active run terminal with outcome `cancelled` by default, clear the task's runtime binding so it can be scheduled again, mark matching agent jobs stale, clean the internal runtime workspace when present, and best-effort stop runtime execution processes. Use them only for intentional operator intervention after preserving any manual work that matters.
+
 Scheduler selection follows the kanban board as the source of truth.
 
 - Tasks in `Resolved` or `Archived` are not scheduling targets and do not appear in `watch-summary`.
@@ -183,6 +192,7 @@ Move from broad checks to narrow checks.
 | Progress across tasks | `a2o runtime watch-summary` |
 | Aggregated task logs | `a2o runtime logs <task-ref>` or `a2o runtime logs --follow` |
 | One task's run / evidence / logs | `a2o runtime describe-task <task-ref>` |
+| Immediately interrupt an active run | `a2o runtime force-stop-task <task-ref> --dangerous` |
 | Metrics export | `a2o runtime metrics list --format json` or `a2o runtime metrics list --format csv` |
 | Metrics rollup | `a2o runtime metrics summary --group-by parent` |
 | Metrics trends | `a2o runtime metrics trends --group-by parent --format json` |

@@ -132,6 +132,14 @@ a2o runtime reset-task <task-ref>
 
 `reset-task` は予行演習として復旧手順を表示する。カンバン、ランタイム状態、ワークスペース、ブランチは変更しない。
 
+run がまだ active で、復旧前に即時停止する必要がある場合は次を使う。
+
+```sh
+a2o runtime force-stop-task <task-ref> --dangerous
+```
+
+これは明示的な介入コマンドである。active run を `cancelled` として記録し、task の runtime binding を解除し、該当 agent job を stale にし、内部 runtime workspace があればクリーンアップし、runtime 実行プロセスを best-effort で止める。必要な手動変更がある場合は、実行前に必ず退避する。
+
 推奨手順:
 
 1. `a2o runtime describe-task <task-ref>` でブロック理由、証跡、コメント、ログを読む。

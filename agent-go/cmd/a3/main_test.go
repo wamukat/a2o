@@ -2004,6 +2004,8 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime doctor",
 		"a2o runtime describe-task TASK_REF",
 		"a2o runtime reset-task TASK_REF",
+		"a2o runtime force-stop-task TASK_REF --dangerous",
+		"a2o runtime force-stop-run RUN_REF --dangerous",
 		"a2o runtime watch-summary [--details]",
 		"a2o runtime skill-feedback list",
 		"a2o runtime skill-feedback propose",
@@ -2071,6 +2073,8 @@ func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
 		{name: "runtime status", args: []string{"runtime", "status", "-bad"}, want: "Usage of a2o runtime status:"},
 		{name: "runtime image-digest", args: []string{"runtime", "image-digest", "-bad"}, want: "Usage of a2o runtime image-digest:"},
 		{name: "runtime doctor", args: []string{"runtime", "doctor", "-bad"}, want: "Usage of a2o runtime doctor:"},
+		{name: "runtime force-stop-task", args: []string{"runtime", "force-stop-task", "-bad"}, want: "Usage of a2o runtime force-stop-task:"},
+		{name: "runtime force-stop-run", args: []string{"runtime", "force-stop-run", "-bad"}, want: "Usage of a2o runtime force-stop-run:"},
 		{name: "runtime run-once", args: []string{"runtime", "run-once", "-bad"}, want: "Usage of a2o runtime run-once:"},
 		{name: "runtime watch-summary", args: []string{"runtime", "watch-summary", "-bad"}, want: "Usage of a2o runtime watch-summary:"},
 		{name: "runtime skill-feedback list", args: []string{"runtime", "skill-feedback", "list", "-bad"}, want: "Usage of a2o runtime skill-feedback list:"},
@@ -5119,6 +5123,106 @@ func TestRuntimeResetTaskPrintsBlockedRecoveryPlan(t *testing.T) {
 	}
 	if len(runner.calls) != 0 {
 		t.Fatalf("reset-task dry-run should not call external commands, got %v", runner.calls)
+	}
+}
+
+func TestRuntimeForceStopTaskRequiresDangerousFlag(t *testing.T) {
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"runtime", "force-stop-task", "A2O#16"}, runner, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("run returned success, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "usage: a2o runtime force-stop-task <task-ref> --dangerous") {
+		t.Fatalf("stderr should explain dangerous flag requirement, got:\n%s", stderr.String())
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("force-stop without --dangerous should not call external commands, got %v", runner.calls)
+	}
+}
+
+func TestRuntimeForceStopTaskDispatchesStorageCommandAndStopsProcesses(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "force-stop-task", "A2O#16", "--dangerous"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	for _, want := range []string{
+		"runtime_force_stop target=task ref=A2O#16 mode=dangerous",
+		"force_stop_task task=A2O#16 run=run-16 outcome=cancelled already_terminal=false",
+		"runtime_force_stop_process_cleanup=best_effort",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("force-stop output missing %q in:\n%s", want, output)
+		}
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"a3 force-stop-task --storage-backend json --storage-dir /var/lib/a3/test-runtime --outcome cancelled --dangerous A2O#16",
+		"pgrep -f a3 execute-until-idle",
+		"pgrep -f a3 agent-server",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("force-stop missing call %q in:\n%s", want, joined)
+		}
+	}
+}
+
+func TestRuntimeForceStopRunDispatchesRunCommand(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "force-stop-run", "run-16", "--dangerous", "--outcome", "aborted"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	want := "a3 force-stop-run --storage-backend json --storage-dir /var/lib/a3/test-runtime --outcome aborted --dangerous run-16"
+	if !strings.Contains(joined, want) {
+		t.Fatalf("force-stop-run missing call %q in:\n%s", want, joined)
 	}
 }
 
@@ -8567,6 +8671,8 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 			return []byte(fmt.Sprintf("task A2O#16 kind=single status=%s current_run=run-stale\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n", taskStatus)), nil
 		}
 		return []byte(fmt.Sprintf("task A2O#16 kind=single status=%s current_run=run-16\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n", taskStatus)), nil
+	case strings.Contains(joined, " a3 force-stop-task ") || strings.Contains(joined, " a3 force-stop-run "):
+		return []byte("force_stop_task task=A2O#16 run=run-16 outcome=cancelled already_terminal=false\nforce_stop_task_state status=verifying current_run=-\n"), nil
 	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "runtime_latest_run"):
 		return []byte("runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation state=terminal outcome=blocked\n"), nil
 	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "requested_task_ref"):

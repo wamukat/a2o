@@ -168,6 +168,8 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o runtime doctor")
 	fmt.Fprintln(w, "  a2o runtime describe-task TASK_REF")
 	fmt.Fprintln(w, "  a2o runtime reset-task TASK_REF              # print blocked-task recovery plan")
+	fmt.Fprintln(w, "  a2o runtime force-stop-task TASK_REF --dangerous")
+	fmt.Fprintln(w, "  a2o runtime force-stop-run RUN_REF --dangerous")
 	fmt.Fprintln(w, "  a2o runtime watch-summary [--details]")
 	fmt.Fprintln(w, "  a2o runtime decomposition investigate|propose|review|create-children|status|cleanup TASK_REF [--project-config project-test.yaml] [--repo-source SLOT=PATH]")
 	fmt.Fprintln(w, "  a2o runtime skill-feedback list [--state STATE] [--target TARGET] [--group]")

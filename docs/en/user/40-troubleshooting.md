@@ -132,6 +132,14 @@ a2o runtime reset-task <task-ref>
 
 `reset-task` prints a dry-run recovery plan. It does not change kanban, runtime state, workspaces, or branches.
 
+If a run is still active and must be interrupted before recovery, use:
+
+```sh
+a2o runtime force-stop-task <task-ref> --dangerous
+```
+
+This is an explicit intervention command. It marks the active run as `cancelled`, clears the task's runtime binding, marks matching agent jobs stale, cleans the internal runtime workspace when present, and best-effort stops runtime execution processes. Inspect or preserve any manual workspace changes before using it.
+
 Recommended recovery:
 
 1. Read the block reason, evidence, comments, and logs with `a2o runtime describe-task <task-ref>`.

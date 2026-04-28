@@ -579,6 +579,38 @@ module A3
       end
     end
 
+    def handle_force_stop_task(argv, out:, run_id_generator:, command_runner:, merge_runner:)
+      with_storage_session(
+        argv: argv,
+        parse_with: :parse_force_stop_task_options,
+        run_id_generator: run_id_generator,
+        command_runner: command_runner,
+        merge_runner: merge_runner
+      ) do |session|
+        result = session.container.fetch(:force_stop_run).call_task(
+          task_ref: session.options.fetch(:task_ref),
+          outcome: session.options.fetch(:outcome)
+        )
+        write_force_stop_result(out, "task", result)
+      end
+    end
+
+    def handle_force_stop_run(argv, out:, run_id_generator:, command_runner:, merge_runner:)
+      with_storage_session(
+        argv: argv,
+        parse_with: :parse_force_stop_run_options,
+        run_id_generator: run_id_generator,
+        command_runner: command_runner,
+        merge_runner: merge_runner
+      ) do |session|
+        result = session.container.fetch(:force_stop_run).call_run(
+          run_ref: session.options.fetch(:run_ref),
+          outcome: session.options.fetch(:outcome)
+        )
+        write_force_stop_result(out, "run", result)
+      end
+    end
+
     def handle_show_scheduler_history(argv, out:, run_id_generator:, command_runner:, merge_runner:)
       with_storage_session(
         argv: argv,
@@ -1732,6 +1764,65 @@ module A3
       parser.on("--apply") { options[:apply] = true }
       parser.parse(argv)
       options
+    end
+
+    def parse_force_stop_task_options(argv)
+      options = default_force_stop_options
+      parser = force_stop_option_parser(options, "a3 force-stop-task")
+      remaining = parser.parse(argv)
+      raise OptionParser::MissingArgument, "--dangerous" unless options.fetch(:dangerous)
+
+      options[:task_ref] = remaining.fetch(0)
+      options
+    rescue IndexError
+      raise OptionParser::MissingArgument, "TASK_REF"
+    end
+
+    def parse_force_stop_run_options(argv)
+      options = default_force_stop_options
+      parser = force_stop_option_parser(options, "a3 force-stop-run")
+      remaining = parser.parse(argv)
+      raise OptionParser::MissingArgument, "--dangerous" unless options.fetch(:dangerous)
+
+      options[:run_ref] = remaining.fetch(0)
+      options
+    rescue IndexError
+      raise OptionParser::MissingArgument, "RUN_REF"
+    end
+
+    def default_force_stop_options
+      {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        repo_sources: {},
+        kanban_repo_label_map: {},
+        kanban_trigger_labels: [],
+        dangerous: false,
+        outcome: :cancelled
+      }
+    end
+
+    def force_stop_option_parser(options, banner)
+      OptionParser.new do |parser|
+        parser.banner = "Usage of #{banner}:"
+        parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+        parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+        parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+        add_kanban_bridge_options(parser, options)
+        parser.on("--outcome OUTCOME") { |value| options[:outcome] = value.to_sym }
+        parser.on("--dangerous") { options[:dangerous] = true }
+      end
+    end
+
+    def write_force_stop_result(out, target_kind, result)
+      out.puts("force_stop_#{target_kind} task=#{result.task.ref} run=#{result.run.ref} outcome=#{result.run.terminal_outcome} already_terminal=#{result.already_terminal}")
+      out.puts("force_stop_task_state status=#{result.task.status} current_run=#{result.task.current_run_ref || '-'}")
+      result.stopped_jobs.each do |job|
+        out.puts("force_stop_agent_job job_id=#{job.job_id} state=#{job.state}")
+      end
+      result.cleaned_paths.each do |path|
+        out.puts("force_stop_workspace_cleanup path=#{path}")
+      end
     end
 
     def parse_cleanup_terminal_workspaces_options(argv)

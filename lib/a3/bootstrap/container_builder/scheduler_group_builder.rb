@@ -21,6 +21,12 @@ module A3
               run_repository: context.run_repository,
               storage_dir: context.storage_dir.to_s
             ),
+            force_stop_run: A3::Application::ForceStopRun.new(
+              task_repository: context.task_repository,
+              run_repository: context.run_repository,
+              storage_dir: context.storage_dir.to_s,
+              provisioner: context.workspace_provisioner
+            ),
             show_scheduler_history: A3::Application::ShowSchedulerHistory.new(
               scheduler_cycle_repository: context.scheduler_cycle_repository
             ),

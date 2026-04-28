@@ -46,6 +46,8 @@ module A3
         "show-scheduler-state" => Definition.new(handler: :handle_show_scheduler_state, session_kind: :storage),
         "show-state" => Definition.new(handler: :handle_show_state, session_kind: :storage),
         "repair-runs" => Definition.new(handler: :handle_repair_runs, session_kind: :storage),
+        "force-stop-task" => Definition.new(handler: :handle_force_stop_task, session_kind: :storage),
+        "force-stop-run" => Definition.new(handler: :handle_force_stop_run, session_kind: :storage),
         "show-scheduler-history" => Definition.new(handler: :handle_show_scheduler_history, session_kind: :storage),
         "pause-scheduler" => Definition.new(handler: :handle_pause_scheduler, session_kind: :storage),
         "resume-scheduler" => Definition.new(handler: :handle_resume_scheduler, session_kind: :storage),
