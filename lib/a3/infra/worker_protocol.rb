@@ -123,6 +123,7 @@ module A3
             response_bundle: worker_response
           )
         end
+        worker_response = mutable_worker_response(worker_response)
         identity_corrections = canonicalize_worker_identity!(
           worker_response,
           expected_task_ref: expected_task_ref,
@@ -189,6 +190,19 @@ module A3
           diagnostics: { "validation_errors" => [message] },
           response_bundle: raw.is_a?(Hash) ? raw : { "raw" => raw }
         )
+      end
+
+      def mutable_worker_response(value)
+        case value
+        when Hash
+          value.each_with_object({}) do |(key, entry), result|
+            result[key] = mutable_worker_response(entry)
+          end
+        when Array
+          value.map { |entry| mutable_worker_response(entry) }
+        else
+          value
+        end
       end
 
       def workspace_automation_env(workspace_root)

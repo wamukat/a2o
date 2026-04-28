@@ -311,6 +311,37 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
+  it "normalizes frozen parent review success payloads without mutating the worker response" do
+    worker_response = {
+      "success" => true,
+      "summary" => "parent review completed",
+      "task_ref" => task.ref,
+      "run_ref" => run.ref,
+      "phase" => "review",
+      "rework_required" => false,
+      "changed_files" => {
+        "repo_beta" => ["marker.txt"].freeze
+      }.freeze
+    }.freeze
+
+    result = described_class.new(review_disposition_repo_scopes: %w[repo_beta]).build_execution_result(
+      worker_response,
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: run.ref,
+      expected_phase: :review,
+      expected_task_kind: :parent
+    )
+
+    expect(result).to have_attributes(success?: true)
+    expect(result.response_bundle.fetch("review_disposition")).to include(
+      "kind" => "completed",
+      "repo_scope" => "repo_beta",
+      "finding_key" => "parent-review-completed"
+    )
+    expect(worker_response).not_to have_key("review_disposition")
+  end
+
   it "accepts a clarification request without blocked failure diagnostics" do
     result = described_class.new.build_execution_result(
       {
