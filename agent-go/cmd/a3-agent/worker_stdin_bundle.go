@@ -18,6 +18,8 @@ type executorProfile struct {
 	Env     map[string]string
 }
 
+const maxWorkerResultCorrectionAttempts = 2
+
 func envPublic(publicName string) string {
 	return strings.TrimSpace(os.Getenv(publicName))
 }
@@ -60,37 +62,69 @@ func runWorkerStdinBundle(args []string) int {
 	if err != nil {
 		return writeWorkerFailureResult(resultPath, request, workerFailure(request, "stdin worker executor config invalid", []string{"executor", "command"}, "invalid_executor_config", map[string]any{"error": err.Error()}))
 	}
-	stdout, stderr, exitCode, runErr := runWorkerExecutor(command, commandEnv, workerWorkspaceRoot())
-	if (runErr != nil || exitCode != 0) && !fileExists(resultPath) {
-		diagnostics := map[string]any{"stdout": stdout, "stderr": stderr}
-		if runErr != nil {
-			diagnostics["error"] = runErr.Error()
+	var correction *workerResultCorrection
+	for attempt := 0; attempt <= maxWorkerResultCorrectionAttempts; attempt++ {
+		_ = os.Remove(resultPath)
+		stdout, stderr, exitCode, runErr := runWorkerExecutor(command, commandEnv, workerWorkspaceRoot(), workerBundle(correction))
+		if (runErr != nil || exitCode != 0) && !fileExists(resultPath) {
+			diagnostics := map[string]any{"stdout": stdout, "stderr": stderr}
+			if runErr != nil {
+				diagnostics["error"] = runErr.Error()
+			}
+			return writeWorkerFailureResult(resultPath, request, workerFailure(request, "stdin worker launcher failed", command, fmt.Sprintf("exit %d", exitCode), diagnostics))
 		}
-		return writeWorkerFailureResult(resultPath, request, workerFailure(request, "stdin worker launcher failed", command, fmt.Sprintf("exit %d", exitCode), diagnostics))
-	}
 
-	payload := map[string]any{}
-	if err := readJSONFile(resultPath, &payload); err != nil {
-		if os.IsNotExist(err) {
-			return writeWorkerFailureResult(resultPath, request, workerFailure(request, "stdin worker returned no final result", command, "missing_worker_result", map[string]any{"stdout": stdout, "stderr": stderr}))
+		payload := map[string]any{}
+		rawResultBody, readErr := os.ReadFile(resultPath)
+		if readErr == nil {
+			readErr = json.Unmarshal(rawResultBody, &payload)
 		}
-		return writeWorkerFailureResult(resultPath, request, workerFailure(request, "stdin worker returned invalid json", command, "invalid_worker_json", map[string]any{"stdout": stdout, "stderr": stderr, "error": err.Error()}))
+		if readErr != nil {
+			issue := workerValidationIssue{
+				Path:    "/",
+				Keyword: "required",
+				Message: "stdin worker returned no final result",
+			}
+			observedState := "missing_worker_result"
+			if !os.IsNotExist(readErr) {
+				issue.Keyword = "type"
+				issue.Message = "stdin worker returned invalid json: " + readErr.Error()
+				observedState = "invalid_worker_json"
+			}
+			if attempt < maxWorkerResultCorrectionAttempts {
+				correction = newWorkerResultCorrection(attempt+1, []workerValidationIssue{issue}, nil, string(rawResultBody), stdout, stderr)
+				continue
+			}
+			diagnostics := map[string]any{"stdout": stdout, "stderr": stderr, "validation_errors": []workerValidationIssue{issue}}
+			if !os.IsNotExist(readErr) {
+				diagnostics["error"] = readErr.Error()
+				diagnostics["worker_response_raw"] = tailString(string(rawResultBody), 4000)
+			}
+			return writeWorkerFailureResult(resultPath, request, workerFailure(request, issue.Message, command, observedState, diagnostics))
+		}
+		normalizeReviewDisposition(payload)
+		canonicalizeWorkerIdentity(payload, request)
+		if validationErrors := validateWorkerPayload(payload, request); len(validationErrors) > 0 {
+			issues := structuredWorkerValidationIssues(validationErrors)
+			if attempt < maxWorkerResultCorrectionAttempts {
+				correction = newWorkerResultCorrection(attempt+1, issues, payload, "", stdout, stderr)
+				continue
+			}
+			return writeWorkerFailureResult(resultPath, request, workerFailure(request, "worker result schema invalid", command, "invalid_worker_result", map[string]any{
+				"validation_errors":      issues,
+				"worker_response_bundle": payload,
+				"correction_attempts":    maxWorkerResultCorrectionAttempts,
+				"stdout":                 stdout,
+				"stderr":                 stderr,
+			}))
+		}
+		if err := writeJSONFile(resultPath, payload); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		return 0
 	}
-	normalizeReviewDisposition(payload)
-	canonicalizeWorkerIdentity(payload, request)
-	if validationErrors := validateWorkerPayload(payload, request); len(validationErrors) > 0 {
-		return writeWorkerFailureResult(resultPath, request, workerFailure(request, "worker result schema invalid", command, "invalid_worker_result", map[string]any{
-			"validation_errors":      validationErrors,
-			"worker_response_bundle": payload,
-			"stdout":                 stdout,
-			"stderr":                 stderr,
-		}))
-	}
-	if err := writeJSONFile(resultPath, payload); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
-	return 0
+	return writeWorkerFailureResult(resultPath, request, workerFailure(request, "worker result schema invalid", command, "invalid_worker_result", map[string]any{}))
 }
 
 func readJSONFile(path string, target any) error {
@@ -119,6 +153,78 @@ func writeWorkerFailureResult(resultPath string, request map[string]any, payload
 		return 1
 	}
 	return 0
+}
+
+type workerValidationIssue struct {
+	Path    string `json:"path"`
+	Keyword string `json:"keyword"`
+	Message string `json:"message"`
+}
+
+type workerResultCorrection struct {
+	Attempt        int                     `json:"attempt"`
+	MaxAttempts    int                     `json:"max_attempts"`
+	Instruction    string                  `json:"instruction"`
+	Errors         []workerValidationIssue `json:"validation_errors"`
+	PreviousResult map[string]any          `json:"previous_result,omitempty"`
+	PreviousRaw    string                  `json:"previous_raw,omitempty"`
+	StdoutTail     string                  `json:"stdout_tail,omitempty"`
+	StderrTail     string                  `json:"stderr_tail,omitempty"`
+}
+
+func newWorkerResultCorrection(attempt int, issues []workerValidationIssue, previous map[string]any, previousRaw string, stdout string, stderr string) *workerResultCorrection {
+	return &workerResultCorrection{
+		Attempt:        attempt,
+		MaxAttempts:    maxWorkerResultCorrectionAttempts,
+		Instruction:    "The previous worker result did not satisfy the response schema. Do not redo the implementation or review work unless necessary. Return a corrected JSON object only, using the same task_ref, run_ref, and phase from request.",
+		Errors:         issues,
+		PreviousResult: previous,
+		PreviousRaw:    tailString(previousRaw, 4000),
+		StdoutTail:     tailString(stdout, 4000),
+		StderrTail:     tailString(stderr, 4000),
+	}
+}
+
+func structuredWorkerValidationIssues(messages []string) []workerValidationIssue {
+	issues := make([]workerValidationIssue, 0, len(messages))
+	for _, message := range messages {
+		issues = append(issues, structuredWorkerValidationIssue(message))
+	}
+	return issues
+}
+
+func structuredWorkerValidationIssue(message string) workerValidationIssue {
+	path := "/"
+	keyword := "validation"
+	switch {
+	case strings.Contains(message, " must be present"):
+		path = "/" + strings.Split(message, " must be present")[0]
+		keyword = "required"
+	case strings.Contains(message, " must be a string"), strings.Contains(message, " must be true or false"), strings.Contains(message, " must be an object"), strings.Contains(message, " must be an array"):
+		path = "/" + strings.Split(message, " must be ")[0]
+		keyword = "type"
+	case strings.Contains(message, " must be one of "):
+		path = "/" + strings.Split(message, " must be one of ")[0]
+		keyword = "enum"
+	case strings.Contains(message, " must match "):
+		path = "/" + strings.Split(message, " must match ")[0]
+		keyword = "const"
+	case strings.Contains(message, " must only be present"):
+		path = "/" + strings.Split(message, " must only be present")[0]
+		keyword = "dependentRequired"
+	}
+	return workerValidationIssue{
+		Path:    strings.ReplaceAll(path, ".", "/"),
+		Keyword: keyword,
+		Message: message,
+	}
+}
+
+func tailString(value string, limit int) string {
+	if limit <= 0 || len(value) <= limit {
+		return value
+	}
+	return value[len(value)-limit:]
 }
 
 func workerFailure(request map[string]any, summary string, command []string, observedState string, diagnostics map[string]any) map[string]any {
@@ -453,7 +559,7 @@ func (w bestEffortBundleWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func runWorkerExecutor(command []string, commandEnv map[string]string, workspaceRoot string) (string, string, int, error) {
+func runWorkerExecutor(command []string, commandEnv map[string]string, workspaceRoot string, bundle string) (string, string, int, error) {
 	if len(command) == 0 {
 		return "", "", 1, fmt.Errorf("executor command is empty")
 	}
@@ -465,7 +571,7 @@ func runWorkerExecutor(command []string, commandEnv map[string]string, workspace
 		env = append(env, key+"="+commandEnv[key])
 	}
 	cmd.Env = env
-	cmd.Stdin = strings.NewReader(workerBundle())
+	cmd.Stdin = strings.NewReader(bundle)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	rawWriter, cleanup := workerAIRawLogWriter()
@@ -508,7 +614,7 @@ func workerAIRawLogWriter() (io.Writer, func()) {
 	return file, func() { _ = file.Close() }
 }
 
-func workerBundle() string {
+func workerBundle(correction *workerResultCorrection) string {
 	request := map[string]any{}
 	_ = readJSONFile(envPublic("A2O_WORKER_REQUEST_PATH"), &request)
 	examples := []map[string]any{}
@@ -549,6 +655,9 @@ func workerBundle() string {
 				"Treat phase_runtime.verification_commands as runner-owned unless explicitly needed for the phase.",
 			},
 		},
+	}
+	if correction != nil {
+		bundle["result_correction"] = correction
 	}
 	body, _ := json.MarshalIndent(bundle, "", "  ")
 	return string(body)

@@ -276,6 +276,257 @@ JSON
 	}
 }
 
+func TestRunWorkerStdinBundleRetriesInvalidWorkerResult(t *testing.T) {
+	tmp := t.TempDir()
+	workspace := filepath.Join(tmp, "workspace")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	requestPath := filepath.Join(tmp, "request.json")
+	resultPath := filepath.Join(tmp, "result.json")
+	launcherPath := filepath.Join(tmp, "launcher.json")
+	scriptPath := filepath.Join(tmp, "executor.sh")
+	countPath := filepath.Join(tmp, "attempt-count")
+	promptDir := filepath.Join(tmp, "prompts")
+	if err := os.MkdirAll(promptDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(requestPath, []byte(`{
+  "task_ref": "A2O#342",
+  "run_ref": "run-1",
+  "phase": "implementation",
+  "phase_runtime": {},
+  "slot_paths": {"repo_alpha": "/tmp/repo-alpha"},
+  "task_packet": {"title": "implement"}
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(scriptPath, []byte(`#!/bin/sh
+set -eu
+count=0
+if [ -f "$2" ]; then
+  count="$(cat "$2")"
+fi
+count=$((count + 1))
+printf '%s\n' "$count" > "$2"
+cat > "$3/prompt-$count.json"
+if [ "$count" -eq 1 ]; then
+  cat > "$1" <<'JSON'
+{
+  "task_ref": "A2O#342",
+  "run_ref": "run-1",
+  "phase": "implementation",
+  "success": true,
+  "summary": "implemented",
+  "failing_command": null,
+  "observed_state": null,
+  "rework_required": false,
+  "changed_files": {"repo_alpha": ["main.go"]}
+}
+JSON
+else
+  cat > "$1" <<'JSON'
+{
+  "task_ref": "A2O#342",
+  "run_ref": "run-1",
+  "phase": "implementation",
+  "success": true,
+  "summary": "implemented",
+  "failing_command": null,
+  "observed_state": null,
+  "rework_required": false,
+  "changed_files": {"repo_alpha": ["main.go"]},
+  "review_disposition": {
+    "kind": "completed",
+    "repo_scope": "repo_alpha",
+    "summary": "clean",
+    "description": "self-review clean",
+    "finding_key": "clean"
+  }
+}
+JSON
+fi
+`), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeWorkerLauncherForTest(t, launcherPath, []string{scriptPath, "{{result_path}}", countPath, promptDir})
+
+	t.Setenv("A2O_WORKER_REQUEST_PATH", requestPath)
+	t.Setenv("A2O_WORKER_RESULT_PATH", resultPath)
+	t.Setenv("A2O_ROOT_DIR", tmp)
+	t.Setenv("A2O_WORKSPACE_ROOT", workspace)
+	t.Setenv("A2O_WORKER_LAUNCHER_CONFIG_PATH", launcherPath)
+
+	if code := run([]string{"worker", "stdin-bundle"}); code != 0 {
+		t.Fatalf("worker exit code = %d", code)
+	}
+
+	if got := strings.TrimSpace(readFileForTest(t, countPath)); got != "2" {
+		t.Fatalf("worker should retry once and accept corrected result, attempts=%s", got)
+	}
+	prompt := readFileForTest(t, filepath.Join(promptDir, "prompt-2.json"))
+	if !strings.Contains(prompt, `"result_correction"`) || !strings.Contains(prompt, `"path": "/review_disposition"`) || !strings.Contains(prompt, `"keyword": "required"`) {
+		t.Fatalf("correction prompt should include structured validation errors, got:\n%s", prompt)
+	}
+	var result map[string]any
+	if err := json.Unmarshal([]byte(readFileForTest(t, resultPath)), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result["success"] != true || result["summary"] != "implemented" {
+		t.Fatalf("unexpected corrected result: %#v", result)
+	}
+}
+
+func TestRunWorkerStdinBundleFailsAfterCorrectionRetriesExhausted(t *testing.T) {
+	tmp := t.TempDir()
+	workspace := filepath.Join(tmp, "workspace")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	requestPath := filepath.Join(tmp, "request.json")
+	resultPath := filepath.Join(tmp, "result.json")
+	launcherPath := filepath.Join(tmp, "launcher.json")
+	scriptPath := filepath.Join(tmp, "executor.sh")
+	countPath := filepath.Join(tmp, "attempt-count")
+	if err := os.WriteFile(requestPath, []byte(`{
+  "task_ref": "A2O#342",
+  "run_ref": "run-1",
+  "phase": "implementation",
+  "phase_runtime": {},
+  "slot_paths": {"repo_alpha": "/tmp/repo-alpha"},
+  "task_packet": {"title": "implement"}
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(scriptPath, []byte(`#!/bin/sh
+set -eu
+count=0
+if [ -f "$2" ]; then
+  count="$(cat "$2")"
+fi
+count=$((count + 1))
+printf '%s\n' "$count" > "$2"
+cat > /dev/null
+cat > "$1" <<'JSON'
+{
+  "task_ref": "A2O#342",
+  "run_ref": "run-1",
+  "phase": "implementation",
+  "success": true,
+  "summary": "implemented",
+  "failing_command": null,
+  "observed_state": null,
+  "rework_required": false,
+  "changed_files": {"repo_alpha": ["main.go"]}
+}
+JSON
+`), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeWorkerLauncherForTest(t, launcherPath, []string{scriptPath, "{{result_path}}", countPath})
+
+	t.Setenv("A2O_WORKER_REQUEST_PATH", requestPath)
+	t.Setenv("A2O_WORKER_RESULT_PATH", resultPath)
+	t.Setenv("A2O_ROOT_DIR", tmp)
+	t.Setenv("A2O_WORKSPACE_ROOT", workspace)
+	t.Setenv("A2O_WORKER_LAUNCHER_CONFIG_PATH", launcherPath)
+
+	if code := run([]string{"worker", "stdin-bundle"}); code != 0 {
+		t.Fatalf("worker should return protocol failure payload with exit 0, got %d", code)
+	}
+
+	if got := strings.TrimSpace(readFileForTest(t, countPath)); got != "3" {
+		t.Fatalf("worker should run initial attempt plus two corrections, attempts=%s", got)
+	}
+	var result map[string]any
+	if err := json.Unmarshal([]byte(readFileForTest(t, resultPath)), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result["success"] != false || result["observed_state"] != "invalid_worker_result" {
+		t.Fatalf("unexpected exhausted retry result: %#v", result)
+	}
+	diagnostics := result["diagnostics"].(map[string]any)
+	if diagnostics["correction_attempts"].(float64) != float64(maxWorkerResultCorrectionAttempts) {
+		t.Fatalf("diagnostics should report correction attempts: %#v", diagnostics)
+	}
+	validationErrors := diagnostics["validation_errors"].([]any)
+	first := validationErrors[0].(map[string]any)
+	if first["path"] != "/review_disposition" || first["keyword"] != "required" {
+		t.Fatalf("diagnostics should preserve structured validation errors: %#v", validationErrors)
+	}
+}
+
+func TestRunWorkerStdinBundlePreservesRawInvalidJSONAfterRetriesExhausted(t *testing.T) {
+	tmp := t.TempDir()
+	workspace := filepath.Join(tmp, "workspace")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	requestPath := filepath.Join(tmp, "request.json")
+	resultPath := filepath.Join(tmp, "result.json")
+	launcherPath := filepath.Join(tmp, "launcher.json")
+	scriptPath := filepath.Join(tmp, "executor.sh")
+	countPath := filepath.Join(tmp, "attempt-count")
+	promptDir := filepath.Join(tmp, "prompts")
+	if err := os.MkdirAll(promptDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(requestPath, []byte(`{
+  "task_ref": "A2O#342",
+  "run_ref": "run-1",
+  "phase": "review",
+  "phase_runtime": {},
+  "task_packet": {"title": "review"}
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(scriptPath, []byte(`#!/bin/sh
+set -eu
+count=0
+if [ -f "$2" ]; then
+  count="$(cat "$2")"
+fi
+count=$((count + 1))
+printf '%s\n' "$count" > "$2"
+cat > "$3/prompt-$count.json"
+printf '{"task_ref":"A2O#342","broken":' > "$1"
+`), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeWorkerLauncherForTest(t, launcherPath, []string{scriptPath, "{{result_path}}", countPath, promptDir})
+
+	t.Setenv("A2O_WORKER_REQUEST_PATH", requestPath)
+	t.Setenv("A2O_WORKER_RESULT_PATH", resultPath)
+	t.Setenv("A2O_ROOT_DIR", tmp)
+	t.Setenv("A2O_WORKSPACE_ROOT", workspace)
+	t.Setenv("A2O_WORKER_LAUNCHER_CONFIG_PATH", launcherPath)
+
+	if code := run([]string{"worker", "stdin-bundle"}); code != 0 {
+		t.Fatalf("worker should return protocol failure payload with exit 0, got %d", code)
+	}
+
+	if got := strings.TrimSpace(readFileForTest(t, countPath)); got != "3" {
+		t.Fatalf("worker should run initial attempt plus two corrections, attempts=%s", got)
+	}
+	prompt := readFileForTest(t, filepath.Join(promptDir, "prompt-2.json"))
+	if !strings.Contains(prompt, `"previous_raw": "{\"task_ref\":\"A2O#342\",\"broken\":"`) {
+		t.Fatalf("correction prompt should preserve raw invalid JSON, got:\n%s", prompt)
+	}
+	var result map[string]any
+	if err := json.Unmarshal([]byte(readFileForTest(t, resultPath)), &result); err != nil {
+		t.Fatal(err)
+	}
+	diagnostics := result["diagnostics"].(map[string]any)
+	if !strings.Contains(stringValue(diagnostics["worker_response_raw"]), `{"task_ref":"A2O#342","broken":`) {
+		t.Fatalf("final diagnostics should preserve raw invalid JSON: %#v", diagnostics)
+	}
+	validationErrors := diagnostics["validation_errors"].([]any)
+	first := validationErrors[0].(map[string]any)
+	if first["keyword"] != "type" {
+		t.Fatalf("invalid JSON should be reported as type validation error: %#v", validationErrors)
+	}
+}
+
 func TestRunWorkerStdinBundleRejectsMissingLauncherConfigEnv(t *testing.T) {
 	tmp := t.TempDir()
 	requestPath := filepath.Join(tmp, "request.json")
@@ -526,7 +777,7 @@ func TestWorkerBundleIncludesParentReviewExamples(t *testing.T) {
 	t.Setenv("A2O_WORKER_REQUEST_PATH", requestPath)
 
 	var bundle map[string]any
-	if err := json.Unmarshal([]byte(workerBundle()), &bundle); err != nil {
+	if err := json.Unmarshal([]byte(workerBundle(nil)), &bundle); err != nil {
 		t.Fatal(err)
 	}
 	contract := bundle["response_contract"].(map[string]any)
@@ -785,6 +1036,38 @@ func writeJSONForTest(t *testing.T, path string, payload any) {
 	if err := os.WriteFile(path, body, 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func writeWorkerLauncherForTest(t *testing.T, path string, command []string) {
+	t.Helper()
+	body, err := json.Marshal(map[string]any{
+		"executor": map[string]any{
+			"kind":             "command",
+			"prompt_transport": "stdin-bundle",
+			"result":           map[string]any{"mode": "file"},
+			"schema":           map[string]any{"mode": "file"},
+			"default_profile": map[string]any{
+				"command": command,
+				"env":     map[string]any{},
+			},
+			"phase_profiles": map[string]any{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func readFileForTest(t *testing.T, path string) string {
+	t.Helper()
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(body)
 }
 
 func createDoctorGitSource(t *testing.T, root string) string {
