@@ -3,6 +3,8 @@
 module A3
   module Infra
     class KanbanCliProposalChildWriter
+      DRAFT_LABEL = "a2o:draft-child"
+      RUNNABLE_LABEL = "trigger:auto-implement"
       Result = Struct.new(:success?, :child_refs, :child_keys, :summary, :diagnostics, keyword_init: true)
       class PartialChildWriteError < StandardError
         attr_reader :child_ref, :child_key, :original_error
@@ -15,9 +17,11 @@ module A3
         end
       end
 
-      def initialize(command_argv: nil, project:, working_dir: nil, client: nil)
+      def initialize(command_argv: nil, project:, working_dir: nil, client: nil, mode: :runnable)
         @project = project.to_s
         @client = client || KanbanCommandClient.subprocess(command_argv: command_argv, project: @project, working_dir: working_dir)
+        @mode = mode.to_sym
+        raise A3::Domain::ConfigurationError, "unknown proposal child writer mode: #{mode}" unless %i[runnable draft].include?(@mode)
       end
 
       def call(parent_task_ref:, parent_external_task_id:, proposal_evidence:)
@@ -72,8 +76,7 @@ module A3
         payload = canonical_task_payload(parent_task_ref: parent_task_ref, proposal_fingerprint: proposal_fingerprint, child: child)
         existing = find_existing_child(child_key)
         task = existing || create_child(payload)
-        ensure_label(task.fetch("id"), "trigger:auto-implement")
-        Array(child["labels"]).each { |label| ensure_label(task.fetch("id"), label) }
+        labels_for(child).each { |label| ensure_label(task.fetch("id"), label) }
         ensure_relation(parent_external_task_id, task.fetch("id")) if parent_external_task_id
         ensure_comment(task.fetch("id"), payload.fetch("comment"))
         { "ref" => task.fetch("ref"), "child_key" => child_key, "id" => task.fetch("id") }
@@ -87,6 +90,14 @@ module A3
 
       def canonical_task_payload(parent_task_ref:, proposal_fingerprint:, child:)
         child_key = child.fetch("child_key")
+        comment = if draft_mode?
+                    "Created draft from decomposition proposal #{proposal_fingerprint}; child key #{child_key}. Add #{RUNNABLE_LABEL} to accept for implementation."
+                  else
+                    "Created from decomposition proposal #{proposal_fingerprint}; child key #{child_key}."
+                  end
+        if draft_mode? && proposal_labels(child).include?(RUNNABLE_LABEL)
+          comment = "#{comment} Proposal suggested #{RUNNABLE_LABEL}, but draft mode did not apply it."
+        end
         {
           "title" => child.fetch("title"),
           "description" => <<~DESC.strip,
@@ -103,8 +114,25 @@ module A3
             #{child.fetch("rationale")}
           DESC
           "priority" => child["priority"] || 2,
-          "comment" => "Created from decomposition proposal #{proposal_fingerprint}; child key #{child_key}."
+          "comment" => comment
         }
+      end
+
+      def labels_for(child)
+        labels = proposal_labels(child)
+        if draft_mode?
+          ([DRAFT_LABEL] + labels.reject { |label| label == RUNNABLE_LABEL }).uniq
+        else
+          ([RUNNABLE_LABEL] + labels).uniq
+        end
+      end
+
+      def proposal_labels(child)
+        Array(child["labels"]).map(&:to_s).reject(&:empty?)
+      end
+
+      def draft_mode?
+        @mode == :draft
       end
 
       def reconcile_dependencies(parent_task_ref:, children:, child_refs_by_key:)

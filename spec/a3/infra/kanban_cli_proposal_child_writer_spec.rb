@@ -2,7 +2,7 @@
 
 RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
   class FakeProposalClient
-    attr_reader :created, :labels, :relations
+    attr_reader :created, :labels, :relations, :comments, :commands
     attr_accessor :fail_after_first_create, :fail_dependency_relation
 
     def initialize(existing: [])
@@ -11,6 +11,7 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
       @labels = []
       @relations = []
       @comments = []
+      @commands = []
       @fail_after_first_create = false
       @fail_dependency_relation = false
     end
@@ -38,6 +39,7 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
       raise A3::Domain::ConfigurationError, "simulated label failure" if @fail_after_first_create && args.first == "task-label-add"
       raise A3::Domain::ConfigurationError, "simulated dependency failure" if @fail_dependency_relation && args.first == "task-relation-create" && args.include?("blocked_by")
 
+      @commands << args
       @labels << args if args.first == "task-label-add"
       @relations << args if args.first == "task-relation-create"
       @comments << args if args.first == "task-comment-create"
@@ -100,6 +102,63 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     expect(result.child_refs).to eq(["A3-v2#5301"])
     expect(client.created).to eq([])
     expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(true)
+  end
+
+  it "creates draft children without runnable trigger labels" do
+    client = FakeProposalClient.new
+    writer = described_class.new(project: "A3-v2", client: client, mode: :draft)
+    payload = proposal_evidence
+    payload["proposal"]["children"].first["labels"] = ["repo:alpha", "trigger:auto-implement"]
+
+    result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: payload)
+
+    expect(result.success?).to be(true)
+    expect(client.created.first.fetch("description")).to include("Child key: child-key-1")
+    expect(client.labels.any? { |args| args.include?("a2o:draft-child") }).to be(true)
+    expect(client.labels.any? { |args| args.include?("repo:alpha") }).to be(true)
+    expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(false)
+    expect(client.comments.any? { |args| args.include?("task-comment-create") }).to be(true)
+  end
+
+  it "reconciles draft children without overwriting existing edited content" do
+    existing = [{ "id" => 5301, "ref" => "A3-v2#5301", "title" => "Human title", "description" => "Human body\nChild key: child-key-1" }]
+    client = FakeProposalClient.new(existing: existing)
+    writer = described_class.new(project: "A3-v2", client: client, mode: :draft)
+
+    result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence(fingerprint: "new", title: "Generated title"))
+
+    expect(result.success?).to be(true)
+    expect(client.created).to eq([])
+    expect(existing.first.fetch("title")).to eq("Human title")
+    expect(existing.first.fetch("description")).to eq("Human body\nChild key: child-key-1")
+    expect(client.labels.any? { |args| args.include?("a2o:draft-child") }).to be(true)
+    expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(false)
+  end
+
+  it "preserves existing accepted draft children by not removing runnable labels" do
+    existing = [{ "id" => 5301, "ref" => "A3-v2#5301", "description" => "Child key: child-key-1" }]
+    client = FakeProposalClient.new(existing: existing)
+    writer = described_class.new(project: "A3-v2", client: client, mode: :draft)
+
+    result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence)
+
+    expect(result.success?).to be(true)
+    expect(client.commands.any? { |args| args.first == "task-label-remove" }).to be(false)
+    expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(false)
+  end
+
+  it "blocks reconciliation when duplicate children claim the same child key" do
+    existing = [
+      { "id" => 5301, "ref" => "A3-v2#5301", "description" => "Child key: child-key-1" },
+      { "id" => 5302, "ref" => "A3-v2#5302", "description" => "Child key: child-key-1" }
+    ]
+    client = FakeProposalClient.new(existing: existing)
+    writer = described_class.new(project: "A3-v2", client: client, mode: :draft)
+
+    result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence)
+
+    expect(result.success?).to be(false)
+    expect(result.diagnostics.fetch("error")).to include("duplicate decomposition children for child key child-key-1")
   end
 
   it "creates blocker relations for child dependencies" do
