@@ -3,11 +3,11 @@
 module A3
   module Domain
     class AgentJobRecord
-      STATES = %i[queued claimed completed].freeze
+      STATES = %i[queued claimed completed stale].freeze
 
-      attr_reader :request, :project_key, :state, :claimed_by, :claimed_at, :heartbeat_at, :result
+      attr_reader :request, :project_key, :state, :claimed_by, :claimed_at, :heartbeat_at, :result, :stale_reason
 
-      def initialize(request:, state:, claimed_by: nil, claimed_at: nil, heartbeat_at: nil, result: nil, project_key: request.project_key)
+      def initialize(request:, state:, claimed_by: nil, claimed_at: nil, heartbeat_at: nil, result: nil, stale_reason: nil, project_key: request.project_key)
         @request = request
         @project_key = A3::Domain::ProjectIdentity.normalize(project_key)
         @state = normalize_state(state)
@@ -15,6 +15,7 @@ module A3
         @claimed_at = claimed_at&.to_s
         @heartbeat_at = heartbeat_at&.to_s
         @result = result
+        @stale_reason = stale_reason&.to_s
         validate_claim!
         validate_result!
         validate_project_identity!
@@ -31,7 +32,8 @@ module A3
           claimed_by: record["claimed_by"],
           claimed_at: record["claimed_at"],
           heartbeat_at: record["heartbeat_at"],
-          result: record["result"] && AgentJobResult.from_result_form(record["result"])
+          result: record["result"] && AgentJobResult.from_result_form(record["result"]),
+          stale_reason: record["stale_reason"]
         )
       end
 
@@ -43,7 +45,8 @@ module A3
           "claimed_by" => claimed_by,
           "claimed_at" => claimed_at,
           "heartbeat_at" => heartbeat_at,
-          "result" => result&.result_form
+          "result" => result&.result_form,
+          "stale_reason" => stale_reason
         }.compact
       end
 
@@ -53,6 +56,10 @@ module A3
 
       def queued?
         state == :queued
+      end
+
+      def terminal?
+        state == :completed || state == :stale
       end
 
       def claim(agent_name:, claimed_at:)
@@ -68,7 +75,7 @@ module A3
       end
 
       def heartbeat(heartbeat_at:)
-        return self if state == :completed
+        return self if terminal?
 
         raise ConfigurationError, "agent job #{job_id} is not claimed" unless state == :claimed
 
@@ -84,7 +91,7 @@ module A3
 
       def complete(result)
         raise ConfigurationError, "agent result job_id #{result.job_id} does not match #{job_id}" unless result.job_id == job_id
-        return self if state == :completed
+        return self if terminal?
 
         self.class.new(
           request: request,
@@ -94,6 +101,20 @@ module A3
           claimed_at: claimed_at,
           heartbeat_at: result.heartbeat || heartbeat_at,
           result: result
+        )
+      end
+
+      def mark_stale(reason:)
+        return self if terminal?
+
+        self.class.new(
+          request: request,
+          project_key: project_key,
+          state: :stale,
+          claimed_by: claimed_by,
+          claimed_at: claimed_at,
+          heartbeat_at: heartbeat_at,
+          stale_reason: reason
         )
       end
 

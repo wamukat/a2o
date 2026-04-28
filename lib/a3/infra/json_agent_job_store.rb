@@ -68,6 +68,19 @@ module A3
         end
       end
 
+      def mark_stale(job_id:, reason:)
+        with_records_lock do
+          records = load_records
+          record_payload = records.fetch(job_id) do
+            raise A3::Domain::RecordNotFound, "Agent job not found: #{job_id}"
+          end
+          stale = A3::Domain::AgentJobRecord.from_persisted_form(record_payload).mark_stale(reason: reason)
+          records[job_id] = stale.persisted_form
+          write_records(records)
+          stale
+        end
+      end
+
       def fetch(job_id)
         with_records_lock do
           A3::Domain::AgentJobRecord.from_persisted_form(load_records.fetch(job_id))

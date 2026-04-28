@@ -63,6 +63,29 @@ RSpec.describe A3::Infra::JsonAgentJobStore do
     expect(fetched.result).to eq(result)
   end
 
+  it "marks a claimed job stale and ignores late heartbeat/result writes" do
+    request = agent_job_request("job-1")
+    store.enqueue(request)
+    store.claim_next(agent_name: "host-local-agent", claimed_at: "2026-04-11T08:00:00Z")
+
+    stale = store.mark_stale(job_id: "job-1", reason: "runtime process stopped")
+    expect(stale.state).to eq(:stale)
+    expect(stale.stale_reason).to eq("runtime process stopped")
+
+    expect(store.heartbeat(job_id: "job-1", heartbeat_at: "2026-04-11T08:00:30Z").state).to eq(:stale)
+    expect(store.complete(agent_job_result("job-1")).state).to eq(:stale)
+    expect(store.fetch("job-1").result).to be_nil
+  end
+
+  it "does not claim stale jobs" do
+    request = agent_job_request("job-1")
+    store.enqueue(request)
+    store.claim_next(agent_name: "host-local-agent", claimed_at: "2026-04-11T08:00:00Z")
+    store.mark_stale(job_id: "job-1", reason: "runtime process stopped")
+
+    expect(store.claim_next(agent_name: "host-local-agent", claimed_at: "2026-04-11T08:01:00Z")).to be_nil
+  end
+
   it "persists project identity at the agent job record boundary" do
     request = agent_job_request("job-1", project_key: "a2o")
 

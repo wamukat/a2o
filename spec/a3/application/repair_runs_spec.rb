@@ -123,6 +123,58 @@ RSpec.describe A3::Application::RepairRuns do
     end
   end
 
+  it "marks claimed agent jobs stale when repairing a run whose runtime process is gone" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::InMemoryTaskRepository.new
+      run_repository = A3::Infra::InMemoryRunRepository.new
+      agent_job_store = A3::Infra::JsonAgentJobStore.new(File.join(dir, "agent_jobs.json"))
+
+      run_repository.save(
+        A3::Domain::Run.new(
+          ref: "run-stale",
+          task_ref: "Sample#336",
+          phase: :verification,
+          workspace_kind: :runtime_workspace,
+          source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: "Sample#336", ref: "refs/heads/a2o/work/Sample-336"),
+          scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], ownership_scope: :task),
+          artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: "Sample#336", owner_scope: :task, snapshot_version: "refs/heads/a2o/work/Sample-336")
+        )
+      )
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "Sample#336",
+          kind: :single,
+          edit_scope: [:repo_alpha],
+          verification_scope: [:repo_alpha],
+          status: :inspection,
+          current_run_ref: "run-stale"
+        )
+      )
+      FileUtils.mkdir_p(File.join(dir, "workspaces", "Sample-336", "runtime_workspace"))
+      agent_job_store.enqueue(agent_job_request("command-run-stale-verification", task_ref: "Sample#336", run_ref: "run-stale"))
+      agent_job_store.claim_next(agent_name: "host-local-agent", claimed_at: "2026-04-11T08:00:00Z")
+
+      use_case = described_class.new(
+        task_repository: task_repository,
+        run_repository: run_repository,
+        storage_dir: dir,
+        agent_job_store: agent_job_store
+      )
+
+      dry_run = use_case.call(apply: false)
+      expect(dry_run.actions.map(&:kind)).to contain_exactly(:stale_task_claimed_agent_job)
+      expect(agent_job_store.fetch("command-run-stale-verification").state).to eq(:claimed)
+
+      applied = use_case.call(apply: true)
+      expect(applied.actions.map(&:kind)).to contain_exactly(:stale_task_claimed_agent_job)
+      expect(task_repository.fetch("Sample#336").current_run_ref).to be_nil
+      expect(agent_job_store.fetch("command-run-stale-verification")).to have_attributes(
+        state: :stale,
+        stale_reason: "runtime process stopped before agent job result was recorded"
+      )
+    end
+  end
+
   it "repairs tasks pointing at corrupt JSON run records" do
     Dir.mktmpdir do |dir|
       task_repository = A3::Infra::InMemoryTaskRepository.new
@@ -200,5 +252,22 @@ RSpec.describe A3::Application::RepairRuns do
       expect(dry_run.actions).to eq([])
       expect(task_repository.fetch("Sample#2").current_run_ref).to eq("run-direct")
     end
+  end
+
+  def agent_job_request(job_id, task_ref:, run_ref:)
+    A3::Domain::AgentJobRequest.new(
+      job_id: job_id,
+      task_ref: task_ref,
+      run_ref: run_ref,
+      phase: :verification,
+      runtime_profile: "host-local-agent",
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: task_ref, ref: "refs/heads/a2o/work/Sample-336"),
+      working_dir: "/workspace/repo-alpha",
+      command: "sh",
+      args: ["-lc", "task test"],
+      env: {},
+      timeout_seconds: 1800,
+      artifact_rules: []
+    )
   end
 end
