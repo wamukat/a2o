@@ -2,7 +2,7 @@
 
 This document details the A2O#356 follow-up to the ticket decomposition MVP in [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md).
 
-The MVP proves that `trigger:investigate` can run investigation, proposal authoring, and proposal review outside the ordinary implementation scheduler. A2O#356 changes the operator experience after a clean proposal: A2O should create draft child tickets in Kanban early, then let the operator edit and accept those children directly on the board.
+The MVP proves that `trigger:investigate` can run investigation, proposal authoring, and proposal review outside the ordinary implementation scheduler. A2O#356 changes the operator experience after an eligible proposal review: A2O should create draft child tickets in Kanban early, then let the operator edit and accept those children directly on the board.
 
 ## 1. Problem
 
@@ -18,7 +18,7 @@ That is safe, but it keeps too much of the planning loop outside Kanban. Operato
 ## 2. Goals
 
 - Treat `trigger:investigate` as the Kanban-first entry point for decomposition.
-- After a clean proposal review, automatically create or reconcile child tickets as drafts.
+- After an eligible proposal review, automatically create or reconcile child tickets as drafts.
 - Keep draft children non-runnable until an operator explicitly accepts them.
 - Preserve operator edits during decomposition reruns.
 - Keep child creation idempotent across proposal reruns and partial failures.
@@ -105,7 +105,9 @@ If the new proposal differs from the existing edited child, A2O records drift ev
 
 ## 7. Automatic Decomposition Stage
 
-A2O#356 adds an automatic draft creation stage after a reviewed clean proposal.
+A2O#356 adds an automatic draft creation stage after an eligible proposal review.
+
+An eligible proposal review means the review disposition allows child draft creation to proceed. It does not require zero reviewer findings; non-blocking findings, notes, or follow-up recommendations may exist as long as the final review disposition is eligible.
 
 The decomposition scheduler should be able to advance this sequence without an operator running each command manually:
 
@@ -113,7 +115,7 @@ The decomposition scheduler should be able to advance this sequence without an o
 2. run investigation when needed
 3. author a proposal when needed
 4. review the proposal when needed
-5. create or reconcile draft children when the review is clean
+5. create or reconcile draft children when the review disposition is eligible
 6. record evidence and post a concise Kanban audit comment
 
 The implementation scheduler remains independent. Draft creation must not wait for implementation worker idleness, and ordinary implementation tasks must not wait for draft creation except through normal Kanban blocker relations.
@@ -134,7 +136,14 @@ The parent/source ticket evidence should include:
 - drift diagnostics
 - blocked reason, when reconciliation cannot continue
 
-Kanban comments should be short and user-actionable. They should say which child drafts were created or reconciled and how to accept them. Detailed JSON belongs in evidence.
+Each decomposition stage must leave a short source-ticket comment when it completes. The required stage comments are:
+
+- investigation completed or blocked
+- proposal authored or blocked
+- proposal review completed, including whether the disposition is eligible for draft creation
+- draft child creation or reconciliation completed or blocked
+
+Kanban comments should be short and user-actionable. They should summarize the stage outcome, point to evidence when useful, and say which child drafts were created or reconciled and how to accept them. Detailed JSON belongs in evidence.
 
 Child tickets should include enough metadata for operators and reruns:
 
@@ -169,7 +178,7 @@ Direct manual label editing remains the primary acceptance path.
 Implementation should include tests for:
 
 - `a2o:draft-child` without `trigger:auto-implement` is not runnable
-- automatic decomposition creates draft children after clean review
+- automatic decomposition creates draft children after an eligible proposal review
 - draft creation does not add `trigger:auto-implement`
 - rerun finds existing children by child key
 - rerun preserves human edits and accepted children
@@ -184,7 +193,7 @@ Implementation should include tests for:
 The implementation should be split by the design sections above:
 
 - Sections 5 and 6: draft child writer and reconciliation behavior.
-- Section 7: automatic scheduler stage from clean review to draft reconciliation.
+- Section 7: automatic scheduler stage from eligible proposal review to draft reconciliation.
 - Section 8: evidence and audit comments.
 - Section 9: remote source ticket boundary.
 - Section 10: optional accept-drafts helper.
