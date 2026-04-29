@@ -4,8 +4,8 @@
 require "json"
 require "pathname"
 
-request_path = Pathname(ENV.fetch("A3_WORKER_REQUEST_PATH"))
-result_path = Pathname(ENV.fetch("A3_WORKER_RESULT_PATH"))
+request_path = Pathname(ENV.fetch("A2O_WORKER_REQUEST_PATH"))
+result_path = Pathname(ENV.fetch("A2O_WORKER_RESULT_PATH"))
 request = JSON.parse(request_path.read)
 
 def write(path, content)
@@ -346,6 +346,141 @@ def implement_python(root)
   )
 end
 
+def implement_java_spring(root)
+  if root.join("reference-products/java-spring-multi-module/pom.xml").exist?
+    root = root.join("reference-products/java-spring-multi-module")
+  end
+
+  utility = root.join("utility-lib/src/main/java/dev/a2o/reference/utility/GreetingFormatter.java")
+  utility.write(<<~JAVA)
+    package dev.a2o.reference.utility;
+
+    public final class GreetingFormatter {
+        private GreetingFormatter() {
+        }
+
+        public static String formatGreeting(String name) {
+            return formatGreeting("Hello", name);
+        }
+
+        public static String formatGreeting(String salutation, String name) {
+            String normalizedSalutation = normalizeSalutation(salutation);
+            String normalizedName = normalizeName(name);
+            return normalizedSalutation + ", " + normalizedName + "!";
+        }
+
+        public static String normalizeName(String name) {
+            if (name == null || name.isBlank()) {
+                return "A2O";
+            }
+            return name.trim();
+        }
+
+        private static String normalizeSalutation(String salutation) {
+            if (salutation == null || salutation.isBlank()) {
+                return "Hello";
+            }
+            return salutation.trim();
+        }
+    }
+  JAVA
+
+  utility_test = root.join("utility-lib/src/test/java/dev/a2o/reference/utility/GreetingFormatterTest.java")
+  utility_test.write(<<~JAVA)
+    package dev.a2o.reference.utility;
+
+    import static org.assertj.core.api.Assertions.assertThat;
+
+    import org.junit.jupiter.api.Test;
+
+    class GreetingFormatterTest {
+        @Test
+        void formatsGreetingWithTrimmedName() {
+            assertThat(GreetingFormatter.formatGreeting("  Kanban  ")).isEqualTo("Hello, Kanban!");
+        }
+
+        @Test
+        void supportsCustomSalutation() {
+            assertThat(GreetingFormatter.formatGreeting("Welcome", "Agent")).isEqualTo("Welcome, Agent!");
+        }
+
+        @Test
+        void usesDefaultValuesWhenInputIsBlank() {
+            assertThat(GreetingFormatter.formatGreeting(" ", "   ")).isEqualTo("Hello, A2O!");
+        }
+    }
+  JAVA
+
+  controller = root.join("web-app/src/main/java/dev/a2o/reference/web/GreetingController.java")
+  controller.write(<<~JAVA)
+    package dev.a2o.reference.web;
+
+    import dev.a2o.reference.utility.GreetingFormatter;
+    import java.util.Map;
+    import org.springframework.web.bind.annotation.GetMapping;
+    import org.springframework.web.bind.annotation.PathVariable;
+    import org.springframework.web.bind.annotation.RequestParam;
+    import org.springframework.web.bind.annotation.RestController;
+
+    @RestController
+    class GreetingController {
+        @GetMapping("/greetings/{name}")
+        Map<String, String> greeting(
+            @PathVariable String name,
+            @RequestParam(defaultValue = "Hello") String salutation
+        ) {
+            return Map.of("message", GreetingFormatter.formatGreeting(salutation, name));
+        }
+
+        @GetMapping("/health")
+        Map<String, String> health() {
+            return Map.of("status", "ok");
+        }
+    }
+  JAVA
+
+  controller_test = root.join("web-app/src/test/java/dev/a2o/reference/web/GreetingControllerTest.java")
+  controller_test.write(<<~JAVA)
+    package dev.a2o.reference.web;
+
+    import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+    import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+    import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+    import org.junit.jupiter.api.Test;
+    import org.springframework.beans.factory.annotation.Autowired;
+    import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+    import org.springframework.test.web.servlet.MockMvc;
+
+    @WebMvcTest(GreetingController.class)
+    class GreetingControllerTest {
+        @Autowired
+        private MockMvc mockMvc;
+
+        @Test
+        void returnsGreetingFromUtilityLibrary() throws Exception {
+            mockMvc.perform(get("/greetings/A2O"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Hello, A2O!"));
+        }
+
+        @Test
+        void returnsCustomSalutationGreeting() throws Exception {
+            mockMvc.perform(get("/greetings/A2O").param("salutation", "Welcome"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Welcome, A2O!"));
+        }
+
+        @Test
+        void returnsHealthStatus() throws Exception {
+            mockMvc.perform(get("/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"));
+        }
+    }
+  JAVA
+end
+
 def implement_catalog(root)
   path = root.join("src/catalog-service.js")
   path.write(path.read.sub(
@@ -398,6 +533,17 @@ begin
       elsif root.join("pyproject.toml").exist?
         implement_python(root)
         changed["app"] = ["src/a2o_reference_service/appointments.py", "tests/test_appointments.py"]
+      elsif (root.join("pom.xml").exist? && root.join("utility-lib/pom.xml").exist? && root.join("web-app/pom.xml").exist?) ||
+            root.join("reference-products/java-spring-multi-module/pom.xml").exist?
+        nested = root.join("reference-products/java-spring-multi-module/pom.xml").exist?
+        prefix = nested ? "reference-products/java-spring-multi-module/" : ""
+        implement_java_spring(root)
+        changed["app"] = [
+          "#{prefix}utility-lib/src/main/java/dev/a2o/reference/utility/GreetingFormatter.java",
+          "#{prefix}utility-lib/src/test/java/dev/a2o/reference/utility/GreetingFormatterTest.java",
+          "#{prefix}web-app/src/main/java/dev/a2o/reference/web/GreetingController.java",
+          "#{prefix}web-app/src/test/java/dev/a2o/reference/web/GreetingControllerTest.java"
+        ]
       end
     end
     if request.fetch("slot_paths").key?("repo_alpha") && editable_slot?(request, "repo_alpha")

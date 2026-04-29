@@ -7,6 +7,7 @@ The suite intentionally covers different runtime shapes:
 - `typescript-api-web`: TypeScript API plus Web UI in one repository.
 - `go-api-cli`: Go HTTP API plus CLI in one repository.
 - `python-service`: Python service using the host or dev-env agent environment.
+- `java-spring-multi-module`: Maven reactor with `utility-lib` and a Spring Boot `web-app`.
 - `multi-repo-fixture`: Two-repository fixture for parent-child and cross-repo validation.
 
 Each product keeps its A2O package under `project-package/`. Bootstrap a package with:

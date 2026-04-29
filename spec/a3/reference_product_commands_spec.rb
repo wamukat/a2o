@@ -37,4 +37,34 @@ RSpec.describe "reference product commands" do
       expect(File.readlines(log_path, chomp: true)).to eq([repo_alpha, repo_beta])
     end
   end
+
+  it "uses the app slot_path for Java Spring multi-module verification" do
+    Dir.mktmpdir do |dir|
+      app = File.join(dir, "app")
+      command_dir = File.join(dir, "command-cwd")
+      bin_dir = File.join(dir, "bin")
+      log_path = File.join(dir, "mvn.log")
+      request_path = File.join(dir, "request.json")
+      product_root = File.join(app, "reference-products/java-spring-multi-module")
+
+      [product_root, command_dir, bin_dir].each { |path| FileUtils.mkdir_p(path) }
+      File.write(
+        File.join(bin_dir, "mvn"),
+        "#!/usr/bin/env sh\nset -eu\npwd >> \"$MVN_LOG\"\n"
+      )
+      FileUtils.chmod("+x", File.join(bin_dir, "mvn"))
+      File.write(request_path, JSON.generate("slot_paths" => { "app" => app }))
+
+      script = File.expand_path("../../reference-products/java-spring-multi-module/project-package/commands/verify.sh", __dir__)
+      env = {
+        "A2O_WORKER_REQUEST_PATH" => request_path,
+        "MVN_LOG" => log_path,
+        "PATH" => "#{bin_dir}:#{ENV.fetch("PATH")}"
+      }
+      _stdout, stderr, status = Open3.capture3(env, script, chdir: command_dir)
+
+      expect(status).to be_success, stderr
+      expect(File.readlines(log_path, chomp: true)).to eq([product_root])
+    end
+  end
 end

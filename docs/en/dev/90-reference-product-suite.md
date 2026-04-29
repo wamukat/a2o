@@ -19,6 +19,7 @@ A2O must work across common product shapes rather than depending on one stack. T
 | TypeScript API/Web | `reference-products/typescript-api-web/` | API and browser UI in one repository |
 | Go API/CLI | `reference-products/go-api-cli/` | server and CLI in one Go module |
 | Python Service | `reference-products/python-service/` | lightweight service and Python verification |
+| Java Spring multi-module | `reference-products/java-spring-multi-module/` | Maven reactor with `utility-lib` and a Spring Boot `web-app` |
 | Multi-repo Fixture | `reference-products/multi-repo-fixture/` | parent-child and cross-repo validation |
 
 Each product keeps its package at `project-package/`.

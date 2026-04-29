@@ -1,0 +1,44 @@
+schema_version: 1
+package:
+  name: a2o-reference-java-spring-multi-module
+kanban:
+  project: A2ODevSampleJava
+  selection:
+    status: To do
+repos:
+  app:
+    path: ../../..
+    role: product
+    label: repo:app
+agent:
+  workspace_root: .work/a2o-dev-sample/agent/workspaces
+  required_bins:
+    - git
+    - java
+    - mvn
+    - ruby
+runtime:
+  max_steps: 30
+  agent_attempts: 200
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - ruby
+          - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - ruby
+          - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
+    verification:
+      commands:
+        - app/reference-products/java-spring-multi-module/project-package/commands/verify.sh
+    remediation:
+      commands:
+        - app/reference-products/java-spring-multi-module/project-package/commands/format.sh
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/a2o/dev-sample-live
