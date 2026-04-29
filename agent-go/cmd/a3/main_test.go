@@ -4380,6 +4380,119 @@ runtime:
 	}
 }
 
+func TestProjectValidateAcceptsDocsConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	repoDir := filepath.Join(tempDir, "docs-repo")
+	if err := os.MkdirAll(filepath.Join(repoDir, "docs", "architecture"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "openapi.yaml"), []byte("openapi: 3.1.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ../app
+  docs:
+    path: ../docs-repo
+docs:
+  repoSlot: docs
+  root: docs
+  index: docs/README.md
+  policy:
+    missingRoot: create
+  categories:
+    architecture:
+      path: docs/architecture
+      index: docs/architecture/README.md
+  languages:
+    primary: ja
+    secondary: [en]
+  impactPolicy:
+    defaultSeverity: warning
+  authorities:
+    openapi:
+      source: openapi.yaml
+      docs:
+        - docs/api.md
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project validate should accept docs config, code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "lint_status=ok") {
+		t.Fatalf("project validate should report ok, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateRejectsInvalidDocsConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ../app
+docs:
+  repoSlot: backend
+  root: /docs
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject invalid docs config, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "invalid docs") ||
+		!strings.Contains(stdout.String(), "repoSlot must match a repos entry: backend") {
+		t.Fatalf("project validate should reject invalid docs config, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
 func TestProjectValidateRejectsMissingRuntimePromptFile(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

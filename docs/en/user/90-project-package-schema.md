@@ -33,6 +33,23 @@ repos:
     path: ..
     role: product
     label: repo:app
+docs:
+  repoSlot: app
+  root: docs
+  index: docs/README.md
+  categories:
+    architecture:
+      path: docs/architecture
+      index: docs/architecture/README.md
+  languages:
+    primary: en
+  impactPolicy:
+    defaultSeverity: warning
+  authorities:
+    openapi:
+      source: openapi.yaml
+      docs:
+        - docs/api.md
 agent:
   workspace_root: .work/a2o/agent/workspaces
   required_bins:
@@ -115,6 +132,39 @@ Each repo slot defines:
 - kanban label
 
 Repo slots are stable aliases used in runtime state and agent job payloads.
+
+## Docs
+
+`docs` is optional. It declares the documentation surface that A2O may inspect or update when a task has documentation impact. In a single-repo package, `docs.repoSlot` may be omitted and A2O treats docs paths as belonging to that repo slot. In multi-repo packages, or when docs live in a dedicated repository, declare the repository under `repos` and set `docs.repoSlot` to the matching slot.
+
+```yaml
+docs:
+  repoSlot: docs
+  root: docs
+  index: docs/README.md
+  categories:
+    architecture:
+      path: docs/architecture
+      index: docs/architecture/README.md
+    shared_specs:
+      path: docs/shared-specs
+  languages:
+    primary: en
+    secondary: [ja]
+  policy:
+    missingRoot: create
+  impactPolicy:
+    defaultSeverity: warning
+  authorities:
+    openapi:
+      source: openapi.yaml
+      docs:
+        - docs/api.md
+```
+
+`docs.root`, `docs.index`, category paths, authority sources, and authority docs are repo-slot-relative paths. A2O rejects absolute paths, `..` escapes, and existing symlinks that resolve outside the selected repo slot. `docs.repoSlot` must match a declared `repos` entry. Category and authority IDs must be non-empty machine-readable keys such as `architecture`, `shared_specs`, or `openapi`.
+
+Authority sources represent source-of-truth artifacts such as OpenAPI, DB migrations, generated schema files, or existing shared specifications. A non-generated authority source must exist when the repo slot checkout is available. Use `generated: true` only when project policy intentionally treats the source as generated outside the current checkout.
 
 ## Agent
 

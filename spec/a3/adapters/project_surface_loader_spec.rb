@@ -180,6 +180,105 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     )
   end
 
+  it "validates docs configuration for repo-slot-relative paths and authorities" do
+    repo_root = File.join(@tmpdir, "docs-repo")
+    FileUtils.mkdir_p(File.join(repo_root, "docs", "architecture"))
+    File.write(File.join(repo_root, "openapi.yaml"), "openapi: 3.1.0\n")
+    project_config_path = write_project_config(
+      "repos" => {
+        "app" => { "path" => "app" },
+        "docs" => { "path" => "docs-repo" }
+      },
+      "docs" => {
+        "repoSlot" => "docs",
+        "root" => "docs",
+        "index" => "docs/README.md",
+        "policy" => { "missingRoot" => "create" },
+        "categories" => {
+          "architecture" => {
+            "path" => "docs/architecture",
+            "index" => "docs/architecture/README.md"
+          }
+        },
+        "languages" => {
+          "primary" => "ja",
+          "secondary" => ["en"]
+        },
+        "impactPolicy" => { "defaultSeverity" => "warning" },
+        "authorities" => {
+          "openapi" => {
+            "source" => "openapi.yaml",
+            "docs" => ["docs/api.md"]
+          }
+        }
+      },
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }.not_to raise_error
+  end
+
+  it "rejects invalid docs repo slots, paths, and symlink escapes" do
+    project_config_path = write_project_config(
+      "repos" => {
+        "app" => { "path" => "app" }
+      },
+      "docs" => {
+        "repoSlot" => "backend",
+        "root" => "docs"
+      },
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml docs.repoSlot must match a repos entry: backend")
+
+    repo_root = File.join(@tmpdir, "app")
+    outside_path = File.join(@tmpdir, "outside-doc.md")
+    FileUtils.mkdir_p(File.join(repo_root, "docs"))
+    File.write(outside_path, "outside")
+    File.symlink(outside_path, File.join(repo_root, "docs", "escape.md"))
+    project_config_path = write_project_config(
+      "repos" => {
+        "app" => { "path" => "app" }
+      },
+      "docs" => {
+        "root" => "docs/escape.md"
+      },
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml docs.root must stay inside the docs repo slot")
+  end
+
   it "falls back implementation_rework to implementation when no rework profile is configured" do
     project_config_path = write_project_config(
       "runtime" => {

@@ -24,6 +24,7 @@ module A3
       def load(manifest_path)
         project_config = load_project_config(manifest_path)
         project_package_root = File.dirname(File.expand_path(manifest_path))
+        validate_docs_config(project_config.fetch("docs", nil), project_package_root, project_config.fetch("repos", {}))
         runtime = project_config.fetch("runtime") do
           raise A3::Domain::ConfigurationError, "project.yaml runtime must be provided"
         end
@@ -159,6 +160,173 @@ module A3
         return [] unless repos.is_a?(Hash)
 
         repos.keys.map(&:to_s)
+      end
+
+      def validate_docs_config(docs, project_package_root, repos)
+        return unless docs
+        unless docs.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml docs must be a mapping"
+        end
+
+        repo_slot = docs.fetch("repoSlot", nil)
+        if docs.key?("repoSlot") && (!repo_slot.is_a?(String) || repo_slot.strip.empty?)
+          raise A3::Domain::ConfigurationError, "project.yaml docs.repoSlot must be a non-empty string"
+        end
+        repo_slot = nil if repo_slot.to_s.strip.empty?
+        repo_names = repos.is_a?(Hash) ? repos.keys.map(&:to_s).sort : []
+        if repo_slot && !repo_names.empty? && !repo_names.include?(repo_slot)
+          raise A3::Domain::ConfigurationError, "project.yaml docs.repoSlot must match a repos entry: #{repo_slot}"
+        end
+        if !repo_slot && repo_names.length > 1
+          raise A3::Domain::ConfigurationError, "project.yaml docs.repoSlot must be provided when multiple repos are declared"
+        end
+        repo_slot ||= repo_names.first
+        repo_root = docs_repo_root(project_package_root, repos, repo_slot)
+
+        validate_docs_path(docs.fetch("root", nil), "docs.root", repo_root, required: true)
+        validate_docs_path(docs.fetch("index", nil), "docs.index", repo_root)
+        validate_docs_categories(docs.fetch("categories", nil), repo_root)
+        validate_docs_languages(docs.fetch("languages", nil))
+        validate_docs_mapping(docs.fetch("policy", nil), "docs.policy")
+        validate_docs_mapping(docs.fetch("impactPolicy", nil), "docs.impactPolicy")
+        validate_docs_authorities(docs.fetch("authorities", nil), repo_root)
+      end
+
+      def docs_repo_root(project_package_root, repos, repo_slot)
+        return nil unless repos.is_a?(Hash) && repo_slot
+
+        repo = repos.fetch(repo_slot, nil)
+        return nil unless repo.is_a?(Hash)
+
+        path = repo.fetch("path", nil)
+        return nil unless path.is_a?(String) && !path.strip.empty?
+
+        Pathname.new(path).absolute? ? File.expand_path(path) : File.expand_path(path, project_package_root)
+      end
+
+      def validate_docs_categories(categories, repo_root)
+        return unless categories
+        unless categories.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml docs.categories must be a mapping"
+        end
+
+        categories.each do |id, category|
+          unless machine_key?(id)
+            raise A3::Domain::ConfigurationError, "project.yaml docs.categories.#{id} id must be a non-empty machine-readable key"
+          end
+          unless category.is_a?(Hash)
+            raise A3::Domain::ConfigurationError, "project.yaml docs.categories.#{id} must be a mapping"
+          end
+          validate_docs_path(category.fetch("path", nil), "docs.categories.#{id}.path", repo_root, required: true)
+          validate_docs_path(category.fetch("index", nil), "docs.categories.#{id}.index", repo_root)
+        end
+      end
+
+      def validate_docs_authorities(authorities, repo_root)
+        return unless authorities
+        unless authorities.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml docs.authorities must be a mapping"
+        end
+
+        authorities.each do |id, authority|
+          unless machine_key?(id)
+            raise A3::Domain::ConfigurationError, "project.yaml docs.authorities.#{id} id must be a non-empty machine-readable key"
+          end
+          unless authority.is_a?(Hash)
+            raise A3::Domain::ConfigurationError, "project.yaml docs.authorities.#{id} must be a mapping"
+          end
+          generated = authority.fetch("generated", false) == true
+          validate_docs_path(authority.fetch("source", nil), "docs.authorities.#{id}.source", repo_root, required: !generated)
+          source = authority.fetch("source", nil)
+          if !generated && repo_root && source.is_a?(String) && !source.strip.empty?
+            source_path = File.expand_path(source, repo_root)
+            unless File.exist?(source_path)
+              raise A3::Domain::ConfigurationError, "project.yaml docs.authorities.#{id}.source file not found: #{source}"
+            end
+          end
+          docs_paths = authority.fetch("docs", nil)
+          case docs_paths
+          when nil
+            next
+          when String
+            validate_docs_path(docs_paths, "docs.authorities.#{id}.docs", repo_root)
+          when Array
+            docs_paths.each_with_index do |entry, index|
+              validate_docs_path(entry, "docs.authorities.#{id}.docs[#{index}]", repo_root, required: true)
+            end
+          else
+            raise A3::Domain::ConfigurationError, "project.yaml docs.authorities.#{id}.docs must be a string or array of strings"
+          end
+        end
+      end
+
+      def validate_docs_languages(languages)
+        return unless languages
+        unless languages.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml docs.languages must be a mapping"
+        end
+        if languages.key?("primary") && (!languages["primary"].is_a?(String) || languages["primary"].strip.empty?)
+          raise A3::Domain::ConfigurationError, "project.yaml docs.languages.primary must be a non-empty string"
+        end
+        %w[secondary required].each do |key|
+          next unless languages.key?(key)
+
+          list = languages.fetch(key)
+          unless list.is_a?(Array)
+            raise A3::Domain::ConfigurationError, "project.yaml docs.languages.#{key} must be an array of non-empty strings"
+          end
+          list.each_with_index do |entry, index|
+            unless entry.is_a?(String) && !entry.strip.empty?
+              raise A3::Domain::ConfigurationError, "project.yaml docs.languages.#{key}[#{index}] must be a non-empty string"
+            end
+          end
+        end
+      end
+
+      def validate_docs_mapping(mapping, location)
+        return unless mapping
+        unless mapping.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must be a mapping"
+        end
+        if mapping.keys.any? { |key| key.to_s.strip.empty? }
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} keys must be non-empty strings"
+        end
+      end
+
+      def validate_docs_path(value, location, repo_root, required: false)
+        if value.nil?
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must be a non-empty repo-slot-relative path" if required
+
+          return
+        end
+        unless value.is_a?(String) && !value.strip.empty?
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must be a non-empty repo-slot-relative path"
+        end
+        if Pathname.new(value).absolute?
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must be relative to the docs repo slot"
+        end
+        if value.split(/[\\\/]/).include?("..")
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must stay inside the docs repo slot"
+        end
+        return unless repo_root
+
+        root = File.expand_path(repo_root)
+        absolute_path = File.expand_path(value, root)
+        unless absolute_path == root || absolute_path.start_with?("#{root}#{File::SEPARATOR}")
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must stay inside the docs repo slot"
+        end
+        return unless File.exist?(absolute_path) || File.symlink?(absolute_path)
+        return unless File.exist?(root)
+
+        real_root = File.realpath(root)
+        real_path = File.realpath(absolute_path)
+        unless real_path == real_root || real_path.start_with?("#{real_root}#{File::SEPARATOR}")
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must stay inside the docs repo slot"
+        end
+      end
+
+      def machine_key?(value)
+        value.is_a?(String) && value.match?(/\A[a-z][a-z0-9_]*\z/)
       end
 
       def prompt_config(runtime, project_package_root, repo_slots:)

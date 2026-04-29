@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -31,6 +32,8 @@ type projectPackageConfig struct {
 	Executor                        map[string]any
 	Repos                           map[string]projectPackageRepo
 }
+
+var projectDocsMachineKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
 type projectPackageRepo struct {
 	Path  string
@@ -114,6 +117,9 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	}
 	if err := validateProjectPromptsConfig(runtimePayload, packagePath, projectRepoNames(payload.Repos)); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.prompts: %w", projectFile, err)
+	}
+	if err := validateProjectDocsConfig(rawPayload["docs"], packagePath, payload.Repos); err != nil {
+		return config, fmt.Errorf("project package config %s has invalid docs: %w", projectFile, err)
 	}
 	executor, err := buildProjectExecutorConfig(payload.Runtime.Phases)
 	if err != nil {
@@ -449,6 +455,268 @@ func validateRepoSlotPromptSkillAddons(slot string, basePhases map[string]any, s
 		}
 	}
 	return nil
+}
+
+func validateProjectDocsConfig(rawDocs any, packagePath string, repos map[string]struct {
+	Path  string `yaml:"path"`
+	Label string `yaml:"label"`
+}) error {
+	if rawDocs == nil {
+		return nil
+	}
+	docs, ok := normalizeYAMLValue(rawDocs).(map[string]any)
+	if !ok {
+		return fmt.Errorf("must be a mapping")
+	}
+	repoNames := projectRepoNames(repos)
+	repoSlot := ""
+	if rawRepoSlot, ok := docs["repoSlot"]; ok {
+		value, ok := rawRepoSlot.(string)
+		if !ok || strings.TrimSpace(value) == "" {
+			return fmt.Errorf("repoSlot must be a non-empty string")
+		}
+		repoSlot = strings.TrimSpace(value)
+		if len(repoNames) > 0 && !containsString(repoNames, repoSlot) {
+			return fmt.Errorf("repoSlot must match a repos entry: %s", repoSlot)
+		}
+	} else if len(repoNames) == 1 {
+		repoSlot = repoNames[0]
+	} else if len(repoNames) > 1 {
+		return fmt.Errorf("repoSlot must be provided when multiple repos are declared")
+	}
+	repoRoot := projectDocsRepoRoot(packagePath, repos, repoSlot)
+	if err := validateProjectDocsPath(docs["root"], "root", repoRoot, true); err != nil {
+		return err
+	}
+	if err := validateProjectDocsPath(docs["index"], "index", repoRoot, false); err != nil {
+		return err
+	}
+	if err := validateProjectDocsCategories(docs["categories"], repoRoot); err != nil {
+		return err
+	}
+	if err := validateProjectDocsLanguages(docs["languages"]); err != nil {
+		return err
+	}
+	if err := validateProjectDocsStringMap(docs["policy"], "policy"); err != nil {
+		return err
+	}
+	if err := validateProjectDocsStringMap(docs["impactPolicy"], "impactPolicy"); err != nil {
+		return err
+	}
+	if err := validateProjectDocsAuthorities(docs["authorities"], repoRoot); err != nil {
+		return err
+	}
+	return nil
+}
+
+func projectDocsRepoRoot(packagePath string, repos map[string]struct {
+	Path  string `yaml:"path"`
+	Label string `yaml:"label"`
+}, repoSlot string) string {
+	repo, ok := repos[repoSlot]
+	if !ok {
+		return ""
+	}
+	if strings.TrimSpace(repo.Path) == "" {
+		return ""
+	}
+	if filepath.IsAbs(repo.Path) {
+		return filepath.Clean(repo.Path)
+	}
+	return filepath.Clean(filepath.Join(packagePath, repo.Path))
+}
+
+func validateProjectDocsCategories(rawCategories any, repoRoot string) error {
+	if rawCategories == nil {
+		return nil
+	}
+	categories, ok := normalizeYAMLValue(rawCategories).(map[string]any)
+	if !ok {
+		return fmt.Errorf("categories must be a mapping")
+	}
+	for id, rawCategory := range categories {
+		if !projectDocsMachineKey(id) {
+			return fmt.Errorf("categories.%s id must be a non-empty machine-readable key", id)
+		}
+		category, ok := normalizeYAMLValue(rawCategory).(map[string]any)
+		if !ok {
+			return fmt.Errorf("categories.%s must be a mapping", id)
+		}
+		if err := validateProjectDocsPath(category["path"], "categories."+id+".path", repoRoot, true); err != nil {
+			return err
+		}
+		if err := validateProjectDocsPath(category["index"], "categories."+id+".index", repoRoot, false); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateProjectDocsAuthorities(rawAuthorities any, repoRoot string) error {
+	if rawAuthorities == nil {
+		return nil
+	}
+	authorities, ok := normalizeYAMLValue(rawAuthorities).(map[string]any)
+	if !ok {
+		return fmt.Errorf("authorities must be a mapping")
+	}
+	for id, rawAuthority := range authorities {
+		if !projectDocsMachineKey(id) {
+			return fmt.Errorf("authorities.%s id must be a non-empty machine-readable key", id)
+		}
+		authority, ok := normalizeYAMLValue(rawAuthority).(map[string]any)
+		if !ok {
+			return fmt.Errorf("authorities.%s must be a mapping", id)
+		}
+		generated, _ := authority["generated"].(bool)
+		if err := validateProjectDocsPath(authority["source"], "authorities."+id+".source", repoRoot, !generated); err != nil {
+			return err
+		}
+		if !generated && repoRoot != "" {
+			source, _ := authority["source"].(string)
+			if strings.TrimSpace(source) != "" {
+				sourcePath := filepath.Join(repoRoot, source)
+				if _, err := os.Stat(sourcePath); err != nil {
+					if os.IsNotExist(err) {
+						return fmt.Errorf("authorities.%s.source file not found: %s", id, source)
+					}
+					return fmt.Errorf("authorities.%s.source inspect file: %w", id, err)
+				}
+			}
+		}
+		if rawDocsPaths, ok := authority["docs"]; ok {
+			switch docsPaths := normalizeYAMLValue(rawDocsPaths).(type) {
+			case string:
+				if err := validateProjectDocsPath(docsPaths, "authorities."+id+".docs", repoRoot, false); err != nil {
+					return err
+				}
+			case []any:
+				for index, entry := range docsPaths {
+					if err := validateProjectDocsPath(entry, fmt.Sprintf("authorities.%s.docs[%d]", id, index), repoRoot, true); err != nil {
+						return err
+					}
+				}
+			default:
+				return fmt.Errorf("authorities.%s.docs must be a string or array of strings", id)
+			}
+		}
+	}
+	return nil
+}
+
+func validateProjectDocsLanguages(rawLanguages any) error {
+	if rawLanguages == nil {
+		return nil
+	}
+	languages, ok := normalizeYAMLValue(rawLanguages).(map[string]any)
+	if !ok {
+		return fmt.Errorf("languages must be a mapping")
+	}
+	if rawPrimary, ok := languages["primary"]; ok {
+		primary, ok := rawPrimary.(string)
+		if !ok || strings.TrimSpace(primary) == "" {
+			return fmt.Errorf("languages.primary must be a non-empty string")
+		}
+	}
+	for _, key := range []string{"secondary", "required"} {
+		rawList, ok := languages[key]
+		if !ok {
+			continue
+		}
+		list, ok := normalizeYAMLValue(rawList).([]any)
+		if !ok {
+			return fmt.Errorf("languages.%s must be an array of non-empty strings", key)
+		}
+		for index, rawEntry := range list {
+			entry, ok := rawEntry.(string)
+			if !ok || strings.TrimSpace(entry) == "" {
+				return fmt.Errorf("languages.%s[%d] must be a non-empty string", key, index)
+			}
+		}
+	}
+	return nil
+}
+
+func validateProjectDocsStringMap(rawMap any, label string) error {
+	if rawMap == nil {
+		return nil
+	}
+	values, ok := normalizeYAMLValue(rawMap).(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s must be a mapping", label)
+	}
+	for key := range values {
+		if strings.TrimSpace(key) == "" {
+			return fmt.Errorf("%s keys must be non-empty strings", label)
+		}
+	}
+	return nil
+}
+
+func validateProjectDocsPath(rawPath any, label string, repoRoot string, required bool) error {
+	if rawPath == nil {
+		if required {
+			return fmt.Errorf("%s must be a non-empty repo-slot-relative path", label)
+		}
+		return nil
+	}
+	path, ok := rawPath.(string)
+	if !ok || strings.TrimSpace(path) == "" {
+		return fmt.Errorf("%s must be a non-empty repo-slot-relative path", label)
+	}
+	if filepath.IsAbs(path) {
+		return fmt.Errorf("%s must be relative to the docs repo slot", label)
+	}
+	for _, part := range strings.FieldsFunc(filepath.ToSlash(path), func(r rune) bool { return r == '/' }) {
+		if part == ".." {
+			return fmt.Errorf("%s must stay inside the docs repo slot", label)
+		}
+	}
+	if repoRoot == "" {
+		return nil
+	}
+	absRepoRoot, err := filepath.Abs(repoRoot)
+	if err != nil {
+		return fmt.Errorf("resolve docs repo slot root: %w", err)
+	}
+	absPath, err := filepath.Abs(filepath.Join(absRepoRoot, path))
+	if err != nil {
+		return fmt.Errorf("%s resolve path: %w", label, err)
+	}
+	if absPath != absRepoRoot && !strings.HasPrefix(absPath, absRepoRoot+string(os.PathSeparator)) {
+		return fmt.Errorf("%s must stay inside the docs repo slot", label)
+	}
+	if _, err := os.Lstat(absPath); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("%s inspect path: %w", label, err)
+	}
+	realRoot, err := filepath.EvalSymlinks(absRepoRoot)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("resolve docs repo slot root: %w", err)
+	}
+	realPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("%s resolve path: %w", label, err)
+	}
+	if realPath != realRoot && !strings.HasPrefix(realPath, realRoot+string(os.PathSeparator)) {
+		return fmt.Errorf("%s must stay inside the docs repo slot", label)
+	}
+	return nil
+}
+
+func projectDocsMachineKey(value string) bool {
+	if strings.TrimSpace(value) == "" {
+		return false
+	}
+	return projectDocsMachineKeyPattern.MatchString(value)
 }
 
 func promptBasePhaseForAddon(phase string, basePhases map[string]any) string {

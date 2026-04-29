@@ -38,6 +38,24 @@ repos:
     role: product
     label: repo:app
 
+docs:
+  repoSlot: app
+  root: docs
+  index: docs/README.md
+  categories:
+    architecture:
+      path: docs/architecture
+      index: docs/architecture/README.md
+  languages:
+    primary: ja
+  impactPolicy:
+    defaultSeverity: warning
+  authorities:
+    openapi:
+      source: openapi.yaml
+      docs:
+        - docs/api.md
+
 agent:
   workspace_root: .work/a2o/agent/workspaces
   required_bins:
@@ -122,6 +140,37 @@ task_templates:
 複数リポジトリの親タスクには、対象リポジトリラベルをすべて付ける。「全リポジトリ」や「両方」を意味する合成ラベルは作らない。合成ラベルは 2 リポジトリを超える構成に拡張できず、リポジトリスロットと直接対応しない。
 
 `repos` は安定したリポジトリスロットを定義する。スロットキーはランタイム上の識別子である。`path` は絶対パスでない限り、パッケージディレクトリからの相対パスとする。`label` はカンバンラベルとリポジトリスロットを対応づける。省略時、実装処理は `repo:<slot>` を導出してよい。
+
+`docs` は任意である。タスクに docs-impact がある場合に、A2O が参照または更新してよいドキュメント面を宣言する。単一 repo package では `docs.repoSlot` を省略でき、その repo slot に docs path が属するとみなす。multi-repo package、または docs が専用 repository にある場合は、その repository を `repos` に宣言し、対応する slot を `docs.repoSlot` に設定する。
+
+```yaml
+docs:
+  repoSlot: docs
+  root: docs
+  index: docs/README.md
+  categories:
+    architecture:
+      path: docs/architecture
+      index: docs/architecture/README.md
+    shared_specs:
+      path: docs/shared-specs
+  languages:
+    primary: ja
+    secondary: [en]
+  policy:
+    missingRoot: create
+  impactPolicy:
+    defaultSeverity: warning
+  authorities:
+    openapi:
+      source: openapi.yaml
+      docs:
+        - docs/api.md
+```
+
+`docs.root`、`docs.index`、category path、authority source、authority docs は repo slot からの相対 path である。A2O は absolute path、`..` による escape、選択した repo slot の外へ解決される既存 symlink を拒否する。`docs.repoSlot` は `repos` に宣言された slot と一致しなければならない。category id と authority id は `architecture`、`shared_specs`、`openapi` のような空でない machine-readable key にする。
+
+authority source は OpenAPI、DB migration、生成 schema、既存の shared specification などの source of truth artifact を表す。repo slot checkout が利用できる場合、generated ではない authority source は存在していなければならない。`generated: true` は、project policy としてその source が現在の checkout 外で生成されることを意図的に認める場合だけ使う。
 
 `agent` はホスト側ワークスペース、プロダクトのツールチェーン要件、実行コマンド要件を持つ。`required_bins` は、エージェントが作業開始前に前提条件を検証できるよう宣言的に残す。
 
