@@ -153,7 +153,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o doctor")
 	fmt.Fprintln(w, "  a2o doctor prompts [--package DIR] [--config project-test.yaml]")
 	fmt.Fprintln(w, "  a2o upgrade check")
-	fmt.Fprintln(w, "  a2o prompt preview --phase PHASE [--package DIR] [--config project-test.yaml] [--repo-slot SLOT] [--task-kind child|parent|single] [--prior-review-feedback] TASK_REF")
+	fmt.Fprintln(w, "  a2o prompt preview --phase PHASE [--package DIR] [--config project-test.yaml] [--repo-slot SLOT]... [--task-kind child|parent|single] [--prior-review-feedback] TASK_REF")
 	fmt.Fprintln(w, "  a2o project bootstrap [--package DIR]")
 	fmt.Fprintln(w, "  a2o project lint [--package DIR] [--config project-test.yaml]")
 	fmt.Fprintln(w, "  a2o project validate [--package DIR] [--config project-test.yaml]")
