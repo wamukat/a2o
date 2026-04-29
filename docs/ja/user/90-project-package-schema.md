@@ -294,7 +294,7 @@ a2o prompt preview --phase review A2O#123
 a2o prompt preview --phase decomposition --repo-slot app A2O#123
 ```
 
-preview は Kanban state を変更せず、A2O core instruction、project system prompt、phase prompt、phase skill、repo-slot addon、ticket phase instruction、task/runtime data、最終的な composed instruction を layer ごとに表示する。`parent_review` を見る場合は `--task-kind parent`、`implementation_rework` を見る場合は `--prior-review-feedback` を指定する。
+preview は Kanban state を変更せず、選択した phase に適用される A2O core instruction、project system prompt、phase prompt、phase skill、repo-slot addon、ticket phase instruction、task/runtime data、最終的な composed instruction を layer ごとに表示する。`parent_review` を見る場合は `--task-kind parent`、`implementation_rework` を見る場合は `--prior-review-feedback` を指定する。
 
 worker を実行せず、Kanban state も変更せずに prompt config を診断するには次を使う。
 

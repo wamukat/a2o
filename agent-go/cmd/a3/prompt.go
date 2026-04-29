@@ -206,13 +206,15 @@ func promptProfileForPreview(phase string, taskKind string, priorReviewFeedback 
 
 func buildPromptPreviewLayers(context promptCommandContext, profile string, runtimePhase string, repoSlot string, taskRef string, taskKind string, priorReviewFeedback bool) ([]promptLayerPreview, error) {
 	layers := []promptLayerPreview{}
-	coreSkill := coreSkillForPromptPreview(context.config, runtimePhase)
-	layers = append(layers, promptLayerPreview{
-		Kind:    "a2o_core_instruction",
-		Title:   "A2O core instruction",
-		Content: coreSkill,
-		Detail:  coreSkillDetail(runtimePhase),
-	})
+	if promptPreviewHasCoreInstruction(runtimePhase) {
+		coreSkill := coreSkillForPromptPreview(context.config, runtimePhase, profile)
+		layers = append(layers, promptLayerPreview{
+			Kind:    "a2o_core_instruction",
+			Title:   "A2O core instruction",
+			Content: coreSkill,
+			Detail:  coreSkillDetail(runtimePhase, profile),
+		})
+	}
 	prompts := context.config.Runtime.Prompts
 	if strings.TrimSpace(prompts.System.File) != "" {
 		layer, err := readPromptLayer(context.packagePath, "project_system_prompt", prompts.System.File)
@@ -260,45 +262,57 @@ func buildPromptPreviewLayers(context promptCommandContext, profile string, runt
 			Detail: "available=" + strings.Join(slots, ",") + " action=rerun with --repo-slot SLOT to preview slot-specific addons",
 		})
 	}
+	if promptPreviewHasTicketInstruction(runtimePhase) {
+		layers = append(layers, promptLayerPreview{
+			Kind:    "ticket_phase_instruction",
+			Title:   "ticket " + taskRef,
+			Content: "Task: " + taskRef,
+			Detail:  fmt.Sprintf("task_kind=%s phase=%s profile=%s prior_review_feedback=%t", strings.TrimSpace(taskKind), strings.TrimSpace(runtimePhase), profile, priorReviewFeedback),
+		})
+	}
 	layers = append(layers, promptLayerPreview{
-		Kind:    "ticket_phase_instruction",
-		Title:   "ticket " + taskRef,
-		Content: "Task: " + taskRef,
-		Detail:  fmt.Sprintf("task_kind=%s phase=%s profile=%s prior_review_feedback=%t", strings.TrimSpace(taskKind), strings.TrimSpace(runtimePhase), profile, priorReviewFeedback),
-	})
-	layers = append(layers, promptLayerPreview{
-		Kind:   "task_runtime_data",
-		Title:  "runtime task data",
-		Detail: "preview only; workers are not executed and Kanban state is not mutated",
+		Kind:    "task_runtime_data",
+		Title:   "runtime task data",
+		Content: fmt.Sprintf("task_ref=%s\ntask_kind=%s\nphase=%s\nprofile=%s\nprior_review_feedback=%t", taskRef, strings.TrimSpace(taskKind), strings.TrimSpace(runtimePhase), profile, priorReviewFeedback),
+		Detail:  "preview only; not included in composed instruction; workers are not executed and Kanban state is not mutated",
 	})
 	return layers, nil
 }
 
-func coreSkillPhase(runtimePhase string) string {
+func promptPreviewHasCoreInstruction(runtimePhase string) bool {
+	return runtimePhase == "implementation" || runtimePhase == "review"
+}
+
+func promptPreviewHasTicketInstruction(runtimePhase string) bool {
+	return runtimePhase == "implementation" || runtimePhase == "review"
+}
+
+func coreSkillPhase(runtimePhase string, profile string) string {
+	if profile == "parent_review" {
+		return "parent_review"
+	}
 	if runtimePhase == "review" {
 		return "review"
 	}
 	return "implementation"
 }
 
-func coreSkillDetail(runtimePhase string) string {
-	switch runtimePhase {
-	case "implementation", "review":
-		return "source=runtime.phases." + coreSkillPhase(runtimePhase) + ".skill"
-	case "decomposition":
-		return "source=runtime.decomposition author command contract"
+func coreSkillDetail(runtimePhase string, profile string) string {
+	switch {
+	case profile == "parent_review":
+		return "source=runtime.phases.parent_review.skill"
+	case runtimePhase == "implementation" || runtimePhase == "review":
+		return "source=runtime.phases." + coreSkillPhase(runtimePhase, profile) + ".skill"
 	default:
 		return "source=runtime phase command contract"
 	}
 }
 
-func coreSkillForPromptPreview(config projectPromptYAML, runtimePhase string) string {
-	switch runtimePhase {
-	case "implementation", "review":
-	default:
-		return "A2O " + strings.TrimSpace(runtimePhase) + " command contract"
+func coreSkillForPromptPreview(config projectPromptYAML, runtimePhase string, profile string) string {
+	if !promptPreviewHasCoreInstruction(runtimePhase) {
+		return ""
 	}
-	phase := coreSkillPhase(runtimePhase)
+	phase := coreSkillPhase(runtimePhase, profile)
 	rawSkill := config.Runtime.Phases[phase].Skill
 	switch value := rawSkill.(type) {
 	case string:
@@ -345,6 +359,9 @@ func promptPhaseLayers(packagePath string, prefix string, templateKind string, p
 func composedPromptPreview(layers []promptLayerPreview) string {
 	sections := []string{}
 	for _, layer := range layers {
+		if layer.Kind == "task_runtime_data" {
+			continue
+		}
 		sections = append(sections, fmt.Sprintf("## %s\n%s", layer.Title, strings.TrimRight(layer.Content, "\n")))
 	}
 	return strings.Join(sections, "\n\n")
@@ -409,6 +426,11 @@ func runDoctorPrompts(args []string, stdout io.Writer, stderr io.Writer) int {
 			detail = "empty phase prompt profile"
 		}
 		report("phase."+phase, true, detail, "none")
+	}
+	if _, hasRework := prompts.Phases["implementation_rework"]; !hasRework {
+		if _, hasImplementation := prompts.Phases["implementation"]; hasImplementation {
+			report("phase.implementation_rework", true, "fallback=implementation", "none")
+		}
 	}
 	slotNames := make([]string, 0, len(prompts.RepoSlots))
 	for slot := range prompts.RepoSlots {

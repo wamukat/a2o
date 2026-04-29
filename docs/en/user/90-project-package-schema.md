@@ -289,7 +289,7 @@ a2o prompt preview --phase review A2O#123
 a2o prompt preview --phase decomposition --repo-slot app A2O#123
 ```
 
-The preview prints each non-mutating layer, including A2O core instruction, project system prompt, phase prompt, phase skills, repo-slot addons, ticket phase instruction, task/runtime data, and the final composed instruction. Use `--task-kind parent` to preview `parent_review`, and `--prior-review-feedback` to preview `implementation_rework`.
+The preview prints each non-mutating layer, including A2O core instruction, project system prompt, phase prompt, phase skills, repo-slot addons, ticket phase instruction, task/runtime data, and the final composed instruction when those layers apply to the selected phase. Use `--task-kind parent` to preview `parent_review`, and `--prior-review-feedback` to preview `implementation_rework`.
 
 Validate prompt configuration without running workers or changing Kanban state with:
 

@@ -4780,21 +4780,91 @@ func TestPromptPreviewShowsPromptLayersWithoutMutatingTask(t *testing.T) {
 	output := stdout.String()
 	for _, want := range []string{
 		"prompt_preview task_ref=A2O#123 phase=decomposition profile=decomposition",
-		"kind=a2o_core_instruction",
 		"kind=project_system_prompt",
 		"kind=project_phase_prompt",
 		"kind=project_phase_skill",
 		"kind=decomposition_child_draft_template",
 		"kind=repo_slot_phase_prompt",
 		"kind=repo_slot_decomposition_child_draft_template",
-		"kind=ticket_phase_instruction",
-		"Task: A2O#123",
 		"kind=task_runtime_data",
+		"task_ref=A2O#123",
 		"--- prompt_composed_instruction ---",
 		"prompt_preview_status=ok mutation=none",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("prompt preview missing %q in:\n%s", want, output)
+		}
+	}
+}
+
+func TestPromptPreviewUsesParentReviewCoreSkill(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(filepath.Join(packageDir, "prompts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    phases:
+      parent_review:
+        prompt: prompts/parent-review.md
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - worker
+    parent_review:
+      skill: skills/review/parent.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "prompts", "parent-review.md"), []byte("parent review guidance"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{
+		"prompt", "preview",
+		"--package", packageDir,
+		"--phase", "review",
+		"--task-kind", "parent",
+		"A2O#123",
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("parent review prompt preview should pass, code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		"prompt_preview task_ref=A2O#123 phase=review profile=parent_review",
+		"detail=source=runtime.phases.parent_review.skill",
+		"skills/review/parent.md",
+		"kind=project_phase_prompt",
+		"kind=ticket_phase_instruction",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("parent review prompt preview missing %q in:\n%s", want, output)
 		}
 	}
 }
