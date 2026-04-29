@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
 )
@@ -111,7 +112,7 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	if err := rejectLegacyPhaseWorkspaceHook(runtimePayload); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.phases: %w", projectFile, err)
 	}
-	if err := validateProjectPromptsConfig(runtimePayload); err != nil {
+	if err := validateProjectPromptsConfig(runtimePayload, packagePath); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.prompts: %w", projectFile, err)
 	}
 	executor, err := buildProjectExecutorConfig(payload.Runtime.Phases)
@@ -252,7 +253,7 @@ func rejectLegacyPhaseWorkspaceHook(runtimePayload map[string]any) error {
 	return nil
 }
 
-func validateProjectPromptsConfig(runtimePayload map[string]any) error {
+func validateProjectPromptsConfig(runtimePayload map[string]any, packagePath string) error {
 	rawPrompts, ok := runtimePayload["prompts"]
 	if !ok {
 		return nil
@@ -266,11 +267,11 @@ func validateProjectPromptsConfig(runtimePayload map[string]any) error {
 		if !ok {
 			return fmt.Errorf("system must be a mapping")
 		}
-		if err := validatePromptPath(system["file"], "system.file", true); err != nil {
+		if err := validatePromptPath(system["file"], "system.file", packagePath, true); err != nil {
 			return err
 		}
 	}
-	if err := validatePromptPhaseMapping(prompts["phases"], "phases"); err != nil {
+	if err := validatePromptPhaseMapping(prompts["phases"], "phases", packagePath); err != nil {
 		return err
 	}
 	if rawRepoSlots, ok := prompts["repoSlots"]; ok {
@@ -286,7 +287,7 @@ func validateProjectPromptsConfig(runtimePayload map[string]any) error {
 			if !ok {
 				return fmt.Errorf("repoSlots.%s must be a mapping", slot)
 			}
-			if err := validatePromptPhaseMapping(slotConfig["phases"], "repoSlots."+slot+".phases"); err != nil {
+			if err := validatePromptPhaseMapping(slotConfig["phases"], "repoSlots."+slot+".phases", packagePath); err != nil {
 				return err
 			}
 		}
@@ -294,7 +295,7 @@ func validateProjectPromptsConfig(runtimePayload map[string]any) error {
 	return nil
 }
 
-func validatePromptPhaseMapping(rawPhases any, label string) error {
+func validatePromptPhaseMapping(rawPhases any, label string, packagePath string) error {
 	if rawPhases == nil {
 		return nil
 	}
@@ -310,20 +311,20 @@ func validatePromptPhaseMapping(rawPhases any, label string) error {
 		if !ok {
 			return fmt.Errorf("%s.%s must be a mapping", label, phase)
 		}
-		if err := validatePromptPath(phaseConfig["prompt"], label+"."+phase+".prompt", false); err != nil {
+		if err := validatePromptPath(phaseConfig["prompt"], label+"."+phase+".prompt", packagePath, false); err != nil {
 			return err
 		}
-		if err := validatePromptStringList(phaseConfig["skills"], label+"."+phase+".skills"); err != nil {
+		if err := validatePromptStringList(phaseConfig["skills"], label+"."+phase+".skills", packagePath); err != nil {
 			return err
 		}
-		if err := validatePromptPath(phaseConfig["childDraftTemplate"], label+"."+phase+".childDraftTemplate", false); err != nil {
+		if err := validatePromptPath(phaseConfig["childDraftTemplate"], label+"."+phase+".childDraftTemplate", packagePath, false); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func validatePromptPath(rawPath any, label string, required bool) error {
+func validatePromptPath(rawPath any, label string, packagePath string, required bool) error {
 	if rawPath == nil {
 		if required {
 			return fmt.Errorf("%s must be a non-empty string", label)
@@ -334,10 +335,55 @@ func validatePromptPath(rawPath any, label string, required bool) error {
 	if !ok || strings.TrimSpace(path) == "" {
 		return fmt.Errorf("%s must be a non-empty string", label)
 	}
+	if filepath.IsAbs(path) {
+		return fmt.Errorf("%s must be relative to the project package root", label)
+	}
+	root, err := filepath.Abs(packagePath)
+	if err != nil {
+		return fmt.Errorf("resolve project package root: %w", err)
+	}
+	absPath, err := filepath.Abs(filepath.Join(root, path))
+	if err != nil {
+		return fmt.Errorf("%s resolve path: %w", label, err)
+	}
+	if absPath != root && !strings.HasPrefix(absPath, root+string(os.PathSeparator)) {
+		return fmt.Errorf("%s must stay inside the project package root", label)
+	}
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return fmt.Errorf("resolve project package root: %w", err)
+	}
+	realPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%s file not found: %s", label, path)
+		}
+		return fmt.Errorf("%s resolve file: %w", label, err)
+	}
+	if realPath != realRoot && !strings.HasPrefix(realPath, realRoot+string(os.PathSeparator)) {
+		return fmt.Errorf("%s must stay inside the project package root", label)
+	}
+	info, err := os.Stat(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%s file not found: %s", label, path)
+		}
+		return fmt.Errorf("%s inspect file: %w", label, err)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("%s must reference a file: %s", label, path)
+	}
+	body, err := os.ReadFile(absPath)
+	if err != nil {
+		return fmt.Errorf("%s read file: %w", label, err)
+	}
+	if !utf8.Valid(body) {
+		return fmt.Errorf("%s must be UTF-8 text: %s", label, path)
+	}
 	return nil
 }
 
-func validatePromptStringList(rawList any, label string) error {
+func validatePromptStringList(rawList any, label string, packagePath string) error {
 	if rawList == nil {
 		return nil
 	}
@@ -349,6 +395,9 @@ func validatePromptStringList(rawList any, label string) error {
 		entry, ok := rawEntry.(string)
 		if !ok || strings.TrimSpace(entry) == "" {
 			return fmt.Errorf("%s[%d] must be a non-empty string", label, index)
+		}
+		if err := validatePromptPath(entry, fmt.Sprintf("%s[%d]", label, index), packagePath, true); err != nil {
+			return err
 		}
 	}
 	return nil

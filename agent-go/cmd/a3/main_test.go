@@ -4347,6 +4347,23 @@ runtime:
 	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	for path, content := range map[string]string{
+		"prompts/system.md":                       "system guidance",
+		"prompts/implementation.md":               "implementation guidance",
+		"skills/testing-policy.md":                "testing policy",
+		"prompts/implementation-rework.md":        "rework guidance",
+		"prompts/decomposition.md":                "decomposition guidance",
+		"prompts/decomposition-child-template.md": "child template",
+		"skills/app-review.md":                    "app review skill",
+	} {
+		target := filepath.Join(packageDir, path)
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -4356,6 +4373,148 @@ runtime:
 	}
 	if !strings.Contains(stdout.String(), "lint_status=ok") {
 		t.Fatalf("project validate should report ok, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateRejectsMissingRuntimePromptFile(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    phases:
+      implementation:
+        prompt: prompts/missing.md
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject missing runtime prompt file, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "invalid runtime.prompts") ||
+		!strings.Contains(stdout.String(), "phases.implementation.prompt file not found: prompts/missing.md") {
+		t.Fatalf("project validate should reject missing runtime prompt file, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateRejectsRuntimePromptPathOutsidePackage(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    phases:
+      implementation:
+        prompt: ../outside.md
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject outside runtime prompt path, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "invalid runtime.prompts") ||
+		!strings.Contains(stdout.String(), "phases.implementation.prompt must stay inside the project package root") {
+		t.Fatalf("project validate should reject outside runtime prompt path, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateRejectsRuntimePromptSymlinkOutsidePackage(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(filepath.Join(packageDir, "prompts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outsidePath := filepath.Join(tempDir, "outside.md")
+	if err := os.WriteFile(outsidePath, []byte("outside"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outsidePath, filepath.Join(packageDir, "prompts", "escape.md")); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    phases:
+      implementation:
+        prompt: prompts/escape.md
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject outside runtime prompt symlink, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "invalid runtime.prompts") ||
+		!strings.Contains(stdout.String(), "phases.implementation.prompt must stay inside the project package root") {
+		t.Fatalf("project validate should reject outside runtime prompt symlink, stdout=%s stderr=%s", stdout.String(), stderr.String())
 	}
 }
 

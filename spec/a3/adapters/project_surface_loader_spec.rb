@@ -151,12 +151,25 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
         }
       }
     )
+    write_project_files(
+      "prompts/system.md" => "system guidance",
+      "prompts/implementation.md" => "implementation guidance",
+      "skills/testing-policy.md" => "test policy",
+      "prompts/implementation-rework.md" => "rework guidance",
+      "prompts/decomposition.md" => "decomposition guidance",
+      "prompts/decomposition-child-template.md" => "child template",
+      "prompts/app-review.md" => "app review prompt",
+      "skills/app-review.md" => "app review skill"
+    )
 
     prompt_config = loader.load(project_config_path).prompt_config
 
     expect(prompt_config.system_file).to eq("prompts/system.md")
+    expect(prompt_config.system_document.content).to eq("system guidance")
     expect(prompt_config.phase(:implementation).prompt_file).to eq("prompts/implementation.md")
+    expect(prompt_config.phase(:implementation).prompt_document.content).to eq("implementation guidance")
     expect(prompt_config.phase(:implementation).skill_files).to eq(["skills/testing-policy.md"])
+    expect(prompt_config.phase(:implementation).skill_documents.map(&:content)).to eq(["test policy"])
     expect(prompt_config.phase(:implementation_rework).prompt_file).to eq("prompts/implementation-rework.md")
     expect(prompt_config.phase(:decomposition).child_draft_template_file).to eq("prompts/decomposition-child-template.md")
     expect(prompt_config.repo_slot_phase(:app, :implementation).prompt_file).to eq("prompts/implementation.md")
@@ -187,6 +200,10 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
           }
         }
       }
+    )
+    write_project_files(
+      "prompts/implementation.md" => "implementation guidance",
+      "skills/testing-policy.md" => "test policy"
     )
 
     rework_config = loader.load(project_config_path).prompt_config.phase(:implementation_rework)
@@ -226,12 +243,20 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
         }
       }
     )
+    write_project_files(
+      "prompts/review.md" => "review guidance",
+      "skills/base-review.md" => "base review skill",
+      "prompts/app-review.md" => "app review guidance",
+      "skills/app-review.md" => "app review skill"
+    )
 
     review_config = loader.load(project_config_path).prompt_config.repo_slot_phase(:app, :review)
 
     expect(review_config.prompt_file).to eq("prompts/app-review.md")
     expect(review_config.prompt_files).to eq(["prompts/review.md", "prompts/app-review.md"])
+    expect(review_config.prompt_documents.map(&:content)).to eq(["review guidance", "app review guidance"])
     expect(review_config.skill_files).to eq(["skills/base-review.md", "skills/app-review.md"])
+    expect(review_config.skill_documents.map(&:content)).to eq(["base review skill", "app review skill"])
   end
 
   it "uses an empty prompt config when runtime.prompts is absent" do
@@ -274,6 +299,111 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
 
     expect { loader.load(project_config_path) }
       .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.phases.implementation.skills[1] must be a non-empty string")
+  end
+
+  it "rejects missing prompt files" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "phases" => {
+            "implementation" => {
+              "prompt" => "prompts/missing.md"
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.phases.implementation.prompt file not found: prompts/missing.md")
+  end
+
+  it "rejects prompt paths outside the project package root" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "phases" => {
+            "implementation" => {
+              "prompt" => "../outside.md"
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.phases.implementation.prompt must stay inside the project package root")
+  end
+
+  it "rejects prompt symlinks that resolve outside the project package root" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "phases" => {
+            "implementation" => {
+              "prompt" => "prompts/escape.md"
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+    outside_path = File.join(File.dirname(@tmpdir), "outside-prompt.md")
+    File.write(outside_path, "outside")
+    FileUtils.mkdir_p(File.join(@tmpdir, "prompts"))
+    File.symlink(outside_path, File.join(@tmpdir, "prompts", "escape.md"))
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.phases.implementation.prompt must stay inside the project package root")
+  end
+
+  it "rejects prompt directories" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "phases" => {
+            "implementation" => {
+              "prompt" => "prompts"
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+    FileUtils.mkdir_p(File.join(@tmpdir, "prompts"))
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.phases.implementation.prompt must reference a file: prompts")
   end
 
   it "maps parent_review phase skill to the parent review runtime variant" do
@@ -495,5 +625,13 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     path = File.join(@tmpdir, "project.yaml")
     File.write(path, YAML.dump({ "schema_version" => 1 }.merge(payload)))
     path
+  end
+
+  def write_project_files(files)
+    files.each do |relative_path, content|
+      path = File.join(@tmpdir, relative_path)
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, content)
+    end
   end
 end

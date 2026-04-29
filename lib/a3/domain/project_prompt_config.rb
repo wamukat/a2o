@@ -3,15 +3,36 @@
 module A3
   module Domain
     class ProjectPromptConfig
-      PhaseConfig = Struct.new(:prompt_file, :prompt_files, :skill_files, :child_draft_template_file, keyword_init: true) do
-        def initialize(prompt_file: nil, prompt_files: nil, skill_files: [], child_draft_template_file: nil)
-          ordered_prompt_files = prompt_files || Array(prompt_file).compact
-          super(
-            prompt_file: prompt_file&.freeze,
-            prompt_files: ordered_prompt_files.map(&:freeze).freeze,
-            skill_files: skill_files.map(&:freeze).freeze,
-            child_draft_template_file: child_draft_template_file&.freeze
-          )
+      class Document
+        attr_reader :path, :absolute_path, :content
+
+        def initialize(path:, absolute_path:, content:)
+          @path = path.freeze
+          @absolute_path = absolute_path.freeze
+          @content = content.freeze
+          freeze
+        end
+      end
+
+      class PhaseConfig
+        attr_reader :prompt_file, :prompt_files, :prompt_document, :prompt_documents,
+                    :skill_files, :skill_documents, :child_draft_template_file,
+                    :child_draft_template_document
+
+        def initialize(prompt_file: nil, prompt_files: nil, prompt_document: nil, prompt_documents: nil, skill_files: nil, skill_documents: [], child_draft_template_file: nil, child_draft_template_document: nil)
+          prompt_file ||= prompt_document&.path
+          ordered_prompt_documents = prompt_documents || Array(prompt_document).compact
+          ordered_prompt_files = prompt_files || ordered_prompt_documents.map(&:path)
+          skill_files ||= skill_documents.map(&:path)
+          child_draft_template_file ||= child_draft_template_document&.path
+          @prompt_file = prompt_file&.freeze
+          @prompt_files = ordered_prompt_files.map(&:freeze).freeze
+          @prompt_document = prompt_document
+          @prompt_documents = ordered_prompt_documents.freeze
+          @skill_files = skill_files.map(&:freeze).freeze
+          @skill_documents = skill_documents.freeze
+          @child_draft_template_file = child_draft_template_file&.freeze
+          @child_draft_template_document = child_draft_template_document
           freeze
         end
 
@@ -31,16 +52,21 @@ module A3
           self.class.new(
             prompt_file: addon.prompt_file || prompt_file,
             prompt_files: prompt_files + addon.prompt_files,
+            prompt_document: addon.prompt_document || prompt_document,
+            prompt_documents: prompt_documents + addon.prompt_documents,
             skill_files: skill_files + addon.skill_files,
-            child_draft_template_file: addon.child_draft_template_file || child_draft_template_file
+            skill_documents: skill_documents + addon.skill_documents,
+            child_draft_template_file: addon.child_draft_template_file || child_draft_template_file,
+            child_draft_template_document: addon.child_draft_template_document || child_draft_template_document
           )
         end
       end
 
-      attr_reader :system_file, :phases, :repo_slots
+      attr_reader :system_file, :system_document, :phases, :repo_slots
 
-      def initialize(system_file: nil, phases: {}, repo_slots: {})
-        @system_file = system_file&.freeze
+      def initialize(system_file: nil, system_document: nil, phases: {}, repo_slots: {})
+        @system_document = system_document
+        @system_file = (system_file || system_document&.path)&.freeze
         @phases = freeze_phase_mapping(phases)
         @repo_slots = repo_slots.each_with_object({}) do |(slot, slot_phases), frozen_slots|
           frozen_slots[slot.to_s.freeze] = freeze_phase_mapping(slot_phases)

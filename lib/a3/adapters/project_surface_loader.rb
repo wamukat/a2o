@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "yaml"
+require "pathname"
 
 module A3
   module Adapters
@@ -11,6 +12,7 @@ module A3
 
       def load(manifest_path)
         project_config = load_project_config(manifest_path)
+        project_package_root = File.dirname(File.expand_path(manifest_path))
         runtime = project_config.fetch("runtime") do
           raise A3::Domain::ConfigurationError, "project.yaml runtime must be provided"
         end
@@ -49,7 +51,7 @@ module A3
           decomposition_investigate_command: decomposition_command(runtime, "investigate"),
           decomposition_author_command: decomposition_command(runtime, "author"),
           decomposition_review_commands: decomposition_review_commands(runtime),
-          prompt_config: prompt_config(runtime)
+          prompt_config: prompt_config(runtime, project_package_root)
         )
       end
 
@@ -141,7 +143,7 @@ module A3
         end
       end
 
-      def prompt_config(runtime)
+      def prompt_config(runtime, project_package_root)
         prompts = runtime.fetch("prompts", nil)
         return A3::Domain::ProjectPromptConfig.empty unless prompts
         unless prompts.is_a?(Hash)
@@ -149,23 +151,23 @@ module A3
         end
 
         A3::Domain::ProjectPromptConfig.new(
-          system_file: system_prompt_file(prompts),
-          phases: prompt_phase_mapping(prompts.fetch("phases", {}), "runtime.prompts.phases"),
-          repo_slots: prompt_repo_slots(prompts.fetch("repoSlots", {}))
+          system_document: system_prompt_document(prompts, project_package_root),
+          phases: prompt_phase_mapping(prompts.fetch("phases", {}), "runtime.prompts.phases", project_package_root),
+          repo_slots: prompt_repo_slots(prompts.fetch("repoSlots", {}), project_package_root)
         )
       end
 
-      def system_prompt_file(prompts)
+      def system_prompt_document(prompts, project_package_root)
         system = prompts.fetch("system", nil)
         return nil unless system
         unless system.is_a?(Hash)
           raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.system must be a mapping"
         end
 
-        prompt_path(system.fetch("file", nil), "runtime.prompts.system.file", required: true)
+        prompt_document(system.fetch("file", nil), "runtime.prompts.system.file", project_package_root, required: true)
       end
 
-      def prompt_repo_slots(repo_slots)
+      def prompt_repo_slots(repo_slots, project_package_root)
         unless repo_slots.is_a?(Hash)
           raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots must be a mapping"
         end
@@ -179,12 +181,13 @@ module A3
           end
           mapping[slot] = prompt_phase_mapping(
             config.fetch("phases", {}),
-            "runtime.prompts.repoSlots.#{slot}.phases"
+            "runtime.prompts.repoSlots.#{slot}.phases",
+            project_package_root
           )
         end
       end
 
-      def prompt_phase_mapping(phases, location)
+      def prompt_phase_mapping(phases, location, project_package_root)
         unless phases.is_a?(Hash)
           raise A3::Domain::ConfigurationError, "project.yaml #{location} must be a mapping"
         end
@@ -198,14 +201,14 @@ module A3
           end
 
           mapping[phase] = A3::Domain::ProjectPromptConfig::PhaseConfig.new(
-            prompt_file: prompt_path(config.fetch("prompt", nil), "#{location}.#{phase}.prompt"),
-            skill_files: prompt_skill_files(config.fetch("skills", []), "#{location}.#{phase}.skills"),
-            child_draft_template_file: prompt_path(config.fetch("childDraftTemplate", nil), "#{location}.#{phase}.childDraftTemplate")
+            prompt_document: prompt_document(config.fetch("prompt", nil), "#{location}.#{phase}.prompt", project_package_root),
+            skill_documents: prompt_skill_documents(config.fetch("skills", []), "#{location}.#{phase}.skills", project_package_root),
+            child_draft_template_document: prompt_document(config.fetch("childDraftTemplate", nil), "#{location}.#{phase}.childDraftTemplate", project_package_root)
           )
         end
       end
 
-      def prompt_path(value, location, required: false)
+      def prompt_document(value, location, project_package_root, required: false)
         if value.nil?
           raise A3::Domain::ConfigurationError, "project.yaml #{location} must be a non-empty string" if required
 
@@ -215,10 +218,10 @@ module A3
           raise A3::Domain::ConfigurationError, "project.yaml #{location} must be a non-empty string"
         end
 
-        value
+        load_prompt_document(value, location, project_package_root)
       end
 
-      def prompt_skill_files(value, location)
+      def prompt_skill_documents(value, location, project_package_root)
         unless value.is_a?(Array)
           raise A3::Domain::ConfigurationError, "project.yaml #{location} must be an array of non-empty strings"
         end
@@ -227,8 +230,41 @@ module A3
             raise A3::Domain::ConfigurationError, "project.yaml #{location}[#{index}] must be a non-empty string"
           end
         end
+        value.each_with_index.map do |entry, index|
+          load_prompt_document(entry, "#{location}[#{index}]", project_package_root)
+        end
+      end
 
-        value
+      def load_prompt_document(path, location, project_package_root)
+        if Pathname.new(path).absolute?
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must be relative to the project package root"
+        end
+        root = File.expand_path(project_package_root)
+        absolute_path = File.expand_path(path, root)
+        unless absolute_path == root || absolute_path.start_with?("#{root}#{File::SEPARATOR}")
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must stay inside the project package root"
+        end
+        unless File.exist?(absolute_path)
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} file not found: #{path}"
+        end
+        real_root = File.realpath(root)
+        real_path = File.realpath(absolute_path)
+        unless real_path == real_root || real_path.start_with?("#{real_root}#{File::SEPARATOR}")
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must stay inside the project package root"
+        end
+        unless File.file?(absolute_path)
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must reference a file: #{path}"
+        end
+        content = File.read(absolute_path, mode: "r:UTF-8")
+        unless content.valid_encoding?
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must be UTF-8 text: #{path}"
+        end
+
+        A3::Domain::ProjectPromptConfig::Document.new(
+          path: path,
+          absolute_path: absolute_path,
+          content: content
+        )
       end
 
       def decomposition_command(runtime, name)
