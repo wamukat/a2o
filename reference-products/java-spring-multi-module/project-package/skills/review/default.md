@@ -10,4 +10,3 @@ Flag findings when:
 - The change adds non-deterministic external runtime dependencies.
 
 Treat a clean review as eligible for verification.
-

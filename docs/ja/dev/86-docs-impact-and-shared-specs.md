@@ -188,8 +188,6 @@ audience:
 status: active
 related_requirements:
   - A2O#371
-source_issues:
-  - GH#52
 related_tickets:
   - A2O#372
   - A2O#374

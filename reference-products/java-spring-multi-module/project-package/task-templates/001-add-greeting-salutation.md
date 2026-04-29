@@ -15,4 +15,3 @@ formatting instead of duplicating formatting logic in the controller.
 - `utility-lib` exposes the formatting behavior.
 - `web-app` has an endpoint that returns the new greeting shape.
 - Maven tests pass for the whole reactor.
-

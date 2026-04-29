@@ -18,4 +18,3 @@ class GreetingController {
         return Map.of("status", "ok");
     }
 }
-

@@ -16,4 +16,3 @@ public final class GreetingFormatter {
         return name.trim();
     }
 }
-

@@ -16,4 +16,3 @@ mvn test
 mvn -pl web-app spring-boot:run
 curl http://127.0.0.1:8080/greetings/A2O
 ```
-

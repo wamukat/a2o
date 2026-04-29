@@ -15,4 +15,3 @@ class GreetingFormatterTest {
         assertThat(GreetingFormatter.formatGreeting("   ")).isEqualTo("Hello, A2O!");
     }
 }
-

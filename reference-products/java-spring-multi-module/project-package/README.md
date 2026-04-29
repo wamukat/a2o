@@ -6,4 +6,3 @@ It is for A2O engine development only and uses the isolated Kanbalone project
 
 Use `tools/dev_sample/README.md` from the repository root to start the isolated
 Kanbalone instance and run the development engine.
-
