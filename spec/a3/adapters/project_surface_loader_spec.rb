@@ -110,6 +110,172 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
       .to raise_error(A3::Domain::ConfigurationError, /runtime\.notifications\.hooks\[0\]\.command/)
   end
 
+  it "loads project prompt and skill configuration schema" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "system" => {
+            "file" => "prompts/system.md"
+          },
+          "phases" => {
+            "implementation" => {
+              "prompt" => "prompts/implementation.md",
+              "skills" => ["skills/testing-policy.md"]
+            },
+            "implementation_rework" => {
+              "prompt" => "prompts/implementation-rework.md"
+            },
+            "decomposition" => {
+              "prompt" => "prompts/decomposition.md",
+              "childDraftTemplate" => "prompts/decomposition-child-template.md"
+            }
+          },
+          "repoSlots" => {
+            "app" => {
+              "phases" => {
+                "review" => {
+                  "prompt" => "prompts/app-review.md",
+                  "skills" => ["skills/app-review.md"]
+                }
+              }
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    prompt_config = loader.load(project_config_path).prompt_config
+
+    expect(prompt_config.system_file).to eq("prompts/system.md")
+    expect(prompt_config.phase(:implementation).prompt_file).to eq("prompts/implementation.md")
+    expect(prompt_config.phase(:implementation).skill_files).to eq(["skills/testing-policy.md"])
+    expect(prompt_config.phase(:implementation_rework).prompt_file).to eq("prompts/implementation-rework.md")
+    expect(prompt_config.phase(:decomposition).child_draft_template_file).to eq("prompts/decomposition-child-template.md")
+    expect(prompt_config.repo_slot_phase(:app, :implementation).prompt_file).to eq("prompts/implementation.md")
+    expect(prompt_config.repo_slot_phase(:app, :implementation).skill_files).to eq(["skills/testing-policy.md"])
+    expect(prompt_config.repo_slot_phase(:app, :review).skill_files).to eq(["skills/app-review.md"])
+    expect(prompt_config.persisted_form).to include(
+      "system" => { "file" => "prompts/system.md" }
+    )
+  end
+
+  it "falls back implementation_rework to implementation when no rework profile is configured" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "phases" => {
+            "implementation" => {
+              "prompt" => "prompts/implementation.md",
+              "skills" => ["skills/testing-policy.md"]
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    rework_config = loader.load(project_config_path).prompt_config.phase(:implementation_rework)
+
+    expect(rework_config.prompt_file).to eq("prompts/implementation.md")
+    expect(rework_config.skill_files).to eq(["skills/testing-policy.md"])
+  end
+
+  it "resolves repo-slot prompt config as an additive layer over phase defaults" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "phases" => {
+            "review" => {
+              "prompt" => "prompts/review.md",
+              "skills" => ["skills/base-review.md"]
+            }
+          },
+          "repoSlots" => {
+            "app" => {
+              "phases" => {
+                "review" => {
+                  "prompt" => "prompts/app-review.md",
+                  "skills" => ["skills/app-review.md"]
+                }
+              }
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    review_config = loader.load(project_config_path).prompt_config.repo_slot_phase(:app, :review)
+
+    expect(review_config.prompt_file).to eq("prompts/app-review.md")
+    expect(review_config.prompt_files).to eq(["prompts/review.md", "prompts/app-review.md"])
+    expect(review_config.skill_files).to eq(["skills/base-review.md", "skills/app-review.md"])
+  end
+
+  it "uses an empty prompt config when runtime.prompts is absent" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect(loader.load(project_config_path).prompt_config).to be_empty
+  end
+
+  it "rejects malformed prompt configuration shapes" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "phases" => {
+            "implementation" => {
+              "skills" => ["skills/testing-policy.md", ""]
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.phases.implementation.skills[1] must be a non-empty string")
+  end
+
   it "maps parent_review phase skill to the parent review runtime variant" do
     project_config_path = write_project_config(
       "runtime" => {

@@ -48,7 +48,8 @@ module A3
           workspace_hook: nil,
           decomposition_investigate_command: decomposition_command(runtime, "investigate"),
           decomposition_author_command: decomposition_command(runtime, "author"),
-          decomposition_review_commands: decomposition_review_commands(runtime)
+          decomposition_review_commands: decomposition_review_commands(runtime),
+          prompt_config: prompt_config(runtime)
         )
       end
 
@@ -138,6 +139,96 @@ module A3
           raise A3::Domain::ConfigurationError,
                 "project.yaml runtime.phases.#{name}.workspace_hook is no longer supported; use phase commands or project package commands"
         end
+      end
+
+      def prompt_config(runtime)
+        prompts = runtime.fetch("prompts", nil)
+        return A3::Domain::ProjectPromptConfig.empty unless prompts
+        unless prompts.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts must be a mapping"
+        end
+
+        A3::Domain::ProjectPromptConfig.new(
+          system_file: system_prompt_file(prompts),
+          phases: prompt_phase_mapping(prompts.fetch("phases", {}), "runtime.prompts.phases"),
+          repo_slots: prompt_repo_slots(prompts.fetch("repoSlots", {}))
+        )
+      end
+
+      def system_prompt_file(prompts)
+        system = prompts.fetch("system", nil)
+        return nil unless system
+        unless system.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.system must be a mapping"
+        end
+
+        prompt_path(system.fetch("file", nil), "runtime.prompts.system.file", required: true)
+      end
+
+      def prompt_repo_slots(repo_slots)
+        unless repo_slots.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots must be a mapping"
+        end
+
+        repo_slots.each_with_object({}) do |(slot, config), mapping|
+          unless slot.is_a?(String) && !slot.strip.empty?
+            raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots keys must be non-empty strings"
+          end
+          unless config.is_a?(Hash)
+            raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots.#{slot} must be a mapping"
+          end
+          mapping[slot] = prompt_phase_mapping(
+            config.fetch("phases", {}),
+            "runtime.prompts.repoSlots.#{slot}.phases"
+          )
+        end
+      end
+
+      def prompt_phase_mapping(phases, location)
+        unless phases.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must be a mapping"
+        end
+
+        phases.each_with_object({}) do |(phase, config), mapping|
+          unless phase.is_a?(String) && !phase.strip.empty?
+            raise A3::Domain::ConfigurationError, "project.yaml #{location} keys must be non-empty strings"
+          end
+          unless config.is_a?(Hash)
+            raise A3::Domain::ConfigurationError, "project.yaml #{location}.#{phase} must be a mapping"
+          end
+
+          mapping[phase] = A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+            prompt_file: prompt_path(config.fetch("prompt", nil), "#{location}.#{phase}.prompt"),
+            skill_files: prompt_skill_files(config.fetch("skills", []), "#{location}.#{phase}.skills"),
+            child_draft_template_file: prompt_path(config.fetch("childDraftTemplate", nil), "#{location}.#{phase}.childDraftTemplate")
+          )
+        end
+      end
+
+      def prompt_path(value, location, required: false)
+        if value.nil?
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must be a non-empty string" if required
+
+          return nil
+        end
+        unless value.is_a?(String) && !value.strip.empty?
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must be a non-empty string"
+        end
+
+        value
+      end
+
+      def prompt_skill_files(value, location)
+        unless value.is_a?(Array)
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must be an array of non-empty strings"
+        end
+        value.each_with_index do |entry, index|
+          unless entry.is_a?(String) && !entry.strip.empty?
+            raise A3::Domain::ConfigurationError, "project.yaml #{location}[#{index}] must be a non-empty string"
+          end
+        end
+
+        value
       end
 
       def decomposition_command(runtime, name)

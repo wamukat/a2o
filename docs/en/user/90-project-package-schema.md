@@ -211,6 +211,41 @@ Cleanup reports the local evidence and disposable workspace paths for the task s
 
 The host launcher wrapper reads storage, project config, Kanban, repo label, and default repo source settings from the bootstrapped runtime package. Use `--project-config project-test.yaml` when the package contains a non-default config file. The lower-level runtime-container commands remain available for diagnostics, but user-facing operation should prefer the `a2o runtime decomposition ...` wrapper.
 
+## Runtime Prompts
+
+`runtime.prompts` is optional. When omitted, A2O keeps the existing phase skill behavior.
+
+The section defines provider-neutral project prompt inputs. These files are additive project guidance; they do not override A2O core safety rules, worker result schemas, workspace boundaries, or runtime control rules.
+
+```yaml
+runtime:
+  prompts:
+    system:
+      file: prompts/system.md
+    phases:
+      implementation:
+        prompt: prompts/implementation.md
+        skills:
+          - skills/testing-policy.md
+      implementation_rework:
+        prompt: prompts/implementation-rework.md
+      review:
+        prompt: prompts/review.md
+      parent_review:
+        prompt: prompts/parent-review.md
+      decomposition:
+        prompt: prompts/decomposition.md
+        childDraftTemplate: prompts/decomposition-child-template.md
+    repoSlots:
+      app:
+        phases:
+          review:
+            skills:
+              - skills/app-review.md
+```
+
+All paths are package-relative non-empty strings. `phases.<phase>.skills` preserves the declared order. `implementation_rework` is optional and falls back to `implementation` when no rework-specific prompt profile is configured. `repoSlots.<slot>.phases` is an additive layer on top of the project phase defaults: phase prompts are composed before repo-slot prompts, and phase skills are composed before repo-slot skills.
+
 ## Runtime Phases
 
 `runtime.phases.<phase>.skill` points to a package skill file.

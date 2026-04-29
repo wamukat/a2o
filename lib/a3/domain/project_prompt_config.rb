@@ -1,0 +1,96 @@
+# frozen_string_literal: true
+
+module A3
+  module Domain
+    class ProjectPromptConfig
+      PhaseConfig = Struct.new(:prompt_file, :prompt_files, :skill_files, :child_draft_template_file, keyword_init: true) do
+        def initialize(prompt_file: nil, prompt_files: nil, skill_files: [], child_draft_template_file: nil)
+          ordered_prompt_files = prompt_files || Array(prompt_file).compact
+          super(
+            prompt_file: prompt_file&.freeze,
+            prompt_files: ordered_prompt_files.map(&:freeze).freeze,
+            skill_files: skill_files.map(&:freeze).freeze,
+            child_draft_template_file: child_draft_template_file&.freeze
+          )
+          freeze
+        end
+
+        def empty?
+          prompt_files.empty? && skill_files.empty? && child_draft_template_file.nil?
+        end
+
+        def persisted_form
+          form = {}
+          form["prompt"] = prompt_file if prompt_file
+          form["skills"] = skill_files unless skill_files.empty?
+          form["childDraftTemplate"] = child_draft_template_file if child_draft_template_file
+          form.freeze
+        end
+
+        def merge_addon(addon)
+          self.class.new(
+            prompt_file: addon.prompt_file || prompt_file,
+            prompt_files: prompt_files + addon.prompt_files,
+            skill_files: skill_files + addon.skill_files,
+            child_draft_template_file: addon.child_draft_template_file || child_draft_template_file
+          )
+        end
+      end
+
+      attr_reader :system_file, :phases, :repo_slots
+
+      def initialize(system_file: nil, phases: {}, repo_slots: {})
+        @system_file = system_file&.freeze
+        @phases = freeze_phase_mapping(phases)
+        @repo_slots = repo_slots.each_with_object({}) do |(slot, slot_phases), frozen_slots|
+          frozen_slots[slot.to_s.freeze] = freeze_phase_mapping(slot_phases)
+        end.freeze
+        freeze
+      end
+
+      def self.empty
+        @empty ||= new
+      end
+
+      def empty?
+        system_file.nil? && phases.empty? && repo_slots.empty?
+      end
+
+      def phase(name)
+        phase_name = name.to_s
+        config = phases.fetch(phase_name, nil)
+        return config if config && !config.empty?
+
+        return phase(:implementation) if phase_name == "implementation_rework"
+
+        PhaseConfig.new
+      end
+
+      def repo_slot_phase(slot, phase)
+        base_config = self.phase(phase)
+        addon_config = repo_slots.fetch(slot.to_s, {}).fetch(phase.to_s, PhaseConfig.new)
+        base_config.merge_addon(addon_config)
+      end
+
+      def persisted_form
+        form = {}
+        form["system"] = { "file" => system_file } if system_file
+        form["phases"] = phases.transform_values(&:persisted_form) unless phases.empty?
+        unless repo_slots.empty?
+          form["repoSlots"] = repo_slots.transform_values do |slot_phases|
+            { "phases" => slot_phases.transform_values(&:persisted_form) }
+          end
+        end
+        form.freeze
+      end
+
+      private
+
+      def freeze_phase_mapping(mapping)
+        mapping.each_with_object({}) do |(phase, config), frozen_phases|
+          frozen_phases[phase.to_s.freeze] = config
+        end.freeze
+      end
+    end
+  end
+end

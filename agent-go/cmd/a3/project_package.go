@@ -111,6 +111,9 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	if err := rejectLegacyPhaseWorkspaceHook(runtimePayload); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.phases: %w", projectFile, err)
 	}
+	if err := validateProjectPromptsConfig(runtimePayload); err != nil {
+		return config, fmt.Errorf("project package config %s has invalid runtime.prompts: %w", projectFile, err)
+	}
 	executor, err := buildProjectExecutorConfig(payload.Runtime.Phases)
 	if err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.phases: %w", projectFile, err)
@@ -244,6 +247,108 @@ func rejectLegacyPhaseWorkspaceHook(runtimePayload map[string]any) error {
 		}
 		if _, ok := phase["workspace_hook"]; ok {
 			return fmt.Errorf("%s.workspace_hook is no longer supported; use phase commands or project package commands", phaseName)
+		}
+	}
+	return nil
+}
+
+func validateProjectPromptsConfig(runtimePayload map[string]any) error {
+	rawPrompts, ok := runtimePayload["prompts"]
+	if !ok {
+		return nil
+	}
+	prompts, ok := normalizeYAMLValue(rawPrompts).(map[string]any)
+	if !ok {
+		return fmt.Errorf("must be a mapping")
+	}
+	if rawSystem, ok := prompts["system"]; ok {
+		system, ok := normalizeYAMLValue(rawSystem).(map[string]any)
+		if !ok {
+			return fmt.Errorf("system must be a mapping")
+		}
+		if err := validatePromptPath(system["file"], "system.file", true); err != nil {
+			return err
+		}
+	}
+	if err := validatePromptPhaseMapping(prompts["phases"], "phases"); err != nil {
+		return err
+	}
+	if rawRepoSlots, ok := prompts["repoSlots"]; ok {
+		repoSlots, ok := normalizeYAMLValue(rawRepoSlots).(map[string]any)
+		if !ok {
+			return fmt.Errorf("repoSlots must be a mapping")
+		}
+		for slot, rawSlotConfig := range repoSlots {
+			if strings.TrimSpace(slot) == "" {
+				return fmt.Errorf("repoSlots keys must be non-empty strings")
+			}
+			slotConfig, ok := normalizeYAMLValue(rawSlotConfig).(map[string]any)
+			if !ok {
+				return fmt.Errorf("repoSlots.%s must be a mapping", slot)
+			}
+			if err := validatePromptPhaseMapping(slotConfig["phases"], "repoSlots."+slot+".phases"); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validatePromptPhaseMapping(rawPhases any, label string) error {
+	if rawPhases == nil {
+		return nil
+	}
+	phases, ok := normalizeYAMLValue(rawPhases).(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s must be a mapping", label)
+	}
+	for phase, rawPhaseConfig := range phases {
+		if strings.TrimSpace(phase) == "" {
+			return fmt.Errorf("%s keys must be non-empty strings", label)
+		}
+		phaseConfig, ok := normalizeYAMLValue(rawPhaseConfig).(map[string]any)
+		if !ok {
+			return fmt.Errorf("%s.%s must be a mapping", label, phase)
+		}
+		if err := validatePromptPath(phaseConfig["prompt"], label+"."+phase+".prompt", false); err != nil {
+			return err
+		}
+		if err := validatePromptStringList(phaseConfig["skills"], label+"."+phase+".skills"); err != nil {
+			return err
+		}
+		if err := validatePromptPath(phaseConfig["childDraftTemplate"], label+"."+phase+".childDraftTemplate", false); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validatePromptPath(rawPath any, label string, required bool) error {
+	if rawPath == nil {
+		if required {
+			return fmt.Errorf("%s must be a non-empty string", label)
+		}
+		return nil
+	}
+	path, ok := rawPath.(string)
+	if !ok || strings.TrimSpace(path) == "" {
+		return fmt.Errorf("%s must be a non-empty string", label)
+	}
+	return nil
+}
+
+func validatePromptStringList(rawList any, label string) error {
+	if rawList == nil {
+		return nil
+	}
+	list, ok := normalizeYAMLValue(rawList).([]any)
+	if !ok {
+		return fmt.Errorf("%s must be an array of non-empty strings", label)
+	}
+	for index, rawEntry := range list {
+		entry, ok := rawEntry.(string)
+		if !ok || strings.TrimSpace(entry) == "" {
+			return fmt.Errorf("%s[%d] must be a non-empty string", label, index)
 		}
 	}
 	return nil

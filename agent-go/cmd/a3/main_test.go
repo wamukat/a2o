@@ -4300,6 +4300,110 @@ runtime:
 	}
 }
 
+func TestProjectValidateAcceptsRuntimePromptsConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    system:
+      file: prompts/system.md
+    phases:
+      implementation:
+        prompt: prompts/implementation.md
+        skills:
+          - skills/testing-policy.md
+      implementation_rework:
+        prompt: prompts/implementation-rework.md
+      decomposition:
+        prompt: prompts/decomposition.md
+        childDraftTemplate: prompts/decomposition-child-template.md
+    repoSlots:
+      app:
+        phases:
+          review:
+            skills:
+              - skills/app-review.md
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project validate should accept runtime.prompts, code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "lint_status=ok") {
+		t.Fatalf("project validate should report ok, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateRejectsMalformedRuntimePromptsConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    phases:
+      implementation:
+        skills: not-an-array
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject malformed runtime.prompts, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "invalid runtime.prompts") ||
+		!strings.Contains(stdout.String(), "phases.implementation.skills must be an array of non-empty strings") {
+		t.Fatalf("project validate should reject malformed runtime.prompts, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
 func TestRuntimeRunOnceRejectsLegacyWorkspaceHook(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
