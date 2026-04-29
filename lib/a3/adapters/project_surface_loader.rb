@@ -271,13 +271,25 @@ module A3
 
       def validate_repo_slot_skill_addons(slot, base_phases, slot_phases)
         slot_phases.each do |phase, slot_config|
-          base_config = base_phases.fetch(phase, A3::Domain::ProjectPromptConfig::PhaseConfig.new)
+          base_phase = base_phase_for_repo_slot_addon(phase, base_phases)
+          base_config = base_phases.fetch(base_phase, A3::Domain::ProjectPromptConfig::PhaseConfig.new)
           duplicate = (base_config.skill_files & slot_config.skill_files).first
           next unless duplicate
 
           raise A3::Domain::ConfigurationError,
-                "project.yaml runtime.prompts.repoSlots.#{slot}.phases.#{phase}.skills duplicates runtime.prompts.phases.#{phase}.skills entry: #{duplicate}"
+                "project.yaml runtime.prompts.repoSlots.#{slot}.phases.#{phase}.skills duplicates runtime.prompts.phases.#{base_phase}.skills entry: #{duplicate}"
         end
+      end
+
+      def base_phase_for_repo_slot_addon(phase, base_phases)
+        phase_name = phase.to_s
+        return phase_name unless phase_name == "implementation_rework"
+
+        rework_config = base_phases.fetch("implementation_rework", A3::Domain::ProjectPromptConfig::PhaseConfig.new)
+        implementation_config = base_phases.fetch("implementation", A3::Domain::ProjectPromptConfig::PhaseConfig.new)
+        return "implementation" if rework_config.empty? && !implementation_config.empty?
+
+        phase_name
       end
 
       def load_prompt_document(path, location, project_package_root)

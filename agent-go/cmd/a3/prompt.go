@@ -223,8 +223,8 @@ func buildPromptPreviewLayers(context promptCommandContext, profile string, runt
 		}
 		layers = append(layers, layer)
 	}
-	phaseConfig := prompts.Phases[profile]
-	phaseLayers, err := promptPhaseLayers(context.packagePath, "project_phase", "decomposition_child_draft_template", profile, phaseConfig)
+	effectiveProfile, phaseConfig := promptPreviewPhaseResolution(prompts.Phases, profile)
+	phaseLayers, err := promptPhaseLayers(context.packagePath, "project_phase", "decomposition_child_draft_template", effectiveProfile, phaseConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -277,6 +277,24 @@ func buildPromptPreviewLayers(context promptCommandContext, profile string, runt
 		Detail:  "preview only; not included in composed instruction; workers are not executed and Kanban state is not mutated",
 	})
 	return layers, nil
+}
+
+func promptPreviewPhaseResolution(phases map[string]promptPhaseYAML, profile string) (string, promptPhaseYAML) {
+	config := phases[profile]
+	if !promptPhaseConfigEmpty(config) {
+		return profile, config
+	}
+	if profile == "implementation_rework" {
+		implementation := phases["implementation"]
+		if !promptPhaseConfigEmpty(implementation) {
+			return "implementation", implementation
+		}
+	}
+	return profile, promptPhaseYAML{}
+}
+
+func promptPhaseConfigEmpty(config promptPhaseYAML) bool {
+	return strings.TrimSpace(config.Prompt) == "" && len(config.Skills) == 0 && strings.TrimSpace(config.ChildDraftTemplate) == ""
 }
 
 func promptPreviewHasCoreInstruction(runtimePhase string) bool {

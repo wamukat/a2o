@@ -440,14 +440,36 @@ func validateRepoSlotPromptSkillAddons(slot string, basePhases map[string]any, s
 		if len(slotSkills) == 0 {
 			continue
 		}
-		baseSkills := promptPhaseSkillFiles(basePhases[phase])
+		basePhase := promptBasePhaseForAddon(phase, basePhases)
+		baseSkills := promptPhaseSkillFiles(basePhases[basePhase])
 		for _, skill := range slotSkills {
 			if containsString(baseSkills, skill) {
-				return fmt.Errorf("repoSlots.%s.phases.%s.skills duplicates phases.%s.skills entry: %s", slot, phase, phase, skill)
+				return fmt.Errorf("repoSlots.%s.phases.%s.skills duplicates phases.%s.skills entry: %s", slot, phase, basePhase, skill)
 			}
 		}
 	}
 	return nil
+}
+
+func promptBasePhaseForAddon(phase string, basePhases map[string]any) string {
+	if phase == "implementation_rework" {
+		if len(promptPhaseSkillFiles(basePhases["implementation_rework"])) == 0 && promptPhaseConfigEmptyRaw(basePhases["implementation_rework"]) {
+			if !promptPhaseConfigEmptyRaw(basePhases["implementation"]) {
+				return "implementation"
+			}
+		}
+	}
+	return phase
+}
+
+func promptPhaseConfigEmptyRaw(rawPhase any) bool {
+	phase, ok := normalizeYAMLValue(rawPhase).(map[string]any)
+	if !ok {
+		return true
+	}
+	prompt, _ := phase["prompt"].(string)
+	childDraftTemplate, _ := phase["childDraftTemplate"].(string)
+	return strings.TrimSpace(prompt) == "" && strings.TrimSpace(childDraftTemplate) == "" && len(promptPhaseSkillFiles(rawPhase)) == 0
 }
 
 func promptPhaseSkillFiles(rawPhase any) []string {

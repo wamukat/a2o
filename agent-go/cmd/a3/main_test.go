@@ -4711,6 +4711,49 @@ runtime:
 	if !strings.Contains(stdout.String(), "repoSlots.app.phases.review.skills duplicates phases.review.skills entry: skills/common.md") {
 		t.Fatalf("project validate should reject duplicate repo-slot skill addon, stdout=%s stderr=%s", stdout.String(), stderr.String())
 	}
+
+	body = `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    phases:
+      implementation:
+        skills:
+          - skills/common.md
+    repoSlots:
+      app:
+        phases:
+          implementation_rework:
+            skills:
+              - skills/common.md
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject duplicate repo-slot rework skill addon, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "repoSlots.app.phases.implementation_rework.skills duplicates phases.implementation.skills entry: skills/common.md") {
+		t.Fatalf("project validate should reject duplicate repo-slot rework skill addon, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
 }
 
 func TestProjectValidateRejectsChildDraftTemplateOutsideDecomposition(t *testing.T) {
@@ -4865,6 +4908,86 @@ runtime:
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("parent review prompt preview missing %q in:\n%s", want, output)
+		}
+	}
+}
+
+func TestPromptPreviewFallsBackImplementationReworkBasePrompt(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(filepath.Join(packageDir, "prompts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(packageDir, "skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    phases:
+      implementation:
+        prompt: prompts/implementation.md
+        skills:
+          - skills/implementation-policy.md
+    repoSlots:
+      app:
+        phases:
+          implementation_rework:
+            prompt: prompts/app-rework.md
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for path, content := range map[string]string{
+		"prompts/implementation.md":       "implementation guidance",
+		"skills/implementation-policy.md": "implementation policy",
+		"prompts/app-rework.md":           "app rework addon",
+	} {
+		if err := os.WriteFile(filepath.Join(packageDir, path), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{
+		"prompt", "preview",
+		"--package", packageDir,
+		"--phase", "implementation",
+		"--prior-review-feedback",
+		"--repo-slot", "app",
+		"A2O#123",
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("implementation rework prompt preview should pass, code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		"prompt_preview task_ref=A2O#123 phase=implementation profile=implementation_rework",
+		"kind=project_phase_prompt title=prompts/implementation.md",
+		"detail=profile=implementation",
+		"kind=project_phase_skill title=skills/implementation-policy.md",
+		"kind=repo_slot_phase_prompt title=prompts/app-rework.md",
+		"detail=app profile=implementation_rework",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("implementation rework prompt preview missing %q in:\n%s", want, output)
 		}
 	}
 }

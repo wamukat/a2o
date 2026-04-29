@@ -259,6 +259,44 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     expect(review_config.skill_documents.map(&:content)).to eq(["base review skill", "app review skill"])
   end
 
+  it "rejects repo-slot rework skills that duplicate fallback implementation skills" do
+    project_config_path = write_project_config(
+      "repos" => {
+        "app" => { "path" => "../app" }
+      },
+      "runtime" => {
+        "prompts" => {
+          "phases" => {
+            "implementation" => {
+              "skills" => ["skills/common.md"]
+            }
+          },
+          "repoSlots" => {
+            "app" => {
+              "phases" => {
+                "implementation_rework" => {
+                  "skills" => ["skills/common.md"]
+                }
+              }
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+    write_project_files("skills/common.md" => "common")
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots.app.phases.implementation_rework.skills duplicates runtime.prompts.phases.implementation.skills entry: skills/common.md")
+  end
+
   it "rejects repo-slot prompt addons that do not match a repo entry" do
     project_config_path = write_project_config(
       "repos" => {
