@@ -34,6 +34,13 @@ module A3
         review_target = run.evidence.review_target
         phase_runtime_form = phase_runtime.worker_request_form
         phase_runtime_form = phase_runtime_form.merge("prior_review_feedback" => prior_review_feedback) if prior_review_feedback
+        project_prompt = project_prompt_form(
+          skill: skill,
+          phase_runtime: phase_runtime,
+          task_packet: task_packet,
+          prior_review_feedback: prior_review_feedback
+        )
+        phase_runtime_form = phase_runtime_form.merge("project_prompt" => project_prompt) if project_prompt
         project_key = run.project_key || task.project_key
         payload = {
           "task_ref" => task.ref,
@@ -70,6 +77,70 @@ module A3
         payload["project_key"] = project_key if project_key
         payload["command_intent"] = command_intent.to_s if command_intent
         payload
+      end
+
+      def project_prompt_form(skill:, phase_runtime:, task_packet:, prior_review_feedback:)
+        prompt_config = phase_runtime.respond_to?(:project_prompt_config) ? phase_runtime.project_prompt_config : nil
+        return nil unless prompt_config && !prompt_config.empty?
+
+        prompt_phase = prompt_phase_for(phase_runtime: phase_runtime, prior_review_feedback: prior_review_feedback)
+        phase_config = phase_prompt_config(prompt_config, phase_runtime: phase_runtime, prompt_phase: prompt_phase)
+        layers = []
+        layers << prompt_layer("a2o_core_instruction", "A2O core instruction", skill.to_s) if skill
+        if prompt_config.system_document
+          layers << prompt_layer("project_system_prompt", prompt_config.system_document.path, prompt_config.system_document.content)
+        end
+        phase_config.prompt_documents.each do |document|
+          layers << prompt_layer("project_phase_prompt", document.path, document.content)
+        end
+        phase_config.skill_documents.each do |document|
+          layers << prompt_layer("project_phase_skill", document.path, document.content)
+        end
+        if phase_config.child_draft_template_document
+          layers << prompt_layer("decomposition_child_draft_template", phase_config.child_draft_template_document.path, phase_config.child_draft_template_document.content)
+        end
+        layers << prompt_layer(
+          "ticket_phase_instruction",
+          "ticket #{task_packet.ref}",
+          ticket_instruction_content(task_packet)
+        )
+        {
+          "profile" => prompt_phase,
+          "layers" => layers,
+          "composed_instruction" => layers.map { |layer| "## #{layer.fetch("title")}\n#{layer.fetch("content")}" }.join("\n\n")
+        }
+      end
+
+      def prompt_phase_for(phase_runtime:, prior_review_feedback:)
+        phase_name = phase_runtime.phase.to_s
+        return "implementation_rework" if phase_name == "implementation" && prior_review_feedback
+        return "parent_review" if phase_name == "review" && phase_runtime.task_kind.to_sym == :parent
+
+        phase_name
+      end
+
+      def phase_prompt_config(prompt_config, phase_runtime:, prompt_phase:)
+        repo_scope = phase_runtime.repo_scope.to_s
+        return prompt_config.phase(prompt_phase) if repo_scope.empty? || repo_scope == "both"
+
+        prompt_config.repo_slot_phase(repo_scope, prompt_phase)
+      end
+
+      def prompt_layer(kind, title, content)
+        {
+          "kind" => kind,
+          "title" => title,
+          "content" => content
+        }
+      end
+
+      def ticket_instruction_content(task_packet)
+        [
+          "Task: #{task_packet.ref}",
+          "Title: #{task_packet.title}",
+          "Description:",
+          task_packet.description.to_s
+        ].join("\n")
       end
 
       def write_request(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, command_intent: nil, prior_review_feedback: nil)

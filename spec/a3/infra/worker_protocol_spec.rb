@@ -165,6 +165,106 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
+  it "composes project prompt layers after core instruction and before ticket instruction" do
+    prompt_config = A3::Domain::ProjectPromptConfig.new(
+      system_document: prompt_document("prompts/system.md", "system guidance"),
+      phases: {
+        "review" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+          prompt_document: prompt_document("prompts/review.md", "review guidance"),
+          skill_documents: [
+            prompt_document("skills/review-policy.md", "review policy")
+          ]
+        )
+      }
+    )
+    runtime = phase_runtime_with_prompt_config(prompt_config)
+
+    request_form = described_class.new.request_form(
+      skill: runtime.review_skill,
+      workspace: workspace,
+      task: task,
+      run: run,
+      phase_runtime: runtime,
+      task_packet: task_packet
+    )
+
+    project_prompt = request_form.fetch("phase_runtime").fetch("project_prompt")
+    expect(project_prompt.fetch("profile")).to eq("review")
+    expect(project_prompt.fetch("layers").map { |layer| layer.fetch("kind") }).to eq(
+      %w[
+        a2o_core_instruction
+        project_system_prompt
+        project_phase_prompt
+        project_phase_skill
+        ticket_phase_instruction
+      ]
+    )
+    expect(project_prompt.fetch("composed_instruction")).to include("## A2O core instruction\n#{runtime.review_skill}")
+    expect(project_prompt.fetch("composed_instruction")).to include("## prompts/system.md\nsystem guidance")
+    expect(project_prompt.fetch("composed_instruction")).to include("## ticket #{task.ref}\nTask: #{task.ref}")
+  end
+
+  it "selects implementation_rework prompt profile when prior review feedback is present" do
+    implementation_run = A3::Domain::Run.new(
+      ref: "run-implementation-1",
+      project_key: "portal",
+      task_ref: task.ref,
+      phase: :implementation,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: source_descriptor,
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_beta],
+        verification_scope: [:repo_beta],
+        ownership_scope: :child
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: task.ref,
+        owner_scope: :child,
+        snapshot_version: "head-1"
+      )
+    )
+    prompt_config = A3::Domain::ProjectPromptConfig.new(
+      phases: {
+        "implementation" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+          prompt_document: prompt_document("prompts/implementation.md", "implementation guidance")
+        ),
+        "implementation_rework" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+          prompt_document: prompt_document("prompts/rework.md", "rework guidance")
+        )
+      }
+    )
+    runtime = phase_runtime_with_prompt_config(prompt_config, phase: :implementation)
+
+    request_form = described_class.new.request_form(
+      skill: runtime.implementation_skill,
+      workspace: workspace,
+      task: task,
+      run: implementation_run,
+      phase_runtime: runtime,
+      task_packet: task_packet,
+      prior_review_feedback: { "summary" => "Fix assertion coverage." }
+    )
+
+    project_prompt = request_form.fetch("phase_runtime").fetch("project_prompt")
+    expect(project_prompt.fetch("profile")).to eq("implementation_rework")
+    expect(project_prompt.fetch("composed_instruction")).to include("rework guidance")
+    expect(project_prompt.fetch("composed_instruction")).not_to include("implementation guidance")
+    expect(request_form.fetch("phase_runtime")).to include("prior_review_feedback" => { "summary" => "Fix assertion coverage." })
+  end
+
+  it "preserves existing worker request shape when no project prompts are configured" do
+    request_form = described_class.new.request_form(
+      skill: phase_runtime.review_skill,
+      workspace: workspace,
+      task: task,
+      run: run,
+      phase_runtime: phase_runtime,
+      task_packet: task_packet
+    )
+
+    expect(request_form.fetch("phase_runtime")).not_to have_key("project_prompt")
+  end
+
   it "normalizes project repo labels in review_disposition repo_scope" do
     result = described_class.new(
       repo_scope_aliases: { "repo:both" => "both" },
@@ -594,5 +694,29 @@ RSpec.describe A3::Infra::WorkerProtocol do
 
   def source_descriptor
     A3::Domain::SourceDescriptor.runtime_detached_commit(task_ref: task.ref, ref: "abc123")
+  end
+
+  def prompt_document(path, content)
+    A3::Domain::ProjectPromptConfig::Document.new(
+      path: path,
+      absolute_path: File.join(tmpdir, path),
+      content: content
+    )
+  end
+
+  def phase_runtime_with_prompt_config(prompt_config, phase: :review)
+    A3::Domain::PhaseRuntimeConfig.new(
+      task_kind: :child,
+      repo_scope: :ui_app,
+      phase: phase,
+      implementation_skill: "task implementation",
+      review_skill: "task review",
+      verification_commands: [],
+      remediation_commands: [],
+      workspace_hook: "bootstrap",
+      merge_target: :merge_to_parent,
+      merge_policy: :squash,
+      project_prompt_config: prompt_config
+    )
   end
 end

@@ -31,7 +31,8 @@ module A3
           merge_target: resolved_merge_config.target,
           merge_policy: resolved_merge_config.policy,
           merge_target_ref: resolved_merge_config.target_ref,
-          review_gate_required: review_gate_required?(task.kind, labels: task.labels)
+          review_gate_required: review_gate_required?(task.kind, labels: task.labels),
+          project_prompt_config: surface.prompt_config
         )
       end
 

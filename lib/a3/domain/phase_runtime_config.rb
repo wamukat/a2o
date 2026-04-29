@@ -5,11 +5,11 @@ module A3
     class PhaseRuntimeConfig
       attr_reader :task_kind, :repo_scope, :phase, :implementation_skill, :review_skill,
                   :verification_commands, :remediation_commands, :metrics_collection_commands, :notification_config, :workspace_hook, :merge_target, :merge_policy,
-                  :merge_target_ref, :review_gate_required
+                  :merge_target_ref, :review_gate_required, :project_prompt_config
 
       def initialize(task_kind:, repo_scope:, phase:, implementation_skill:, review_skill:, verification_commands:,
                      remediation_commands:, workspace_hook:, merge_target:, merge_policy:, metrics_collection_commands: [], merge_target_ref: nil,
-                     notification_config: A3::Domain::NotificationConfig.empty, review_gate_required: false)
+                     notification_config: A3::Domain::NotificationConfig.empty, review_gate_required: false, project_prompt_config: A3::Domain::ProjectPromptConfig.empty)
         @task_kind = task_kind.to_sym
         @repo_scope = repo_scope.to_sym
         @phase = phase.to_sym
@@ -24,6 +24,7 @@ module A3
         @merge_policy = merge_policy.to_sym
         @merge_target_ref = merge_target_ref
         @review_gate_required = !!review_gate_required
+        @project_prompt_config = project_prompt_config || A3::Domain::ProjectPromptConfig.empty
         freeze
       end
 
@@ -42,7 +43,8 @@ module A3
           other.merge_target == merge_target &&
           other.merge_policy == merge_policy &&
           other.merge_target_ref == merge_target_ref &&
-          other.review_gate_required == review_gate_required
+          other.review_gate_required == review_gate_required &&
+          other.project_prompt_config == project_prompt_config
       end
       alias eql? ==
 
