@@ -203,7 +203,7 @@ child ticket creation は明示 gate の後ろに置き、Kanban command boundar
 a2o runtime decomposition create-children A2O#123 --gate
 ```
 
-このコマンドは `--gate` がない場合は child を作成せず、eligible proposal を `blocked` に変えずに `gate_closed` evidence を記録する。同じ proposal fingerprint に対する eligible proposal review が必要であり、既存 child は child key で再利用する。その後に限って `trigger:auto-implement` を付ける。
+このコマンドは `--gate` がない場合は child を作成せず、eligible proposal を `blocked` に変えずに `gate_closed` evidence を記録する。同じ proposal fingerprint に対する eligible proposal review が必要であり、既存 child は child key で再利用する。Kanban-first draft mode では、作成または再利用された child は draft の計画 artifact のままである。A2O は `a2o:draft-child` を付け、`trigger:auto-implement` や `trigger:auto-parent` は付けない。child が実装スケジューラに入るのは、運用者が承認として `trigger:auto-implement` を付けた後である。
 
 trial cleanup は既定で dry-run になる。
 

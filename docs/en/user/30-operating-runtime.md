@@ -147,7 +147,7 @@ The same Compose project reuses the existing board. If the Compose project or Do
 
 ## Requirement Decomposition
 
-Use `trigger:investigate` when the kanban ticket is a broad requirement that should be investigated and split before implementation. Do not add `trigger:auto-implement` to that source ticket unless you intentionally want it to bypass decomposition and enter the implementation scheduler. A source ticket with `trigger:investigate` belongs to the decomposition domain; implementation work should happen on the generated or accepted child tickets.
+Use `trigger:investigate` when the kanban ticket is a broad requirement that should be investigated and split before implementation. A source ticket with `trigger:investigate` belongs to the decomposition domain even if it also has `trigger:auto-implement`; remove `trigger:investigate` before treating the source ticket itself as ordinary implementation work. In normal operation, implementation should happen on the generated or accepted child tickets.
 
 The automatic decomposition flow is:
 
