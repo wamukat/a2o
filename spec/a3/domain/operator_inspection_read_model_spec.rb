@@ -263,7 +263,8 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
           },
           runtime_snapshot: A3::Domain::PhaseRuntimeSnapshot.new(
             task_kind: :child,
-            repo_scope: :repo_alpha,
+            repo_scope: :both,
+            repo_slots: %i[repo_alpha repo_beta],
             phase: :review,
             implementation_skill: "sample-implementation",
             review_skill: "sample-review",
@@ -303,7 +304,8 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
         "observed_state" => "repo-beta missing"
       )
       expect(result.latest_execution.runtime_snapshot).to have_attributes(
-        repo_scope: :repo_alpha,
+        repo_scope: :both,
+        repo_slots: %i[repo_alpha repo_beta],
         review_skill: "sample-review",
         remediation_commands: ["commands/apply-remediation"],
         merge_target: :merge_to_parent

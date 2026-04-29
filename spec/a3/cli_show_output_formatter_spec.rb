@@ -162,7 +162,8 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
         },
         runtime_snapshot: A3::Domain::PhaseRuntimeSnapshot.new(
           task_kind: :child,
-          repo_scope: :repo_alpha,
+          repo_scope: :both,
+          repo_slots: %i[repo_alpha repo_beta],
           phase: :review,
           implementation_skill: "sample-implementation",
           review_skill: "sample-review",
@@ -715,16 +716,17 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
           },
           runtime_snapshot: A3::Domain::PhaseRuntimeSnapshot.new(
             task_kind: :child,
-            repo_scope: :repo_alpha,
+            repo_scope: :both,
+            repo_slots: %i[repo_alpha repo_beta],
             phase: :review,
-          implementation_skill: "sample-implementation",
-          review_skill: "sample-review",
-          verification_commands: ["commands/check-style", "commands/verify-all"],
-          remediation_commands: ["commands/apply-remediation"],
-          workspace_hook: "sample-bootstrap",
-          merge_target: :merge_to_parent,
-          merge_policy: :ff_only
-        ),
+            implementation_skill: "sample-implementation",
+            review_skill: "sample-review",
+            verification_commands: ["commands/check-style", "commands/verify-all"],
+            remediation_commands: ["commands/apply-remediation"],
+            workspace_hook: "sample-bootstrap",
+            merge_target: :merge_to_parent,
+            merge_policy: :ff_only
+          ),
           skill_feedback: [
             {
               "category" => "review_gap",
@@ -758,6 +760,8 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     expect(result).to include("skill_feedback_suggested_patch=Check slot materialization before review.")
     expect(result).to include("runtime_package_action=inspect_runtime_package")
     expect(result).to include("runtime_package_guidance=run doctor-runtime and inspect repo sources, secret delivery, and scheduler store migration before rerun")
+    expect(result).to include("runtime task_kind=child repo_scope=both phase=review")
+    expect(result).to include("runtime repo_slots=repo_alpha,repo_beta")
     expect(result).to include("runtime merge_target=merge_to_parent merge_policy=ff_only")
     expect(result).to include("execution_validation_error=observed_state must be a string when success is false unless rework_required is true")
     expect(result).to include("blocked_validation_error=failing_command must be a string when success is false unless rework_required is true")

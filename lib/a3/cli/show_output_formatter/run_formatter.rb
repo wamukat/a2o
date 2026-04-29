@@ -167,6 +167,8 @@ module A3
           return unless runtime
 
           result << "runtime task_kind=#{runtime.task_kind} repo_scope=#{runtime.repo_scope} phase=#{runtime.phase}"
+          repo_slots = Array(runtime.repo_slots)
+          result << "runtime repo_slots=#{repo_slots.join(',')}" unless repo_slots.empty?
           result << "runtime implementation_skill=#{runtime.implementation_skill}" if runtime.implementation_skill
           result << "runtime review_skill=#{runtime.review_skill}" if runtime.review_skill
           result << "runtime verification_commands=#{runtime.verification_commands.join(' ')}" unless runtime.verification_commands.empty?
