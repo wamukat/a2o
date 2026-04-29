@@ -45,8 +45,8 @@ Do not delegate the ticket to A2O runtime automation such as `a2o runtime run-on
 
 6. Finish.
    - When the latest review has no findings, add a final kanban comment with the reviewed commit SHA(s), tests, and review result.
-   - Do not wait for an extra user confirmation after a sub-agent review returns `no findings`; move the ticket to `Done` unless the user explicitly asks to hold it.
-   - Move the ticket to `Done`.
+   - Move the Kanbalone ticket to the `Done` lane, but keep it unresolved.
+   - Do not set `isResolved=true`; the user owns final resolution after reviewing the contents.
 
 ## Notes
 
