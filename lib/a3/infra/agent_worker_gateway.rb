@@ -124,7 +124,7 @@ module A3
         completed = wait_for_completion(request.job_id)
         return completed if completed.is_a?(A3::Application::ExecutionResult)
         log_agent_job_event("wait_done", request: request, skill: skill, state: completed.state, result_status: completed.result&.status)
-        return agent_result_execution(completed.result) unless completed.result.succeeded?
+        return with_project_prompt_metadata(agent_result_execution(completed.result), prompt_metadata) unless completed.result.succeeded?
 
         descriptor_validation = materialized_changed_files_evidence(
           workspace_request: request.workspace_request,

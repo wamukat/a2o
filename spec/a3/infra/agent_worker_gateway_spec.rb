@@ -277,6 +277,54 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     )
   end
 
+  it "keeps project prompt metadata when an agent materialized job fails before worker result handling" do
+    client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :failed, 127)) }
+    prompt_config = A3::Domain::ProjectPromptConfig.new(
+      system_document: prompt_document("prompts/system.md", "system guidance"),
+      phases: {
+        "implementation" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+          prompt_document: prompt_document("prompts/implementation.md", "implementation guidance")
+        )
+      }
+    )
+    runtime = A3::Domain::PhaseRuntimeConfig.new(
+      task_kind: :child,
+      repo_scope: :ui_app,
+      phase: :implementation,
+      implementation_skill: phase_runtime.implementation_skill,
+      review_skill: phase_runtime.review_skill,
+      verification_commands: [],
+      remediation_commands: [],
+      workspace_hook: "bootstrap",
+      merge_target: :merge_to_parent,
+      merge_policy: :squash,
+      project_prompt_config: prompt_config
+    )
+    gateway = materialized_gateway
+
+    execution = gateway.run(
+      skill: runtime.implementation_skill,
+      workspace: workspace,
+      task: task,
+      run: run,
+      phase_runtime: runtime,
+      task_packet: task_packet
+    )
+
+    expect(execution).to have_attributes(
+      success: false,
+      failing_command: "agent_job",
+      observed_state: "failed"
+    )
+    prompt_metadata = execution.diagnostics.fetch("project_prompt")
+    expect(prompt_metadata.fetch("profile")).to eq("implementation")
+    expect(prompt_metadata.fetch("layers").map { |layer| layer.fetch("title") }).to include(
+      "prompts/system.md",
+      "prompts/implementation.md"
+    )
+    expect(prompt_metadata.to_s).not_to include("system guidance")
+  end
+
   it "rejects materialized review when workspace descriptor metadata does not match the request" do
     client.on_fetch = lambda do |job_id|
       client.complete(
@@ -973,5 +1021,13 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       "sync_class" => "eager",
       "ownership" => "edit_target"
     }
+  end
+
+  def prompt_document(path, content)
+    A3::Domain::ProjectPromptConfig::Document.new(
+      path: path,
+      absolute_path: File.join(tmpdir, path),
+      content: content
+    )
   end
 end
