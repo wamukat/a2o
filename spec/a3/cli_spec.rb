@@ -52,6 +52,28 @@ RSpec.describe A3::CLI do
     )
   end
 
+  it "logs agent server lifecycle and fatal errors to stderr" do
+    Dir.mktmpdir do |dir|
+      out = StringIO.new
+      server = instance_double(A3::Infra::AgentHttpPullServer)
+      allow(A3::Infra::AgentHttpPullServer).to receive(:new).and_return(server)
+      allow(server).to receive(:start).and_raise(RuntimeError, "server exploded")
+
+      expect do
+        expect do
+          described_class.handle_agent_server(
+            ["--storage-dir", dir, "--host", "127.0.0.1", "--port", "0"],
+            out: out
+          )
+        end.to raise_error(RuntimeError, "server exploded")
+      end.to output(
+        /agent_server_start host=127\.0\.0\.1 port=0 .* pid=\d+.*agent_server_fatal_error class=RuntimeError message=server exploded pid=\d+.*agent_server_fatal_backtrace .*agent_server_exit pid=\d+/m
+      ).to_stderr
+
+      expect(out.string).to include("agent server listening on 127.0.0.1:0")
+    end
+  end
+
   it "passes parsed skill feedback list filters to the application service" do
     out = StringIO.new
     service = instance_double(A3::Application::ListSkillFeedback)

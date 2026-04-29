@@ -90,6 +90,45 @@ RSpec.describe A3::Infra::AgentHttpPullServer do
     expect(artifact_store.read("art-log-1")).to eq(content)
   end
 
+  it "keeps serving requests after a handler exception" do
+    calls = {count: 0}
+    resilient_handler = Class.new do
+      def initialize(calls)
+        @calls = calls
+      end
+
+      def handle(method:, path:, query:, body:, headers:)
+        @calls[:count] += 1
+        raise "simulated handler failure" if @calls[:count] == 1
+
+        A3::Infra::AgentHttpPullHandler::Response.new(
+          status: 200,
+          headers: {"content-type" => "application/json"},
+          body: JSON.generate("ok" => true, "path" => path)
+        )
+      end
+    end.new(calls)
+    resilient_server = described_class.new(handler: resilient_handler, port: 0)
+    resilient_thread = Thread.new { resilient_server.start }
+    base_uri = URI("http://127.0.0.1:#{resilient_server.bound_port}")
+
+    begin
+      failed_response = Net::HTTP.get_response(base_uri + "/v1/agent/jobs/next?agent=host-local")
+      recovered_response = Net::HTTP.get_response(base_uri + "/v1/agent/jobs/next?agent=host-local")
+
+      expect(failed_response.code).to eq("500")
+      expect(JSON.parse(failed_response.body)).to include(
+        "error" => "internal_server_error",
+        "message" => "simulated handler failure"
+      )
+      expect(recovered_response.code).to eq("200")
+      expect(JSON.parse(recovered_response.body)).to include("ok" => true)
+    ensure
+      resilient_server.shutdown
+      resilient_thread.join(2)
+    end
+  end
+
   it "ignores clients that disconnect while the response is being written" do
     response = A3::Infra::AgentHttpPullHandler::Response.new(
       status: 200,

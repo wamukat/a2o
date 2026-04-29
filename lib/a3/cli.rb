@@ -1207,7 +1207,16 @@ module A3
       )
 
       out.puts("agent server listening on #{options.fetch(:host)}:#{options.fetch(:port)}")
-      server.start
+      warn("agent_server_start host=#{options.fetch(:host)} port=#{options.fetch(:port)} storage_dir=#{options.fetch(:storage_dir)} job_store=#{options.fetch(:job_store_path)} artifact_store=#{options.fetch(:artifact_store_dir)} pid=#{Process.pid}")
+      begin
+        server.start
+      rescue StandardError => e
+        warn("agent_server_fatal_error class=#{e.class} message=#{e.message} pid=#{Process.pid}")
+        Array(e.backtrace).first(20).each { |line| warn("agent_server_fatal_backtrace #{line}") }
+        raise
+      ensure
+        warn("agent_server_exit pid=#{Process.pid}")
+      end
     end
 
     def handle_agent_artifact_cleanup(argv, out:)

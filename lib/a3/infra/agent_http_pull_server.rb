@@ -72,6 +72,13 @@ module A3
           headers: {"content-type" => "application/json"},
           body: JSON.generate("error" => e.message)
         ))
+      rescue StandardError => e
+        warn("agent_http_pull_server_request_error class=#{e.class} message=#{e.message}")
+        write_response(client, A3::Infra::AgentHttpPullHandler::Response.new(
+          status: 500,
+          headers: {"content-type" => "application/json"},
+          body: JSON.generate("error" => "internal_server_error", "class" => e.class.name, "message" => e.message)
+        ))
       ensure
         client.close unless client.closed?
       end
