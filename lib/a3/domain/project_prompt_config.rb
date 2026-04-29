@@ -94,8 +94,11 @@ module A3
 
       def repo_slot_phase(slot, phase)
         base_config = self.phase(phase)
-        addon_config = repo_slots.fetch(slot.to_s, {}).fetch(phase.to_s, PhaseConfig.new)
-        base_config.merge_addon(addon_config)
+        base_config.merge_addon(repo_slot_addon_phase(slot, phase))
+      end
+
+      def repo_slot_addon_phase(slot, phase)
+        repo_slots.fetch(slot.to_s, {}).fetch(phase.to_s, PhaseConfig.new)
       end
 
       def persisted_form

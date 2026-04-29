@@ -258,6 +258,81 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(request_form.fetch("phase_runtime")).to include("prior_review_feedback" => { "summary" => "Fix assertion coverage." })
   end
 
+  it "adds repo-slot prompt layers without replacing project phase defaults" do
+    prompt_config = A3::Domain::ProjectPromptConfig.new(
+      phases: {
+        "implementation" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+          prompt_document: prompt_document("prompts/implementation.md", "implementation guidance"),
+          skill_documents: [prompt_document("skills/common-testing.md", "common testing")]
+        )
+      },
+      repo_slots: {
+        "ui_app" => {
+          "implementation" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+            prompt_document: prompt_document("prompts/ui-implementation.md", "ui guidance"),
+            skill_documents: [prompt_document("skills/playwright.md", "browser testing")]
+          )
+        }
+      }
+    )
+    runtime = phase_runtime_with_prompt_config(prompt_config, phase: :implementation, repo_scope: :ui_app)
+
+    request_form = described_class.new.request_form(
+      skill: runtime.implementation_skill,
+      workspace: workspace,
+      task: task,
+      run: implementation_run,
+      phase_runtime: runtime,
+      task_packet: task_packet
+    )
+
+    project_prompt = request_form.fetch("phase_runtime").fetch("project_prompt")
+    expect(project_prompt.fetch("layers").map { |layer| layer.fetch("kind") }).to include(
+      "project_phase_prompt",
+      "project_phase_skill",
+      "repo_slot_phase_prompt",
+      "repo_slot_phase_skill"
+    )
+    expect(project_prompt.fetch("layers").map { |layer| layer.fetch("title") }).to include(
+      "prompts/implementation.md",
+      "skills/common-testing.md",
+      "ui_app:prompts/ui-implementation.md",
+      "ui_app:skills/playwright.md"
+    )
+  end
+
+  it "uses only project phase prompts for repo_scope both" do
+    prompt_config = A3::Domain::ProjectPromptConfig.new(
+      phases: {
+        "implementation" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+          prompt_document: prompt_document("prompts/implementation.md", "implementation guidance")
+        )
+      },
+      repo_slots: {
+        "ui_app" => {
+          "implementation" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+            prompt_document: prompt_document("prompts/ui-implementation.md", "ui guidance")
+          )
+        }
+      }
+    )
+    runtime = phase_runtime_with_prompt_config(prompt_config, phase: :implementation, repo_scope: :both)
+
+    request_form = described_class.new.request_form(
+      skill: runtime.implementation_skill,
+      workspace: workspace,
+      task: task,
+      run: implementation_run,
+      phase_runtime: runtime,
+      task_packet: task_packet
+    )
+
+    project_prompt = request_form.fetch("phase_runtime").fetch("project_prompt")
+    expect(project_prompt.fetch("composed_instruction")).to include("implementation guidance")
+    expect(project_prompt.fetch("composed_instruction")).not_to include("ui guidance")
+    expect(project_prompt.fetch("layers").map { |layer| layer.fetch("kind") }).not_to include("repo_slot_phase_prompt")
+  end
+
   it "preserves existing worker request shape when no project prompts are configured" do
     request_form = described_class.new.request_form(
       skill: phase_runtime.review_skill,
@@ -710,10 +785,10 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
-  def phase_runtime_with_prompt_config(prompt_config, phase: :review)
+  def phase_runtime_with_prompt_config(prompt_config, phase: :review, repo_scope: :ui_app)
     A3::Domain::PhaseRuntimeConfig.new(
       task_kind: :child,
-      repo_scope: :ui_app,
+      repo_scope: repo_scope,
       phase: phase,
       implementation_skill: "task implementation",
       review_skill: "task review",

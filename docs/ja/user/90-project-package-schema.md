@@ -249,7 +249,9 @@ runtime:
               - skills/app-review.md
 ```
 
-すべての path は package からの相対 path で、空文字は使えない。`phases.<phase>.skills` は宣言順を維持する。`implementation_rework` は任意であり、未設定の場合は `implementation` の prompt profile にフォールバックする。`repoSlots.<slot>.phases` は project phase default に対する追加 layer であり、phase prompt の後に repo-slot prompt、phase skill の後に repo-slot skill を合成する。
+すべての path は package からの相対 path で、空文字は使えない。prompt phase 名は A2O が認識する phase profile に限定される。`phases.<phase>.skills` は宣言順を維持し、同じ skill file を重複指定してはならない。`implementation_rework` は任意であり、未設定の場合は `implementation` の prompt profile にフォールバックする。`repoSlots.<slot>.phases` は project phase default に対する追加 layer であり、`<slot>` は `repos` の entry と一致する必要がある。phase prompt / skill の後に repo-slot prompt / skill を合成し、diagnostics/evidence では `repo_slot_phase_prompt`、`repo_slot_phase_skill`、`repo_slot_decomposition_child_draft_template` として区別できる。
+
+`repo_scope=both` のように複数 repo をまたぐ task では、A2O は repo-slot addon を合成しない。複数 slot の指示を暗黙に混ぜると worker の責務境界が曖昧になるため、project-wide phase prompt だけを使う。repo-specific な指示が必要な場合は、task を repo slot 単位の child に分ける。
 
 ## Runtime Phases
 

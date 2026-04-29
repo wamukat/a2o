@@ -259,6 +259,109 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     expect(review_config.skill_documents.map(&:content)).to eq(["base review skill", "app review skill"])
   end
 
+  it "rejects repo-slot prompt addons that do not match a repo entry" do
+    project_config_path = write_project_config(
+      "repos" => {
+        "app" => { "path" => "../app" }
+      },
+      "runtime" => {
+        "prompts" => {
+          "repoSlots" => {
+            "backend" => {
+              "phases" => {
+                "review" => {
+                  "skills" => ["skills/backend-review.md"]
+                }
+              }
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+    write_project_files("skills/backend-review.md" => "backend review skill")
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots.backend must match a repos entry")
+  end
+
+  it "rejects unsupported prompt phases and duplicate repo-slot skills" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "phases" => {
+            "implementation" => {
+              "skills" => ["skills/common.md"]
+            }
+          },
+          "repoSlots" => {
+            "app" => {
+              "phases" => {
+                "deployment" => {
+                  "skills" => ["skills/deploy.md"]
+                }
+              }
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+    write_project_files(
+      "skills/common.md" => "common",
+      "skills/deploy.md" => "deploy"
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots.app.phases.deployment is not a supported prompt phase")
+
+    duplicate_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "phases" => {
+            "review" => {
+              "skills" => ["skills/common.md"]
+            }
+          },
+          "repoSlots" => {
+            "app" => {
+              "phases" => {
+                "review" => {
+                  "skills" => ["skills/common.md"]
+                }
+              }
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(duplicate_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots.app.phases.review.skills duplicates runtime.prompts.phases.review.skills entry: skills/common.md")
+  end
+
   it "uses an empty prompt config when runtime.prompts is absent" do
     project_config_path = write_project_config(
       "runtime" => {

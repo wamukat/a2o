@@ -85,7 +85,9 @@ module A3
         return nil unless prompt_config && !prompt_config.empty?
 
         prompt_phase = prompt_phase_for(phase_runtime: phase_runtime, prior_review_feedback: prior_review_feedback)
-        phase_config = phase_prompt_config(prompt_config, phase_runtime: phase_runtime, prompt_phase: prompt_phase)
+        phase_config = prompt_config.phase(prompt_phase)
+        repo_slot = repo_prompt_slot(phase_runtime)
+        repo_slot_config = repo_slot ? prompt_config.repo_slot_addon_phase(repo_slot, prompt_phase) : nil
         layers = []
         layers << prompt_layer("a2o_core_instruction", "A2O core instruction", skill.to_s) if skill
         if prompt_config.system_document
@@ -99,6 +101,17 @@ module A3
         end
         if phase_config.child_draft_template_document
           layers << prompt_layer("decomposition_child_draft_template", phase_config.child_draft_template_document.path, phase_config.child_draft_template_document.content)
+        end
+        if repo_slot_config && !repo_slot_config.empty?
+          repo_slot_config.prompt_documents.each do |document|
+            layers << prompt_layer("repo_slot_phase_prompt", "#{repo_slot}:#{document.path}", document.content)
+          end
+          repo_slot_config.skill_documents.each do |document|
+            layers << prompt_layer("repo_slot_phase_skill", "#{repo_slot}:#{document.path}", document.content)
+          end
+          if repo_slot_config.child_draft_template_document
+            layers << prompt_layer("repo_slot_decomposition_child_draft_template", "#{repo_slot}:#{repo_slot_config.child_draft_template_document.path}", repo_slot_config.child_draft_template_document.content)
+          end
         end
         layers << prompt_layer(
           "ticket_phase_instruction",
@@ -120,11 +133,11 @@ module A3
         phase_name
       end
 
-      def phase_prompt_config(prompt_config, phase_runtime:, prompt_phase:)
+      def repo_prompt_slot(phase_runtime)
         repo_scope = phase_runtime.repo_scope.to_s
-        return prompt_config.phase(prompt_phase) if repo_scope.empty? || repo_scope == "both"
+        return nil if repo_scope.empty? || repo_scope == "both"
 
-        prompt_config.repo_slot_phase(repo_scope, prompt_phase)
+        repo_scope
       end
 
       def prompt_layer(kind, title, content)

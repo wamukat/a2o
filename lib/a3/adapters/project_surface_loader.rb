@@ -6,6 +6,17 @@ require "pathname"
 module A3
   module Adapters
     class ProjectSurfaceLoader
+      PROMPT_PHASES = %w[
+        implementation
+        implementation_rework
+        review
+        parent_review
+        verification
+        remediation
+        metrics
+        decomposition
+      ].freeze
+
       def initialize(preset_dir:, required_preset_schema_version: ENV.fetch("A3_REQUIRED_PRESET_SCHEMA_VERSION", "1"))
         # Kept for CLI call-site compatibility while project.yaml phases replace presets.
       end
@@ -51,7 +62,7 @@ module A3
           decomposition_investigate_command: decomposition_command(runtime, "investigate"),
           decomposition_author_command: decomposition_command(runtime, "author"),
           decomposition_review_commands: decomposition_review_commands(runtime),
-          prompt_config: prompt_config(runtime, project_package_root)
+          prompt_config: prompt_config(runtime, project_package_root, repo_slots: repo_slot_names(project_config))
         )
       end
 
@@ -143,17 +154,25 @@ module A3
         end
       end
 
-      def prompt_config(runtime, project_package_root)
+      def repo_slot_names(project_config)
+        repos = project_config.fetch("repos", {})
+        return [] unless repos.is_a?(Hash)
+
+        repos.keys.map(&:to_s)
+      end
+
+      def prompt_config(runtime, project_package_root, repo_slots:)
         prompts = runtime.fetch("prompts", nil)
         return A3::Domain::ProjectPromptConfig.empty unless prompts
         unless prompts.is_a?(Hash)
           raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts must be a mapping"
         end
+        phases = prompt_phase_mapping(prompts.fetch("phases", {}), "runtime.prompts.phases", project_package_root)
 
         A3::Domain::ProjectPromptConfig.new(
           system_document: system_prompt_document(prompts, project_package_root),
-          phases: prompt_phase_mapping(prompts.fetch("phases", {}), "runtime.prompts.phases", project_package_root),
-          repo_slots: prompt_repo_slots(prompts.fetch("repoSlots", {}), project_package_root)
+          phases: phases,
+          repo_slots: prompt_repo_slots(prompts.fetch("repoSlots", {}), project_package_root, known_slots: repo_slots, base_phases: phases)
         )
       end
 
@@ -167,7 +186,7 @@ module A3
         prompt_document(system.fetch("file", nil), "runtime.prompts.system.file", project_package_root, required: true)
       end
 
-      def prompt_repo_slots(repo_slots, project_package_root)
+      def prompt_repo_slots(repo_slots, project_package_root, known_slots:, base_phases:)
         unless repo_slots.is_a?(Hash)
           raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots must be a mapping"
         end
@@ -179,11 +198,16 @@ module A3
           unless config.is_a?(Hash)
             raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots.#{slot} must be a mapping"
           end
-          mapping[slot] = prompt_phase_mapping(
+          if !known_slots.empty? && !known_slots.include?(slot)
+            raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots.#{slot} must match a repos entry"
+          end
+          slot_phases = prompt_phase_mapping(
             config.fetch("phases", {}),
             "runtime.prompts.repoSlots.#{slot}.phases",
             project_package_root
           )
+          validate_repo_slot_skill_addons(slot, base_phases, slot_phases)
+          mapping[slot] = slot_phases
         end
       end
 
@@ -195,6 +219,9 @@ module A3
         phases.each_with_object({}) do |(phase, config), mapping|
           unless phase.is_a?(String) && !phase.strip.empty?
             raise A3::Domain::ConfigurationError, "project.yaml #{location} keys must be non-empty strings"
+          end
+          unless PROMPT_PHASES.include?(phase)
+            raise A3::Domain::ConfigurationError, "project.yaml #{location}.#{phase} is not a supported prompt phase"
           end
           unless config.is_a?(Hash)
             raise A3::Domain::ConfigurationError, "project.yaml #{location}.#{phase} must be a mapping"
@@ -225,6 +252,10 @@ module A3
         unless value.is_a?(Array)
           raise A3::Domain::ConfigurationError, "project.yaml #{location} must be an array of non-empty strings"
         end
+        duplicates = value.select { |entry| value.count(entry) > 1 }.uniq
+        unless duplicates.empty?
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} contains duplicate skill file: #{duplicates.first}"
+        end
         value.each_with_index do |entry, index|
           unless entry.is_a?(String) && !entry.strip.empty?
             raise A3::Domain::ConfigurationError, "project.yaml #{location}[#{index}] must be a non-empty string"
@@ -232,6 +263,17 @@ module A3
         end
         value.each_with_index.map do |entry, index|
           load_prompt_document(entry, "#{location}[#{index}]", project_package_root)
+        end
+      end
+
+      def validate_repo_slot_skill_addons(slot, base_phases, slot_phases)
+        slot_phases.each do |phase, slot_config|
+          base_config = base_phases.fetch(phase, A3::Domain::ProjectPromptConfig::PhaseConfig.new)
+          duplicate = (base_config.skill_files & slot_config.skill_files).first
+          next unless duplicate
+
+          raise A3::Domain::ConfigurationError,
+                "project.yaml runtime.prompts.repoSlots.#{slot}.phases.#{phase}.skills duplicates runtime.prompts.phases.#{phase}.skills entry: #{duplicate}"
         end
       end
 

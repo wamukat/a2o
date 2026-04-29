@@ -112,7 +112,7 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	if err := rejectLegacyPhaseWorkspaceHook(runtimePayload); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.phases: %w", projectFile, err)
 	}
-	if err := validateProjectPromptsConfig(runtimePayload, packagePath); err != nil {
+	if err := validateProjectPromptsConfig(runtimePayload, packagePath, projectRepoNames(payload.Repos)); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.prompts: %w", projectFile, err)
 	}
 	executor, err := buildProjectExecutorConfig(payload.Runtime.Phases)
@@ -236,6 +236,18 @@ type projectPackagePhaseYAML struct {
 	TargetRef any            `yaml:"target_ref"`
 }
 
+func projectRepoNames(repos map[string]struct {
+	Path  string `yaml:"path"`
+	Label string `yaml:"label"`
+}) []string {
+	names := make([]string, 0, len(repos))
+	for name := range repos {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
 func rejectLegacyPhaseWorkspaceHook(runtimePayload map[string]any) error {
 	phases, ok := normalizeYAMLValue(runtimePayload["phases"]).(map[string]any)
 	if !ok {
@@ -253,7 +265,7 @@ func rejectLegacyPhaseWorkspaceHook(runtimePayload map[string]any) error {
 	return nil
 }
 
-func validateProjectPromptsConfig(runtimePayload map[string]any, packagePath string) error {
+func validateProjectPromptsConfig(runtimePayload map[string]any, packagePath string, repoNames []string) error {
 	rawPrompts, ok := runtimePayload["prompts"]
 	if !ok {
 		return nil
@@ -271,6 +283,7 @@ func validateProjectPromptsConfig(runtimePayload map[string]any, packagePath str
 			return err
 		}
 	}
+	basePhases, _ := normalizeYAMLValue(prompts["phases"]).(map[string]any)
 	if err := validatePromptPhaseMapping(prompts["phases"], "phases", packagePath); err != nil {
 		return err
 	}
@@ -283,11 +296,18 @@ func validateProjectPromptsConfig(runtimePayload map[string]any, packagePath str
 			if strings.TrimSpace(slot) == "" {
 				return fmt.Errorf("repoSlots keys must be non-empty strings")
 			}
+			if len(repoNames) > 0 && !containsString(repoNames, slot) {
+				return fmt.Errorf("repoSlots.%s must match a repos entry", slot)
+			}
 			slotConfig, ok := normalizeYAMLValue(rawSlotConfig).(map[string]any)
 			if !ok {
 				return fmt.Errorf("repoSlots.%s must be a mapping", slot)
 			}
 			if err := validatePromptPhaseMapping(slotConfig["phases"], "repoSlots."+slot+".phases", packagePath); err != nil {
+				return err
+			}
+			slotPhases, _ := normalizeYAMLValue(slotConfig["phases"]).(map[string]any)
+			if err := validateRepoSlotPromptSkillAddons(slot, basePhases, slotPhases); err != nil {
 				return err
 			}
 		}
@@ -306,6 +326,9 @@ func validatePromptPhaseMapping(rawPhases any, label string, packagePath string)
 	for phase, rawPhaseConfig := range phases {
 		if strings.TrimSpace(phase) == "" {
 			return fmt.Errorf("%s keys must be non-empty strings", label)
+		}
+		if !containsString([]string{"implementation", "implementation_rework", "review", "parent_review", "verification", "remediation", "metrics", "decomposition"}, phase) {
+			return fmt.Errorf("%s.%s is not a supported prompt phase", label, phase)
 		}
 		phaseConfig, ok := normalizeYAMLValue(rawPhaseConfig).(map[string]any)
 		if !ok {
@@ -391,16 +414,56 @@ func validatePromptStringList(rawList any, label string, packagePath string) err
 	if !ok {
 		return fmt.Errorf("%s must be an array of non-empty strings", label)
 	}
+	seen := map[string]bool{}
 	for index, rawEntry := range list {
 		entry, ok := rawEntry.(string)
 		if !ok || strings.TrimSpace(entry) == "" {
 			return fmt.Errorf("%s[%d] must be a non-empty string", label, index)
 		}
+		if seen[entry] {
+			return fmt.Errorf("%s contains duplicate skill file: %s", label, entry)
+		}
+		seen[entry] = true
 		if err := validatePromptPath(entry, fmt.Sprintf("%s[%d]", label, index), packagePath, true); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func validateRepoSlotPromptSkillAddons(slot string, basePhases map[string]any, slotPhases map[string]any) error {
+	for phase, rawSlotPhase := range slotPhases {
+		slotSkills := promptPhaseSkillFiles(rawSlotPhase)
+		if len(slotSkills) == 0 {
+			continue
+		}
+		baseSkills := promptPhaseSkillFiles(basePhases[phase])
+		for _, skill := range slotSkills {
+			if containsString(baseSkills, skill) {
+				return fmt.Errorf("repoSlots.%s.phases.%s.skills duplicates phases.%s.skills entry: %s", slot, phase, phase, skill)
+			}
+		}
+	}
+	return nil
+}
+
+func promptPhaseSkillFiles(rawPhase any) []string {
+	phase, ok := normalizeYAMLValue(rawPhase).(map[string]any)
+	if !ok {
+		return nil
+	}
+	rawSkills, ok := normalizeYAMLValue(phase["skills"]).([]any)
+	if !ok {
+		return nil
+	}
+	skills := make([]string, 0, len(rawSkills))
+	for _, rawSkill := range rawSkills {
+		skill, ok := rawSkill.(string)
+		if ok {
+			skills = append(skills, skill)
+		}
+	}
+	return skills
 }
 
 func rejectMergeTarget(runtimePayload map[string]any) error {
