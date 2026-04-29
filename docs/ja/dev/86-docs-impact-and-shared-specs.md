@@ -58,16 +58,28 @@ docs:
   index: docs/README.md
   policy: docs/policy.md
   categories:
-    architecture: docs/architecture
-    shared_specs: docs/shared-specs
-    frameworks: docs/frameworks
-    data_model: docs/data-model
-    acl: docs/integrations/acl
-    interfaces: docs/interfaces
-    features: docs/features
-    decisions: docs/decisions
-    operations: docs/operations
-    migration: docs/migration
+    architecture:
+      path: docs/architecture
+    shared_specs:
+      path: docs/shared-specs
+    frameworks:
+      path: docs/frameworks
+    data_model:
+      path: docs/data-model
+    acl:
+      path: docs/integrations/acl
+    external_api:
+      path: docs/integrations/external-api
+    interfaces:
+      path: docs/interfaces
+    features:
+      path: docs/features
+    decisions:
+      path: docs/decisions
+    operations:
+      path: docs/operations
+    migration:
+      path: docs/migration
 ```
 
 docs が別 repo slot にある場合は、repo slot と root を指定する。
