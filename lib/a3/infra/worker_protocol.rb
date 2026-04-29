@@ -75,9 +75,37 @@ module A3
           "phase_runtime" => phase_runtime_form,
           "slot_paths" => workspace.slot_paths.transform_keys(&:to_s).transform_values(&:to_s)
         }
+        docs_context = docs_context_form(workspace: workspace, task: task, task_packet: task_packet, phase_runtime: phase_runtime)
+        payload["docs_context"] = docs_context if docs_context
         payload["project_key"] = project_key if project_key
         payload["command_intent"] = command_intent.to_s if command_intent
         payload
+      end
+
+      def docs_context_form(workspace:, task:, task_packet:, phase_runtime:)
+        return nil unless phase_runtime.phase.to_sym == :implementation
+        docs_config = phase_runtime.respond_to?(:docs_config) ? phase_runtime.docs_config : nil
+        return nil unless docs_config.is_a?(Hash)
+
+        repo_root = docs_repo_root(workspace: workspace, docs_config: docs_config)
+        return nil unless repo_root
+
+        docs_index = A3::Domain::ProjectDocsIndex.load(repo_root: repo_root, docs_config: docs_config)
+        A3::Domain::ProjectDocsImpactAnalyzer.new(docs_index: docs_index)
+          .analyze(task: task, task_packet: task_packet)
+          .request_form
+      end
+
+      def docs_repo_root(workspace:, docs_config:)
+        slot = docs_config["repoSlot"] || docs_config[:repoSlot]
+        if slot
+          slot_path = workspace.slot_paths[slot.to_sym]
+          return slot_path.to_s if slot_path
+        elsif workspace.slot_paths.one?
+          return workspace.slot_paths.values.first.to_s
+        end
+
+        workspace.root_path.to_s
       end
 
       def project_prompt_form(skill:, phase_runtime:, task_packet:, prior_review_feedback:)

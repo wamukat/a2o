@@ -14,12 +14,13 @@ module A3
         decomposition_author_command
         decomposition_review_commands
         prompt_config
+        docs_config
         workspace_hook
       ].freeze
 
       attr_reader(*SURFACE_KEYS)
 
-      def initialize(implementation_skill:, review_skill:, verification_commands:, remediation_commands:, workspace_hook:, metrics_collection_commands: [], notification_config: A3::Domain::NotificationConfig.empty, decomposition_investigate_command: nil, decomposition_author_command: nil, decomposition_review_commands: [], prompt_config: A3::Domain::ProjectPromptConfig.empty)
+      def initialize(implementation_skill:, review_skill:, verification_commands:, remediation_commands:, workspace_hook:, metrics_collection_commands: [], notification_config: A3::Domain::NotificationConfig.empty, decomposition_investigate_command: nil, decomposition_author_command: nil, decomposition_review_commands: [], prompt_config: A3::Domain::ProjectPromptConfig.empty, docs_config: nil)
         @implementation_skill = deep_freeze_value(implementation_skill)
         @review_skill = deep_freeze_value(review_skill)
         @verification_commands = deep_freeze_value(verification_commands)
@@ -30,6 +31,7 @@ module A3
         @decomposition_author_command = deep_freeze_value(decomposition_author_command)
         @decomposition_review_commands = deep_freeze_value(decomposition_review_commands)
         @prompt_config = prompt_config || A3::Domain::ProjectPromptConfig.empty
+        @docs_config = deep_freeze_value(docs_config)
         @workspace_hook = deep_freeze_value(workspace_hook)
         freeze
       end

@@ -63,7 +63,8 @@ module A3
           decomposition_investigate_command: decomposition_command(runtime, "investigate"),
           decomposition_author_command: decomposition_command(runtime, "author"),
           decomposition_review_commands: decomposition_review_commands(runtime),
-          prompt_config: prompt_config(runtime, project_package_root, repo_slots: repo_slot_names(project_config))
+          prompt_config: prompt_config(runtime, project_package_root, repo_slots: repo_slot_names(project_config)),
+          docs_config: project_config.fetch("docs", nil)
         )
       end
 

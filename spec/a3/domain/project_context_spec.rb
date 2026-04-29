@@ -86,7 +86,8 @@ RSpec.describe A3::Domain::ProjectContext do
       "merge_target" => "merge_to_parent",
       "merge_policy" => "ff_only",
       "merge_target_ref" => "refs/heads/live",
-      "review_gate_required" => false
+      "review_gate_required" => false,
+      "docs_configured" => false
     )
   end
 

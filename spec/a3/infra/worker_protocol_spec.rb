@@ -293,6 +293,83 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(metadata.fetch("layers").map { |layer| layer.fetch("title") }).to include("prompts/implementation.md")
   end
 
+  it "adds docs-impact context to implementation worker requests" do
+    docs_root = workspace.slot_paths.fetch(:repo_beta).join("docs", "shared")
+    FileUtils.mkdir_p(docs_root)
+    docs_root.join("project-package-schema.md").write(
+      <<~MARKDOWN
+        ---
+        title: Project Package Schema
+        category: shared_specs
+        status: active
+        related_tickets:
+          - #{task.ref}
+        authorities:
+          - project_package_schema
+        ---
+
+        Schema constraints for workers.
+      MARKDOWN
+    )
+    runtime = A3::Domain::PhaseRuntimeConfig.new(
+      task_kind: :child,
+      repo_scope: :repo_beta,
+      phase: :implementation,
+      implementation_skill: "task implementation",
+      review_skill: "task review",
+      verification_commands: [],
+      remediation_commands: [],
+      workspace_hook: "bootstrap",
+      merge_target: :merge_to_parent,
+      merge_policy: :squash,
+      docs_config: {
+        "repoSlot" => "repo_beta",
+        "root" => "docs",
+        "categories" => {
+          "shared_specs" => { "path" => "docs/shared" }
+        },
+        "authorities" => {
+          "project_package_schema" => { "source" => "project.yaml" }
+        }
+      }
+    )
+    implementation_packet = A3::Domain::WorkerTaskPacket.new(
+      ref: task.ref,
+      external_task_id: task.external_task_id,
+      kind: task.kind,
+      edit_scope: task.edit_scope,
+      verification_scope: task.verification_scope,
+      parent_ref: task.parent_ref,
+      child_refs: task.child_refs,
+      title: "Update project-package schema",
+      description: "Change shared schema behavior.",
+      status: "In progress",
+      labels: []
+    )
+
+    request_form = described_class.new.request_form(
+      skill: runtime.implementation_skill,
+      workspace: workspace,
+      task: task,
+      run: implementation_run,
+      phase_runtime: runtime,
+      task_packet: implementation_packet
+    )
+
+    docs_context = request_form.fetch("docs_context")
+    expect(docs_context.fetch("decision")).to eq("yes")
+    expect(docs_context.fetch("categories")).to include("shared_specs")
+    expect(docs_context.fetch("candidate_docs")).to include(
+      hash_including(
+        "path" => "docs/shared/project-package-schema.md",
+        "title" => "Project Package Schema",
+        "reason" => "related_ticket:#{task.ref}",
+        "excerpt" => "Schema constraints for workers."
+      )
+    )
+    expect(docs_context.fetch("authority_precedence")).to eq(%w[authority_source docs evidence_artifacts ticket_text])
+  end
+
   it "keeps repo-slot implementation_rework addons when the base profile falls back to implementation" do
     prompt_config = A3::Domain::ProjectPromptConfig.new(
       phases: {

@@ -5,11 +5,11 @@ module A3
     class PhaseRuntimeConfig
       attr_reader :task_kind, :repo_scope, :phase, :implementation_skill, :review_skill,
                   :verification_commands, :remediation_commands, :metrics_collection_commands, :notification_config, :workspace_hook, :merge_target, :merge_policy,
-                  :merge_target_ref, :review_gate_required, :project_prompt_config
+                  :merge_target_ref, :review_gate_required, :project_prompt_config, :docs_config
 
       def initialize(task_kind:, repo_scope:, phase:, implementation_skill:, review_skill:, verification_commands:,
                      remediation_commands:, workspace_hook:, merge_target:, merge_policy:, metrics_collection_commands: [], merge_target_ref: nil,
-                     notification_config: A3::Domain::NotificationConfig.empty, review_gate_required: false, project_prompt_config: A3::Domain::ProjectPromptConfig.empty)
+                     notification_config: A3::Domain::NotificationConfig.empty, review_gate_required: false, project_prompt_config: A3::Domain::ProjectPromptConfig.empty, docs_config: nil)
         @task_kind = task_kind.to_sym
         @repo_scope = repo_scope.to_sym
         @phase = phase.to_sym
@@ -25,6 +25,7 @@ module A3
         @merge_target_ref = merge_target_ref
         @review_gate_required = !!review_gate_required
         @project_prompt_config = project_prompt_config || A3::Domain::ProjectPromptConfig.empty
+        @docs_config = deep_freeze_value(docs_config)
         freeze
       end
 
@@ -44,7 +45,8 @@ module A3
           other.merge_policy == merge_policy &&
           other.merge_target_ref == merge_target_ref &&
           other.review_gate_required == review_gate_required &&
-          other.project_prompt_config == project_prompt_config
+          other.project_prompt_config == project_prompt_config &&
+          other.docs_config == docs_config
       end
       alias eql? ==
 
@@ -63,8 +65,22 @@ module A3
           "merge_target" => merge_target.to_s,
           "merge_policy" => merge_policy.to_s,
           "merge_target_ref" => merge_target_ref,
-          "review_gate_required" => review_gate_required
+          "review_gate_required" => review_gate_required,
+          "docs_configured" => !docs_config.nil?
         }
+      end
+
+      private
+
+      def deep_freeze_value(value)
+        case value
+        when Hash
+          value.each_with_object({}) { |(key, entry), frozen| frozen[key] = deep_freeze_value(entry) }.freeze
+        when Array
+          value.map { |entry| deep_freeze_value(entry) }.freeze
+        else
+          value.frozen? ? value : value&.freeze
+        end
       end
     end
   end
