@@ -107,7 +107,8 @@ docs config は prompt / skill config と同じく厳格に検証する。
 | `shared_specs` | AI が独自実装を増やさないための共通仕様。 |
 | `frameworks` | プロダクト固有フレームワーク、共通ライブラリ、拡張ポイント。 |
 | `data_model` | DB、永続化、ドメインモデル、migration 方針。 |
-| `acl` | 外部 API 呼び出し、adapter / anti-corruption layer、認証、retry 方針。 |
+| `acl` | 認可、認証、permission、role、access control policy。 |
+| `external_api` | 外部 API 呼び出し、integration contract、adapter / anti-corruption layer、retry 方針。 |
 | `interfaces` | 外部 I/F、API、CLI、イベント、設定 schema。 |
 | `features` | 利用者から見た機能仕様。 |
 | `decisions` | なぜその構造にしたか、捨てた案、トレードオフ。 |

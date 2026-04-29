@@ -8,13 +8,16 @@ module A3
         "shared_specs" => %w[shared spec schema protocol model prompt skill project-package],
         "interfaces" => %w[api cli command event config configuration interface],
         "data_model" => %w[database db migration table schema model],
+        "acl" => %w[acl permission permissions role roles authorization authentication access],
+        "external_api" => %w[openapi graphql webhook external api integration integrations],
         "features" => %w[feature user behavior ux],
         "operations" => %w[operation release deploy doctor diagnostic monitoring],
         "migration" => %w[migration compatibility upgrade breaking]
       }.freeze
+      SHARED_SPEC_CATEGORIES = %w[shared_specs acl external_api].freeze
 
       CandidateDoc = Struct.new(:path, :title, :category, :reason, :excerpt, keyword_init: true)
-      Decision = Struct.new(:decision, :categories, :matched_rules, :candidate_docs, :authorities, :mirror_debt, :diagnostics, keyword_init: true) do
+      Decision = Struct.new(:decision, :categories, :matched_rules, :candidate_docs, :authorities, :authority_sources, :mirror_debt, :diagnostics, keyword_init: true) do
         def request_form
           {
             "decision" => decision,
@@ -23,6 +26,7 @@ module A3
             "candidate_docs" => candidate_docs.map { |candidate| stringify_hash(candidate.to_h) },
             "authority_precedence" => A3::Domain::ProjectDocsIndex::AUTHORITY_PRECEDENCE,
             "authorities" => authorities,
+            "authority_sources" => authority_sources.map { |source| stringify_hash(source.to_h) },
             "mirror_debt" => mirror_debt.map { |debt| stringify_hash(debt.to_h) },
             "diagnostics" => diagnostics.map { |diagnostic| stringify_hash(diagnostic.to_h) }
           }
@@ -52,8 +56,8 @@ module A3
         categories.each do |category|
           add_candidates(candidates, @docs_index.by_category(category), "category:#{category}")
         end
-        if categories.include?("shared_specs") || shared_spec_signal?(task_packet)
-          add_candidates(candidates, @docs_index.by_category("shared_specs"), "shared_specs_constraint")
+        shared_spec_categories(categories, task_packet).each do |category|
+          add_candidates(candidates, @docs_index.by_category(category), "#{category}_constraint")
         end
         authorities = candidates.flat_map { |candidate| Array(candidate[:document].authorities) }.uniq.sort
         decision = decision_for(categories: categories, candidates: candidates, matched_rules: matched)
@@ -63,6 +67,7 @@ module A3
           matched_rules: matched.uniq,
           candidate_docs: candidates.map { |candidate| candidate_doc(candidate.fetch(:document), candidate.fetch(:reason)) },
           authorities: authorities.map { |name| { "name" => name, "declaration" => @docs_index.authority(name) }.compact },
+          authority_sources: @docs_index.authority_sources,
           mirror_debt: @docs_index.mirror_debt,
           diagnostics: @docs_index.diagnostics
         )
@@ -91,6 +96,13 @@ module A3
 
       def shared_spec_signal?(task_packet)
         [task_packet.title, task_packet.description].join(" ").downcase.match?(/shared|common|schema|protocol|prompt|skill|project-package/)
+      end
+
+      def shared_spec_categories(categories, task_packet)
+        selected = categories & SHARED_SPEC_CATEGORIES
+        selected << "shared_specs" if categories.include?("shared_specs")
+        selected << "shared_specs" if shared_spec_signal?(task_packet)
+        selected.uniq
       end
 
       def add_candidates(candidates, documents, reason)

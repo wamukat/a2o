@@ -53,8 +53,9 @@ module A3
       Diagnostic = Struct.new(:severity, :path, :field, :message, keyword_init: true)
       ManagedIndexBlock = Struct.new(:path, :content, keyword_init: true)
       MirrorDebt = Struct.new(:source_path, :language, :expected_path, keyword_init: true)
+      AuthoritySource = Struct.new(:name, :source, :exists, :path, keyword_init: true)
 
-      attr_reader :documents, :diagnostics, :managed_index_blocks, :authorities, :mirror_debt
+      attr_reader :documents, :diagnostics, :managed_index_blocks, :authorities, :mirror_debt, :authority_sources
 
       def self.load(repo_root:, docs_config:)
         new(repo_root: repo_root, docs_config: docs_config).load
@@ -68,6 +69,7 @@ module A3
         @managed_index_blocks = []
         @authorities = stringify_keys(@docs_config.fetch("authorities", {}))
         @mirror_debt = []
+        @authority_sources = []
       end
 
       def load
@@ -75,6 +77,7 @@ module A3
           parse_document(path)
         end
         load_managed_index_blocks
+        resolve_authority_sources
         record_mirror_debt
         self
       end
@@ -238,6 +241,26 @@ module A3
 
             mirror_debt << MirrorDebt.new(source_path: document.path, language: language.to_s, expected_path: expected_path)
           end
+        end
+      end
+
+      def resolve_authority_sources
+        authorities.keys.sort.each do |name|
+          declaration = stringify_keys(authorities.fetch(name, {}))
+          source = declaration["source"].to_s
+          next if source.empty?
+
+          absolute_path = safe_repo_path(source)
+          exists = !!(absolute_path && File.exist?(absolute_path))
+          authority_sources << AuthoritySource.new(
+            name: name,
+            source: source,
+            exists: exists,
+            path: absolute_path && repo_relative_path(absolute_path)
+          )
+          next if exists
+
+          diagnostic(:warning, source, "authorities.#{name}.source", "authority source is declared but missing")
         end
       end
 

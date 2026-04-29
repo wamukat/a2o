@@ -39,6 +39,7 @@ RSpec.describe A3::Domain::ProjectDocsIndex do
         Body.
       MARKDOWN
     )
+    write_file("project-package/project.yaml", "name: sample\n")
     write_file(
       "docs/README.md",
       <<~MARKDOWN
@@ -71,8 +72,57 @@ RSpec.describe A3::Domain::ProjectDocsIndex do
     expect(index.by_related_ticket("A2O#386").map(&:title)).to eq(["Prompt Composition Model"])
     expect(index.by_authority("project_package_schema").map(&:title)).to eq(["Prompt Composition Model"])
     expect(index.authority("project_package_schema")).to eq("source" => "project-package/project.yaml")
+    expect(index.authority_sources.map(&:to_h)).to eq(
+      [
+        {
+          name: "project_package_schema",
+          source: "project-package/project.yaml",
+          exists: true,
+          path: "project-package/project.yaml"
+        }
+      ]
+    )
     expect(index.authority_precedence("project_package_schema")).to eq(%w[authority_source docs evidence_artifacts ticket_text])
     expect(index.managed_index_blocks.map(&:content)).to eq(["- [Prompt Composition Model](shared/prompt-composition.md)"])
+  end
+
+  it "records authority source drift when a declared source is missing" do
+    write_file(
+      "docs/shared/api.md",
+      <<~MARKDOWN
+        ---
+        title: API
+        category: external_api
+        authorities:
+          - openapi
+        ---
+
+        Body.
+      MARKDOWN
+    )
+
+    index = described_class.load(
+      repo_root: @repo_root,
+      docs_config: {
+        "root" => "docs",
+        "authorities" => {
+          "openapi" => { "source" => "spec/openapi.yaml" }
+        }
+      }
+    )
+
+    expect(index.authority_sources.map(&:to_h)).to include(
+      name: "openapi",
+      source: "spec/openapi.yaml",
+      exists: false,
+      path: "spec/openapi.yaml"
+    )
+    expect(index.diagnostics.map(&:to_h)).to include(
+      severity: :warning,
+      path: "spec/openapi.yaml",
+      field: "authorities.openapi.source",
+      message: "authority source is declared but missing"
+    )
   end
 
   it "records actionable diagnostics for malformed front matter and lifecycle fields" do

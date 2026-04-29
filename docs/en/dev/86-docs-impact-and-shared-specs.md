@@ -107,7 +107,8 @@ Initial first-class categories:
 | `shared_specs` | Shared specifications that prevent duplicate local implementations. |
 | `frameworks` | Product-specific frameworks, shared libraries, and extension points. |
 | `data_model` | DB, persistence, domain model, and migration policy. |
-| `acl` | External API calls, adapters, anti-corruption layers, auth, and retry policy. |
+| `acl` | Authorization, authentication, permissions, roles, and access control policy. |
+| `external_api` | External API calls, integration contracts, adapters, anti-corruption layers, and retry policy. |
 | `interfaces` | External interfaces, APIs, CLI, events, and config schemas. |
 | `features` | User-visible feature behavior. |
 | `decisions` | Rationale, rejected alternatives, and tradeoffs. |

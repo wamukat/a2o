@@ -32,6 +32,7 @@ RSpec.describe A3::Domain::ProjectDocsImpactAnalyzer do
         Project package schema constraints.
       MARKDOWN
     )
+    write_file("project.yaml", "name: sample\n")
     index = A3::Domain::ProjectDocsIndex.load(
       repo_root: @repo_root,
       docs_config: {
@@ -59,7 +60,71 @@ RSpec.describe A3::Domain::ProjectDocsImpactAnalyzer do
     expect(decision.candidate_docs.map(&:path)).to include("docs/shared/project-package-schema.md")
     expect(decision.candidate_docs.map(&:reason)).to include("related_requirement:A2O#385", "related_ticket:A2O#388", "source_issue:wamukat/a2o#53")
     expect(decision.authorities).to eq([{ "name" => "project_package_schema", "declaration" => { "source" => "project.yaml" } }])
+    expect(decision.request_form.fetch("authority_sources")).to include(
+      hash_including(
+        "name" => "project_package_schema",
+        "source" => "project.yaml",
+        "exists" => true
+      )
+    )
     expect(decision.request_form.fetch("authority_precedence")).to eq(%w[authority_source docs evidence_artifacts ticket_text])
+  end
+
+  it "treats ACL and external API specs as shared-spec constraints" do
+    write_file(
+      "docs/acl/roles.md",
+      <<~MARKDOWN
+        ---
+        title: Role Matrix
+        category: acl
+        status: active
+        ---
+
+        Shared authorization role constraints.
+      MARKDOWN
+    )
+    write_file(
+      "docs/api/openapi.md",
+      <<~MARKDOWN
+        ---
+        title: External API Contract
+        category: external_api
+        status: active
+        authorities:
+          - openapi
+        ---
+
+        External API integration constraints.
+      MARKDOWN
+    )
+    write_file("spec/openapi.yaml", "openapi: 3.1.0\n")
+    index = A3::Domain::ProjectDocsIndex.load(
+      repo_root: @repo_root,
+      docs_config: {
+        "root" => "docs",
+        "categories" => {
+          "acl" => { "path" => "docs/acl" },
+          "external_api" => { "path" => "docs/api" }
+        },
+        "authorities" => {
+          "openapi" => { "source" => "spec/openapi.yaml" }
+        }
+      }
+    )
+    task = A3::Domain::Task.new(ref: "A2O#392", kind: :child, edit_scope: [:repo_alpha])
+    packet = task_packet(
+      ref: task.ref,
+      title: "Add role-based external API integration",
+      description: "Change ACL permissions and OpenAPI webhook behavior."
+    )
+
+    decision = described_class.new(docs_index: index).analyze(task: task, task_packet: packet)
+
+    expect(decision.categories).to include("acl", "external_api")
+    expect(decision.candidate_docs.map(&:path)).to include("docs/acl/roles.md", "docs/api/openapi.md")
+    expect(decision.request_form.fetch("authority_sources")).to include(
+      hash_including("name" => "openapi", "source" => "spec/openapi.yaml", "exists" => true)
+    )
   end
 
   it "records maybe for matched docs-impact rules without a candidate doc" do
