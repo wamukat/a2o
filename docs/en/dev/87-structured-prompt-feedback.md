@@ -24,7 +24,7 @@ Each feedback event is tied to a task, run, phase, prompt identity, and observed
     "effective_profile": "implementation",
     "fallback_profile": "implementation",
     "repo_slot": "app",
-    "schema_version": "1",
+    "project_package_schema_version": "1",
     "composed_instruction_sha256": "..."
   },
   "category": "missing_verification",
@@ -59,7 +59,7 @@ Recommended `category` values are stable strings, not free-form prose: `schema_i
 
 Use layered storage so normal Kanban comments stay concise:
 
-- Run artifacts: canonical JSONL feedback records. This is the durable source for analysis.
+- Run artifacts: canonical JSONL feedback records under the existing analysis artifact area, initially `prompt-feedback/<task_ref>/<run_ref>.jsonl`. This is the durable source for analysis and follows the same retention/access policy as other prompt / skill / executor analysis artifacts.
 - Execution diagnostics: summarized counts and prompt identity fields only.
 - Kanbalone structured logs or ticket comments: rendered summaries such as `prompt_feedback category=missing_verification count=1 prompt=implementation_rework sha256=...`.
 
@@ -99,7 +99,6 @@ The first implementation should not create draft prompt edits. A later workflow 
 
 ## Open Questions
 
-- Whether feedback records should be stored in the existing analysis artifact root or a dedicated prompt-feedback store.
+- Whether a later release should move feedback records from the existing analysis artifact area to a dedicated prompt-feedback store.
 - Whether Kanbalone should receive first-class structured feedback fields, or only rendered comments in the first release.
-- How long prompt feedback artifacts should be retained relative to AI raw logs and execution metadata.
-
+- Whether prompt feedback retention needs a shorter default than AI raw logs and execution metadata.

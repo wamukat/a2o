@@ -24,7 +24,7 @@ prompt guidance が不足した箇所や失敗した箇所を構造化 evidence 
     "effective_profile": "implementation",
     "fallback_profile": "implementation",
     "repo_slot": "app",
-    "schema_version": "1",
+    "project_package_schema_version": "1",
     "composed_instruction_sha256": "..."
   },
   "category": "missing_verification",
@@ -59,7 +59,7 @@ prompt guidance が不足した箇所や失敗した箇所を構造化 evidence 
 
 通常の Kanban comment を簡潔に保つため、保存先を分ける。
 
-- Run artifact: 正本となる JSONL feedback record。分析用の durable source とする。
+- Run artifact: 既存の analysis artifact area 配下に置く正本 JSONL feedback record。初期 path は `prompt-feedback/<task_ref>/<run_ref>.jsonl` とする。分析用の durable source であり、prompt / skill / executor analysis artifact と同じ retention / access policy に従う。
 - Execution diagnostics: count summary と prompt identity field だけを載せる。
 - Kanbalone structured log または ticket comment: `prompt_feedback category=missing_verification count=1 prompt=implementation_rework sha256=...` のような summary を描画する。
 
@@ -99,7 +99,6 @@ prompt guidance が不足した箇所や失敗した箇所を構造化 evidence 
 
 ## Open Questions
 
-- feedback record を既存の analysis artifact root に置くか、専用 prompt-feedback store に置くか。
+- 将来 release で feedback record を既存の analysis artifact area から専用 prompt-feedback store へ移すべきか。
 - Kanbalone に first-class structured feedback field を追加するか、初回は rendered comment のみにするか。
-- prompt feedback artifact の retention を AI raw log / execution metadata とどう揃えるか。
-
+- prompt feedback retention に AI raw log / execution metadata より短い default が必要か。
