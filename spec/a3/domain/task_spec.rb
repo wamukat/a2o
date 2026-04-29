@@ -143,7 +143,7 @@ RSpec.describe A3::Domain::Task do
       expect(task.child_refs).to eq(["A3-v2#3025", "A3-v2#3026"])
     end
 
-    it "derives repo_scope both when multiple edit scopes exist" do
+    it "keeps ordered repo_slots when legacy repo_scope collapses multiple edit scopes" do
       task = described_class.new(
         ref: "A3-v2#3022",
         kind: :parent,
@@ -151,6 +151,7 @@ RSpec.describe A3::Domain::Task do
       )
 
       expect(task.repo_scope_key).to eq(:both)
+      expect(task.repo_slots).to eq([:repo_alpha, :repo_beta])
     end
   end
 

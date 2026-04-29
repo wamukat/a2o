@@ -116,6 +116,10 @@ module A3
         edit_scope.fetch(0)
       end
 
+      def repo_slots
+        edit_scope
+      end
+
       def runnable_phase
         return nil if current_run_ref
 

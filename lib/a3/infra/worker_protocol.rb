@@ -241,6 +241,9 @@ module A3
       end
 
       def repo_prompt_slots(phase_runtime, task_packet)
+        runtime_slots = phase_runtime.respond_to?(:repo_slots) ? Array(phase_runtime.repo_slots).map(&:to_s).reject(&:empty?) : []
+        return runtime_slots unless runtime_slots.empty?
+
         repo_scope = phase_runtime.repo_scope.to_s
         return [] if repo_scope.empty?
         return [repo_scope] unless repo_scope == "both"

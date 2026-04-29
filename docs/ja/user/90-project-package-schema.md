@@ -304,7 +304,7 @@ runtime:
 
 すべての path は package からの相対 path で、空文字は使えない。prompt phase 名は A2O が認識する phase profile に限定される。`phases.<phase>.skills` は宣言順を維持し、同じ skill file を重複指定してはならない。`implementation_rework` は任意であり、未設定の場合は `implementation` の prompt profile にフォールバックする。`repoSlots.<slot>.phases` は project phase default に対する追加 layer であり、`<slot>` は `repos` の entry と一致する必要がある。phase prompt / skill の後に repo-slot prompt / skill を合成し、diagnostics/evidence では `repo_slot_phase_prompt`、`repo_slot_phase_skill`、`repo_slot_decomposition_child_draft_template` として区別できる。
 
-`repo_scope=both` のように複数 repo をまたぐ task では、A2O は task の `edit_scope` に含まれる各 slot の repo-slot addon を、その順序で合成する。たとえば `app` と `lib` を触る multi-repo implementation では、project-wide phase prompt の後に `repoSlots.app` の phase addon、続いて `repoSlots.lib` の phase addon、最後に ticket-specific instruction を渡す。diagnostics には順序付き list として `repo_slots` を出し、従来の単数 `repo_slot` は single-slot task の場合だけ設定する。複数 slot の指示を同時に渡すと広すぎる、または衝突する場合は、task を repo slot 単位の child に分ける。
+複数 repo をまたぐ task では、A2O は task の `repo_slots` / `edit_scope` に含まれる各 slot の repo-slot addon を、その順序で合成する。たとえば `app` と `lib` を触る multi-repo implementation では、project-wide phase prompt の後に `repoSlots.app` の phase addon、続いて `repoSlots.lib` の phase addon、最後に ticket-specific instruction を渡す。diagnostics には順序付き list として `repo_slots` を出す。`repo_scope` は互換 field として残し、従来の単数 `repo_slot` は single-slot task の場合だけ設定する。複数 slot の指示を同時に渡すと広すぎる、または衝突する場合は、task を repo slot 単位の child に分ける。
 
 合成順序は固定で、すべて追加 layer として扱う。
 
@@ -348,7 +348,7 @@ a2o prompt preview --phase decomposition --repo-slot app A2O#123
 a2o prompt preview --phase decomposition --repo-slot app --repo-slot lib A2O#123
 ```
 
-preview は Kanban state を変更せず、選択した phase に適用される A2O core instruction、project system prompt、phase prompt、phase skill、repo-slot addon、ticket phase instruction、task/runtime data、最終的な composed instruction を layer ごとに表示する。multi-repo の `repo_scope=both` 合成を確認する場合は、task の `edit_scope` と同じ順序で `--repo-slot` を複数指定する。`parent_review` を見る場合は `--task-kind parent`、`implementation_rework` を見る場合は `--prior-review-feedback` を指定する。
+preview は Kanban state を変更せず、選択した phase に適用される A2O core instruction、project system prompt、phase prompt、phase skill、repo-slot addon、ticket phase instruction、task/runtime data、最終的な composed instruction を layer ごとに表示する。multi-repo 合成を確認する場合は、task の `repo_slots` / `edit_scope` と同じ順序で `--repo-slot` を複数指定する。`parent_review` を見る場合は `--task-kind parent`、`implementation_rework` を見る場合は `--prior-review-feedback` を指定する。
 
 worker を実行せず、Kanban state も変更せずに prompt config を診断するには次を使う。
 

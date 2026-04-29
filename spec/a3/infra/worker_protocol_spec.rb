@@ -608,7 +608,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(metadata.fetch("layers").map { |layer| layer.fetch("kind") }).to include("repo_slot_phase_prompt", "repo_slot_phase_skill")
   end
 
-  it "composes repo-slot prompt addons for each scoped slot when repo_scope is both" do
+  it "composes repo-slot prompt addons from explicit repo_slots on multi-repo requests" do
     prompt_config = A3::Domain::ProjectPromptConfig.new(
       phases: {
         "implementation" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
@@ -628,7 +628,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
         }
       }
     )
-    runtime = phase_runtime_with_prompt_config(prompt_config, phase: :implementation, repo_scope: :both)
+    runtime = phase_runtime_with_prompt_config(prompt_config, phase: :implementation, repo_scope: :both, repo_slots: %i[repo_alpha repo_beta])
     multi_repo_packet = A3::Domain::WorkerTaskPacket.new(
       ref: task.ref,
       external_task_id: task.external_task_id,
@@ -1290,10 +1290,11 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
-  def phase_runtime_with_prompt_config(prompt_config, phase: :review, repo_scope: :ui_app)
+  def phase_runtime_with_prompt_config(prompt_config, phase: :review, repo_scope: :ui_app, repo_slots: nil)
     A3::Domain::PhaseRuntimeConfig.new(
       task_kind: :child,
       repo_scope: repo_scope,
+      repo_slots: repo_slots,
       phase: phase,
       implementation_skill: "task implementation",
       review_skill: "task review",

@@ -29,7 +29,7 @@ A2O 0.5.52 で現在利用できる公開機能と検証範囲を示す。
 - investigate decomposition MVP: `runtime.decomposition.investigate.command`、`runtime.decomposition.author.command`、`a2o runtime decomposition investigate`、`propose`、`review`、`create-children`、`status`、`cleanup`
 - decomposition command UX: `a2o runtime decomposition <action> --help` の action-level help と、単発 decomposition command の外部 task 同期 / 照合
 - gate closed の decomposition child creation は、空の `success=` を表示せず、`status=gate_closed` と `child_creation_result=not_attempted` を表示する
-- project prompt composition: `runtime.prompts.repoSlots` は multi-repo の `repo_scope=both` task で、task の `edit_scope` 順に各 repo slot の prompt / skill addon を合成する。
+- project prompt composition: `runtime.prompts.repoSlots` は multi-repo task で、task の `repo_slots` / `edit_scope` 順に各 repo slot の prompt / skill addon を合成する。
 - prompt diagnostics / evidence は順序付きの `project_prompt.repo_slots` を出力する。従来の単数 `repo_slot` は single-slot task の場合だけ設定される。
 - prompt preview は `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib A2O#123` または `a2o prompt preview --phase implementation --repo-slot app,lib A2O#123` のように、複数 repo slot を指定した multi-repo 合成確認に対応する。
 - agent server 接続向けの project runtime 調整項目: `runtime.agent_control_plane_connect_timeout`、`runtime.agent_control_plane_request_timeout`、`runtime.agent_control_plane_retry_count`、`runtime.agent_control_plane_retry_delay`
@@ -47,7 +47,7 @@ A2O 0.5.52 で現在利用できる公開機能と検証範囲を示す。
 
 ## マイグレーション案内
 
-- 既に `runtime.prompts.repoSlots` を定義している project package は、upgrade 前に multi-repo task を確認すること。A2O 0.5.52 では `repo_scope=both` task に対し、task の `edit_scope` 順にすべての repo-slot addon を渡す。以前の release では単数 repo-slot layer だけが適用対象だったため、slot 固有の指示が組み合わさって広すぎる、または衝突する場合がある。その場合は repo slot 単位の child task に分割するか、package prompt を調整する。worker 実行前に `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib <task-ref>` で合成後の instruction を確認する。
+- 既に `runtime.prompts.repoSlots` を定義している project package は、upgrade 前に multi-repo task を確認すること。multi-repo task では `repo_slots` / `edit_scope` 順にすべての repo-slot addon を渡す。以前の release では単数 repo-slot layer だけが適用対象だったため、slot 固有の指示が組み合わさって広すぎる、または衝突する場合がある。その場合は repo slot 単位の child task に分割するか、package prompt を調整する。worker 実行前に `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib <task-ref>` で合成後の instruction を確認する。
 - `a2o runtime start` と `a2o runtime stop` は互換 alias ではなくなった。常駐スケジューラを再開する場合は `a2o runtime resume`、現在の作業後に停止予約する場合は `a2o runtime pause` を使う。削除済みコマンドを実行した場合、A2O は非ゼロで終了し、`migration_required=true` と移行先コマンドを表示する。
 - SoloBoard 時代の Kanbalone 互換名は削除された。`KANBAN_BACKEND=kanbalone`、`KANBALONE_BASE_URL`、`KANBALONE_API_TOKEN`、`--kanbalone-port`、`A2O_BUNDLE_KANBALONE_PORT`、`A2O_KANBALONE_INTERNAL_URL` を使う。削除済み SoloBoard 入力を使った場合は `migration_required=true` と置き換え先を表示する。
 - 同梱 Kanbalone のデータ名は `<compose-project>_soloboard-data` / `soloboard.sqlite` から `<compose-project>_kanbalone-data` / `kanbalone.sqlite` に変わった。旧 volume が存在し、新 volume が存在しない場合、`a2o kanban up` は空の board を作らず `migration_required=true` で停止する。同梱サービスを起動する前に、既存の Kanban data を copy または rename する。

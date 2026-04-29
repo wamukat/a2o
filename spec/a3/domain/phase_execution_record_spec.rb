@@ -34,6 +34,7 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
       "runtime_snapshot" => {
         "task_kind" => "child",
         "repo_scope" => "ui_app",
+        "repo_slots" => ["ui_app"],
         "phase" => "review",
         "implementation_skill" => "sample-implementation",
         "review_skill" => "sample-review",

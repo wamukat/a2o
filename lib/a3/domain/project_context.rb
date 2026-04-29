@@ -20,6 +20,7 @@ module A3
         A3::Domain::PhaseRuntimeConfig.new(
           task_kind: task.kind,
           repo_scope: task.repo_scope_key,
+          repo_slots: task.repo_slots,
           phase: phase,
           implementation_skill: surface.resolve(:implementation_skill, task_kind: task.kind, repo_scope: task.repo_scope_key, phase: phase),
           review_skill: surface.resolve(:review_skill, task_kind: task.kind, repo_scope: task.repo_scope_key, phase: phase),

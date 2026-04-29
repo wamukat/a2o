@@ -50,6 +50,7 @@ RSpec.describe A3::Domain::ProjectContext do
 
     expect(runtime.task_kind).to eq(:parent)
     expect(runtime.repo_scope).to eq(:both)
+    expect(runtime.repo_slots).to eq(%i[repo_alpha repo_beta])
     expect(runtime.phase).to eq(:review)
     expect(runtime.implementation_skill).to eq("skills/implementation/base.md")
     expect(runtime.review_skill).to eq("skills/review/default.md")
@@ -72,6 +73,7 @@ RSpec.describe A3::Domain::ProjectContext do
     expect(runtime.worker_request_form).to eq(
       "task_kind" => "parent",
       "repo_scope" => "both",
+      "repo_slots" => ["repo_alpha", "repo_beta"],
       "phase" => "review",
       "workspace_hook" => "hooks/prepare-runtime.sh",
       "implementation_skill" => "skills/implementation/base.md",

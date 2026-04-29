@@ -3,15 +3,16 @@
 module A3
   module Domain
     class PhaseRuntimeConfig
-      attr_reader :task_kind, :repo_scope, :phase, :implementation_skill, :review_skill,
+      attr_reader :task_kind, :repo_scope, :repo_slots, :phase, :implementation_skill, :review_skill,
                   :verification_commands, :remediation_commands, :metrics_collection_commands, :notification_config, :workspace_hook, :merge_target, :merge_policy,
                   :merge_target_ref, :review_gate_required, :project_prompt_config, :docs_config
 
       def initialize(task_kind:, repo_scope:, phase:, implementation_skill:, review_skill:, verification_commands:,
                      remediation_commands:, workspace_hook:, merge_target:, merge_policy:, metrics_collection_commands: [], merge_target_ref: nil,
-                     notification_config: A3::Domain::NotificationConfig.empty, review_gate_required: false, project_prompt_config: A3::Domain::ProjectPromptConfig.empty, docs_config: nil)
+                     notification_config: A3::Domain::NotificationConfig.empty, review_gate_required: false, project_prompt_config: A3::Domain::ProjectPromptConfig.empty, docs_config: nil, repo_slots: nil)
         @task_kind = task_kind.to_sym
         @repo_scope = repo_scope.to_sym
+        @repo_slots = normalize_repo_slots(repo_slots, fallback_scope: @repo_scope)
         @phase = phase.to_sym
         @implementation_skill = implementation_skill
         @review_skill = review_skill
@@ -33,6 +34,7 @@ module A3
         other.is_a?(self.class) &&
           other.task_kind == task_kind &&
           other.repo_scope == repo_scope &&
+          other.repo_slots == repo_slots &&
           other.phase == phase &&
           other.implementation_skill == implementation_skill &&
           other.review_skill == review_skill &&
@@ -54,6 +56,7 @@ module A3
         {
           "task_kind" => task_kind.to_s,
           "repo_scope" => repo_scope.to_s,
+          "repo_slots" => repo_slots.map(&:to_s),
           "phase" => phase.to_s,
           "workspace_hook" => workspace_hook,
           "implementation_skill" => implementation_skill,
@@ -71,6 +74,12 @@ module A3
       end
 
       private
+
+      def normalize_repo_slots(value, fallback_scope:)
+        slots = Array(value).map(&:to_sym).reject { |slot| slot.to_s.empty? }.uniq
+        slots = [fallback_scope] if slots.empty? && fallback_scope != :both
+        slots.freeze
+      end
 
       def deep_freeze_value(value)
         case value

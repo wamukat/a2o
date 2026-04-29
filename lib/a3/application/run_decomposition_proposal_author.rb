@@ -170,6 +170,9 @@ module A3
       end
 
       def decomposition_prompt_repo_slots(task)
+        task_slots = task.respond_to?(:repo_slots) ? Array(task.repo_slots).map(&:to_s).reject(&:empty?) : []
+        return task_slots unless task_slots.empty?
+
         repo_scope = task.repo_scope_key.to_s
         return [] if repo_scope.empty?
         return [repo_scope] unless repo_scope == "both"

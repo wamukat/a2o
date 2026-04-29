@@ -300,7 +300,7 @@ runtime:
 
 All paths are package-relative non-empty strings. Prompt phase names are limited to A2O-recognized phase profiles. `phases.<phase>.skills` preserves the declared order and must not list the same skill file more than once. `implementation_rework` is optional and falls back to `implementation` when no rework-specific prompt profile is configured. `repoSlots.<slot>.phases` is an additive layer on top of the project phase defaults, and `<slot>` must match a `repos` entry. Phase prompts and skills are composed before repo-slot prompts and skills. Diagnostics and evidence identify repo-slot layers as `repo_slot_phase_prompt`, `repo_slot_phase_skill`, or `repo_slot_decomposition_child_draft_template`.
 
-For tasks that span multiple repositories, such as `repo_scope=both`, A2O composes repo-slot addons for each slot in the task `edit_scope`, in that order. A multi-repo implementation touching `app` and `lib` therefore receives the project-wide phase prompt first, then `repoSlots.app` phase addons, then `repoSlots.lib` phase addons, before ticket-specific instructions. Diagnostics expose `repo_slots` as the ordered list; the legacy singular `repo_slot` field is populated only for single-slot tasks. If the combined instructions would be too broad or conflicting, split the work into repo-slot child tasks.
+For tasks that span multiple repositories, A2O composes repo-slot addons for each slot in the task `repo_slots` / `edit_scope`, in that order. A multi-repo implementation touching `app` and `lib` therefore receives the project-wide phase prompt first, then `repoSlots.app` phase addons, then `repoSlots.lib` phase addons, before ticket-specific instructions. Diagnostics expose `repo_slots` as the ordered list; the legacy `repo_scope` field is kept for compatibility and the singular `repo_slot` field is populated only for single-slot tasks. If the combined instructions would be too broad or conflicting, split the work into repo-slot child tasks.
 
 Composition order is fixed and additive:
 
@@ -344,7 +344,7 @@ a2o prompt preview --phase decomposition --repo-slot app A2O#123
 a2o prompt preview --phase decomposition --repo-slot app --repo-slot lib A2O#123
 ```
 
-The preview prints each non-mutating layer, including A2O core instruction, project system prompt, phase prompt, phase skills, repo-slot addons, ticket phase instruction, task/runtime data, and the final composed instruction when those layers apply to the selected phase. Repeat `--repo-slot` in the same order as the task `edit_scope` to preview multi-repo `repo_scope=both` composition. Use `--task-kind parent` to preview `parent_review`, and `--prior-review-feedback` to preview `implementation_rework`.
+The preview prints each non-mutating layer, including A2O core instruction, project system prompt, phase prompt, phase skills, repo-slot addons, ticket phase instruction, task/runtime data, and the final composed instruction when those layers apply to the selected phase. Repeat `--repo-slot` in the same order as the task `repo_slots` / `edit_scope` to preview multi-repo composition. Use `--task-kind parent` to preview `parent_review`, and `--prior-review-feedback` to preview `implementation_rework`.
 
 Validate prompt configuration without running workers or changing Kanban state with:
 
