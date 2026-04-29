@@ -597,6 +597,61 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "runs accept-decomposition-drafts with explicit child selection" do
+    out = StringIO.new
+    task = A3::Domain::Task.new(ref: "Portal#240", kind: :single, edit_scope: [:repo_alpha], external_task_id: 240)
+    repository = instance_double(A3::Infra::JsonTaskRepository, fetch: task)
+    allow(described_class).to receive(:build_watch_summary_repositories).and_return(task_repository: repository)
+    writer = instance_double(A3::Infra::KanbanCliDraftAcceptanceWriter)
+    result = A3::Infra::KanbanCliDraftAcceptanceWriter::Result.new(
+      success?: true,
+      accepted_refs: ["Portal#241"],
+      skipped_refs: [],
+      parent_automation_applied: true,
+      summary: "accepted 1 draft child ticket(s); skipped 0"
+    )
+    expect(A3::Infra::KanbanCliDraftAcceptanceWriter).to receive(:new).with(
+      command_argv: ["kanban"],
+      project: "Portal",
+      working_dir: nil
+    ).and_return(writer)
+    expect(writer).to receive(:call).with(
+      parent_task_ref: "Portal#240",
+      parent_external_task_id: 240,
+      child_refs: ["Portal#241"],
+      all: false,
+      ready_only: false,
+      remove_draft_label: true,
+      parent_auto: true
+    ).and_return(result)
+
+    described_class.start(
+      [
+        "accept-decomposition-drafts",
+        "Portal#240",
+        "--child", "Portal#241",
+        "--remove-draft-label",
+        "--parent-auto",
+        "--kanban-command", "kanban",
+        "--kanban-project", "Portal"
+      ],
+      out: out
+    )
+
+    expect(out.string).to include("decomposition draft acceptance Portal#240 success=true")
+    expect(out.string).to include("accepted_refs=Portal#241")
+    expect(out.string).to include("parent_automation_applied=true")
+  end
+
+  it "requires an explicit accept-decomposition-drafts selector" do
+    expect do
+      described_class.send(
+        :parse_accept_decomposition_drafts_options,
+        ["Portal#240", "--kanban-command", "kanban", "--kanban-project", "Portal"]
+      )
+    end.to raise_error(ArgumentError, /exactly one selector/)
+  end
+
   it "raises record not found for direct child creation when no local or external task source can resolve the task" do
     Dir.mktmpdir do |dir|
       expect do

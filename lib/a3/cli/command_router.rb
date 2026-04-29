@@ -39,6 +39,7 @@ module A3
         "run-decomposition-proposal-author" => Definition.new(handler: :handle_run_decomposition_proposal_author, session_kind: :runtime),
         "run-decomposition-proposal-review" => Definition.new(handler: :handle_run_decomposition_proposal_review, session_kind: :runtime),
         "run-decomposition-child-creation" => Definition.new(handler: :handle_run_decomposition_child_creation, session_kind: :storage),
+        "accept-decomposition-drafts" => Definition.new(handler: :handle_accept_decomposition_drafts, session_kind: :storage),
         "show-decomposition-status" => Definition.new(handler: :handle_show_decomposition_status, session_kind: :storage),
         "cleanup-decomposition-trial" => Definition.new(handler: :handle_cleanup_decomposition_trial, session_kind: :storage),
         "execute-next-runnable-task" => Definition.new(handler: :handle_execute_next_runnable_task, needs_worker_gateway: true, session_kind: :runtime),

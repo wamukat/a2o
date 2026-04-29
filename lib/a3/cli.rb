@@ -445,6 +445,43 @@ module A3
       out.puts("evidence_path=#{result.evidence_path}")
     end
 
+    def handle_accept_decomposition_drafts(argv, out:, run_id_generator:, command_runner:, merge_runner:)
+      options = parse_accept_decomposition_drafts_options(argv)
+      repositories = build_watch_summary_repositories(options: options)
+      external_task_source =
+        if kanban_bridge_enabled?(options)
+          build_external_task_source(options)
+        else
+          A3::Infra::NullExternalTaskSource.new
+        end
+      task = resolve_direct_task(
+        task_repository: repositories.fetch(:task_repository),
+        external_task_source: external_task_source,
+        task_ref: options.fetch(:task_ref)
+      )
+      writer = A3::Infra::KanbanCliDraftAcceptanceWriter.new(
+        command_argv: kanban_command_argv(options),
+        project: options.fetch(:kanban_project),
+        working_dir: options[:kanban_working_dir]
+      )
+      result = writer.call(
+        parent_task_ref: task.ref,
+        parent_external_task_id: task.external_task_id,
+        child_refs: options.fetch(:child_refs),
+        all: options.fetch(:all),
+        ready_only: options.fetch(:ready_only),
+        remove_draft_label: options.fetch(:remove_draft_label),
+        parent_auto: options.fetch(:parent_auto)
+      )
+
+      out.puts("decomposition draft acceptance #{task.ref} success=#{result.success?}")
+      out.puts("summary=#{result.summary}")
+      out.puts("accepted_refs=#{result.accepted_refs.join(',')}")
+      out.puts("skipped_refs=#{result.skipped_refs.join(',')}")
+      out.puts("parent_automation_applied=#{result.parent_automation_applied}")
+      out.puts("error=#{result.diagnostics['error']}") if result.diagnostics && result.diagnostics["error"]
+    end
+
     def handle_show_decomposition_status(argv, out:, run_id_generator:, command_runner:, merge_runner:)
       with_storage_container(
         argv: argv,
@@ -1734,6 +1771,39 @@ module A3
       if options.fetch(:gate) && (!options[:kanban_command] || !options[:kanban_project])
         raise ArgumentError, "child creation requires --kanban-command and --kanban-project when --gate is set"
       end
+      options
+    end
+
+    def parse_accept_decomposition_drafts_options(argv)
+      options = {
+        storage_backend: :json,
+        storage_dir: default_storage_dir,
+        repo_sources: {},
+        child_refs: [],
+        all: false,
+        ready_only: false,
+        remove_draft_label: false,
+        parent_auto: false
+      }
+      parser = OptionParser.new
+      parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
+      parser.on("--storage-dir DIR") { |value| options[:storage_dir] = File.expand_path(value) }
+      parser.on("--repo-source SLOT=PATH") { |value| add_repo_source_option(options, value) }
+      parser.on("--child REF") { |value| options[:child_refs] << value }
+      parser.on("--all") { options[:all] = true }
+      parser.on("--ready") { options[:ready_only] = true }
+      parser.on("--remove-draft-label") { options[:remove_draft_label] = true }
+      parser.on("--parent-auto") { options[:parent_auto] = true }
+      options[:kanban_repo_label_map] = {}
+      options[:kanban_trigger_labels] = []
+      add_kanban_bridge_options(parser, options)
+      remaining = parser.parse(argv)
+      options[:task_ref] = remaining.fetch(0)
+      raise ArgumentError, "accept-decomposition-drafts requires --kanban-command and --kanban-project" unless kanban_child_writer_configured?(options)
+
+      selector_count = [options[:all], options[:ready_only], !options[:child_refs].empty?].count(true)
+      raise ArgumentError, "accept-decomposition-drafts requires exactly one selector: --child, --ready, or --all" unless selector_count == 1
+
       options
     end
 
