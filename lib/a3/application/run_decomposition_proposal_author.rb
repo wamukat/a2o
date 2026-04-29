@@ -31,7 +31,13 @@ module A3
         FileUtils.rm_f(result_path)
 
         investigation_evidence = load_investigation_evidence(investigation_evidence, investigation_evidence_path)
-        request = request_payload(task: task, investigation_evidence: investigation_evidence, investigation_evidence_path: investigation_evidence_path, workspace_root: workspace_root)
+        request = request_payload(
+          task: task,
+          project_surface: project_surface,
+          investigation_evidence: investigation_evidence,
+          investigation_evidence_path: investigation_evidence_path,
+          workspace_root: workspace_root
+        )
         write_json(request_path, request)
 
         command = resolve_command(command)
@@ -102,8 +108,8 @@ module A3
         Dir.mktmpdir("proposal-#{@clock.call.strftime('%Y%m%d%H%M%S')}-", base_dir)
       end
 
-      def request_payload(task:, investigation_evidence:, investigation_evidence_path:, workspace_root:)
-        {
+      def request_payload(task:, project_surface:, investigation_evidence:, investigation_evidence_path:, workspace_root:)
+        payload = {
           "task_ref" => task.ref,
           "task_kind" => task.kind.to_s,
           "labels" => task.labels,
@@ -114,6 +120,59 @@ module A3
           "investigation_evidence_path" => investigation_evidence_path,
           "investigation_evidence" => investigation_evidence,
           "workspace_root" => workspace_root
+        }
+        project_prompt = decomposition_project_prompt(project_surface.prompt_config, task)
+        payload["project_prompt"] = project_prompt if project_prompt
+        payload
+      end
+
+      def decomposition_project_prompt(prompt_config, task)
+        return nil unless prompt_config && !prompt_config.empty?
+
+        phase_config = prompt_config.phase(:decomposition)
+        repo_slot = task.repo_scope_key.to_s
+        repo_slot_config =
+          if repo_slot.empty? || repo_slot == "both"
+            A3::Domain::ProjectPromptConfig::PhaseConfig.new
+          else
+            prompt_config.repo_slot_addon_phase(repo_slot, :decomposition)
+          end
+        layers = []
+        if prompt_config.system_document
+          layers << prompt_layer("project_system_prompt", prompt_config.system_document.path, prompt_config.system_document.content)
+        end
+        phase_config.prompt_documents.each do |document|
+          layers << prompt_layer("project_phase_prompt", document.path, document.content)
+        end
+        phase_config.skill_documents.each do |document|
+          layers << prompt_layer("project_phase_skill", document.path, document.content)
+        end
+        if phase_config.child_draft_template_document
+          layers << prompt_layer("decomposition_child_draft_template", phase_config.child_draft_template_document.path, phase_config.child_draft_template_document.content)
+        end
+        repo_slot_config.prompt_documents.each do |document|
+          layers << prompt_layer("repo_slot_phase_prompt", "#{repo_slot}:#{document.path}", document.content)
+        end
+        repo_slot_config.skill_documents.each do |document|
+          layers << prompt_layer("repo_slot_phase_skill", "#{repo_slot}:#{document.path}", document.content)
+        end
+        if repo_slot_config.child_draft_template_document
+          layers << prompt_layer("repo_slot_decomposition_child_draft_template", "#{repo_slot}:#{repo_slot_config.child_draft_template_document.path}", repo_slot_config.child_draft_template_document.content)
+        end
+        return nil if layers.empty?
+
+        {
+          "profile" => "decomposition",
+          "layers" => layers,
+          "composed_instruction" => layers.map { |layer| "## #{layer.fetch("title")}\n#{layer.fetch("content")}" }.join("\n\n")
+        }
+      end
+
+      def prompt_layer(kind, title, content)
+        {
+          "kind" => kind,
+          "title" => title,
+          "content" => content
         }
       end
 

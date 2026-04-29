@@ -19,14 +19,15 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
     )
   end
 
-  def project_surface(command: ["author-proposal", "--json"])
+  def project_surface(command: ["author-proposal", "--json"], prompt_config: A3::Domain::ProjectPromptConfig.empty)
     A3::Domain::ProjectSurface.new(
       implementation_skill: "skills/implementation.md",
       review_skill: "skills/review.md",
       verification_commands: [],
       remediation_commands: [],
       workspace_hook: nil,
-      decomposition_author_command: command
+      decomposition_author_command: command,
+      prompt_config: prompt_config
     )
   end
 
@@ -126,6 +127,66 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
         "proposal_fingerprint" => result.proposal_fingerprint
       )
       expect(evidence.fetch("proposal").fetch("children").size).to eq(2)
+    end
+  end
+
+  it "passes decomposition child draft templates to the proposal author request" do
+    Dir.mktmpdir do |dir|
+      scoped_task = A3::Domain::Task.new(
+        ref: "A3-v2#5300",
+        kind: :single,
+        edit_scope: [:repo_alpha],
+        status: :todo,
+        labels: ["trigger:investigate"],
+        priority: 3,
+        external_task_id: 5300
+      )
+      prompt_config = A3::Domain::ProjectPromptConfig.new(
+        system_document: prompt_document("prompts/system.md", "system guidance"),
+        phases: {
+          "decomposition" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+            prompt_document: prompt_document("prompts/decomposition.md", "decomposition guidance"),
+            skill_documents: [prompt_document("skills/ticket-splitting.md", "split carefully")],
+            child_draft_template_document: prompt_document("prompts/child-template.md", "Base child template")
+          )
+        },
+        repo_slots: {
+          "repo_alpha" => {
+            "decomposition" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+              child_draft_template_document: prompt_document("prompts/repo-alpha-child-template.md", "Repo alpha template")
+            )
+          }
+        }
+      )
+      process_runner = lambda do |_command, env:, **|
+        File.write(env.fetch("A2O_DECOMPOSITION_AUTHOR_RESULT_PATH"), JSON.generate(valid_author_result))
+        ["", "", FakeAuthorStatus.new(true, 0)]
+      end
+
+      result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
+        task: scoped_task,
+        project_surface: project_surface(prompt_config: prompt_config),
+        investigation_evidence: { "summary" => "Need split" }
+      )
+
+      request = JSON.parse(File.read(result.request_path))
+      project_prompt = request.fetch("project_prompt")
+      expect(project_prompt.fetch("profile")).to eq("decomposition")
+      expect(project_prompt.fetch("layers").map { |layer| layer.fetch("kind") }).to include(
+        "project_system_prompt",
+        "project_phase_prompt",
+        "project_phase_skill",
+        "decomposition_child_draft_template",
+        "repo_slot_decomposition_child_draft_template"
+      )
+      expect(project_prompt.fetch("layers").map { |layer| layer.fetch("title") }).to include(
+        "prompts/child-template.md",
+        "repo_alpha:prompts/repo-alpha-child-template.md"
+      )
+      expect(project_prompt.fetch("composed_instruction")).to include("Base child template")
+      expect(project_prompt.fetch("composed_instruction")).to include("Repo alpha template")
+      evidence = JSON.parse(File.read(result.evidence_path))
+      expect(evidence.fetch("request").fetch("project_prompt")).to eq(project_prompt)
     end
   end
 
@@ -321,5 +382,13 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
         described_class.new(storage_dir: dir).call(task: task, project_surface: surface)
       end.to raise_error(A3::Domain::ConfigurationError, /runtime.decomposition.author.command/)
     end
+  end
+
+  def prompt_document(path, content)
+    A3::Domain::ProjectPromptConfig::Document.new(
+      path: path,
+      absolute_path: File.join(Dir.tmpdir, path),
+      content: content
+    )
   end
 end
