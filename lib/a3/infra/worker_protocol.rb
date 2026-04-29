@@ -75,15 +75,21 @@ module A3
           "phase_runtime" => phase_runtime_form,
           "slot_paths" => workspace.slot_paths.transform_keys(&:to_s).transform_values(&:to_s)
         }
-        docs_context = docs_context_form(workspace: workspace, task: task, task_packet: task_packet, phase_runtime: phase_runtime)
+        docs_context = docs_context_form(
+          workspace: workspace,
+          task: task,
+          task_packet: task_packet,
+          phase_runtime: phase_runtime,
+          command_intent: command_intent
+        )
         payload["docs_context"] = docs_context if docs_context
         payload["project_key"] = project_key if project_key
         payload["command_intent"] = command_intent.to_s if command_intent
         payload
       end
 
-      def docs_context_form(workspace:, task:, task_packet:, phase_runtime:)
-        return nil unless phase_runtime.phase.to_sym == :implementation
+      def docs_context_form(workspace:, task:, task_packet:, phase_runtime:, command_intent: nil)
+        return nil unless docs_context_relevant?(phase_runtime: phase_runtime, command_intent: command_intent)
         docs_config = phase_runtime.respond_to?(:docs_config) ? phase_runtime.docs_config : nil
         return nil unless docs_config.is_a?(Hash)
 
@@ -91,9 +97,24 @@ module A3
         return nil unless repo_root
 
         docs_index = A3::Domain::ProjectDocsIndex.load(repo_root: repo_root, docs_config: docs_config)
-        A3::Domain::ProjectDocsImpactAnalyzer.new(docs_index: docs_index)
-          .analyze(task: task, task_packet: task_packet)
+        context = A3::Domain::ProjectDocsImpactAnalyzer.new(docs_index: docs_index)
+          .analyze(task: task, task_packet: task_packet, changed_files: changed_files_from_workspace(workspace))
           .request_form
+        context.merge(
+          "config_summary" => docs_config_summary(docs_config),
+          "expected_actions" => expected_docs_actions(context),
+          "impact_policy" => stringify_keys(docs_config["impactPolicy"] || docs_config[:impactPolicy] || {}),
+          "language_policy" => language_policy_summary(docs_config),
+          "traceability_refs" => docs_traceability_refs(task: task, task_packet: task_packet),
+          "request_phase" => docs_context_phase(phase_runtime)
+        )
+      end
+
+      def docs_context_relevant?(phase_runtime:, command_intent:)
+        return true if command_intent&.to_sym == :decomposition
+
+        phase = phase_runtime.phase.to_sym
+        phase == :implementation || phase == :review
       end
 
       def docs_repo_root(workspace:, docs_config:)
@@ -106,6 +127,56 @@ module A3
         end
 
         workspace.root_path.to_s
+      end
+
+      def docs_config_summary(docs_config)
+        categories = stringify_keys(docs_config["categories"] || docs_config[:categories] || {})
+        authorities = stringify_keys(docs_config["authorities"] || docs_config[:authorities] || {})
+        {
+          "root" => docs_config["root"] || docs_config[:root],
+          "repo_slot" => docs_config["repoSlot"] || docs_config[:repoSlot],
+          "index" => docs_config["index"] || docs_config[:index],
+          "policy" => docs_config["policy"] || docs_config[:policy],
+          "categories" => categories.keys.sort,
+          "authorities" => authorities.keys.sort
+        }.compact
+      end
+
+      def expected_docs_actions(context)
+        case context.fetch("decision", "no")
+        when "yes"
+          actions = ["update_or_confirm_candidate_docs", "record_docs_impact_evidence"]
+          actions << "respect_mirror_policy" unless Array(context["mirror_debt"]).empty?
+          actions
+        when "maybe"
+          ["decide_docs_impact", "record_docs_impact_evidence"]
+        else
+          ["record_no_docs_impact_if_relevant"]
+        end
+      end
+
+      def language_policy_summary(docs_config)
+        impact_policy = docs_config["impactPolicy"] || docs_config[:impactPolicy] || {}
+        languages = docs_config["languages"] || docs_config[:languages] || {}
+        {
+          "primary" => impact_policy["primaryLanguage"] || impact_policy[:primaryLanguage] || languages["primary"] || languages[:primary],
+          "mirrors" => impact_policy["mirrorLanguages"] || impact_policy[:mirrorLanguages] || languages["mirrors"] || languages[:mirrors],
+          "mirror_policy" => impact_policy["mirrorPolicy"] || impact_policy[:mirrorPolicy] || languages["policy"] || languages[:policy]
+        }.compact
+      end
+
+      def docs_traceability_refs(task:, task_packet:)
+        text = [task_packet.title, task_packet.description].join("\n")
+        refs = [task.ref, task.parent_ref, *task.child_refs]
+        refs.concat(text.scan(/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#\d+/))
+        refs.concat(text.scan(/[A-Z][A-Za-z0-9_-]*#\d+/))
+        refs.compact.map(&:to_s).reject(&:empty?).uniq
+      end
+
+      def docs_context_phase(phase_runtime)
+        return "parent_review" if phase_runtime.phase.to_sym == :review && phase_runtime.task_kind.to_sym == :parent
+
+        phase_runtime.phase.to_s
       end
 
       def project_prompt_form(skill:, phase_runtime:, task_packet:, prior_review_feedback:)
@@ -464,6 +535,7 @@ module A3
         end
         validate_skill_feedback(worker_response["skill_feedback"]).each { |error| errors << error } if worker_response.key?("skill_feedback")
         validate_clarification_request(worker_response["clarification_request"], success: worker_response["success"]).each { |error| errors << error } if worker_response.key?("clarification_request")
+        validate_docs_impact(worker_response["docs_impact"]).each { |error| errors << error } if worker_response.key?("docs_impact")
         unless [true, false].include?(worker_response["rework_required"])
           errors << "rework_required must be true or false"
         end
@@ -605,12 +677,71 @@ module A3
         errors
       end
 
+      def validate_docs_impact(value)
+        return [] if value.nil?
+        return ["docs_impact must be an object when present"] unless value.is_a?(Hash)
+
+        errors = []
+        if value.key?("disposition")
+          dispositions = %w[yes no maybe]
+          errors << "docs_impact.disposition must be one of #{dispositions.join(', ')}" unless dispositions.include?(value["disposition"])
+        else
+          errors << "docs_impact.disposition must be present"
+        end
+        validate_optional_string_array(value, "categories", "docs_impact.categories").each { |error| errors << error }
+        validate_optional_string_array(value, "updated_docs", "docs_impact.updated_docs").each { |error| errors << error }
+        validate_optional_string_array(value, "updated_authorities", "docs_impact.updated_authorities").each { |error| errors << error }
+        validate_optional_string_array(value, "matched_rules", "docs_impact.matched_rules").each { |error| errors << error }
+        validate_optional_string(value, "review_disposition", "docs_impact.review_disposition").each { |error| errors << error }
+        validate_docs_impact_skipped_docs(value["skipped_docs"]).each { |error| errors << error } if value.key?("skipped_docs")
+        if value.key?("traceability")
+          errors << "docs_impact.traceability must be an object when present" unless value["traceability"].is_a?(Hash)
+        end
+        errors
+      end
+
+      def validate_optional_string_array(value, key, field)
+        return [] unless value.key?(key)
+
+        entries = value[key]
+        return [] if entries.is_a?(Array) && entries.all? { |entry| entry.is_a?(String) }
+
+        ["#{field} must be an array of strings when present"]
+      end
+
+      def validate_optional_string(value, key, field)
+        return [] unless value.key?(key)
+        return [] if value[key].nil? || value[key].is_a?(String)
+
+        ["#{field} must be a string when present"]
+      end
+
+      def validate_docs_impact_skipped_docs(value)
+        return ["docs_impact.skipped_docs must be an array of objects when present"] unless value.is_a?(Array)
+
+        value.each_with_index.flat_map do |entry, index|
+          prefix = "docs_impact.skipped_docs[#{index}]"
+          next ["#{prefix} must be an object"] unless entry.is_a?(Hash)
+
+          errors = []
+          errors << "#{prefix}.path must be a string" unless entry["path"].is_a?(String)
+          errors << "#{prefix}.reason must be a string" unless entry["reason"].is_a?(String)
+          errors
+        end
+      end
+
       def clarification_request_present?(worker_response)
         worker_response["clarification_request"].is_a?(Hash)
       end
 
       def present_string?(value)
         value.is_a?(String) && !value.strip.empty?
+      end
+
+      def stringify_keys(value)
+        return {} unless value.is_a?(Hash)
+
+        value.each_with_object({}) { |(key, entry), memo| memo[key.to_s] = entry }
       end
 
       def normalize_repo_scope_aliases(repo_scope_aliases)

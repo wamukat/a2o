@@ -299,6 +299,19 @@ worker request には少なくとも次を含める。
 - traceability refs
 - 多言語 policy
 
+`docs_context` は任意であり、`docs` config がない project では出力しない。存在する場合は implementation、review、parent review の worker request に載せる。decomposition command も、既存の shared spec を踏まえて child ticket を起案する必要がある場合は同じ形を受け取れる。
+
+worker result には構造化された `docs_impact` object を含められる。A2O は docs 更新を全タスクに強制せず、object の形だけを検証する。
+
+- `disposition`: `yes` / `no` / `maybe`
+- `categories`: 判断対象になった docs category
+- `updated_docs`: worker が変更した docs path
+- `updated_authorities`: 更新または確認した正本
+- `skipped_docs`: 意図的に更新しなかった `{ path, reason }`
+- `matched_rules`: 判断根拠となった rule
+- `review_disposition`: docs 判断に対する review outcome
+- `traceability`: 関連要件、ticket、source issue
+
 ### 10.2 実装時更新
 
 docs-impact がある場合、implementation worker は実装 branch 上で docs を追加 / 更新する。

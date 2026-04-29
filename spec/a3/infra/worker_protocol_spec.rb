@@ -358,6 +358,15 @@ RSpec.describe A3::Infra::WorkerProtocol do
 
     docs_context = request_form.fetch("docs_context")
     expect(docs_context.fetch("decision")).to eq("yes")
+    expect(docs_context.fetch("request_phase")).to eq("implementation")
+    expect(docs_context.fetch("config_summary")).to include(
+      "root" => "docs",
+      "repo_slot" => "repo_beta",
+      "categories" => ["shared_specs"],
+      "authorities" => ["project_package_schema"]
+    )
+    expect(docs_context.fetch("expected_actions")).to include("update_or_confirm_candidate_docs", "record_docs_impact_evidence")
+    expect(docs_context.fetch("traceability_refs")).to include(task.ref)
     expect(docs_context.fetch("categories")).to include("shared_specs")
     expect(docs_context.fetch("candidate_docs")).to include(
       hash_including(
@@ -368,6 +377,58 @@ RSpec.describe A3::Infra::WorkerProtocol do
       )
     )
     expect(docs_context.fetch("authority_precedence")).to eq(%w[authority_source docs evidence_artifacts ticket_text])
+  end
+
+  it "adds docs-impact context to review and parent-review worker requests when docs are configured" do
+    docs_root = workspace.slot_paths.fetch(:repo_beta).join("docs", "shared")
+    FileUtils.mkdir_p(docs_root)
+    docs_root.join("review-policy.md").write(
+      <<~MARKDOWN
+        ---
+        title: Review Policy
+        category: shared_specs
+        status: active
+        related_tickets:
+          - #{task.ref}
+        ---
+
+        Review docs-impact evidence and shared-spec updates.
+      MARKDOWN
+    )
+    runtime = A3::Domain::PhaseRuntimeConfig.new(
+      task_kind: :parent,
+      repo_scope: :repo_beta,
+      phase: :review,
+      implementation_skill: "task implementation",
+      review_skill: "task review",
+      verification_commands: [],
+      remediation_commands: [],
+      workspace_hook: "bootstrap",
+      merge_target: :merge_to_parent,
+      merge_policy: :squash,
+      docs_config: {
+        "repoSlot" => "repo_beta",
+        "root" => "docs",
+        "categories" => {
+          "shared_specs" => { "path" => "docs/shared" }
+        }
+      }
+    )
+
+    request_form = described_class.new.request_form(
+      skill: runtime.review_skill,
+      workspace: workspace,
+      task: task,
+      run: run,
+      phase_runtime: runtime,
+      task_packet: task_packet
+    )
+
+    docs_context = request_form.fetch("docs_context")
+    expect(docs_context.fetch("request_phase")).to eq("parent_review")
+    expect(docs_context.fetch("candidate_docs")).to include(
+      hash_including("path" => "docs/shared/review-policy.md")
+    )
   end
 
   it "keeps repo-slot implementation_rework addons when the base profile falls back to implementation" do
@@ -695,6 +756,90 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(result.summary).to eq("worker result schema invalid")
     expect(result.diagnostics.fetch("validation_errors")).to include(
       "review_disposition must be present for implementation success"
+    )
+  end
+
+  it "preserves structured docs-impact worker results" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => true,
+        "summary" => "worker completed",
+        "task_ref" => task.ref,
+        "run_ref" => implementation_run.ref,
+        "phase" => "implementation",
+        "rework_required" => false,
+        "changed_files" => { "repo_beta" => ["docs/shared/project-package-schema.md"] },
+        "review_disposition" => {
+          "kind" => "completed",
+          "repo_scope" => "repo_beta",
+          "summary" => "self-review clean",
+          "description" => "No findings.",
+          "finding_key" => "none"
+        },
+        "docs_impact" => {
+          "disposition" => "yes",
+          "categories" => ["shared_specs"],
+          "updated_docs" => ["docs/shared/project-package-schema.md"],
+          "updated_authorities" => ["project.yaml schema"],
+          "skipped_docs" => [
+            { "path" => "docs/ja/shared/project-package-schema.md", "reason" => "mirror follow-up" }
+          ],
+          "matched_rules" => ["keyword:schema->shared_specs"],
+          "review_disposition" => "accepted",
+          "traceability" => {
+            "related_tickets" => [task.ref]
+          }
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: implementation_run.ref,
+      expected_phase: :implementation,
+      canonical_changed_files: { "repo_beta" => ["docs/shared/project-package-schema.md"] }
+    )
+
+    expect(result).to have_attributes(success?: true)
+    expect(result.response_bundle.fetch("docs_impact")).to include(
+      "disposition" => "yes",
+      "updated_docs" => ["docs/shared/project-package-schema.md"]
+    )
+  end
+
+  it "reports precise validation errors for invalid docs-impact worker results" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => true,
+        "summary" => "worker completed",
+        "task_ref" => task.ref,
+        "run_ref" => implementation_run.ref,
+        "phase" => "implementation",
+        "rework_required" => false,
+        "changed_files" => { "repo_beta" => ["marker.txt"] },
+        "review_disposition" => {
+          "kind" => "completed",
+          "repo_scope" => "repo_beta",
+          "summary" => "self-review clean",
+          "description" => "No findings.",
+          "finding_key" => "none"
+        },
+        "docs_impact" => {
+          "disposition" => "clean",
+          "updated_docs" => [123],
+          "skipped_docs" => [{ "path" => "docs/spec.md" }]
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: implementation_run.ref,
+      expected_phase: :implementation,
+      canonical_changed_files: { "repo_beta" => ["marker.txt"] }
+    )
+
+    expect(result).to have_attributes(success?: false)
+    expect(result.diagnostics.fetch("validation_errors")).to include(
+      "docs_impact.disposition must be one of yes, no, maybe",
+      "docs_impact.updated_docs must be an array of strings when present",
+      "docs_impact.skipped_docs[0].reason must be a string"
     )
   end
 

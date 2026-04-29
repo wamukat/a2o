@@ -301,6 +301,19 @@ The worker request includes at least:
 - traceability refs
 - language policy
 
+`docs_context` is optional and absent for projects without `docs` config. When present, it is carried on implementation, review, and parent-review worker requests. Decomposition commands may also receive the same shape when they need to draft child tickets that respect existing shared specs.
+
+The worker result may include a structured `docs_impact` object. A2O validates the object without making docs mandatory for every task:
+
+- `disposition`: `yes`, `no`, or `maybe`
+- `categories`: docs categories that were considered
+- `updated_docs`: docs paths changed by the worker
+- `updated_authorities`: authoritative sources changed or confirmed
+- `skipped_docs`: `{ path, reason }` entries for intentional omissions
+- `matched_rules`: evidence rules that drove the decision
+- `review_disposition`: review outcome for the docs decision
+- `traceability`: related requirements, tickets, and source issues
+
 ### 10.2 Implementation Updates
 
 When docs-impact exists, the implementation worker updates docs on the implementation branch.
