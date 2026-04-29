@@ -83,13 +83,21 @@ module A3
       end
 
       def phase(name)
+        _resolved_name, config = phase_resolution(name)
+        config
+      end
+
+      def phase_resolution(name)
         phase_name = name.to_s
         config = phases.fetch(phase_name, nil)
-        return config if config && !config.empty?
+        return [phase_name, config] if config && !config.empty?
 
-        return phase(:implementation) if phase_name == "implementation_rework"
+        if phase_name == "implementation_rework"
+          implementation = phases.fetch("implementation", nil)
+          return ["implementation", implementation] if implementation && !implementation.empty?
+        end
 
-        PhaseConfig.new
+        [phase_name, PhaseConfig.new]
       end
 
       def repo_slot_phase(slot, phase)

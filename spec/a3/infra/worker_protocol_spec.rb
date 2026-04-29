@@ -205,6 +205,8 @@ RSpec.describe A3::Infra::WorkerProtocol do
 
     metadata = described_class.new.project_prompt_metadata(request_form)
     expect(metadata.fetch("profile")).to eq("review")
+    expect(metadata.fetch("effective_profile")).to eq("review")
+    expect(metadata.fetch("project_package_schema_version")).to eq("1")
     expect(metadata.fetch("layers").map { |layer| layer.fetch("title") }).to include("prompts/system.md", "prompts/review.md", "skills/review-policy.md")
     expect(metadata.fetch("layers").first).to include("content_sha256", "content_bytes")
     expect(metadata.to_s).not_to include("system guidance")
@@ -256,6 +258,39 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(project_prompt.fetch("composed_instruction")).to include("rework guidance")
     expect(project_prompt.fetch("composed_instruction")).not_to include("implementation guidance")
     expect(request_form.fetch("phase_runtime")).to include("prior_review_feedback" => { "summary" => "Fix assertion coverage." })
+  end
+
+  it "records implementation rework fallback profile metadata" do
+    prompt_config = A3::Domain::ProjectPromptConfig.new(
+      phases: {
+        "implementation" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+          prompt_document: prompt_document("prompts/implementation.md", "implementation guidance")
+        )
+      }
+    )
+    runtime = phase_runtime_with_prompt_config(prompt_config, phase: :implementation)
+
+    request_form = described_class.new.request_form(
+      skill: runtime.implementation_skill,
+      workspace: workspace,
+      task: task,
+      run: implementation_run,
+      phase_runtime: runtime,
+      task_packet: task_packet,
+      prior_review_feedback: { "summary" => "Fix assertion coverage." }
+    )
+
+    project_prompt = request_form.fetch("phase_runtime").fetch("project_prompt")
+    expect(project_prompt.fetch("profile")).to eq("implementation_rework")
+    expect(project_prompt.fetch("effective_profile")).to eq("implementation")
+    expect(project_prompt.fetch("fallback_profile")).to eq("implementation")
+    expect(project_prompt.fetch("composed_instruction")).to include("implementation guidance")
+
+    metadata = described_class.new.project_prompt_metadata(request_form)
+    expect(metadata.fetch("profile")).to eq("implementation_rework")
+    expect(metadata.fetch("effective_profile")).to eq("implementation")
+    expect(metadata.fetch("fallback_profile")).to eq("implementation")
+    expect(metadata.fetch("layers").map { |layer| layer.fetch("title") }).to include("prompts/implementation.md")
   end
 
   it "selects parent_review prompt profile for parent review runs" do
@@ -378,6 +413,9 @@ RSpec.describe A3::Infra::WorkerProtocol do
       "ui_app:prompts/ui-implementation.md",
       "ui_app:skills/playwright.md"
     )
+    metadata = described_class.new.project_prompt_metadata(request_form)
+    expect(metadata.fetch("repo_slot")).to eq("ui_app")
+    expect(metadata.fetch("layers").map { |layer| layer.fetch("kind") }).to include("repo_slot_phase_prompt", "repo_slot_phase_skill")
   end
 
   it "uses only project phase prompts for repo_scope both" do

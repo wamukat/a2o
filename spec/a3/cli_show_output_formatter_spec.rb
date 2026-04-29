@@ -868,6 +868,9 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
         diagnostics: {
           "project_prompt" => {
             "profile" => "implementation",
+            "effective_profile" => "implementation",
+            "repo_slot" => "repo_alpha",
+            "project_package_schema_version" => "1",
             "composed_instruction_sha256" => "abc123",
             "composed_instruction_bytes" => 128,
             "layers" => [
@@ -891,7 +894,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
 
     result = described_class.run_lines(run_view)
 
-    expect(result).to include("project_prompt profile=implementation composed_sha256=abc123 bytes=128")
+    expect(result).to include("project_prompt profile=implementation effective_profile=implementation repo_slot=repo_alpha schema_version=1 composed_sha256=abc123 bytes=128")
     expect(result).to include("project_prompt_layer kind=project_system_prompt title=prompts/system.md sha256=def456 bytes=42")
     expect(result).not_to include(a_string_matching(/execution_diagnostic.project_prompt/))
   end

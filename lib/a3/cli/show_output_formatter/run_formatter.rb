@@ -119,7 +119,14 @@ module A3
           prompt = diagnostics["project_prompt"]
           return unless prompt.is_a?(Hash)
 
-          result << "project_prompt profile=#{prompt['profile']} composed_sha256=#{prompt['composed_instruction_sha256']} bytes=#{prompt['composed_instruction_bytes']}"
+          details = ["profile=#{prompt['profile']}"]
+          details << "effective_profile=#{prompt['effective_profile']}" if prompt["effective_profile"].to_s != ""
+          details << "fallback_profile=#{prompt['fallback_profile']}" if prompt["fallback_profile"].to_s != ""
+          details << "repo_slot=#{prompt['repo_slot']}" if prompt["repo_slot"].to_s != ""
+          details << "schema_version=#{prompt['project_package_schema_version']}" if prompt["project_package_schema_version"].to_s != ""
+          details << "composed_sha256=#{prompt['composed_instruction_sha256']}"
+          details << "bytes=#{prompt['composed_instruction_bytes']}"
+          result << "project_prompt #{details.join(' ')}"
           Array(prompt["layers"]).each do |layer|
             next unless layer.is_a?(Hash)
 

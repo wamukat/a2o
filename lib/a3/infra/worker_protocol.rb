@@ -85,9 +85,9 @@ module A3
         return nil unless prompt_config && !prompt_config.empty?
 
         prompt_phase = prompt_phase_for(phase_runtime: phase_runtime, prior_review_feedback: prior_review_feedback)
-        phase_config = prompt_config.phase(prompt_phase)
+        effective_prompt_phase, phase_config = prompt_config.phase_resolution(prompt_phase)
         repo_slot = repo_prompt_slot(phase_runtime)
-        repo_slot_config = repo_slot ? prompt_config.repo_slot_addon_phase(repo_slot, prompt_phase) : nil
+        repo_slot_config = repo_slot ? prompt_config.repo_slot_addon_phase(repo_slot, effective_prompt_phase) : nil
         layers = []
         layers << prompt_layer("a2o_core_instruction", "A2O core instruction", skill.to_s) if skill
         if prompt_config.system_document
@@ -120,6 +120,10 @@ module A3
         )
         {
           "profile" => prompt_phase,
+          "effective_profile" => effective_prompt_phase,
+          "fallback_profile" => (effective_prompt_phase if effective_prompt_phase != prompt_phase),
+          "repo_slot" => repo_slot,
+          "project_package_schema_version" => "1",
           "layers" => layers,
           "composed_instruction" => layers.map { |layer| "## #{layer.fetch("title")}\n#{layer.fetch("content")}" }.join("\n\n")
         }
@@ -185,6 +189,10 @@ module A3
         composed = project_prompt.fetch("composed_instruction", "").to_s
         {
           "profile" => project_prompt["profile"].to_s,
+          "effective_profile" => project_prompt["effective_profile"].to_s,
+          "fallback_profile" => project_prompt["fallback_profile"].to_s,
+          "repo_slot" => project_prompt["repo_slot"].to_s,
+          "project_package_schema_version" => project_prompt["project_package_schema_version"].to_s,
           "layers" => layers,
           "composed_instruction_sha256" => Digest::SHA256.hexdigest(composed),
           "composed_instruction_bytes" => composed.bytesize
