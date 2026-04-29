@@ -535,7 +535,12 @@ module A3
         end
         validate_skill_feedback(worker_response["skill_feedback"]).each { |error| errors << error } if worker_response.key?("skill_feedback")
         validate_clarification_request(worker_response["clarification_request"], success: worker_response["success"]).each { |error| errors << error } if worker_response.key?("clarification_request")
-        validate_docs_impact(worker_response["docs_impact"]).each { |error| errors << error } if worker_response.key?("docs_impact")
+        validate_docs_impact(
+          worker_response["docs_impact"],
+          worker_response: worker_response,
+          expected_phase: expected_phase,
+          expected_task_kind: expected_task_kind
+        ).each { |error| errors << error } if worker_response.key?("docs_impact")
         unless [true, false].include?(worker_response["rework_required"])
           errors << "rework_required must be true or false"
         end
@@ -677,7 +682,7 @@ module A3
         errors
       end
 
-      def validate_docs_impact(value)
+      def validate_docs_impact(value, worker_response:, expected_phase:, expected_task_kind:)
         return [] if value.nil?
         return ["docs_impact must be an object when present"] unless value.is_a?(Hash)
 
@@ -693,9 +698,50 @@ module A3
         validate_optional_string_array(value, "updated_authorities", "docs_impact.updated_authorities").each { |error| errors << error }
         validate_optional_string_array(value, "matched_rules", "docs_impact.matched_rules").each { |error| errors << error }
         validate_optional_string(value, "review_disposition", "docs_impact.review_disposition").each { |error| errors << error }
+        validate_docs_impact_review_gate(
+          value,
+          worker_response: worker_response,
+          expected_phase: expected_phase,
+          expected_task_kind: expected_task_kind
+        ).each { |error| errors << error }
         validate_docs_impact_skipped_docs(value["skipped_docs"]).each { |error| errors << error } if value.key?("skipped_docs")
         if value.key?("traceability")
           errors << "docs_impact.traceability must be an object when present" unless value["traceability"].is_a?(Hash)
+        end
+        errors
+      end
+
+      def validate_docs_impact_review_gate(value, worker_response:, expected_phase:, expected_task_kind:)
+        return [] unless expected_phase.to_s == "review"
+        return [] unless %w[yes maybe].include?(value["disposition"])
+
+        errors = []
+        review_disposition = value["review_disposition"]
+        valid_review_dispositions = %w[accepted warned blocked follow_up]
+        if review_disposition.nil? || review_disposition.to_s.empty?
+          errors << "docs_impact.review_disposition must be present for review phases when docs-impact is yes or maybe"
+          return errors
+        end
+        unless valid_review_dispositions.include?(review_disposition)
+          errors << "docs_impact.review_disposition must be one of #{valid_review_dispositions.join(', ')}"
+          return errors
+        end
+
+        if review_disposition == "blocked"
+          errors << "docs_impact.review_disposition=blocked requires review result success=false" unless worker_response["success"] == false
+          if parent_review?(expected_phase: expected_phase, expected_task_kind: expected_task_kind)
+            disposition = worker_response["review_disposition"]
+            unless disposition.is_a?(Hash) && disposition["kind"] == "blocked"
+              errors << "docs_impact.review_disposition=blocked requires review_disposition.kind=blocked for parent review"
+            end
+          else
+            errors << "docs_impact.review_disposition=blocked requires rework_required=true for child review" unless worker_response["rework_required"] == true
+          end
+        elsif review_disposition == "follow_up" && parent_review?(expected_phase: expected_phase, expected_task_kind: expected_task_kind)
+          disposition = worker_response["review_disposition"]
+          unless disposition.is_a?(Hash) && disposition["kind"] == "follow_up_child"
+            errors << "docs_impact.review_disposition=follow_up requires review_disposition.kind=follow_up_child for parent review"
+          end
         end
         errors
       end

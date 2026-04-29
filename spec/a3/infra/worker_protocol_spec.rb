@@ -851,6 +851,63 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
+  it "requires blocked docs-impact review findings to route child review to rework" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => true,
+        "summary" => "review completed",
+        "task_ref" => task.ref,
+        "run_ref" => run.ref,
+        "phase" => "review",
+        "rework_required" => false,
+        "docs_impact" => {
+          "disposition" => "yes",
+          "categories" => ["shared_specs"],
+          "review_disposition" => "blocked",
+          "matched_rules" => ["shared spec missing"]
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: run.ref,
+      expected_phase: :review,
+      expected_task_kind: :child
+    )
+
+    expect(result).to have_attributes(success?: false)
+    expect(result.diagnostics.fetch("validation_errors")).to include(
+      "docs_impact.review_disposition=blocked requires review result success=false",
+      "docs_impact.review_disposition=blocked requires rework_required=true for child review"
+    )
+  end
+
+  it "accepts non-blocking docs-impact review debt as structured evidence" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => true,
+        "summary" => "review completed",
+        "task_ref" => task.ref,
+        "run_ref" => run.ref,
+        "phase" => "review",
+        "rework_required" => false,
+        "docs_impact" => {
+          "disposition" => "maybe",
+          "categories" => ["features"],
+          "review_disposition" => "warned",
+          "matched_rules" => ["feature docs maybe needed"]
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: run.ref,
+      expected_phase: :review,
+      expected_task_kind: :child
+    )
+
+    expect(result).to have_attributes(success?: true)
+    expect(result.response_bundle.fetch("docs_impact").fetch("review_disposition")).to eq("warned")
+  end
+
   it "canonicalizes optional worker identity fields instead of blocking on invented refs" do
     result = described_class.new(review_disposition_repo_scopes: %w[repo_beta]).build_execution_result(
       {

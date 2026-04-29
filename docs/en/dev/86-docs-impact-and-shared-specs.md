@@ -314,6 +314,8 @@ The worker result may include a structured `docs_impact` object. A2O validates t
 - `review_disposition`: review outcome for the docs decision
 - `traceability`: related requirements, tickets, and source issues
 
+In review phases, `docs_impact.disposition` of `yes` or `maybe` must include `review_disposition`: `accepted`, `warned`, `blocked`, or `follow_up`. `blocked` must route child review to rework. In parent review, `blocked` and `follow_up` must align with the top-level parent-review disposition so docs debt does not disappear as a successful review.
+
 ### 10.2 Implementation Updates
 
 When docs-impact exists, the implementation worker updates docs on the implementation branch.
