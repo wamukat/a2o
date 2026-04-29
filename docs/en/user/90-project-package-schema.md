@@ -301,6 +301,27 @@ The prompt doctor reports missing files, invalid paths, unsupported prompt phase
 
 A copyable baseline is available at `samples/prompt-packs/ja-conservative/`. It demonstrates a Japanese system prompt, phase prompts for implementation, implementation rework, review, parent review, and decomposition, reusable phase skills, a decomposition child draft template, and a minimal `runtime.prompts` config snippet.
 
+## Prompt Authoring Boundaries
+
+Use the narrowest durable surface that matches the instruction:
+
+- Project system prompt: language, tone, stable project-wide rules, compatibility posture, and general policy that should apply to every phase.
+- Phase prompt: short behavior guidance that changes by phase, such as implementation scope, implementation rework stance, review disposition, parent-review integration policy, or decomposition strategy.
+- Phase skill: longer reusable procedures such as testing policy, technology-specific operating notes, migration guides, domain checklists, review rubrics, and decomposition rules.
+- Ticket-specific instruction: task-local acceptance criteria, one-off constraints, temporary exceptions, human decisions, priority, and evidence required for that ticket.
+
+Keep project prompts and skills durable. If an instruction applies to one ticket only, put it in the ticket. If it applies to one phase across many tickets, put it in that phase prompt or a phase skill. If it applies across all phases and is unlikely to change per task, put it in the system prompt.
+
+Common anti-patterns:
+
+- Putting one-off ticket requirements in `prompts/system.md`, which makes future unrelated tasks inherit stale constraints.
+- Duplicating the same long checklist in every phase prompt instead of referencing one phase skill.
+- Putting schema override, workspace escape, branch bypass, Kanban mutation, or review-skip instructions in project prompt files. A2O core contracts are not overridable.
+- Putting product decisions that require human approval into reusable skills. Keep those decisions on the ticket or in explicit project documentation.
+- Using ticket comments for stable project policy that should be versioned with the project package.
+
+Precedence remains additive: A2O core worker contract and phase skill come first, then `runtime.prompts.system`, phase prompt, phase skills, repo-slot addons, and finally ticket-specific instruction. `implementation_rework` falls back to `implementation` when no rework-specific prompt profile is configured; `parent_review` is selected for parent review runs. For existing project packages, see [Runtime Prompt Migration](#runtime-prompt-migration). For a copyable baseline, see `samples/prompt-packs/ja-conservative/`.
+
 ## Runtime Prompt Migration
 
 Existing project packages do not need to migrate before adopting a new A2O version. The released phase execution surface remains supported:

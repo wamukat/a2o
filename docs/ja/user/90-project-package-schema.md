@@ -306,6 +306,27 @@ prompt doctor は、missing file、invalid path、unsupported prompt phase、dup
 
 コピーして使える baseline として `samples/prompt-packs/ja-conservative/` を用意している。日本語 system prompt、implementation、implementation rework、review、parent review、decomposition の phase prompt、再利用可能な phase skill、decomposition child draft template、最小の `runtime.prompts` config snippet を含む。
 
+## Prompt Authoring Boundaries
+
+instruction は、意図に合う最も狭く永続的な surface に置く。
+
+- Project system prompt: すべての phase に適用する言語、tone、安定した project-wide rule、compatibility posture、general policy。
+- Phase prompt: implementation scope、implementation rework stance、review disposition、parent-review integration policy、decomposition strategy など、phase ごとに変わる短い behavior guidance。
+- Phase skill: testing policy、technology-specific operating note、migration guide、domain checklist、review rubric、decomposition rule など、長めの再利用可能手順。
+- Ticket-specific instruction: その ticket 固有の acceptance criteria、一回限りの制約、一時的な例外、人間の判断、priority、必要な evidence。
+
+project prompt / skill は durable な内容に限る。1 ticket だけに必要な指示は ticket に置く。多くの ticket にまたがって 1 phase だけへ適用する指示は phase prompt または phase skill に置く。すべての phase に適用し、task ごとに変わりにくい指示だけを system prompt に置く。
+
+よくない配置は次の通り。
+
+- 一回限りの ticket requirement を `prompts/system.md` に入れ、将来の無関係な task に古い制約を継承させる。
+- 同じ長い checklist を各 phase prompt に重複して書き、phase skill として再利用しない。
+- schema override、workspace escape、branch bypass、Kanban mutation、review skip の指示を project prompt file に入れる。A2O core contract は上書きできない。
+- 人間の承認が必要な product decision を再利用可能 skill に入れる。その判断は ticket または明示的な project documentation に置く。
+- version 管理すべき安定した project policy を ticket comment にだけ残す。
+
+優先順位は additive である。A2O core worker contract と phase skill が先にあり、`runtime.prompts.system`、phase prompt、phase skill、repo-slot addon、最後に ticket-specific instruction が続く。`implementation_rework` は rework-specific prompt profile がなければ `implementation` にフォールバックし、parent review run では `parent_review` が選択される。既存 project package からの移行は [Runtime Prompt Migration](#runtime-prompt-migration) を参照する。コピー可能な baseline は `samples/prompt-packs/ja-conservative/` を参照する。
+
 ## Runtime Prompt Migration
 
 既存の project package は、新しい A2O version を使う前に必ず移行する必要はない。現在リリース済みの phase execution surface は引き続きサポートされる。
