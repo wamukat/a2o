@@ -130,13 +130,7 @@ module A3
         return nil unless prompt_config && !prompt_config.empty?
 
         phase_config = prompt_config.phase(:decomposition)
-        repo_slot = task.repo_scope_key.to_s
-        repo_slot_config =
-          if repo_slot.empty? || repo_slot == "both"
-            A3::Domain::ProjectPromptConfig::PhaseConfig.new
-          else
-            prompt_config.repo_slot_addon_phase(repo_slot, :decomposition)
-          end
+        repo_slots = decomposition_prompt_repo_slots(task)
         layers = []
         if prompt_config.system_document
           layers << prompt_layer("project_system_prompt", prompt_config.system_document.path, prompt_config.system_document.content)
@@ -150,22 +144,37 @@ module A3
         if phase_config.child_draft_template_document
           layers << prompt_layer("decomposition_child_draft_template", phase_config.child_draft_template_document.path, phase_config.child_draft_template_document.content)
         end
-        repo_slot_config.prompt_documents.each do |document|
-          layers << prompt_layer("repo_slot_phase_prompt", "#{repo_slot}:#{document.path}", document.content)
-        end
-        repo_slot_config.skill_documents.each do |document|
-          layers << prompt_layer("repo_slot_phase_skill", "#{repo_slot}:#{document.path}", document.content)
-        end
-        if repo_slot_config.child_draft_template_document
-          layers << prompt_layer("repo_slot_decomposition_child_draft_template", "#{repo_slot}:#{repo_slot_config.child_draft_template_document.path}", repo_slot_config.child_draft_template_document.content)
+        repo_slots.each do |repo_slot|
+          repo_slot_config = prompt_config.repo_slot_addon_phase(repo_slot, :decomposition)
+          next if repo_slot_config.empty?
+
+          repo_slot_config.prompt_documents.each do |document|
+            layers << prompt_layer("repo_slot_phase_prompt", "#{repo_slot}:#{document.path}", document.content)
+          end
+          repo_slot_config.skill_documents.each do |document|
+            layers << prompt_layer("repo_slot_phase_skill", "#{repo_slot}:#{document.path}", document.content)
+          end
+          if repo_slot_config.child_draft_template_document
+            layers << prompt_layer("repo_slot_decomposition_child_draft_template", "#{repo_slot}:#{repo_slot_config.child_draft_template_document.path}", repo_slot_config.child_draft_template_document.content)
+          end
         end
         return nil if layers.empty?
 
         {
           "profile" => "decomposition",
+          "repo_slot" => (repo_slots.one? ? repo_slots.first : nil),
+          "repo_slots" => repo_slots,
           "layers" => layers,
           "composed_instruction" => layers.map { |layer| "## #{layer.fetch("title")}\n#{layer.fetch("content")}" }.join("\n\n")
         }
+      end
+
+      def decomposition_prompt_repo_slots(task)
+        repo_scope = task.repo_scope_key.to_s
+        return [] if repo_scope.empty?
+        return [repo_scope] unless repo_scope == "both"
+
+        task.edit_scope.map(&:to_s).reject(&:empty?).uniq
       end
 
       def prompt_layer(kind, title, content)
@@ -198,6 +207,8 @@ module A3
         composed = project_prompt.fetch("composed_instruction", "").to_s
         {
           "profile" => project_prompt["profile"].to_s,
+          "repo_slot" => project_prompt["repo_slot"].to_s,
+          "repo_slots" => Array(project_prompt["repo_slots"]).map(&:to_s).reject(&:empty?),
           "layers" => layers,
           "composed_instruction_sha256" => Digest::SHA256.hexdigest(composed),
           "composed_instruction_bytes" => composed.bytesize

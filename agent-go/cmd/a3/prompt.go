@@ -47,6 +47,23 @@ type promptLayerPreview struct {
 	Detail  string
 }
 
+type promptRepoSlotFlags []string
+
+func (f *promptRepoSlotFlags) String() string {
+	return strings.Join(*f, ",")
+}
+
+func (f *promptRepoSlotFlags) Set(value string) error {
+	for _, entry := range strings.Split(value, ",") {
+		slot := strings.TrimSpace(entry)
+		if slot == "" {
+			continue
+		}
+		*f = append(*f, slot)
+	}
+	return nil
+}
+
 func runPrompt(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "missing prompt subcommand")
@@ -67,7 +84,7 @@ func runPrompt(args []string, stdout io.Writer, stderr io.Writer) int {
 
 func printPromptUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage:")
-	fmt.Fprintln(w, "  a2o prompt preview --phase PHASE [--package DIR] [--config project-test.yaml] [--repo-slot SLOT] [--task-kind child|parent|single] [--prior-review-feedback] TASK_REF")
+	fmt.Fprintln(w, "  a2o prompt preview --phase PHASE [--package DIR] [--config project-test.yaml] [--repo-slot SLOT]... [--task-kind child|parent|single] [--prior-review-feedback] TASK_REF")
 }
 
 func runPromptPreview(args []string, stdout io.Writer, stderr io.Writer) int {
@@ -77,7 +94,8 @@ func runPromptPreview(args []string, stdout io.Writer, stderr io.Writer) int {
 	configPath := flags.String("config", "", "project config file; defaults to project.yaml under --package")
 	workspaceRoot := flags.String("workspace", ".", "workspace root used when discovering ./a2o-project or ./project-package")
 	phase := flags.String("phase", "", "runtime phase to preview")
-	repoSlot := flags.String("repo-slot", "", "optional repo slot used for repo-slot prompt addons")
+	var repoSlots promptRepoSlotFlags
+	flags.Var(&repoSlots, "repo-slot", "optional repo slot used for repo-slot prompt addons; repeat or comma-separate for multi-repo preview")
 	taskKind := flags.String("task-kind", "child", "task kind: child, parent, or single")
 	priorReviewFeedback := flags.Bool("prior-review-feedback", false, "preview implementation_rework prompt profile")
 	if err := flags.Parse(args); err != nil {
@@ -102,16 +120,17 @@ func runPromptPreview(args []string, stdout io.Writer, stderr io.Writer) int {
 		printUserFacingError(stderr, err)
 		return 2
 	}
-	layers, err := buildPromptPreviewLayers(context, profile, *phase, *repoSlot, taskRef, *taskKind, *priorReviewFeedback)
+	selectedRepoSlots := normalizePromptPreviewRepoSlots(repoSlots)
+	layers, err := buildPromptPreviewLayers(context, profile, *phase, selectedRepoSlots, taskRef, *taskKind, *priorReviewFeedback)
 	if err != nil {
 		printUserFacingError(stderr, err)
 		return 1
 	}
 	fmt.Fprintf(stdout, "prompt_preview task_ref=%s phase=%s profile=%s package=%s config=%s\n", taskRef, strings.TrimSpace(*phase), profile, context.packagePath, context.configPath)
-	if strings.TrimSpace(*repoSlot) != "" {
-		fmt.Fprintf(stdout, "prompt_preview_repo_slot slot=%s status=selected\n", strings.TrimSpace(*repoSlot))
+	if len(selectedRepoSlots) != 0 {
+		fmt.Fprintf(stdout, "prompt_preview_repo_slots slots=%s status=selected\n", strings.Join(selectedRepoSlots, ","))
 	} else {
-		fmt.Fprintln(stdout, "prompt_preview_repo_slot slot= status=not_selected reason=no_repo_slot_argument")
+		fmt.Fprintln(stdout, "prompt_preview_repo_slots slots= status=not_selected reason=no_repo_slot_argument")
 	}
 	for index, layer := range layers {
 		fmt.Fprintf(stdout, "--- prompt_layer index=%d kind=%s title=%s ---\n", index+1, layer.Kind, singleLine(layer.Title))
@@ -131,6 +150,22 @@ func runPromptPreview(args []string, stdout io.Writer, stderr io.Writer) int {
 	fmt.Fprintln(stdout, composedPromptPreview(layers))
 	fmt.Fprintln(stdout, "prompt_preview_status=ok mutation=none")
 	return 0
+}
+
+func normalizePromptPreviewRepoSlots(values []string) []string {
+	seen := map[string]bool{}
+	slots := []string{}
+	for _, value := range values {
+		for _, entry := range strings.Split(value, ",") {
+			slot := strings.TrimSpace(entry)
+			if slot == "" || seen[slot] {
+				continue
+			}
+			seen[slot] = true
+			slots = append(slots, slot)
+		}
+	}
+	return slots
 }
 
 type promptCommandContext struct {
@@ -204,7 +239,7 @@ func promptProfileForPreview(phase string, taskKind string, priorReviewFeedback 
 	return phase, nil
 }
 
-func buildPromptPreviewLayers(context promptCommandContext, profile string, runtimePhase string, repoSlot string, taskRef string, taskKind string, priorReviewFeedback bool) ([]promptLayerPreview, error) {
+func buildPromptPreviewLayers(context promptCommandContext, profile string, runtimePhase string, repoSlots []string, taskRef string, taskKind string, priorReviewFeedback bool) ([]promptLayerPreview, error) {
 	layers := []promptLayerPreview{}
 	if promptPreviewHasCoreInstruction(runtimePhase) {
 		coreSkill := coreSkillForPromptPreview(context.config, runtimePhase, profile)
@@ -229,26 +264,28 @@ func buildPromptPreviewLayers(context promptCommandContext, profile string, runt
 		return nil, err
 	}
 	layers = append(layers, phaseLayers...)
-	if strings.TrimSpace(repoSlot) != "" {
-		slotConfig, ok := prompts.RepoSlots[strings.TrimSpace(repoSlot)]
-		if !ok {
-			return nil, fmt.Errorf("repo slot %q is not configured under runtime.prompts.repoSlots", repoSlot)
-		}
-		repoSlotLayers, err := promptPhaseLayers(context.packagePath, "repo_slot_phase", "repo_slot_decomposition_child_draft_template", profile, slotConfig.Phases[profile])
-		if err != nil {
-			return nil, err
-		}
-		if len(repoSlotLayers) == 0 {
-			layers = append(layers, promptLayerPreview{
-				Kind:   "repo_slot_phase",
-				Title:  "repo slot " + strings.TrimSpace(repoSlot),
-				Detail: "no repo-slot prompt or skill addons for profile=" + profile,
-			})
-		} else {
-			for i := range repoSlotLayers {
-				repoSlotLayers[i].Detail = strings.TrimSpace(repoSlot) + " " + repoSlotLayers[i].Detail
+	if len(repoSlots) != 0 {
+		for _, repoSlot := range repoSlots {
+			slotConfig, ok := prompts.RepoSlots[repoSlot]
+			if !ok {
+				return nil, fmt.Errorf("repo slot %q is not configured under runtime.prompts.repoSlots", repoSlot)
 			}
-			layers = append(layers, repoSlotLayers...)
+			repoSlotLayers, err := promptPhaseLayers(context.packagePath, "repo_slot_phase", "repo_slot_decomposition_child_draft_template", profile, slotConfig.Phases[profile])
+			if err != nil {
+				return nil, err
+			}
+			if len(repoSlotLayers) == 0 {
+				layers = append(layers, promptLayerPreview{
+					Kind:   "repo_slot_phase",
+					Title:  "repo slot " + repoSlot,
+					Detail: "no repo-slot prompt or skill addons for profile=" + profile,
+				})
+			} else {
+				for i := range repoSlotLayers {
+					repoSlotLayers[i].Detail = repoSlot + " " + repoSlotLayers[i].Detail
+				}
+				layers = append(layers, repoSlotLayers...)
+			}
 		}
 	} else if len(prompts.RepoSlots) > 0 {
 		slots := make([]string, 0, len(prompts.RepoSlots))
@@ -259,7 +296,7 @@ func buildPromptPreviewLayers(context promptCommandContext, profile string, runt
 		layers = append(layers, promptLayerPreview{
 			Kind:   "repo_slot_phase",
 			Title:  "repo slot addons",
-			Detail: "available=" + strings.Join(slots, ",") + " action=rerun with --repo-slot SLOT to preview slot-specific addons",
+			Detail: "available=" + strings.Join(slots, ",") + " action=rerun with --repo-slot SLOT, repeatable in edit_scope order for multi-repo preview",
 		})
 	}
 	if promptPreviewHasTicketInstruction(runtimePhase) {

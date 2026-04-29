@@ -4823,6 +4823,7 @@ func TestPromptPreviewShowsPromptLayersWithoutMutatingTask(t *testing.T) {
 	output := stdout.String()
 	for _, want := range []string{
 		"prompt_preview task_ref=A2O#123 phase=decomposition profile=decomposition",
+		"prompt_preview_repo_slots slots=app status=selected",
 		"kind=project_system_prompt",
 		"kind=project_phase_prompt",
 		"kind=project_phase_skill",
@@ -4837,6 +4838,60 @@ func TestPromptPreviewShowsPromptLayersWithoutMutatingTask(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Fatalf("prompt preview missing %q in:\n%s", want, output)
 		}
+	}
+}
+
+func TestPromptPreviewComposesMultipleRepoSlotsInFlagOrder(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "repeated flags",
+			args: []string{"--repo-slot", "app", "--repo-slot", "lib"},
+		},
+		{
+			name: "comma separated",
+			args: []string{"--repo-slot", "app,lib"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			packageDir := filepath.Join(tempDir, "package")
+			writePromptPreviewProjectPackage(t, packageDir)
+
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			args := append([]string{
+				"prompt", "preview",
+				"--package", packageDir,
+				"--phase", "decomposition",
+			}, tt.args...)
+			args = append(args, "A2O#123")
+			code := run(args, &fakeRunner{}, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("multi repo prompt preview should pass, code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+			}
+			output := stdout.String()
+			for _, want := range []string{
+				"prompt_preview_repo_slots slots=app,lib status=selected",
+				"kind=repo_slot_phase_prompt title=prompts/app-decomposition.md",
+				"detail=app profile=decomposition",
+				"kind=repo_slot_phase_prompt title=prompts/lib-decomposition.md",
+				"detail=lib profile=decomposition",
+				"kind=repo_slot_decomposition_child_draft_template title=prompts/app-child-template.md",
+				"kind=repo_slot_decomposition_child_draft_template title=prompts/lib-child-template.md",
+			} {
+				if !strings.Contains(output, want) {
+					t.Fatalf("multi repo prompt preview missing %q in:\n%s", want, output)
+				}
+			}
+			appIndex := strings.Index(output, "title=prompts/app-decomposition.md")
+			libIndex := strings.Index(output, "title=prompts/lib-decomposition.md")
+			if appIndex < 0 || libIndex < 0 || appIndex > libIndex {
+				t.Fatalf("multi repo prompt preview did not preserve repo-slot flag order:\n%s", output)
+			}
+		})
 	}
 }
 
@@ -5057,6 +5112,8 @@ kanban:
 repos:
   app:
     path: ..
+  lib:
+    path: ..
 runtime:
   prompts:
     system:
@@ -5073,6 +5130,11 @@ runtime:
           decomposition:
             prompt: prompts/app-decomposition.md
             childDraftTemplate: prompts/app-child-template.md
+      lib:
+        phases:
+          decomposition:
+            prompt: prompts/lib-decomposition.md
+            childDraftTemplate: prompts/lib-child-template.md
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -5093,6 +5155,8 @@ runtime:
 		"prompts/decomposition-child-template.md": "base child template",
 		"prompts/app-decomposition.md":            "app decomposition guidance",
 		"prompts/app-child-template.md":           "app child template",
+		"prompts/lib-decomposition.md":            "lib decomposition guidance",
+		"prompts/lib-child-template.md":           "lib child template",
 	} {
 		target := filepath.Join(packageDir, path)
 		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {

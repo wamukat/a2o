@@ -123,6 +123,7 @@ module A3
           details << "effective_profile=#{prompt['effective_profile']}" if prompt["effective_profile"].to_s != ""
           details << "fallback_profile=#{prompt['fallback_profile']}" if prompt["fallback_profile"].to_s != ""
           details << "repo_slot=#{prompt['repo_slot']}" if prompt["repo_slot"].to_s != ""
+          details << "repo_slots=#{Array(prompt['repo_slots']).join(',')}" unless Array(prompt["repo_slots"]).empty?
           details << "schema_version=#{prompt['project_package_schema_version']}" if prompt["project_package_schema_version"].to_s != ""
           details << "composed_sha256=#{prompt['composed_instruction_sha256']}"
           details << "bytes=#{prompt['composed_instruction_bytes']}"

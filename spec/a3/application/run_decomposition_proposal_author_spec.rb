@@ -188,9 +188,68 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
       evidence = JSON.parse(File.read(result.evidence_path))
       evidence_prompt = evidence.fetch("request").fetch("project_prompt")
       expect(evidence_prompt.fetch("profile")).to eq("decomposition")
+      expect(evidence_prompt.fetch("repo_slot")).to eq("repo_alpha")
+      expect(evidence_prompt.fetch("repo_slots")).to eq(["repo_alpha"])
       expect(evidence_prompt.fetch("layers").first).to include("content_sha256", "content_bytes")
       expect(evidence_prompt.to_s).not_to include("Base child template")
       expect(evidence_prompt.to_s).not_to include("Repo alpha template")
+    end
+  end
+
+  it "passes decomposition repo-slot templates for every scoped repo on multi-repo tasks" do
+    Dir.mktmpdir do |dir|
+      multi_repo_task = A3::Domain::Task.new(
+        ref: "A3-v2#5300",
+        kind: :single,
+        edit_scope: %i[repo_alpha repo_beta],
+        status: :todo,
+        labels: ["trigger:investigate"],
+        priority: 3,
+        external_task_id: 5300
+      )
+      prompt_config = A3::Domain::ProjectPromptConfig.new(
+        phases: {
+          "decomposition" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+            prompt_document: prompt_document("prompts/decomposition.md", "decomposition guidance")
+          )
+        },
+        repo_slots: {
+          "repo_alpha" => {
+            "decomposition" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+              child_draft_template_document: prompt_document("prompts/repo-alpha-child-template.md", "Repo alpha template")
+            )
+          },
+          "repo_beta" => {
+            "decomposition" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+              child_draft_template_document: prompt_document("prompts/repo-beta-child-template.md", "Repo beta template")
+            )
+          }
+        }
+      )
+      process_runner = lambda do |_command, env:, **|
+        File.write(env.fetch("A2O_DECOMPOSITION_AUTHOR_RESULT_PATH"), JSON.generate(valid_author_result))
+        ["", "", FakeAuthorStatus.new(true, 0)]
+      end
+
+      result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
+        task: multi_repo_task,
+        project_surface: project_surface(prompt_config: prompt_config),
+        investigation_evidence: { "summary" => "Need split" }
+      )
+
+      request = JSON.parse(File.read(result.request_path))
+      project_prompt = request.fetch("project_prompt")
+      expect(project_prompt.fetch("repo_slot")).to be_nil
+      expect(project_prompt.fetch("repo_slots")).to eq(%w[repo_alpha repo_beta])
+      expect(project_prompt.fetch("layers").map { |layer| layer.fetch("title") }).to include(
+        "repo_alpha:prompts/repo-alpha-child-template.md",
+        "repo_beta:prompts/repo-beta-child-template.md"
+      )
+      expect(project_prompt.fetch("composed_instruction")).to include("Repo alpha template")
+      expect(project_prompt.fetch("composed_instruction")).to include("Repo beta template")
+
+      evidence_prompt = JSON.parse(File.read(result.evidence_path)).fetch("request").fetch("project_prompt")
+      expect(evidence_prompt.fetch("repo_slots")).to eq(%w[repo_alpha repo_beta])
     end
   end
 

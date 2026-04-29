@@ -329,6 +329,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
 
     metadata = described_class.new.project_prompt_metadata(request_form)
     expect(metadata.fetch("repo_slot")).to eq("ui_app")
+    expect(metadata.fetch("repo_slots")).to eq(["ui_app"])
     expect(metadata.fetch("layers").map { |layer| layer.fetch("title") }).to include(
       "prompts/implementation.md",
       "ui_app:prompts/ui-rework.md"
@@ -457,10 +458,11 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
     metadata = described_class.new.project_prompt_metadata(request_form)
     expect(metadata.fetch("repo_slot")).to eq("ui_app")
+    expect(metadata.fetch("repo_slots")).to eq(["ui_app"])
     expect(metadata.fetch("layers").map { |layer| layer.fetch("kind") }).to include("repo_slot_phase_prompt", "repo_slot_phase_skill")
   end
 
-  it "uses only project phase prompts for repo_scope both" do
+  it "composes repo-slot prompt addons for each scoped slot when repo_scope is both" do
     prompt_config = A3::Domain::ProjectPromptConfig.new(
       phases: {
         "implementation" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
@@ -468,14 +470,32 @@ RSpec.describe A3::Infra::WorkerProtocol do
         )
       },
       repo_slots: {
-        "ui_app" => {
+        "repo_alpha" => {
           "implementation" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
-            prompt_document: prompt_document("prompts/ui-implementation.md", "ui guidance")
+            skill_documents: [prompt_document("skills/repo-alpha.md", "repo alpha guidance")]
+          )
+        },
+        "repo_beta" => {
+          "implementation" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+            skill_documents: [prompt_document("skills/repo-beta.md", "repo beta guidance")]
           )
         }
       }
     )
     runtime = phase_runtime_with_prompt_config(prompt_config, phase: :implementation, repo_scope: :both)
+    multi_repo_packet = A3::Domain::WorkerTaskPacket.new(
+      ref: task.ref,
+      external_task_id: task.external_task_id,
+      kind: task.kind,
+      edit_scope: %i[repo_alpha repo_beta],
+      verification_scope: %i[repo_alpha repo_beta],
+      parent_ref: task.parent_ref,
+      child_refs: task.child_refs,
+      title: task_packet.title,
+      description: task_packet.description,
+      status: task_packet.status,
+      labels: task_packet.labels
+    )
 
     request_form = described_class.new.request_form(
       skill: runtime.implementation_skill,
@@ -483,13 +503,23 @@ RSpec.describe A3::Infra::WorkerProtocol do
       task: task,
       run: implementation_run,
       phase_runtime: runtime,
-      task_packet: task_packet
+      task_packet: multi_repo_packet
     )
 
     project_prompt = request_form.fetch("phase_runtime").fetch("project_prompt")
     expect(project_prompt.fetch("composed_instruction")).to include("implementation guidance")
-    expect(project_prompt.fetch("composed_instruction")).not_to include("ui guidance")
-    expect(project_prompt.fetch("layers").map { |layer| layer.fetch("kind") }).not_to include("repo_slot_phase_prompt")
+    expect(project_prompt.fetch("composed_instruction")).to include("repo alpha guidance")
+    expect(project_prompt.fetch("composed_instruction")).to include("repo beta guidance")
+    expect(project_prompt.fetch("repo_slot")).to be_nil
+    expect(project_prompt.fetch("repo_slots")).to eq(%w[repo_alpha repo_beta])
+    expect(project_prompt.fetch("layers").map { |layer| layer.fetch("title") }).to include(
+      "repo_alpha:skills/repo-alpha.md",
+      "repo_beta:skills/repo-beta.md"
+    )
+
+    metadata = described_class.new.project_prompt_metadata(request_form)
+    expect(metadata.fetch("repo_slot")).to eq("")
+    expect(metadata.fetch("repo_slots")).to eq(%w[repo_alpha repo_beta])
   end
 
   it "preserves existing worker request shape when no project prompts are configured" do

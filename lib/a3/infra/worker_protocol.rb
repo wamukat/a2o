@@ -86,8 +86,7 @@ module A3
 
         prompt_phase = prompt_phase_for(phase_runtime: phase_runtime, prior_review_feedback: prior_review_feedback)
         effective_prompt_phase, phase_config = prompt_config.phase_resolution(prompt_phase)
-        repo_slot = repo_prompt_slot(phase_runtime)
-        repo_slot_config = repo_slot ? prompt_config.repo_slot_addon_phase(repo_slot, prompt_phase) : nil
+        repo_slots = repo_prompt_slots(phase_runtime, task_packet)
         layers = []
         layers << prompt_layer("a2o_core_instruction", "A2O core instruction", skill.to_s) if skill
         if prompt_config.system_document
@@ -102,7 +101,10 @@ module A3
         if phase_config.child_draft_template_document
           layers << prompt_layer("decomposition_child_draft_template", phase_config.child_draft_template_document.path, phase_config.child_draft_template_document.content)
         end
-        if repo_slot_config && !repo_slot_config.empty?
+        repo_slots.each do |repo_slot|
+          repo_slot_config = prompt_config.repo_slot_addon_phase(repo_slot, prompt_phase)
+          next if repo_slot_config.empty?
+
           repo_slot_config.prompt_documents.each do |document|
             layers << prompt_layer("repo_slot_phase_prompt", "#{repo_slot}:#{document.path}", document.content)
           end
@@ -113,6 +115,7 @@ module A3
             layers << prompt_layer("repo_slot_decomposition_child_draft_template", "#{repo_slot}:#{repo_slot_config.child_draft_template_document.path}", repo_slot_config.child_draft_template_document.content)
           end
         end
+        repo_slot = repo_slots.one? ? repo_slots.first : nil
         layers << prompt_layer(
           "ticket_phase_instruction",
           "ticket #{task_packet.ref}",
@@ -123,6 +126,7 @@ module A3
           "effective_profile" => effective_prompt_phase,
           "fallback_profile" => (effective_prompt_phase if effective_prompt_phase != prompt_phase),
           "repo_slot" => repo_slot,
+          "repo_slots" => repo_slots,
           "project_package_schema_version" => "1",
           "layers" => layers,
           "composed_instruction" => layers.map { |layer| "## #{layer.fetch("title")}\n#{layer.fetch("content")}" }.join("\n\n")
@@ -137,11 +141,12 @@ module A3
         phase_name
       end
 
-      def repo_prompt_slot(phase_runtime)
+      def repo_prompt_slots(phase_runtime, task_packet)
         repo_scope = phase_runtime.repo_scope.to_s
-        return nil if repo_scope.empty? || repo_scope == "both"
+        return [] if repo_scope.empty?
+        return [repo_scope] unless repo_scope == "both"
 
-        repo_scope
+        Array(task_packet.edit_scope).map(&:to_s).reject(&:empty?).uniq
       end
 
       def prompt_layer(kind, title, content)
@@ -192,6 +197,7 @@ module A3
           "effective_profile" => project_prompt["effective_profile"].to_s,
           "fallback_profile" => project_prompt["fallback_profile"].to_s,
           "repo_slot" => project_prompt["repo_slot"].to_s,
+          "repo_slots" => Array(project_prompt["repo_slots"]).map(&:to_s).reject(&:empty?),
           "project_package_schema_version" => project_prompt["project_package_schema_version"].to_s,
           "layers" => layers,
           "composed_instruction_sha256" => Digest::SHA256.hexdigest(composed),
