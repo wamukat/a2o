@@ -304,6 +304,8 @@ a2o doctor prompts
 
 prompt doctor は、missing file、invalid path、unsupported prompt phase、duplicate skill entry、invalid repo-slot addon、fallback を含む prompt profile、`childDraftTemplate` の不正配置を、package path と phase context つきで報告する。
 
+コピーして使える baseline として `samples/prompt-packs/ja-conservative/` を用意している。日本語 system prompt、implementation、implementation rework、review、parent review、decomposition の phase prompt、再利用可能な phase skill、decomposition child draft template、最小の `runtime.prompts` config snippet を含む。
+
 ## Runtime Prompt Migration
 
 既存の project package は、新しい A2O version を使う前に必ず移行する必要はない。現在リリース済みの phase execution surface は引き続きサポートされる。

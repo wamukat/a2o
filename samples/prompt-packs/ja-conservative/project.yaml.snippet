@@ -1,0 +1,27 @@
+runtime:
+  prompts:
+    system:
+      file: prompts/system.md
+    phases:
+      implementation:
+        prompt: prompts/implementation.md
+        skills:
+          - skills/testing-policy.md
+      implementation_rework:
+        prompt: prompts/implementation-rework.md
+        skills:
+          - skills/testing-policy.md
+      review:
+        prompt: prompts/review.md
+        skills:
+          - skills/review-checklist.md
+      parent_review:
+        prompt: prompts/parent-review.md
+        skills:
+          - skills/review-checklist.md
+      decomposition:
+        prompt: prompts/decomposition.md
+        skills:
+          - skills/decomposition-policy.md
+        childDraftTemplate: prompts/decomposition-child-template.md
+
