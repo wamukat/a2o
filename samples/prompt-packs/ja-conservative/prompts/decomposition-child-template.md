@@ -23,4 +23,3 @@ Explain why this child exists and which parent requirement it satisfies.
 ## Verification
 
 List the expected test or manual verification commands.
-

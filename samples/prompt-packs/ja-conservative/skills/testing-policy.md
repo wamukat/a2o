@@ -5,4 +5,3 @@
 - Record commands exactly as run.
 - If a test cannot be run, report the blocker and the residual risk.
 - Do not weaken or remove existing tests to make a change pass.
-
