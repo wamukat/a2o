@@ -248,6 +248,40 @@ All paths are package-relative non-empty strings. Prompt phase names are limited
 
 For tasks that span multiple repositories, such as `repo_scope=both`, A2O does not compose repo-slot addons. Implicitly mixing multiple slot-specific instructions makes worker ownership ambiguous, so A2O uses only the project-wide phase prompt. Split the work into repo-slot child tasks when repo-specific guidance is required.
 
+Composition order is fixed and additive:
+
+```text
+A2O core worker contract
+  > runtime.prompts.system
+  > runtime.prompts.phases.<profile>.prompt
+  > runtime.prompts.phases.<profile>.skills
+  > runtime.prompts.repoSlots.<slot>.phases.<profile> addons
+  > ticket-specific instruction and task packet
+```
+
+Project prompts can define language, tone, local conventions, review stance, decomposition policy, and reusable phase guidance. They cannot disable required result schemas, workspace boundaries, branch/publish safety, Kanban gates, review requirements, or runtime state transitions. If a project prompt conflicts with an A2O runtime rule, the runtime rule wins.
+
+Typical prompt files are short Markdown files:
+
+```markdown
+<!-- prompts/system.md -->
+Respond in Japanese. Keep user-facing comments concise. Preserve existing project conventions and avoid unrelated refactors.
+
+<!-- prompts/implementation.md -->
+Implement the smallest coherent change for the ticket. Run focused tests first, then broader checks when shared behavior changes. Report changed files and verification.
+
+<!-- prompts/review.md -->
+Review for regressions, incomplete acceptance coverage, missing tests, and unsafe compatibility changes. Findings must include file and line references.
+
+<!-- prompts/parent-review.md -->
+Judge whether child outputs integrate cleanly. Identify follow-up child work only when it is required before parent completion.
+
+<!-- prompts/decomposition.md -->
+Split broad requirements into draft child tickets with clear ownership, dependencies, non-goals, acceptance criteria, and verification method.
+```
+
+Skills are longer reusable Markdown guidance referenced from a phase. Use prompts for phase stance and instruction layering; use skills for detailed procedures such as testing policy, API compatibility rules, UI review checklist, or Kanban decomposition templates. `childDraftTemplate` is decomposition-specific guidance for the expected child ticket shape. It is passed to the proposal author request, while durable evidence stores only safe prompt metadata.
+
 ## Runtime Phases
 
 `runtime.phases.<phase>.skill` points to a package skill file.

@@ -258,6 +258,85 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(request_form.fetch("phase_runtime")).to include("prior_review_feedback" => { "summary" => "Fix assertion coverage." })
   end
 
+  it "selects parent_review prompt profile for parent review runs" do
+    parent_task = A3::Domain::Task.new(
+      ref: "A3-v2#3000",
+      project_key: "portal",
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      verification_scope: %i[repo_alpha repo_beta],
+      child_refs: [task.ref]
+    )
+    parent_run = A3::Domain::Run.new(
+      ref: "run-parent-review-1",
+      project_key: "portal",
+      task_ref: parent_task.ref,
+      phase: :review,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: source_descriptor,
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: parent_task.edit_scope,
+        verification_scope: parent_task.verification_scope,
+        ownership_scope: :parent
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: parent_task.ref,
+        owner_scope: :parent,
+        snapshot_version: "head-1"
+      )
+    )
+    parent_packet = A3::Domain::WorkerTaskPacket.new(
+      ref: parent_task.ref,
+      external_task_id: nil,
+      kind: parent_task.kind,
+      edit_scope: parent_task.edit_scope,
+      verification_scope: parent_task.verification_scope,
+      parent_ref: nil,
+      child_refs: parent_task.child_refs,
+      title: "Review child integration",
+      description: "Check whether children can be integrated.",
+      status: "In review",
+      labels: []
+    )
+    prompt_config = A3::Domain::ProjectPromptConfig.new(
+      phases: {
+        "review" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+          prompt_document: prompt_document("prompts/review.md", "child review guidance")
+        ),
+        "parent_review" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+          prompt_document: prompt_document("prompts/parent-review.md", "parent integration guidance")
+        )
+      }
+    )
+    runtime = A3::Domain::PhaseRuntimeConfig.new(
+      task_kind: :parent,
+      repo_scope: :both,
+      phase: :review,
+      implementation_skill: "task implementation",
+      review_skill: "parent review",
+      verification_commands: [],
+      remediation_commands: [],
+      workspace_hook: "bootstrap",
+      merge_target: :merge_to_parent,
+      merge_policy: :squash,
+      project_prompt_config: prompt_config
+    )
+
+    request_form = described_class.new.request_form(
+      skill: runtime.review_skill,
+      workspace: workspace,
+      task: parent_task,
+      run: parent_run,
+      phase_runtime: runtime,
+      task_packet: parent_packet
+    )
+
+    project_prompt = request_form.fetch("phase_runtime").fetch("project_prompt")
+    expect(project_prompt.fetch("profile")).to eq("parent_review")
+    expect(project_prompt.fetch("composed_instruction")).to include("parent integration guidance")
+    expect(project_prompt.fetch("composed_instruction")).not_to include("child review guidance")
+  end
+
   it "adds repo-slot prompt layers without replacing project phase defaults" do
     prompt_config = A3::Domain::ProjectPromptConfig.new(
       phases: {

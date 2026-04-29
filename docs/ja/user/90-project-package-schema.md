@@ -253,6 +253,40 @@ runtime:
 
 `repo_scope=both` のように複数 repo をまたぐ task では、A2O は repo-slot addon を合成しない。複数 slot の指示を暗黙に混ぜると worker の責務境界が曖昧になるため、project-wide phase prompt だけを使う。repo-specific な指示が必要な場合は、task を repo slot 単位の child に分ける。
 
+合成順序は固定で、すべて追加 layer として扱う。
+
+```text
+A2O core worker contract
+  > runtime.prompts.system
+  > runtime.prompts.phases.<profile>.prompt
+  > runtime.prompts.phases.<profile>.skills
+  > runtime.prompts.repoSlots.<slot>.phases.<profile> addons
+  > ticket-specific instruction and task packet
+```
+
+project prompt では、言語、tone、local convention、review stance、decomposition policy、phase ごとの再利用可能な作業指針を定義できる。一方で、必須 worker result schema、workspace boundary、branch / publish safety、Kanban gate、review requirement、runtime state transition は無効化できない。project prompt と A2O runtime rule が衝突した場合は runtime rule が優先される。
+
+典型的な prompt file は短い Markdown として用意する。
+
+```markdown
+<!-- prompts/system.md -->
+日本語で応答する。利用者向けコメントは簡潔にする。既存のプロジェクト規約を守り、無関係なリファクタリングは避ける。
+
+<!-- prompts/implementation.md -->
+チケットを満たす最小の一貫した変更を実装する。まず focused test を実行し、共有動作に触れる場合は広めの検証も行う。変更ファイルと検証結果を報告する。
+
+<!-- prompts/review.md -->
+regression、acceptance coverage の不足、missing tests、危険な互換性変更を確認する。finding には file / line reference を含める。
+
+<!-- prompts/parent-review.md -->
+child の成果物が統合可能かを判断する。parent 完了前に必須の作業だけを follow-up child として指摘する。
+
+<!-- prompts/decomposition.md -->
+大きな要求を、明確な ownership、dependencies、non-goals、acceptance criteria、verification method を持つ draft child ticket に分割する。
+```
+
+skill は phase から参照する長めの再利用可能 Markdown guidance である。phase stance や instruction layering は prompt に置き、testing policy、API compatibility rule、UI review checklist、Kanban decomposition template などの詳細手順は skill に置く。`childDraftTemplate` は decomposition 専用で、期待する child ticket 形状を proposal author request に渡す。永続 evidence には raw content ではなく安全な prompt metadata だけを保存する。
+
 ## Runtime Phases
 
 `runtime.phases` はフェーズごとのスキル、実行コマンド、検証 / 修復コマンド、マージ方針を持つ。A2O はフェーズごとの実行コマンドを内部の標準入力バンドル用ランチャー設定へ変換する。利用者は別途 `launcher.json` を作らない。
