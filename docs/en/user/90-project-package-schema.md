@@ -302,18 +302,18 @@ runtime:
     implementation:
       skill: skills/implementation.md
       executor:
-        command: project-package/commands/implementation.sh
+        command: [project-package/commands/implementation.sh]
     review:
       skill: skills/review.md
       executor:
-        command: project-package/commands/review.sh
+        command: [project-package/commands/review.sh]
     parent_review:
       skill: skills/parent-review.md
       executor:
-        command: project-package/commands/parent-review.sh
+        command: [project-package/commands/parent-review.sh]
   decomposition:
-    propose:
-      command: project-package/commands/decompose.sh
+    author:
+      command: [project-package/commands/decompose.sh]
 ```
 
 After migration, keep the phase skills as the runtime worker contract and add project prompt layers for project policy, phase stance, reusable checklists, rework behavior, and decomposition ticket shape:
@@ -343,18 +343,18 @@ runtime:
     implementation:
       skill: skills/implementation.md
       executor:
-        command: project-package/commands/implementation.sh
+        command: [project-package/commands/implementation.sh]
     review:
       skill: skills/review.md
       executor:
-        command: project-package/commands/review.sh
+        command: [project-package/commands/review.sh]
     parent_review:
       skill: skills/parent-review.md
       executor:
-        command: project-package/commands/parent-review.sh
+        command: [project-package/commands/parent-review.sh]
   decomposition:
-    propose:
-      command: project-package/commands/decompose.sh
+    author:
+      command: [project-package/commands/decompose.sh]
 ```
 
 Use this split when moving existing content:

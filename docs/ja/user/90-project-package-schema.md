@@ -307,18 +307,18 @@ runtime:
     implementation:
       skill: skills/implementation.md
       executor:
-        command: project-package/commands/implementation.sh
+        command: [project-package/commands/implementation.sh]
     review:
       skill: skills/review.md
       executor:
-        command: project-package/commands/review.sh
+        command: [project-package/commands/review.sh]
     parent_review:
       skill: skills/parent-review.md
       executor:
-        command: project-package/commands/parent-review.sh
+        command: [project-package/commands/parent-review.sh]
   decomposition:
-    propose:
-      command: project-package/commands/decompose.sh
+    author:
+      command: [project-package/commands/decompose.sh]
 ```
 
 移行後も phase skill は runtime worker contract として残し、project policy、phase stance、再利用可能 checklist、rework behavior、decomposition ticket shape を project prompt layer として追加する。
@@ -348,18 +348,18 @@ runtime:
     implementation:
       skill: skills/implementation.md
       executor:
-        command: project-package/commands/implementation.sh
+        command: [project-package/commands/implementation.sh]
     review:
       skill: skills/review.md
       executor:
-        command: project-package/commands/review.sh
+        command: [project-package/commands/review.sh]
     parent_review:
       skill: skills/parent-review.md
       executor:
-        command: project-package/commands/parent-review.sh
+        command: [project-package/commands/parent-review.sh]
   decomposition:
-    propose:
-      command: project-package/commands/decompose.sh
+    author:
+      command: [project-package/commands/decompose.sh]
 ```
 
 既存内容を移すときは次の分担にする。
