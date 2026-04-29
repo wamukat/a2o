@@ -18,7 +18,7 @@ module A3
       def call
         @sync_external_tasks&.call
         tasks = @task_repository.all
-        candidates = tasks.select(&:decomposition_requested?).freeze
+        candidates = tasks.select { |task| task.decomposition_requested? && !task.decomposed? }.freeze
         active_task = candidates.find { |task| active_decomposition_task?(task) }
         selected_task = active_task ? nil : next_candidate(candidates: candidates, tasks: tasks)
 

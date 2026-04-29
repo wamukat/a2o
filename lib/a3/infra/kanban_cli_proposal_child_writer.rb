@@ -4,6 +4,7 @@ module A3
   module Infra
     class KanbanCliProposalChildWriter
       DRAFT_LABEL = "a2o:draft-child"
+      DECOMPOSED_LABEL = "a2o:decomposed"
       RUNNABLE_LABEL = "trigger:auto-implement"
       Result = Struct.new(:success?, :child_refs, :child_keys, :summary, :diagnostics, keyword_init: true)
       class PartialChildWriteError < StandardError
@@ -54,6 +55,7 @@ module A3
         end
         begin
           reconcile_dependencies(parent_task_ref: parent_task_ref, children: children, child_refs_by_key: child_refs_by_key)
+          ensure_source_decomposed(parent_external_task_id) if draft_mode? && parent_external_task_id
         rescue StandardError => e
           failed_write = dependency_failed_write(e)
           raise
@@ -215,6 +217,10 @@ module A3
 
         @client.run_command("label-ensure", "--project", @project, "--title", label.to_s)
         @client.run_command("task-label-add", "--project", @project, "--task-id", task_id.to_s, "--label", label.to_s)
+      end
+
+      def ensure_source_decomposed(parent_task_id)
+        ensure_label(parent_task_id, DECOMPOSED_LABEL)
       end
 
       def ensure_relation(parent_task_id, child_task_id)

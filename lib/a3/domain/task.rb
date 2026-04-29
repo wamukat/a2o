@@ -6,6 +6,7 @@ module A3
 
     class Task
       DECOMPOSITION_TRIGGER_LABEL = "trigger:investigate"
+      DECOMPOSED_LABEL = "a2o:decomposed"
       DRAFT_CHILD_LABEL = "a2o:draft-child"
       AUTO_IMPLEMENT_TRIGGER_LABEL = "trigger:auto-implement"
 
@@ -136,6 +137,10 @@ module A3
 
       def decomposition_requested?
         labels.include?(DECOMPOSITION_TRIGGER_LABEL)
+      end
+
+      def decomposed?
+        labels.include?(DECOMPOSED_LABEL)
       end
 
       def draft_child?

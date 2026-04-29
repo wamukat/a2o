@@ -115,6 +115,7 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     expect(result.success?).to be(true)
     expect(client.created.first.fetch("description")).to include("Child key: child-key-1")
     expect(client.labels.any? { |args| args.include?("a2o:draft-child") }).to be(true)
+    expect(client.labels.any? { |args| args.include?("a2o:decomposed") && args.include?("5300") }).to be(true)
     expect(client.labels.any? { |args| args.include?("repo:alpha") }).to be(true)
     expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(false)
     expect(client.comments.any? { |args| args.include?("task-comment-create") }).to be(true)

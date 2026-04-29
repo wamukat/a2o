@@ -57,6 +57,71 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
+  it "skips decomposed source tickets before requiring a repo scope label" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      task_get_includes_labels: false,
+      snapshots: [
+        {
+          "id" => 3048,
+          "ref" => "Sample#3048",
+          "status" => "To do",
+          "priority" => 3,
+          "labels" => ["trigger:investigate", "a2o:decomposed"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:investigate"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      expect(source.load).to eq([])
+    end
+  end
+
+  it "does not hide decomposed parents selected by parent automation trigger" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      task_get_includes_labels: false,
+      snapshots: [
+        {
+          "id" => 3049,
+          "ref" => "Sample#3049",
+          "status" => "To do",
+          "priority" => 3,
+          "labels" => ["repo:ui-app", "trigger:auto-parent", "a2o:decomposed"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-parent"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+
+      expect(tasks.map(&:ref)).to eq(["Sample#3049"])
+      expect(tasks.fetch(0).edit_scope).to eq([:repo_beta])
+    end
+  end
+
   it "maps clarification-labeled tasks to needs_clarification" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,

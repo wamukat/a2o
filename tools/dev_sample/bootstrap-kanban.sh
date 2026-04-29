@@ -52,6 +52,7 @@ PY
 "${KANBAN[@]}" label-ensure --project "$A2O_DEV_SAMPLE_PROJECT" --title repo:lib --hex-color '#0f766e' >/dev/null
 "${KANBAN[@]}" label-ensure --project "$A2O_DEV_SAMPLE_PROJECT" --title trigger:auto-implement --hex-color '#2563eb' >/dev/null
 "${KANBAN[@]}" label-ensure --project "$A2O_DEV_SAMPLE_PROJECT" --title trigger:investigate --hex-color '#f59e0b' >/dev/null
+"${KANBAN[@]}" label-ensure --project "$A2O_DEV_SAMPLE_PROJECT" --title a2o:decomposed --hex-color '#0891b2' >/dev/null
 "${KANBAN[@]}" label-ensure --project "$A2O_DEV_SAMPLE_PROJECT" --title trigger:auto-parent --hex-color '#7c3aed' >/dev/null
 "${KANBAN[@]}" label-ensure --project "$A2O_DEV_SAMPLE_PROJECT" --title a2o:draft-child --hex-color '#8b5cf6' >/dev/null
 "${KANBAN[@]}" label-ensure --project "$A2O_DEV_SAMPLE_PROJECT" --title blocked --hex-color '#dc2626' >/dev/null

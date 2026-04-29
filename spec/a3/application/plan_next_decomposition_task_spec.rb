@@ -91,4 +91,32 @@ RSpec.describe A3::Application::PlanNextDecompositionTask do
 
     expect(result.task&.ref).to eq("A3-v2#5199")
   end
+
+  it "skips already-decomposed source tickets even if trigger remains" do
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#5200",
+        kind: :single,
+        edit_scope: [:repo_alpha],
+        status: :todo,
+        labels: ["trigger:investigate", "a2o:decomposed"],
+        priority: 5
+      )
+    )
+    task_repository.save(
+      A3::Domain::Task.new(
+        ref: "A3-v2#5201",
+        kind: :single,
+        edit_scope: [:repo_beta],
+        status: :todo,
+        labels: ["trigger:investigate"],
+        priority: 1
+      )
+    )
+
+    result = use_case.call
+
+    expect(result.task&.ref).to eq("A3-v2#5201")
+    expect(result.candidates.map(&:ref)).to eq(["A3-v2#5201"])
+  end
 end

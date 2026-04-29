@@ -366,6 +366,7 @@ module A3
         task_ref = String(raw_snapshot.fetch("ref")).strip
         return nil unless ignore_trigger_filter || @trigger_labels.empty? || (labels & @trigger_labels).any?
         return nil if task_closed?(raw_snapshot.fetch("status", nil), raw_snapshot["done"], raw_snapshot["is_archived"])
+        return nil if decomposed_source_selected_only_for_decomposition?(labels)
 
         edit_scope = resolve_edit_scope(labels: labels, task_ref: task_ref)
 
@@ -388,6 +389,13 @@ module A3
 
       def trigger_selected?(labels)
         @trigger_labels.empty? || !(labels & @trigger_labels).empty?
+      end
+
+      def decomposed_source_selected_only_for_decomposition?(labels)
+        return false unless labels.include?(A3::Domain::Task::DECOMPOSED_LABEL)
+        return false unless @trigger_labels.include?(A3::Domain::Task::DECOMPOSITION_TRIGGER_LABEL)
+
+        ((labels & @trigger_labels) - [A3::Domain::Task::DECOMPOSITION_TRIGGER_LABEL]).empty?
       end
 
       def resolve_edit_scope(labels:, task_ref:)
