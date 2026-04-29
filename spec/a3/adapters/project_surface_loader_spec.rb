@@ -277,6 +277,33 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
 
     expect { loader.load(project_config_path) }
       .to raise_error(A3::Domain::ConfigurationError, "project.yaml docs.root must stay inside the docs repo slot")
+
+    FileUtils.rm_f(File.join(repo_root, "docs", "escape.md"))
+    outside_dir = File.join(@tmpdir, "outside-doc-dir")
+    FileUtils.mkdir_p(outside_dir)
+    File.symlink(outside_dir, File.join(repo_root, "docs", "outside"))
+    project_config_path = write_project_config(
+      "repos" => {
+        "app" => { "path" => "app" }
+      },
+      "docs" => {
+        "root" => "docs",
+        "index" => "docs/outside/new.md"
+      },
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml docs.index must stay inside the docs repo slot")
   end
 
   it "falls back implementation_rework to implementation when no rework profile is configured" do

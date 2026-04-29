@@ -686,12 +686,6 @@ func validateProjectDocsPath(rawPath any, label string, repoRoot string, require
 	if absPath != absRepoRoot && !strings.HasPrefix(absPath, absRepoRoot+string(os.PathSeparator)) {
 		return fmt.Errorf("%s must stay inside the docs repo slot", label)
 	}
-	if _, err := os.Lstat(absPath); err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("%s inspect path: %w", label, err)
-	}
 	realRoot, err := filepath.EvalSymlinks(absRepoRoot)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -699,17 +693,34 @@ func validateProjectDocsPath(rawPath any, label string, repoRoot string, require
 		}
 		return fmt.Errorf("resolve docs repo slot root: %w", err)
 	}
-	realPath, err := filepath.EvalSymlinks(absPath)
+	existingPath, err := nearestExistingPath(absPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
+		return fmt.Errorf("%s inspect path: %w", label, err)
+	}
+	realExistingPath, err := filepath.EvalSymlinks(existingPath)
+	if err != nil {
 		return fmt.Errorf("%s resolve path: %w", label, err)
 	}
-	if realPath != realRoot && !strings.HasPrefix(realPath, realRoot+string(os.PathSeparator)) {
+	if realExistingPath != realRoot && !strings.HasPrefix(realExistingPath, realRoot+string(os.PathSeparator)) {
 		return fmt.Errorf("%s must stay inside the docs repo slot", label)
 	}
 	return nil
+}
+
+func nearestExistingPath(path string) (string, error) {
+	current := path
+	for {
+		if _, err := os.Lstat(current); err == nil {
+			return current, nil
+		} else if !os.IsNotExist(err) {
+			return "", err
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return "", os.ErrNotExist
+		}
+		current = parent
+	}
 }
 
 func projectDocsMachineKey(value string) bool {

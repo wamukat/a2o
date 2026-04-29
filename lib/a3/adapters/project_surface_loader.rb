@@ -315,14 +315,24 @@ module A3
         unless absolute_path == root || absolute_path.start_with?("#{root}#{File::SEPARATOR}")
           raise A3::Domain::ConfigurationError, "project.yaml #{location} must stay inside the docs repo slot"
         end
-        return unless File.exist?(absolute_path) || File.symlink?(absolute_path)
         return unless File.exist?(root)
 
         real_root = File.realpath(root)
-        real_path = File.realpath(absolute_path)
+        real_path = File.realpath(nearest_existing_path(absolute_path))
         unless real_path == real_root || real_path.start_with?("#{real_root}#{File::SEPARATOR}")
           raise A3::Domain::ConfigurationError, "project.yaml #{location} must stay inside the docs repo slot"
         end
+      end
+
+      def nearest_existing_path(path)
+        current = path
+        until File.exist?(current) || File.symlink?(current)
+          parent = File.dirname(current)
+          raise Errno::ENOENT, path if parent == current
+
+          current = parent
+        end
+        current
       end
 
       def machine_key?(value)

@@ -4491,6 +4491,52 @@ runtime:
 		!strings.Contains(stdout.String(), "repoSlot must match a repos entry: backend") {
 		t.Fatalf("project validate should reject invalid docs config, stdout=%s stderr=%s", stdout.String(), stderr.String())
 	}
+
+	repoDir := filepath.Join(tempDir, "app")
+	outsideDir := filepath.Join(tempDir, "outside")
+	if err := os.MkdirAll(filepath.Join(repoDir, "docs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(outsideDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outsideDir, filepath.Join(repoDir, "docs", "outside")); err != nil {
+		t.Fatal(err)
+	}
+	body = `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ../app
+docs:
+  root: docs
+  index: docs/outside/new.md
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject intermediate symlink escape, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "index must stay inside the docs repo slot") {
+		t.Fatalf("project validate should reject intermediate symlink escape, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
 }
 
 func TestProjectValidateRejectsMissingRuntimePromptFile(t *testing.T) {
