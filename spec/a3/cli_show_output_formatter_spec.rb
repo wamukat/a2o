@@ -835,6 +835,67 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     expect(result).not_to include(a_string_matching(/execution_diagnostic.merge_recovery/))
   end
 
+  it "formats project prompt metadata without dumping prompt content" do
+    run_view = A3::Domain::OperatorInspectionReadModel::RunView.new(
+      ref: "run-prompt",
+      task_ref: "Sample#245",
+      task_kind: :child,
+      phase: :implementation,
+      workspace_kind: :runtime_workspace,
+      source_type: :branch_head,
+      source_ref: "refs/heads/a2o/work/Sample-245",
+      terminal_outcome: :completed,
+      evidence_summary: A3::Domain::OperatorInspectionReadModel::EvidenceSummary.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :branch_head,
+        source_ref: "refs/heads/a2o/work/Sample-245",
+        review_base: nil,
+        review_head: nil,
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        ownership_scope: :child,
+        artifact_owner_ref: "Sample#245",
+        artifact_owner_scope: :child,
+        artifact_snapshot_version: "head-1",
+        phase_records_count: 1
+      ),
+      latest_execution: A3::Domain::OperatorInspectionReadModel::RunView::ExecutionSnapshot.new(
+        phase: :implementation,
+        summary: "implementation completed",
+        verification_summary: nil,
+        failing_command: nil,
+        observed_state: nil,
+        diagnostics: {
+          "project_prompt" => {
+            "profile" => "implementation",
+            "composed_instruction_sha256" => "abc123",
+            "composed_instruction_bytes" => 128,
+            "layers" => [
+              {
+                "kind" => "project_system_prompt",
+                "title" => "prompts/system.md",
+                "content_sha256" => "def456",
+                "content_bytes" => 42
+              }
+            ]
+          }
+        },
+        worker_response_bundle: nil,
+        runtime_snapshot: nil,
+        review_disposition: nil
+      ),
+      latest_blocked_diagnosis: nil,
+      rerun_decision: nil,
+      recovery: nil
+    )
+
+    result = described_class.run_lines(run_view)
+
+    expect(result).to include("project_prompt profile=implementation composed_sha256=abc123 bytes=128")
+    expect(result).to include("project_prompt_layer kind=project_system_prompt title=prompts/system.md sha256=def456 bytes=42")
+    expect(result).not_to include(a_string_matching(/execution_diagnostic.project_prompt/))
+  end
+
   it "formats scheduler history lines through the scheduler formatter" do
     history = A3::Domain::OperatorInspectionReadModel::SchedulerHistory.from_cycles(
       [

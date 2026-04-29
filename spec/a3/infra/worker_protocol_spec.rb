@@ -202,6 +202,12 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(project_prompt.fetch("composed_instruction")).to include("## A2O core instruction\n#{runtime.review_skill}")
     expect(project_prompt.fetch("composed_instruction")).to include("## prompts/system.md\nsystem guidance")
     expect(project_prompt.fetch("composed_instruction")).to include("## ticket #{task.ref}\nTask: #{task.ref}")
+
+    metadata = described_class.new.project_prompt_metadata(request_form)
+    expect(metadata.fetch("profile")).to eq("review")
+    expect(metadata.fetch("layers").map { |layer| layer.fetch("title") }).to include("prompts/system.md", "prompts/review.md", "skills/review-policy.md")
+    expect(metadata.fetch("layers").first).to include("content_sha256", "content_bytes")
+    expect(metadata.to_s).not_to include("system guidance")
   end
 
   it "selects implementation_rework prompt profile when prior review feedback is present" do

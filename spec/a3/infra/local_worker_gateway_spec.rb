@@ -229,6 +229,54 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     expect(execution).to eq(result)
   end
 
+  it "adds safe project prompt metadata to execution diagnostics" do
+    result = A3::Application::ExecutionResult.new(success: true, summary: "ok")
+    prompt_config = A3::Domain::ProjectPromptConfig.new(
+      system_document: prompt_document("prompts/system.md", "system guidance"),
+      phases: {
+        "implementation" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+          prompt_document: prompt_document("prompts/implementation.md", "implementation guidance")
+        )
+      }
+    )
+    runtime = A3::Domain::PhaseRuntimeConfig.new(
+      task_kind: :child,
+      repo_scope: :ui_app,
+      phase: :implementation,
+      implementation_skill: "task implementation",
+      review_skill: "task review",
+      verification_commands: [],
+      remediation_commands: [],
+      workspace_hook: "bootstrap",
+      merge_target: :merge_to_parent,
+      merge_policy: :squash,
+      project_prompt_config: prompt_config
+    )
+    gateway = described_class.new(command_runner: command_runner)
+
+    allow(command_runner).to receive(:run).and_return(result)
+
+    execution = gateway.run(
+      skill: runtime.implementation_skill,
+      workspace: workspace,
+      task: task,
+      run: run,
+      phase_runtime: runtime,
+      task_packet: task_packet
+    )
+
+    prompt_metadata = execution.diagnostics.fetch("project_prompt")
+    expect(prompt_metadata.fetch("profile")).to eq("implementation")
+    expect(prompt_metadata.fetch("layers").map { |layer| layer.fetch("title") }).to include(
+      "A2O core instruction",
+      "prompts/system.md",
+      "prompts/implementation.md",
+      "ticket #{task.ref}"
+    )
+    expect(prompt_metadata.fetch("layers").first).to include("content_sha256", "content_bytes")
+    expect(prompt_metadata.to_s).not_to include("system guidance")
+  end
+
   it "prefers a structured worker result bundle over the command runner exit result" do
     result_path = workspace.root_path.join(".a2o", "worker-result.json")
     bundle = {
@@ -1313,6 +1361,14 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
         "failing_command must be a string when success is false unless rework_required is true",
         "observed_state must be a string when present"
       ]
+    )
+  end
+
+  def prompt_document(path, content)
+    A3::Domain::ProjectPromptConfig::Document.new(
+      path: path,
+      absolute_path: File.join(tmpdir, path),
+      content: content
     )
   end
 end

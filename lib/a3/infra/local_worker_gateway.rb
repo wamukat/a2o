@@ -27,7 +27,7 @@ module A3
             "skill" => skill
           }
         )
-        @worker_protocol.write_request(
+        request_form = @worker_protocol.write_request(
           skill: skill,
           workspace: workspace,
           task: task,
@@ -47,6 +47,7 @@ module A3
             "command" => command
           }
         )
+        prompt_metadata = @worker_protocol.project_prompt_metadata(request_form)
         @command_runner.run(
           [command],
           workspace: workspace,
@@ -67,9 +68,9 @@ module A3
           )
           worker_response = @worker_protocol.load_result(result_path)
           if worker_response.is_a?(A3::Application::ExecutionResult)
-            worker_response
+            with_project_prompt_metadata(worker_response, prompt_metadata)
           else
-            @worker_protocol.build_execution_result(
+            execution = @worker_protocol.build_execution_result(
               worker_response,
               workspace: workspace,
               expected_task_ref: task.ref,
@@ -77,6 +78,7 @@ module A3
               expected_phase: run.phase,
               expected_task_kind: task.kind
             ) || execution_result
+            with_project_prompt_metadata(execution, prompt_metadata)
           end
         end
       end
@@ -87,6 +89,12 @@ module A3
         return skill unless @worker_command
 
         Shellwords.join([@worker_command, *@worker_command_args])
+      end
+
+      def with_project_prompt_metadata(execution, metadata)
+        return execution unless metadata
+
+        execution.with_diagnostics(execution.diagnostics.merge("project_prompt" => metadata))
       end
     end
   end

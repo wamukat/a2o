@@ -88,6 +88,7 @@ module A3
           append_clarification_request_lines(result, execution.clarification_request)
           append_skill_feedback_lines(result, execution.skill_feedback)
           append_inherited_parent_lines(result, execution.diagnostics)
+          append_project_prompt_lines(result, execution.diagnostics)
           append_validation_error_lines(result, "execution_validation_error", execution.diagnostics)
           result << "failing_command=#{FormattingHelpers.diagnostic_value(execution.failing_command)}" if execution.failing_command
           result << "observed_state=#{execution.observed_state}" if execution.observed_state
@@ -109,7 +110,20 @@ module A3
               control_plane_url
               inherited_parent_ref
               inherited_parent_state_fingerprint
+              project_prompt
             ].include?(key)
+          end
+        end
+
+        def append_project_prompt_lines(result, diagnostics)
+          prompt = diagnostics["project_prompt"]
+          return unless prompt.is_a?(Hash)
+
+          result << "project_prompt profile=#{prompt['profile']} composed_sha256=#{prompt['composed_instruction_sha256']} bytes=#{prompt['composed_instruction_bytes']}"
+          Array(prompt["layers"]).each do |layer|
+            next unless layer.is_a?(Hash)
+
+            result << "project_prompt_layer kind=#{layer['kind']} title=#{layer['title']} sha256=#{layer['content_sha256']} bytes=#{layer['content_bytes']}"
           end
         end
 

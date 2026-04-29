@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "digest"
 require "fileutils"
 require "open3"
 require "a3/domain/skill_feedback"
@@ -146,9 +147,35 @@ module A3
       def write_request(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, command_intent: nil, prior_review_feedback: nil)
         request_dir = metadata_dir(workspace)
         FileUtils.mkdir_p(request_dir)
+        form = request_form(skill: skill, workspace: workspace, task: task, run: run, phase_runtime: phase_runtime, task_packet: task_packet, command_intent: command_intent, prior_review_feedback: prior_review_feedback)
         request_dir.join("worker-request.json").write(
-          JSON.pretty_generate(request_form(skill: skill, workspace: workspace, task: task, run: run, phase_runtime: phase_runtime, task_packet: task_packet, command_intent: command_intent, prior_review_feedback: prior_review_feedback))
+          JSON.pretty_generate(form)
         )
+        form
+      end
+
+      def project_prompt_metadata(request_form)
+        project_prompt = request_form.dig("phase_runtime", "project_prompt")
+        return nil unless project_prompt.is_a?(Hash)
+
+        layers = Array(project_prompt["layers"]).map do |layer|
+          next unless layer.is_a?(Hash)
+
+          content = layer.fetch("content", "").to_s
+          {
+            "kind" => layer["kind"].to_s,
+            "title" => layer["title"].to_s,
+            "content_sha256" => Digest::SHA256.hexdigest(content),
+            "content_bytes" => content.bytesize
+          }
+        end.compact
+        composed = project_prompt.fetch("composed_instruction", "").to_s
+        {
+          "profile" => project_prompt["profile"].to_s,
+          "layers" => layers,
+          "composed_instruction_sha256" => Digest::SHA256.hexdigest(composed),
+          "composed_instruction_bytes" => composed.bytesize
+        }
       end
 
       def load_result(result_path)

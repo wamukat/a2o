@@ -55,7 +55,7 @@ module A3
         result_path = @worker_protocol.result_path(workspace)
         FileUtils.rm_f(result_path)
         log_request_start(workspace: workspace, task: task, run: run, skill: skill)
-        @worker_protocol.write_request(
+        request_form = @worker_protocol.write_request(
           skill: skill,
           workspace: workspace,
           task: task,
@@ -64,6 +64,7 @@ module A3
           task_packet: task_packet,
           prior_review_feedback: prior_review_feedback
         )
+        prompt_metadata = @worker_protocol.project_prompt_metadata(request_form)
 
         request = build_job_request(workspace: workspace, task: task, run: run)
         log_agent_job_event("enqueue_start", request: request, skill: skill)
@@ -87,30 +88,32 @@ module A3
           expected_phase: run.phase,
           expected_task_kind: task.kind
         )
-        return with_agent_job_result(execution, completed.result) if execution
-        return agent_result_execution(completed.result) unless completed.result.succeeded?
+        return with_project_prompt_metadata(with_agent_job_result(execution, completed.result), prompt_metadata) if execution
+        return with_project_prompt_metadata(agent_result_execution(completed.result), prompt_metadata) unless completed.result.succeeded?
 
-        @worker_protocol.missing_result
+        with_project_prompt_metadata(@worker_protocol.missing_result, prompt_metadata)
       end
 
       def run_agent_materialized(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, prior_review_feedback:)
         return invalid_configuration_result("workspace_request_builder must be provided for agent-materialized mode") unless @workspace_request_builder
 
         log_request_start(workspace: workspace, task: task, run: run, skill: skill)
+        worker_protocol_request = @worker_protocol.request_form(
+          skill: skill,
+          workspace: workspace,
+          task: task,
+          run: run,
+          phase_runtime: phase_runtime,
+          task_packet: task_packet,
+          prior_review_feedback: prior_review_feedback
+        )
+        prompt_metadata = @worker_protocol.project_prompt_metadata(worker_protocol_request)
         request = build_job_request(
           workspace: workspace,
           task: task,
           run: run,
           workspace_request: @workspace_request_builder.call(workspace: workspace, task: task, run: run),
-          worker_protocol_request: @worker_protocol.request_form(
-            skill: skill,
-            workspace: workspace,
-            task: task,
-            run: run,
-            phase_runtime: phase_runtime,
-            task_packet: task_packet,
-            prior_review_feedback: prior_review_feedback
-          )
+          worker_protocol_request: worker_protocol_request
         )
         log_agent_job_event("enqueue_start", request: request, skill: skill)
         record = enqueue(request)
@@ -156,9 +159,9 @@ module A3
           expected_task_kind: task.kind,
           canonical_changed_files: canonical_changed_files
         )
-        return with_agent_job_result(execution, completed.result) if execution
+        return with_project_prompt_metadata(with_agent_job_result(execution, completed.result), prompt_metadata) if execution
 
-        @worker_protocol.missing_result
+        with_project_prompt_metadata(@worker_protocol.missing_result, prompt_metadata)
       end
 
       def build_job_request(workspace:, task:, run:, workspace_request: nil, worker_protocol_request: nil)
@@ -397,6 +400,12 @@ module A3
           diagnostics: diagnostics,
           response_bundle: execution.response_bundle
         )
+      end
+
+      def with_project_prompt_metadata(execution, metadata)
+        return execution unless metadata
+
+        execution.with_diagnostics(execution.diagnostics.merge("project_prompt" => metadata))
       end
 
       def agent_artifacts_from_result(result)
