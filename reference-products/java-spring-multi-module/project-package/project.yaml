@@ -42,3 +42,13 @@ runtime:
     merge:
       policy: ff_only
       target_ref: refs/heads/a2o/dev-sample-live
+  decomposition:
+    investigate:
+      command:
+        - commands/investigate.rb
+    author:
+      command:
+        - commands/author-proposal.rb
+    review:
+      commands:
+        - - commands/review-proposal.rb

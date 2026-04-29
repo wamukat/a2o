@@ -42,6 +42,28 @@ This executes `ruby -Ilib bin/a3 execute-until-idle` from the current source
 tree. It uses `.work/a2o-dev-sample/` for runtime state and talks only to the
 isolated Kanbalone on port `3471` and the local agent server on port `7394`.
 
+## Run decomposition from a Kanban requirement ticket
+
+Create a ticket in `To do` with `repo:app` and `trigger:investigate`, then run:
+
+```sh
+tools/dev_sample/run-decomposition-once.sh
+```
+
+This runs the local checkout through `investigate -> propose -> review`.
+When the proposal review is eligible, draft child tickets are created on the
+same board with `a2o:draft-child`. The source ticket receives short comments
+for each completed stage.
+
+Diagnostic logs and evidence:
+
+- `.work/a2o-dev-sample/runtime/decomposition-evidence/<task>/investigation.json`
+- `.work/a2o-dev-sample/runtime/decomposition-evidence/<task>/proposal.json`
+- `.work/a2o-dev-sample/runtime/decomposition-evidence/<task>/proposal-review.json`
+- `.work/a2o-dev-sample/runtime/decomposition-evidence/<task>/child-creation.json`
+- `.work/a2o-dev-sample/runtime/agent-server.log`
+- `.work/a2o-dev-sample/runtime/agent-worker.log`
+
 ## Reset the isolated environment
 
 ```sh
