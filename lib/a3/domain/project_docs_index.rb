@@ -216,9 +216,10 @@ module A3
 
       def record_mirror_debt
         languages = stringify_keys(docs_config.fetch("languages", {}))
+        impact_policy = stringify_keys(docs_config.fetch("impactPolicy", {}))
         canonical = languages["canonical"] || languages["primary"]
         mirrored = languages["mirrored"] || languages["secondary"] || []
-        policy = languages["policy"].to_s
+        policy = (impact_policy["mirrorPolicy"] || languages["policy"]).to_s
         return unless canonical.is_a?(String) && !canonical.empty?
         return unless mirrored.is_a?(Array) && mirrored.any?
         return if policy == "canonical_only"

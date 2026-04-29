@@ -45,6 +45,7 @@ docs:
     primary: en
   impactPolicy:
     defaultSeverity: warning
+    mirrorPolicy: require_canonical_warn_mirror
   authorities:
     openapi:
       source: openapi.yaml
@@ -155,6 +156,7 @@ docs:
     missingRoot: create
   impactPolicy:
     defaultSeverity: warning
+    mirrorPolicy: require_canonical_warn_mirror
   authorities:
     openapi:
       source: openapi.yaml
@@ -163,6 +165,8 @@ docs:
 ```
 
 `docs.root`, `docs.index`, category paths, authority sources, and authority docs are repo-slot-relative paths. A2O rejects absolute paths, `..` escapes, and existing symlinks that resolve outside the selected repo slot. `docs.repoSlot` must match a declared `repos` entry. Category and authority IDs must be non-empty machine-readable keys such as `architecture`, `shared_specs`, or `openapi`.
+
+`docs.impactPolicy.mirrorPolicy` controls mirror debt handling for `docs.languages.secondary`: `require_all` means every declared language should be updated together, `require_canonical_warn_mirror` records mirror debt for missing secondary docs, and `canonical_only` suppresses mirror debt.
 
 Authority sources represent source-of-truth artifacts such as OpenAPI, DB migrations, generated schema files, or existing shared specifications. A non-generated authority source must exist when the repo slot checkout is available. Use `generated: true` only when project policy intentionally treats the source as generated outside the current checkout.
 

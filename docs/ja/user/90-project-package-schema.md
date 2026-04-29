@@ -50,6 +50,7 @@ docs:
     primary: ja
   impactPolicy:
     defaultSeverity: warning
+    mirrorPolicy: require_canonical_warn_mirror
   authorities:
     openapi:
       source: openapi.yaml
@@ -161,6 +162,7 @@ docs:
     missingRoot: create
   impactPolicy:
     defaultSeverity: warning
+    mirrorPolicy: require_canonical_warn_mirror
   authorities:
     openapi:
       source: openapi.yaml
@@ -169,6 +171,8 @@ docs:
 ```
 
 `docs.root`、`docs.index`、category path、authority source、authority docs は repo slot からの相対 path である。A2O は absolute path、`..` による escape、選択した repo slot の外へ解決される既存 symlink を拒否する。`docs.repoSlot` は `repos` に宣言された slot と一致しなければならない。category id と authority id は `architecture`、`shared_specs`、`openapi` のような空でない machine-readable key にする。
+
+`docs.impactPolicy.mirrorPolicy` は `docs.languages.secondary` に対する mirror debt の扱いを制御する。`require_all` は宣言されたすべての言語を同じ変更で更新する方針、`require_canonical_warn_mirror` は不足した secondary docs を mirror debt として記録する方針、`canonical_only` は mirror debt を記録しない方針である。
 
 authority source は OpenAPI、DB migration、生成 schema、既存の shared specification などの source of truth artifact を表す。repo slot checkout が利用できる場合、generated ではない authority source は存在していなければならない。`generated: true` は、project policy としてその source が現在の checkout 外で生成されることを意図的に認める場合だけ使う。
 

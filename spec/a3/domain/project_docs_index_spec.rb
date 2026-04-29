@@ -124,8 +124,10 @@ RSpec.describe A3::Domain::ProjectDocsIndex do
         "root" => "docs",
         "languages" => {
           "canonical" => "ja",
-          "mirrored" => ["en"],
-          "policy" => "require_canonical_warn_mirror"
+          "mirrored" => ["en"]
+        },
+        "impactPolicy" => {
+          "mirrorPolicy" => "require_canonical_warn_mirror"
         }
       }
     )
