@@ -328,6 +328,10 @@ RSpec.describe A3::Infra::WorkerProtocol do
         "categories" => {
           "shared_specs" => { "path" => "docs/shared" }
         },
+        "languages" => {
+          "primary" => "en",
+          "secondary" => ["ja"]
+        },
         "authorities" => {
           "project_package_schema" => { "source" => "project.yaml" }
         }
@@ -366,6 +370,10 @@ RSpec.describe A3::Infra::WorkerProtocol do
       "authorities" => ["project_package_schema"]
     )
     expect(docs_context.fetch("expected_actions")).to include("update_or_confirm_candidate_docs", "record_docs_impact_evidence")
+    expect(docs_context.fetch("language_policy")).to include(
+      "primary" => "en",
+      "mirrors" => ["ja"]
+    )
     expect(docs_context.fetch("traceability_refs")).to include(task.ref)
     expect(docs_context.fetch("categories")).to include("shared_specs")
     expect(docs_context.fetch("candidate_docs")).to include(

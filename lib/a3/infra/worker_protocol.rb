@@ -160,7 +160,7 @@ module A3
         languages = docs_config["languages"] || docs_config[:languages] || {}
         {
           "primary" => impact_policy["primaryLanguage"] || impact_policy[:primaryLanguage] || languages["primary"] || languages[:primary],
-          "mirrors" => impact_policy["mirrorLanguages"] || impact_policy[:mirrorLanguages] || languages["mirrors"] || languages[:mirrors],
+          "mirrors" => impact_policy["mirrorLanguages"] || impact_policy[:mirrorLanguages] || languages["mirrors"] || languages[:mirrors] || languages["secondary"] || languages[:secondary],
           "mirror_policy" => impact_policy["mirrorPolicy"] || impact_policy[:mirrorPolicy] || languages["policy"] || languages[:policy]
         }.compact
       end

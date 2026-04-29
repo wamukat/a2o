@@ -29,6 +29,7 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
       "review_disposition" => nil,
       "clarification_request" => nil,
       "skill_feedback" => [],
+      "docs_impact" => nil,
       "follow_up_child_fingerprints" => [],
       "runtime_snapshot" => {
         "task_kind" => "child",
@@ -145,6 +146,31 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
     expect(described_class.from_persisted_form(record.persisted_form)).to eq(record)
   end
 
+  it "captures docs-impact evidence from an execution result" do
+    execution = A3::Application::ExecutionResult.new(
+      success: true,
+      summary: "implemented with docs evidence",
+      response_bundle: {
+        "docs_impact" => {
+          "disposition" => "yes",
+          "categories" => ["shared_specs"],
+          "updated_docs" => ["docs/shared/spec.md"],
+          "matched_rules" => ["keyword:shared->shared_specs"]
+        }
+      }
+    )
+
+    record = described_class.from_execution_result(execution)
+
+    expect(record.docs_impact).to eq(
+      "disposition" => "yes",
+      "categories" => ["shared_specs"],
+      "updated_docs" => ["docs/shared/spec.md"],
+      "matched_rules" => ["keyword:shared->shared_specs"]
+    )
+    expect(described_class.from_persisted_form(record.persisted_form)).to eq(record)
+  end
+
   it "does not persist skill feedback from invalid worker results" do
     execution = A3::Application::ExecutionResult.new(
       success: false,
@@ -163,5 +189,24 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
     record = described_class.from_execution_result(execution)
 
     expect(record.skill_feedback).to eq([])
+  end
+
+  it "does not persist docs-impact evidence from invalid worker results" do
+    execution = A3::Application::ExecutionResult.new(
+      success: false,
+      summary: "worker result schema invalid",
+      failing_command: "worker_result_schema",
+      observed_state: "invalid_worker_result",
+      response_bundle: {
+        "docs_impact" => {
+          "disposition" => "yes",
+          "updated_docs" => ["docs/shared/spec.md"]
+        }
+      }
+    )
+
+    record = described_class.from_execution_result(execution)
+
+    expect(record.docs_impact).to be_nil
   end
 end

@@ -69,6 +69,14 @@ module A3
         end
       end
 
+      def docs_impact
+        return nil if invalid_worker_result?
+        return nil unless response_bundle.is_a?(Hash)
+
+        value = response_bundle["docs_impact"]
+        value.is_a?(Hash) ? value : nil
+      end
+
       def invalid_worker_result?
         failing_command == "worker_result_schema" ||
           failing_command == "worker_result_json" ||
