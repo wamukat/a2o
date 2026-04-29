@@ -176,6 +176,34 @@ module A3
         }
       end
 
+      def evidence_request_payload(request)
+        payload = stringify_keys(request)
+        project_prompt = payload["project_prompt"]
+        payload["project_prompt"] = project_prompt_metadata(project_prompt) if project_prompt.is_a?(Hash)
+        payload
+      end
+
+      def project_prompt_metadata(project_prompt)
+        layers = Array(project_prompt["layers"]).map do |layer|
+          next unless layer.is_a?(Hash)
+
+          content = layer.fetch("content", "").to_s
+          {
+            "kind" => layer["kind"].to_s,
+            "title" => layer["title"].to_s,
+            "content_sha256" => Digest::SHA256.hexdigest(content),
+            "content_bytes" => content.bytesize
+          }
+        end.compact
+        composed = project_prompt.fetch("composed_instruction", "").to_s
+        {
+          "profile" => project_prompt["profile"].to_s,
+          "layers" => layers,
+          "composed_instruction_sha256" => Digest::SHA256.hexdigest(composed),
+          "composed_instruction_bytes" => composed.bytesize
+        }
+      end
+
       def load_investigation_evidence(value, path)
         return value if value
         return nil unless path
@@ -308,7 +336,7 @@ module A3
             "request_path" => request_path,
             "result_path" => result_path,
             "workspace_root" => workspace_root,
-            "request" => request,
+            "request" => evidence_request_payload(request),
             "result" => result,
             "proposal" => proposal,
             "validation_errors" => validation_errors,

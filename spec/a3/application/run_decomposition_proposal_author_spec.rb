@@ -186,7 +186,11 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
       expect(project_prompt.fetch("composed_instruction")).to include("Base child template")
       expect(project_prompt.fetch("composed_instruction")).to include("Repo alpha template")
       evidence = JSON.parse(File.read(result.evidence_path))
-      expect(evidence.fetch("request").fetch("project_prompt")).to eq(project_prompt)
+      evidence_prompt = evidence.fetch("request").fetch("project_prompt")
+      expect(evidence_prompt.fetch("profile")).to eq("decomposition")
+      expect(evidence_prompt.fetch("layers").first).to include("content_sha256", "content_bytes")
+      expect(evidence_prompt.to_s).not_to include("Base child template")
+      expect(evidence_prompt.to_s).not_to include("Repo alpha template")
     end
   end
 
