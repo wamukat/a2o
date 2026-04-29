@@ -213,7 +213,7 @@ The host launcher wrapper reads storage, project config, Kanban, repo label, and
 
 ## Runtime Prompts
 
-`runtime.prompts` is optional. When omitted, A2O keeps the existing phase skill behavior.
+`runtime.prompts` is optional. When omitted, A2O keeps the existing phase skill behavior. For migration from existing phase skills, see [Runtime Prompt Migration](#runtime-prompt-migration).
 
 The section defines provider-neutral project prompt inputs. These files are additive project guidance; they do not override A2O core safety rules, worker result schemas, workspace boundaries, or runtime control rules.
 
@@ -281,6 +281,96 @@ Split broad requirements into draft child tickets with clear ownership, dependen
 ```
 
 Skills are longer reusable Markdown guidance referenced from a phase. Use prompts for phase stance and instruction layering; use skills for detailed procedures such as testing policy, API compatibility rules, UI review checklist, or Kanban decomposition templates. `childDraftTemplate` is decomposition-specific guidance for the expected child ticket shape. It is passed to the proposal author request, while durable evidence stores only safe prompt metadata.
+
+## Runtime Prompt Migration
+
+Existing project packages do not need to migrate before adopting a new A2O version. The released phase execution surface remains supported:
+
+- `runtime.phases.implementation.skill`
+- `runtime.phases.review.skill`
+- `runtime.phases.parent_review.skill`, when the project uses parent review
+- phase executor, verification, remediation, and merge commands under `runtime.phases`
+- decomposition command configuration under `runtime.decomposition`
+
+The new `runtime.prompts` surface is additive guidance. It does not replace the phase skill or executor contract. Keep the current phase skills in place while moving project-specific guidance into prompt files, then simplify the old skill files only after the project has validated the new prompt layering.
+
+Before migration, a project usually keeps most guidance inside phase skills:
+
+```yaml
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation.md
+      executor:
+        command: project-package/commands/implementation.sh
+    review:
+      skill: skills/review.md
+      executor:
+        command: project-package/commands/review.sh
+    parent_review:
+      skill: skills/parent-review.md
+      executor:
+        command: project-package/commands/parent-review.sh
+  decomposition:
+    propose:
+      command: project-package/commands/decompose.sh
+```
+
+After migration, keep the phase skills as the runtime worker contract and add project prompt layers for project policy, phase stance, reusable checklists, rework behavior, and decomposition ticket shape:
+
+```yaml
+runtime:
+  prompts:
+    system:
+      file: prompts/system.md
+    phases:
+      implementation:
+        prompt: prompts/implementation.md
+        skills:
+          - skills/testing-policy.md
+      implementation_rework:
+        prompt: prompts/implementation-rework.md
+      review:
+        prompt: prompts/review.md
+        skills:
+          - skills/review-checklist.md
+      parent_review:
+        prompt: prompts/parent-review.md
+      decomposition:
+        prompt: prompts/decomposition.md
+        childDraftTemplate: prompts/decomposition-child-template.md
+  phases:
+    implementation:
+      skill: skills/implementation.md
+      executor:
+        command: project-package/commands/implementation.sh
+    review:
+      skill: skills/review.md
+      executor:
+        command: project-package/commands/review.sh
+    parent_review:
+      skill: skills/parent-review.md
+      executor:
+        command: project-package/commands/parent-review.sh
+  decomposition:
+    propose:
+      command: project-package/commands/decompose.sh
+```
+
+Use this split when moving existing content:
+
+- Project system prompt: language, tone, product-wide conventions, compatibility posture, and repository ownership rules.
+- Phase prompt: the goal and decision policy for one phase, such as implementation scope, rework handling, review disposition, parent integration review, or decomposition strategy.
+- Phase skill files under `runtime.prompts.phases.<phase>.skills`: longer reusable procedures, checklists, testing policy, API compatibility rules, and review heuristics.
+- Ticket-specific instructions: acceptance criteria, requested behavior, priority, constraints, and evidence required for the specific ticket.
+
+Precedence is fixed. The A2O core worker contract and `runtime.phases.<phase>.skill` remain authoritative for worker result schemas, process boundaries, and required outputs. `runtime.prompts` layers are appended after that contract and before ticket-specific instructions. If both old phase skills and new prompt config are present, the project prompt may add context but cannot override A2O runtime rules, workspace boundaries, Kanban gates, or result schemas.
+
+`implementation_rework` is a prompt profile, not a separate scheduler phase. It is selected for implementation requests that include prior review feedback, and it falls back to `implementation` when omitted. `parent_review` follows the same prompt layering as other review profiles. `decomposition` uses the decomposition prompt plus optional `childDraftTemplate`; the template is allowed only for decomposition and should describe the expected draft child ticket format.
+
+A2O reports invalid prompt migration through `a2o project validate` and `a2o project lint` diagnostics. Typical failures include missing prompt or skill files, paths outside the package root, non-file paths, unsupported prompt phase names, duplicate skill files in one phase layer, unknown `repoSlots` keys, duplicate repo-slot skill additions, and `childDraftTemplate` outside `decomposition`. Validation coverage exists for both old-style packages without `runtime.prompts` and new-style packages with project prompt configuration.
+
+This is a coexistence policy, not a deprecation notice. Existing phase skills continue to work until a deliberate migration/removal plan is documented in a future release.
 
 ## Runtime Phases
 
