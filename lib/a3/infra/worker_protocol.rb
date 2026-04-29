@@ -737,10 +737,14 @@ module A3
           else
             errors << "docs_impact.review_disposition=blocked requires rework_required=true for child review" unless worker_response["rework_required"] == true
           end
-        elsif review_disposition == "follow_up" && parent_review?(expected_phase: expected_phase, expected_task_kind: expected_task_kind)
-          disposition = worker_response["review_disposition"]
-          unless disposition.is_a?(Hash) && disposition["kind"] == "follow_up_child"
-            errors << "docs_impact.review_disposition=follow_up requires review_disposition.kind=follow_up_child for parent review"
+        elsif review_disposition == "follow_up"
+          if parent_review?(expected_phase: expected_phase, expected_task_kind: expected_task_kind)
+            disposition = worker_response["review_disposition"]
+            unless disposition.is_a?(Hash) && disposition["kind"] == "follow_up_child"
+              errors << "docs_impact.review_disposition=follow_up requires review_disposition.kind=follow_up_child for parent review"
+            end
+          else
+            errors << "docs_impact.review_disposition=follow_up is only supported for parent review"
           end
         end
         errors

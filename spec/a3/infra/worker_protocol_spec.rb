@@ -908,6 +908,35 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(result.response_bundle.fetch("docs_impact").fetch("review_disposition")).to eq("warned")
   end
 
+  it "rejects docs-impact follow-up disposition for child review" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => true,
+        "summary" => "review completed",
+        "task_ref" => task.ref,
+        "run_ref" => run.ref,
+        "phase" => "review",
+        "rework_required" => false,
+        "docs_impact" => {
+          "disposition" => "maybe",
+          "categories" => ["features"],
+          "review_disposition" => "follow_up",
+          "matched_rules" => ["feature docs follow-up"]
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: run.ref,
+      expected_phase: :review,
+      expected_task_kind: :child
+    )
+
+    expect(result).to have_attributes(success?: false)
+    expect(result.diagnostics.fetch("validation_errors")).to include(
+      "docs_impact.review_disposition=follow_up is only supported for parent review"
+    )
+  end
+
   it "canonicalizes optional worker identity fields instead of blocking on invented refs" do
     result = described_class.new(review_disposition_repo_scopes: %w[repo_beta]).build_execution_result(
       {
