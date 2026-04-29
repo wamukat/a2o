@@ -34,7 +34,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - External Kanbalone bootstrap fields: `--kanban-mode external`, `--kanban-url`, `--kanban-runtime-url`
 - Runtime CLI overrides for agent server connectivity: `--agent-control-plane-connect-timeout`, `--agent-control-plane-request-timeout`, `--agent-control-plane-retries`, `--agent-control-plane-retry-delay`
 - Host agent CLI and runtime profile fields for agent server connectivity: `--control-plane-connect-timeout`, `--control-plane-request-timeout`, `--control-plane-retries`, `--control-plane-retry-delay`, `control_plane_connect_timeout`, `control_plane_request_timeout`, `control_plane_retry_count`, `control_plane_retry_delay`
-- Kanbalone adapter and bootstrap tooling, defaulting to Kanbalone `v0.9.22`
+- Kanbalone adapter and bootstrap tooling, defaulting to Kanbalone `v0.9.24`
 - Agent HTTP worker gateway, including claimed-job heartbeats
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates

@@ -34,7 +34,7 @@ A2O 0.5.50 で現在利用できる公開機能と検証範囲を示す。
 - 外部 Kanbalone bootstrap 項目: `--kanban-mode external`、`--kanban-url`、`--kanban-runtime-url`
 - agent server 接続向けの runtime CLI 上書き: `--agent-control-plane-connect-timeout`、`--agent-control-plane-request-timeout`、`--agent-control-plane-retries`、`--agent-control-plane-retry-delay`
 - agent server 接続向けの host agent CLI / runtime profile 項目: `--control-plane-connect-timeout`、`--control-plane-request-timeout`、`--control-plane-retries`、`--control-plane-retry-delay`、`control_plane_connect_timeout`、`control_plane_request_timeout`、`control_plane_retry_count`、`control_plane_retry_delay`
-- Kanbalone アダプターと初期化ツール。既定の Kanbalone イメージは `v0.9.22`
+- Kanbalone アダプターと初期化ツール。既定の Kanbalone イメージは `v0.9.24`
 - エージェント HTTP ワーカー境界。取得済みジョブの heartbeat を含む
 - エージェントが具体化するワークスペース方式
 - TypeScript、Go、Python、複数リポジトリタスクテンプレートの参照用プロダクトパッケージ
