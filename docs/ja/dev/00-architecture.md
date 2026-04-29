@@ -25,6 +25,7 @@
 | Kanban-first な分解 draft child | [76-kanban-first-decomposition-drafts.md](76-kanban-first-decomposition-drafts.md) |
 | コアとプロジェクト拡張の境界 | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
 | マルチプロジェクト runtime context | [85-multi-project-runtime-contexts.md](85-multi-project-runtime-contexts.md) |
+| docs-impact と共通仕様ドキュメント | [86-docs-impact-and-shared-specs.md](86-docs-impact-and-shared-specs.md) |
 | 参照用プロダクトによる検証 | [90-reference-product-suite.md](90-reference-product-suite.md) |
 | release publish の遅延と distribution 境界 | [98-release-publish-latency-and-distribution-build.md](98-release-publish-latency-and-distribution-build.md) |
 | カンバンアダプターと Kanbalone 境界 | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
@@ -178,8 +179,10 @@ A2O の全体像と導入手順を扱う。
 - [../user/90-project-package-schema.md](../user/90-project-package-schema.md)
 - [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md)
 - [85-multi-project-runtime-contexts.md](85-multi-project-runtime-contexts.md)
+- [86-docs-impact-and-shared-specs.md](86-docs-impact-and-shared-specs.md)
 
 プロジェクトパッケージスキーマ、プロジェクトスクリプト契約、リポジトリスロット、検証、初期化 hook の境界を扱う。
+docs-impact と共通仕様ドキュメント設計では、project-package docs 設定、共通仕様、正本、トレーサビリティ、ドキュメント更新 review gate を扱う。
 
 ### 6. 証跡 / 再実行 / ブロック診断
 

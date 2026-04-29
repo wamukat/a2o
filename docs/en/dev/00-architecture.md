@@ -25,6 +25,7 @@ Read this document first to understand runtime flow and responsibility boundarie
 | Kanban-first decomposition draft children | [76-kanban-first-decomposition-drafts.md](76-kanban-first-decomposition-drafts.md) |
 | Boundary between core and project extensions | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
 | Multi-project runtime contexts | [85-multi-project-runtime-contexts.md](85-multi-project-runtime-contexts.md) |
+| Docs impact and shared specifications | [86-docs-impact-and-shared-specs.md](86-docs-impact-and-shared-specs.md) |
 | Validation through reference products | [90-reference-product-suite.md](90-reference-product-suite.md) |
 | Release publish latency and distribution boundary | [98-release-publish-latency-and-distribution-build.md](98-release-publish-latency-and-distribution-build.md) |
 | Kanban adapter and Kanbalone boundary | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
@@ -178,8 +179,10 @@ Covers fixed repo slots, synchronization, freshness, retention, garbage collecti
 - [../user/90-project-package-schema.md](../user/90-project-package-schema.md)
 - [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md)
 - [85-multi-project-runtime-contexts.md](85-multi-project-runtime-contexts.md)
+- [86-docs-impact-and-shared-specs.md](86-docs-impact-and-shared-specs.md)
 
 Covers the project package schema, project script contract, repo slots, verification, and initialization hook boundaries.
+The docs-impact and shared specifications design covers project-package docs configuration, shared specs, authorities, traceability, and documentation review gates.
 
 ### 6. Evidence / Rerun / Blocked Diagnosis
 
