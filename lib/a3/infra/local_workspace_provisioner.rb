@@ -164,8 +164,12 @@ module A3
       def materialize_slot_paths(root_path, task_ref, workspace_plan, artifact_owner, bootstrap_marker)
         FileUtils.mkdir_p(root_path)
         workspace_plan.slot_requirements.each_with_object({}) do |requirement, slot_paths|
-          slot_path = root_path.join(repo_slot_directory(requirement.repo_slot))
           source_root = repo_source_for(requirement.repo_slot)
+          slot_path = root_path.join(repo_slot_directory(requirement.repo_slot, source_root))
+          if slot_paths.value?(slot_path)
+            raise A3::Domain::ConfigurationError,
+                  "Repo source basename collision for #{source_root.basename}; materialized workspace directories must be unique"
+          end
           ready = slot_ready?(slot_path, source_root, task_ref, workspace_plan, requirement, artifact_owner, bootstrap_marker)
           unless ready
             A3::Infra::WorkspaceTraceLogger.log(
@@ -347,8 +351,8 @@ module A3
         task_ref.gsub(/[^A-Za-z0-9._-]+/, "-")
       end
 
-      def repo_slot_directory(repo_slot)
-        repo_slot.to_s.gsub(/[^A-Za-z0-9._:-]+/, "-")
+      def repo_slot_directory(repo_slot, source_root = repo_source_for(repo_slot))
+        source_root.basename.to_s
       end
 
       def git_repo_source?(source_root)

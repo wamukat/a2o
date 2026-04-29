@@ -89,6 +89,98 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     )
   end
 
+  it "uses the repo source basename as the materialized directory while preserving the slot key" do
+    source_root = Pathname(tmpdir).join("full-repo-name")
+    FileUtils.mkdir_p(source_root)
+    source_root.join("README.md").write("full repo source\n")
+    repo_sources = { short_name: source_root.to_s }
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#366",
+      kind: :single,
+      edit_scope: [:short_name]
+    )
+    workspace_plan = A3::Domain::WorkspacePlan.new(
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :detached_commit,
+        ref: "abc366",
+        task_ref: task.ref
+      ),
+      slot_requirements: [
+        A3::Domain::SlotRequirement.new(repo_slot: :short_name, sync_class: :eager)
+      ]
+    )
+    provisioner = described_class.new(base_dir: tmpdir, repo_sources: repo_sources)
+
+    workspace = provisioner.call(
+      task: task,
+      workspace_plan: workspace_plan,
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: task.ref,
+        owner_scope: :task,
+        snapshot_version: "abc366"
+      ),
+      bootstrap_marker: "workspace-hook:v1"
+    )
+
+    slot_path = workspace.slot_paths.fetch(:short_name)
+    expect(slot_path).to eq(workspace.root_path.join("full-repo-name"))
+    expect(slot_path.join("README.md").read).to eq("full repo source\n")
+    expect(workspace.root_path.join("short_name")).not_to exist
+    expect(slot_metadata_path(slot_path)).to exist
+
+    slot_metadata = JSON.parse(slot_metadata_path(slot_path).read)
+    expect(slot_metadata).to include(
+      "repo_slot" => "short_name",
+      "slot_path" => slot_path.to_s,
+      "repo_source_root" => source_root.to_s
+    )
+  end
+
+  it "rejects materialized directory basename collisions between repo slots" do
+    alpha_root = Pathname(tmpdir).join("alpha", "same-repo")
+    beta_root = Pathname(tmpdir).join("beta", "same-repo")
+    FileUtils.mkdir_p(alpha_root)
+    FileUtils.mkdir_p(beta_root)
+    repo_sources = {
+      repo_alpha: alpha_root.to_s,
+      repo_beta: beta_root.to_s
+    }
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#366",
+      kind: :single,
+      edit_scope: %i[repo_alpha repo_beta]
+    )
+    workspace_plan = A3::Domain::WorkspacePlan.new(
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :detached_commit,
+        ref: "abc366",
+        task_ref: task.ref
+      ),
+      slot_requirements: [
+        A3::Domain::SlotRequirement.new(repo_slot: :repo_alpha, sync_class: :eager),
+        A3::Domain::SlotRequirement.new(repo_slot: :repo_beta, sync_class: :eager)
+      ]
+    )
+    provisioner = described_class.new(base_dir: tmpdir, repo_sources: repo_sources)
+
+    expect do
+      provisioner.call(
+        task: task,
+        workspace_plan: workspace_plan,
+        artifact_owner: A3::Domain::ArtifactOwner.new(
+          owner_ref: task.ref,
+          owner_scope: :task,
+          snapshot_version: "abc366"
+        ),
+        bootstrap_marker: "workspace-hook:v1"
+      )
+    end.to raise_error(A3::Domain::ConfigurationError, /Repo source basename collision/)
+  end
+
   it "skips generated local artifacts when copying non-git repo sources" do
     repo_sources = create_repo_sources(tmpdir, slots: [:repo_alpha])
     source_root = Pathname(repo_sources.fetch(:repo_alpha))
@@ -451,7 +543,7 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     quarantine_path = provisioner.quarantine_task(task_ref: task.ref)
 
     expect(Pathname(quarantine_path)).to exist
-    expect(Pathname(quarantine_path).join("runtime_workspace", "repo_alpha", "README.md").read).to eq("git-backed repo-alpha\n")
+    expect(Pathname(quarantine_path).join("runtime_workspace", "repo-alpha", "README.md").read).to eq("git-backed repo-alpha\n")
     expect(workspace.root_path).not_to exist
     worktree_list = `git -C #{repo_dir} worktree list --porcelain`
     expect(worktree_list).not_to include(slot_path.to_s)
@@ -742,9 +834,9 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     )
 
     parent_root = Pathname(tmpdir).join("workspaces", "Sample-134-parent", "runtime_workspace")
-    parent_slot = parent_root.join("repo_alpha")
+    parent_slot = parent_root.join("repo-alpha")
     expect(workspace.root_path).to eq(Pathname(tmpdir).join("workspaces", "Sample-134-parent", "children", "Sample-135", "ticket_workspace"))
-    expect(workspace.slot_paths.fetch(:repo_alpha)).to eq(workspace.root_path.join("repo_alpha"))
+    expect(workspace.slot_paths.fetch(:repo_alpha)).to eq(workspace.root_path.join("repo-alpha"))
     expect(parent_slot).to exist
     expect(`git -C #{repo_root} worktree list --porcelain`).to include(parent_slot.to_s)
     expect(`git -C #{repo_root} rev-parse refs/heads/a2o/parent/Sample-134`.strip).to eq(`git -C #{parent_slot} rev-parse HEAD`.strip)
