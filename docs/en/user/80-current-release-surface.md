@@ -31,7 +31,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Gate-closed decomposition child creation reports `status=gate_closed` and `child_creation_result=not_attempted` without rendering an empty `success=` value
 - Project prompt composition: `runtime.prompts.repoSlots` composes repo-slot prompt and skill addons for each scoped slot in multi-repo `repo_scope=both` tasks, following the task `edit_scope` order.
 - Prompt diagnostics and evidence expose ordered `project_prompt.repo_slots`; the legacy singular `repo_slot` field is populated only for single-slot tasks.
-- Prompt preview supports multi-repo composition with repeatable or comma-separated repo slots, for example `a2o prompt preview --repo-slot app --repo-slot lib` or `a2o prompt preview --repo-slot app,lib`.
+- Prompt preview supports multi-repo composition with repeatable or comma-separated repo slots, for example `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib A2O#123` or `a2o prompt preview --phase implementation --repo-slot app,lib A2O#123`.
 - Project runtime tuning fields for agent server connectivity: `runtime.agent_control_plane_connect_timeout`, `runtime.agent_control_plane_request_timeout`, `runtime.agent_control_plane_retry_count`, `runtime.agent_control_plane_retry_delay`
 - Optional child/single review gate fields: `runtime.review_gate.child`, `runtime.review_gate.single`, `runtime.review_gate.skip_labels`, `runtime.review_gate.require_labels`
 - External Kanbalone bootstrap fields: `--kanban-mode external`, `--kanban-url`, `--kanban-runtime-url`
@@ -47,6 +47,7 @@ Use it to confirm which features can be documented for users and what can be tre
 
 ## Migration Notes
 
+- Project packages that already define `runtime.prompts.repoSlots` should audit multi-repo tasks before upgrading. In A2O 0.5.52, `repo_scope=both` tasks receive every repo-slot addon in the task `edit_scope` order; earlier releases only applied a singular repo-slot layer. If slot-specific instructions conflict or become too broad when combined, split the work into repo-slot child tasks or adjust the package prompts. Use `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib <task-ref>` before running workers to inspect the composed instruction.
 - `a2o runtime start` and `a2o runtime stop` are no longer compatibility aliases. Use `a2o runtime resume` to resume the resident scheduler and `a2o runtime pause` to pause it after the current work. If the removed commands are invoked, A2O exits non-zero and prints `migration_required=true` with the replacement command.
 - SoloBoard-era Kanbalone compatibility names are removed. Use `KANBAN_BACKEND=kanbalone`, `KANBALONE_BASE_URL`, `KANBALONE_API_TOKEN`, `--kanbalone-port`, `A2O_BUNDLE_KANBALONE_PORT`, and `A2O_KANBALONE_INTERNAL_URL`. Removed SoloBoard inputs fail with `migration_required=true` and the replacement name.
 - Bundled Kanbalone data names changed from `<compose-project>_soloboard-data` / `soloboard.sqlite` to `<compose-project>_kanbalone-data` / `kanbalone.sqlite`. If the old volume exists and the new one does not, `a2o kanban up` fails with `migration_required=true` instead of silently creating an empty board. Copy or rename the existing Kanban data before starting the bundled service.
