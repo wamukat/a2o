@@ -38,22 +38,26 @@ RSpec.describe "reference product commands" do
     end
   end
 
-  it "uses the app slot_path for Java Spring multi-module verification" do
+  it "uses Java Spring module slot_paths for multi-module verification" do
     Dir.mktmpdir do |dir|
-      app = File.join(dir, "app")
+      product_root = File.join(dir, "java-spring-multi-module")
+      app = File.join(product_root, "web-app")
+      lib = File.join(product_root, "utility-lib")
       command_dir = File.join(dir, "command-cwd")
       bin_dir = File.join(dir, "bin")
       log_path = File.join(dir, "mvn.log")
       request_path = File.join(dir, "request.json")
-      product_root = File.join(app, "reference-products/java-spring-multi-module")
 
-      [product_root, command_dir, bin_dir].each { |path| FileUtils.mkdir_p(path) }
+      [app, lib, command_dir, bin_dir].each { |path| FileUtils.mkdir_p(path) }
+      [product_root, app, lib].each do |path|
+        File.write(File.join(path, "pom.xml"), "<project></project>\n")
+      end
       File.write(
         File.join(bin_dir, "mvn"),
         "#!/usr/bin/env sh\nset -eu\npwd >> \"$MVN_LOG\"\n"
       )
       FileUtils.chmod("+x", File.join(bin_dir, "mvn"))
-      File.write(request_path, JSON.generate("slot_paths" => { "app" => app }))
+      File.write(request_path, JSON.generate("slot_paths" => { "app" => app, "lib" => lib }))
 
       script = File.expand_path("../../reference-products/java-spring-multi-module/project-package/commands/verify.sh", __dir__)
       env = {
