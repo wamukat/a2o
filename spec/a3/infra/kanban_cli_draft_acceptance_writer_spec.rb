@@ -13,7 +13,7 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
       }
       @tasks_by_id = @tasks.values.each_with_object({}) { |task, memo| memo[task.fetch("id")] = task }
       @labels = {
-        240 => [],
+        240 => ["trigger:investigate"],
         241 => ["a2o:draft-child", "a2o:ready-child"],
         242 => ["a2o:draft-child"],
         999 => ["a2o:draft-child"]
@@ -127,6 +127,7 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
     expect(client.labels_for(241)).to include("trigger:auto-implement")
     expect(client.labels_for(241)).not_to include("a2o:draft-child")
     expect(client.labels_for(240)).to include("trigger:auto-parent")
+    expect(client.labels_for(240)).not_to include("trigger:investigate")
     expect(client.comments.size).to eq(2)
   end
 

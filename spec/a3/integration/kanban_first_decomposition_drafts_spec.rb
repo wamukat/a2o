@@ -169,10 +169,14 @@ RSpec.describe "Kanban-first decomposition draft flow" do
       expect(accepted.accepted_refs).to eq(["Portal#241"])
       expect(client.labels_for(241)).to include("trigger:auto-implement")
       expect(client.labels_for(240)).to include("trigger:auto-parent")
+      expect(client.labels_for(240)).not_to include("trigger:investigate")
 
       task_repository.save(A3::Domain::Task.new(ref: "Portal#241", kind: :child, edit_scope: [:repo_beta], parent_ref: source_task.ref, labels: client.labels_for(241)))
       accepted_plan = A3::Application::PlanNextRunnableTask.new(task_repository: task_repository, sync_external_tasks: nil).call
       expect(accepted_plan.task&.ref).to eq("Portal#241")
+      parent_after_acceptance = A3::Domain::Task.new(ref: source_task.ref, kind: :parent, edit_scope: [:repo_beta], child_refs: ["Portal#241"], labels: client.labels_for(240))
+      parent_assessment = A3::Domain::RunnableTaskAssessment.evaluate(task: parent_after_acceptance, tasks: [parent_after_acceptance])
+      expect(parent_assessment.reason).not_to eq(:decomposition_requested)
 
       comment_count = client.comments.size
       rerun_accept = accept_writer.call(parent_task_ref: source_task.ref, parent_external_task_id: 240, child_refs: ["Portal#241"], parent_auto: true)

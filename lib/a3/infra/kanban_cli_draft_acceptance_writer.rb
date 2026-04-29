@@ -5,6 +5,7 @@ module A3
     class KanbanCliDraftAcceptanceWriter
       DRAFT_LABEL = "a2o:draft-child"
       READY_LABEL = "a2o:ready-child"
+      DECOMPOSITION_LABEL = "trigger:investigate"
       RUNNABLE_LABEL = "trigger:auto-implement"
       PARENT_RUNNABLE_LABEL = "trigger:auto-parent"
 
@@ -42,6 +43,7 @@ module A3
         if parent_auto && accepted.any?
           parent_labels = label_names(@client.load_task_labels(parent.fetch("id")))
           parent_changed = ensure_label(parent.fetch("id"), PARENT_RUNNABLE_LABEL, existing_labels: parent_labels)
+          parent_changed = remove_label(parent.fetch("id"), DECOMPOSITION_LABEL, existing_labels: parent_labels) || parent_changed
           ensure_parent_comment(parent.fetch("id"), accepted_refs: accepted) if parent_changed
         end
 
