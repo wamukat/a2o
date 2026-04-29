@@ -18,6 +18,9 @@ import (
 var projectScriptContractA3EnvPattern = regexp.MustCompile(`A3_[A-Z0-9_]+`)
 
 func runDoctor(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "prompts" {
+		return runDoctorPrompts(args[1:], stdout, stderr)
+	}
 	flags := flag.NewFlagSet("a2o doctor", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	if err := flags.Parse(args); err != nil {

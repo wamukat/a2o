@@ -2168,7 +2168,9 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 
 	output := stdout.String()
 	for _, want := range []string{
+		"a2o doctor prompts [--package DIR]",
 		"a2o upgrade check",
+		"a2o prompt preview --phase PHASE",
 		"a2o project bootstrap [--package DIR]",
 		"a2o project lint [--package DIR]",
 		"a2o kanban up [--build]",
@@ -2214,7 +2216,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 }
 
 func TestGroupHelpPrintsUsage(t *testing.T) {
-	for _, group := range []string{"project", "kanban", "runtime", "agent", "upgrade"} {
+	for _, group := range []string{"project", "kanban", "runtime", "agent", "upgrade", "prompt"} {
 		t.Run(group, func(t *testing.T) {
 			var stdout bytes.Buffer
 			var stderr bytes.Buffer
@@ -2245,6 +2247,8 @@ func TestSubcommandFlagDiagnosticsUseA2ONames(t *testing.T) {
 		{name: "kanban up", args: []string{"kanban", "up", "-bad"}, want: "Usage of a2o kanban up:"},
 		{name: "kanban doctor", args: []string{"kanban", "doctor", "-bad"}, want: "Usage of a2o kanban doctor:"},
 		{name: "kanban url", args: []string{"kanban", "url", "-bad"}, want: "Usage of a2o kanban url:"},
+		{name: "doctor prompts", args: []string{"doctor", "prompts", "-bad"}, want: "Usage of a2o doctor prompts:"},
+		{name: "prompt preview", args: []string{"prompt", "preview", "-bad"}, want: "Usage of a2o prompt preview:"},
 		{name: "runtime up", args: []string{"runtime", "up", "-bad"}, want: "Usage of a2o runtime up:"},
 		{name: "runtime down", args: []string{"runtime", "down", "-bad"}, want: "Usage of a2o runtime down:"},
 		{name: "runtime resume", args: []string{"runtime", "resume", "-bad"}, want: "Usage of a2o runtime resume:"},
@@ -4753,6 +4757,157 @@ runtime:
 	}
 	if !strings.Contains(stdout.String(), "phases.review.childDraftTemplate is only supported for decomposition") {
 		t.Fatalf("project validate should reject childDraftTemplate outside decomposition, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestPromptPreviewShowsPromptLayersWithoutMutatingTask(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	writePromptPreviewProjectPackage(t, packageDir)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{
+		"prompt", "preview",
+		"--package", packageDir,
+		"--phase", "decomposition",
+		"--repo-slot", "app",
+		"A2O#123",
+	}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("prompt preview should pass, code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		"prompt_preview task_ref=A2O#123 phase=decomposition profile=decomposition",
+		"kind=a2o_core_instruction",
+		"kind=project_system_prompt",
+		"kind=project_phase_prompt",
+		"kind=project_phase_skill",
+		"kind=decomposition_child_draft_template",
+		"kind=repo_slot_phase_prompt",
+		"kind=repo_slot_decomposition_child_draft_template",
+		"kind=ticket_phase_instruction",
+		"Task: A2O#123",
+		"kind=task_runtime_data",
+		"--- prompt_composed_instruction ---",
+		"prompt_preview_status=ok mutation=none",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("prompt preview missing %q in:\n%s", want, output)
+		}
+	}
+}
+
+func TestDoctorPromptsReportsInvalidPromptConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    phases:
+      implementation:
+        prompt: prompts/missing.md
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"doctor", "prompts", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("doctor prompts should fail for invalid prompt config")
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		"prompt_doctor_check name=project_package status=blocked",
+		"invalid runtime.prompts",
+		"phases.implementation.prompt file not found: prompts/missing.md",
+		"prompt_doctor_status=blocked",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("doctor prompts missing %q in stdout=%s stderr=%s", want, stdout.String(), stderr.String())
+		}
+	}
+}
+
+func writePromptPreviewProjectPackage(t *testing.T, packageDir string) {
+	t.Helper()
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    system:
+      file: prompts/system.md
+    phases:
+      decomposition:
+        prompt: prompts/decomposition.md
+        skills:
+          - skills/decomposition-policy.md
+        childDraftTemplate: prompts/decomposition-child-template.md
+    repoSlots:
+      app:
+        phases:
+          decomposition:
+            prompt: prompts/app-decomposition.md
+            childDraftTemplate: prompts/app-child-template.md
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for path, content := range map[string]string{
+		"prompts/system.md":                       "system guidance",
+		"prompts/decomposition.md":                "decomposition guidance",
+		"skills/decomposition-policy.md":          "decomposition policy",
+		"prompts/decomposition-child-template.md": "base child template",
+		"prompts/app-decomposition.md":            "app decomposition guidance",
+		"prompts/app-child-template.md":           "app child template",
+	} {
+		target := filepath.Join(packageDir, path)
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

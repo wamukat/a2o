@@ -282,6 +282,23 @@ Split broad requirements into draft child tickets with clear ownership, dependen
 
 Skills are longer reusable Markdown guidance referenced from a phase. Use prompts for phase stance and instruction layering; use skills for detailed procedures such as testing policy, API compatibility rules, UI review checklist, or Kanban decomposition templates. `childDraftTemplate` is decomposition-specific guidance for the expected child ticket shape. It is passed to the proposal author request, while durable evidence stores only safe prompt metadata.
 
+Inspect prompt composition before running a worker with:
+
+```bash
+a2o prompt preview --phase review A2O#123
+a2o prompt preview --phase decomposition --repo-slot app A2O#123
+```
+
+The preview prints each non-mutating layer, including A2O core instruction, project system prompt, phase prompt, phase skills, repo-slot addons, ticket phase instruction, task/runtime data, and the final composed instruction. Use `--task-kind parent` to preview `parent_review`, and `--prior-review-feedback` to preview `implementation_rework`.
+
+Validate prompt configuration without running workers or changing Kanban state with:
+
+```bash
+a2o doctor prompts
+```
+
+The prompt doctor reports missing files, invalid paths, unsupported prompt phases, duplicate skill entries, invalid repo-slot addons, fallback-visible prompt profiles, and invalid `childDraftTemplate` placement with package path and phase context.
+
 ## Runtime Prompt Migration
 
 Existing project packages do not need to migrate before adopting a new A2O version. The released phase execution surface remains supported:
