@@ -401,6 +401,8 @@ module A3
       def resolve_edit_scope(labels:, task_ref:)
         edit_scope = labels.flat_map { |label| @repo_label_map.fetch(label, []) }.uniq.freeze
         return edit_scope unless edit_scope.empty?
+        return [] if unscoped_decomposition_source?(labels)
+        return configured_edit_scope_universe if unscoped_decomposed_parent_automation?(labels)
 
         configured_labels = @repo_label_map.keys.sort
         label_summary = labels.empty? ? "(none)" : labels.sort.join(", ")
@@ -409,6 +411,25 @@ module A3
               "kanban task #{task_ref} has no repo label that maps to an A2O edit scope; " \
               "task labels=#{label_summary}; configured repo labels=#{configured_summary}; " \
               "add one or more configured repo labels to the kanban task"
+      end
+
+      def unscoped_decomposition_source?(labels)
+        return false unless @trigger_labels.include?(A3::Domain::Task::DECOMPOSITION_TRIGGER_LABEL)
+        return false unless labels.include?(A3::Domain::Task::DECOMPOSITION_TRIGGER_LABEL)
+
+        ((labels & @trigger_labels) - [A3::Domain::Task::DECOMPOSITION_TRIGGER_LABEL]).empty?
+      end
+
+      def unscoped_decomposed_parent_automation?(labels)
+        return false unless labels.include?(A3::Domain::Task::DECOMPOSED_LABEL)
+        return false unless labels.include?("trigger:auto-parent")
+        return false unless @trigger_labels.include?("trigger:auto-parent")
+
+        ((labels & @trigger_labels) - ["trigger:auto-parent"]).empty?
+      end
+
+      def configured_edit_scope_universe
+        @repo_label_map.values.flatten.uniq.freeze
       end
 
       def resolve_topology_edit_scope(labels)

@@ -77,6 +77,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
       command_argv: ["ruby", fake_cli.fetch(:script_path)],
       project: "Sample",
       repo_label_map: {
+        "repo:api" => [:repo_alpha],
         "repo:ui-app" => [:repo_beta]
       },
       trigger_labels: ["trigger:investigate"],
@@ -85,6 +86,72 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
 
     with_env(fake_cli.fetch(:env)) do
       expect(source.load).to eq([])
+    end
+  end
+
+  it "imports trigger-investigate source tickets without repo scope labels" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      task_get_includes_labels: false,
+      snapshots: [
+        {
+          "id" => 3050,
+          "ref" => "Sample#3050",
+          "status" => "To do",
+          "priority" => 3,
+          "labels" => ["trigger:investigate"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:investigate"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+
+      expect(tasks.map(&:ref)).to eq(["Sample#3050"])
+      expect(tasks.fetch(0).edit_scope).to eq([])
+      expect(tasks.fetch(0).labels).to eq(["trigger:investigate"])
+    end
+  end
+
+  it "keeps implementation-triggered tasks strict when repo scope labels are missing" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      task_get_includes_labels: false,
+      snapshots: [
+        {
+          "id" => 3051,
+          "ref" => "Sample#3051",
+          "status" => "To do",
+          "priority" => 3,
+          "labels" => ["trigger:auto-implement"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-implement"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      expect { source.load }.to raise_error(A3::Domain::ConfigurationError, /has no repo label/)
     end
   end
 
@@ -108,6 +175,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
       command_argv: ["ruby", fake_cli.fetch(:script_path)],
       project: "Sample",
       repo_label_map: {
+        "repo:api" => [:repo_alpha],
         "repo:ui-app" => [:repo_beta]
       },
       trigger_labels: ["trigger:auto-parent"],
@@ -119,6 +187,43 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
 
       expect(tasks.map(&:ref)).to eq(["Sample#3049"])
       expect(tasks.fetch(0).edit_scope).to eq([:repo_beta])
+    end
+  end
+
+  it "imports unscoped decomposed parents selected by parent automation trigger" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      task_get_includes_labels: false,
+      snapshots: [
+        {
+          "id" => 3052,
+          "ref" => "Sample#3052",
+          "status" => "To do",
+          "priority" => 3,
+          "labels" => ["trigger:auto-parent", "a2o:decomposed"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:api" => [:repo_alpha],
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-parent"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+
+      expect(tasks.map(&:ref)).to eq(["Sample#3052"])
+      expect(tasks.fetch(0).edit_scope).to eq(%i[repo_alpha repo_beta])
+      expect(tasks.fetch(0).repo_scope_key).to eq(:both)
+      expect(tasks.fetch(0).labels).to eq(["trigger:auto-parent", "a2o:decomposed"])
     end
   end
 

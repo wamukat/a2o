@@ -44,7 +44,7 @@ isolated Kanbalone on port `3471` and the local agent server on port `7394`.
 
 ## Run decomposition from a Kanban requirement ticket
 
-Create a ticket in `To do` with `repo:app` and `trigger:investigate`, then run:
+Create a ticket in `To do` with `trigger:investigate`, then run:
 
 ```sh
 tools/dev_sample/run-decomposition-once.sh
@@ -53,7 +53,9 @@ tools/dev_sample/run-decomposition-once.sh
 This runs the local checkout through `investigate -> propose -> review`.
 When the proposal review is eligible, draft child tickets are created on the
 same board with `a2o:draft-child`. The source ticket receives short comments
-for each completed stage.
+for each completed stage and `a2o:decomposed` after successful draft
+reconciliation. The generated children carry concrete repo labels such as
+`repo:app` or `repo:lib`; the source requirement does not need them.
 
 Diagnostic logs and evidence:
 
