@@ -37,7 +37,7 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
 
     def run_command(*args)
       raise A3::Domain::ConfigurationError, "simulated label failure" if @fail_after_first_create && args.first == "task-label-add"
-      raise A3::Domain::ConfigurationError, "simulated dependency failure" if @fail_dependency_relation && args.first == "task-relation-create" && args.include?("blocked_by")
+      raise A3::Domain::ConfigurationError, "simulated dependency failure" if @fail_dependency_relation && args.first == "task-relation-create" && args.include?("blocked")
 
       @commands << args
       @labels << args if args.first == "task-label-add"
@@ -208,7 +208,7 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: payload)
 
     expect(result.success?).to be(true)
-    expect(client.relations.any? { |args| args.include?("blocked_by") }).to be(true)
+    expect(client.relations.any? { |args| args.include?("blocked") }).to be(true)
   end
 
   it "returns already-created refs when a later reconciliation write fails" do

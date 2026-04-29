@@ -10,7 +10,7 @@ RSpec.describe "Kanban-first decomposition draft flow" do
       }
       @tasks_by_id = { 240 => @tasks.fetch("Portal#240") }
       @labels = { 240 => ["trigger:investigate", "repo:portal"] }
-      @relations = Hash.new { |hash, key| hash[key] = { "subtask" => [], "blocked_by" => [] } }
+      @relations = Hash.new { |hash, key| hash[key] = { "subtask" => [], "blocked" => [] } }
       @created = []
       @commands = []
       @comments = []
@@ -88,8 +88,8 @@ RSpec.describe "Kanban-first decomposition draft flow" do
       kind = args.fetch(args.index("--relation-kind") + 1)
       if kind == "subtask"
         @relations[task_id]["subtask"] << { "id" => other_id, "ref" => @tasks_by_id.fetch(other_id).fetch("ref") }
-      elsif kind == "blocked_by"
-        @relations[task_id]["blocked_by"] << { "id" => other_id, "ref" => @tasks_by_id.fetch(other_id).fetch("ref") }
+      elsif kind == "blocked"
+        @relations[task_id]["blocked"] << { "id" => other_id, "ref" => @tasks_by_id.fetch(other_id).fetch("ref") }
       end
     end
   end

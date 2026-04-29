@@ -9,7 +9,8 @@ mkdir -p "$A2O_DEV_SAMPLE_STORAGE_DIR"
 COMMON_OPTIONS=(
   --storage-backend sqlite
   --storage-dir "$A2O_DEV_SAMPLE_STORAGE_DIR"
-  --repo-source "app=$A2O_DEV_SAMPLE_ROOT/reference-products/java-spring-multi-module"
+  --repo-source "app=$A2O_DEV_SAMPLE_ROOT/reference-products/java-spring-multi-module/web-app"
+  --repo-source "lib=$A2O_DEV_SAMPLE_ROOT/reference-products/java-spring-multi-module/utility-lib"
   --kanban-backend subprocess-cli
   --kanban-command python3
   --kanban-command-arg tools/kanban/kanban_cli.py
@@ -21,6 +22,7 @@ COMMON_OPTIONS=(
   --kanban-status "To do"
   --kanban-trigger-label trigger:investigate
   --kanban-repo-label repo:app=app
+  --kanban-repo-label repo:lib=lib
 )
 RUNTIME_OPTIONS=(
   "${COMMON_OPTIONS[@]}"

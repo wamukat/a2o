@@ -16,12 +16,13 @@ findings << {
 
 children.each_with_index do |child, index|
   labels = Array(child["labels"])
-  next if labels.include?("repo:app")
+  repo_labels = labels & ["repo:app", "repo:lib"]
+  next if repo_labels.length == 1
 
   findings << {
     "severity" => "critical",
-    "summary" => "child #{index + 1} is missing repo:app",
-    "details" => "Draft children in this sample must target the app repo slot."
+    "summary" => "child #{index + 1} must target exactly one repo scope",
+    "details" => "Draft children in this sample must target exactly one of repo:app or repo:lib."
   }
 end
 

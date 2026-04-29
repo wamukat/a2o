@@ -7,9 +7,13 @@ kanban:
     status: To do
 repos:
   app:
-    path: ../../..
+    path: ../web-app
     role: product
     label: repo:app
+  lib:
+    path: ../utility-lib
+    role: product
+    label: repo:lib
 agent:
   workspace_root: .work/a2o-dev-sample/agent/workspaces
   required_bins:
@@ -46,6 +50,7 @@ runtime:
     investigate:
       command:
         - commands/investigate.rb
+        - module-roles.json
     author:
       command:
         - commands/author-proposal.rb

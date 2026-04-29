@@ -49,6 +49,7 @@ PY
   --bucket Done >/dev/null
 
 "${KANBAN[@]}" label-ensure --project "$A2O_DEV_SAMPLE_PROJECT" --title repo:app --hex-color '#4b7f52' >/dev/null
+"${KANBAN[@]}" label-ensure --project "$A2O_DEV_SAMPLE_PROJECT" --title repo:lib --hex-color '#0f766e' >/dev/null
 "${KANBAN[@]}" label-ensure --project "$A2O_DEV_SAMPLE_PROJECT" --title trigger:auto-implement --hex-color '#2563eb' >/dev/null
 "${KANBAN[@]}" label-ensure --project "$A2O_DEV_SAMPLE_PROJECT" --title trigger:investigate --hex-color '#f59e0b' >/dev/null
 "${KANBAN[@]}" label-ensure --project "$A2O_DEV_SAMPLE_PROJECT" --title trigger:auto-parent --hex-color '#7c3aed' >/dev/null

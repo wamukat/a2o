@@ -239,7 +239,7 @@ module A3
           "--project", @project,
           "--task-id", blocked_task_id.to_s,
           "--other-task-id", blocker_task_id.to_s,
-          "--relation-kind", "blocked_by"
+          "--relation-kind", "blocked"
         )
       end
 
@@ -270,7 +270,9 @@ module A3
       def blocker_relation_exists?(relations, blocker_task_id:)
         case relations
         when Hash
-          Array(relations["blocked_by"]).any? { |relation| Integer(relation["id"]) == Integer(blocker_task_id) }
+          (Array(relations["blocked"]) + Array(relations["blocked_by"])).any? do |relation|
+            Integer(relation["id"]) == Integer(blocker_task_id)
+          end
         when Array
           relations.any? { |relation| Integer(relation["related_task_id"]) == Integer(blocker_task_id) }
         else

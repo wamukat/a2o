@@ -1,0 +1,48 @@
+{
+  "modules": {
+    "app": {
+      "label": "repo:app",
+      "path": "web-app",
+      "owns": [
+        "Spring Boot application wiring",
+        "HTTP controllers and response contracts",
+        "HTML pages, forms, and HTMX partial responses"
+      ],
+      "does_not_own": [
+        "Reusable greeting text formatting rules",
+        "Language-specific greeting normalization"
+      ]
+    },
+    "lib": {
+      "label": "repo:lib",
+      "path": "utility-lib",
+      "owns": [
+        "Reusable greeting formatting rules",
+        "Name normalization",
+        "Language-specific greeting message selection"
+      ],
+      "does_not_own": [
+        "HTTP routing",
+        "HTML rendering",
+        "HTMX request handling"
+      ]
+    }
+  },
+  "routing_hints": [
+    {
+      "keywords": ["Japanese", "English", "language", "locale", "日本語", "英語", "日英"],
+      "preferred_modules": ["lib", "app"],
+      "reason": "Message selection belongs in utility-lib; web-app exposes it through HTTP/UI."
+    },
+    {
+      "keywords": ["screen", "form", "HTML", "HTMX", "画面", "フォーム"],
+      "preferred_modules": ["app"],
+      "reason": "Browser-facing UI belongs in web-app."
+    },
+    {
+      "keywords": ["format", "normalize", "greeting", "挨拶", "あいさつ"],
+      "preferred_modules": ["lib"],
+      "reason": "Reusable greeting behavior belongs in utility-lib."
+    }
+  ]
+}
