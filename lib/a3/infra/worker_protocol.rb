@@ -87,7 +87,7 @@ module A3
         prompt_phase = prompt_phase_for(phase_runtime: phase_runtime, prior_review_feedback: prior_review_feedback)
         effective_prompt_phase, phase_config = prompt_config.phase_resolution(prompt_phase)
         repo_slot = repo_prompt_slot(phase_runtime)
-        repo_slot_config = repo_slot ? prompt_config.repo_slot_addon_phase(repo_slot, effective_prompt_phase) : nil
+        repo_slot_config = repo_slot ? prompt_config.repo_slot_addon_phase(repo_slot, prompt_phase) : nil
         layers = []
         layers << prompt_layer("a2o_core_instruction", "A2O core instruction", skill.to_s) if skill
         if prompt_config.system_document

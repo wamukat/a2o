@@ -293,6 +293,48 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(metadata.fetch("layers").map { |layer| layer.fetch("title") }).to include("prompts/implementation.md")
   end
 
+  it "keeps repo-slot implementation_rework addons when the base profile falls back to implementation" do
+    prompt_config = A3::Domain::ProjectPromptConfig.new(
+      phases: {
+        "implementation" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+          prompt_document: prompt_document("prompts/implementation.md", "implementation guidance")
+        )
+      },
+      repo_slots: {
+        "ui_app" => {
+          "implementation_rework" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+            prompt_document: prompt_document("prompts/ui-rework.md", "ui rework guidance")
+          )
+        }
+      }
+    )
+    runtime = phase_runtime_with_prompt_config(prompt_config, phase: :implementation, repo_scope: :ui_app)
+
+    request_form = described_class.new.request_form(
+      skill: runtime.implementation_skill,
+      workspace: workspace,
+      task: task,
+      run: implementation_run,
+      phase_runtime: runtime,
+      task_packet: task_packet,
+      prior_review_feedback: { "summary" => "Fix assertion coverage." }
+    )
+
+    project_prompt = request_form.fetch("phase_runtime").fetch("project_prompt")
+    expect(project_prompt.fetch("profile")).to eq("implementation_rework")
+    expect(project_prompt.fetch("effective_profile")).to eq("implementation")
+    expect(project_prompt.fetch("fallback_profile")).to eq("implementation")
+    expect(project_prompt.fetch("composed_instruction")).to include("implementation guidance")
+    expect(project_prompt.fetch("composed_instruction")).to include("ui rework guidance")
+
+    metadata = described_class.new.project_prompt_metadata(request_form)
+    expect(metadata.fetch("repo_slot")).to eq("ui_app")
+    expect(metadata.fetch("layers").map { |layer| layer.fetch("title") }).to include(
+      "prompts/implementation.md",
+      "ui_app:prompts/ui-rework.md"
+    )
+  end
+
   it "selects parent_review prompt profile for parent review runs" do
     parent_task = A3::Domain::Task.new(
       ref: "A3-v2#3000",
