@@ -145,6 +145,32 @@ a2o project bootstrap --kanban-mode external --kanban-url http://127.0.0.1:3470
 
 同じ Compose プロジェクトなら既存ボードを再利用する。Compose プロジェクトや Docker volume が変わると、同じプロダクトでも別ボードに見える。ボードが空に見える場合は、まず `a2o runtime status` と `a2o kanban doctor` でインスタンス設定、Compose プロジェクト、volume を確認する。
 
+## 要求の分解
+
+カンバンチケットが大きな要求であり、実装前に調査して子チケットへ分けたい場合は `trigger:investigate` を使う。その source ticket には、意図的に分解を通さず実装スケジューラへ入れたい場合を除き、`trigger:auto-implement` を付けない。`trigger:investigate` が付いた source ticket は decomposition domain に属し、実装は生成または承認された child ticket 側で進める。
+
+自動 decomposition flow は次の順で進む。
+
+1. A2O が `trigger:investigate` 付きの source ticket を選択する。
+2. プロジェクト所有の investigation command が実行され、調査 evidence を記録する。
+3. proposal author が正規化された child-ticket proposal を作る。
+4. proposal review が draft child creation に進める状態かを判定する。
+5. eligible な proposal から `a2o:draft-child` 付きの draft child ticket を作る。
+
+各 stage が完了すると、source ticket に短いコメントが残るため、運用者は Kanban 上で進行を追える。詳細な evidence は runtime storage 配下の `decomposition-evidence/<task>/` に保存される。`a2o runtime decomposition status <task-ref>` は decomposition evidence の概要を表示し、`a2o runtime describe-task <task-ref>` はより広い task 状態を表示する。
+
+draft child は計画用の artifact である。ボード上には表示されるが、人間が `trigger:auto-implement` を付けて承認するまで runnable にはならない。運用者は承認前に、生成された child の title、body、label、blocker、scope を編集できる。`a2o:draft-child` を外すことは任意の metadata 整理であり、runnable gate は `trigger:auto-implement` である。
+
+よく使うコマンド:
+
+```sh
+a2o runtime decomposition status <task-ref>
+a2o runtime decomposition cleanup <task-ref> --dry-run
+a2o runtime decomposition cleanup <task-ref> --apply
+```
+
+`runtime.decomposition.investigate.command`、`runtime.decomposition.author.command`、decomposition prompt / template layer などの project package 設定は [90-project-package-schema.md](90-project-package-schema.md#runtime-decomposition) を読む。
+
 ## エージェント運用
 
 a2o-agent は、A2O Engine から渡されたジョブをプロダクト環境で実行するバイナリである。標準配置先は `.work/a2o/agent/bin/a2o-agent` である。

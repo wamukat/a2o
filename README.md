@@ -32,6 +32,21 @@ Kanban task
 
 Start with [docs/en/user/00-overview.md](docs/en/user/00-overview.md) to understand how these parts fit together.
 
+## Requirement Decomposition
+
+Use `trigger:investigate` for a high-level requirement that should be broken down before implementation. A2O treats that label as a decomposition request, not as an implementation request:
+
+```text
+Requirement ticket with trigger:investigate
+  -> A2O investigates the request
+  -> A2O proposes child tickets
+  -> A2O reviews the proposal
+  -> A2O creates draft child tickets with a2o:draft-child
+  -> a human edits / accepts the children by adding trigger:auto-implement
+```
+
+The source ticket receives short comments as the investigate, propose, review, and child creation stages complete. The generated draft children are not runnable until a human accepts them with `trigger:auto-implement`. Configure this flow in `runtime.decomposition` and `runtime.prompts.decomposition` in the project package. See [docs/en/user/30-operating-runtime.md](docs/en/user/30-operating-runtime.md#requirement-decomposition) and [docs/en/user/90-project-package-schema.md](docs/en/user/90-project-package-schema.md#runtime-decomposition).
+
 ## Principles
 
 - A2O is a local-first runtime that ships with bundled Kanbalone by default and can also connect to an external Kanbalone board.
@@ -100,6 +115,8 @@ a2o runtime image-digest
 a2o runtime doctor
 a2o runtime watch-summary
 a2o runtime describe-task A2O#1
+a2o runtime decomposition status A2O#1
+a2o runtime decomposition cleanup A2O#1 --dry-run
 a2o runtime reset-task A2O#1
 a2o runtime skill-feedback list
 a2o runtime skill-feedback propose --format ticket

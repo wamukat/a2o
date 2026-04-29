@@ -145,6 +145,32 @@ External mode stores the public board URL in the runtime instance and, when need
 
 The same Compose project reuses the existing board. If the Compose project or Docker volume changes, the same product can appear to have a different empty board. When that happens, first check instance settings, Compose project, and volume through `a2o runtime status` and `a2o kanban doctor`.
 
+## Requirement Decomposition
+
+Use `trigger:investigate` when the kanban ticket is a broad requirement that should be investigated and split before implementation. Do not add `trigger:auto-implement` to that source ticket unless you intentionally want it to bypass decomposition and enter the implementation scheduler. A source ticket with `trigger:investigate` belongs to the decomposition domain; implementation work should happen on the generated or accepted child tickets.
+
+The automatic decomposition flow is:
+
+1. A2O selects a source ticket with `trigger:investigate`.
+2. The project-owned investigation command runs and records investigation evidence.
+3. The proposal author creates a normalized child-ticket proposal.
+4. Proposal review decides whether the proposal is eligible for draft child creation.
+5. Eligible proposals create draft child tickets labeled `a2o:draft-child`.
+
+Each completed stage leaves a short comment on the source ticket so operators can follow progress from Kanban. Detailed evidence is stored under the runtime storage directory in `decomposition-evidence/<task>/`; `a2o runtime decomposition status <task-ref>` shows the current decomposition evidence summary, and `a2o runtime describe-task <task-ref>` gives the broader task state.
+
+Draft children are planning artifacts. They are visible on the board, but they are not runnable until a human accepts them by adding `trigger:auto-implement`. Operators can edit the generated child title, body, labels, blockers, and scope before acceptance. Removing `a2o:draft-child` is optional metadata cleanup; the runnable gate is `trigger:auto-implement`.
+
+Useful commands:
+
+```sh
+a2o runtime decomposition status <task-ref>
+a2o runtime decomposition cleanup <task-ref> --dry-run
+a2o runtime decomposition cleanup <task-ref> --apply
+```
+
+For package configuration, including `runtime.decomposition.investigate.command`, `runtime.decomposition.author.command`, and decomposition prompt/template layers, read [90-project-package-schema.md](90-project-package-schema.md#runtime-decomposition).
+
 ## Agent Operation
 
 `a2o-agent` is the binary that runs jobs from A2O Engine in the product environment. The standard install path is `.work/a2o/agent/bin/a2o-agent`.
