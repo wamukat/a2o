@@ -244,7 +244,9 @@ runtime:
               - skills/app-review.md
 ```
 
-All paths are package-relative non-empty strings. `phases.<phase>.skills` preserves the declared order. `implementation_rework` is optional and falls back to `implementation` when no rework-specific prompt profile is configured. `repoSlots.<slot>.phases` is an additive layer on top of the project phase defaults: phase prompts are composed before repo-slot prompts, and phase skills are composed before repo-slot skills.
+All paths are package-relative non-empty strings. Prompt phase names are limited to A2O-recognized phase profiles. `phases.<phase>.skills` preserves the declared order and must not list the same skill file more than once. `implementation_rework` is optional and falls back to `implementation` when no rework-specific prompt profile is configured. `repoSlots.<slot>.phases` is an additive layer on top of the project phase defaults, and `<slot>` must match a `repos` entry. Phase prompts and skills are composed before repo-slot prompts and skills. Diagnostics and evidence identify repo-slot layers as `repo_slot_phase_prompt`, `repo_slot_phase_skill`, or `repo_slot_decomposition_child_draft_template`.
+
+For tasks that span multiple repositories, such as `repo_scope=both`, A2O does not compose repo-slot addons. Implicitly mixing multiple slot-specific instructions makes worker ownership ambiguous, so A2O uses only the project-wide phase prompt. Split the work into repo-slot child tasks when repo-specific guidance is required.
 
 ## Runtime Phases
 
