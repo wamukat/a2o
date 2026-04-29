@@ -1,6 +1,6 @@
 # 現在の公開機能
 
-A2O 0.5.52 で現在利用できる公開機能と検証範囲を示す。
+A2O 0.5.53 で現在利用できる公開機能と検証範囲を示す。
 
 この文書は、リリース時点で「利用者に案内してよい機能」と「検証済みとして扱える範囲」を確認するための一覧である。導入手順を知りたい場合は [10-quickstart.md](10-quickstart.md)、設定項目を知りたい場合は [90-project-package-schema.md](90-project-package-schema.md) を読む。
 
@@ -30,6 +30,7 @@ A2O 0.5.52 で現在利用できる公開機能と検証範囲を示す。
 - decomposition command UX: `a2o runtime decomposition <action> --help` の action-level help と、単発 decomposition command の外部 task 同期 / 照合
 - gate closed の decomposition child creation は、空の `success=` を表示せず、`status=gate_closed` と `child_creation_result=not_attempted` を表示する
 - project prompt composition: `runtime.prompts.repoSlots` は multi-repo task で、task の `repo_slots` / `edit_scope` 順に各 repo slot の prompt / skill addon を合成する。
+- worker runtime request と inspection output は、multi-repo task について順序付きの `repo_slots` を出力する。従来の `repo_scope` は single-scope 互換フィールドとして残し、旧 variant lookup 互換のために `both` を表示する場合があるが、multi-repo identity の正本ではない。
 - prompt diagnostics / evidence は順序付きの `project_prompt.repo_slots` を出力する。従来の単数 `repo_slot` は single-slot task の場合だけ設定される。
 - prompt preview は `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib A2O#123` または `a2o prompt preview --phase implementation --repo-slot app,lib A2O#123` のように、複数 repo slot を指定した multi-repo 合成確認に対応する。
 - agent server 接続向けの project runtime 調整項目: `runtime.agent_control_plane_connect_timeout`、`runtime.agent_control_plane_request_timeout`、`runtime.agent_control_plane_retry_count`、`runtime.agent_control_plane_retry_delay`
@@ -41,7 +42,7 @@ A2O 0.5.52 で現在利用できる公開機能と検証範囲を示す。
 - エージェント HTTP ワーカー境界。取得済みジョブの heartbeat を含む
 - エージェントが具体化するワークスペース方式
 - TypeScript、Go、Python、複数リポジトリタスクテンプレートの参照用プロダクトパッケージ
-- GHCR ランタイムイメージタグ: `latest`、`0.5.52`、`sha-*`
+- GHCR ランタイムイメージタグ: `latest`、`0.5.53`、`sha-*`
 - タグリリースでは `latest` も同時に公開する。そのため、公開完了後はリリース版タグと `latest` が同じランタイムイメージを指す前提で確認する。
 - ローカルリリース判定: RSpec 全体、release package doctor、local RC host smoke、および runtime 実行 / worker launcher / scheduler / Kanban / env generation 変更時の real-task local RC smoke
 
