@@ -334,6 +334,9 @@ func validatePromptPhaseMapping(rawPhases any, label string, packagePath string)
 		if !ok {
 			return fmt.Errorf("%s.%s must be a mapping", label, phase)
 		}
+		if _, ok := phaseConfig["childDraftTemplate"]; ok && phase != "decomposition" {
+			return fmt.Errorf("%s.%s.childDraftTemplate is only supported for decomposition", label, phase)
+		}
 		if err := validatePromptPath(phaseConfig["prompt"], label+"."+phase+".prompt", packagePath, false); err != nil {
 			return err
 		}

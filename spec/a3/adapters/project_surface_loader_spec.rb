@@ -404,6 +404,32 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
       .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.phases.implementation.skills[1] must be a non-empty string")
   end
 
+  it "rejects child draft templates outside decomposition prompt phases" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "phases" => {
+            "review" => {
+              "childDraftTemplate" => "prompts/review-child-template.md"
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+    write_project_files("prompts/review-child-template.md" => "review template")
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.phases.review.childDraftTemplate is only supported for decomposition")
+  end
+
   it "rejects missing prompt files" do
     project_config_path = write_project_config(
       "runtime" => {

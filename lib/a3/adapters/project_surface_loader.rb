@@ -226,6 +226,9 @@ module A3
           unless config.is_a?(Hash)
             raise A3::Domain::ConfigurationError, "project.yaml #{location}.#{phase} must be a mapping"
           end
+          if config.key?("childDraftTemplate") && phase != "decomposition"
+            raise A3::Domain::ConfigurationError, "project.yaml #{location}.#{phase}.childDraftTemplate is only supported for decomposition"
+          end
 
           mapping[phase] = A3::Domain::ProjectPromptConfig::PhaseConfig.new(
             prompt_document: prompt_document(config.fetch("prompt", nil), "#{location}.#{phase}.prompt", project_package_root),

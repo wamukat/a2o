@@ -4709,6 +4709,53 @@ runtime:
 	}
 }
 
+func TestProjectValidateRejectsChildDraftTemplateOutsideDecomposition(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(filepath.Join(packageDir, "prompts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "prompts", "review-child-template.md"), []byte("review template"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    phases:
+      review:
+        childDraftTemplate: prompts/review-child-template.md
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject childDraftTemplate outside decomposition, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "phases.review.childDraftTemplate is only supported for decomposition") {
+		t.Fatalf("project validate should reject childDraftTemplate outside decomposition, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
 func TestRuntimeRunOnceRejectsLegacyWorkspaceHook(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
