@@ -961,7 +961,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
         runtime_snapshot: nil,
         review_disposition: {
           "kind" => "completed",
-          "repo_scope" => "repo_alpha",
+          "slot_scopes" => ["repo_alpha"],
           "summary" => "No findings",
           "description" => "Implementation finished and final self-review found no outstanding issues.",
           "finding_key" => "completed-no-findings"
@@ -974,7 +974,7 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
 
     result = described_class.run_lines(run_view)
 
-    expect(result).to include("review_disposition kind=completed repo_scope=repo_alpha finding_key=completed-no-findings")
+    expect(result).to include("review_disposition kind=completed slot_scopes=repo_alpha finding_key=completed-no-findings")
     expect(result).to include("review_disposition_summary=No findings")
     expect(result).to include("review_disposition_description=Implementation finished and final self-review found no outstanding issues.")
   end

@@ -50,7 +50,7 @@ RSpec.describe A3::Application::HandleParentReviewDisposition do
   it "returns todo plus follow-up child refs for slot-scoped findings" do
     disposition = A3::Domain::ReviewDisposition.new(
       kind: :follow_up_child,
-      repo_scope: :repo_beta,
+      slot_scopes: [:repo_beta],
       summary: "redirect regression",
       description: "legacy malformed params should redirect",
       finding_key: "finding-1"
@@ -74,7 +74,7 @@ RSpec.describe A3::Application::HandleParentReviewDisposition do
   it "returns blocked for unresolved findings" do
     disposition = A3::Domain::ReviewDisposition.new(
       kind: :blocked,
-      repo_scope: :unresolved,
+      slot_scopes: [:unresolved],
       summary: "scope unresolved",
       description: "cross-repo architecture issue",
       finding_key: "finding-2"

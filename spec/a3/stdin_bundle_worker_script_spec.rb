@@ -127,7 +127,7 @@ RSpec.describe "worker:stdin-bundle" do
     }
   end
 
-  def write_launcher_config(path, command:, phase_profiles: {}, review_disposition_repo_scope_aliases: {}, review_disposition_repo_scopes: nil)
+  def write_launcher_config(path, command:, phase_profiles: {}, review_disposition_slot_scopes: nil)
     executor = {
       "kind" => "command",
       "prompt_transport" => "stdin-bundle",
@@ -137,10 +137,9 @@ RSpec.describe "worker:stdin-bundle" do
         "command" => command,
         "env" => {}
       },
-      "phase_profiles" => phase_profiles,
-      "review_disposition_repo_scope_aliases" => review_disposition_repo_scope_aliases
+      "phase_profiles" => phase_profiles
     }
-    executor["review_disposition_repo_scopes"] = review_disposition_repo_scopes if review_disposition_repo_scopes
+    executor["review_disposition_slot_scopes"] = review_disposition_slot_scopes if review_disposition_slot_scopes
     path.write(
       JSON.generate(
         "executor" => executor
@@ -175,7 +174,7 @@ RSpec.describe "worker:stdin-bundle" do
             "changed_files" => { "repo_alpha" => ["src/main.rb"] },
             "review_disposition" => {
               "kind" => "completed",
-              "repo_scope" => "repo_alpha",
+              "slot_scopes" => ["repo_alpha"],
               "summary" => "self review clean",
               "description" => "No findings.",
               "finding_key" => "self-review-clean"
@@ -260,7 +259,7 @@ RSpec.describe "worker:stdin-bundle" do
           "changed_files" => { "repo_alpha" => [] },
           "review_disposition" => {
             "kind" => "completed",
-            "repo_scope" => "repo_alpha",
+            "slot_scopes" => ["repo_alpha"],
             "summary" => "self review clean",
             "description" => "No findings.",
             "finding_key" => "self-review-clean"
@@ -568,7 +567,7 @@ RSpec.describe "worker:stdin-bundle" do
     end
   end
 
-  it "normalizes review disposition repo scope only through injected aliases" do
+  it "rejects the removed review disposition repo_scope key" do
     request = base_request
     payload = {
       "task_ref" => "Sample#3112",
@@ -582,7 +581,7 @@ RSpec.describe "worker:stdin-bundle" do
       "changed_files" => { "repo_alpha" => ["src/main.rb"] },
       "review_disposition" => {
         "kind" => "completed",
-        "repo_scope" => "repo:starters",
+        "repo_scope" => "repo_alpha",
         "summary" => "self review clean",
         "description" => "No findings.",
         "finding_key" => "self-review-clean"
@@ -595,11 +594,7 @@ RSpec.describe "worker:stdin-bundle" do
       payload_path = temp_dir.join("payload.json")
       request_path.write(JSON.generate(request))
       payload_path.write(JSON.generate(payload))
-      write_launcher_config(
-        launcher_config,
-        command: ["runner", "{{result_path}}"],
-        review_disposition_repo_scope_aliases: { "repo:starters" => "repo_alpha" }
-      )
+      write_launcher_config(launcher_config, command: ["runner", "{{result_path}}"])
 
       ruby = <<~RUBY
         ENV["A2O_WORKER_LAUNCHER_CONFIG_PATH"] = #{launcher_config.to_s.inspect}
@@ -618,7 +613,10 @@ RSpec.describe "worker:stdin-bundle" do
       )
 
       expect(status.success?).to eq(true), "#{stdout}\n#{stderr}"
-      expect(JSON.parse(stdout)).to eq([])
+      expect(JSON.parse(stdout)).to include(
+        "review_disposition.repo_scope is not supported; use review_disposition.slot_scopes",
+        "review_disposition.slot_scopes must be a non-empty array of strings"
+      )
     end
   end
 
@@ -636,7 +634,7 @@ RSpec.describe "worker:stdin-bundle" do
       "changed_files" => { "repo_alpha" => ["src/main.rb"] },
       "review_disposition" => {
         "kind" => "completed",
-        "repo_scope" => "repo:starters",
+        "slot_scopes" => ["repo:starters"],
         "summary" => "self review clean",
         "description" => "No findings.",
         "finding_key" => "self-review-clean"
@@ -668,41 +666,7 @@ RSpec.describe "worker:stdin-bundle" do
       )
 
       expect(status.success?).to eq(true), "#{stdout}\n#{stderr}"
-      expect(JSON.parse(stdout)).to include("review_disposition.repo_scope must be one of repo_alpha")
-    end
-  end
-
-  it "reports invalid review disposition alias config as structured failure" do
-    Dir.mktmpdir("a3-stdin-worker-invalid-alias-config-") do |temp_dir_text|
-      temp_dir = Pathname(temp_dir_text)
-      fake_worker = write_fake_worker(temp_dir)
-      launcher_config = temp_dir.join("launcher.json")
-      request_path = temp_dir.join("request.json")
-      result_path = temp_dir.join("result.json")
-      workspace_root = temp_dir.join("workspace")
-      workspace_root.mkpath
-      request_path.write(JSON.generate(base_request))
-      write_launcher_config(
-        launcher_config,
-        command: [fake_worker.to_s, "--result", "{{result_path}}", "--schema", "{{schema_path}}"],
-        review_disposition_repo_scope_aliases: { "repo:starters" => 123 }
-      )
-
-      stdout, stderr, status = run_worker_process(
-        {
-          "A2O_WORKER_REQUEST_PATH" => request_path.to_s,
-          "A2O_WORKER_RESULT_PATH" => result_path.to_s,
-          "A2O_WORKSPACE_ROOT" => workspace_root.to_s,
-          "A2O_WORKER_LAUNCHER_CONFIG_PATH" => launcher_config.to_s
-        }
-      )
-
-      expect(status.success?).to eq(true), "#{stdout}\n#{stderr}"
-      payload = JSON.parse(result_path.read)
-      expect(payload.fetch("success")).to eq(false)
-      expect(payload.fetch("summary")).to eq("stdin worker executor config invalid")
-      expect(payload.fetch("observed_state")).to eq("invalid_executor_config")
-      expect(payload.fetch("diagnostics").fetch("error")).to include("review_disposition_repo_scope_aliases")
+      expect(JSON.parse(stdout)).to include("review_disposition.slot_scopes must be one of repo_alpha")
     end
   end
 
@@ -719,7 +683,7 @@ RSpec.describe "worker:stdin-bundle" do
       write_launcher_config(
         launcher_config,
         command: [fake_worker.to_s, "--result", "{{result_path}}", "--schema", "{{schema_path}}"],
-        review_disposition_repo_scopes: [123]
+        review_disposition_slot_scopes: [123]
       )
 
       stdout, stderr, status = run_worker_process(
@@ -736,7 +700,7 @@ RSpec.describe "worker:stdin-bundle" do
       expect(payload.fetch("success")).to eq(false)
       expect(payload.fetch("summary")).to eq("stdin worker executor config invalid")
       expect(payload.fetch("observed_state")).to eq("invalid_executor_config")
-      expect(payload.fetch("diagnostics").fetch("error")).to include("review_disposition_repo_scopes")
+      expect(payload.fetch("diagnostics").fetch("error")).to include("review_disposition_slot_scopes")
     end
   end
 
@@ -827,7 +791,7 @@ RSpec.describe "worker:stdin-bundle" do
       )
       expect(examples.fetch(1).fetch("response").fetch("review_disposition")).to include(
         "kind" => "follow_up_child",
-        "repo_scope" => "repo_alpha"
+        "slot_scopes" => ["repo_alpha"]
       )
     end
   end
@@ -883,7 +847,7 @@ RSpec.describe "worker:stdin-bundle" do
         expect(validate_payload(payload, request: request)).to eq([])
         expect(payload.fetch("review_disposition")).to eq(
           "kind" => "completed",
-          "repo_scope" => "repo_alpha",
+          "slot_scopes" => ["repo_alpha"],
           "summary" => "parent review clean",
           "description" => "parent review clean",
           "finding_key" => "parent-review-completed"
@@ -911,7 +875,7 @@ RSpec.describe "worker:stdin-bundle" do
       "rework_required" => false,
       "review_disposition" => {
         "kind" => "completed",
-        "repo_scope" => "repo_alpha",
+        "slot_scopes" => ["repo_alpha"],
         "summary" => "No findings",
         "description" => "The parent integration branch is ready.",
         "finding_key" => "no-findings"
@@ -978,7 +942,7 @@ RSpec.describe "worker:stdin-bundle" do
       "rework_required" => false,
       "review_disposition" => {
         "kind" => "follow_up_child",
-        "repo_scope" => "repo_beta",
+        "slot_scopes" => ["repo_beta"],
         "summary" => "follow-up child needed",
         "description" => "Reviewer found a follow-up task.",
         "finding_key" => "follow-up-1"

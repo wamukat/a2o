@@ -14,7 +14,7 @@ module A3
       end
 
       def call(parent_task_ref:, parent_external_task_id:, review_run_ref:, disposition:)
-        repo_scopes_for(disposition.repo_scope).each_with_object({ refs: [], fingerprints: [] }) do |repo_scope, acc|
+        repo_scopes_for(disposition.slot_scopes).each_with_object({ refs: [], fingerprints: [] }) do |repo_scope, acc|
           child = ensure_child(
             parent_task_ref: parent_task_ref,
             parent_external_task_id: parent_external_task_id,
@@ -33,9 +33,11 @@ module A3
 
       private
 
-      def repo_scopes_for(repo_scope)
-        scope_key = repo_scope.to_s
-        @repo_scope_expansions.fetch(scope_key, [scope_key]).map(&:to_sym)
+      def repo_scopes_for(slot_scopes)
+        Array(slot_scopes).flat_map do |slot_scope|
+          scope_key = slot_scope.to_s
+          @repo_scope_expansions.fetch(scope_key, [scope_key])
+        end.map(&:to_sym).uniq
       end
 
       def ensure_child(parent_task_ref:, parent_external_task_id:, review_run_ref:, disposition:, repo_scope:)

@@ -2795,11 +2795,9 @@ module A3
       end
     end
 
-    def review_disposition_repo_scopes_from_kanban_label_map(repo_label_map)
-      scopes = repo_label_map.flat_map do |label, values|
-        normalized_values = Array(values).map(&:to_s).reject(&:empty?)
-        alias_scope = repo_scope_aliases_from_kanban_label_map({ label => normalized_values }).fetch(label, nil)
-        normalized_values + Array(alias_scope)
+    def review_disposition_slot_scopes_from_kanban_label_map(repo_label_map)
+      scopes = repo_label_map.flat_map do |_label, values|
+        Array(values).map(&:to_s).reject(&:empty?)
       end.uniq
       scopes.empty? ? nil : scopes
     end
@@ -2916,7 +2914,7 @@ module A3
         worker_command_args: options.fetch(:worker_command_args, []),
         worker_protocol: A3::Infra::WorkerProtocol.new(
           repo_scope_aliases: repo_scope_aliases_from_kanban_label_map(options.fetch(:kanban_repo_label_map, {})),
-          review_disposition_repo_scopes: review_disposition_repo_scopes_from_kanban_label_map(options.fetch(:kanban_repo_label_map, {}))
+          review_disposition_slot_scopes: review_disposition_slot_scopes_from_kanban_label_map(options.fetch(:kanban_repo_label_map, {}))
         )
       ) if gateway == "local"
 
@@ -2941,7 +2939,7 @@ module A3
           poll_interval_seconds: options.fetch(:agent_job_poll_interval_seconds, 1.0),
           worker_protocol: A3::Infra::WorkerProtocol.new(
             repo_scope_aliases: repo_scope_aliases_from_kanban_label_map(options.fetch(:kanban_repo_label_map, {})),
-            review_disposition_repo_scopes: review_disposition_repo_scopes_from_kanban_label_map(options.fetch(:kanban_repo_label_map, {}))
+            review_disposition_slot_scopes: review_disposition_slot_scopes_from_kanban_label_map(options.fetch(:kanban_repo_label_map, {}))
           ),
           workspace_request_builder: agent_workspace_request_builder(options),
           env: options.fetch(:agent_env, {}),

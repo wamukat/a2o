@@ -18,7 +18,7 @@ RSpec.describe A3::Infra::KanbanCliFollowUpChildWriter do
   let(:disposition) do
     A3::Domain::ReviewDisposition.new(
       kind: :follow_up_child,
-      repo_scope: :repo_beta,
+      slot_scopes: [:repo_beta],
       summary: "redirect regression",
       description: "legacy malformed params should redirect",
       finding_key: "finding-1"

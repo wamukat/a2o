@@ -270,9 +270,9 @@ RSpec.describe A3::Application::ShowRun do
       execution_record: A3::Domain::PhaseExecutionRecord.new(
         summary: "implementation completed",
         diagnostics: {},
-        review_disposition: {
-          "kind" => "completed",
-          "repo_scope" => "repo_alpha",
+          review_disposition: {
+            "kind" => "completed",
+            "slot_scopes" => ["repo_alpha"],
           "summary" => "No findings",
           "description" => "Implementation finished and final self-review found no outstanding issues.",
           "finding_key" => "completed-no-findings"
@@ -286,7 +286,7 @@ RSpec.describe A3::Application::ShowRun do
     expect(result.latest_execution.phase).to eq(:implementation)
     expect(result.latest_execution.review_disposition).to eq(
       "kind" => "completed",
-      "repo_scope" => "repo_alpha",
+      "slot_scopes" => ["repo_alpha"],
       "summary" => "No findings",
       "description" => "Implementation finished and final self-review found no outstanding issues.",
       "finding_key" => "completed-no-findings"

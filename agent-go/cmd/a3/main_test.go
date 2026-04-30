@@ -1544,7 +1544,7 @@ json.dump({
     "changed_files": {},
     "review_disposition": {
         "kind": "completed",
-        "repo_scope": repo_scope,
+        "slot_scopes": [repo_scope],
         "summary": "worker self-review clean",
         "description": "The command wrapper preserved the A2O response contract.",
         "finding_key": "completed-no-findings"
@@ -1837,7 +1837,7 @@ func TestWorkerValidateResultRejectsRuntimeProtocolShapeMismatches(t *testing.T)
 		"changed_files":   map[string]any{"app": "README.md"},
 		"review_disposition": map[string]any{
 			"kind":        "follow_up_child",
-			"repo_scope":  "all",
+			"slot_scopes": []string{"all"},
 			"summary":     "bad disposition",
 			"description": "bad disposition",
 			"finding_key": "bad-disposition",
@@ -1858,7 +1858,7 @@ func TestWorkerValidateResultRejectsRuntimeProtocolShapeMismatches(t *testing.T)
 		"worker_protocol_error=diagnostics must be an object",
 		"worker_protocol_error=changed_files for app must be an array of strings",
 		"worker_protocol_error=review_disposition.kind must be completed for implementation evidence",
-		"worker_protocol_error=review_disposition.repo_scope must be one of app",
+		"worker_protocol_error=review_disposition.slot_scopes must be one of app",
 	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("validate-result output missing %q in:\n%s", want, stdout.String())
@@ -1938,7 +1938,7 @@ func TestWorkerValidateResultMatchesRuntimeEmptyStringSemantics(t *testing.T) {
 	}
 }
 
-func TestWorkerValidateResultHonorsConfiguredReviewScopesAndAliases(t *testing.T) {
+func TestWorkerValidateResultHonorsConfiguredReviewSlotScopes(t *testing.T) {
 	tempDir := t.TempDir()
 	requestPath := filepath.Join(tempDir, "request.json")
 	resultPath := filepath.Join(tempDir, "result.json")
@@ -1959,7 +1959,7 @@ func TestWorkerValidateResultHonorsConfiguredReviewScopesAndAliases(t *testing.T
 		"changed_files":   map[string]any{},
 		"review_disposition": map[string]any{
 			"kind":        "completed",
-			"repo_scope":  "pkg",
+			"slot_scopes": []string{"package"},
 			"summary":     "configured scope",
 			"description": "configured scope",
 			"finding_key": "",
@@ -1977,16 +1977,31 @@ func TestWorkerValidateResultHonorsConfiguredReviewScopesAndAliases(t *testing.T
 		requestPath,
 		"--result",
 		resultPath,
-		"--review-scope",
+		"--review-slot-scope",
 		"package",
-		"--repo-scope-alias",
-		"pkg=package",
 	}, &fakeRunner{}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("validate-result returned %d, stdout=%s stderr=%s", code, stdout.String(), stderr.String())
 	}
 	if !strings.Contains(stdout.String(), "worker_protocol_status=ok") {
 		t.Fatalf("validate-result should report ok, got %q", stdout.String())
+	}
+}
+
+func TestTopLevelUsageDocumentsReviewSlotScope(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"--help"}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("help returned %d, stderr=%s", code, stderr.String())
+	}
+	usage := stdout.String()
+	if !strings.Contains(usage, "--review-slot-scope SCOPE") {
+		t.Fatalf("usage should document --review-slot-scope, got %q", usage)
+	}
+	if strings.Contains(usage, "--review-scope") || strings.Contains(usage, "--repo-scope-alias") {
+		t.Fatalf("usage should not document removed review disposition flags, got %q", usage)
 	}
 }
 

@@ -69,7 +69,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       diagnostics: {},
       review_disposition: {
         "kind" => "completed",
-        "repo_scope" => "repo_alpha",
+        "slot_scopes" => ["repo_alpha"],
         "summary" => "implementation self-review found no findings",
         "description" => "checked the committed diff and targeted tests",
         "finding_key" => "implementation-review-clean"
@@ -100,7 +100,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
-      body: a_string_matching(/A2O 実行完了: implementation.*要約: implemented redirect handling and verified targeted tests.*レビュー結果: completed repo_scope=repo_alpha finding_key=implementation-review-clean.*レビュー要約: implementation self-review found no findings/m)
+      body: a_string_matching(/A2O 実行完了: implementation.*要約: implemented redirect handling and verified targeted tests.*レビュー結果: completed slot_scopes=repo_alpha finding_key=implementation-review-clean.*レビュー要約: implementation self-review found no findings/m)
     )
     result = use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :completed)
 
@@ -276,7 +276,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
           "rework_required" => false,
           "review_disposition" => {
             "kind" => "completed",
-            "repo_scope" => "repo_alpha",
+            "slot_scopes" => ["repo_alpha"],
             "finding_key" => "no-findings"
           }
         }
@@ -305,7 +305,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(activity_publisher).to receive(:publish).with(
       task_ref: task.ref,
       external_task_id: 3025,
-      body: a_string_matching(/worker_result_validation_error: summary must be a string.*worker_result_validation_error: run_ref must match the worker request.*worker_response: success=true run_ref=ProjectName-10-parent phase=review rework_required=false review_disposition=kind=completed repo_scope=repo_alpha finding_key=no-findings/m),
+      body: a_string_matching(/worker_result_validation_error: summary must be a string.*worker_result_validation_error: run_ref must match the worker request.*worker_response: success=true run_ref=ProjectName-10-parent phase=review rework_required=false review_disposition=kind=completed slot_scopes=repo_alpha finding_key=no-findings/m),
       event: hash_including("kind" => "task_blocked")
     )
 
@@ -724,7 +724,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     )
     disposition = A3::Domain::ReviewDisposition.new(
       kind: :follow_up_child,
-      repo_scope: :repo_beta,
+      slot_scopes: [:repo_beta],
       summary: "add redirect fallback follow-up",
       description: "legacy malformed params should redirect to /points",
       finding_key: "sample-3140-repo-beta-1"
@@ -738,7 +738,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
         "rework_required" => false,
         "review_disposition" => {
           "kind" => "follow_up_child",
-          "repo_scope" => "repo_beta",
+          "slot_scopes" => ["repo_beta"],
           "summary" => disposition.summary,
           "description" => disposition.description,
           "finding_key" => disposition.finding_key
@@ -793,7 +793,7 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       run: have_attributes(ref: parent_run.ref, phase: :review, task_ref: parent_task.ref),
       disposition: have_attributes(
         kind: :follow_up_child,
-        repo_scope: :repo_beta,
+        slot_scopes: [:repo_beta],
         summary: disposition.summary,
         description: disposition.description,
         finding_key: disposition.finding_key

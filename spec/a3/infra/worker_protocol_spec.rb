@@ -681,10 +681,9 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(request_form.fetch("phase_runtime")).not_to have_key("project_prompt")
   end
 
-  it "normalizes project repo labels in review_disposition repo_scope" do
+  it "accepts ordered slot scopes in review_disposition" do
     result = described_class.new(
-      repo_scope_aliases: { "repo:both" => "both" },
-      review_disposition_repo_scopes: %w[repo_alpha repo_beta both]
+      review_disposition_slot_scopes: %w[repo_alpha repo_beta]
     ).build_execution_result(
       {
         "success" => true,
@@ -696,7 +695,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
         "changed_files" => { "repo_alpha" => ["marker.txt"], "repo_beta" => ["marker.txt"] },
         "review_disposition" => {
           "kind" => "completed",
-          "repo_scope" => "repo:both",
+          "slot_scopes" => %w[repo_alpha repo_beta],
           "summary" => "self-review clean",
           "description" => "No findings.",
           "finding_key" => "none"
@@ -710,10 +709,10 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
 
     expect(result).to have_attributes(success?: true)
-    expect(result.response_bundle.fetch("review_disposition").fetch("repo_scope")).to eq("both")
+    expect(result.response_bundle.fetch("review_disposition").fetch("slot_scopes")).to eq(%w[repo_alpha repo_beta])
   end
 
-  it "does not hardcode project repo labels when normalizing review_disposition repo_scope" do
+  it "rejects label aliases in review_disposition slot_scopes" do
     result = described_class.new.build_execution_result(
       {
         "success" => true,
@@ -725,7 +724,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
         "changed_files" => { "repo_alpha" => ["marker.txt"], "repo_beta" => ["marker.txt"] },
         "review_disposition" => {
           "kind" => "completed",
-          "repo_scope" => "repo:both",
+          "slot_scopes" => ["repo:both"],
           "summary" => "self-review clean",
           "description" => "No findings.",
           "finding_key" => "none"
@@ -739,7 +738,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
 
     expect(result).to have_attributes(success?: false)
-    expect(result.diagnostics.fetch("validation_errors")).to include("review_disposition.repo_scope must be one of repo_beta")
+    expect(result.diagnostics.fetch("validation_errors")).to include("review_disposition.slot_scopes must be one of repo_beta")
   end
 
   it "requires review_disposition for implementation success" do
@@ -779,7 +778,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
         "changed_files" => { "repo_beta" => ["docs/shared/project-package-schema.md"] },
         "review_disposition" => {
           "kind" => "completed",
-          "repo_scope" => "repo_beta",
+          "slot_scopes" => ["repo_beta"],
           "summary" => "self-review clean",
           "description" => "No findings.",
           "finding_key" => "none"
@@ -825,7 +824,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
         "changed_files" => { "repo_beta" => ["marker.txt"] },
         "review_disposition" => {
           "kind" => "completed",
-          "repo_scope" => "repo_beta",
+          "slot_scopes" => ["repo_beta"],
           "summary" => "self-review clean",
           "description" => "No findings.",
           "finding_key" => "none"
@@ -938,7 +937,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
   end
 
   it "canonicalizes optional worker identity fields instead of blocking on invented refs" do
-    result = described_class.new(review_disposition_repo_scopes: %w[repo_beta]).build_execution_result(
+    result = described_class.new(review_disposition_slot_scopes: %w[repo_beta]).build_execution_result(
       {
         "success" => true,
         "summary" => "parent review completed",
@@ -948,7 +947,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
         "rework_required" => false,
         "review_disposition" => {
           "kind" => "completed",
-          "repo_scope" => "repo_beta",
+          "slot_scopes" => ["repo_beta"],
           "summary" => "No findings",
           "description" => "The parent integration branch is ready.",
           "finding_key" => "no-findings"
@@ -974,7 +973,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
   end
 
   it "normalizes parent review success without an explicit review_disposition" do
-    result = described_class.new(review_disposition_repo_scopes: %w[repo_beta]).build_execution_result(
+    result = described_class.new(review_disposition_slot_scopes: %w[repo_beta]).build_execution_result(
       {
         "success" => true,
         "summary" => "parent review completed",
@@ -993,7 +992,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(result).to have_attributes(success?: true)
     expect(result.response_bundle.fetch("review_disposition")).to eq(
       "kind" => "completed",
-      "repo_scope" => "repo_beta",
+      "slot_scopes" => ["repo_beta"],
       "summary" => "parent review completed",
       "description" => "parent review completed",
       "finding_key" => "parent-review-completed"
@@ -1013,7 +1012,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
       }.freeze
     }.freeze
 
-    result = described_class.new(review_disposition_repo_scopes: %w[repo_beta]).build_execution_result(
+    result = described_class.new(review_disposition_slot_scopes: %w[repo_beta]).build_execution_result(
       worker_response,
       workspace: workspace,
       expected_task_ref: task.ref,
@@ -1025,7 +1024,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(result).to have_attributes(success?: true)
     expect(result.response_bundle.fetch("review_disposition")).to include(
       "kind" => "completed",
-      "repo_scope" => "repo_beta",
+      "slot_scopes" => ["repo_beta"],
       "finding_key" => "parent-review-completed"
     )
     expect(worker_response).not_to have_key("review_disposition")
@@ -1091,7 +1090,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
   it "accepts and normalizes structured skill feedback without changing successful worker flow" do
     result = described_class.new(
       repo_scope_aliases: { "repo:both" => "both" },
-      review_disposition_repo_scopes: %w[repo_alpha repo_beta both]
+      review_disposition_slot_scopes: %w[repo_alpha repo_beta]
     ).build_execution_result(
       {
         "success" => true,
@@ -1103,7 +1102,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
         "changed_files" => { "repo_beta" => ["marker.txt"] },
         "review_disposition" => {
           "kind" => "completed",
-          "repo_scope" => "repo_beta",
+          "slot_scopes" => ["repo_beta"],
           "summary" => "self-review clean",
           "description" => "No findings.",
           "finding_key" => "none"
@@ -1229,7 +1228,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
   end
 
   it "rejects parent review success with follow-up child disposition" do
-    result = described_class.new(review_disposition_repo_scopes: %w[repo_beta]).build_execution_result(
+    result = described_class.new(review_disposition_slot_scopes: %w[repo_beta]).build_execution_result(
       {
         "success" => true,
         "summary" => "follow-up required",
@@ -1239,7 +1238,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
         "rework_required" => false,
         "review_disposition" => {
           "kind" => "follow_up_child",
-          "repo_scope" => "repo_beta",
+          "slot_scopes" => ["repo_beta"],
           "summary" => "follow-up required",
           "description" => "Reviewer found work for a child task.",
           "finding_key" => "follow-up-1"

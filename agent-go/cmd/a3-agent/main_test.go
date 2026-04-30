@@ -343,7 +343,7 @@ else
   "changed_files": {"repo_alpha": ["main.go"]},
   "review_disposition": {
     "kind": "completed",
-    "repo_scope": "repo_alpha",
+    "slot_scopes": ["repo_alpha"],
     "summary": "clean",
     "description": "self-review clean",
     "finding_key": "clean"
@@ -601,7 +601,7 @@ cat > "$1" <<'JSON'
   "changed_files": {"repo_alpha": ["main.go"]},
   "review_disposition": {
     "kind": "completed",
-    "repo_scope": "repo_alpha",
+    "slot_scopes": ["repo_alpha"],
     "summary": "clean",
     "description": "self-review clean",
     "finding_key": "clean"
@@ -748,7 +748,7 @@ cat > "$1" <<'JSON'
   "changed_files": {},
   "review_disposition": {
     "kind": "completed",
-    "repo_scope": "repo_alpha",
+    "slot_scopes": ["repo_alpha"],
     "summary": "clean",
     "description": "clean",
     "finding_key": "clean"
@@ -932,7 +932,7 @@ func TestWorkerBundleIncludesParentReviewExamples(t *testing.T) {
 		t.Fatalf("follow-up example should include failure diagnostics: %#v", followUp)
 	}
 	disposition := followUp["review_disposition"].(map[string]any)
-	if disposition["kind"] != "follow_up_child" || disposition["repo_scope"] != "repo_alpha" {
+	if disposition["kind"] != "follow_up_child" || !reflect.DeepEqual(disposition["slot_scopes"], []any{"repo_alpha"}) {
 		t.Fatalf("unexpected follow-up disposition example: %#v", disposition)
 	}
 }
@@ -1053,7 +1053,7 @@ func TestWorkerPayloadNormalizesParentReviewSuccessWithoutReviewDisposition(t *t
 	disposition := payload["review_disposition"].(map[string]any)
 	expected := map[string]any{
 		"kind":        "completed",
-		"repo_scope":  "repo_alpha",
+		"slot_scopes": []string{"repo_alpha"},
 		"summary":     "parent review clean",
 		"description": "parent review clean",
 		"finding_key": "parent-review-completed",
@@ -1081,8 +1081,8 @@ func TestWorkerPayloadCompletesIncompleteParentReviewSuccessDisposition(t *testi
 		"summary":         "parent review clean",
 		"rework_required": false,
 		"review_disposition": map[string]any{
-			"kind":       "completed",
-			"repo_scope": "repo_alpha",
+			"kind":        "completed",
+			"slot_scopes": []string{"repo_alpha"},
 		},
 	}
 
@@ -1117,7 +1117,7 @@ func TestWorkerPayloadCanonicalizesIdentityBeforeValidation(t *testing.T) {
 		"rework_required": false,
 		"review_disposition": map[string]any{
 			"kind":        "completed",
-			"repo_scope":  "repo_alpha",
+			"slot_scopes": []string{"repo_alpha"},
 			"summary":     "No findings",
 			"description": "The parent integration branch is ready.",
 			"finding_key": "no-findings",
@@ -1160,7 +1160,7 @@ func TestWorkerPayloadRejectsInvalidParentReviewDisposition(t *testing.T) {
 		"rework_required": false,
 		"review_disposition": map[string]any{
 			"kind":        "completed",
-			"repo_scope":  "repo_alpha",
+			"slot_scopes": []string{"repo_alpha"},
 			"summary":     "No findings",
 			"description": "The parent integration branch is ready.",
 			"finding_key": "no-findings",
@@ -1186,11 +1186,11 @@ func TestWorkerPayloadRejectsInvalidParentReviewDisposition(t *testing.T) {
 			expected: "review_disposition.kind must be one of completed, follow_up_child, blocked",
 		},
 		{
-			name: "invalid repo scope",
+			name: "invalid slot scopes",
 			mutate: func(payload map[string]any) {
-				payload["review_disposition"].(map[string]any)["repo_scope"] = "repo_beta"
+				payload["review_disposition"].(map[string]any)["slot_scopes"] = []any{"repo_beta"}
 			},
-			expected: "review_disposition.repo_scope must be one of repo_alpha, unresolved",
+			expected: "review_disposition.slot_scopes must be one of repo_alpha, unresolved",
 		},
 	}
 	for _, tc := range tests {

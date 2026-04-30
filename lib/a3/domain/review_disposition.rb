@@ -5,11 +5,11 @@ module A3
     class ReviewDisposition
       KINDS = %i[completed follow_up_child blocked].freeze
 
-      attr_reader :kind, :repo_scope, :summary, :description, :finding_key
+      attr_reader :kind, :slot_scopes, :summary, :description, :finding_key
 
-      def initialize(kind:, repo_scope:, summary:, description:, finding_key:)
+      def initialize(kind:, slot_scopes:, summary:, description:, finding_key:)
         @kind = kind.to_sym
-        @repo_scope = repo_scope.to_sym
+        @slot_scopes = Array(slot_scopes).map(&:to_s).reject(&:empty?).map(&:to_sym).uniq.freeze
         @summary = summary.to_s
         @description = description.to_s
         @finding_key = finding_key.to_s
@@ -24,7 +24,7 @@ module A3
 
         new(
           kind: payload.fetch("kind"),
-          repo_scope: payload.fetch("repo_scope"),
+          slot_scopes: payload.fetch("slot_scopes"),
           summary: payload.fetch("summary"),
           description: payload.fetch("description"),
           finding_key: payload.fetch("finding_key")
@@ -47,7 +47,7 @@ module A3
 
       def valid?
         KINDS.include?(kind) &&
-          !repo_scope.to_s.strip.empty? &&
+          !slot_scopes.empty? &&
           !summary.strip.empty? &&
           !description.strip.empty? &&
           !finding_key.strip.empty?

@@ -342,7 +342,7 @@ RSpec.describe A3::Application::PhaseExecutionOrchestrator do
         "rework_required" => false,
         "review_disposition" => {
           "kind" => "follow_up_child",
-          "repo_scope" => "repo_beta",
+          "slot_scopes" => ["repo_beta"],
           "summary" => "repo_beta follow-up required",
           "description" => "legacy malformed params should redirect",
           "finding_key" => "parent-review-1"
@@ -404,7 +404,7 @@ RSpec.describe A3::Application::PhaseExecutionOrchestrator do
         "rework_required" => false,
         "review_disposition" => {
           "kind" => "blocked",
-          "repo_scope" => "unresolved",
+          "slot_scopes" => ["unresolved"],
           "summary" => "cannot route follow-up",
           "description" => "No configured repo scope can handle this finding.",
           "finding_key" => "parent-review-blocked"

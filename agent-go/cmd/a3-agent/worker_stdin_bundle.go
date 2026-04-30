@@ -361,7 +361,7 @@ func workerFailure(request map[string]any, summary string, command []string, obs
 	if stringValue(request["phase"]) == "review" && nestedString(request, "phase_runtime", "task_kind") == "parent" {
 		payload["review_disposition"] = map[string]any{
 			"kind":        "blocked",
-			"repo_scope":  "unresolved",
+			"slot_scopes": []string{"unresolved"},
 			"summary":     summary,
 			"description": fmt.Sprintf("Parent review failed before producing a canonical review disposition. observed_state=%s", observedState),
 			"finding_key": "parent-review-runtime-failure",
@@ -505,12 +505,12 @@ func reviewDispositionSchema(schemaType any) map[string]any {
 		"type": schemaType,
 		"properties": map[string]any{
 			"kind":        map[string]any{"type": "string"},
-			"repo_scope":  map[string]any{"type": "string"},
+			"slot_scopes": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "minItems": 1},
 			"summary":     map[string]any{"type": "string"},
 			"description": map[string]any{"type": "string"},
 			"finding_key": map[string]any{"type": "string"},
 		},
-		"required":             []string{"kind", "repo_scope", "summary", "description", "finding_key"},
+		"required":             []string{"kind", "slot_scopes", "summary", "description", "finding_key"},
 		"additionalProperties": false,
 	}
 }
@@ -749,11 +749,11 @@ func workerBundle(correction *workerResultCorrection) string {
 				"For implementation success, include changed_files keyed by slot name with relative paths to publish.",
 				"For implementation success, include review_disposition with kind=completed when self-review is clean.",
 				"For review failures caused by findings, include rework_required=true.",
-				"For parent review, include review_disposition with kind, repo_scope, summary, description, and finding_key unless you return clarification_request.",
+				"For parent review, include review_disposition with kind, slot_scopes, summary, description, and finding_key unless you return clarification_request.",
 				"Copy task_ref, run_ref, and phase exactly from request. If you are uncertain, omit them rather than inventing values.",
 				"For parent review success with no findings, set success=true, observed_state=null, rework_required=false, and review_disposition.kind=completed.",
-				"For parent review code follow-up findings, set success=false, observed_state to a concise string such as review_findings, rework_required=false, and review_disposition.kind=follow_up_child with a configured repo_scope.",
-				"For parent review blocked findings, set success=false, observed_state to a concise string such as blocked_finding, rework_required=false, and review_disposition.kind=blocked with repo_scope=unresolved.",
+				"For parent review code follow-up findings, set success=false, observed_state to a concise string such as review_findings, rework_required=false, and review_disposition.kind=follow_up_child with configured slot_scopes.",
+				"For parent review blocked findings, set success=false, observed_state to a concise string such as blocked_finding, rework_required=false, and review_disposition.kind=blocked with slot_scopes=[unresolved].",
 			},
 			"examples": examples,
 		},
@@ -778,11 +778,11 @@ func workerBundle(correction *workerResultCorrection) string {
 }
 
 func parentReviewResponseExamples(request map[string]any) []map[string]any {
-	repoScope := "repo_alpha"
-	scopes := validWorkerReviewDispositionRepoScopes(request, true)
+	slotScope := "repo_alpha"
+	scopes := validWorkerReviewDispositionSlotScopes(request, true)
 	for _, scope := range scopes {
 		if scope != "unresolved" {
-			repoScope = scope
+			slotScope = scope
 			break
 		}
 	}
@@ -799,7 +799,7 @@ func parentReviewResponseExamples(request map[string]any) []map[string]any {
 	clean["rework_required"] = false
 	clean["review_disposition"] = map[string]any{
 		"kind":        "completed",
-		"repo_scope":  repoScope,
+		"slot_scopes": []string{slotScope},
 		"summary":     "No findings",
 		"description": "The parent integration branch is ready to complete.",
 		"finding_key": "no-findings",
@@ -812,7 +812,7 @@ func parentReviewResponseExamples(request map[string]any) []map[string]any {
 	followUp["rework_required"] = false
 	followUp["review_disposition"] = map[string]any{
 		"kind":        "follow_up_child",
-		"repo_scope":  repoScope,
+		"slot_scopes": []string{slotScope},
 		"summary":     "Follow-up child required",
 		"description": "The finding is scoped to one configured slot and should be implemented as a child task.",
 		"finding_key": "parent-review-follow-up",
@@ -825,7 +825,7 @@ func parentReviewResponseExamples(request map[string]any) []map[string]any {
 	blocked["rework_required"] = false
 	blocked["review_disposition"] = map[string]any{
 		"kind":        "blocked",
-		"repo_scope":  "unresolved",
+		"slot_scopes": []string{"unresolved"},
 		"summary":     "Parent review blocked",
 		"description": "The finding cannot be routed to a configured child scope without requester input or technical resolution.",
 		"finding_key": "parent-review-blocked",
@@ -879,7 +879,7 @@ func workerInstruction(request map[string]any) string {
 		return instruction + " For implementation success, make the required code change, leave git staging/commit publication to the outer A2O runtime, and include changed_files keyed by slot name with relative paths to publish. After you finish implementation, perform a final self-review before returning. When that self-review is clean, include review_disposition with kind=completed so the outer runtime can preserve review evidence without a separate review phase."
 	}
 	if phase == "review" && nestedString(request, "phase_runtime", "task_kind") == "parent" {
-		return instruction + " For parent review, include review_disposition unless you return clarification_request. Use kind=completed when review is clean, kind=follow_up_child with a configured slot repo_scope for code follow-up, and kind=blocked with repo_scope unresolved when the finding should block the parent. Use clarification_request instead when the finding needs requester input rather than code follow-up or technical blocking. Parent review must not rely on rework_required routing."
+		return instruction + " For parent review, include review_disposition unless you return clarification_request. Use kind=completed when review is clean, kind=follow_up_child with slot_scopes for code follow-up, and kind=blocked with slot_scopes=[unresolved] when the finding should block the parent. Use clarification_request instead when the finding needs requester input rather than code follow-up or technical blocking. Parent review must not rely on rework_required routing."
 	}
 	if phase == "review" {
 		return instruction + " For review, report success only when you found no findings; otherwise return success=false with a short summary and set rework_required=true for code findings that should go back to implementation. Reserve rework_required=false for infrastructure or launch failures that should stay blocked. For review findings, you may set failing_command to null."
@@ -940,11 +940,15 @@ func validateWorkerPayload(payload map[string]any, request map[string]any) []str
 				errors = append(errors, "review_disposition must be present for parent review")
 			}
 		} else {
-			for _, key := range []string{"kind", "repo_scope", "summary", "description", "finding_key"} {
+			for _, key := range []string{"kind", "summary", "description", "finding_key"} {
 				if stringValue(disposition[key]) == "" {
 					errors = append(errors, "review_disposition."+key+" must be a string")
 				}
 			}
+			if _, ok := disposition["repo_scope"]; ok {
+				errors = append(errors, "review_disposition.repo_scope is not supported; use review_disposition.slot_scopes")
+			}
+			errors = append(errors, validateWorkerReviewDispositionSlotScopes(disposition["slot_scopes"])...)
 			errors = append(errors, validateWorkerReviewDisposition(disposition, request, success)...)
 		}
 	}
@@ -954,16 +958,16 @@ func validateWorkerPayload(payload map[string]any, request map[string]any) []str
 func validateWorkerReviewDisposition(disposition map[string]any, request map[string]any, success bool) []string {
 	phase := stringValue(request["phase"])
 	parentReview := phase == "review" && nestedString(request, "phase_runtime", "task_kind") == "parent"
-	validScopes := validWorkerReviewDispositionRepoScopes(request, parentReview)
-	repoScope := stringValue(disposition["repo_scope"])
+	validScopes := validWorkerReviewDispositionSlotScopes(request, parentReview)
+	slotScopes := stringSliceValue(disposition["slot_scopes"])
 	errors := []string{}
 	if parentReview {
 		validKinds := []string{"completed", "follow_up_child", "blocked"}
 		if !containsString(validKinds, stringValue(disposition["kind"])) {
 			errors = append(errors, "review_disposition.kind must be one of "+strings.Join(validKinds, ", "))
 		}
-		if !containsString(validScopes, repoScope) {
-			errors = append(errors, "review_disposition.repo_scope must be one of "+strings.Join(validScopes, ", "))
+		if invalid := invalidStringMembers(slotScopes, validScopes); len(invalid) > 0 {
+			errors = append(errors, "review_disposition.slot_scopes must be one of "+strings.Join(validScopes, ", "))
 		}
 		if success && stringValue(disposition["kind"]) != "completed" {
 			errors = append(errors, "review_disposition.kind must be completed when success is true for parent review")
@@ -974,8 +978,8 @@ func validateWorkerReviewDisposition(disposition map[string]any, request map[str
 		if stringValue(disposition["kind"]) != "completed" {
 			errors = append(errors, "review_disposition.kind must be completed for implementation evidence")
 		}
-		if !containsString(validScopes, repoScope) {
-			errors = append(errors, "review_disposition.repo_scope must be one of "+strings.Join(validScopes, ", "))
+		if invalid := invalidStringMembers(slotScopes, validScopes); len(invalid) > 0 {
+			errors = append(errors, "review_disposition.slot_scopes must be one of "+strings.Join(validScopes, ", "))
 		}
 	}
 	return errors
@@ -1055,27 +1059,6 @@ func needsReviewDisposition(request map[string]any, success bool) bool {
 
 func normalizeReviewDisposition(payload map[string]any, request map[string]any) {
 	normalizeParentReviewSuccess(payload, request)
-
-	disposition, ok := payload["review_disposition"].(map[string]any)
-	if !ok {
-		return
-	}
-	config := map[string]any{}
-	if err := readJSONFile(workerLauncherConfigPath(), &config); err != nil {
-		return
-	}
-	executor, ok := config["executor"].(map[string]any)
-	if !ok {
-		return
-	}
-	aliases, ok := executor["review_disposition_repo_scope_aliases"].(map[string]any)
-	if !ok {
-		return
-	}
-	scope := stringValue(disposition["repo_scope"])
-	if replacement := stringValue(aliases[scope]); replacement != "" {
-		disposition["repo_scope"] = replacement
-	}
 }
 
 func normalizeParentReviewSuccess(payload map[string]any, request map[string]any) {
@@ -1098,8 +1081,8 @@ func normalizeParentReviewSuccess(payload map[string]any, request map[string]any
 		normalized[key] = value
 	}
 	normalized["kind"] = "completed"
-	if stringValue(normalized["repo_scope"]) == "" {
-		normalized["repo_scope"] = defaultParentReviewRepoScope(request)
+	if len(stringSliceValue(normalized["slot_scopes"])) == 0 {
+		normalized["slot_scopes"] = []string{defaultParentReviewSlotScope(request)}
 	}
 	if stringValue(normalized["summary"]) == "" {
 		normalized["summary"] = stringValue(payload["summary"])
@@ -1113,8 +1096,8 @@ func normalizeParentReviewSuccess(payload map[string]any, request map[string]any
 	payload["review_disposition"] = normalized
 }
 
-func defaultParentReviewRepoScope(request map[string]any) string {
-	scopes := validWorkerReviewDispositionRepoScopes(request, true)
+func defaultParentReviewSlotScope(request map[string]any) string {
+	scopes := validWorkerReviewDispositionSlotScopes(request, true)
 	for _, scope := range scopes {
 		if scope != "unresolved" {
 			return scope
@@ -1167,8 +1150,8 @@ func mapValue(value any) map[string]any {
 	return values
 }
 
-func validWorkerReviewDispositionRepoScopes(request map[string]any, includeUnresolved bool) []string {
-	scopes := configuredWorkerReviewDispositionRepoScopes()
+func validWorkerReviewDispositionSlotScopes(request map[string]any, includeUnresolved bool) []string {
+	scopes := configuredWorkerReviewDispositionSlotScopes()
 	if len(scopes) == 0 {
 		for scope := range mapValue(request["slot_paths"]) {
 			if scope != "" && !containsString(scopes, scope) {
@@ -1182,7 +1165,7 @@ func validWorkerReviewDispositionRepoScopes(request map[string]any, includeUnres
 	return scopes
 }
 
-func configuredWorkerReviewDispositionRepoScopes() []string {
+func configuredWorkerReviewDispositionSlotScopes() []string {
 	config := map[string]any{}
 	if err := readJSONFile(workerLauncherConfigPath(), &config); err != nil {
 		return nil
@@ -1191,7 +1174,7 @@ func configuredWorkerReviewDispositionRepoScopes() []string {
 	if !ok {
 		return nil
 	}
-	rawScopes, ok := executor["review_disposition_repo_scopes"].([]any)
+	rawScopes, ok := executor["review_disposition_slot_scopes"].([]any)
 	if !ok {
 		return nil
 	}
@@ -1203,6 +1186,43 @@ func configuredWorkerReviewDispositionRepoScopes() []string {
 		}
 	}
 	return scopes
+}
+
+func validateWorkerReviewDispositionSlotScopes(value any) []string {
+	scopes := stringSliceValue(value)
+	if len(scopes) == 0 {
+		return []string{"review_disposition.slot_scopes must be a non-empty array of strings"}
+	}
+	return nil
+}
+
+func stringSliceValue(value any) []string {
+	raw, ok := value.([]any)
+	if !ok {
+		if typed, ok := value.([]string); ok {
+			return typed
+		}
+		return nil
+	}
+	values := []string{}
+	for _, entry := range raw {
+		scope := stringValue(entry)
+		if strings.TrimSpace(scope) == "" {
+			return nil
+		}
+		values = append(values, scope)
+	}
+	return values
+}
+
+func invalidStringMembers(values []string, valid []string) []string {
+	invalid := []string{}
+	for _, value := range values {
+		if !containsString(valid, value) {
+			invalid = append(invalid, value)
+		}
+	}
+	return invalid
 }
 
 func fileExists(path string) bool {

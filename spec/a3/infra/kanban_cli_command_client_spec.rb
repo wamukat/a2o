@@ -132,7 +132,7 @@ RSpec.describe A3::Infra::KanbanCommandClient do
 
     disposition = A3::Domain::ReviewDisposition.new(
       kind: :follow_up_child,
-      repo_scope: :repo_beta,
+      slot_scopes: [:repo_beta],
       summary: "contract coverage",
       description: "verify relation and labels",
       finding_key: "finding-contract"

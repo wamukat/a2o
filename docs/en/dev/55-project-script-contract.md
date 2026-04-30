@@ -115,7 +115,7 @@ Worker commands write one JSON object to `A2O_WORKER_RESULT_PATH`. Required keys
 - `observed_state`
 - `rework_required`
 
-Implementation success also includes `changed_files` keyed by repo slot. Review and parent review may include `review_disposition` according to the worker response schema.
+Implementation success also includes `changed_files` keyed by repo slot. Review and parent review may include `review_disposition` according to the worker response schema. The canonical review disposition scope key is `slot_scopes`, a non-empty array of repo slot names such as `["repo_alpha"]` or `["repo_alpha", "repo_beta"]`; `repo_scope` is not accepted in `review_disposition`.
 
 ## Cache And Artifacts
 

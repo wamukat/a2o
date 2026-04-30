@@ -376,7 +376,8 @@ module A3
 
         fields = []
         fields << disposition["kind"] if present?(disposition["kind"])
-        fields << "repo_scope=#{single_line(disposition['repo_scope'])}" if present?(disposition["repo_scope"])
+        slot_scopes = Array(disposition["slot_scopes"]).map { |scope| single_line(scope) }.reject(&:empty?)
+        fields << "slot_scopes=#{slot_scopes.join(',')}" unless slot_scopes.empty?
         fields << "finding_key=#{single_line(disposition['finding_key'])}" if present?(disposition["finding_key"])
         lines << "レビュー結果: #{fields.join(' ')}" unless fields.empty?
         lines << "レビュー要約: #{single_line(disposition['summary'])}" if present?(disposition["summary"])
@@ -424,9 +425,11 @@ module A3
         end
         disposition = bundle["review_disposition"]
         if disposition.is_a?(Hash)
-          review_fields = %w[kind repo_scope finding_key].filter_map do |key|
+          review_fields = %w[kind finding_key].filter_map do |key|
             "#{key}=#{single_line(disposition[key])}" if present?(disposition[key])
           end
+          slot_scopes = Array(disposition["slot_scopes"]).map { |scope| single_line(scope) }.reject(&:empty?)
+          review_fields.insert(1, "slot_scopes=#{slot_scopes.join(',')}") unless slot_scopes.empty?
           fields << "review_disposition=#{review_fields.join(' ')}" unless review_fields.empty?
         end
         truncate_comment_value(fields.reject(&:empty?).join(" "))

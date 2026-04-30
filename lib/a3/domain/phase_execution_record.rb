@@ -49,7 +49,7 @@ module A3
           runtime_snapshot: runtime_snapshot,
           review_disposition: execution.review_disposition && {
             "kind" => execution.review_disposition.kind.to_s,
-            "repo_scope" => execution.review_disposition.repo_scope.to_s,
+            "slot_scopes" => execution.review_disposition.slot_scopes.map(&:to_s),
             "summary" => execution.review_disposition.summary,
             "description" => execution.review_disposition.description,
             "finding_key" => execution.review_disposition.finding_key

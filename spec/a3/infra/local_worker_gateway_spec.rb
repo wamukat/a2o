@@ -398,7 +398,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       "changed_files" => { "repo_beta" => ["src/main.rb"] },
       "review_disposition" => {
         "kind" => "completed",
-        "repo_scope" => "repo_beta",
+        "slot_scopes" => ["repo_beta"],
         "summary" => "self-review clean",
         "description" => "Implementation self-review found no outstanding issues.",
         "finding_key" => "completed-no-findings"
@@ -517,7 +517,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       "changed_files" => { "repo_beta" => ["declared.txt"] },
       "review_disposition" => {
         "kind" => "completed",
-        "repo_scope" => "repo_beta",
+        "slot_scopes" => ["repo_beta"],
         "summary" => "self-review clean",
         "description" => "Implementation self-review found no outstanding issues.",
         "finding_key" => "completed-no-findings"
@@ -615,7 +615,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       "rework_required" => false,
       "review_disposition" => {
         "kind" => "completed",
-        "repo_scope" => "both",
+        "slot_scopes" => %w[repo_alpha repo_beta],
         "summary" => "No findings",
         "description" => "Parent integration snapshot is clean.",
         "finding_key" => "completed-no-findings"
@@ -623,7 +623,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     }
     gateway = described_class.new(
       command_runner: command_runner,
-      worker_protocol: A3::Infra::WorkerProtocol.new(review_disposition_repo_scopes: %w[repo_alpha repo_beta both])
+      worker_protocol: A3::Infra::WorkerProtocol.new(review_disposition_slot_scopes: %w[repo_alpha repo_beta])
     )
 
     allow(command_runner).to receive(:run) do
@@ -709,7 +709,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     }
     gateway = described_class.new(
       command_runner: command_runner,
-      worker_protocol: A3::Infra::WorkerProtocol.new(review_disposition_repo_scopes: %w[repo_alpha repo_beta both])
+      worker_protocol: A3::Infra::WorkerProtocol.new(review_disposition_slot_scopes: %w[repo_alpha repo_beta])
     )
 
     allow(command_runner).to receive(:run) do
@@ -729,7 +729,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     expect(execution.success?).to be(true)
     expect(execution.response_bundle.fetch("review_disposition")).to include(
       "kind" => "completed",
-      "repo_scope" => "repo_alpha",
+      "slot_scopes" => ["repo_alpha"],
       "summary" => "parent review clean",
       "finding_key" => "parent-review-completed"
     )
@@ -800,7 +800,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       "changed_files" => nil,
       "review_disposition" => {
         "kind" => "completed",
-        "repo_scope" => "both",
+        "slot_scopes" => %w[repo_alpha repo_beta],
         "summary" => "No findings",
         "description" => "Parent integration snapshot is clean.",
         "finding_key" => "completed-no-findings"
@@ -808,7 +808,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     }
     gateway = described_class.new(
       command_runner: command_runner,
-      worker_protocol: A3::Infra::WorkerProtocol.new(review_disposition_repo_scopes: %w[repo_alpha repo_beta both])
+      worker_protocol: A3::Infra::WorkerProtocol.new(review_disposition_slot_scopes: %w[repo_alpha repo_beta])
     )
 
     allow(command_runner).to receive(:run) do
@@ -843,7 +843,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       "changed_files" => { "repo_beta" => ["nested/actual.txt"] },
       "review_disposition" => {
         "kind" => "completed",
-        "repo_scope" => "repo_beta",
+        "slot_scopes" => ["repo_beta"],
         "summary" => "No findings",
         "description" => "Implementation finished and final self-review found no outstanding issues.",
         "finding_key" => "completed-no-findings"
@@ -870,7 +870,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     expect(execution.success?).to be(true)
     expect(execution.response_bundle.fetch("review_disposition")).to eq(
       "kind" => "completed",
-      "repo_scope" => "repo_beta",
+      "slot_scopes" => ["repo_beta"],
       "summary" => "No findings",
       "description" => "Implementation finished and final self-review found no outstanding issues.",
       "finding_key" => "completed-no-findings"
@@ -931,7 +931,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       "rework_required" => false,
       "review_disposition" => {
         "kind" => "banana",
-        "repo_scope" => "both",
+        "slot_scopes" => ["repo_alpha"],
         "summary" => "No findings",
         "description" => "Parent integration snapshot is clean.",
         "finding_key" => "completed-no-findings"
@@ -974,7 +974,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       "changed_files" => { "repo_beta" => ["declared.txt"] },
       "review_disposition" => {
         "kind" => "follow_up_child",
-        "repo_scope" => "repo_beta",
+        "slot_scopes" => ["repo_beta"],
         "summary" => "No findings",
         "description" => "Invalid implementation evidence.",
         "finding_key" => "invalid-implementation-evidence"
@@ -1113,7 +1113,7 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
       "changed_files" => { "repo_beta" => [1, 2] },
       "review_disposition" => {
         "kind" => "completed",
-        "repo_scope" => "repo_beta",
+        "slot_scopes" => ["repo_beta"],
         "summary" => "self-review clean",
         "description" => "Implementation self-review found no outstanding issues.",
         "finding_key" => "completed-no-findings"

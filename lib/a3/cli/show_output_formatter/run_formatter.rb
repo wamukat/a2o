@@ -180,7 +180,8 @@ module A3
         def append_review_disposition_lines(result, review_disposition)
           return unless review_disposition.is_a?(Hash)
 
-          result << "review_disposition kind=#{review_disposition['kind']} repo_scope=#{review_disposition['repo_scope']} finding_key=#{review_disposition['finding_key']}"
+          slot_scopes = Array(review_disposition["slot_scopes"]).map(&:to_s).reject(&:empty?)
+          result << "review_disposition kind=#{review_disposition['kind']} slot_scopes=#{slot_scopes.join(',')} finding_key=#{review_disposition['finding_key']}"
           result << "review_disposition_summary=#{review_disposition['summary']}" if review_disposition["summary"]
           result << "review_disposition_description=#{review_disposition['description']}" if review_disposition["description"]
         end

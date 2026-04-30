@@ -380,7 +380,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
           diagnostics: {},
           review_disposition: {
             "kind" => "completed",
-            "repo_scope" => "repo_alpha",
+            "slot_scopes" => ["repo_alpha"],
             "summary" => "No findings",
             "description" => "Implementation finished and final self-review found no outstanding issues.",
             "finding_key" => "completed-no-findings"
@@ -393,7 +393,7 @@ RSpec.describe A3::Domain::OperatorInspectionReadModel do
       expect(result.latest_execution.phase).to eq(:implementation)
       expect(result.latest_execution.review_disposition).to eq(
         "kind" => "completed",
-        "repo_scope" => "repo_alpha",
+        "slot_scopes" => ["repo_alpha"],
         "summary" => "No findings",
         "description" => "Implementation finished and final self-review found no outstanding issues.",
         "finding_key" => "completed-no-findings"

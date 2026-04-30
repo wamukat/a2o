@@ -294,7 +294,8 @@ module A3
 
         fields = []
         fields << disposition["kind"] if present?(disposition["kind"])
-        fields << "repo_scope=#{single_line(disposition['repo_scope'])}" if present?(disposition["repo_scope"])
+        slot_scopes = Array(disposition["slot_scopes"]).map { |scope| single_line(scope) }.reject(&:empty?)
+        fields << "slot_scopes=#{slot_scopes.join(',')}" unless slot_scopes.empty?
         fields << "finding_key=#{single_line(disposition['finding_key'])}" if present?(disposition["finding_key"])
         lines << "review=#{fields.join(' ')}" unless fields.empty?
         lines << "review_summary=#{single_line(disposition['summary'])}" if present?(disposition["summary"])

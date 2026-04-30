@@ -9,9 +9,9 @@ require "a3/domain/skill_feedback"
 module A3
   module Infra
     class WorkerProtocol
-      def initialize(repo_scope_aliases: {}, review_disposition_repo_scopes: nil)
+      def initialize(repo_scope_aliases: {}, review_disposition_slot_scopes: nil)
         @repo_scope_aliases = normalize_repo_scope_aliases(repo_scope_aliases)
-        @review_disposition_repo_scopes = normalize_configured_review_disposition_repo_scopes(review_disposition_repo_scopes)
+        @review_disposition_slot_scopes = normalize_configured_review_disposition_slot_scopes(review_disposition_slot_scopes)
       end
 
       def metadata_dir(workspace)
@@ -496,26 +496,31 @@ module A3
             return errors
           end
 
-          %w[kind repo_scope summary description finding_key].each do |key|
+          %w[kind summary description finding_key].each do |key|
             errors << "review_disposition.#{key} must be present" unless disposition[key].is_a?(String)
           end
+          errors << "review_disposition.repo_scope is not supported; use review_disposition.slot_scopes" if disposition.key?("repo_scope")
+          slot_scope_errors = validate_review_disposition_slot_scopes(disposition["slot_scopes"])
+          errors.concat(slot_scope_errors)
           if parent_review
             valid_kinds = %w[completed follow_up_child blocked]
-            valid_repo_scopes = valid_review_disposition_repo_scopes(workspace, include_unresolved: true)
+            valid_slot_scopes = valid_review_disposition_slot_scopes(workspace, include_unresolved: true)
             unless valid_kinds.include?(disposition["kind"])
               errors << "review_disposition.kind must be one of #{valid_kinds.join(', ')}"
             end
-            unless valid_repo_scopes.include?(disposition["repo_scope"])
-              errors << "review_disposition.repo_scope must be one of #{valid_repo_scopes.join(', ')}"
+            invalid_slot_scopes = Array(disposition["slot_scopes"]) - valid_slot_scopes
+            unless invalid_slot_scopes.empty?
+              errors << "review_disposition.slot_scopes must be one of #{valid_slot_scopes.join(', ')}"
             end
             if worker_response["success"] == true && disposition["kind"] != "completed"
               errors << "review_disposition.kind must be completed when success is true for parent review"
             end
           elsif implementation_phase
-            valid_repo_scopes = valid_review_disposition_repo_scopes(workspace, include_unresolved: false)
+            valid_slot_scopes = valid_review_disposition_slot_scopes(workspace, include_unresolved: false)
             errors << "review_disposition.kind must be completed for implementation evidence" unless disposition["kind"] == "completed"
-            unless valid_repo_scopes.include?(disposition["repo_scope"])
-              errors << "review_disposition.repo_scope must be one of #{valid_repo_scopes.join(', ')}"
+            invalid_slot_scopes = Array(disposition["slot_scopes"]) - valid_slot_scopes
+            unless invalid_slot_scopes.empty?
+              errors << "review_disposition.slot_scopes must be one of #{valid_slot_scopes.join(', ')}"
             end
           end
         end
@@ -574,10 +579,6 @@ module A3
         disposition = worker_response["review_disposition"]
         normalize_skill_feedback!(worker_response)
         normalize_parent_review_success!(worker_response, workspace: workspace) if parent_review?(expected_phase: expected_phase, expected_task_kind: expected_task_kind)
-        disposition = worker_response["review_disposition"]
-        return unless disposition.is_a?(Hash)
-
-        disposition["repo_scope"] = @repo_scope_aliases.fetch(disposition["repo_scope"], disposition["repo_scope"])
       end
 
       def parent_review?(expected_phase:, expected_task_kind:)
@@ -593,15 +594,15 @@ module A3
 
         normalized_disposition = disposition.is_a?(Hash) ? disposition.dup : {}
         normalized_disposition["kind"] = "completed"
-        normalized_disposition["repo_scope"] = default_parent_review_repo_scope(workspace) unless present_string?(normalized_disposition["repo_scope"])
+        normalized_disposition["slot_scopes"] = [default_parent_review_slot_scope(workspace)] if Array(normalized_disposition["slot_scopes"]).empty?
         normalized_disposition["summary"] = worker_response["summary"] unless present_string?(normalized_disposition["summary"])
         normalized_disposition["description"] = worker_response["summary"] unless present_string?(normalized_disposition["description"])
         normalized_disposition["finding_key"] = "parent-review-completed" unless present_string?(normalized_disposition["finding_key"])
         worker_response["review_disposition"] = normalized_disposition
       end
 
-      def default_parent_review_repo_scope(workspace)
-        valid_review_disposition_repo_scopes(workspace, include_unresolved: true)
+      def default_parent_review_slot_scope(workspace)
+        valid_review_disposition_slot_scopes(workspace, include_unresolved: true)
           .reject { |scope| scope == "unresolved" }
           .fetch(0, "unresolved")
       end
@@ -813,24 +814,32 @@ module A3
         A3::Domain::SkillFeedback.targets
       end
 
-      def normalize_configured_review_disposition_repo_scopes(scopes)
+      def normalize_configured_review_disposition_slot_scopes(scopes)
         return nil if scopes.nil?
         unless scopes.is_a?(Array) && scopes.all? { |scope| scope.is_a?(String) && !scope.empty? }
-          raise A3::Domain::ConfigurationError, "review_disposition_repo_scopes must be an array of non-empty strings"
+          raise A3::Domain::ConfigurationError, "review_disposition_slot_scopes must be an array of non-empty strings"
         end
 
         scopes.uniq
       end
 
-      def valid_review_disposition_repo_scopes(workspace, include_unresolved:)
-        scopes = @review_disposition_repo_scopes || inferred_review_disposition_repo_scopes(workspace)
+      def valid_review_disposition_slot_scopes(workspace, include_unresolved:)
+        scopes = @review_disposition_slot_scopes || inferred_review_disposition_slot_scopes(workspace)
         scopes = scopes.reject { |scope| scope == "unresolved" } unless include_unresolved
         scopes = scopes + ["unresolved"] if include_unresolved
         scopes.uniq
       end
 
-      def inferred_review_disposition_repo_scopes(workspace)
+      def inferred_review_disposition_slot_scopes(workspace)
         workspace.slot_paths.keys.map(&:to_s).reject(&:empty?).uniq
+      end
+
+      def validate_review_disposition_slot_scopes(value)
+        unless value.is_a?(Array) && !value.empty? && value.all? { |scope| scope.is_a?(String) && !scope.strip.empty? }
+          return ["review_disposition.slot_scopes must be a non-empty array of strings"]
+        end
+
+        []
       end
 
       def changed_files_from_workspace(workspace)

@@ -766,7 +766,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       "changed_files" => {},
       "review_disposition" => {
         "kind" => "completed",
-        "repo_scope" => "repo_beta",
+        "slot_scopes" => ["repo_beta"],
         "summary" => "done",
         "description" => "done",
         "finding_key" => "none"
@@ -900,7 +900,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
           "changed_files" => {},
           "review_disposition" => {
             "kind" => "completed",
-            "repo_scope" => "repo_beta",
+            "slot_scopes" => ["repo_beta"],
             "summary" => "done",
             "description" => "done",
             "finding_key" => "none"

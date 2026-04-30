@@ -498,7 +498,7 @@ RSpec.describe A3::Application::RunWorkerPhase do
         response_bundle: {
           "review_disposition" => {
             "kind" => "completed",
-            "repo_scope" => "repo_alpha",
+            "slot_scopes" => ["repo_alpha"],
             "summary" => "No findings",
             "description" => "Parent review completed without outstanding findings.",
             "finding_key" => "completed-no-findings"

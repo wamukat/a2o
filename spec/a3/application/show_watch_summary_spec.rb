@@ -481,7 +481,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
           summary: "implementation completed",
           review_disposition: {
             "kind" => "completed",
-            "repo_scope" => "repo_alpha",
+            "slot_scopes" => ["repo_alpha"],
             "summary" => "self-review found no findings",
             "description" => "reviewed diff and tests",
             "finding_key" => "implementation-review-clean"
@@ -520,7 +520,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
           summary: "verification completed",
           review_disposition: {
             "kind" => "completed",
-            "repo_scope" => "repo_alpha",
+            "slot_scopes" => ["repo_alpha"],
             "summary" => "verification metadata should not override implementation review",
             "description" => "future non-review phase metadata",
             "finding_key" => "verification-metadata"
@@ -552,7 +552,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
     result = use_case.call
 
     detail_lines = result.tasks.find { |item| item.ref == "Sample#reviewed" }.blocked_lines
-    expect(detail_lines).to include("review=completed repo_scope=repo_alpha finding_key=implementation-review-clean")
+    expect(detail_lines).to include("review=completed slot_scopes=repo_alpha finding_key=implementation-review-clean")
     expect(detail_lines).to include("review_summary=self-review found no findings")
   end
 

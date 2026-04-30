@@ -144,7 +144,7 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
       response_bundle: {
         "review_disposition" => {
           "kind" => "completed",
-          "repo_scope" => "repo_alpha",
+          "slot_scopes" => ["repo_alpha"],
           "summary" => "No findings",
           "description" => "Implementation finished and final self-review found no outstanding issues.",
           "finding_key" => "completed-no-findings"
@@ -170,7 +170,7 @@ RSpec.describe A3::Application::PhaseExecutionFlow do
 
     expect(result.run.phase_records.last.execution_record.review_disposition).to eq(
       "kind" => "completed",
-      "repo_scope" => "repo_alpha",
+      "slot_scopes" => ["repo_alpha"],
       "summary" => "No findings",
       "description" => "Implementation finished and final self-review found no outstanding issues.",
       "finding_key" => "completed-no-findings"

@@ -86,9 +86,7 @@ func runWorkerValidateResult(args []string, stdout io.Writer, stderr io.Writer) 
 	requestPath := flags.String("request", "", "worker request JSON path")
 	resultPath := flags.String("result", "", "worker result JSON path")
 	var reviewScopes stringListFlag
-	var repoScopeAliases stringListFlag
-	flags.Var(&reviewScopes, "review-scope", "valid review_disposition repo_scope; repeat to match executor configuration")
-	flags.Var(&repoScopeAliases, "repo-scope-alias", "review_disposition repo_scope alias in from=to form; repeat to match executor configuration")
+	flags.Var(&reviewScopes, "review-slot-scope", "valid review_disposition slot_scopes entry; repeat to match executor configuration")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -109,13 +107,8 @@ func runWorkerValidateResult(args []string, stdout io.Writer, stderr io.Writer) 
 	if err := readWorkerJSONFile(*resultPath, &result); err != nil {
 		return fmt.Errorf("read worker result: %w", err)
 	}
-	aliases, err := parseWorkerRepoScopeAliases(repoScopeAliases)
-	if err != nil {
-		return err
-	}
 	errors := validatePublicWorkerPayload(result, request, workerValidationOptions{
-		ReviewScopes:     reviewScopes,
-		RepoScopeAliases: aliases,
+		ReviewScopes: reviewScopes,
 	})
 	if len(errors) == 0 {
 		fmt.Fprintln(stdout, "worker_protocol_check name=result_schema status=ok")
@@ -142,8 +135,7 @@ func readWorkerJSONFile(path string, target any) error {
 }
 
 type workerValidationOptions struct {
-	ReviewScopes     []string
-	RepoScopeAliases map[string]string
+	ReviewScopes []string
 }
 
 func workerScaffoldTemplate(language string) (string, os.FileMode, error) {
@@ -278,29 +270,19 @@ func validatePublicWorkerPayload(payload map[string]any, request map[string]any,
 				errors = append(errors, "review_disposition must be an object")
 				return errors
 			}
-			for _, key := range []string{"kind", "repo_scope", "summary", "description", "finding_key"} {
+			for _, key := range []string{"kind", "summary", "description", "finding_key"} {
 				if _, ok := disposition[key].(string); !ok {
 					errors = append(errors, "review_disposition."+key+" must be a string")
 				}
 			}
+			if _, ok := disposition["repo_scope"]; ok {
+				errors = append(errors, "review_disposition.repo_scope is not supported; use review_disposition.slot_scopes")
+			}
+			errors = append(errors, validatePublicReviewDispositionSlotScopes(disposition["slot_scopes"])...)
 			errors = append(errors, validateReviewDisposition(disposition, request, options)...)
 		}
 	}
 	return errors
-}
-
-func parseWorkerRepoScopeAliases(values []string) (map[string]string, error) {
-	aliases := map[string]string{}
-	for _, value := range values {
-		left, right, ok := strings.Cut(value, "=")
-		left = strings.TrimSpace(left)
-		right = strings.TrimSpace(right)
-		if !ok || left == "" || right == "" {
-			return nil, fmt.Errorf("--repo-scope-alias must use from=to with non-empty values")
-		}
-		aliases[left] = right
-	}
-	return aliases, nil
 }
 
 func validateChangedFiles(changedFiles map[string]any) []string {
@@ -327,18 +309,15 @@ func validateChangedFiles(changedFiles map[string]any) []string {
 func validateReviewDisposition(disposition map[string]any, request map[string]any, options workerValidationOptions) []string {
 	phase := workerStringValue(request["phase"])
 	parentReview := phase == "review" && workerNestedString(request, "phase_runtime", "task_kind") == "parent"
-	validScopes := validReviewDispositionRepoScopes(request, parentReview, options)
-	repoScope := workerStringValue(disposition["repo_scope"])
-	if replacement := options.RepoScopeAliases[repoScope]; replacement != "" {
-		repoScope = replacement
-	}
+	validScopes := validReviewDispositionSlotScopes(request, parentReview, options)
+	slotScopes := workerStringSliceValue(disposition["slot_scopes"])
 	errors := []string{}
 	if parentReview {
 		if !containsString([]string{"completed", "follow_up_child", "blocked"}, workerStringValue(disposition["kind"])) {
 			errors = append(errors, "review_disposition.kind must be one of completed, follow_up_child, blocked")
 		}
-		if !containsString(validScopes, repoScope) {
-			errors = append(errors, "review_disposition.repo_scope must be one of "+strings.Join(validScopes, ", "))
+		if invalid := invalidWorkerStringMembers(slotScopes, validScopes); len(invalid) > 0 {
+			errors = append(errors, "review_disposition.slot_scopes must be one of "+strings.Join(validScopes, ", "))
 		}
 		return errors
 	}
@@ -346,14 +325,14 @@ func validateReviewDisposition(disposition map[string]any, request map[string]an
 		if workerStringValue(disposition["kind"]) != "completed" {
 			errors = append(errors, "review_disposition.kind must be completed for implementation evidence")
 		}
-		if !containsString(validScopes, repoScope) {
-			errors = append(errors, "review_disposition.repo_scope must be one of "+strings.Join(validScopes, ", "))
+		if invalid := invalidWorkerStringMembers(slotScopes, validScopes); len(invalid) > 0 {
+			errors = append(errors, "review_disposition.slot_scopes must be one of "+strings.Join(validScopes, ", "))
 		}
 	}
 	return errors
 }
 
-func validReviewDispositionRepoScopes(request map[string]any, includeUnresolved bool, options workerValidationOptions) []string {
+func validReviewDispositionSlotScopes(request map[string]any, includeUnresolved bool, options workerValidationOptions) []string {
 	scopes := []string{}
 	if len(options.ReviewScopes) > 0 {
 		for _, scope := range options.ReviewScopes {
@@ -372,6 +351,14 @@ func validReviewDispositionRepoScopes(request map[string]any, includeUnresolved 
 		scopes = append(scopes, "unresolved")
 	}
 	return scopes
+}
+
+func validatePublicReviewDispositionSlotScopes(value any) []string {
+	scopes := workerStringSliceValue(value)
+	if len(scopes) == 0 {
+		return []string{"review_disposition.slot_scopes must be a non-empty array of strings"}
+	}
+	return nil
 }
 
 func publicWorkerRequiredFields(request map[string]any) []string {
@@ -434,6 +421,35 @@ func workerStringValue(value any) string {
 	return ""
 }
 
+func workerStringSliceValue(value any) []string {
+	if typed, ok := value.([]string); ok {
+		return typed
+	}
+	raw, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	values := []string{}
+	for _, entry := range raw {
+		scope := workerStringValue(entry)
+		if strings.TrimSpace(scope) == "" {
+			return nil
+		}
+		values = append(values, scope)
+	}
+	return values
+}
+
+func invalidWorkerStringMembers(values []string, valid []string) []string {
+	invalid := []string{}
+	for _, value := range values {
+		if !containsString(valid, value) {
+			invalid = append(invalid, value)
+		}
+	}
+	return invalid
+}
+
 func workerNestedString(value map[string]any, keys ...string) string {
 	var current any = value
 	for _, key := range keys {
@@ -467,7 +483,7 @@ def main():
     parser.add_argument("--result", required=True)
     args = parser.parse_args()
     request = request_from_stdin()
-    repo_scope = next(iter(request.get("slot_paths", {"app": ""})), "app")
+    slot_scope = next(iter(request.get("slot_paths", {"app": ""})), "app")
     result = {
         "task_ref": request.get("task_ref", ""),
         "run_ref": request.get("run_ref", ""),
@@ -480,7 +496,7 @@ def main():
         "changed_files": {},
         "review_disposition": {
             "kind": "completed",
-            "repo_scope": repo_scope,
+            "slot_scopes": [slot_scope],
             "summary": "scaffold worker self-review clean",
             "description": "No changes were required by the scaffold worker.",
             "finding_key": "none",
@@ -668,7 +684,7 @@ end
 request = payload.fetch("request", payload)
 request = {} unless request.is_a?(Hash)
 slot_paths = request.fetch("slot_paths", { "app" => "" })
-repo_scope = slot_paths.is_a?(Hash) && !slot_paths.empty? ? slot_paths.keys.first.to_s : "app"
+slot_scope = slot_paths.is_a?(Hash) && !slot_paths.empty? ? slot_paths.keys.first.to_s : "app"
 
 result = {
   "task_ref" => request.fetch("task_ref", ""),
@@ -682,7 +698,7 @@ result = {
   "changed_files" => {},
   "review_disposition" => {
     "kind" => "completed",
-    "repo_scope" => repo_scope,
+    "slot_scopes" => [slot_scope],
     "summary" => "scaffold worker self-review clean",
     "description" => "No changes were required by the scaffold worker.",
     "finding_key" => "none"
@@ -736,7 +752,7 @@ json_escape() {
 task_ref="$(extract_json_string task_ref)"
 run_ref="$(extract_json_string run_ref)"
 phase="$(extract_json_string phase)"
-repo_scope="$(
+slot_scope="$(
   awk '
     /"slot_paths"[[:space:]]*:[[:space:]]*\{/ { in_slot_paths=1; next }
     in_slot_paths && /}/ { exit }
@@ -747,8 +763,8 @@ repo_scope="$(
     }
   ' "$bundle_path"
 )"
-if [[ -z "$repo_scope" ]]; then
-  repo_scope="app"
+if [[ -z "$slot_scope" ]]; then
+  slot_scope="app"
 fi
 
 cat > "$result_path" <<JSON
@@ -764,7 +780,7 @@ cat > "$result_path" <<JSON
   "changed_files": {},
   "review_disposition": {
     "kind": "completed",
-    "repo_scope": "$(json_escape "$repo_scope")",
+    "slot_scopes": ["$(json_escape "$slot_scope")"],
     "summary": "scaffold worker self-review clean",
     "description": "No changes were required by the scaffold worker.",
     "finding_key": "none"
@@ -796,11 +812,11 @@ func main() {
 	if !ok {
 		request = payload
 	}
-	repoScope := "app"
+	slotScope := "app"
 	if slotPaths, ok := request["slot_paths"].(map[string]any); ok {
 		for slotName := range slotPaths {
 			if slotName != "" {
-				repoScope = slotName
+				slotScope = slotName
 				break
 			}
 		}
@@ -818,7 +834,7 @@ func main() {
 		"changed_files":    map[string]any{},
 		"review_disposition": map[string]any{
 			"kind":        "completed",
-			"repo_scope":  repoScope,
+			"slot_scopes": []string{slotScope},
 			"summary":     "scaffold worker self-review clean",
 			"description": "No changes were required by the scaffold worker.",
 			"finding_key": "none",

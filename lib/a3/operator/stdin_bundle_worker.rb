@@ -88,7 +88,7 @@ def failure(request, summary:, command:, observed_state:, diagnostics: {})
   if request["phase"] == "review" && request.dig("phase_runtime", "task_kind").to_s == "parent"
     payload["review_disposition"] = {
       "kind" => "blocked",
-      "repo_scope" => "unresolved",
+      "slot_scopes" => ["unresolved"],
       "summary" => summary,
       "description" => "Parent review failed before producing a canonical review disposition. observed_state=#{observed_state}",
       "finding_key" => "parent-review-runtime-failure"
@@ -108,7 +108,7 @@ end
 def bundle_for(request)
   phase = request["phase"].to_s
   parent_review = phase == "review" && request.dig("phase_runtime", "task_kind").to_s == "parent"
-  review_scopes = valid_review_disposition_repo_scopes(request, include_unresolved: phase == "review")
+  review_scopes = valid_review_disposition_slot_scopes(request, include_unresolved: phase == "review")
   instruction = +"You are the A2O worker. Work only under slot_paths. Follow AGENTS.md and repo Taskfile conventions. "
   instruction << "Do not update kanban directly. Treat request.task_packet as the primary source of truth for what to implement or review before inferring from repository context. Return only the final JSON object required by response_contract."
   if phase == "implementation"
@@ -117,7 +117,7 @@ def bundle_for(request)
     instruction << " If request.phase_runtime.prior_review_feedback is present, treat it as mandatory rework input from the previous review and directly address each finding before returning."
   elsif phase == "review"
     if request.dig("phase_runtime", "task_kind").to_s == "parent"
-      instruction << " For parent review, include review_disposition unless you return clarification_request. Use kind=completed when review is clean, kind=follow_up_child with a configured slot repo_scope for code follow-up, and kind=blocked with repo_scope unresolved when the finding should block the parent. Use clarification_request instead when the finding needs requester input rather than code follow-up or technical blocking. Valid repo_scope values for this request: #{review_scopes.join(', ')}. Parent review must not rely on rework_required routing."
+      instruction << " For parent review, include review_disposition unless you return clarification_request. Use kind=completed when review is clean, kind=follow_up_child with slot_scopes for code follow-up, and kind=blocked with slot_scopes=[unresolved] when the finding should block the parent. Use clarification_request instead when the finding needs requester input rather than code follow-up or technical blocking. Valid slot_scopes values for this request: #{review_scopes.join(', ')}. Parent review must not rely on rework_required routing."
     else
       instruction << " For review, report success only when you found no findings; otherwise return success=false with a short summary and set rework_required=true for code findings that should go back to implementation. Reserve rework_required=false for infrastructure or launch failures that should stay blocked. For review findings, you may set failing_command to null."
     end
@@ -149,10 +149,10 @@ def bundle_for(request)
           "For implementation success, you may include review_disposition when the final self-review is clean.",
           "For review failures caused by findings, include rework_required=true.",
           "Copy task_ref, run_ref, and phase exactly from request. If you are uncertain, omit them rather than inventing values.",
-          "For parent review, include review_disposition with kind, repo_scope, summary, description, and finding_key unless you return clarification_request.",
+          "For parent review, include review_disposition with kind, slot_scopes, summary, description, and finding_key unless you return clarification_request.",
           "For parent review success with no findings, set success=true, observed_state=null, rework_required=false, and review_disposition.kind=completed.",
-          "For parent review code follow-up findings, set success=false, observed_state to a concise string such as review_findings, rework_required=false, and review_disposition.kind=follow_up_child with a configured repo_scope.",
-          "For parent review blocked findings, set success=false, observed_state to a concise string such as blocked_finding, rework_required=false, and review_disposition.kind=blocked with repo_scope=unresolved.",
+          "For parent review code follow-up findings, set success=false, observed_state to a concise string such as review_findings, rework_required=false, and review_disposition.kind=follow_up_child with configured slot_scopes.",
+          "For parent review blocked findings, set success=false, observed_state to a concise string such as blocked_finding, rework_required=false, and review_disposition.kind=blocked with slot_scopes=[unresolved].",
           "Optionally include skill_feedback when this run revealed reusable project or A2O skill guidance. Use category, summary, proposal.target, and optional repo_scope, skill_path, confidence, evidence, and proposal.suggested_patch. Do not edit skill files directly from this field."
         ],
         "examples" => parent_review ? parent_review_response_examples(request) : []
@@ -175,8 +175,8 @@ def parent_review_response_examples(request)
   task_ref = request["task_ref"]
   run_ref = request["run_ref"]
   phase = request["phase"] || "review"
-  scopes = valid_review_disposition_repo_scopes(request, include_unresolved: true).reject { |scope| scope == "unresolved" }
-  repo_scope = scopes.first || "repo_alpha"
+  scopes = valid_review_disposition_slot_scopes(request, include_unresolved: true).reject { |scope| scope == "unresolved" }
+  slot_scopes = [scopes.first || "repo_alpha"]
   [
     {
       "name" => "parent_review_clean",
@@ -191,7 +191,7 @@ def parent_review_response_examples(request)
         "rework_required" => false,
         "review_disposition" => {
           "kind" => "completed",
-          "repo_scope" => repo_scope,
+          "slot_scopes" => slot_scopes,
           "summary" => "No findings",
           "description" => "The parent integration branch is ready to complete.",
           "finding_key" => "no-findings"
@@ -211,7 +211,7 @@ def parent_review_response_examples(request)
         "rework_required" => false,
         "review_disposition" => {
           "kind" => "follow_up_child",
-          "repo_scope" => repo_scope,
+          "slot_scopes" => slot_scopes,
           "summary" => "Follow-up child required",
           "description" => "The finding is scoped to one configured slot and should be implemented as a child task.",
           "finding_key" => "parent-review-follow-up"
@@ -231,7 +231,7 @@ def parent_review_response_examples(request)
         "rework_required" => false,
         "review_disposition" => {
           "kind" => "blocked",
-          "repo_scope" => "unresolved",
+          "slot_scopes" => ["unresolved"],
           "summary" => "Parent review blocked",
           "description" => "The finding cannot be routed to a configured child scope without requester input or technical resolution.",
           "finding_key" => "parent-review-blocked"
@@ -276,12 +276,12 @@ def response_schema(request)
       "type" => ["object", "null"],
       "properties" => {
         "kind" => { "type" => "string" },
-        "repo_scope" => { "type" => "string" },
+        "slot_scopes" => { "type" => "array", "items" => { "type" => "string" }, "minItems" => 1 },
         "summary" => { "type" => "string" },
         "description" => { "type" => "string" },
         "finding_key" => { "type" => "string" }
       },
-      "required" => %w[kind repo_scope summary description finding_key],
+      "required" => %w[kind slot_scopes summary description finding_key],
       "additionalProperties" => false
     }
   end
@@ -290,12 +290,12 @@ def response_schema(request)
       "type" => "object",
       "properties" => {
         "kind" => { "type" => "string" },
-        "repo_scope" => { "type" => "string" },
+        "slot_scopes" => { "type" => "array", "items" => { "type" => "string" }, "minItems" => 1 },
         "summary" => { "type" => "string" },
         "description" => { "type" => "string" },
         "finding_key" => { "type" => "string" }
       },
-      "required" => %w[kind repo_scope summary description finding_key],
+      "required" => %w[kind slot_scopes summary description finding_key],
       "additionalProperties" => false
     }
   end
@@ -477,37 +477,24 @@ def executor_env(request:)
   resolve_executor_profile(request, executor: executor).fetch("env")
 end
 
-def review_disposition_repo_scope_aliases
-  aliases = load_executor_config.fetch("review_disposition_repo_scope_aliases", {})
-  raise ArgumentError, "executor.review_disposition_repo_scope_aliases must be an object" unless aliases.is_a?(Hash)
-
-  aliases.each_with_object({}) do |(from, to), normalized|
-    unless from.is_a?(String) && !from.empty? && to.is_a?(String) && !to.empty?
-      raise ArgumentError, "executor.review_disposition_repo_scope_aliases keys and values must be non-empty strings"
-    end
-
-    normalized[from] = to
-  end
-end
-
-def configured_review_disposition_repo_scopes
+def configured_review_disposition_slot_scopes
   return nil if LAUNCHER_CONFIG_PATH.to_s.strip.empty?
 
-  scopes = load_executor_config["review_disposition_repo_scopes"]
+  scopes = load_executor_config["review_disposition_slot_scopes"]
   return nil if scopes.nil?
   unless scopes.is_a?(Array) && scopes.all? { |scope| scope.is_a?(String) && !scope.empty? }
-    raise ArgumentError, "executor.review_disposition_repo_scopes must be an array of non-empty strings"
+    raise ArgumentError, "executor.review_disposition_slot_scopes must be an array of non-empty strings"
   end
 
   scopes.uniq
 end
 
-def inferred_review_disposition_repo_scopes(request)
+def inferred_review_disposition_slot_scopes(request)
   request.fetch("slot_paths", {}).keys.map(&:to_s).reject(&:empty?).uniq
 end
 
-def valid_review_disposition_repo_scopes(request, include_unresolved:)
-  scopes = configured_review_disposition_repo_scopes || inferred_review_disposition_repo_scopes(request)
+def valid_review_disposition_slot_scopes(request, include_unresolved:)
+  scopes = configured_review_disposition_slot_scopes || inferred_review_disposition_slot_scopes(request)
   scopes = scopes.reject { |scope| scope == "unresolved" } unless include_unresolved
   scopes = scopes + ["unresolved"] if include_unresolved
   scopes.uniq
@@ -571,19 +558,24 @@ def validate_payload(payload, request:)
       errors << "review_disposition must be an object"
       return errors
     end
-    %w[kind repo_scope summary description finding_key].each do |key|
+    %w[kind summary description finding_key].each do |key|
       errors << "review_disposition.#{key} must be a string" unless disposition[key].is_a?(String)
     end
+    errors << "review_disposition.repo_scope is not supported; use review_disposition.slot_scopes" if disposition.key?("repo_scope")
+    slot_scope_errors = validate_review_disposition_slot_scopes(disposition["slot_scopes"])
+    errors.concat(slot_scope_errors)
     if parent_review
       valid_kinds = %w[completed follow_up_child blocked]
-      valid_repo_scopes = valid_review_disposition_repo_scopes(request, include_unresolved: true)
+      valid_slot_scopes = valid_review_disposition_slot_scopes(request, include_unresolved: true)
       errors << "review_disposition.kind must be one of #{valid_kinds.join(', ')}" unless valid_kinds.include?(disposition["kind"])
-      errors << "review_disposition.repo_scope must be one of #{valid_repo_scopes.join(', ')}" unless valid_repo_scopes.include?(disposition["repo_scope"])
+      invalid_slot_scopes = Array(disposition["slot_scopes"]) - valid_slot_scopes
+      errors << "review_disposition.slot_scopes must be one of #{valid_slot_scopes.join(', ')}" unless invalid_slot_scopes.empty?
       errors << "review_disposition.kind must be completed when success is true for parent review" if payload["success"] == true && disposition["kind"] != "completed"
     elsif implementation_phase
-      valid_repo_scopes = valid_review_disposition_repo_scopes(request, include_unresolved: false)
+      valid_slot_scopes = valid_review_disposition_slot_scopes(request, include_unresolved: false)
       errors << "review_disposition.kind must be completed for implementation evidence" unless disposition["kind"] == "completed"
-      errors << "review_disposition.repo_scope must be one of #{valid_repo_scopes.join(', ')}" unless valid_repo_scopes.include?(disposition["repo_scope"])
+      invalid_slot_scopes = Array(disposition["slot_scopes"]) - valid_slot_scopes
+      errors << "review_disposition.slot_scopes must be one of #{valid_slot_scopes.join(', ')}" unless invalid_slot_scopes.empty?
     end
   elsif parent_review && !clarification_request_present?(payload)
     errors << "review_disposition must be present for parent review"
@@ -635,16 +627,8 @@ end
 
 def normalize_payload!(payload, request:)
   disposition = payload["review_disposition"]
-  needs_aliases = disposition.is_a?(Hash) || skill_feedback_entries(payload["skill_feedback"]).any? { |entry| entry.is_a?(Hash) && entry["repo_scope"].is_a?(String) }
-  aliases = needs_aliases ? review_disposition_repo_scope_aliases : {}
-  normalize_skill_feedback!(payload, aliases: aliases)
+  normalize_skill_feedback!(payload, aliases: {})
   normalize_parent_review_success!(payload, request: request) if payload["success"] == true
-  disposition = payload["review_disposition"]
-  return unless needs_aliases || disposition.is_a?(Hash)
-
-  return unless disposition.is_a?(Hash)
-
-  disposition["repo_scope"] = aliases.fetch(disposition["repo_scope"], disposition["repo_scope"])
 end
 
 def normalize_parent_review_success!(payload, request:)
@@ -657,17 +641,25 @@ def normalize_parent_review_success!(payload, request:)
 
   normalized_disposition = disposition.is_a?(Hash) ? disposition.dup : {}
   normalized_disposition["kind"] = "completed"
-  normalized_disposition["repo_scope"] = default_parent_review_repo_scope(request) unless present_string?(normalized_disposition["repo_scope"])
+  normalized_disposition["slot_scopes"] = [default_parent_review_slot_scope(request)] if Array(normalized_disposition["slot_scopes"]).empty?
   normalized_disposition["summary"] = payload["summary"] unless present_string?(normalized_disposition["summary"])
   normalized_disposition["description"] = payload["summary"] unless present_string?(normalized_disposition["description"])
   normalized_disposition["finding_key"] = "parent-review-completed" unless present_string?(normalized_disposition["finding_key"])
   payload["review_disposition"] = normalized_disposition
 end
 
-def default_parent_review_repo_scope(request)
-  (inferred_review_disposition_repo_scopes(request) + ["unresolved"]).uniq
+def default_parent_review_slot_scope(request)
+  (inferred_review_disposition_slot_scopes(request) + ["unresolved"]).uniq
     .reject { |scope| scope == "unresolved" }
     .fetch(0, "unresolved")
+end
+
+def validate_review_disposition_slot_scopes(value)
+  unless value.is_a?(Array) && !value.empty? && value.all? { |scope| scope.is_a?(String) && !scope.strip.empty? }
+    return ["review_disposition.slot_scopes must be a non-empty array of strings"]
+  end
+
+  []
 end
 
 def present_string?(value)

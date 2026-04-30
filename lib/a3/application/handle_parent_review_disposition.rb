@@ -14,14 +14,16 @@ module A3
           return blocked_result(
             task: task,
             run: run,
-            disposition_repo_scope: :invalid,
+            disposition_slot_scopes: [:invalid],
             summary: "parent review disposition is missing or invalid"
           )
         end
 
-        return blocked_result(task: task, run: run, disposition_repo_scope: disposition.repo_scope, summary: disposition.summary) if disposition.blocked? || disposition.repo_scope == :unresolved
+        if disposition.blocked? || disposition.slot_scopes.include?(:unresolved)
+          return blocked_result(task: task, run: run, disposition_slot_scopes: disposition.slot_scopes, summary: disposition.summary)
+        end
 
-        return blocked_result(task: task, run: run, disposition_repo_scope: disposition.repo_scope, summary: "unsupported parent review disposition #{disposition.kind}") unless disposition.follow_up_child?
+        return blocked_result(task: task, run: run, disposition_slot_scopes: disposition.slot_scopes, summary: "unsupported parent review disposition #{disposition.kind}") unless disposition.follow_up_child?
 
         write_result = @follow_up_child_writer.call(
           parent_task_ref: task.ref,
@@ -39,13 +41,13 @@ module A3
             comment_lines: ["follow_up_children: #{write_result.child_refs.join(',')}"]
           )
         else
-          blocked_result(task: task, run: run, disposition_repo_scope: disposition.repo_scope, summary: write_result.summary, diagnostics: write_result.diagnostics)
+          blocked_result(task: task, run: run, disposition_slot_scopes: disposition.slot_scopes, summary: write_result.summary, diagnostics: write_result.diagnostics)
         end
       end
 
       private
 
-      def blocked_result(task:, run:, disposition_repo_scope:, summary:, diagnostics: {})
+      def blocked_result(task:, run:, disposition_slot_scopes:, summary:, diagnostics: {})
         Result.new(
           terminal_status: :blocked,
           terminal_outcome: :blocked,
@@ -59,7 +61,7 @@ module A3
             scope_snapshot: run.evidence.scope_snapshot,
             artifact_owner: run.evidence.artifact_owner,
             expected_state: "parent review disposition is handled canonically",
-            observed_state: disposition_repo_scope.to_s,
+            observed_state: Array(disposition_slot_scopes).map(&:to_s).join(","),
             failing_command: "parent_review_disposition",
             diagnostic_summary: summary,
             infra_diagnostics: diagnostics
