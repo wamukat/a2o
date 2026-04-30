@@ -95,7 +95,7 @@ a2o runtime status --all-projects
 a2o runtime pause --all-projects
 ```
 
-`--all-projects` は project ごとに scheduler を1つずつ起動または pause する。各 project 内で同時に動く active task は引き続き最大1件であり、この mode で project 内 task 並列は有効にならない。
+`--all-projects` は project ごとに scheduler を1つずつ起動または pause する。各 project 内で同時に動く active task は引き続き最大1件であり、この mode で project 内 task 並列は有効にならない。登録 project ごとの `compose_project` と host `agent_port` は一意である必要があり、衝突する場合は scheduler 起動前に fail する。
 
 すでに実行中のタスクをすぐ止める必要がある場合は、dangerous な強制停止コマンドを使う。
 

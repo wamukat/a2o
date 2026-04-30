@@ -192,6 +192,7 @@ Phase A behavior:
 - `runtime status --all-projects` prints read-only, project-labelled status rows for every registered project.
 - `runtime watch-summary --project <key>` shows one project.
 - Each scheduler uses project-scoped pid, command, and log files under `.work/a2o/projects/<project>/scheduler`.
+- Multi-project lifecycle commands require unique effective `compose_project` and host `agent_port` values for every registered project. A2O fails before starting schedulers if missing values would fall back to shared defaults or explicit values collide.
 
 Phase A deliberately does not allow more than one active task inside the same project. Phase B must separately design bounded intra-project task parallelism, including durable task claims, parent/child group exclusion, and merge/publish serialization. Phase C must broaden status, watch-summary, logs, and stale-claim diagnostics for multiple active runs.
 

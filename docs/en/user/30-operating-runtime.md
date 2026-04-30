@@ -95,7 +95,7 @@ a2o runtime status --all-projects
 a2o runtime pause --all-projects
 ```
 
-`--all-projects` starts or pauses one scheduler per project. Each project still runs at most one active task; intra-project parallel task execution is not enabled by this mode.
+`--all-projects` starts or pauses one scheduler per project. Each project still runs at most one active task; intra-project parallel task execution is not enabled by this mode. Every registered project must resolve to a unique `compose_project` and host `agent_port`; A2O fails before scheduler startup if those lifecycle surfaces collide.
 
 If an already-running task must be interrupted immediately, use the dangerous force-stop commands:
 

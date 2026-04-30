@@ -537,6 +537,9 @@ func runRuntimeResumeAllProjects(options runtimeResumeOptions, runner commandRun
 	if err != nil {
 		return err
 	}
+	if err := validateAllProjectLifecycleSurfaces(registryPath, registry); err != nil {
+		return err
+	}
 	failures := 0
 	for _, key := range sortedProjectKeys(registry) {
 		context, err := projectRuntimeContextFromRegistry(registryPath, registry, key)
@@ -667,6 +670,9 @@ func runRuntimePauseAllProjects(runner commandRunner, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if err := validateAllProjectLifecycleSurfaces(registryPath, registry); err != nil {
+		return err
+	}
 	failures := 0
 	for _, key := range sortedProjectKeys(registry) {
 		context, err := projectRuntimeContextFromRegistry(registryPath, registry, key)
@@ -787,6 +793,44 @@ func sortedProjectKeys(registry *runtimeProjectRegistry) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func validateAllProjectLifecycleSurfaces(registryPath string, registry *runtimeProjectRegistry) error {
+	composeOwners := map[string]string{}
+	agentPortOwners := map[string]string{}
+	issues := []string{}
+	for _, key := range sortedProjectKeys(registry) {
+		context, err := projectRuntimeContextFromRegistry(registryPath, registry, key)
+		if err != nil {
+			issues = append(issues, fmt.Sprintf("project %s invalid: %s", key, singleLine(err.Error())))
+			continue
+		}
+		effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
+		composeProject := strings.TrimSpace(effectiveConfig.ComposeProject)
+		if composeProject == "" {
+			issues = append(issues, fmt.Sprintf("project %s has empty compose_project", context.ProjectKey))
+		} else if owner, exists := composeOwners[composeProject]; exists {
+			issues = append(issues, fmt.Sprintf("projects %s and %s share compose_project %q", owner, context.ProjectKey, composeProject))
+		} else {
+			composeOwners[composeProject] = context.ProjectKey
+		}
+		agentPort := effectiveRuntimeAgentPort(effectiveConfig)
+		if agentPort == "" {
+			issues = append(issues, fmt.Sprintf("project %s has empty agent_port", context.ProjectKey))
+		} else if owner, exists := agentPortOwners[agentPort]; exists {
+			issues = append(issues, fmt.Sprintf("projects %s and %s share agent_port %q", owner, context.ProjectKey, agentPort))
+		} else {
+			agentPortOwners[agentPort] = context.ProjectKey
+		}
+	}
+	if len(issues) > 0 {
+		return fmt.Errorf("multi-project lifecycle requires isolated compose_project and agent_port values: %s", strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func effectiveRuntimeAgentPort(config runtimeInstanceConfig) string {
+	return envDefaultCompat("A2O_BUNDLE_AGENT_PORT", "A3_BUNDLE_AGENT_PORT", envDefaultValue(config.AgentPort, "7393"))
 }
 
 func printRuntimeStatusForContext(context *projectRuntimeContext, configPath string, runner commandRunner, stdout io.Writer) error {
@@ -2486,7 +2530,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 		AgentControlPlaneRequestTimeout: agentControlPlaneRequestTimeout,
 		AgentControlPlaneRetryCount:     agentControlPlaneRetryCount,
 		AgentControlPlaneRetryDelay:     agentControlPlaneRetryDelay,
-		AgentPort:                       envDefaultCompat("A2O_BUNDLE_AGENT_PORT", "A3_BUNDLE_AGENT_PORT", envDefaultValue(config.AgentPort, "7393")),
+		AgentPort:                       effectiveRuntimeAgentPort(config),
 		AgentInternalPort:               envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_INTERNAL_PORT", "A3_RUNTIME_RUN_ONCE_AGENT_INTERNAL_PORT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_INTERNAL_PORT", "A3_RUNTIME_SCHEDULER_AGENT_INTERNAL_PORT", "7393")),
 		StorageDir:                      envDefaultCompat("A2O_BUNDLE_STORAGE_DIR", "A3_BUNDLE_STORAGE_DIR", envDefaultValue(config.StorageDir, runtimeDefaultStorageDir(config))),
 		HostRootDir:                     hostRootDir,

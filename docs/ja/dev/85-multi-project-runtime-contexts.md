@@ -190,6 +190,7 @@ Phase A の挙動:
 - `runtime status --all-projects` は全登録 project の status を project label 付きの read-only 行として出力する。
 - `runtime watch-summary --project <key>` は1 project を表示する。
 - 各 scheduler は `.work/a2o/projects/<project>/scheduler` 配下の project-scoped pid、command、log file を使う。
+- multi-project lifecycle command では、登録 project ごとに有効な `compose_project` と host `agent_port` が一意でなければならない。未指定値が共通 default に落ちる場合や明示値が衝突する場合、A2O は scheduler 起動前に fail する。
 
 Phase A では、同一 project 内で active task を複数持たせない。Phase B では、project 内 bounded parallelism を別途設計し、durable task claim、親子/同一親 group の排他、merge/publish serialization を扱う必要がある。Phase C では、複数 active run 向けに status、watch-summary、logs、stale claim diagnostics を拡張する必要がある。
 

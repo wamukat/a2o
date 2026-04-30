@@ -6213,6 +6213,107 @@ func TestRuntimeResumeAllProjectsRejectsProjectFilter(t *testing.T) {
 	}
 }
 
+func TestRuntimeResumeAllProjectsRejectsAmbiguousDefaultLifecycleSurfaces(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, map[string]any{
+		"version":         1,
+		"default_project": "alpha",
+		"projects": map[string]any{
+			"alpha": map[string]any{
+				"package_path": packageDir,
+				"storage_dir":  "/var/lib/a2o/projects/alpha",
+				"kanban":       map[string]any{"mode": "external"},
+			},
+			"beta": map[string]any{
+				"package_path": packageDir,
+				"storage_dir":  "/var/lib/a2o/projects/beta",
+				"kanban":       map[string]any{"mode": "external"},
+			},
+		},
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "resume", "--all-projects"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail when project lifecycle surfaces default to shared values")
+		}
+	})
+
+	output := stderr.String()
+	for _, want := range []string{
+		"multi-project lifecycle requires isolated compose_project and agent_port values",
+		`share compose_project "a2o-runtime"`,
+		`share agent_port "7393"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stderr should include %q in:\n%s", want, output)
+		}
+	}
+	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "start-background") {
+		t.Fatalf("runtime resume should fail before starting schedulers, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+	}
+}
+
+func TestRuntimeResumeAllProjectsRejectsDuplicateExplicitLifecycleSurfaces(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, map[string]any{
+		"version":         1,
+		"default_project": "alpha",
+		"projects": map[string]any{
+			"alpha": map[string]any{
+				"package_path":    packageDir,
+				"compose_project": "shared-runtime",
+				"agent_port":      "7490",
+				"storage_dir":     "/var/lib/a2o/projects/alpha",
+				"kanban":          map[string]any{"mode": "external"},
+			},
+			"beta": map[string]any{
+				"package_path":    packageDir,
+				"compose_project": "shared-runtime",
+				"agent_port":      "7490",
+				"storage_dir":     "/var/lib/a2o/projects/beta",
+				"kanban":          map[string]any{"mode": "external"},
+			},
+		},
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "resume", "--all-projects"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run should fail when project lifecycle surfaces are explicitly shared")
+		}
+	})
+
+	output := stderr.String()
+	for _, want := range []string{
+		`share compose_project "shared-runtime"`,
+		`share agent_port "7490"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stderr should include %q in:\n%s", want, output)
+		}
+	}
+	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "start-background") {
+		t.Fatalf("runtime resume should fail before starting schedulers, got:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+	}
+}
+
 func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -10839,6 +10940,7 @@ func multiProjectRegistryPayload(packageDir string, workspaceRoot string) map[st
 				"compose_file":    filepath.Join(workspaceRoot, "compose-a2o.yml"),
 				"compose_project": "a3-a2o",
 				"runtime_service": "a2o-runtime",
+				"agent_port":      "7393",
 				"storage_dir":     "/var/lib/a2o/projects/a2o",
 				"kanban": map[string]any{
 					"mode":            "external",
@@ -10855,6 +10957,7 @@ func multiProjectRegistryPayload(packageDir string, workspaceRoot string) map[st
 				"compose_file":    filepath.Join(workspaceRoot, "compose-beta.yml"),
 				"compose_project": "a3-beta",
 				"runtime_service": "a2o-runtime",
+				"agent_port":      "7394",
 				"storage_dir":     "/var/lib/a2o/projects/beta",
 				"kanban": map[string]any{
 					"mode":            "external",
