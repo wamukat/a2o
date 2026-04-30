@@ -1,6 +1,6 @@
-# A2O 0.5.53 Current Release Surface
+# A2O 0.5.54 Current Release Surface
 
-This document describes the currently supported A2O 0.5.53 user surface and validation boundary.
+This document describes the currently supported A2O 0.5.54 user surface and validation boundary.
 
 Use it to confirm which features can be documented for users and what can be treated as validated at this release. For setup steps, read [10-quickstart.md](10-quickstart.md). For configuration fields, read [90-project-package-schema.md](90-project-package-schema.md).
 
@@ -42,7 +42,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Agent HTTP worker gateway, including claimed-job heartbeats
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates
-- GHCR runtime image tags: `latest`, `0.5.53`, and `sha-*`
+- GHCR runtime image tags: `latest`, `0.5.54`, and `sha-*`
 - Tag releases also publish `latest`, so the released version tag and `latest` are expected to point to the same runtime image after release publication finishes.
 - Local release gate: full RSpec suite, release package doctor, local RC host smoke, and real-task local RC smoke for runtime execution / worker launcher / scheduler / Kanban / env generation changes
 
@@ -50,6 +50,7 @@ Use it to confirm which features can be documented for users and what can be tre
 
 - Project packages that already define `runtime.prompts.repoSlots` should audit multi-repo tasks before upgrading. Multi-repo tasks receive every repo-slot addon in the task `repo_slots` / `edit_scope` order; earlier releases only applied a singular repo-slot layer. If slot-specific instructions conflict or become too broad when combined, split the work into repo-slot child tasks or adjust the package prompts. Use `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib <task-ref>` before running workers to inspect the composed instruction.
 - `a2o runtime start` and `a2o runtime stop` are no longer compatibility aliases. Use `a2o runtime resume` to resume the resident scheduler and `a2o runtime pause` to pause it after the current work. If the removed commands are invoked, A2O exits non-zero and prints `migration_required=true` with the replacement command.
+- Custom workers must return `review_disposition.slot_scopes` as the review disposition scope field. `review_disposition.repo_scope` is not accepted in 0.5.54 worker results; migrate values such as `"repo_alpha"` to `slot_scopes: ["repo_alpha"]`, and multi-repo findings to all affected slot names. Validate saved worker results with `a2o worker validate-result --request request.json --result result.json --review-slot-scope <slot>`.
 - SoloBoard-era Kanbalone compatibility names are removed. Use `KANBAN_BACKEND=kanbalone`, `KANBALONE_BASE_URL`, `KANBALONE_API_TOKEN`, `--kanbalone-port`, `A2O_BUNDLE_KANBALONE_PORT`, and `A2O_KANBALONE_INTERNAL_URL`. Removed SoloBoard inputs fail with `migration_required=true` and the replacement name.
 - Bundled Kanbalone data names changed from `<compose-project>_soloboard-data` / `soloboard.sqlite` to `<compose-project>_kanbalone-data` / `kanbalone.sqlite`. If the old volume exists and the new one does not, `a2o kanban up` fails with `migration_required=true` instead of silently creating an empty board. Copy or rename the existing Kanban data before starting the bundled service.
 - Public `A3_*` environment fallbacks for runtime, agent, worker, and root utility configuration are removed where `A2O_*` replacements exist. Use `A2O_RUNTIME_IMAGE`, `A2O_COMPOSE_PROJECT`, `A2O_COMPOSE_FILE`, `A2O_RUNTIME_SERVICE`, `A2O_BUNDLE_AGENT_PORT`, `A2O_BUNDLE_STORAGE_DIR`, `A2O_AGENT_PACKAGE_DIR`, `A2O_AGENT_TOKEN`, `A2O_AGENT_TOKEN_FILE`, `A2O_AGENT_CONTROL_TOKEN`, `A2O_AGENT_CONTROL_TOKEN_FILE`, `A2O_AGENT_*`, `A2O_WORKER_*`, `A2O_WORKSPACE_ROOT`, `A2O_ROOT_DIR`, and `A2O_ROOT_*` root utility controls. Removed `A3_*` inputs fail with `migration_required=true` and the replacement name.

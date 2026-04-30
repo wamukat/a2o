@@ -188,6 +188,14 @@ a2o worker scaffold --language command --output ./project-package/commands/a2o-c
 
 生成されたラッパーは `A2O_WORKER_COMMAND` に設定したコマンドへ A2O stdin bundle を渡す。そのコマンドは最終的な A2O worker result JSON を stdout に出す必要がある。ラッパーは A2O の結果契約を維持し、implementation 成功時に `review_disposition` がない結果を拒否する。
 
+custom worker を開発する場合は、保存した worker request / result の組を使って、runtime 実行前に結果形式を検証する。
+
+```sh
+a2o worker validate-result --request request.json --result result.json
+```
+
+検証では、必須キーの不足、型エラー、`task_ref` / `run_ref` / `phase` の不一致を具体的に報告する。executor が review disposition の slot scope を設定している場合は、同じ公開値を `--review-slot-scope SCOPE` の繰り返しで渡す。`review_disposition` の scope は `slot_scopes` が正規キーであり、`repo_scope` は受け付けない。
+
 要求されたプロダクト仕様が曖昧、または既存契約と矛盾して安全に続行できない場合、worker は技術的な `blocked` ではなく `clarification_request` を返す。
 
 ```json
