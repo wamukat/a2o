@@ -22,7 +22,10 @@ A2O_BUNDLE_AGENT_PORT="$A2O_DEV_SAMPLE_AGENT_PORT" \
     -f docker/compose/a2o-kanbalone.yml \
     down -v
 
-rm -rf "$storage_root"
+if [ -d "$storage_root" ]; then
+  chmod -R u+rwX "$storage_root" 2>/dev/null || true
+  rm -rf "$storage_root"
+fi
 
 git for-each-ref --format='%(refname)' refs/heads/a2o/work |
 while IFS= read -r ref; do

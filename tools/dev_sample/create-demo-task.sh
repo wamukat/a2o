@@ -16,6 +16,7 @@ task_json="$("${KANBAN[@]}" task-create \
 
 task_id="$(printf '%s' "$task_json" | ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("id")')"
 "${KANBAN[@]}" task-label-add --project "$A2O_DEV_SAMPLE_PROJECT" --task-id "$task_id" --title repo:app --reason "dev sample" >/dev/null
+"${KANBAN[@]}" task-label-add --project "$A2O_DEV_SAMPLE_PROJECT" --task-id "$task_id" --title repo:lib --reason "dev sample" >/dev/null
 "${KANBAN[@]}" task-label-add --project "$A2O_DEV_SAMPLE_PROJECT" --task-id "$task_id" --title trigger:auto-implement --reason "dev sample" >/dev/null
 
 printf '%s\n' "$task_json"
