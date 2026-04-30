@@ -37,8 +37,7 @@ module A3
         merge_status
         lane
       ].freeze
-      INDEX_START = "<!-- a2o-docs-index:start"
-      INDEX_END = "<!-- a2o-docs-index:end -->"
+      INDEX_BLOCK = /<!--\s*a2o-docs-index:start(?:\s+category=(?<category>[A-Za-z0-9_-]+))?\s*-->(?<body>.*?)<!--\s*a2o-docs-index:end\s*-->/m.freeze
       LEGACY_INDEX_START = "<!-- a2o:index:start -->"
       LEGACY_INDEX_END = "<!-- a2o:index:end -->"
 
@@ -201,25 +200,27 @@ module A3
           next unless absolute_path && File.file?(absolute_path)
 
           content = File.read(absolute_path, mode: "r:UTF-8")
-          block = managed_index_block(content)
-          next unless block
-
-          managed_index_blocks << ManagedIndexBlock.new(path: relative_path, content: block.fetch(:content), category: block.fetch(:category))
+          extract_managed_index_blocks(content).each do |block|
+            managed_index_blocks << ManagedIndexBlock.new(path: relative_path, content: block.fetch(:content), category: block.fetch(:category))
+          end
         end
       end
 
-      def managed_index_block(content)
-        match = content.match(/<!--\s*a2o-docs-index:start(?:\s+category=(?<category>[A-Za-z0-9_-]+))?\s*-->(?<body>.*?)<!--\s*a2o-docs-index:end\s*-->/m)
-        return { content: match[:body].strip, category: match[:category] } if match
+      def extract_managed_index_blocks(content)
+        blocks = content.to_enum(:scan, INDEX_BLOCK).map do
+          match = Regexp.last_match
+          { content: match[:body].strip, category: match[:category] }
+        end
+        return blocks unless blocks.empty?
 
         start_index = content.index(LEGACY_INDEX_START)
-        return nil unless start_index
+        return [] unless start_index
 
         body_start = start_index + LEGACY_INDEX_START.length
         end_index = content.index(LEGACY_INDEX_END, body_start)
-        return nil unless end_index
+        return [] unless end_index
 
-        { content: content[body_start...end_index].strip, category: nil }
+        [{ content: content[body_start...end_index].strip, category: nil }]
       end
 
       def record_mirror_debt

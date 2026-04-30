@@ -172,6 +172,38 @@ RSpec.describe A3::Domain::ProjectDocsUpdater do
     expect(content).to include("- [Runtime Event Model](shared/runtime-event-model.md)")
   end
 
+  it "records a review finding instead of rewriting duplicate eligible managed blocks" do
+    write_file(
+      "docs/README.md",
+      <<~MARKDOWN
+        # Docs
+
+        <!-- a2o-docs-index:start category=shared_specs -->
+        <!-- a2o-docs-index:end -->
+
+        <!-- a2o-docs-index:start category=shared_specs -->
+        <!-- a2o-docs-index:end -->
+      MARKDOWN
+    )
+
+    result = described_class.update_document(
+      repo_root: @repo_root,
+      docs_config: docs_config,
+      category: "shared_specs",
+      title: "Runtime Event Model",
+      body: "Runtime events.\n"
+    )
+
+    expect(result.updated_paths).to eq(["docs/shared/runtime-event-model.md"])
+    expect(result.diagnostics.map(&:to_h)).to include(
+      severity: :review_finding,
+      path: "docs/README.md",
+      field: "category",
+      message: "index has multiple eligible a2o-docs-index blocks for category shared_specs; skipping ambiguous rewrite"
+    )
+    expect(read_file("docs/README.md")).not_to include("Runtime Event Model")
+  end
+
   it "rejects document paths that escape the repo slot" do
     result = described_class.update_document(
       repo_root: @repo_root,

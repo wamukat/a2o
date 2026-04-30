@@ -120,22 +120,34 @@ module A3
           next unless File.file?(absolute_path)
 
           content = File.read(absolute_path, mode: "r:UTF-8")
-          unless content.match?(INDEX_BLOCK)
+          matches = managed_index_matches(content, category)
+          all_matches = content.to_enum(:scan, INDEX_BLOCK).map { Regexp.last_match }
+          if all_matches.empty?
             diagnostic(:review_finding, index_path, nil, "index has no a2o-docs-index managed block; skipping broad rewrite")
             next
           end
-
-          index_dir = File.dirname(index_path)
-          next_content = content.gsub(INDEX_BLOCK) do |block|
-            match = Regexp.last_match
-            block_category = match[:category]
-            if block_category && block_category != category
-              block
-            else
-              render_index_block(category: block_category, body: match[:body], index_dir: index_dir, document_path: document_path, title: title)
-            end
+          if matches.empty?
+            diagnostic(:review_finding, index_path, "category", "index has no a2o-docs-index block for category #{category}; skipping broad rewrite")
+            next
           end
+          if matches.length > 1
+            diagnostic(:review_finding, index_path, "category", "index has multiple eligible a2o-docs-index blocks for category #{category}; skipping ambiguous rewrite")
+            next
+          end
+
+          match = matches.first
+          index_dir = File.dirname(index_path)
+          replacement = render_index_block(category: match[:category], body: match[:body], index_dir: index_dir, document_path: document_path, title: title)
+          next_content = "#{content[0...match.begin(0)]}#{replacement}#{content[match.end(0)..]}"
           write_if_changed(absolute_path, next_content)
+        end
+      end
+
+      def managed_index_matches(content, category)
+        content.to_enum(:scan, INDEX_BLOCK).filter_map do
+          match = Regexp.last_match
+          block_category = match[:category]
+          match if block_category.nil? || block_category == category
         end
       end
 

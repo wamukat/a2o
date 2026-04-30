@@ -87,6 +87,33 @@ RSpec.describe A3::Domain::ProjectDocsIndex do
     expect(index.managed_index_blocks.map(&:category)).to eq(["shared_specs"])
   end
 
+  it "discovers multiple category-managed index blocks in one file" do
+    write_file(
+      "docs/README.md",
+      <<~MARKDOWN
+        # Docs
+
+        <!-- a2o-docs-index:start category=features -->
+        - [Greeting](features/greeting.md)
+        <!-- a2o-docs-index:end -->
+
+        <!-- a2o-docs-index:start category=shared_specs -->
+        - [Runtime Events](shared/runtime-events.md)
+        <!-- a2o-docs-index:end -->
+      MARKDOWN
+    )
+
+    index = described_class.load(repo_root: @repo_root, docs_config: { "root" => "docs", "index" => "docs/README.md" })
+
+    expect(index.managed_index_blocks.map(&:category)).to eq(%w[features shared_specs])
+    expect(index.managed_index_blocks.map(&:content)).to eq(
+      [
+        "- [Greeting](features/greeting.md)",
+        "- [Runtime Events](shared/runtime-events.md)"
+      ]
+    )
+  end
+
   it "still reads legacy managed index blocks for compatibility" do
     write_file(
       "docs/README.md",
