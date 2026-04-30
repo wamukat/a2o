@@ -124,6 +124,41 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
+  it "does not warn about missing repo scope labels for trigger-investigate source tickets in watch-summary" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      task_get_includes_labels: false,
+      snapshots: [
+        {
+          "id" => 3052,
+          "ref" => "Sample#3052",
+          "status" => "To do",
+          "priority" => 3,
+          "labels" => ["trigger:investigate"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: [],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      result = source.load_for_watch_summary
+
+      expect(result.warnings).to eq([])
+      expect(result.tasks.map(&:ref)).to eq(["Sample#3052"])
+      expect(result.tasks.fetch(0).edit_scope).to eq([])
+    end
+  end
+
   it "keeps implementation-triggered tasks strict when repo scope labels are missing" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,

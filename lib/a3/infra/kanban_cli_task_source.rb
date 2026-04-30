@@ -414,10 +414,7 @@ module A3
       end
 
       def unscoped_decomposition_source?(labels)
-        return false unless @trigger_labels.include?(A3::Domain::Task::DECOMPOSITION_TRIGGER_LABEL)
-        return false unless labels.include?(A3::Domain::Task::DECOMPOSITION_TRIGGER_LABEL)
-
-        ((labels & @trigger_labels) - [A3::Domain::Task::DECOMPOSITION_TRIGGER_LABEL]).empty?
+        labels.include?(A3::Domain::Task::DECOMPOSITION_TRIGGER_LABEL)
       end
 
       def unscoped_decomposed_parent_automation?(labels)
