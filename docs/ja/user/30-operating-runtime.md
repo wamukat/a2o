@@ -166,7 +166,7 @@ a2o project bootstrap --kanban-mode external --kanban-url http://127.0.0.1:3470
 2. A2O が source ticket を `In progress` に移動し、プロジェクト所有の investigation command が実行され、調査 evidence を記録する。
 3. proposal author が正規化された child-ticket proposal を作る。
 4. A2O が source ticket を `In review` に移動し、proposal review が draft child creation に進める状態かを判定する。
-5. eligible な proposal から、要求 source ticket とは別の generated implementation parent ticket を作り、generated parent の description と source ticket への comment に要求 source を記録し、その generated parent の下に `a2o:draft-child` 付きの draft child ticket を作る。
+5. eligible な proposal から、要求 source ticket とは別の generated implementation parent ticket を `Backlog` に作り、generated parent の description と source ticket への comment に要求 source を記録し、その generated parent の下に `a2o:draft-child` 付きの draft child ticket を `Backlog` に作る。
 6. A2O が source ticket を decomposed として印付けし、`Done` に移動する。
 
 A2O は要求 source ticket から generated implementation parent へ `related` relation も作る。この relation は traceability 専用であり、source ticket を runnable にはしない。また child の `subtask` relation や依存関係の `blocked` relation を置き換えない。外部 Kanbalone 環境では、この decomposition relation 経路のために Kanbalone v0.9.25 以降が必要である。
@@ -175,7 +175,7 @@ A2O は要求 source ticket から generated implementation parent へ `related`
 
 `a2o runtime logs <task-ref>` は decomposition source ticket に対しても利用できる。source ticket に通常の implementation / review log artifact がない場合、decomposition status と evidence path の表示にフォールバックする。`--follow` は decomposition の live stream ではない。通常 task run が動いていない場合は decomposition fallback を表示し、その source-ticket 状態では live follow 非対応であることを明示する。
 
-draft child は計画用の artifact である。ボード上では generated parent の下に表示されるが、人間が `trigger:auto-implement` を付けて承認するまで runnable にはならない。運用者は承認前に、生成された parent と child の title、body、label、blocker、scope を編集できる。`a2o:draft-child` を外すことは任意の metadata 整理であり、runnable gate は `trigger:auto-implement` である。accepted child work が親 review に進める状態になったら、元の要求 source ticket ではなく generated parent に `trigger:auto-parent` を付ける。
+draft child は計画用の artifact である。生成された parent の下に `Backlog` で作られ、人間が `trigger:auto-implement` を付けて承認し、さらに実行可能な `To do` lane へ移動するまで runnable にはならない。運用者は承認前に、生成された parent と child の title、body、label、blocker、scope を編集できる。`a2o:draft-child` を外すことは任意の metadata 整理であり、label 側の runnable gate は `trigger:auto-implement`、lane 側の gate は運用者による `To do` への移動である。accepted child work が親 review に進める状態になったら、元の要求 source ticket ではなく generated parent に `trigger:auto-parent` を付ける。
 
 よく使うコマンド:
 

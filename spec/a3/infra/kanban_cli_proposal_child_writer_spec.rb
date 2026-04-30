@@ -26,7 +26,13 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
 
         matches.map { |task| task.merge("description" => "") }
       when "task-create"
-        task = { "id" => 5301 + @created.size, "ref" => "A3-v2##{5301 + @created.size}", "title" => args[args.index("--title") + 1], "description" => "created" }
+        task = {
+          "id" => 5301 + @created.size,
+          "ref" => "A3-v2##{5301 + @created.size}",
+          "title" => args[args.index("--title") + 1],
+          "status" => args[args.index("--status") + 1],
+          "description" => "created"
+        }
         @created << task
         task
       when "task-relation-list"
@@ -107,6 +113,10 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     (client.created + client.instance_variable_get(:@existing)).find { |task| task.fetch("description", "").include?("Child key: #{child_key}") }
   end
 
+  def created_task_statuses(client)
+    client.created.map { |task| task.fetch("status") }
+  end
+
   it "creates a child with idempotency key, labels, trigger, and parent relation" do
     client = FakeProposalClient.new
     writer = described_class.new(project: "A3-v2", client: client)
@@ -117,6 +127,7 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     expect(result.parent_ref).to eq("A3-v2#5301")
     expect(result.child_refs).to eq(["A3-v2#5302"])
     expect(result.child_keys).to eq(["child-key-1"])
+    expect(created_task_statuses(client)).to eq(["Backlog", "Backlog"])
     expect(generated_parent(client).fetch("description")).to include("Decomposition source: A3-v2#5300")
     expect(generated_child(client).fetch("description")).to include("Parent: A3-v2#5301")
     expect(generated_child(client).fetch("description")).to include("Child key: child-key-1")

@@ -77,7 +77,13 @@ RSpec.describe "Kanban-first decomposition draft flow" do
     def create_task(args)
       id = 241 + @created.size
       ref = "Portal##{id}"
-      task = { "id" => id, "ref" => ref, "title" => args.fetch(args.index("--title") + 1), "description" => "" }
+      task = {
+        "id" => id,
+        "ref" => ref,
+        "title" => args.fetch(args.index("--title") + 1),
+        "status" => args.fetch(args.index("--status") + 1),
+        "description" => ""
+      }
       @tasks[ref] = task
       @tasks_by_id[id] = task
       @labels[id] = []
@@ -151,6 +157,8 @@ RSpec.describe "Kanban-first decomposition draft flow" do
       expect(first.parent_ref).to eq("Portal#241")
       expect(first.child_refs).to eq(["Portal#242"])
       expect(client.created.size).to eq(2)
+      expect(client.fetch_task_by_ref("Portal#241").fetch("status")).to eq("Backlog")
+      expect(client.fetch_task_by_ref("Portal#242").fetch("status")).to eq("Backlog")
       expect(client.labels_for(241)).to include("a2o:decomposed")
       expect(client.labels_for(242)).to include("a2o:draft-child", "repo:portal")
       expect(client.labels_for(242)).not_to include("trigger:auto-implement", "trigger:auto-parent")
@@ -177,10 +185,14 @@ RSpec.describe "Kanban-first decomposition draft flow" do
       expect(client.labels_for(242)).to include("trigger:auto-implement")
       expect(client.labels_for(241)).to include("trigger:auto-parent")
       expect(client.labels_for(240)).not_to include("trigger:auto-parent")
+      expect(client.fetch_task_by_ref("Portal#242").fetch("status")).to eq("Backlog")
 
-      task_repository.save(A3::Domain::Task.new(ref: "Portal#242", kind: :child, edit_scope: [:repo_beta], parent_ref: "Portal#241", labels: client.labels_for(242)))
+      task_repository.save(A3::Domain::Task.new(ref: "Portal#242", kind: :child, edit_scope: [:repo_beta], status: :backlog, parent_ref: "Portal#241", labels: client.labels_for(242)))
       accepted_plan = A3::Application::PlanNextRunnableTask.new(task_repository: task_repository, sync_external_tasks: nil).call
-      expect(accepted_plan.task&.ref).to eq("Portal#242")
+      expect(accepted_plan.task).to be_nil
+      task_repository.save(A3::Domain::Task.new(ref: "Portal#242", kind: :child, edit_scope: [:repo_beta], status: :todo, parent_ref: "Portal#241", labels: client.labels_for(242)))
+      runnable_plan = A3::Application::PlanNextRunnableTask.new(task_repository: task_repository, sync_external_tasks: nil).call
+      expect(runnable_plan.task&.ref).to eq("Portal#242")
       parent_after_acceptance = A3::Domain::Task.new(ref: "Portal#241", kind: :parent, edit_scope: [:repo_beta], child_refs: ["Portal#242"], labels: client.labels_for(241))
       parent_assessment = A3::Domain::RunnableTaskAssessment.evaluate(task: parent_after_acceptance, tasks: [parent_after_acceptance])
       expect(parent_assessment.reason).not_to eq(:decomposition_requested)

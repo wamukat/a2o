@@ -6,6 +6,7 @@ module A3
       DRAFT_LABEL = "a2o:draft-child"
       DECOMPOSED_LABEL = "a2o:decomposed"
       RUNNABLE_LABEL = "trigger:auto-implement"
+      CREATED_TASK_STATUS = "Backlog"
       Result = Struct.new(:success?, :parent_ref, :child_refs, :child_keys, :summary, :diagnostics, keyword_init: true)
       class PartialChildWriteError < StandardError
         attr_reader :child_ref, :child_key, :original_error
@@ -256,7 +257,7 @@ module A3
           "task-create",
           "--project", @project,
           "--title", payload.fetch("title"),
-          "--status", "To do",
+          "--status", CREATED_TASK_STATUS,
           "--priority", payload.fetch("priority").to_s,
           option_name: "--description",
           text: payload.fetch("description"),
