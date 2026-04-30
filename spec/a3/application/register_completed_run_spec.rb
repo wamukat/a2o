@@ -109,6 +109,59 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(result.run.terminal_outcome).to eq(:completed)
   end
 
+  it "publishes concise docs-impact traceability summaries in completion comments" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :in_progress,
+      current_run_ref: "run-1",
+      external_task_id: 3025
+    )
+    docs_execution_record = A3::Domain::PhaseExecutionRecord.new(
+      summary: "updated project documentation",
+      diagnostics: {},
+      docs_impact: {
+        "disposition" => "yes",
+        "categories" => %w[shared_specs interfaces],
+        "updated_docs" => ["docs/shared/prompt-composition.md", "docs/interfaces/schema.md"],
+        "updated_authorities" => ["project.yaml schema"],
+        "skipped_docs" => [
+          { "path" => "docs/ja/interfaces/schema.md", "reason" => "mirror follow-up" }
+        ],
+        "matched_rules" => ["project_package_schema_changed"],
+        "review_disposition" => "accepted",
+        "traceability" => {
+          "related_requirements" => ["A2O#385"],
+          "source_issues" => ["wamukat/a2o#53"],
+          "related_tickets" => %w[A2O#391 A2O#393]
+        }
+      }
+    )
+    task_repository.save(task)
+    run_repository.save(
+      run.append_phase_evidence(
+        phase: run.phase,
+        source_descriptor: run.source_descriptor,
+        scope_snapshot: run.scope_snapshot,
+        execution_record: docs_execution_record
+      )
+    )
+
+    expect(status_publisher).to receive(:publish)
+    expect(activity_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      body: a_string_matching(
+        /docs-impact: yes categories=shared_specs,interfaces review=accepted.*docs-updated: docs\/shared\/prompt-composition\.md,docs\/interfaces\/schema\.md.*docs-skipped: docs\/ja\/interfaces\/schema\.md\(mirror follow-up\).*docs-authorities: project\.yaml schema.*docs-rules: project_package_schema_changed.*docs-traceability: requirements=A2O#385 issues=wamukat\/a2o#53 tickets=A2O#391,A2O#393/m
+      )
+    )
+
+    result = use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :completed)
+
+    expect(result.task.status).to eq(:verifying)
+  end
+
   it "stops phase advancement when the external task has an operator blocked label" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",

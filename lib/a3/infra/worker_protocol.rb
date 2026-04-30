@@ -710,7 +710,7 @@ module A3
         ).each { |error| errors << error }
         validate_docs_impact_skipped_docs(value["skipped_docs"]).each { |error| errors << error } if value.key?("skipped_docs")
         if value.key?("traceability")
-          errors << "docs_impact.traceability must be an object when present" unless value["traceability"].is_a?(Hash)
+          validate_docs_impact_traceability(value["traceability"]).each { |error| errors << error }
         end
         errors
       end
@@ -782,6 +782,16 @@ module A3
           errors << "#{prefix}.reason must be a string" unless entry["reason"].is_a?(String)
           errors
         end
+      end
+
+      def validate_docs_impact_traceability(value)
+        return ["docs_impact.traceability must be an object when present"] unless value.is_a?(Hash)
+
+        errors = []
+        %w[related_requirements source_issues related_tickets].each do |key|
+          validate_optional_string_array(value, key, "docs_impact.traceability.#{key}").each { |error| errors << error }
+        end
+        errors
       end
 
       def clarification_request_present?(worker_response)

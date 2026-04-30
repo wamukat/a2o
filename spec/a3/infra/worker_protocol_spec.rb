@@ -831,6 +831,8 @@ RSpec.describe A3::Infra::WorkerProtocol do
           "matched_rules" => ["keyword:schema->shared_specs"],
           "review_disposition" => "accepted",
           "traceability" => {
+            "related_requirements" => ["A2O#385"],
+            "source_issues" => ["wamukat/a2o#53"],
             "related_tickets" => [task.ref]
           }
         }
@@ -845,7 +847,12 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(result).to have_attributes(success?: true)
     expect(result.response_bundle.fetch("docs_impact")).to include(
       "disposition" => "yes",
-      "updated_docs" => ["docs/shared/project-package-schema.md"]
+      "updated_docs" => ["docs/shared/project-package-schema.md"],
+      "traceability" => hash_including(
+        "related_requirements" => ["A2O#385"],
+        "source_issues" => ["wamukat/a2o#53"],
+        "related_tickets" => [task.ref]
+      )
     )
   end
 
@@ -869,7 +876,12 @@ RSpec.describe A3::Infra::WorkerProtocol do
         "docs_impact" => {
           "disposition" => "clean",
           "updated_docs" => [123],
-          "skipped_docs" => [{ "path" => "docs/spec.md" }]
+          "skipped_docs" => [{ "path" => "docs/spec.md" }],
+          "traceability" => {
+            "related_requirements" => "A2O#385",
+            "source_issues" => [53],
+            "related_tickets" => ["A2O#393"]
+          }
         }
       },
       workspace: workspace,
@@ -883,7 +895,9 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(result.diagnostics.fetch("validation_errors")).to include(
       "docs_impact.disposition must be one of yes, no, maybe",
       "docs_impact.updated_docs must be an array of strings when present",
-      "docs_impact.skipped_docs[0].reason must be a string"
+      "docs_impact.skipped_docs[0].reason must be a string",
+      "docs_impact.traceability.related_requirements must be an array of strings when present",
+      "docs_impact.traceability.source_issues must be an array of strings when present"
     )
   end
 

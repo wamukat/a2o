@@ -346,6 +346,7 @@ module A3
         end
 
         append_review_disposition_comment_lines(lines, execution_record&.review_disposition)
+        append_docs_impact_comment_lines(lines, execution_record&.docs_impact)
         append_clarification_request_comment_lines(lines, execution_record&.clarification_request)
         append_merge_recovery_comment_lines(lines, execution_record&.diagnostics || execution&.diagnostics)
         append_worker_result_diagnostic_comment_lines(
@@ -393,6 +394,69 @@ module A3
         lines << "選択肢: #{options.each_with_index.map { |option, index| "#{index + 1}. #{option}" }.join(' / ')}" unless options.empty?
         lines << "推奨: #{single_line(request['recommended_option'])}" if present?(request["recommended_option"])
         lines << "影響: #{single_line(request['impact'])}" if present?(request["impact"])
+      end
+
+      def append_docs_impact_comment_lines(lines, docs_impact)
+        return unless docs_impact.is_a?(Hash)
+
+        disposition = docs_impact["disposition"]
+        categories = summary_list(docs_impact["categories"])
+        summary = []
+        summary << single_line(disposition) if present?(disposition)
+        summary << "categories=#{categories}" if present?(categories)
+        summary << "review=#{single_line(docs_impact['review_disposition'])}" if present?(docs_impact["review_disposition"])
+        lines << "docs-impact: #{summary.join(' ')}" unless summary.empty?
+
+        updated_docs = summary_list(docs_impact["updated_docs"])
+        skipped_docs = skipped_docs_summary(docs_impact["skipped_docs"])
+        authorities = summary_list(docs_impact["updated_authorities"])
+        matched_rules = summary_list(docs_impact["matched_rules"])
+        traceability = traceability_summary(docs_impact["traceability"])
+
+        lines << "docs-updated: #{updated_docs}" if present?(updated_docs)
+        lines << "docs-skipped: #{skipped_docs}" if present?(skipped_docs)
+        lines << "docs-authorities: #{authorities}" if present?(authorities)
+        lines << "docs-rules: #{matched_rules}" if present?(matched_rules)
+        lines << "docs-traceability: #{traceability}" if present?(traceability)
+      end
+
+      def summary_list(value, limit: 5)
+        entries = Array(value).map { |entry| single_line(entry) }.reject(&:empty?)
+        return nil if entries.empty?
+
+        suffix = entries.length > limit ? ",+#{entries.length - limit}" : ""
+        truncate_comment_value("#{entries.first(limit).join(',')}#{suffix}")
+      end
+
+      def skipped_docs_summary(value, limit: 3)
+        entries = Array(value).filter_map do |entry|
+          next unless entry.is_a?(Hash)
+
+          path = single_line(entry["path"])
+          reason = single_line(entry["reason"])
+          next if path.empty?
+
+          reason.empty? ? path : "#{path}(#{reason})"
+        end
+        return nil if entries.empty?
+
+        suffix = entries.length > limit ? ",+#{entries.length - limit}" : ""
+        truncate_comment_value("#{entries.first(limit).join(',')}#{suffix}")
+      end
+
+      def traceability_summary(value)
+        return nil unless value.is_a?(Hash)
+
+        fields = []
+        {
+          "requirements" => "related_requirements",
+          "issues" => "source_issues",
+          "tickets" => "related_tickets"
+        }.each do |label, key|
+          entries = summary_list(value[key], limit: 4)
+          fields << "#{label}=#{entries}" if present?(entries)
+        end
+        fields.empty? ? nil : truncate_comment_value(fields.join(" "))
       end
 
       def append_worker_result_diagnostic_comment_lines(lines, diagnostics, worker_result_context:)
