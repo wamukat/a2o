@@ -45,9 +45,9 @@ RSpec.describe A3::Domain::ProjectDocsIndex do
       <<~MARKDOWN
         # Docs
 
-        <!-- a2o:index:start -->
+        <!-- a2o-docs-index:start category=shared_specs -->
         - [Prompt Composition Model](shared/prompt-composition.md)
-        <!-- a2o:index:end -->
+        <!-- a2o-docs-index:end -->
       MARKDOWN
     )
 
@@ -84,6 +84,25 @@ RSpec.describe A3::Domain::ProjectDocsIndex do
     )
     expect(index.authority_precedence("project_package_schema")).to eq(%w[authority_source docs evidence_artifacts ticket_text])
     expect(index.managed_index_blocks.map(&:content)).to eq(["- [Prompt Composition Model](shared/prompt-composition.md)"])
+    expect(index.managed_index_blocks.map(&:category)).to eq(["shared_specs"])
+  end
+
+  it "still reads legacy managed index blocks for compatibility" do
+    write_file(
+      "docs/README.md",
+      <<~MARKDOWN
+        # Docs
+
+        <!-- a2o:index:start -->
+        - [Legacy](legacy.md)
+        <!-- a2o:index:end -->
+      MARKDOWN
+    )
+
+    index = described_class.load(repo_root: @repo_root, docs_config: { "root" => "docs", "index" => "docs/README.md" })
+
+    expect(index.managed_index_blocks.map(&:content)).to eq(["- [Legacy](legacy.md)"])
+    expect(index.managed_index_blocks.map(&:category)).to eq([nil])
   end
 
   it "records authority source drift when a declared source is missing" do
