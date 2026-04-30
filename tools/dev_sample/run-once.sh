@@ -6,11 +6,15 @@ set -eu
 cd "$A2O_DEV_SAMPLE_ROOT"
 mkdir -p "$A2O_DEV_SAMPLE_STORAGE_DIR"
 
+"$A2O_DEV_SAMPLE_ROOT/tools/dev_sample/prepare-sources.sh" >/dev/null
+app_source="$A2O_DEV_SAMPLE_ROOT/.work/a2o-dev-sample/sources/web-app"
+lib_source="$A2O_DEV_SAMPLE_ROOT/.work/a2o-dev-sample/sources/utility-lib"
+
 ruby -Ilib bin/a3 execute-until-idle \
   --storage-backend sqlite \
   --storage-dir "$A2O_DEV_SAMPLE_STORAGE_DIR" \
-  --repo-source "app=$A2O_DEV_SAMPLE_ROOT/reference-products/java-spring-multi-module/web-app" \
-  --repo-source "lib=$A2O_DEV_SAMPLE_ROOT/reference-products/java-spring-multi-module/utility-lib" \
+  --repo-source "app=$app_source" \
+  --repo-source "lib=$lib_source" \
   --preset-dir config/presets \
   --kanban-backend subprocess-cli \
   --kanban-command python3 \
@@ -32,8 +36,8 @@ ruby -Ilib bin/a3 execute-until-idle \
   --agent-shared-workspace-mode agent-materialized \
   --agent-source-alias app=app \
   --agent-source-alias lib=lib \
-  --agent-source-path "app=$A2O_DEV_SAMPLE_ROOT/reference-products/java-spring-multi-module/web-app" \
-  --agent-source-path "lib=$A2O_DEV_SAMPLE_ROOT/reference-products/java-spring-multi-module/utility-lib" \
+  --agent-source-path "app=$app_source" \
+  --agent-source-path "lib=$lib_source" \
   --agent-support-ref refs/heads/a2o/dev-sample-live \
   --agent-workspace-root "$A2O_DEV_SAMPLE_AGENT_WORKSPACE_DIR" \
   --worker-command ruby \

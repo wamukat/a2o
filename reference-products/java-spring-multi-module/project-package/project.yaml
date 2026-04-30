@@ -75,10 +75,10 @@ runtime:
           - "{{a2o_root_dir}}/tools/reference_validation/deterministic_worker.rb"
     verification:
       commands:
-        - app/reference-products/java-spring-multi-module/project-package/commands/verify.sh
+        - "{{a2o_root_dir}}/reference-products/java-spring-multi-module/project-package/commands/verify.sh"
     remediation:
       commands:
-        - app/reference-products/java-spring-multi-module/project-package/commands/format.sh
+        - "{{a2o_root_dir}}/reference-products/java-spring-multi-module/project-package/commands/format.sh"
     merge:
       policy: ff_only
       target_ref: refs/heads/a2o/dev-sample-live
