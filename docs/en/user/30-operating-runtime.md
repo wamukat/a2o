@@ -170,7 +170,9 @@ The automatic decomposition flow is:
 4. Proposal review decides whether the proposal is eligible for draft child creation.
 5. Eligible proposals create draft child tickets labeled `a2o:draft-child`.
 
-Each completed stage leaves a short comment on the source ticket so operators can follow progress from Kanban. Detailed evidence is stored under the runtime storage directory in `decomposition-evidence/<task>/`; `a2o runtime decomposition status <task-ref>` shows the current decomposition evidence summary, and `a2o runtime describe-task <task-ref>` gives the broader task state.
+Each completed stage leaves a short comment on the source ticket so operators can follow progress from Kanban. `a2o runtime watch-summary` also shows `trigger:investigate` source tickets in its `Decomposition` section; before any evidence is written they appear as `state=queued`, and after evidence exists the section shows the current decomposition state, disposition, and proposal fingerprint when available. Detailed evidence is stored under the runtime storage directory in `decomposition-evidence/<task>/`; `a2o runtime decomposition status <task-ref>` shows the current decomposition evidence summary, and `a2o runtime describe-task <task-ref>` gives the broader task state.
+
+`a2o runtime logs <task-ref>` is useful for decomposition source tickets as well. If the source ticket has no ordinary implementation/review log artifacts, the command falls back to the decomposition status output and evidence paths. `--follow` is not a live decomposition stream; when no ordinary task run is active it prints the decomposition fallback and reports that live follow is not supported for that source-ticket state.
 
 Draft children are planning artifacts. They are visible on the board, but they are not runnable until a human accepts them by adding `trigger:auto-implement`. Operators can edit the generated child title, body, labels, blockers, and scope before acceptance. Removing `a2o:draft-child` is optional metadata cleanup; the runnable gate is `trigger:auto-implement`.
 

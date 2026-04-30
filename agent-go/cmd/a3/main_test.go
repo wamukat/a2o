@@ -7650,6 +7650,136 @@ func TestRuntimeLogsStaticModeFailsForMissingTaskRef(t *testing.T) {
 	}
 }
 
+func TestRuntimeLogsShowsQueuedDecompositionSourceWithoutRunArtifacts(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		showTaskOutput:            "task A2O#61 kind=single status=todo current_run=\nedit_scope=\nverification_scope=\nrunnable_reason=decomposition_requested\n",
+		logManifestOutput:         `{"run_ref":"","current_run":"","phase":"","source_type":"","source_ref":"","active":false,"artifacts":[]}`,
+		decompositionStatusOutput: "decomposition task=A2O#61 state=none\n",
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "logs", "A2O#61"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	for _, want := range []string{
+		"=== decomposition: A2O#61 ===",
+		"decomposition task=A2O#61 state=queued",
+		"decomposition_notice=no evidence has been written yet",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("runtime logs missing %q in:\n%s", want, output)
+		}
+	}
+}
+
+func TestRuntimeLogsShowsEvidenceBackedDecompositionStatus(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		showTaskOutput:    "task A2O#61 kind=single status=todo current_run=\nedit_scope=\nverification_scope=\nrunnable_reason=decomposition_requested\n",
+		logManifestOutput: `{"run_ref":"","current_run":"","phase":"","source_type":"","source_ref":"","active":false,"artifacts":[]}`,
+		decompositionStatusOutput: strings.Join([]string{
+			"decomposition task=A2O#61 state=active",
+			"proposal_fingerprint=abc123",
+			"evidence.investigation=/var/lib/a3/test-runtime/decomposition-evidence/A2O-61/investigation.json",
+			"",
+		}, "\n"),
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "logs", "A2O#61"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	for _, want := range []string{
+		"=== decomposition: A2O#61 ===",
+		"decomposition task=A2O#61 state=active",
+		"proposal_fingerprint=abc123",
+		"evidence.investigation=/var/lib/a3/test-runtime/decomposition-evidence/A2O-61/investigation.json",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("runtime logs missing %q in:\n%s", want, output)
+		}
+	}
+}
+
+func TestRuntimeLogsFollowReportsDecompositionFallbackAsNotLiveFollowable(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		showTaskOutput:            "task A2O#61 kind=single status=todo current_run=\nedit_scope=\nverification_scope=\nrunnable_reason=decomposition_requested\n",
+		runtimeLogTargetsOutput:   `{"requested_task_ref":"A2O#61","selected_task_ref":"A2O#61","dynamic_follow":false,"candidates":[]}`,
+		logManifestOutput:         `{"run_ref":"","current_run":"","phase":"","source_type":"","source_ref":"","active":false,"artifacts":[]}`,
+		decompositionStatusOutput: "decomposition task=A2O#61 state=none\n",
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "logs", "A2O#61", "--follow"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	if !strings.Contains(output, "decomposition_follow=not_supported") {
+		t.Fatalf("runtime logs --follow should explain decomposition fallback, got:\n%s", output)
+	}
+}
+
 func TestRuntimeLogsFollowsLatestActiveRunWhenTaskCurrentRunIsBlank(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -10997,40 +11127,42 @@ func assertNoRemovedA3Env(t *testing.T, env map[string]string) {
 }
 
 type fakeRunner struct {
-	calls                    [][]string
-	emptyContainer           bool
-	missingVolumes           map[string]bool
-	legacySoloBoardDBVolumes map[string]bool
-	failShowTask             bool
-	taskWithoutCurrentRun    bool
-	staleCurrentRun          bool
-	runtimeExitMissing       bool
-	legacyRuntimeOrphans     []string
-	failLegacyRuntimeRM      bool
-	missingRunHistory        bool
-	schedulerPaused          bool
-	schedulerStopReason      string
-	schedulerExecutedCount   int
-	startBackgroundErr       error
-	err                      error
-	lastEnv                  map[string]string
-	nextPID                  int
-	processCommands          map[int]string
-	errorOutput              string
-	imageInspectDigests      map[string]string
-	imageInspectIDs          map[string]string
-	containerImageIDs        map[string]string
-	logManifestOutput        string
-	logManifestOutputs       []string
-	runtimeLogTargetsOutput  string
-	runtimeLogTargetsOutputs []string
-	watchSummaryOutput       string
-	taskStatus               string
-	hostAgentOutput          string
-	hostAgentOutputs         []string
-	hostAgentOutputIndex     int
-	runtimeCommandLogOutput  string
-	decompositionPlanOutput  string
+	calls                     [][]string
+	emptyContainer            bool
+	missingVolumes            map[string]bool
+	legacySoloBoardDBVolumes  map[string]bool
+	failShowTask              bool
+	showTaskOutput            string
+	decompositionStatusOutput string
+	taskWithoutCurrentRun     bool
+	staleCurrentRun           bool
+	runtimeExitMissing        bool
+	legacyRuntimeOrphans      []string
+	failLegacyRuntimeRM       bool
+	missingRunHistory         bool
+	schedulerPaused           bool
+	schedulerStopReason       string
+	schedulerExecutedCount    int
+	startBackgroundErr        error
+	err                       error
+	lastEnv                   map[string]string
+	nextPID                   int
+	processCommands           map[int]string
+	errorOutput               string
+	imageInspectDigests       map[string]string
+	imageInspectIDs           map[string]string
+	containerImageIDs         map[string]string
+	logManifestOutput         string
+	logManifestOutputs        []string
+	runtimeLogTargetsOutput   string
+	runtimeLogTargetsOutputs  []string
+	watchSummaryOutput        string
+	taskStatus                string
+	hostAgentOutput           string
+	hostAgentOutputs          []string
+	hostAgentOutputIndex      int
+	runtimeCommandLogOutput   string
+	decompositionPlanOutput   string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -11163,6 +11295,9 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		if r.failShowTask {
 			return []byte("task not found\n"), errors.New("task not found")
 		}
+		if r.showTaskOutput != "" {
+			return []byte(r.showTaskOutput), nil
+		}
 		taskStatus := r.taskStatus
 		if taskStatus == "" {
 			taskStatus = "blocked"
@@ -11174,6 +11309,11 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 			return []byte(fmt.Sprintf("task A2O#16 kind=single status=%s current_run=run-stale\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n", taskStatus)), nil
 		}
 		return []byte(fmt.Sprintf("task A2O#16 kind=single status=%s current_run=run-16\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n", taskStatus)), nil
+	case strings.Contains(joined, " a3 show-decomposition-status "):
+		if r.decompositionStatusOutput != "" {
+			return []byte(r.decompositionStatusOutput), nil
+		}
+		return []byte("decomposition task=A2O#16 state=none\n"), nil
 	case strings.Contains(joined, " a3 force-stop-task ") || strings.Contains(joined, " a3 force-stop-run "):
 		return []byte("force_stop_task task=A2O#16 run=run-16 outcome=cancelled already_terminal=false\nforce_stop_task_state status=verifying current_run=-\n"), nil
 	case strings.Contains(joined, " ruby -rjson -e ") && strings.Contains(joined, "runtime_latest_run"):

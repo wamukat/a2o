@@ -186,6 +186,31 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "shows queued decomposition source tickets before evidence exists" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "Sample#5400",
+          kind: :single,
+          edit_scope: [],
+          status: :todo,
+          labels: ["trigger:investigate"]
+        )
+      )
+
+      out = StringIO.new
+      described_class.start(
+        ["watch-summary", "--storage-backend", "json", "--storage-dir", dir],
+        out: out
+      )
+
+      expect(out.string).to include("Decomposition")
+      expect(out.string).to include("- #5400 state=queued")
+      expect(out.string).to include("Task Tree")
+    end
+  end
+
   it "hides per-task detail lines unless details are requested" do
     Dir.mktmpdir do |dir|
       task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))

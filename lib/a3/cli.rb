@@ -2392,7 +2392,16 @@ module A3
         .select(&:decomposition_requested?)
         .filter_map do |task|
           status = A3::Application::ShowDecompositionStatus.new(storage_dir: storage_dir).call(task_ref: task.ref)
-          next if status.state == "none"
+          if status.state == "none"
+            status = A3::Application::ShowDecompositionStatus::Status.new(
+              task_ref: task.ref,
+              state: "queued",
+              proposal_fingerprint: nil,
+              disposition: nil,
+              blocked_reason: nil,
+              evidence_paths: {}
+            )
+          end
 
           status
         end

@@ -45,7 +45,7 @@ Requirement ticket with trigger:investigate
   -> a human edits / accepts the children by adding trigger:auto-implement
 ```
 
-The source ticket does not need a `repo:*` scope label; repo labels belong on the generated or accepted implementation children. The source ticket receives short comments as the investigate, propose, review, and child creation stages complete. The generated draft children are not runnable until a human accepts them with `trigger:auto-implement`. Configure this flow in `runtime.decomposition` and `runtime.prompts.decomposition` in the project package. See [docs/en/user/30-operating-runtime.md](docs/en/user/30-operating-runtime.md#requirement-decomposition) and [docs/en/user/90-project-package-schema.md](docs/en/user/90-project-package-schema.md#runtime-decomposition).
+The source ticket does not need a `repo:*` scope label; repo labels belong on the generated or accepted implementation children. `watch-summary` shows `trigger:investigate` source tickets in its `Decomposition` section even before evidence exists, and `runtime logs <task-ref>` falls back to decomposition status/evidence when the source ticket has no ordinary implementation log. The source ticket receives short comments as the investigate, propose, review, and child creation stages complete. The generated draft children are not runnable until a human accepts them with `trigger:auto-implement`. Configure this flow in `runtime.decomposition` and `runtime.prompts.decomposition` in the project package. See [docs/en/user/30-operating-runtime.md](docs/en/user/30-operating-runtime.md#requirement-decomposition) and [docs/en/user/90-project-package-schema.md](docs/en/user/90-project-package-schema.md#runtime-decomposition).
 
 ## Principles
 

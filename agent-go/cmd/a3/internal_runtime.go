@@ -1996,6 +1996,13 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 				}
 				printedArtifacts[item.ArtifactID] = true
 			}
+			if len(manifest.CompletedArtifacts) == 0 && !manifest.Active {
+				if printed, err := printRuntimeDecompositionLogFallback(effectiveConfig, plan, runner, stdout, taskRef, *follow); err != nil {
+					return err
+				} else if printed {
+					return nil
+				}
+			}
 			if manifest.Active && manifest.CurrentRunRef != "" && manifest.CurrentPhase != "" {
 				livePath := plan.preferredLiveLogPath(taskRef, manifest.CurrentPhase)
 				liveKey := manifest.CurrentRunRef + "|" + manifest.CurrentPhase + "|" + manifest.LiveMode + "|" + livePath
@@ -2043,6 +2050,34 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 			time.Sleep(*pollInterval)
 		}
 	})
+}
+
+func printRuntimeDecompositionLogFallback(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, taskRef string, follow bool) (bool, error) {
+	taskOutput, err := runtimeDescribeSectionOutput(config, plan, runner, "task", "a3", "show-task", "--storage-backend", "json", "--storage-dir", plan.StorageDir, taskRef)
+	if err != nil {
+		return false, err
+	}
+	statusOutput, err := runtimeDescribeSectionOutput(config, plan, runner, "decomposition_status", "a3", "show-decomposition-status", "--storage-backend", "json", "--storage-dir", plan.StorageDir, taskRef)
+	if err != nil {
+		return false, err
+	}
+	state := parseOutputValue(statusOutput, "state")
+	isDecompositionSource := parseOutputValue(taskOutput, "runnable_reason") == "decomposition_requested"
+	if !isDecompositionSource && state == "none" {
+		return false, nil
+	}
+
+	fmt.Fprintf(stdout, "=== decomposition: %s ===\n", taskRef)
+	if state == "none" {
+		fmt.Fprintf(stdout, "decomposition task=%s state=queued\n", taskRef)
+		fmt.Fprintln(stdout, "decomposition_notice=no evidence has been written yet; the source ticket is waiting for the decomposition scheduler")
+	} else if strings.TrimSpace(statusOutput) != "" {
+		fmt.Fprintln(stdout, strings.TrimSpace(statusOutput))
+	}
+	if follow {
+		fmt.Fprintln(stdout, "decomposition_follow=not_supported reason=no ordinary task run log is active; use `a2o runtime decomposition status` for stage evidence")
+	}
+	return true, nil
 }
 
 func validateRuntimeLogsTaskRef(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, taskRef string) error {

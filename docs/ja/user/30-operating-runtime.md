@@ -168,7 +168,9 @@ a2o project bootstrap --kanban-mode external --kanban-url http://127.0.0.1:3470
 4. proposal review が draft child creation に進める状態かを判定する。
 5. eligible な proposal から `a2o:draft-child` 付きの draft child ticket を作る。
 
-各 stage が完了すると、source ticket に短いコメントが残るため、運用者は Kanban 上で進行を追える。詳細な evidence は runtime storage 配下の `decomposition-evidence/<task>/` に保存される。`a2o runtime decomposition status <task-ref>` は decomposition evidence の概要を表示し、`a2o runtime describe-task <task-ref>` はより広い task 状態を表示する。
+各 stage が完了すると、source ticket に短いコメントが残るため、運用者は Kanban 上で進行を追える。`a2o runtime watch-summary` も `trigger:investigate` の source ticket を `Decomposition` セクションに表示する。まだ evidence がない段階では `state=queued` として表示し、evidence 作成後は decomposition state、disposition、proposal fingerprint があれば表示する。詳細な evidence は runtime storage 配下の `decomposition-evidence/<task>/` に保存される。`a2o runtime decomposition status <task-ref>` は decomposition evidence の概要を表示し、`a2o runtime describe-task <task-ref>` はより広い task 状態を表示する。
+
+`a2o runtime logs <task-ref>` は decomposition source ticket に対しても利用できる。source ticket に通常の implementation / review log artifact がない場合、decomposition status と evidence path の表示にフォールバックする。`--follow` は decomposition の live stream ではない。通常 task run が動いていない場合は decomposition fallback を表示し、その source-ticket 状態では live follow 非対応であることを明示する。
 
 draft child は計画用の artifact である。ボード上には表示されるが、人間が `trigger:auto-implement` を付けて承認するまで runnable にはならない。運用者は承認前に、生成された child の title、body、label、blocker、scope を編集できる。`a2o:draft-child` を外すことは任意の metadata 整理であり、runnable gate は `trigger:auto-implement` である。
 
