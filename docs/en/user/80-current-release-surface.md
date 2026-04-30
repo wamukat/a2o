@@ -1,6 +1,6 @@
-# A2O 0.5.57 Current Release Surface
+# A2O 0.5.58 Current Release Surface
 
-This document describes the currently supported A2O 0.5.57 user surface and validation boundary.
+This document describes the currently supported A2O 0.5.58 user surface and validation boundary.
 
 Use it to confirm which features can be documented for users and what can be treated as validated at this release. For setup steps, read [10-quickstart.md](10-quickstart.md). For configuration fields, read [90-project-package-schema.md](90-project-package-schema.md).
 
@@ -26,10 +26,12 @@ Use it to confirm which features can be documented for users and what can be tre
 - Multi-project runtime context scopes runtime storage, host logs/workspaces, scheduler pid/log files, temp files, and branch namespaces by resolved project key. `a2o runtime resume --all-projects`, `pause --all-projects`, and `status --all-projects` operate one scheduler per registered project while preserving one active task per project.
 - Upgrade diagnosis: `a2o upgrade check`
 - Single-file project package config: `project.yaml`
-- Investigate decomposition MVP: `runtime.decomposition.investigate.command`, `runtime.decomposition.author.command`, `a2o runtime decomposition investigate`, `propose`, `review`, `create-children`, `status`, and `cleanup`
+- Investigate decomposition MVP: `runtime.decomposition.investigate.command`, `runtime.decomposition.author.command`, `a2o runtime decomposition investigate`, `propose`, `review`, `create-children`, `accept-drafts`, `status`, and `cleanup`
 - `trigger:investigate` source tickets are decomposition requests and do not require `repo:*` scope labels; implementation children still require the appropriate repo labels before `trigger:auto-implement` execution.
 - `a2o runtime decomposition investigate`, `propose`, and `review` execute project-owned decomposition commands through the host agent in the same host workspace boundary as implementation workers. This lets project decomposition commands call host-only agent CLIs such as Copilot while the runtime container remains the orchestrator.
 - Decomposition command UX: action-level help for `a2o runtime decomposition <action> --help`, plus direct external task sync/reconciliation for one-shot decomposition commands
+- Requirement decomposition source tickets are requirement artifacts. After successful decomposition they move to `Done`, and A2O creates separate generated implementation work. When Kanbalone supports non-blocking relations, the source ticket is linked to the generated implementation parent with a `related` relation for traceability.
+- `a2o runtime decomposition accept-drafts` accepts selected draft children by adding `trigger:auto-implement`; it can optionally remove `a2o:draft-child` and add `trigger:auto-parent` to the generated parent. The command pauses scheduler processing while mutating labels, resumes only after successful mutation when it paused the scheduler, and leaves the scheduler paused on failure for inspection.
 - Gate-closed decomposition child creation reports `status=gate_closed` and `child_creation_result=not_attempted` without rendering an empty `success=` value
 - Multi-repo documentation surfaces: `docs.surfaces` can declare repo-local docs and integration docs separately, while `docs.authorities` can point to source-of-truth files in a specific repo slot. Worker `docs_context` includes surface id, repo slot, role, candidate docs, and authority source metadata.
 - Agent-materialized execution resolves documentation context from the actual agent source aliases and paths, so repo-local docs and cross-repo authorities are visible when the host agent owns workspace materialization.
@@ -47,7 +49,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Agent HTTP worker gateway, including claimed-job heartbeats
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates
-- GHCR runtime image tags: `latest`, `0.5.57`, and `sha-*`
+- GHCR runtime image tags: `latest`, `0.5.58`, and `sha-*`
 - Tag releases also publish `latest`, so the released version tag and `latest` are expected to point to the same runtime image after release publication finishes.
 - Local release gate: full RSpec suite, release package doctor, local RC host smoke, and real-task local RC smoke for runtime execution / worker launcher / scheduler / Kanban / env generation changes
 
@@ -56,15 +58,15 @@ Use it to confirm which features can be documented for users and what can be tre
 - Project packages that already define `runtime.prompts.repoSlots` should audit multi-repo tasks before upgrading. Multi-repo tasks receive every repo-slot addon in the task `repo_slots` / `edit_scope` order; earlier releases only applied a singular repo-slot layer. If slot-specific instructions conflict or become too broad when combined, split the work into repo-slot child tasks or adjust the package prompts. Use `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib <task-ref>` before running workers to inspect the composed instruction.
 - Project packages that use no-op `runtime.phases.implementation.skill` or `runtime.phases.review.skill` stubs only to satisfy validation may remove those stubs after defining the matching `runtime.prompts.phases.<phase>` prompt or skills. A system prompt alone is not enough; `a2o project validate` still fails with `runtime.phases.<phase>.skill must be provided` when neither a phase skill nor a matching phase prompt/skill exists.
 - `a2o runtime start` and `a2o runtime stop` are no longer compatibility aliases. Use `a2o runtime resume` to resume the resident scheduler and `a2o runtime pause` to pause it after the current work. If the removed commands are invoked, A2O exits non-zero and prints `migration_required=true` with the replacement command.
-- Custom workers must return `review_disposition.slot_scopes` as the review disposition scope field. `review_disposition.repo_scope` is not accepted in 0.5.57 worker results; migrate values such as `"repo_alpha"` to `slot_scopes: ["repo_alpha"]`, and multi-repo findings to all affected slot names. Validate saved worker results with `a2o worker validate-result --request request.json --result result.json --review-slot-scope <slot>`.
+- Custom workers must return `review_disposition.slot_scopes` as the review disposition scope field. `review_disposition.repo_scope` is not accepted in 0.5.58 worker results; migrate values such as `"repo_alpha"` to `slot_scopes: ["repo_alpha"]`, and multi-repo findings to all affected slot names. Validate saved worker results with `a2o worker validate-result --request request.json --result result.json --review-slot-scope <slot>`.
 - SoloBoard-era Kanbalone compatibility names are removed. Use `KANBAN_BACKEND=kanbalone`, `KANBALONE_BASE_URL`, `KANBALONE_API_TOKEN`, `--kanbalone-port`, `A2O_BUNDLE_KANBALONE_PORT`, and `A2O_KANBALONE_INTERNAL_URL`. Removed SoloBoard inputs fail with `migration_required=true` and the replacement name.
 - Bundled Kanbalone data names changed from `<compose-project>_soloboard-data` / `soloboard.sqlite` to `<compose-project>_kanbalone-data` / `kanbalone.sqlite`. If the old volume exists and the new one does not, `a2o kanban up` fails with `migration_required=true` instead of silently creating an empty board. Copy or rename the existing Kanban data before starting the bundled service.
 - Public `A3_*` environment fallbacks for runtime, agent, worker, and root utility configuration are removed where `A2O_*` replacements exist. Use `A2O_RUNTIME_IMAGE`, `A2O_COMPOSE_PROJECT`, `A2O_COMPOSE_FILE`, `A2O_RUNTIME_SERVICE`, `A2O_BUNDLE_AGENT_PORT`, `A2O_BUNDLE_STORAGE_DIR`, `A2O_AGENT_PACKAGE_DIR`, `A2O_AGENT_TOKEN`, `A2O_AGENT_TOKEN_FILE`, `A2O_AGENT_CONTROL_TOKEN`, `A2O_AGENT_CONTROL_TOKEN_FILE`, `A2O_AGENT_*`, `A2O_WORKER_*`, `A2O_WORKSPACE_ROOT`, `A2O_ROOT_DIR`, and `A2O_ROOT_*` root utility controls. Removed `A3_*` inputs fail with `migration_required=true` and the replacement name.
 - `worker-runs.json` is no longer an activity state source. Operator diagnostics, cleanup, rerun readiness, reconcile, and watch-summary use `agent_jobs.json`; leftover `worker-runs.json` is reported with `migration_required=true`.
 - Public agent package and host launcher artifacts use `a2o-agent` / `a2o` names. Release archives are named `a2o-agent-<version>-<os>-<arch>.tar.gz`, archives contain `a2o-agent`, host install writes `a2o` and `a2o-<os>-<arch>` only, shell installers remove stale `a3*` files from their install directory, and old package/cache environment names fail with `migration_required=true`. Runtime-image `a3 agent package ...` also fails with `migration_required=true`; use `a2o agent package ...`.
 - Decomposition command execution now depends on the host launcher and packaged host agent. Upgrade the host launcher/shared assets and runtime image together before using `a2o runtime decomposition investigate`, `propose`, or `review`; otherwise an older host launcher may not recognize the decomposition host-agent command path. A typical upgrade is:
-  - install the new launcher from the release image: `docker run --rm -v "$PWD/.work/a2o:/out" ghcr.io/wamukat/a2o-engine:0.5.57 a2o host install --output-dir /out/bin --share-dir /out/share`
-  - update project runtime image references to `ghcr.io/wamukat/a2o-engine:0.5.57`
+  - install the new launcher from the release image: `docker run --rm -v "$PWD/.work/a2o:/out" ghcr.io/wamukat/a2o-engine:0.5.58 a2o host install --output-dir /out/bin --share-dir /out/share`
+  - update project runtime image references to `ghcr.io/wamukat/a2o-engine:0.5.58`
   - restart the runtime container with the new image before running decomposition commands.
 - Project packages that adopt `docs.surfaces` should validate that every surface `repoSlot` is backed by a configured repo source and that every cross-repo `docs.authorities.*.repoSlot` points at the repo containing the source-of-truth file. No migration is required for existing single-surface `docs` packages.
 
