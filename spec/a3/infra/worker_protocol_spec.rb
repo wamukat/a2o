@@ -212,6 +212,43 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(metadata.to_s).not_to include("system guidance")
   end
 
+  it "omits the core instruction layer when a prompts-only phase has no phase skill" do
+    prompt_config = A3::Domain::ProjectPromptConfig.new(
+      system_document: prompt_document("prompts/system.md", "system guidance"),
+      phases: {
+        "review" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+          prompt_document: prompt_document("prompts/review.md", "review guidance"),
+          skill_documents: [
+            prompt_document("skills/review-policy.md", "review policy")
+          ]
+        )
+      }
+    )
+    runtime = phase_runtime_with_prompt_config(prompt_config, review_skill: nil)
+
+    request_form = described_class.new.request_form(
+      skill: runtime.review_skill,
+      workspace: workspace,
+      task: task,
+      run: run,
+      phase_runtime: runtime,
+      task_packet: task_packet
+    )
+
+    project_prompt = request_form.fetch("phase_runtime").fetch("project_prompt")
+    expect(project_prompt.fetch("layers").map { |layer| layer.fetch("kind") }).to eq(
+      %w[
+        project_system_prompt
+        project_phase_prompt
+        project_phase_skill
+        ticket_phase_instruction
+      ]
+    )
+    expect(project_prompt.fetch("composed_instruction")).not_to include("## A2O core instruction")
+    expect(project_prompt.fetch("composed_instruction")).to include("## prompts/review.md\nreview guidance")
+    expect(request_form).to include("skill" => nil)
+  end
+
   it "selects implementation_rework prompt profile when prior review feedback is present" do
     implementation_run = A3::Domain::Run.new(
       ref: "run-implementation-1",
@@ -1289,14 +1326,14 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
-  def phase_runtime_with_prompt_config(prompt_config, phase: :review, repo_scope: :ui_app, repo_slots: nil)
+  def phase_runtime_with_prompt_config(prompt_config, phase: :review, repo_scope: :ui_app, repo_slots: nil, implementation_skill: "task implementation", review_skill: "task review")
     A3::Domain::PhaseRuntimeConfig.new(
       task_kind: :child,
       repo_scope: repo_scope,
       repo_slots: repo_slots,
       phase: phase,
-      implementation_skill: "task implementation",
-      review_skill: "task review",
+      implementation_skill: implementation_skill,
+      review_skill: review_skill,
       verification_commands: [],
       remediation_commands: [],
       workspace_hook: "bootstrap",

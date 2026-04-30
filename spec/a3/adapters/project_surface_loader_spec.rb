@@ -180,6 +180,72 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     )
   end
 
+  it "allows prompt-backed implementation and review phases without legacy phase skills" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "phases" => {
+            "implementation" => {
+              "prompt" => "prompts/implementation.md"
+            },
+            "review" => {
+              "skills" => ["skills/review-policy.md"]
+            },
+            "decomposition" => {
+              "prompt" => "prompts/decomposition.md"
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {},
+          "review" => {}
+        },
+        "decomposition" => {
+          "investigate" => {
+            "command" => ["commands/investigate.sh"]
+          },
+          "author" => {
+            "command" => ["commands/author.sh"]
+          }
+        }
+      }
+    )
+    write_project_files(
+      "prompts/implementation.md" => "implementation guidance",
+      "skills/review-policy.md" => "review guidance",
+      "prompts/decomposition.md" => "decomposition guidance"
+    )
+
+    surface = loader.load(project_config_path)
+
+    expect(surface.implementation_skill).to be_nil
+    expect(surface.review_skill).to be_nil
+    expect(surface.prompt_config.phase(:implementation).prompt_file).to eq("prompts/implementation.md")
+    expect(surface.prompt_config.phase(:review).skill_files).to eq(["skills/review-policy.md"])
+    expect(surface.decomposition_investigate_command).to eq(["commands/investigate.sh"])
+    expect(surface.decomposition_author_command).to eq(["commands/author.sh"])
+  end
+
+  it "keeps phase skills required when no corresponding prompt phase is configured" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "system" => {
+            "file" => "prompts/system.md"
+          }
+        },
+        "phases" => {
+          "implementation" => {},
+          "review" => {}
+        }
+      }
+    )
+    write_project_files("prompts/system.md" => "system guidance")
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.phases.implementation.skill must be provided")
+  end
+
   it "validates docs configuration for repo-slot-relative paths and authorities" do
     repo_root = File.join(@tmpdir, "docs-repo")
     FileUtils.mkdir_p(File.join(repo_root, "docs", "architecture"))

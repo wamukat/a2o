@@ -463,17 +463,19 @@ runtime:
 - `runtime.prompts.phases.<phase>.skills` 配下の phase skill file: 長めの再利用可能手順、checklist、testing policy、API compatibility rule、review heuristic。
 - Ticket-specific instruction: その ticket 固有の acceptance criteria、要求動作、priority、制約、必要な evidence。
 
-優先順位は固定である。A2O core worker contract と `runtime.phases.<phase>.skill` は、worker result schema、process boundary、required output に対する正本であり続ける。`runtime.prompts` layer は、その contract の後、ticket-specific instruction の前に追加される。古い phase skill と新しい prompt config が両方ある場合、project prompt は context を追加できるが、A2O runtime rule、workspace boundary、Kanban gate、result schema は上書きできない。
+優先順位は固定である。`runtime.phases.<phase>.skill` を設定している場合、その従来の phase skill は `a2o_core_instruction` layer として最初に出力され、worker result schema、process boundary、required output に対する正本であり続ける。`runtime.prompts` layer は、その contract の後、ticket-specific instruction の前に追加される。古い phase skill と新しい prompt config が両方ある場合、project prompt は context を追加できるが、A2O runtime rule、workspace boundary、Kanban gate、result schema は上書きできない。
+
+phase guidance を `runtime.prompts.phases.<phase>` へ完全に移した project では、その phase の `runtime.phases.<phase>.skill` を省略できる。この prompts-only mode では、省略した skill に対する `a2o_core_instruction` layer は出力されない。project system prompt、phase prompt、phase skill file、repo-slot addon、ticket-specific instruction が project prompt stack を構成する。対応する prompt phase には、少なくとも prompt または skill file のどちらかが必要である。system prompt だけでは、その phase が prompts-backed とはみなされない。
 
 `implementation_rework` は prompt profile であり、独立した scheduler phase ではない。prior review feedback を含む implementation request で選択され、省略時は `implementation` にフォールバックする。`parent_review` は他の review profile と同じ prompt layering を使う。`decomposition` は decomposition prompt と任意の `childDraftTemplate` を使う。template は decomposition 専用であり、期待する draft child ticket format を記述する。
 
 A2O は、prompt migration の不正を `a2o project validate` と `a2o project lint` の diagnostics として報告する。典型的な失敗は、prompt / skill file の欠落、package root 外の path、file ではない path、unsupported prompt phase name、同一 phase layer 内の duplicate skill file、未知の `repoSlots` key、repo-slot skill addition の重複、`decomposition` 以外の `childDraftTemplate` である。validation coverage には、`runtime.prompts` を持たない old-style package と project prompt config を持つ new-style package の両方が含まれる。
 
-これは coexistence policy であり、deprecation notice ではない。既存の phase skill は、将来の release で deliberate migration/removal plan が文書化されるまで動作し続ける。
+これは coexistence policy であり、deprecation notice ではない。既存の phase skill は、将来の release で deliberate migration/removal plan が文書化されるまで動作し続ける。一方で、phase guidance を意図的に `runtime.prompts` へ移した project では prompts-only phase も利用できる。
 
 ## Runtime Phases
 
-`runtime.phases` はフェーズごとのスキル、実行コマンド、検証 / 修復コマンド、マージ方針を持つ。A2O はフェーズごとの実行コマンドを内部の標準入力バンドル用ランチャー設定へ変換する。利用者は別途 `launcher.json` を作らない。
+`runtime.phases` はフェーズごとのスキル、実行コマンド、検証 / 修復コマンド、マージ方針を持つ。A2O はフェーズごとの実行コマンドを内部の標準入力バンドル用ランチャー設定へ変換する。利用者は別途 `launcher.json` を作らない。`runtime.phases.<phase>.skill` は package skill file を指す。implementation / review phase では、対応する `runtime.prompts.phases.<phase>` に prompt または skill content がある場合だけ、この skill を省略できる。phase skill も対応する prompt phase もない場合、validation は `runtime.phases.<phase>.skill must be provided` 診断で失敗する。
 
 フェーズ実行コマンドはワーカーバンドルを標準入力で受け取り、ワーカー結果 JSON を `{{result_path}}` に書く必要がある。実行コマンド用プレースホルダーには `{{result_path}}`、`{{schema_path}}`、`{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` が含まれる。検証コマンドと修復コマンドは `{{workspace_root}}`、`{{a2o_root_dir}}`、`{{root_dir}}` を使える。
 

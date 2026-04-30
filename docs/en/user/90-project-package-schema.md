@@ -459,17 +459,19 @@ Use this split when moving existing content:
 - Phase skill files under `runtime.prompts.phases.<phase>.skills`: longer reusable procedures, checklists, testing policy, API compatibility rules, and review heuristics.
 - Ticket-specific instructions: acceptance criteria, requested behavior, priority, constraints, and evidence required for the specific ticket.
 
-Precedence is fixed. The A2O core worker contract and `runtime.phases.<phase>.skill` remain authoritative for worker result schemas, process boundaries, and required outputs. `runtime.prompts` layers are appended after that contract and before ticket-specific instructions. If both old phase skills and new prompt config are present, the project prompt may add context but cannot override A2O runtime rules, workspace boundaries, Kanban gates, or result schemas.
+Precedence is fixed. When `runtime.phases.<phase>.skill` is configured, that legacy phase skill is emitted first as the `a2o_core_instruction` layer and remains authoritative for worker result schemas, process boundaries, and required outputs. `runtime.prompts` layers are appended after that contract and before ticket-specific instructions. If both old phase skills and new prompt config are present, the project prompt may add context but cannot override A2O runtime rules, workspace boundaries, Kanban gates, or result schemas.
+
+Projects that have fully moved a phase to `runtime.prompts.phases.<phase>` may omit `runtime.phases.<phase>.skill` for that phase. In that prompts-only mode, A2O does not emit an `a2o_core_instruction` layer for the omitted skill; the project system prompt, phase prompt, phase skill files, repo-slot addons, and ticket-specific instruction form the project prompt stack. The corresponding prompt phase must contain at least one prompt or skill file. A system prompt alone does not make a phase prompts-backed.
 
 `implementation_rework` is a prompt profile, not a separate scheduler phase. It is selected for implementation requests that include prior review feedback, and it falls back to `implementation` when omitted. `parent_review` follows the same prompt layering as other review profiles. `decomposition` uses the decomposition prompt plus optional `childDraftTemplate`; the template is allowed only for decomposition and should describe the expected draft child ticket format.
 
 A2O reports invalid prompt migration through `a2o project validate` and `a2o project lint` diagnostics. Typical failures include missing prompt or skill files, paths outside the package root, non-file paths, unsupported prompt phase names, duplicate skill files in one phase layer, unknown `repoSlots` keys, duplicate repo-slot skill additions, and `childDraftTemplate` outside `decomposition`. Validation coverage exists for both old-style packages without `runtime.prompts` and new-style packages with project prompt configuration.
 
-This is a coexistence policy, not a deprecation notice. Existing phase skills continue to work until a deliberate migration/removal plan is documented in a future release.
+This is a coexistence policy, not a deprecation notice. Existing phase skills continue to work until a deliberate migration/removal plan is documented in a future release, while prompts-only phases are supported for projects that have intentionally moved their phase guidance into `runtime.prompts`.
 
 ## Runtime Phases
 
-`runtime.phases.<phase>.skill` points to a package skill file.
+`runtime.phases.<phase>.skill` points to a package skill file. It may be omitted for implementation or review phases only when the matching `runtime.prompts.phases.<phase>` entry contains prompt or skill content. If neither a phase skill nor a matching prompt phase is configured, validation fails with a `runtime.phases.<phase>.skill must be provided` diagnostic.
 
 `runtime.phases.<phase>.executor.command` is the agent-side command for implementation and review phases. Supported placeholders:
 

@@ -50,7 +50,8 @@ module A3
           raise A3::Domain::ConfigurationError, "project.yaml runtime.phases must be a mapping"
         end
         reject_legacy_workspace_hook(phases)
-        payload = surface_payload_from_phases(phases)
+        project_prompt_config = prompt_config(runtime, project_package_root, repo_slots: repo_slot_names(project_config))
+        payload = surface_payload_from_phases(phases, prompt_config: project_prompt_config)
 
         A3::Domain::ProjectSurface.new(
           implementation_skill: payload["implementation_skill"],
@@ -63,7 +64,7 @@ module A3
           decomposition_investigate_command: decomposition_command(runtime, "investigate"),
           decomposition_author_command: decomposition_command(runtime, "author"),
           decomposition_review_commands: decomposition_review_commands(runtime),
-          prompt_config: prompt_config(runtime, project_package_root, repo_slots: repo_slot_names(project_config)),
+          prompt_config: project_prompt_config,
           docs_config: project_config.fetch("docs", nil)
         )
       end
@@ -89,7 +90,7 @@ module A3
         payload
       end
 
-      def surface_payload_from_phases(phases)
+      def surface_payload_from_phases(phases, prompt_config:)
         implementation = phase_mapping(phases, "implementation")
         review = phase_mapping(phases, "review")
         verification = optional_phase_mapping(phases, "verification")
@@ -97,12 +98,8 @@ module A3
         metrics = optional_phase_mapping(phases, "metrics")
 
         payload = {
-          "implementation_skill" => implementation.fetch("skill") do
-            raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.implementation.skill must be provided"
-          end,
-          "review_skill" => review.fetch("skill") do
-            raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.review.skill must be provided"
-          end,
+          "implementation_skill" => phase_skill_or_prompt_backed_nil(implementation, "implementation", prompt_config),
+          "review_skill" => phase_skill_or_prompt_backed_nil(review, "review", prompt_config),
           "verification_commands" => verification.fetch("commands", []),
           "remediation_commands" => remediation.fetch("commands", []),
           "metrics_collection_commands" => metrics.fetch("commands", [])
@@ -127,6 +124,19 @@ module A3
           }
         end
         payload
+      end
+
+      def phase_skill_or_prompt_backed_nil(phase, name, prompt_config)
+        return phase.fetch("skill") if phase.key?("skill")
+        return nil if prompt_phase_configured?(prompt_config, name)
+
+        raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.#{name}.skill must be provided"
+      end
+
+      def prompt_phase_configured?(prompt_config, name)
+        return false unless prompt_config
+
+        !prompt_config.phase(name).empty?
       end
 
       def phase_mapping(phases, name)
