@@ -16,7 +16,8 @@ module A3
           run_repository: run_repository,
           task_metrics_repository: task_metrics_repository,
           scheduler_state_repository: scheduler_state_repository(store),
-          scheduler_cycle_repository: scheduler_cycle_repository(store)
+          scheduler_cycle_repository: scheduler_cycle_repository(store),
+          shared_ref_lock_repository: A3::Infra::InMemorySharedRefLockRepository.new
         }
       end
 

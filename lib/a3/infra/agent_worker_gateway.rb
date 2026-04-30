@@ -8,7 +8,9 @@ require "a3/infra/workspace_trace_logger"
 module A3
   module Infra
     class AgentWorkerGateway
-      def initialize(control_plane_client:, worker_command:, worker_command_args: [], runtime_profile:, shared_workspace_mode:, timeout_seconds: 1800, poll_interval_seconds: 1.0, job_id_generator: -> { SecureRandom.uuid }, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, worker_protocol: A3::Infra::WorkerProtocol.new, workspace_request_builder: nil, env: {}, agent_environment: nil)
+      attr_writer :shared_ref_lock_guard
+
+      def initialize(control_plane_client:, worker_command:, worker_command_args: [], runtime_profile:, shared_workspace_mode:, timeout_seconds: 1800, poll_interval_seconds: 1.0, job_id_generator: -> { SecureRandom.uuid }, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, worker_protocol: A3::Infra::WorkerProtocol.new, workspace_request_builder: nil, env: {}, agent_environment: nil, shared_ref_lock_guard: nil)
         @control_plane_client = control_plane_client
         @worker_command = worker_command.to_s
         @worker_command_args = Array(worker_command_args).map(&:to_s).freeze
@@ -24,6 +26,7 @@ module A3
         @env = env.transform_keys(&:to_s).transform_values(&:to_s).freeze
         validate_root_env!(@env)
         @agent_environment = agent_environment
+        @shared_ref_lock_guard = shared_ref_lock_guard
       end
 
       def run(skill:, workspace:, task:, run:, phase_runtime:, task_packet:, prior_review_feedback: nil)
@@ -108,13 +111,25 @@ module A3
           prior_review_feedback: prior_review_feedback
         )
         prompt_metadata = @worker_protocol.project_prompt_metadata(worker_protocol_request)
+        workspace_request = @workspace_request_builder.call(workspace: workspace, task: task, run: run)
         request = build_job_request(
           workspace: workspace,
           task: task,
           run: run,
-          workspace_request: @workspace_request_builder.call(workspace: workspace, task: task, run: run),
+          workspace_request: workspace_request,
           worker_protocol_request: worker_protocol_request
         )
+        lock_requests = publish_lock_requests_for(task: task, run: run, workspace_request: workspace_request)
+        if lock_requests.any? && @shared_ref_lock_guard
+          return @shared_ref_lock_guard.with_locks(lock_requests) do
+            run_agent_materialized_request(request: request, skill: skill, prompt_metadata: prompt_metadata, task: task, run: run, workspace: workspace)
+          end
+        end
+
+        run_agent_materialized_request(request: request, skill: skill, prompt_metadata: prompt_metadata, task: task, run: run, workspace: workspace)
+      end
+
+      def run_agent_materialized_request(request:, skill:, prompt_metadata:, task:, run:, workspace:)
         log_agent_job_event("enqueue_start", request: request, skill: skill)
         record = enqueue(request)
         return record if record.is_a?(A3::Application::ExecutionResult)
@@ -162,6 +177,22 @@ module A3
         return with_project_prompt_metadata(with_agent_job_result(execution, completed.result), prompt_metadata) if execution
 
         with_project_prompt_metadata(@worker_protocol.missing_result, prompt_metadata)
+      end
+
+      def publish_lock_requests_for(task:, run:, workspace_request:)
+        return [] unless workspace_request.publish_policy
+
+        workspace_request.slots.each_with_object([]) do |(slot_name, descriptor), requests|
+          next unless descriptor.fetch("ownership") == "edit_target"
+
+          requests << {
+            operation: :publish,
+            repo_slot: slot_name,
+            target_ref: descriptor.fetch("ref"),
+            run_ref: run.ref,
+            project_key: run.project_key || task.project_key
+          }
+        end
       end
 
       def build_job_request(workspace:, task:, run:, workspace_request: nil, worker_protocol_request: nil)

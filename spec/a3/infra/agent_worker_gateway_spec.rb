@@ -277,6 +277,43 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     )
   end
 
+  it "holds shared-ref publish locks around agent materialized implementation jobs" do
+    lock_guard = instance_double(A3::Application::SharedRefLockGuard)
+    lock_requests = nil
+    allow(lock_guard).to receive(:with_locks) do |requests, &block|
+      lock_requests = requests
+      block.call
+    end
+    client.on_fetch = lambda do |job_id|
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: worker_success,
+          workspace_descriptor: workspace_descriptor(
+            "repo_beta" => materialized_published_slot_descriptor("changed.txt")
+          )
+        )
+      )
+    end
+    gateway = materialized_gateway(shared_ref_lock_guard: lock_guard)
+
+    execution = run_gateway(gateway)
+
+    expect(execution.success).to be(true)
+    expect(lock_requests).to eq([
+      {
+        operation: :publish,
+        repo_slot: "repo_beta",
+        target_ref: "refs/heads/a2o/work/Sample-42",
+        run_ref: "run-1",
+        project_key: "a2o"
+      }
+    ])
+  end
+
   it "keeps project prompt metadata when an agent materialized job fails before worker result handling" do
     client.on_fetch = ->(job_id) { client.complete(job_id, agent_result(job_id, :failed, 127)) }
     prompt_config = A3::Domain::ProjectPromptConfig.new(
@@ -729,7 +766,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     )
   end
 
-  def materialized_gateway
+  def materialized_gateway(shared_ref_lock_guard: nil)
     described_class.new(
       control_plane_client: client,
       worker_command: "ruby",
@@ -740,7 +777,8 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       poll_interval_seconds: 0,
       job_id_generator: -> { "job-1" },
       sleeper: ->(_seconds) {},
-      workspace_request_builder: ->(**kwargs) { materialized_workspace_request(publish: kwargs.fetch(:run).phase.to_sym == :implementation) }
+      workspace_request_builder: ->(**kwargs) { materialized_workspace_request(publish: kwargs.fetch(:run).phase.to_sym == :implementation) },
+      shared_ref_lock_guard: shared_ref_lock_guard
     )
   end
 

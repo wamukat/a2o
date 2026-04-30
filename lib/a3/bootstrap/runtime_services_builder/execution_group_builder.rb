@@ -5,6 +5,14 @@ module A3
     class RuntimeServicesBuilder
       class ExecutionGroupBuilder
         def self.build(repositories:, support_group:, command_runner:, merge_runner:, worker_gateway:, external_task_source:)
+          lock_guard = A3::Application::SharedRefLockGuard.new(
+            lock_repository: repositories.fetch(:shared_ref_lock_repository, A3::Infra::InMemorySharedRefLockRepository.new)
+          )
+          locked_merge_runner = A3::Infra::SharedRefLockingMergeRunner.new(
+            inner: merge_runner,
+            lock_guard: lock_guard
+          )
+          worker_gateway.shared_ref_lock_guard = lock_guard if worker_gateway.respond_to?(:shared_ref_lock_guard=)
           build_merge_plan = A3::Application::BuildMergePlan.new(
             task_repository: repositories.fetch(:task_repository),
             run_repository: repositories.fetch(:run_repository)
@@ -40,7 +48,7 @@ module A3
               run_repository: repositories.fetch(:run_repository),
               register_completed_run: support_group.fetch(:register_completed_run),
               build_merge_plan: build_merge_plan,
-              merge_runner: merge_runner,
+              merge_runner: locked_merge_runner,
               prepare_workspace: support_group.fetch(:prepare_workspace),
               command_runner: command_runner
             )
