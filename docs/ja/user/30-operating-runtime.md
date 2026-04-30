@@ -147,7 +147,7 @@ a2o project bootstrap --kanban-mode external --kanban-url http://127.0.0.1:3470
 
 ## 要求の分解
 
-カンバンチケットが大きな要求であり、実装前に調査して子チケットへ分けたい場合は `trigger:investigate` を使う。`trigger:investigate` が付いた source ticket は、`trigger:auto-implement` が同時に付いていても decomposition domain に属する。source ticket 自体を通常の実装対象として扱うには、先に `trigger:investigate` を外す。通常運用では、実装は生成または承認された child ticket 側で進める。
+カンバンチケットが大きな要求であり、実装前に調査して子チケットへ分けたい場合は `trigger:investigate` を使う。`trigger:investigate` が付いた source ticket は、`trigger:auto-implement` が同時に付いていても decomposition domain に属する。source ticket 自体を通常の実装対象として扱うには、先に `trigger:investigate` を外す。source ticket は実装対象ではないため、`repo:*` scope label は不要である。通常運用では、実装は生成または承認された child ticket 側で進め、実装対象の child ticket に適切な repo label を付ける。
 
 自動 decomposition flow は次の順で進む。
 

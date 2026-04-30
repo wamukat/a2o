@@ -27,6 +27,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Upgrade diagnosis: `a2o upgrade check`
 - Single-file project package config: `project.yaml`
 - Investigate decomposition MVP: `runtime.decomposition.investigate.command`, `runtime.decomposition.author.command`, `a2o runtime decomposition investigate`, `propose`, `review`, `create-children`, `status`, and `cleanup`
+- `trigger:investigate` source tickets are decomposition requests and do not require `repo:*` scope labels; implementation children still require the appropriate repo labels before `trigger:auto-implement` execution.
 - Decomposition command UX: action-level help for `a2o runtime decomposition <action> --help`, plus direct external task sync/reconciliation for one-shot decomposition commands
 - Gate-closed decomposition child creation reports `status=gate_closed` and `child_creation_result=not_attempted` without rendering an empty `success=` value
 - Project prompt composition: `runtime.prompts.repoSlots` composes repo-slot prompt and skill addons for each scoped slot in multi-repo tasks, following the task `repo_slots` / `edit_scope` order.

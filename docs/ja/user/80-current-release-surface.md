@@ -27,6 +27,7 @@ A2O 0.5.54 で現在利用できる公開機能と検証範囲を示す。
 - アップグレード診断: `a2o upgrade check`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
 - investigate decomposition MVP: `runtime.decomposition.investigate.command`、`runtime.decomposition.author.command`、`a2o runtime decomposition investigate`、`propose`、`review`、`create-children`、`status`、`cleanup`
+- `trigger:investigate` 付き source ticket は decomposition request であり、`repo:*` scope label は不要である。`trigger:auto-implement` で実行する implementation child には、引き続き適切な repo label が必要である。
 - decomposition command UX: `a2o runtime decomposition <action> --help` の action-level help と、単発 decomposition command の外部 task 同期 / 照合
 - gate closed の decomposition child creation は、空の `success=` を表示せず、`status=gate_closed` と `child_creation_result=not_attempted` を表示する
 - project prompt composition: `runtime.prompts.repoSlots` は multi-repo task で、task の `repo_slots` / `edit_scope` 順に各 repo slot の prompt / skill addon を合成する。
