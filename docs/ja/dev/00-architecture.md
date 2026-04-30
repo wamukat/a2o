@@ -23,6 +23,7 @@
 | a2o-agent とのジョブ境界 | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
 | 自動チケット分解 MVP | [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md) |
 | Kanban-first な分解 draft child | [76-kanban-first-decomposition-drafts.md](76-kanban-first-decomposition-drafts.md) |
+| host-agent 経由の decomposition command protocol | [77-host-agent-decomposition-command-protocol.md](77-host-agent-decomposition-command-protocol.md) |
 | コアとプロジェクト拡張の境界 | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
 | マルチプロジェクト runtime context | [85-multi-project-runtime-contexts.md](85-multi-project-runtime-contexts.md) |
 | docs-impact と共通仕様ドキュメント | [86-docs-impact-and-shared-specs.md](86-docs-impact-and-shared-specs.md) |

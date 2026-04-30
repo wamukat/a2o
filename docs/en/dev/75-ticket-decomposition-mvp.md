@@ -101,6 +101,8 @@ The exact schema can evolve, but the public contract should follow the existing 
 - Investigation commands must not mutate repo slots, create implementation branches, or take locks that would block implementation runs.
 - Non-zero exit or invalid JSON blocks the decomposition pipeline with evidence.
 
+User-facing decomposition CLI actions must run project-owned commands through the host-agent command protocol when the project command needs host-only AI worker CLIs, credentials, or local agent configuration. See [77-host-agent-decomposition-command-protocol.md](77-host-agent-decomposition-command-protocol.md).
+
 The request should include:
 
 - source ticket ref, title, description, labels, and priority

@@ -101,6 +101,8 @@ runtime:
 - investigation command は repo slot を変更せず、implementation branch を作らず、implementation run を止める lock を取得しない。
 - 非ゼロ終了または不正 JSON は、証跡付きで分解パイプラインを block する。
 
+user-facing な decomposition CLI action は、project command が host-only AI worker CLI、credential、local agent config を必要とする場合、host-agent command protocol 経由で project-owned command を実行する。詳細は [77-host-agent-decomposition-command-protocol.md](77-host-agent-decomposition-command-protocol.md) を参照する。
+
 request には次を含める。
 
 - source ticket ref、title、description、label、priority
