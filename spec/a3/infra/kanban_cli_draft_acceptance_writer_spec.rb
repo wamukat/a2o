@@ -3,6 +3,7 @@
 RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
   class FakeDraftAcceptanceClient
     attr_reader :commands, :comments, :json_calls
+    attr_accessor :task_find_returns_summaries
 
     def initialize
       @tasks = {
@@ -29,6 +30,7 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
       @commands = []
       @comments = []
       @json_calls = []
+      @task_find_returns_summaries = false
     end
 
     def fetch_task_by_id(task_id)
@@ -47,7 +49,10 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
       @json_calls << args
       if args.first == "task-find"
         query = args.fetch(args.index("--query") + 1)
-        return @tasks.values.select { |task| task.fetch("description", "").include?("Decomposition source: #{query}") }
+        matches = @tasks.values.select { |task| task.fetch("description", "").include?("Decomposition source: #{query}") }
+        return matches.map { |task| task.merge("description" => "") } if @task_find_returns_summaries
+
+        return matches
       end
       return @relations.fetch(Integer(args.fetch(args.index("--task-id") + 1)), {}) if args.first == "task-relation-list"
 
@@ -146,6 +151,7 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
   it "accepts generated-parent children when invoked with the requirement source ticket" do
     client = FakeDraftAcceptanceClient.new
     client.fetch_task_by_ref("Portal#243")["description"] = "Decomposition source: Portal#240"
+    client.task_find_returns_summaries = true
     writer = described_class.new(project: "Portal", client: client)
 
     result = writer.call(

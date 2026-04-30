@@ -104,7 +104,18 @@ module A3
 
       def find_generated_parents(source_task_ref)
         matches = @client.run_json_command("task-find", "--project", @project, "--query", source_task_ref)
-        Array(matches).select { |task| task.fetch("description", "").include?("Decomposition source: #{source_task_ref}") }
+        hydrate_task_find_matches(matches).select { |task| task.fetch("description", "").include?("Decomposition source: #{source_task_ref}") }
+      end
+
+      def hydrate_task_find_matches(matches)
+        Array(matches).map do |task|
+          next task if task.fetch("description", "").to_s.strip != ""
+
+          ref = task["ref"] || task["task_ref"] || task["reference"]
+          ref ? @client.fetch_task_by_ref(ref) : task
+        rescue StandardError
+          task
+        end
       end
 
       def normalize_relation_refs(relations, relation_kind:)

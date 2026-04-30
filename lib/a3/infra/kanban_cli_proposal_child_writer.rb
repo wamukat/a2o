@@ -104,7 +104,7 @@ module A3
 
       def find_existing_generated_parent(source_task_ref)
         matches = @client.run_json_command("task-find", "--project", @project, "--query", source_task_ref)
-        exact = Array(matches).select { |task| task.fetch("description", "").include?("Decomposition source: #{source_task_ref}") }
+        exact = hydrate_task_find_matches(matches).select { |task| task.fetch("description", "").include?("Decomposition source: #{source_task_ref}") }
         if exact.size > 1
           duplicates = exact.map { |task| "#{task["ref"] || "unknown-ref"}(id=#{task["id"] || "unknown"})" }.join(", ")
           raise A3::Domain::ConfigurationError, "duplicate generated decomposition parents for #{source_task_ref}: #{duplicates}"
@@ -230,13 +230,24 @@ module A3
 
       def find_existing_child(child_key)
         matches = @client.run_json_command("task-find", "--project", @project, "--query", child_key)
-        exact = Array(matches).select { |task| task.fetch("description", "").include?("Child key: #{child_key}") }
+        exact = hydrate_task_find_matches(matches).select { |task| task.fetch("description", "").include?("Child key: #{child_key}") }
         if exact.size > 1
           duplicates = exact.map { |task| "#{task["ref"] || "unknown-ref"}(id=#{task["id"] || "unknown"})" }.join(", ")
           raise A3::Domain::ConfigurationError, "duplicate decomposition children for child key #{child_key}: #{duplicates}"
         end
 
         exact.first
+      end
+
+      def hydrate_task_find_matches(matches)
+        Array(matches).map do |task|
+          next task if task.fetch("description", "").to_s.strip != ""
+
+          ref = task["ref"] || task["task_ref"] || task["reference"]
+          ref ? @client.fetch_task_by_ref(ref) : task
+        rescue StandardError
+          task
+        end
       end
 
       def create_child(payload)
@@ -290,6 +301,8 @@ module A3
       end
 
       def ensure_comment(task_id, body)
+        return if comment_exists?(task_id, body)
+
         @client.run_command_with_text_file_option(
           "task-comment-create",
           "--project", @project,
@@ -298,6 +311,16 @@ module A3
           text: body,
           tempfile_prefix: "a2o-decomposition-child-comment"
         )
+      end
+
+      def comment_exists?(task_id, body)
+        comments = @client.run_json_command("task-comment-list", "--project", @project, "--task-id", task_id.to_s)
+        Array(comments).any? do |comment|
+          text = comment["bodyMarkdown"] || comment["body"] || comment["comment"] || comment["text"]
+          text.to_s == body.to_s
+        end
+      rescue StandardError
+        false
       end
 
       def ensure_source_parent_comment(source_task_id, generated_parent_ref:, proposal_fingerprint:)

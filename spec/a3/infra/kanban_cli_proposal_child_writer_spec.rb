@@ -3,7 +3,7 @@
 RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
   class FakeProposalClient
     attr_reader :created, :labels, :relations, :comments, :commands
-    attr_accessor :fail_after_first_create, :fail_dependency_relation
+    attr_accessor :fail_after_first_create, :fail_dependency_relation, :task_find_returns_summaries
 
     def initialize(existing: [])
       @existing = existing
@@ -11,21 +11,29 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
       @labels = []
       @relations = []
       @comments = []
+      @comment_texts = Hash.new { |hash, key| hash[key] = [] }
       @commands = []
       @fail_after_first_create = false
       @fail_dependency_relation = false
+      @task_find_returns_summaries = false
     end
 
     def run_json_command(*args)
       case args.first
       when "task-find"
-        @existing
+        matches = @existing + @created
+        return matches unless @task_find_returns_summaries
+
+        matches.map { |task| task.merge("description" => "") }
       when "task-create"
         task = { "id" => 5301 + @created.size, "ref" => "A3-v2##{5301 + @created.size}", "title" => args[args.index("--title") + 1], "description" => "created" }
         @created << task
         task
       when "task-relation-list"
         { "subtask" => [] }
+      when "task-comment-list"
+        task_id = args.fetch(args.index("--task-id") + 1)
+        @comment_texts[task_id].map { |text| { "bodyMarkdown" => text } }
       else
         {}
       end
@@ -46,7 +54,11 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
       nil
     end
 
-    def run_command_with_text_file_option(*args, **)
+    def run_command_with_text_file_option(*args, text:, **)
+      if args.first == "task-comment-create"
+        task_id = args.fetch(args.index("--task-id") + 1)
+        @comment_texts[task_id] << text
+      end
       run_command(*args)
     end
 
@@ -120,6 +132,37 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     expect(client.created.size).to eq(1)
     expect(generated_parent(client).fetch("description")).to include("Decomposition source: A3-v2#5300")
     expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(true)
+  end
+
+  it "hydrates task-find summaries before matching generated parent and child markers" do
+    existing = [
+      { "id" => 5301, "ref" => "A3-v2#5301", "description" => "Decomposition source: A3-v2#5300" },
+      { "id" => 5302, "ref" => "A3-v2#5302", "description" => "Child key: child-key-1\nProposal fingerprint: old" }
+    ]
+    client = FakeProposalClient.new(existing: existing)
+    client.task_find_returns_summaries = true
+    writer = described_class.new(project: "A3-v2", client: client)
+
+    result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence(fingerprint: "new"))
+
+    expect(result.success?).to be(true)
+    expect(result.parent_ref).to eq("A3-v2#5301")
+    expect(result.child_refs).to eq(["A3-v2#5302"])
+    expect(client.created).to eq([])
+  end
+
+  it "does not duplicate owned comments on reconciliation reruns" do
+    client = FakeProposalClient.new
+    writer = described_class.new(project: "A3-v2", client: client, mode: :draft)
+
+    first = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence)
+    second = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence)
+
+    expect(first.success?).to be(true)
+    expect(second.success?).to be(true)
+    expect(client.comments.count { |args| args.include?("5300") }).to eq(1)
+    expect(client.comments.count { |args| args.include?("5301") }).to eq(1)
+    expect(client.comments.count { |args| args.include?("5302") }).to eq(1)
   end
 
   it "creates draft children without runnable trigger labels" do
