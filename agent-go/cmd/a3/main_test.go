@@ -3756,12 +3756,13 @@ func TestRuntimeRunOnceAutomaticallyRunsTriggerInvestigateDecomposition(t *testi
 		"run-decomposition-investigation",
 		"run-decomposition-proposal-author",
 		"run-decomposition-proposal-review",
-		"run-decomposition-child-creation",
-		"'--gate'",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("automatic decomposition missing %q in:\n%s", want, joined)
 		}
+	}
+	if strings.Contains(joined, "run-decomposition-child-creation") {
+		t.Fatalf("automatic decomposition should not rerun child creation after review created draft children:\n%s", joined)
 	}
 	if strings.Contains(joined, "'a3' 'execute-until-idle'") {
 		t.Fatalf("decomposition cycle should not also run generic implementation tasks:\n%s", joined)
@@ -10381,9 +10382,11 @@ func TestRuntimeLoopAutomaticallyRunsTriggerInvestigateDecomposition(t *testing.
 	}
 	if !strings.Contains(joined, "run-decomposition-investigation") ||
 		!strings.Contains(joined, "run-decomposition-proposal-author") ||
-		!strings.Contains(joined, "run-decomposition-proposal-review") ||
-		!strings.Contains(joined, "run-decomposition-child-creation") {
+		!strings.Contains(joined, "run-decomposition-proposal-review") {
 		t.Fatalf("runtime loop should execute the decomposition pipeline, calls:\n%s", joined)
+	}
+	if strings.Contains(joined, "run-decomposition-child-creation") {
+		t.Fatalf("runtime loop should not rerun child creation after review created draft children:\n%s", joined)
 	}
 	if strings.Contains(joined, "'a3' 'execute-until-idle'") {
 		t.Fatalf("decomposition loop cycle should not also run generic implementation tasks:\n%s", joined)

@@ -2526,19 +2526,6 @@ func runAutomaticRuntimeDecompositionIfReady(config runtimeInstanceConfig, plan 
 			return true, err
 		}
 	}
-
-	command, err := runtimeDecompositionCommand("create-children", selection.TaskRef, plan, nil, runtimeDecompositionOverrides{Gate: true})
-	if err != nil {
-		return true, err
-	}
-	output, err := dockerComposeExecOutput(config, plan, runner, runtimeInspectionArgs(command...)...)
-	if err != nil {
-		return true, fmt.Errorf("runtime decomposition create-children failed: %w", err)
-	}
-	fmt.Fprint(stdout, string(output))
-	if len(output) == 0 || output[len(output)-1] != '\n' {
-		fmt.Fprintln(stdout)
-	}
 	return true, nil
 }
 

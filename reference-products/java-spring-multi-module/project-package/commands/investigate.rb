@@ -5,7 +5,7 @@ require "json"
 
 request = JSON.parse(File.read(ENV.fetch("A2O_DECOMPOSITION_REQUEST_PATH")))
 roles_path = ARGV.fetch(0, nil)
-if roles_path && !File.absolute_path?(roles_path)
+if roles_path && File.expand_path(roles_path) != roles_path
   command_relative = File.expand_path(roles_path, __dir__)
   package_relative = File.expand_path(roles_path, File.expand_path("..", __dir__))
   roles_path = File.exist?(command_relative) ? command_relative : package_relative
@@ -35,11 +35,11 @@ if sample_root && Dir.exist?(sample_root)
     .select { |entry| File.directory?(File.join(sample_root, entry)) && File.exist?(File.join(sample_root, entry, "pom.xml")) }
     .sort
 elsif !role_modules.empty?
-  modules = slot_paths.filter_map do |slot, path|
+  modules = slot_paths.each_with_object([]) do |(slot, path), memo|
     role = role_modules[slot]
     next unless role && File.exist?(File.join(path, "pom.xml"))
 
-    role.fetch("path", slot)
+    memo << role.fetch("path", slot)
   end.sort
 end
 
