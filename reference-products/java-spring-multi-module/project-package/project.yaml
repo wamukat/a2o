@@ -14,6 +14,42 @@ repos:
     path: ../utility-lib
     role: product
     label: repo:lib
+  docs:
+    path: ../docs
+    role: docs
+    label: repo:docs
+docs:
+  repoSlot: docs
+  root: docs
+  index: docs/README.md
+  categories:
+    features:
+      path: docs/features
+      index: docs/features/README.md
+    shared_specs:
+      path: docs/shared-specs
+      index: docs/shared-specs/README.md
+    interfaces:
+      path: docs/interfaces
+      index: docs/interfaces/README.md
+  languages:
+    primary: en
+    secondary:
+      - ja
+  policy:
+    missingRoot: create
+  impactPolicy:
+    defaultSeverity: warning
+    mirrorPolicy: require_canonical_warn_mirror
+  authorities:
+    greeting_api:
+      source: docs/interfaces/greeting-api.md
+      docs:
+        - docs/interfaces/greeting-api.md
+    greeting_shared_spec:
+      source: docs/shared-specs/greeting-format.md
+      docs:
+        - docs/shared-specs/greeting-format.md
 agent:
   workspace_root: .work/a2o-dev-sample/agent/workspaces
   required_bins:

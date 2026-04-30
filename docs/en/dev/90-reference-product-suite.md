@@ -19,7 +19,7 @@ A2O must work across common product shapes rather than depending on one stack. T
 | TypeScript API/Web | `reference-products/typescript-api-web/` | API and browser UI in one repository |
 | Go API/CLI | `reference-products/go-api-cli/` | server and CLI in one Go module |
 | Python Service | `reference-products/python-service/` | lightweight service and Python verification |
-| Java Spring multi-module | `reference-products/java-spring-multi-module/` | Maven reactor with `utility-lib` and a Spring Boot `web-app` |
+| Java Spring multi-module | `reference-products/java-spring-multi-module/` | Maven reactor with `utility-lib`, a Spring Boot `web-app`, and a dedicated docs slot |
 | Multi-repo Fixture | `reference-products/multi-repo-fixture/` | parent-child and cross-repo validation |
 
 Each product keeps its package at `project-package/`.
@@ -38,6 +38,8 @@ The package must define deterministic test or build commands, agent prerequisite
 
 `project.yaml` is the single author-facing package config file. It owns package identity, kanban selection, repo slots, agent prerequisites, runtime surface commands, and merge defaults.
 
+Reference packages that exercise docs-impact should also declare `docs` config in `project.yaml`. The Java Spring multi-module package is the canonical docs-impact reference: it has `app`, `lib`, and `docs` repo slots, feature docs, shared specs, interface docs, authority sources, managed index blocks, and mirror policy.
+
 ## Validation Boundary
 
 Core validation starts with the reference suite. If a runtime, workspace, worker gateway, verification, merge, or package preset change cannot be validated against at least one reference product, create a ticket to add or improve a reference task template before relying on external product evidence.
@@ -55,5 +57,6 @@ The suite is the release validation target for:
 - parent live merge
 - runtime watch summary and task diagnostics
 - evidence persistence
+- docs-impact context, evidence, summaries, and docs repo slot validation
 
 Validation runs may use deterministic workers to isolate Engine behavior from model variability, but the exercised surfaces remain real: kanban pickup and transitions, branch namespace creation, workspace materialization, worker gateway transport, agent-side publication, verification commands, merge, and evidence persistence.

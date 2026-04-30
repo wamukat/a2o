@@ -170,6 +170,45 @@ docs:
 
 Authority sources represent source-of-truth artifacts such as OpenAPI, DB migrations, generated schema files, or existing shared specifications. A non-generated authority source must exist when the repo slot checkout is available. Use `generated: true` only when project policy intentionally treats the source as generated outside the current checkout.
 
+### Docs-impact workflow
+
+When `docs` is configured, A2O includes `docs_context` in implementation, review, parent-review, and decomposition worker requests. The context gives workers the configured categories, candidate docs, authority sources, language policy, expected docs actions, and traceability refs. Workers still decide the actual impact per task and report it through the `docs_impact` evidence object.
+
+Implementation results can include:
+
+```json
+{
+  "docs_impact": {
+    "disposition": "yes",
+    "categories": ["shared_specs", "interfaces"],
+    "updated_docs": [
+      "docs/shared-specs/greeting-format.md",
+      "docs/interfaces/greeting-api.md"
+    ],
+    "updated_authorities": ["greeting_api"],
+    "skipped_docs": [
+      {
+        "path": "docs/ja/interfaces/greeting-api.md",
+        "reason": "mirror follow-up"
+      }
+    ],
+    "matched_rules": ["interface_changed"],
+    "review_disposition": "accepted",
+    "traceability": {
+      "related_requirements": ["A2O#394"],
+      "source_issues": ["wamukat/a2o#16"],
+      "related_tickets": ["A2O#391", "A2O#393"]
+    }
+  }
+}
+```
+
+Review phases check the same evidence. For `disposition: yes` or `maybe`, review must set `review_disposition` to `accepted`, `warned`, `blocked`, or `follow_up`. A blocked child review returns to implementation; a parent-review follow-up must create or link a follow-up child so docs debt is not hidden by a clean task result.
+
+Kanban comments contain only a short docs-impact summary. Runtime state such as current lane, run status, review disposition, and merge status remains in run evidence and task comments. Do not copy those lifecycle fields into docs front matter.
+
+Existing projects can omit `docs` and continue to run. To migrate incrementally, add `docs.root`, one category, and one managed index block first, then add authorities and language policy once the team agrees on the source of truth. A2O refuses unsafe docs paths with explicit validation errors, so fix package validation before enabling runtime processing.
+
 ## Agent
 
 `agent.required_bins` lists commands that must exist where `a2o-agent` runs.

@@ -16,6 +16,7 @@
 | `skills/` | AI ワーカーに渡すプロダクト固有の判断基準を書く | 実装、レビュー、親タスクレビュー |
 | `commands/` | ビルド、テスト、検証、修復、ワーカー用コマンドを置く | フェーズ実行、検証、修復 |
 | `task-templates/` | 人間がカンバンタスクを作るときの型を置く | タスク作成時の参考 |
+| `project.yaml` の docs 設定 | docs root、category、authority、言語ポリシー、traceability ルールを定義する | docs-impact context、ドキュメント更新、レビュー確認 |
 
 A2O はプロダクトの方針をソースコードから自動推測しない。リポジトリの境界、使うコマンド、AI に守らせるルール、検証方法はプロジェクトパッケージに明示する。
 
@@ -64,6 +65,8 @@ project-package/
 `skills/` には AI ワーカーに渡すルールを置く。スキルは短く、具体的に書く。リポジトリの境界、編集してよいパス、レビュー観点、残すべき証跡など、AI が安全に推測できない判断を明記する。
 
 `task-templates/` には人間がタスクを作るときのテンプレートを置く。A2O はテンプレートを自動投入しない。実行対象はカンバンに登録されたタスクである。
+
+ドキュメント影響を A2O に判断させたいプロジェクトは、`project.yaml` に `docs` を宣言する。docs 設定では、docs repo slot、root、category directory、managed index、authority source、言語ポリシーを定義する。A2O は implementation / review worker に `docs_context` を渡し、shared spec、interface、architecture、migration、利用者向け挙動が変わる task では `docs_impact` evidence を期待する。
 
 `tests/fixtures/` にはパッケージ検証用のフィクスチャや、結果が決まっているテスト用ワーカーを置く。通常運用のランタイムフェーズからフィクスチャを呼ばない。
 

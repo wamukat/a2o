@@ -415,6 +415,7 @@ run evidence には docs-impact の判断を記録する。
     "review_disposition": "accepted",
     "traceability": {
       "related_requirements": ["A2O#371"],
+      "source_issues": ["wamukat/a2o#16"],
       "related_tickets": ["A2O#372", "A2O#374"]
     }
   }
@@ -422,6 +423,8 @@ run evidence には docs-impact の判断を記録する。
 ```
 
 チケットコメントには要約だけを残す。
+
+参照検証では、この流れを実際の project package で確認する。Java Spring multi-module 参照プロダクトは `app`、`lib`、専用 `docs` slot を宣言する。docs 設定には app feature docs、greeting の shared spec、interface docs、managed index block、authority、ja/en mirror policy を含める。project validation で docs 設定が読み込めること、worker protocol test で `docs_context` と `docs_impact` evidence が扱えること、completion comment test で Kanban へ短い summary だけが投稿されることを確認する。
 
 ## 13. Prompt / skill 設定との関係
 

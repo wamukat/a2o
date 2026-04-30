@@ -14,6 +14,7 @@ A project package collects four kinds of user-managed input in one directory.
 | `skills/` | Product-specific judgment rules passed to AI workers | Implementation, review, parent review |
 | `commands/` | Build, test, verification, remediation, and worker commands | Phase execution, verification, remediation |
 | `task-templates/` | Human-facing examples for creating kanban tasks | Task authoring |
+| docs config in `project.yaml` | Documentation roots, categories, authorities, language policy, and traceability rules | Docs-impact context, documentation updates, review checks |
 
 A2O does not infer product policy from source code. If a worker needs a repository boundary, command, rule, or verification method, put it in the project package.
 
@@ -51,6 +52,7 @@ The project package owns product-specific decisions:
 - implementation and review skills
 - build, test, verification, and remediation commands
 - project-specific coding rules
+- documentation surfaces, shared specs, authorities, and mirror policy
 - optional knowledge catalog commands
 - task templates used by humans to create board tasks
 
@@ -80,6 +82,8 @@ project-package/
 `task-templates/` contains human-facing task templates. A2O does not enqueue them automatically.
 
 For multi-repo parent-child workflows, write task templates with explicit repo labels. A parent task that affects two repositories should carry both repo labels, for example `repo:catalog` and `repo:storefront`. Avoid synthetic aggregate labels that mean "all repos" or "both repos".
+
+If the project wants A2O to reason about documentation impact, declare `docs` in `project.yaml`. The docs config names the docs repo slot, root, category directories, managed indexes, authority sources, and language policy. A2O then sends `docs_context` to implementation/review workers and expects `docs_impact` evidence when a task changes shared specs, interfaces, architecture, migrations, or user-visible behavior.
 
 `tests/fixtures/` contains deterministic workers, fake inputs, or package validation fixtures. Runtime production config should not reference this directory.
 

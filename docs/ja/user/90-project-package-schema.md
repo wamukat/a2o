@@ -176,6 +176,45 @@ docs:
 
 authority source は OpenAPI、DB migration、生成 schema、既存の shared specification などの source of truth artifact を表す。repo slot checkout が利用できる場合、generated ではない authority source は存在していなければならない。`generated: true` は、project policy としてその source が現在の checkout 外で生成されることを意図的に認める場合だけ使う。
 
+### docs-impact の流れ
+
+`docs` を設定すると、A2O は implementation、review、parent-review、decomposition の worker request に `docs_context` を含める。ここには、設定済み category、候補 docs、authority source、言語ポリシー、期待する docs action、traceability refs が入る。実際に docs-impact があるかは task ごとに worker が判断し、`docs_impact` evidence として返す。
+
+implementation result には次のような値を含められる。
+
+```json
+{
+  "docs_impact": {
+    "disposition": "yes",
+    "categories": ["shared_specs", "interfaces"],
+    "updated_docs": [
+      "docs/shared-specs/greeting-format.md",
+      "docs/interfaces/greeting-api.md"
+    ],
+    "updated_authorities": ["greeting_api"],
+    "skipped_docs": [
+      {
+        "path": "docs/ja/interfaces/greeting-api.md",
+        "reason": "mirror follow-up"
+      }
+    ],
+    "matched_rules": ["interface_changed"],
+    "review_disposition": "accepted",
+    "traceability": {
+      "related_requirements": ["A2O#394"],
+      "source_issues": ["wamukat/a2o#16"],
+      "related_tickets": ["A2O#391", "A2O#393"]
+    }
+  }
+}
+```
+
+review phase は同じ evidence を確認する。`disposition: yes` または `maybe` の場合、review は `review_disposition` として `accepted`、`warned`、`blocked`、`follow_up` のいずれかを返す。child review の `blocked` は implementation へ戻す。parent-review の `follow_up` は follow-up child を作る、または紐づける必要があり、docs debt を成功結果の裏に隠してはならない。
+
+Kanban コメントには短い docs-impact summary だけを残す。現在レーン、run status、review disposition、merge status のような lifecycle state は run evidence とタスクコメントが持つ。docs front matter へこれらをコピーしない。
+
+既存プロジェクトは `docs` を省略したまま動かせる。段階的に移行する場合は、まず `docs.root`、1 つの category、1 つの managed index block を追加し、その後で authority と言語ポリシーを足す。A2O は危険な docs path を明示的な validation error で拒否するため、runtime 処理を有効にする前に package validation を通す。
+
 `agent` はホスト側ワークスペース、プロダクトのツールチェーン要件、実行コマンド要件を持つ。`required_bins` は、エージェントが作業開始前に前提条件を検証できるよう宣言的に残す。
 
 `runtime` は実行時の既定値とフェーズ定義を持つ。
