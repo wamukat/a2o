@@ -115,6 +115,14 @@ module A3
         end
 
         payload.map { |raw_snapshot| normalize_snapshot(raw_snapshot) }.compact.freeze
+      rescue A3::Domain::ConfigurationError => e
+        return tolerate_invalid_edit_scope ? { snapshots: [], warnings: [] }.freeze : [] if missing_project_error?(e)
+
+        raise
+      end
+
+      def missing_project_error?(error)
+        error.message.include?("Project not found: #{@project}")
       end
 
       def watch_summary_warning(raw_snapshot:, error:)

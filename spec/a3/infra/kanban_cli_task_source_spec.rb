@@ -57,6 +57,30 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
+  it "treats a missing kanban project as an empty task selection" do
+    client = Class.new do
+      def run_json_command(*args)
+        raise A3::Domain::ConfigurationError, "kanban command failed (exit=1): Project not found: LocalRCSmoke" if args.fetch(0) == "task-snapshot-list"
+
+        raise "unexpected command: #{args.inspect}"
+      end
+    end.new
+
+    source = described_class.new(
+      client: client,
+      project: "LocalRCSmoke",
+      repo_label_map: {
+        "repo:app" => [:app]
+      },
+      trigger_labels: ["trigger:investigate"]
+    )
+
+    expect(source.load).to eq([])
+    watch_result = source.load_for_watch_summary
+    expect(watch_result.tasks).to eq([])
+    expect(watch_result.warnings).to eq([])
+  end
+
   it "skips decomposed source tickets before requiring a repo scope label" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,
