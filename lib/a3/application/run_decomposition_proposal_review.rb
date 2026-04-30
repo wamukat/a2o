@@ -5,10 +5,13 @@ require "json"
 require "open3"
 require "pathname"
 require "tmpdir"
+require_relative "decomposition_workspace_permissions"
 
 module A3
   module Application
     class RunDecompositionProposalReview
+      include DecompositionWorkspacePermissions
+
       Result = Struct.new(:success, :summary, :disposition, :critical_findings, :review_results, :request_path, :evidence_path, :source_ticket_summary, keyword_init: true)
 
       def initialize(storage_dir:, project_root: Dir.pwd, process_runner: nil, publish_external_task_activity: nil, clock: -> { Time.now.utc }, host_shared_root: nil, container_shared_root: nil, command_workspace_dir: nil)
@@ -32,6 +35,7 @@ module A3
         workspace_root = prepare_workspace_root(task.ref)
         request_path = File.join(workspace_root, ".a2o", "decomposition-review-request.json")
         FileUtils.mkdir_p(File.dirname(request_path))
+        make_shared_workspace_tree(File.dirname(request_path))
         request = request_payload(task: task, proposal_evidence_path: command_path(proposal_evidence_path), proposal_evidence: proposal_evidence, workspace_root: command_path(workspace_root))
         write_json(request_path, request)
 
@@ -205,8 +209,10 @@ module A3
 
       def prepare_workspace_root(task_ref)
         base_dir = File.join(@command_workspace_dir || File.join(@storage_dir, "decomposition-workspaces"), slugify(task_ref))
-        FileUtils.mkdir_p(base_dir)
-        Dir.mktmpdir("proposal-review-#{@clock.call.strftime('%Y%m%d%H%M%S')}-", base_dir)
+        make_shared_workspace_dir(base_dir)
+        Dir.mktmpdir("proposal-review-#{@clock.call.strftime('%Y%m%d%H%M%S')}-", base_dir).tap do |path|
+          make_shared_workspace_tree(path)
+        end
       end
 
       def default_proposal_evidence_path(task_ref)

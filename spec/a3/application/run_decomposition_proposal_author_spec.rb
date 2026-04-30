@@ -97,6 +97,8 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
       expect(captured.fetch(:command)).to eq(["author-proposal", "--json"])
       expect(captured.fetch(:chdir)).to eq(result.workspace_root)
       expect(result.workspace_root).to start_with(File.join(dir, "decomposition-workspaces", "A3-v2-5300"))
+      expect(File.stat(result.workspace_root).mode & 0o777).to eq(0o777)
+      expect(File.stat(File.join(result.workspace_root, ".a2o")).mode & 0o777).to eq(0o777)
       expect(captured.fetch(:env)).to include(
         "A2O_DECOMPOSITION_AUTHOR_REQUEST_PATH" => result.request_path,
         "A2O_DECOMPOSITION_AUTHOR_RESULT_PATH" => result.result_path,

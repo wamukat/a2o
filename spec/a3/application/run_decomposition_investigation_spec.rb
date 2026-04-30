@@ -97,6 +97,8 @@ RSpec.describe A3::Application::RunDecompositionInvestigation do
         )
         expect(isolated_repo).not_to eq(source_repo)
         expect(isolated_repo).to start_with(result.workspace_root)
+        expect(File.stat(result.workspace_root).mode & 0o777).to eq(0o777)
+        expect(File.stat(File.join(result.workspace_root, ".a2o")).mode & 0o777).to eq(0o777)
         expect(File.read(File.join(isolated_repo, "lib", "a.rb"))).to eq("class A; end\n")
         expect(File.read(File.join(isolated_repo, "service", "app.rb"))).to eq("class App; end\n")
         expect(File).not_to exist(File.join(isolated_repo, ".git"))

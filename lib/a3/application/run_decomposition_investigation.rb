@@ -5,10 +5,13 @@ require "json"
 require "open3"
 require "pathname"
 require "tmpdir"
+require_relative "decomposition_workspace_permissions"
 
 module A3
   module Application
     class RunDecompositionInvestigation
+      include DecompositionWorkspacePermissions
+
       Result = Struct.new(:success, :summary, :result, :source_ticket_summary, :source_ticket_summary_published, :request_path, :result_path, :workspace_root, :evidence_path, :failing_command, :observed_state, keyword_init: true)
       DEFAULT_SLOT_EXCLUDES = %w[
         .git
@@ -44,6 +47,7 @@ module A3
         request_path = File.join(workspace_root, ".a2o", "decomposition-investigate-request.json")
         result_path = File.join(workspace_root, ".a2o", "decomposition-investigate-result.json")
         FileUtils.mkdir_p(File.dirname(request_path))
+        make_shared_workspace_tree(File.dirname(request_path))
         FileUtils.rm_f(result_path)
         request = request_payload(
           task: task,
@@ -126,13 +130,15 @@ module A3
 
       def prepare_workspace_root(task_ref:)
         base_dir = File.join(@command_workspace_dir || File.join(@storage_dir, "decomposition-workspaces"), slugify(task_ref))
-        FileUtils.mkdir_p(base_dir)
-        Dir.mktmpdir("run-#{@clock.call.strftime('%Y%m%d%H%M%S')}-", base_dir)
+        make_shared_workspace_dir(base_dir)
+        Dir.mktmpdir("run-#{@clock.call.strftime('%Y%m%d%H%M%S')}-", base_dir).tap do |path|
+          make_shared_workspace_tree(path)
+        end
       end
 
       def materialize_isolated_slot_paths(slot_paths:, workspace_root:)
         slots_root = File.join(workspace_root, "slots")
-        FileUtils.mkdir_p(slots_root)
+        make_shared_workspace_dir(slots_root)
         stringify_hash(slot_paths).each_with_object({}) do |(slot, source_path), memo|
           destination = File.join(slots_root, slugify(slot))
           progress("decomposition materialize slot=#{slot} source=#{source_path} destination=#{destination} status=start")

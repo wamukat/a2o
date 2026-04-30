@@ -6811,6 +6811,42 @@ func TestRuntimeDecompositionForwardsEvidencePathOverrides(t *testing.T) {
 	}
 }
 
+func TestRuntimeDecompositionReusesReadyAgentServerForManualCommand(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "decomposition", "propose", "A2O#245"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if strings.Contains(joined, "'a3' 'agent-server'") {
+		t.Fatalf("manual decomposition should reuse the ready runtime agent server instead of starting another one:\n%s", joined)
+	}
+	if !strings.Contains(stdout.String(), "runtime_agent_server_reuse port=7393 host_port=7393") {
+		t.Fatalf("stdout should report agent-server reuse, got:\n%s", stdout.String())
+	}
+}
+
 func TestRuntimeDecompositionPrintsRuntimeLogBeforeHostAgentFailureCleanup(t *testing.T) {
 	t.Setenv("A2O_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS", "1")
 	tempDir := t.TempDir()

@@ -272,7 +272,7 @@ func runRuntimeDecompositionWithHostAgent(config runtimeInstanceConfig, plan run
 		if err := ensureRuntimeHostAgent(config, plan, runner, stdout); err != nil {
 			return err
 		}
-		if err := startRuntimeAgentServer(config, plan, runner, stdout); err != nil {
+		if err := startRuntimeAgentServerUnlessReady(config, plan, runner, stdout); err != nil {
 			return err
 		}
 		if err := waitForRuntimeControlPlane(plan, runner); err != nil {
@@ -3431,11 +3431,19 @@ func startRuntimeAgentServer(config runtimeInstanceConfig, plan runtimeRunOncePl
 	}.shellScript())
 }
 
-func waitForRuntimeControlPlane(plan runtimeRunOncePlan, runner commandRunner) error {
-	probeURL := fmt.Sprintf("http://127.0.0.1:%s/v1/agent/jobs/next?agent=probe", plan.AgentPort)
-	if strings.TrimSpace(plan.ProjectKey) != "" {
-		probeURL = probeURL + "&project_key=" + url.QueryEscape(strings.TrimSpace(plan.ProjectKey))
+func startRuntimeAgentServerUnlessReady(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
+	if runtimeControlPlaneReady(plan, runner) {
+		fmt.Fprintf(stdout, "runtime_agent_server_reuse port=%s host_port=%s\n", plan.AgentInternalPort, plan.AgentPort)
+		return nil
 	}
+	return startRuntimeAgentServer(config, plan, runner, stdout)
+}
+
+func waitForRuntimeControlPlane(plan runtimeRunOncePlan, runner commandRunner) error {
+	if runtimeControlPlaneReady(plan, runner) {
+		return nil
+	}
+	probeURL := runtimeControlPlaneProbeURL(plan)
 	var lastErr error
 	for i := 0; i < 80; i++ {
 		if _, err := runExternal(runner, "curl", "-fsS", probeURL); err == nil {
@@ -3446,6 +3454,19 @@ func waitForRuntimeControlPlane(plan runtimeRunOncePlan, runner commandRunner) e
 		time.Sleep(250 * time.Millisecond)
 	}
 	return fmt.Errorf("agent control plane did not become ready: %w", lastErr)
+}
+
+func runtimeControlPlaneReady(plan runtimeRunOncePlan, runner commandRunner) bool {
+	_, err := runExternal(runner, "curl", "-fsS", runtimeControlPlaneProbeURL(plan))
+	return err == nil
+}
+
+func runtimeControlPlaneProbeURL(plan runtimeRunOncePlan) string {
+	probeURL := fmt.Sprintf("http://127.0.0.1:%s/v1/agent/jobs/next?agent=probe", plan.AgentPort)
+	if strings.TrimSpace(plan.ProjectKey) != "" {
+		probeURL = probeURL + "&project_key=" + url.QueryEscape(strings.TrimSpace(plan.ProjectKey))
+	}
+	return probeURL
 }
 
 func startRuntimeExecuteUntilIdle(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
