@@ -57,4 +57,28 @@ RSpec.describe A3::Infra::AgentDecompositionCommandRunner do
     expect(request.worker_protocol_request).to include("command_intent" => "decomposition_propose")
     expect(request.workspace_request).to be_nil
   end
+
+  it "uses the current project key when the CLI passes nil explicitly" do
+    result = Result.new(succeeded?: true, exit_code: 0, worker_protocol_result: {})
+    control_plane = DecompositionControlPlane.new(result: result)
+
+    previous = ENV["A2O_PROJECT_KEY"]
+    ENV["A2O_PROJECT_KEY"] = "release-smoke"
+    begin
+      runner = described_class.new(
+        control_plane_client: control_plane,
+        runtime_profile: "host-local",
+        task_ref: "A2O#411",
+        stage: :investigate,
+        project_key: nil,
+        job_id_generator: -> { "job-project-key" }
+      )
+
+      runner.call(["true"], chdir: "/host/work", env: {})
+    ensure
+      ENV["A2O_PROJECT_KEY"] = previous
+    end
+
+    expect(control_plane.requests.fetch(0).project_key).to eq("release-smoke")
+  end
 end

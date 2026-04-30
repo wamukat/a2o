@@ -971,6 +971,21 @@ RSpec.describe A3::CLI do
     end.to raise_error(ArgumentError, /only one of --dry-run or --apply/)
   end
 
+  it "accepts the agent decomposition command runner for proposal review parsing" do
+    options = described_class.send(
+      :parse_run_decomposition_proposal_review_options,
+      [
+        "A2O#411",
+        "/tmp/project.yaml",
+        "--decomposition-command-runner", "agent-http",
+        "--agent-control-plane-url", "http://127.0.0.1:7393"
+      ]
+    )
+
+    expect(options.fetch(:decomposition_command_runner)).to eq("agent-http")
+    expect(options.fetch(:agent_control_plane_url)).to eq("http://127.0.0.1:7393")
+  end
+
   it "builds a subprocess-cli kanban bridge bundle" do
     Dir.mktmpdir do |dir|
       bundle = described_class.send(

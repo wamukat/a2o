@@ -13,7 +13,7 @@ module A3
         @runtime_profile = runtime_profile.to_s
         @task_ref = task_ref.to_s
         @stage = stage.to_s
-        @project_key = A3::Domain::ProjectIdentity.normalize(project_key)
+        @project_key = A3::Domain::ProjectIdentity.normalize(project_key) || A3::Domain::ProjectIdentity.current
         @timeout_seconds = Integer(timeout_seconds)
         @poll_interval_seconds = Float(poll_interval_seconds)
         @job_id_generator = job_id_generator

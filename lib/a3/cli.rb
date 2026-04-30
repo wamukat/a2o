@@ -51,7 +51,7 @@ module A3
       out.puts("  a2o worker:stdin-bundle")
       out.puts("")
       out.puts("host launcher:")
-      out.puts("  docker run --rm -v \"$PWD/.work/a2o:/out\" ghcr.io/wamukat/a2o-engine:0.5.55 a2o host install --output-dir /out/bin --share-dir /out/share")
+      out.puts("  docker run --rm -v \"$PWD/.work/a2o:/out\" ghcr.io/wamukat/a2o-engine:0.5.56 a2o host install --output-dir /out/bin --share-dir /out/share")
       out.puts("  .work/a2o/bin/a2o project template --help")
     end
 
@@ -1720,7 +1720,8 @@ module A3
         verification_command_runner: nil,
         merge_runner: nil,
         worker_gateway: nil,
-        worker_command_args: []
+        worker_command_args: [],
+        decomposition_command_runner: nil
       }
 
       parser = OptionParser.new
@@ -1731,6 +1732,7 @@ module A3
       parser.on("--proposal-evidence-path PATH") { |value| options[:proposal_evidence_path] = File.expand_path(value) }
       add_kanban_bridge_options(parser, options)
       add_verification_command_runner_options(parser, options)
+      add_decomposition_command_runner_options(parser, options)
       add_merge_runner_options(parser, options)
       add_worker_gateway_options(parser, options)
       remaining = parser.parse(argv)
