@@ -51,7 +51,7 @@ module A3
       out.puts("  a2o worker:stdin-bundle")
       out.puts("")
       out.puts("host launcher:")
-      out.puts("  docker run --rm -v \"$PWD/.work/a2o:/out\" ghcr.io/wamukat/a2o-engine:0.5.55 a2o host install --output-dir /out/bin --share-dir /out/share")
+      out.puts("  docker run --rm -v \"$PWD/.work/a2o:/out\" ghcr.io/wamukat/a2o-engine:0.5.56 a2o host install --output-dir /out/bin --share-dir /out/share")
       out.puts("  .work/a2o/bin/a2o project template --help")
     end
 
@@ -314,11 +314,16 @@ module A3
       ) do |session|
         task = resolve_direct_task(container: session.container, task_ref: session.options.fetch(:task_ref))
         bridge = build_external_task_bridge(session.options)
+        process_runner = build_decomposition_process_runner(options: session.options, task_ref: task.ref, stage: :investigate)
         result = A3::Application::RunDecompositionInvestigation.new(
           storage_dir: session.options.fetch(:storage_dir),
           project_root: File.dirname(session.options.fetch(:manifest_path)),
+          process_runner: process_runner,
           progress_io: out,
-          publish_external_task_activity: session.container.fetch(:external_task_activity_publisher)
+          publish_external_task_activity: session.container.fetch(:external_task_activity_publisher),
+          host_shared_root: session.options[:host_shared_root],
+          container_shared_root: session.options[:container_shared_root],
+          command_workspace_dir: session.options[:decomposition_workspace_dir]
         ).call(
           task: task,
           project_surface: session.project_surface,
@@ -345,9 +350,14 @@ module A3
         merge_runner: merge_runner
       ) do |session|
         task = resolve_direct_task(container: session.container, task_ref: session.options.fetch(:task_ref))
+        process_runner = build_decomposition_process_runner(options: session.options, task_ref: task.ref, stage: :propose)
         runner = A3::Application::RunDecompositionProposalAuthor.new(
           storage_dir: session.options.fetch(:storage_dir),
           project_root: File.dirname(session.options.fetch(:manifest_path)),
+          process_runner: process_runner,
+          host_shared_root: session.options[:host_shared_root],
+          container_shared_root: session.options[:container_shared_root],
+          command_workspace_dir: session.options[:decomposition_workspace_dir],
           publish_external_task_activity: session.container.fetch(:external_task_activity_publisher)
         )
         result = runner.call(
@@ -373,9 +383,14 @@ module A3
         merge_runner: merge_runner
       ) do |session|
         task = resolve_direct_task(container: session.container, task_ref: session.options.fetch(:task_ref))
+        process_runner = build_decomposition_process_runner(options: session.options, task_ref: task.ref, stage: :review)
         result = A3::Application::RunDecompositionProposalReview.new(
           storage_dir: session.options.fetch(:storage_dir),
           project_root: File.dirname(session.options.fetch(:manifest_path)),
+          process_runner: process_runner,
+          host_shared_root: session.options[:host_shared_root],
+          container_shared_root: session.options[:container_shared_root],
+          command_workspace_dir: session.options[:decomposition_workspace_dir],
           publish_external_task_activity: session.container.fetch(:external_task_activity_publisher)
         ).call(
           task: task,
@@ -1605,7 +1620,8 @@ module A3
         verification_command_runner: nil,
         merge_runner: nil,
         worker_gateway: nil,
-        worker_command_args: []
+        worker_command_args: [],
+        decomposition_command_runner: nil
       }
 
       parser = OptionParser.new
@@ -1615,6 +1631,7 @@ module A3
       parser.on("--preset-dir DIR") { |value| options[:preset_dir] = File.expand_path(value) }
       add_kanban_bridge_options(parser, options)
       add_verification_command_runner_options(parser, options)
+      add_decomposition_command_runner_options(parser, options)
       add_merge_runner_options(parser, options)
       add_worker_gateway_options(parser, options)
       remaining = parser.parse(argv)
@@ -1634,7 +1651,8 @@ module A3
         verification_command_runner: nil,
         merge_runner: nil,
         worker_gateway: nil,
-        worker_command_args: []
+        worker_command_args: [],
+        decomposition_command_runner: nil
       }
 
       parser = OptionParser.new
@@ -1644,6 +1662,7 @@ module A3
       parser.on("--preset-dir DIR") { |value| options[:preset_dir] = File.expand_path(value) }
       add_kanban_bridge_options(parser, options)
       add_verification_command_runner_options(parser, options)
+      add_decomposition_command_runner_options(parser, options)
       add_merge_runner_options(parser, options)
       add_worker_gateway_options(parser, options)
       remaining = parser.parse(argv)
@@ -1664,7 +1683,8 @@ module A3
         verification_command_runner: nil,
         merge_runner: nil,
         worker_gateway: nil,
-        worker_command_args: []
+        worker_command_args: [],
+        decomposition_command_runner: nil
       }
 
       parser = OptionParser.new
@@ -1675,6 +1695,7 @@ module A3
       parser.on("--investigation-evidence-path PATH") { |value| options[:investigation_evidence_path] = File.expand_path(value) }
       add_kanban_bridge_options(parser, options)
       add_verification_command_runner_options(parser, options)
+      add_decomposition_command_runner_options(parser, options)
       add_merge_runner_options(parser, options)
       add_worker_gateway_options(parser, options)
       remaining = parser.parse(argv)
@@ -1699,7 +1720,8 @@ module A3
         verification_command_runner: nil,
         merge_runner: nil,
         worker_gateway: nil,
-        worker_command_args: []
+        worker_command_args: [],
+        decomposition_command_runner: nil
       }
 
       parser = OptionParser.new
@@ -1710,6 +1732,7 @@ module A3
       parser.on("--proposal-evidence-path PATH") { |value| options[:proposal_evidence_path] = File.expand_path(value) }
       add_kanban_bridge_options(parser, options)
       add_verification_command_runner_options(parser, options)
+      add_decomposition_command_runner_options(parser, options)
       add_merge_runner_options(parser, options)
       add_worker_gateway_options(parser, options)
       remaining = parser.parse(argv)
@@ -2764,6 +2787,13 @@ module A3
       parser.on("--verification-command-runner VALUE") { |value| options[:verification_command_runner] = value }
     end
 
+    def add_decomposition_command_runner_options(parser, options)
+      parser.on("--decomposition-command-runner VALUE") { |value| options[:decomposition_command_runner] = value }
+      parser.on("--host-shared-root PATH") { |value| options[:host_shared_root] = File.expand_path(value) }
+      parser.on("--container-shared-root PATH") { |value| options[:container_shared_root] = value }
+      parser.on("--decomposition-workspace-dir PATH") { |value| options[:decomposition_workspace_dir] = File.expand_path(value) }
+    end
+
     def add_merge_runner_options(parser, options)
       parser.on("--merge-runner VALUE") { |value| options[:merge_runner] = value }
     end
@@ -2979,6 +3009,34 @@ module A3
       end
 
       raise ArgumentError, "Unsupported verification command runner: #{runner}"
+    end
+
+    def build_decomposition_process_runner(options:, task_ref:, stage:, fallback: nil)
+      runner = options[:decomposition_command_runner].to_s
+      return fallback if runner.empty?
+      return fallback if runner == "local"
+
+      if runner == "agent-http"
+        raise ArgumentError, "--agent-control-plane-url is required for --decomposition-command-runner agent-http" unless options[:agent_control_plane_url]
+        validate_agent_control_plane_url!(options.fetch(:agent_control_plane_url), allow_insecure_remote: options.fetch(:agent_allow_insecure_remote, false))
+
+        return A3::Infra::AgentDecompositionCommandRunner.new(
+          control_plane_client: A3::Infra::AgentControlPlaneClient.new(
+            base_url: options.fetch(:agent_control_plane_url),
+            auth_token: agent_control_auth_token(options)
+          ),
+          runtime_profile: options.fetch(:agent_runtime_profile, "default"),
+          task_ref: task_ref,
+          stage: stage,
+          project_key: options[:project_key],
+          timeout_seconds: options.fetch(:agent_job_timeout_seconds, 1800),
+          poll_interval_seconds: options.fetch(:agent_job_poll_interval_seconds, 1.0),
+          env: options.fetch(:agent_env, {}),
+          agent_environment: agent_environment_from_options(options)
+        )
+      end
+
+      raise ArgumentError, "Unsupported decomposition command runner: #{runner}"
     end
 
     def build_merge_runner(options:, fallback:)

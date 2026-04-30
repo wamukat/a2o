@@ -235,6 +235,9 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 	fmt.Fprintf(stdout, "runtime_instance_config=%s\n", publicInstanceConfigPath(configPath))
 	fmt.Fprintf(stdout, "runtime_project_key=%s\n", context.ProjectKey)
 	fmt.Fprintf(stdout, "runtime_storage=internal-managed project_config=%s surface_source=project-package\n", plan.ManifestPath)
+	if runtimeDecompositionUsesHostAgent(action) {
+		return runRuntimeDecompositionWithHostAgent(effectiveConfig, plan, command, action, runner, stdout)
+	}
 	output, err := dockerComposeExecOutput(effectiveConfig, plan, runner, runtimeInspectionArgs(command...)...)
 	if err != nil {
 		return fmt.Errorf("runtime decomposition %s failed: %w", action, err)
@@ -244,6 +247,73 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 		fmt.Fprintln(stdout)
 	}
 	return nil
+}
+
+func runtimeDecompositionUsesHostAgent(action string) bool {
+	return action == "investigate" || action == "propose" || action == "review"
+}
+
+func runRuntimeDecompositionWithHostAgent(config runtimeInstanceConfig, plan runtimeRunOncePlan, command []string, action string, runner commandRunner, stdout io.Writer) error {
+	return withComposeEnv(config, func() error {
+		services := []string{config.RuntimeService}
+		if !isExternalKanban(config) {
+			services = append(services, "kanbalone")
+		}
+		if _, err := runExternal(runner, "docker", append(plan.ComposePrefix, append([]string{"up", "-d"}, services...)...)...); err != nil {
+			return err
+		}
+		decompositionPlan := decompositionRuntimeProcessPlan(config, plan, action)
+		if err := cleanupRuntimeProcesses(config, decompositionPlan, runner); err != nil {
+			return err
+		}
+		if err := ensureRuntimeLauncherConfig(plan, stdout); err != nil {
+			return err
+		}
+		if err := ensureRuntimeHostAgent(config, plan, runner, stdout); err != nil {
+			return err
+		}
+		if err := startRuntimeAgentServer(config, plan, runner, stdout); err != nil {
+			return err
+		}
+		if err := waitForRuntimeControlPlane(plan, runner); err != nil {
+			return err
+		}
+		if err := startRuntimeDecompositionCommand(config, decompositionPlan, command, action, runner, stdout); err != nil {
+			return err
+		}
+		if err := runHostAgentLoop(config, decompositionPlan, runner, stdout); err != nil {
+			output := dockerComposeExecBestEffort(config, decompositionPlan, runner, "cat", decompositionPlan.RuntimeLog)
+			if len(output) > 0 {
+				fmt.Fprint(stdout, string(output))
+				if output[len(output)-1] != '\n' {
+					fmt.Fprintln(stdout)
+				}
+			}
+			_ = cleanupRuntimeProcesses(config, decompositionPlan, runner)
+			return err
+		}
+		exit, err := readRuntimeExit(config, decompositionPlan, runner)
+		if err != nil {
+			return err
+		}
+		output := dockerComposeExecBestEffort(config, decompositionPlan, runner, "cat", decompositionPlan.RuntimeLog)
+		fmt.Fprint(stdout, string(output))
+		if len(output) == 0 || output[len(output)-1] != '\n' {
+			fmt.Fprintln(stdout)
+		}
+		if exit != "0" {
+			return fmt.Errorf("runtime decomposition %s failed with exit=%s", action, exit)
+		}
+		return cleanupRuntimeProcesses(config, decompositionPlan, runner)
+	})
+}
+
+func decompositionRuntimeProcessPlan(config runtimeInstanceConfig, plan runtimeRunOncePlan, action string) runtimeRunOncePlan {
+	suffix := "decomposition-" + safeProjectKeyComponent(action)
+	plan.RuntimeLog = runtimeProjectTempPath(config, suffix+".log")
+	plan.RuntimeExitFile = runtimeProjectTempPath(config, suffix+".exit")
+	plan.RuntimePIDFile = runtimeProjectTempPath(config, suffix+".pid")
+	return plan
 }
 
 func splitRuntimeDecompositionArgs(action string, args []string) ([]string, []string, error) {
@@ -287,11 +357,13 @@ func runtimeDecompositionCommand(action string, taskRef string, plan runtimeRunO
 	case "investigate":
 		args = append(args, "run-decomposition-investigation", taskRef, plan.ManifestPath)
 		args = append(args, runtimeDecompositionRuntimeOptions(plan)...)
+		args = append(args, runtimeDecompositionHostAgentOptions(plan)...)
 		args = append(args, runtimeDecompositionKanbanOptions(plan)...)
 		args = append(args, runtimeDecompositionRepoSourceOptions(repoSources, plan.RepoSources)...)
 	case "propose":
 		args = append(args, "run-decomposition-proposal-author", taskRef, plan.ManifestPath)
 		args = append(args, runtimeDecompositionRuntimeOptions(plan)...)
+		args = append(args, runtimeDecompositionHostAgentOptions(plan)...)
 		if strings.TrimSpace(overrides.InvestigationEvidencePath) != "" {
 			args = append(args, "--investigation-evidence-path", workspaceContainerPath(plan.HostRootDir, overrides.InvestigationEvidencePath))
 		}
@@ -300,6 +372,7 @@ func runtimeDecompositionCommand(action string, taskRef string, plan runtimeRunO
 	case "review":
 		args = append(args, "run-decomposition-proposal-review", taskRef, plan.ManifestPath)
 		args = append(args, runtimeDecompositionRuntimeOptions(plan)...)
+		args = append(args, runtimeDecompositionHostAgentOptions(plan)...)
 		if strings.TrimSpace(overrides.ProposalEvidencePath) != "" {
 			args = append(args, "--proposal-evidence-path", workspaceContainerPath(plan.HostRootDir, overrides.ProposalEvidencePath))
 		}
@@ -364,6 +437,29 @@ func printRuntimeDecompositionActionUsage(w io.Writer, action string) error {
 
 func runtimeDecompositionRuntimeOptions(plan runtimeRunOncePlan) []string {
 	return []string{"--storage-backend", "json", "--storage-dir", plan.StorageDir, "--preset-dir", plan.PresetDir}
+}
+
+func runtimeDecompositionHostAgentOptions(plan runtimeRunOncePlan) []string {
+	args := []string{
+		"--decomposition-command-runner", "agent-http",
+		"--agent-control-plane-url", "http://127.0.0.1:" + plan.AgentInternalPort,
+		"--agent-runtime-profile", "host-local",
+		"--agent-job-timeout-seconds", plan.JobTimeoutSeconds,
+		"--agent-job-poll-interval-seconds", "1.0",
+		"--host-shared-root", plan.HostRootDir,
+		"--container-shared-root", "/workspace",
+		"--decomposition-workspace-dir", "/workspace/.work/a2o/decomposition-workspaces",
+	}
+	for _, agentEnv := range plan.AgentEnv {
+		args = append(args, "--agent-env", agentEnv)
+	}
+	for _, sourcePath := range plan.AgentSourcePaths {
+		args = append(args, "--agent-source-path", sourcePath)
+	}
+	for _, requiredBin := range plan.AgentRequiredBins {
+		args = append(args, "--agent-required-bin", requiredBin)
+	}
+	return args
 }
 
 func runtimeDecompositionKanbanOptions(plan runtimeRunOncePlan) []string {
@@ -3373,6 +3469,33 @@ func startRuntimeExecuteUntilIdle(config runtimeInstanceConfig, plan runtimeRunO
 			"A3_SECRET_REFERENCE": "${A3_SECRET_REFERENCE:-A3_SECRET}",
 		},
 		Args:        executeUntilIdleArgs(plan),
+		StdoutPath:  plan.RuntimeLog,
+		StderrToOut: true,
+		ExitFile:    plan.RuntimeExitFile,
+		PIDFile:     plan.RuntimePIDFile,
+	}.shellScript())
+}
+
+func startRuntimeDecompositionCommand(config runtimeInstanceConfig, plan runtimeRunOncePlan, command []string, action string, runner commandRunner, stdout io.Writer) error {
+	fmt.Fprintf(stdout, "runtime_decomposition_start action=%s\n", action)
+	env := map[string]string{
+		"A2O_ROOT_DIR":   "/workspace",
+		"KANBAN_BACKEND": "kanbalone",
+	}
+	if strings.TrimSpace(plan.ProjectKey) != "" {
+		env["A2O_PROJECT_KEY"] = strings.TrimSpace(plan.ProjectKey)
+	}
+	if plan.MultiProjectMode {
+		env["A2O_MULTI_PROJECT_MODE"] = "1"
+	}
+	return dockerComposeExecShell(config, plan, runner, runtimeContainerProcess{
+		WorkingDir: "/workspace",
+		Env:        env,
+		EnvShell: map[string]string{
+			"A3_SECRET":           "${A3_SECRET:-a2o-runtime-secret}",
+			"A3_SECRET_REFERENCE": "${A3_SECRET_REFERENCE:-A3_SECRET}",
+		},
+		Args:        runtimeInspectionArgs(command...),
 		StdoutPath:  plan.RuntimeLog,
 		StderrToOut: true,
 		ExitFile:    plan.RuntimeExitFile,

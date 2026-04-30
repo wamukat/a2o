@@ -23,6 +23,7 @@ Read this document first to understand runtime flow and responsibility boundarie
 | Job boundary with `a2o-agent` | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
 | Automated ticket decomposition MVP | [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md) |
 | Kanban-first decomposition draft children | [76-kanban-first-decomposition-drafts.md](76-kanban-first-decomposition-drafts.md) |
+| Host-agent decomposition command protocol | [77-host-agent-decomposition-command-protocol.md](77-host-agent-decomposition-command-protocol.md) |
 | Boundary between core and project extensions | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
 | Multi-project runtime contexts | [85-multi-project-runtime-contexts.md](85-multi-project-runtime-contexts.md) |
 | Docs impact and shared specifications | [86-docs-impact-and-shared-specs.md](86-docs-impact-and-shared-specs.md) |

@@ -144,7 +144,7 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 		return nil, false, err
 	}
 	if workerProtocolResult == nil {
-		workerProtocolResult = notificationWorkerProtocolResult(runRequest, execution)
+		workerProtocolResult = commandOutputWorkerProtocolResult(runRequest, execution)
 	}
 	if metadataUpload, err := w.uploadExecutionMetadata(*request, execution, startedAt, finishedAt); err != nil {
 		w.logJobEvent(*request, "upload_error", map[string]any{"role": "execution-metadata", "error": err.Error()})
@@ -547,11 +547,12 @@ func (w Worker) uploadArtifactsAndWorkerResult(request JobRequest) ([]ArtifactUp
 	return uploads, workerProtocolResult, nil
 }
 
-func notificationWorkerProtocolResult(request JobRequest, execution ExecutionResult) map[string]any {
+func commandOutputWorkerProtocolResult(request JobRequest, execution ExecutionResult) map[string]any {
 	if request.WorkerProtocolRequest == nil {
 		return nil
 	}
-	if request.WorkerProtocolRequest["command_intent"] != "notification" {
+	intent, _ := request.WorkerProtocolRequest["command_intent"].(string)
+	if intent != "notification" && !strings.HasPrefix(intent, "decomposition_") {
 		return nil
 	}
 	return map[string]any{

@@ -111,7 +111,7 @@ module A3
       end
 
       def docs_context_relevant?(phase_runtime:, command_intent:)
-        return true if command_intent&.to_sym == :decomposition
+        return true if command_intent&.to_sym == :decomposition || command_intent.to_s.start_with?("decomposition_")
 
         phase = phase_runtime.phase.to_sym
         phase == :implementation || phase == :review
