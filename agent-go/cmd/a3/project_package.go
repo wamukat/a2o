@@ -29,6 +29,7 @@ type projectPackageConfig struct {
 	AgentControlPlaneRetryDelay     string
 	AgentWorkspaceRoot              string
 	AgentRequiredBins               []string
+	SchedulerMaxParallelTasks       string
 	Executor                        map[string]any
 	Repos                           map[string]projectPackageRepo
 }
@@ -85,6 +86,7 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	config.AgentControlPlaneRetryDelay = scalarString(payload.Runtime.AgentControlPlaneRetryDelay)
 	config.AgentWorkspaceRoot = payload.Agent.WorkspaceRoot
 	config.AgentRequiredBins = payload.Agent.RequiredBins
+	config.SchedulerMaxParallelTasks = scalarString(projectSchedulerRawMaxParallelTasks(runtimePayload))
 	if strings.TrimSpace(config.SchemaVersion) == "" {
 		return config, fmt.Errorf("project package config %s is missing schema_version", projectFile)
 	}
@@ -114,6 +116,9 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	}
 	if err := rejectLegacyPhaseWorkspaceHook(runtimePayload); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.phases: %w", projectFile, err)
+	}
+	if err := validateProjectSchedulerConfig(runtimePayload); err != nil {
+		return config, fmt.Errorf("project package config %s has invalid runtime.scheduler: %w", projectFile, err)
 	}
 	if err := validateProjectPromptsConfig(runtimePayload, packagePath, projectRepoNames(payload.Repos)); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.prompts: %w", projectFile, err)
@@ -272,6 +277,61 @@ func rejectLegacyPhaseWorkspaceHook(runtimePayload map[string]any) error {
 		}
 	}
 	return nil
+}
+
+func validateProjectSchedulerConfig(runtimePayload map[string]any) error {
+	rawScheduler, ok := runtimePayload["scheduler"]
+	if !ok {
+		return nil
+	}
+	scheduler, ok := normalizeYAMLValue(rawScheduler).(map[string]any)
+	if !ok {
+		return fmt.Errorf("must be a mapping")
+	}
+	rawMaxParallelTasks, ok := scheduler["max_parallel_tasks"]
+	if !ok {
+		return nil
+	}
+	maxParallelTasks, ok := schedulerInteger(rawMaxParallelTasks)
+	if !ok {
+		return fmt.Errorf("max_parallel_tasks must be an integer")
+	}
+	if maxParallelTasks < 1 {
+		return fmt.Errorf("max_parallel_tasks must be greater than or equal to 1")
+	}
+	if maxParallelTasks > 1 {
+		return fmt.Errorf("max_parallel_tasks > 1 is not supported yet; requires scheduler task claims, batch planning, and shared-ref publish/merge locks")
+	}
+	return nil
+}
+
+func projectSchedulerRawMaxParallelTasks(runtimePayload map[string]any) any {
+	rawScheduler, ok := runtimePayload["scheduler"]
+	if !ok {
+		return nil
+	}
+	scheduler, ok := normalizeYAMLValue(rawScheduler).(map[string]any)
+	if !ok {
+		return nil
+	}
+	return scheduler["max_parallel_tasks"]
+}
+
+func schedulerInteger(value any) (int64, bool) {
+	switch typed := value.(type) {
+	case int:
+		return int64(typed), true
+	case int64:
+		return typed, true
+	case float64:
+		integer := int64(typed)
+		if typed != float64(integer) {
+			return 0, false
+		}
+		return integer, true
+	default:
+		return 0, false
+	}
 }
 
 func validateProjectPromptsConfig(runtimePayload map[string]any, packagePath string, repoNames []string) error {

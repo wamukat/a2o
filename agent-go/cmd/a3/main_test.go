@@ -4277,6 +4277,124 @@ runtime:
 	}
 }
 
+func TestProjectValidateAcceptsSingleTaskSchedulerConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	writeSchedulerValidationProjectPackage(t, packageDir, "  scheduler:\n    max_parallel_tasks: 1\n")
+
+	config, err := loadProjectPackageConfig(packageDir)
+	if err != nil {
+		t.Fatalf("loadProjectPackageConfig should accept max_parallel_tasks=1, got %v", err)
+	}
+	if config.SchedulerMaxParallelTasks != "1" {
+		t.Fatalf("SchedulerMaxParallelTasks=%q", config.SchedulerMaxParallelTasks)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project validate should accept max_parallel_tasks=1, code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "lint_check name=project_package status=ok") {
+		t.Fatalf("project validate should report ok, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateRejectsMalformedSchedulerConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	writeSchedulerValidationProjectPackage(t, packageDir, "  scheduler:\n    - invalid\n")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject malformed runtime.scheduler, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "invalid runtime.scheduler") ||
+		!strings.Contains(stdout.String(), "must be a mapping") {
+		t.Fatalf("project validate should reject malformed runtime.scheduler, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateRejectsInvalidSchedulerMaxParallelTasks(t *testing.T) {
+	cases := []struct {
+		name       string
+		scheduler  string
+		wantDetail string
+	}{
+		{
+			name:       "non-integer",
+			scheduler:  "  scheduler:\n    max_parallel_tasks: \"2\"\n",
+			wantDetail: "max_parallel_tasks must be an integer",
+		},
+		{
+			name:       "lower than one",
+			scheduler:  "  scheduler:\n    max_parallel_tasks: 0\n",
+			wantDetail: "max_parallel_tasks must be greater than or equal to 1",
+		},
+		{
+			name:       "unsupported parallelism",
+			scheduler:  "  scheduler:\n    max_parallel_tasks: 2\n",
+			wantDetail: "max_parallel_tasks > 1 is not supported yet",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			packageDir := filepath.Join(tempDir, "package")
+			writeSchedulerValidationProjectPackage(t, packageDir, tc.scheduler)
+
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+			if code == 0 {
+				t.Fatalf("project validate should reject %s, stdout=%s", tc.name, stdout.String())
+			}
+			if !strings.Contains(stdout.String(), "invalid runtime.scheduler") ||
+				!strings.Contains(stdout.String(), tc.wantDetail) {
+				t.Fatalf("project validate should reject %s, stdout=%s stderr=%s", tc.name, stdout.String(), stderr.String())
+			}
+		})
+	}
+}
+
+func writeSchedulerValidationProjectPackage(t *testing.T, packageDir string, schedulerYAML string) {
+	t.Helper()
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+` + schedulerYAML + `  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestProjectValidateRejectsUnknownRuntimePhase(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
