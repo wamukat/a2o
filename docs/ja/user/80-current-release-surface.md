@@ -1,6 +1,6 @@
 # 現在の公開機能
 
-A2O 0.5.54 で現在利用できる公開機能と検証範囲を示す。
+A2O 0.5.55 で現在利用できる公開機能と検証範囲を示す。
 
 この文書は、リリース時点で「利用者に案内してよい機能」と「検証済みとして扱える範囲」を確認するための一覧である。導入手順を知りたい場合は [10-quickstart.md](10-quickstart.md)、設定項目を知りたい場合は [90-project-package-schema.md](90-project-package-schema.md) を読む。
 
@@ -34,6 +34,7 @@ A2O 0.5.54 で現在利用できる公開機能と検証範囲を示す。
 - worker runtime request と inspection output は、multi-repo task について順序付きの `repo_slots` を出力する。従来の `repo_scope` は single-scope 互換フィールドとして残し、旧 variant lookup 互換のために `both` を表示する場合があるが、multi-repo identity の正本ではない。
 - prompt diagnostics / evidence は順序付きの `project_prompt.repo_slots` を出力する。従来の単数 `repo_slot` は single-slot task の場合だけ設定される。
 - prompt preview は `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib A2O#123` または `a2o prompt preview --phase implementation --repo-slot app,lib A2O#123` のように、複数 repo slot を指定した multi-repo 合成確認に対応する。
+- prompts-only の implementation / review phase に対応する。`runtime.prompts.phases.<phase>` に prompt または skill がある場合、`runtime.phases.<phase>.skill` は省略でき、その phase では no-op の `a2o_core_instruction` layer を出力しない。
 - agent server 接続向けの project runtime 調整項目: `runtime.agent_control_plane_connect_timeout`、`runtime.agent_control_plane_request_timeout`、`runtime.agent_control_plane_retry_count`、`runtime.agent_control_plane_retry_delay`
 - child / single タスク向けの任意 review gate 項目: `runtime.review_gate.child`、`runtime.review_gate.single`、`runtime.review_gate.skip_labels`、`runtime.review_gate.require_labels`
 - 外部 Kanbalone bootstrap 項目: `--kanban-mode external`、`--kanban-url`、`--kanban-runtime-url`
@@ -43,15 +44,16 @@ A2O 0.5.54 で現在利用できる公開機能と検証範囲を示す。
 - エージェント HTTP ワーカー境界。取得済みジョブの heartbeat を含む
 - エージェントが具体化するワークスペース方式
 - TypeScript、Go、Python、複数リポジトリタスクテンプレートの参照用プロダクトパッケージ
-- GHCR ランタイムイメージタグ: `latest`、`0.5.54`、`sha-*`
+- GHCR ランタイムイメージタグ: `latest`、`0.5.55`、`sha-*`
 - タグリリースでは `latest` も同時に公開する。そのため、公開完了後はリリース版タグと `latest` が同じランタイムイメージを指す前提で確認する。
 - ローカルリリース判定: RSpec 全体、release package doctor、local RC host smoke、および runtime 実行 / worker launcher / scheduler / Kanban / env generation 変更時の real-task local RC smoke
 
 ## マイグレーション案内
 
 - 既に `runtime.prompts.repoSlots` を定義している project package は、upgrade 前に multi-repo task を確認すること。multi-repo task では `repo_slots` / `edit_scope` 順にすべての repo-slot addon を渡す。以前の release では単数 repo-slot layer だけが適用対象だったため、slot 固有の指示が組み合わさって広すぎる、または衝突する場合がある。その場合は repo slot 単位の child task に分割するか、package prompt を調整する。worker 実行前に `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib <task-ref>` で合成後の instruction を確認する。
+- validation を満たすためだけの no-op `runtime.phases.implementation.skill` / `runtime.phases.review.skill` stub を使っている project package は、対応する `runtime.prompts.phases.<phase>` に prompt または skills を定義したうえで stub を削除できる。system prompt だけでは不十分であり、phase skill と対応する phase prompt / skill のどちらも無い場合、`a2o project validate` は引き続き `runtime.phases.<phase>.skill must be provided` で失敗する。
 - `a2o runtime start` と `a2o runtime stop` は互換 alias ではなくなった。常駐スケジューラを再開する場合は `a2o runtime resume`、現在の作業後に停止予約する場合は `a2o runtime pause` を使う。削除済みコマンドを実行した場合、A2O は非ゼロで終了し、`migration_required=true` と移行先コマンドを表示する。
-- custom worker は review disposition の scope 欄として `review_disposition.slot_scopes` を返す必要がある。0.5.54 の worker result では `review_disposition.repo_scope` を受け付けない。`"repo_alpha"` のような値は `slot_scopes: ["repo_alpha"]` に、複数リポジトリの指摘は対象 slot 名の配列に移行する。保存済み worker result は `a2o worker validate-result --request request.json --result result.json --review-slot-scope <slot>` で検証する。
+- custom worker は review disposition の scope 欄として `review_disposition.slot_scopes` を返す必要がある。0.5.55 の worker result では `review_disposition.repo_scope` を受け付けない。`"repo_alpha"` のような値は `slot_scopes: ["repo_alpha"]` に、複数リポジトリの指摘は対象 slot 名の配列に移行する。保存済み worker result は `a2o worker validate-result --request request.json --result result.json --review-slot-scope <slot>` で検証する。
 - SoloBoard 時代の Kanbalone 互換名は削除された。`KANBAN_BACKEND=kanbalone`、`KANBALONE_BASE_URL`、`KANBALONE_API_TOKEN`、`--kanbalone-port`、`A2O_BUNDLE_KANBALONE_PORT`、`A2O_KANBALONE_INTERNAL_URL` を使う。削除済み SoloBoard 入力を使った場合は `migration_required=true` と置き換え先を表示する。
 - 同梱 Kanbalone のデータ名は `<compose-project>_soloboard-data` / `soloboard.sqlite` から `<compose-project>_kanbalone-data` / `kanbalone.sqlite` に変わった。旧 volume が存在し、新 volume が存在しない場合、`a2o kanban up` は空の board を作らず `migration_required=true` で停止する。同梱サービスを起動する前に、既存の Kanban data を copy または rename する。
 - runtime / agent / worker / root utility 設定の公開 `A3_*` 環境変数 fallback は、`A2O_*` 置き換えがあるものから削除された。`A2O_RUNTIME_IMAGE`、`A2O_COMPOSE_PROJECT`、`A2O_COMPOSE_FILE`、`A2O_RUNTIME_SERVICE`、`A2O_BUNDLE_AGENT_PORT`、`A2O_BUNDLE_STORAGE_DIR`、`A2O_AGENT_PACKAGE_DIR`、`A2O_AGENT_TOKEN`、`A2O_AGENT_TOKEN_FILE`、`A2O_AGENT_CONTROL_TOKEN`、`A2O_AGENT_CONTROL_TOKEN_FILE`、`A2O_AGENT_*`、`A2O_WORKER_*`、`A2O_WORKSPACE_ROOT`、`A2O_ROOT_DIR`、`A2O_ROOT_*` root utility controls を使う。削除済み `A3_*` 入力を使った場合は `migration_required=true` と置き換え先を表示する。

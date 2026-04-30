@@ -27,7 +27,7 @@ def editable_slot?(request, slot)
   request.fetch("scope_snapshot", {}).fetch("edit_scope", request.fetch("slot_paths").keys).include?(slot)
 end
 
-def success(request, summary:, changed_files: {}, repo_scope: nil)
+def success(request, summary:, changed_files: {}, slot_scopes: nil)
   payload = {
     "task_ref" => request.fetch("task_ref"),
     "run_ref" => request.fetch("run_ref"),
@@ -39,11 +39,11 @@ def success(request, summary:, changed_files: {}, repo_scope: nil)
     "rework_required" => false
   }
   if request.fetch("phase") == "implementation"
-    scope = repo_scope || changed_files.keys.first || request.fetch("slot_paths").keys.first
+    scopes = Array(slot_scopes || changed_files.keys.first || request.fetch("slot_paths").keys.first)
     payload["changed_files"] = changed_files
     payload["review_disposition"] = {
       "kind" => "completed",
-      "repo_scope" => scope,
+      "slot_scopes" => scopes,
       "summary" => "deterministic implementation self-review clean",
       "description" => "Reference validation worker applied the requested baseline change.",
       "finding_key" => "reference-validation-clean"
@@ -51,7 +51,7 @@ def success(request, summary:, changed_files: {}, repo_scope: nil)
   elsif request.fetch("phase") == "review"
     payload["review_disposition"] = {
       "kind" => "completed",
-      "repo_scope" => repo_scope || "both",
+      "slot_scopes" => Array(slot_scopes || request.fetch("scope_snapshot", {}).fetch("edit_scope", request.fetch("slot_paths").keys)),
       "summary" => "deterministic parent review clean",
       "description" => "Reference validation worker found no parent aggregation findings.",
       "finding_key" => "reference-validation-parent-clean"
@@ -657,7 +657,7 @@ end
 begin
   phase = request.fetch("phase")
   if phase == "review"
-    result = success(request, summary: "deterministic parent review completed", repo_scope: "both")
+    result = success(request, summary: "deterministic parent review completed")
   elsif phase == "implementation"
     changed = {}
     if request.fetch("slot_paths").key?("lib") && editable_slot?(request, "lib")

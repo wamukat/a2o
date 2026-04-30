@@ -71,4 +71,37 @@ RSpec.describe "reference product commands" do
       expect(File.readlines(log_path, chomp: true)).to eq([product_root])
     end
   end
+
+  it "emits canonical slot_scopes from the deterministic worker review disposition" do
+    Dir.mktmpdir do |dir|
+      request_path = File.join(dir, "request.json")
+      result_path = File.join(dir, "result.json")
+      repo_alpha = File.join(dir, "repo_alpha")
+      repo_beta = File.join(dir, "repo_beta")
+      FileUtils.mkdir_p(repo_alpha)
+      FileUtils.mkdir_p(repo_beta)
+      File.write(
+        request_path,
+        JSON.pretty_generate(
+          "task_ref" => "A2OReference#1",
+          "run_ref" => "run-1",
+          "phase" => "review",
+          "slot_paths" => { "repo_alpha" => repo_alpha, "repo_beta" => repo_beta },
+          "scope_snapshot" => { "edit_scope" => ["repo_alpha", "repo_beta"] }
+        )
+      )
+
+      script = File.expand_path("../../tools/reference_validation/deterministic_worker.rb", __dir__)
+      env = {
+        "A2O_WORKER_REQUEST_PATH" => request_path,
+        "A2O_WORKER_RESULT_PATH" => result_path
+      }
+      _stdout, stderr, status = Open3.capture3(env, "ruby", script)
+
+      expect(status).to be_success, stderr
+      disposition = JSON.parse(File.read(result_path)).fetch("review_disposition")
+      expect(disposition).to include("slot_scopes" => ["repo_alpha", "repo_beta"])
+      expect(disposition).not_to have_key("repo_scope")
+    end
+  end
 end
