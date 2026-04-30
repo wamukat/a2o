@@ -30,6 +30,7 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
       "clarification_request" => nil,
       "skill_feedback" => [],
       "docs_impact" => nil,
+      "refactoring_assessment" => nil,
       "follow_up_child_fingerprints" => [],
       "runtime_snapshot" => {
         "task_kind" => "child",

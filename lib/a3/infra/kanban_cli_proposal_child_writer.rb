@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "a3/domain/refactoring_assessment"
+
 module A3
   module Infra
     class KanbanCliProposalChildWriter
@@ -95,6 +97,7 @@ module A3
         parent = proposal["parent"].is_a?(Hash) ? proposal["parent"] : {}
         parent_title = parent["title"].to_s.strip
         parent_body = parent["body"].to_s.strip
+        refactoring_body = refactoring_assessment_body(proposal["refactoring_assessment"])
         {
           "title" => parent_title.empty? ? "Implementation plan for #{source_task_ref}" : parent_title,
           "description" => <<~DESC.strip,
@@ -102,10 +105,31 @@ module A3
             Proposal fingerprint: #{proposal_fingerprint}
 
             #{parent_body.empty? ? "This generated parent groups implementation draft children created from the requirement ticket." : parent_body}
+            #{refactoring_body}
           DESC
           "priority" => 2,
           "comment" => "Created generated implementation parent for requirement #{source_task_ref}; proposal #{proposal_fingerprint}."
         }
+      end
+
+      def refactoring_assessment_body(value)
+        assessment = A3::Domain::RefactoringAssessment.from_persisted_form(value)
+        return "" unless assessment&.active?
+
+        lines = [
+          "",
+          "Refactoring assessment:",
+          "- disposition: #{assessment.disposition}"
+        ]
+        lines << "- recommended_action: #{assessment.recommended_action}" if assessment.recommended_action
+        lines << "- risk: #{assessment.risk}" if assessment.risk
+        lines << "- reason: #{assessment.reason}" if assessment.reason
+        lines << "- scope: #{assessment.scope.join(', ')}" unless assessment.scope.empty?
+        unless assessment.evidence.empty?
+          lines << "- evidence:"
+          assessment.evidence.each { |entry| lines << "  - #{entry}" }
+        end
+        lines.join("\n")
       end
 
       def find_existing_generated_parent(source_task_ref)

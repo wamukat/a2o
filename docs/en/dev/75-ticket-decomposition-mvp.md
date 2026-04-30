@@ -155,6 +155,8 @@ The proposal `outcome` defaults to `draft_children`. In that outcome, the propos
 
 If investigation shows the requested behavior already exists, the author can return `outcome: "no_action"`, `children: []`, and a non-empty `reason`. If the requirement cannot be decomposed safely, the author can return `outcome: "needs_clarification"`, `children: []`, a non-empty `reason`, and one or more `questions`. These outcomes still go through proposal review, but child creation does not create a generated parent or children.
 
+The proposal may include optional `refactoring_assessment` using the same schema as worker results. A2O validates and stores this object but does not decide project-specific refactoring policy. The project package prompt, skill, or docs must define what counts as refactoring debt and whether it belongs in the current child set. `include_child` means the proposal should include a normal child draft for the refactoring work. `defer_follow_up` does not block child creation; A2O records the debt in proposal evidence, source-ticket comments, and generated-parent content so parent review can decide whether to create a follow-up child. `blocked_by_design_debt` and `needs_clarification` must be distinguishable from ordinary technical blocked states.
+
 The proposal fingerprint is required for idempotency. It should be derived from the source ticket ref, source revision fields, investigation result digest, and ordered child draft content.
 
 Each child draft also needs a stable child idempotency key derived from the source ticket ref and the child boundary, not from volatile title text alone. Creation uses the proposal fingerprint to identify the proposal version and child keys to reconcile individual tickets.

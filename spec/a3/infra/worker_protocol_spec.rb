@@ -871,6 +871,83 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
+  it "preserves structured refactoring assessments in worker results" do
+    assessment = {
+      "disposition" => "defer_follow_up",
+      "reason" => "The new branch duplicates existing factory selection logic.",
+      "scope" => ["repo-beta/app/services/address"],
+      "recommended_action" => "create_follow_up_child",
+      "risk" => "medium",
+      "evidence" => ["Factory A and Factory B share the same responsibility."]
+    }
+    result = described_class.new.build_execution_result(
+      {
+        "success" => true,
+        "summary" => "worker completed",
+        "task_ref" => task.ref,
+        "run_ref" => implementation_run.ref,
+        "phase" => "implementation",
+        "rework_required" => false,
+        "changed_files" => { "repo_beta" => ["marker.txt"] },
+        "review_disposition" => {
+          "kind" => "completed",
+          "slot_scopes" => ["repo_beta"],
+          "summary" => "self-review clean",
+          "description" => "No findings.",
+          "finding_key" => "none"
+        },
+        "refactoring_assessment" => assessment
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: implementation_run.ref,
+      expected_phase: :implementation,
+      canonical_changed_files: { "repo_beta" => ["marker.txt"] }
+    )
+
+    expect(result).to have_attributes(success?: true)
+    expect(result.refactoring_assessment).to eq(assessment)
+  end
+
+  it "rejects malformed refactoring assessments" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => true,
+        "summary" => "worker completed",
+        "task_ref" => task.ref,
+        "run_ref" => implementation_run.ref,
+        "phase" => "implementation",
+        "rework_required" => false,
+        "changed_files" => { "repo_beta" => ["marker.txt"] },
+        "review_disposition" => {
+          "kind" => "completed",
+          "slot_scopes" => ["repo_beta"],
+          "summary" => "self-review clean",
+          "description" => "No findings.",
+          "finding_key" => "none"
+        },
+        "refactoring_assessment" => {
+          "disposition" => "later",
+          "scope" => ["valid", ""],
+          "recommended_action" => "maybe"
+        }
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: implementation_run.ref,
+      expected_phase: :implementation,
+      canonical_changed_files: { "repo_beta" => ["marker.txt"] }
+    )
+
+    expect(result.summary).to eq("worker result schema invalid")
+    expect(result.diagnostics.fetch("validation_errors")).to include(
+      "refactoring_assessment.disposition must be one of none, include_child, defer_follow_up, blocked_by_design_debt, needs_clarification",
+      "refactoring_assessment.reason must be a non-empty string for later",
+      "refactoring_assessment.recommended_action must be one of none, document_only, include_in_current_child, create_refactoring_child, create_follow_up_child, request_clarification, block_until_decision",
+      "refactoring_assessment.scope must be an array of non-empty strings when present"
+    )
+  end
+
   it "reports precise validation errors for invalid docs-impact worker results" do
     result = described_class.new.build_execution_result(
       {

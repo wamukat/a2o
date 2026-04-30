@@ -162,6 +162,51 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(result.task.status).to eq(:verifying)
   end
 
+  it "publishes refactoring assessment summaries in completion comments" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :in_progress,
+      current_run_ref: "run-1",
+      external_task_id: 3025
+    )
+    execution_record = A3::Domain::PhaseExecutionRecord.new(
+      summary: "implemented greeting behavior",
+      diagnostics: {},
+      refactoring_assessment: {
+        "disposition" => "defer_follow_up",
+        "reason" => "Locale fallback logic is duplicated.",
+        "scope" => ["utility-lib", "web-app"],
+        "recommended_action" => "create_follow_up_child",
+        "risk" => "medium",
+        "evidence" => ["Both modules implement fallback ordering."]
+      }
+    )
+    task_repository.save(task)
+    run_repository.save(
+      run.append_phase_evidence(
+        phase: run.phase,
+        source_descriptor: run.source_descriptor,
+        scope_snapshot: run.scope_snapshot,
+        execution_record: execution_record
+      )
+    )
+
+    expect(status_publisher).to receive(:publish)
+    expect(activity_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      body: a_string_matching(
+        /refactoring-assessment: defer_follow_up action=create_follow_up_child risk=medium scope=utility-lib,web-app reason=Locale fallback logic is duplicated\..*refactoring-evidence: Both modules implement fallback ordering\./m
+      )
+    )
+
+    result = use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :completed)
+
+    expect(result.task.status).to eq(:verifying)
+  end
+
   it "stops phase advancement when the external task has an operator blocked label" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",

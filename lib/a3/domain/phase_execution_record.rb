@@ -7,9 +7,9 @@ module A3
     class PhaseExecutionRecord
       include DeepFreezable
 
-      attr_reader :summary, :failing_command, :observed_state, :diagnostics, :runtime_snapshot, :review_disposition, :clarification_request, :skill_feedback, :docs_impact, :follow_up_child_fingerprints
+      attr_reader :summary, :failing_command, :observed_state, :diagnostics, :runtime_snapshot, :review_disposition, :clarification_request, :skill_feedback, :docs_impact, :refactoring_assessment, :follow_up_child_fingerprints
 
-      def initialize(summary:, failing_command: nil, observed_state: nil, diagnostics: {}, runtime_snapshot: nil, review_disposition: nil, clarification_request: nil, skill_feedback: [], docs_impact: nil, follow_up_child_fingerprints: [])
+      def initialize(summary:, failing_command: nil, observed_state: nil, diagnostics: {}, runtime_snapshot: nil, review_disposition: nil, clarification_request: nil, skill_feedback: [], docs_impact: nil, refactoring_assessment: nil, follow_up_child_fingerprints: [])
         @summary = summary
         @failing_command = failing_command
         @observed_state = observed_state
@@ -19,6 +19,7 @@ module A3
         @clarification_request = deep_freeze_value(clarification_request)
         @skill_feedback = deep_freeze_value(Array(skill_feedback))
         @docs_impact = deep_freeze_value(docs_impact)
+        @refactoring_assessment = deep_freeze_value(refactoring_assessment)
         @follow_up_child_fingerprints = deep_freeze_value(Array(follow_up_child_fingerprints))
         freeze
       end
@@ -36,6 +37,7 @@ module A3
           clarification_request: record["clarification_request"],
           skill_feedback: record.fetch("skill_feedback", []),
           docs_impact: record["docs_impact"],
+          refactoring_assessment: record["refactoring_assessment"],
           follow_up_child_fingerprints: record.fetch("follow_up_child_fingerprints", [])
         )
       end
@@ -56,7 +58,8 @@ module A3
           },
           clarification_request: execution.clarification_request&.persisted_form,
           skill_feedback: execution.skill_feedback,
-          docs_impact: execution.docs_impact
+          docs_impact: execution.docs_impact,
+          refactoring_assessment: execution.refactoring_assessment
         )
       end
 
@@ -71,6 +74,7 @@ module A3
           clarification_request: clarification_request,
           skill_feedback: skill_feedback,
           docs_impact: docs_impact,
+          refactoring_assessment: refactoring_assessment,
           follow_up_child_fingerprints: fingerprints
         )
       end
@@ -86,6 +90,7 @@ module A3
           clarification_request: clarification_request,
           skill_feedback: skill_feedback,
           docs_impact: docs_impact,
+          refactoring_assessment: refactoring_assessment,
           follow_up_child_fingerprints: follow_up_child_fingerprints
         )
       end
@@ -101,6 +106,7 @@ module A3
           "clarification_request" => clarification_request,
           "skill_feedback" => skill_feedback,
           "docs_impact" => docs_impact,
+          "refactoring_assessment" => refactoring_assessment,
           "follow_up_child_fingerprints" => follow_up_child_fingerprints
         }
       end
@@ -116,6 +122,7 @@ module A3
           other.clarification_request == clarification_request &&
           other.skill_feedback == skill_feedback &&
           other.docs_impact == docs_impact &&
+          other.refactoring_assessment == refactoring_assessment &&
           other.follow_up_child_fingerprints == follow_up_child_fingerprints
       end
       alias eql? ==

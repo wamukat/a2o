@@ -5,6 +5,7 @@ require "pathname"
 require "tempfile"
 require "open3"
 require "thread"
+require_relative "../domain/refactoring_assessment"
 require_relative "../domain/skill_feedback"
 
 def removed_legacy_env_error(public_name, legacy_name)
@@ -147,6 +148,7 @@ def bundle_for(request)
           "When requirements are ambiguous or conflicting and you cannot safely continue, return success=false, rework_required=false, and clarification_request with question, optional context/options/recommended_option/impact. This is for requester input, not runtime or validation failures.",
           "For implementation success, include changed_files as an object like {\"repo_alpha\": [\"src/main.rb\"]} using only relative paths under each slot.",
           "For implementation success, you may include review_disposition when the final self-review is clean.",
+          "Optionally include refactoring_assessment when implementation or review finds design debt. Use disposition one of none, include_child, defer_follow_up, blocked_by_design_debt, needs_clarification and recommended_action one of none, document_only, include_in_current_child, create_refactoring_child, create_follow_up_child, request_clarification, block_until_decision.",
           "For review failures caused by findings, include rework_required=true.",
           "Copy task_ref, run_ref, and phase exactly from request. If you are uncertain, omit them rather than inventing values.",
           "For parent review, include review_disposition with kind, slot_scopes, summary, description, and finding_key unless you return clarification_request.",
@@ -254,6 +256,7 @@ def response_schema(request)
     "observed_state" => { "type" => ["string", "null"] },
     "rework_required" => { "type" => "boolean" },
     "clarification_request" => clarification_request_schema,
+    "refactoring_assessment" => refactoring_assessment_schema,
     "skill_feedback" => skill_feedback_schema
   }
   required_fields = [
@@ -321,6 +324,37 @@ def clarification_request_schema
       "impact" => { "type" => "string" }
     },
     "required" => ["question"],
+    "additionalProperties" => false
+  }
+end
+
+def refactoring_assessment_schema
+  {
+    "type" => ["object", "null"],
+    "properties" => {
+      "disposition" => {
+        "type" => "string",
+        "enum" => A3::Domain::RefactoringAssessment::DISPOSITIONS
+      },
+      "reason" => { "type" => "string" },
+      "scope" => {
+        "type" => "array",
+        "items" => { "type" => "string" }
+      },
+      "recommended_action" => {
+        "type" => "string",
+        "enum" => A3::Domain::RefactoringAssessment::RECOMMENDED_ACTIONS
+      },
+      "risk" => {
+        "type" => "string",
+        "enum" => A3::Domain::RefactoringAssessment::RISKS
+      },
+      "evidence" => {
+        "type" => "array",
+        "items" => { "type" => "string" }
+      }
+    },
+    "required" => ["disposition"],
     "additionalProperties" => false
   }
 end
@@ -527,6 +561,9 @@ def validate_payload(payload, request:)
   errors << "diagnostics must be an object" if payload.key?("diagnostics") && !payload["diagnostics"].is_a?(Hash)
   validate_skill_feedback(payload["skill_feedback"]).each { |error| errors << error } if payload.key?("skill_feedback")
   validate_clarification_request(payload["clarification_request"], success: payload["success"]).each { |error| errors << error } if payload.key?("clarification_request")
+  if payload.key?("refactoring_assessment")
+    A3::Domain::RefactoringAssessment.validation_errors(payload["refactoring_assessment"]).each { |error| errors << error }
+  end
   if payload.key?("changed_files")
     changed_files = payload["changed_files"]
     unless changed_files.nil? || changed_files.is_a?(Hash)

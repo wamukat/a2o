@@ -134,6 +134,17 @@ children = [
 
 result = {
   "outcome" => "draft_children",
+  "refactoring_assessment" => {
+    "disposition" => "defer_follow_up",
+    "reason" => "Greeting formatting and locale fallback rules should stay reusable in utility-lib rather than being duplicated in web-app.",
+    "scope" => ["utility-lib", "web-app"],
+    "recommended_action" => "create_follow_up_child",
+    "risk" => "low",
+    "evidence" => [
+      "utility-lib owns reusable greeting behavior.",
+      "web-app should expose behavior through HTTP/UI only."
+    ]
+  },
   "parent" => {
     "title" => "Implementation plan for #{title}",
     "body" => [

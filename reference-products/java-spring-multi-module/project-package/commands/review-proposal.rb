@@ -47,6 +47,17 @@ if outcome == "needs_clarification" && Array(proposal["questions"]).empty?
   }
 end
 
+assessment = proposal["refactoring_assessment"]
+if assessment
+  unless assessment.is_a?(Hash) && %w[none include_child defer_follow_up blocked_by_design_debt needs_clarification].include?(assessment["disposition"])
+    findings << {
+      "severity" => "critical",
+      "summary" => "refactoring assessment disposition is invalid",
+      "details" => "Use none, include_child, defer_follow_up, blocked_by_design_debt, or needs_clarification."
+    }
+  end
+end
+
 children.each_with_index do |child, index|
   labels = Array(child["labels"])
   repo_labels = labels & ["repo:app", "repo:lib"]

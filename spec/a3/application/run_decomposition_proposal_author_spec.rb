@@ -132,6 +132,67 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
     end
   end
 
+  it "normalizes and summarizes a decomposition refactoring assessment" do
+    Dir.mktmpdir do |dir|
+      author_result = valid_author_result.merge(
+        "refactoring_assessment" => {
+          "disposition" => "defer_follow_up",
+          "reason" => "Routing and review gates duplicate task classification decisions.",
+          "scope" => ["lib/a3/application/decomposition"],
+          "recommended_action" => "create_follow_up_child",
+          "risk" => "medium",
+          "evidence" => ["Both phases classify draft eligibility."]
+        }
+      )
+      process_runner = lambda do |_command, env:, **|
+        File.write(env.fetch("A2O_DECOMPOSITION_AUTHOR_RESULT_PATH"), JSON.generate(author_result))
+        ["", "", FakeAuthorStatus.new(true, 0)]
+      end
+
+      result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
+        task: task,
+        project_surface: project_surface,
+        investigation_evidence: { "summary" => "Need decomposition" }
+      )
+
+      expect(result).to have_attributes(success: true)
+      expect(result.proposal.fetch("refactoring_assessment")).to include(
+        "disposition" => "defer_follow_up",
+        "recommended_action" => "create_follow_up_child"
+      )
+      expect(result.source_ticket_summary).to include(
+        "Refactoring assessment: defer_follow_up action=create_follow_up_child risk=medium scope=lib/a3/application/decomposition"
+      )
+      evidence = JSON.parse(File.read(result.evidence_path))
+      expect(evidence.fetch("proposal").fetch("refactoring_assessment")).to include("reason" => "Routing and review gates duplicate task classification decisions.")
+    end
+  end
+
+  it "rejects invalid decomposition refactoring assessments" do
+    Dir.mktmpdir do |dir|
+      author_result = valid_author_result.merge(
+        "refactoring_assessment" => {
+          "disposition" => "later",
+          "recommended_action" => "create_other_ticket"
+        }
+      )
+      process_runner = lambda do |_command, env:, **|
+        File.write(env.fetch("A2O_DECOMPOSITION_AUTHOR_RESULT_PATH"), JSON.generate(author_result))
+        ["", "", FakeAuthorStatus.new(true, 0)]
+      end
+
+      result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
+        task: task,
+        project_surface: project_surface,
+        investigation_evidence: { "summary" => "Need decomposition" }
+      )
+
+      expect(result.success).to be(false)
+      expect(result.summary).to include("refactoring_assessment.disposition must be one of")
+      expect(result.source_ticket_summary).to include("Status: blocked")
+    end
+  end
+
   it "rewrites project-visible request and environment paths to host paths for agent execution" do
     Dir.mktmpdir do |dir|
       host_root = File.join(dir, "host-root")

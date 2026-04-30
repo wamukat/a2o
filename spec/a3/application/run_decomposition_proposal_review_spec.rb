@@ -112,6 +112,58 @@ RSpec.describe A3::Application::RunDecompositionProposalReview do
     end
   end
 
+  it "records reviewer refactoring assessments in evidence and source summaries" do
+    Dir.mktmpdir do |dir|
+      proposal_path = File.join(dir, "proposal.json")
+      File.write(proposal_path, JSON.generate(
+        "success" => true,
+        "proposal_fingerprint" => "abc123",
+        "proposal" => { "proposal_fingerprint" => "abc123", "children" => [{ "title" => "child" }] }
+      ))
+      publisher = instance_double(A3::Infra::NullExternalTaskActivityPublisher)
+      expect(publisher).to receive(:publish).with(
+        task_ref: "A3-v2#5300",
+        external_task_id: 5300,
+        body: a_string_matching(/Refactoring assessment: defer_follow_up action=create_follow_up_child risk=medium scope=repo_alpha reason=Duplicate setup belongs in a follow-up\./)
+      )
+      process_runner = lambda do |_command, env:, **|
+        File.write(
+          env.fetch("A2O_DECOMPOSITION_REVIEW_RESULT_PATH"),
+          JSON.generate(
+            "summary" => "clean",
+            "findings" => [],
+            "refactoring_assessment" => {
+              "disposition" => "defer_follow_up",
+              "reason" => "Duplicate setup belongs in a follow-up.",
+              "scope" => ["repo_alpha"],
+              "recommended_action" => "create_follow_up_child",
+              "risk" => "medium",
+              "evidence" => ["Two setup helpers overlap."]
+            }
+          )
+        )
+        ["", "", FakeReviewStatus.new(true, 0)]
+      end
+
+      result = described_class.new(
+        storage_dir: dir,
+        process_runner: process_runner,
+        publish_external_task_activity: publisher
+      ).call(
+        task: task,
+        project_surface: project_surface([["reviewer"]]),
+        proposal_evidence_path: proposal_path
+      )
+
+      expect(result.success).to be(true)
+      evidence = JSON.parse(File.read(result.evidence_path))
+      expect(evidence.fetch("review_results").first.fetch("refactoring_assessment")).to include(
+        "disposition" => "defer_follow_up",
+        "recommended_action" => "create_follow_up_child"
+      )
+    end
+  end
+
   it "blocks when proposal evidence is missing a successful proposal draft" do
     Dir.mktmpdir do |dir|
       proposal_path = File.join(dir, "proposal.json")

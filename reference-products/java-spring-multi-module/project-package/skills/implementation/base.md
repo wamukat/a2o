@@ -10,6 +10,11 @@ Rules:
   `reference-products/java-spring-multi-module/web-app/`.
 - Keep `web-app` depending on `utility-lib` through Maven, not by copying utility
   code into the web module.
+- If implementation reveals duplicated greeting formatting, mixed app/lib
+  responsibilities, or locale fallback logic that should be shared, return
+  `refactoring_assessment` in the worker result. Use `defer_follow_up` when the
+  current feature can safely proceed, and `include_child` only when the cleanup
+  is required before or during the current child.
 - After implementation, run
   `reference-products/java-spring-multi-module/project-package/commands/verify.sh`
   or explain why it could not run.

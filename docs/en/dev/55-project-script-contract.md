@@ -117,6 +117,23 @@ Worker commands write one JSON object to `A2O_WORKER_RESULT_PATH`. Required keys
 
 Implementation success also includes `changed_files` keyed by repo slot. Review and parent review may include `review_disposition` according to the worker response schema. The canonical review disposition scope key is `slot_scopes`, a non-empty array of repo slot names such as `["repo_alpha"]` or `["repo_alpha", "repo_beta"]`; `repo_scope` is not accepted in `review_disposition`.
 
+Worker results may include optional `refactoring_assessment` when implementation or review identifies design debt. A2O owns the schema, validation, evidence retention, and short Kanban comment summary. The project package owns the policy for what counts as debt, when debt can be included in the current child, and when it must become a separate child or follow-up. Valid `disposition` values are `none`, `include_child`, `defer_follow_up`, `blocked_by_design_debt`, and `needs_clarification`. Valid `recommended_action` values are `none`, `document_only`, `include_in_current_child`, `create_refactoring_child`, `create_follow_up_child`, `request_clarification`, and `block_until_decision`.
+
+```json
+{
+  "refactoring_assessment": {
+    "disposition": "defer_follow_up",
+    "reason": "The new branch duplicates existing factory selection logic.",
+    "scope": ["repo_beta/app/services/address"],
+    "recommended_action": "create_follow_up_child",
+    "risk": "medium",
+    "evidence": ["Factory A and Factory B already share the same responsibility."]
+  }
+}
+```
+
+`defer_follow_up` means work may continue while the debt remains visible in evidence. `include_child` means the decomposition or parent-review flow should include a refactoring child. `blocked_by_design_debt` and `needs_clarification` are not generic technical failures; use them when project policy says safe implementation requires a design decision or requester input.
+
 ## Cache And Artifacts
 
 Task-local cache and artifact paths are A2O-managed workspace concerns. Project packages may create product-specific cache directories under the materialized workspace, but durable cache policy and evidence retention belong to A2O. If a project needs a new stable cache/artifact discovery helper, add it as an A2O contract before scripts depend on private runtime paths.

@@ -399,6 +399,54 @@ RSpec.describe "worker:stdin-bundle" do
     expect(validate_payload(payload, request: request)).to eq([])
   end
 
+  it "accepts structured refactoring assessment in worker helper validation" do
+    payload = {
+      "task_ref" => "Sample#3112",
+      "run_ref" => "run-1",
+      "phase" => "review",
+      "success" => true,
+      "summary" => "review clean",
+      "failing_command" => nil,
+      "observed_state" => nil,
+      "rework_required" => false,
+      "refactoring_assessment" => {
+        "disposition" => "defer_follow_up",
+        "reason" => "Setup helpers duplicate application wiring.",
+        "scope" => ["repo_alpha"],
+        "recommended_action" => "create_follow_up_child",
+        "risk" => "low",
+        "evidence" => ["Two helper methods initialize the same state."]
+      }
+    }
+    request = base_request.merge("phase" => "review")
+
+    expect(validate_payload(payload, request: request)).to eq([])
+  end
+
+  it "rejects malformed refactoring assessment in worker helper validation" do
+    payload = {
+      "task_ref" => "Sample#3112",
+      "run_ref" => "run-1",
+      "phase" => "review",
+      "success" => false,
+      "summary" => "review failed",
+      "failing_command" => "review_worker",
+      "observed_state" => "invalid assessment",
+      "rework_required" => false,
+      "refactoring_assessment" => {
+        "disposition" => "later",
+        "recommended_action" => "unknown"
+      }
+    }
+    request = base_request.merge("phase" => "review")
+
+    expect(validate_payload(payload, request: request)).to include(
+      "refactoring_assessment.disposition must be one of none, include_child, defer_follow_up, blocked_by_design_debt, needs_clarification",
+      "refactoring_assessment.reason must be a non-empty string for later",
+      "refactoring_assessment.recommended_action must be one of none, document_only, include_in_current_child, create_refactoring_child, create_follow_up_child, request_clarification, block_until_decision"
+    )
+  end
+
   it "rejects malformed skill feedback in worker helper validation" do
     payload = {
       "task_ref" => "Sample#3112",

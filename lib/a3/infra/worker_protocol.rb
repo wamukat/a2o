@@ -4,6 +4,7 @@ require "json"
 require "digest"
 require "fileutils"
 require "open3"
+require "a3/domain/refactoring_assessment"
 require "a3/domain/skill_feedback"
 
 module A3
@@ -566,6 +567,9 @@ module A3
           expected_phase: expected_phase,
           expected_task_kind: expected_task_kind
         ).each { |error| errors << error } if worker_response.key?("docs_impact")
+        if worker_response.key?("refactoring_assessment")
+          A3::Domain::RefactoringAssessment.validation_errors(worker_response["refactoring_assessment"]).each { |error| errors << error }
+        end
         unless [true, false].include?(worker_response["rework_required"])
           errors << "rework_required must be true or false"
         end

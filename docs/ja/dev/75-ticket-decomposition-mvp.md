@@ -155,6 +155,8 @@ proposal の `outcome` は省略時 `draft_children` とする。この outcome 
 
 調査の結果、要求が既存実装で満たされている場合、author は `outcome: "no_action"`、`children: []`、非空の `reason` を返せる。要求を安全に分解できない場合、author は `outcome: "needs_clarification"`、`children: []`、非空の `reason`、1 件以上の `questions` を返せる。これらの outcome も proposal review を通るが、child creation では generated parent / child を作成しない。
 
+proposal には worker result と同じ schema の任意 `refactoring_assessment` を含められる。A2O はこの object を検証して保存するが、project 固有の refactoring 方針は決めない。何を refactoring debt とみなすか、それを現在の child set に含めるかは、project package の prompt、skill、docs が定義する。`include_child` は通常の child draft として refactoring work を proposal に含める判断である。`defer_follow_up` は child creation を block せず、proposal evidence、source-ticket comment、generated parent に debt を残し、parent review が follow-up child 化を判断できるようにする。`blocked_by_design_debt` と `needs_clarification` は、通常の technical blocked state と区別できるように扱う。
+
 proposal fingerprint は idempotency のために必須とする。source ticket ref、source revision fields、investigation result digest、順序付き child draft content から生成する。
 
 各 child draft には、source ticket ref と child boundary から導出する安定した child idempotency key も必要である。title のような揺れやすい文字列だけから作ってはならない。作成処理は proposal fingerprint で proposal version を識別し、child key で個別チケットを照合する。

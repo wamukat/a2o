@@ -246,6 +246,27 @@ Kanban comments contain only a short docs-impact summary. Runtime state such as 
 
 Existing projects can omit `docs` and continue to run. To migrate incrementally, add `docs.root`, one category, and one managed index block first, then add authorities and language policy once the team agrees on the source of truth. A2O refuses unsafe docs paths with explicit validation errors, so fix package validation before enabling runtime processing.
 
+### Refactoring assessment workflow
+
+Implementation, review, parent-review, and decomposition author outputs may include optional `refactoring_assessment`. A2O defines the schema and records the assessment in evidence and concise Kanban comments. The project package defines the actual policy through prompts, skills, and docs: what counts as debt, which module boundaries matter, when debt can be included in the current child, and when it must become a separate or follow-up child.
+
+```json
+{
+  "refactoring_assessment": {
+    "disposition": "defer_follow_up",
+    "reason": "The new branch duplicates existing factory selection logic.",
+    "scope": ["repo_beta/app/services/address"],
+    "recommended_action": "create_follow_up_child",
+    "risk": "medium",
+    "evidence": ["Factory A and Factory B already share the same responsibility."]
+  }
+}
+```
+
+`disposition` must be one of `none`, `include_child`, `defer_follow_up`, `blocked_by_design_debt`, or `needs_clarification`. `recommended_action`, when present or required by a non-`none` disposition, must be one of `none`, `document_only`, `include_in_current_child`, `create_refactoring_child`, `create_follow_up_child`, `request_clarification`, or `block_until_decision`.
+
+For decomposition, `include_child` means the proposal should include a normal child draft for the refactoring work. `defer_follow_up` records debt on the source-ticket summary and generated implementation parent but does not block child creation. `blocked_by_design_debt` and `needs_clarification` are distinct from ordinary technical blocked failures; use them only when project policy says safe implementation requires a design decision or requester input.
+
 ## Agent
 
 `agent.required_bins` lists commands that must exist where `a2o-agent` runs.

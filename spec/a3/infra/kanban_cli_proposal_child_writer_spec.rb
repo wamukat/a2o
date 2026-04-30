@@ -114,6 +114,19 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     end
   end
 
+  def proposal_evidence_with_refactoring_assessment
+    proposal_evidence_with_parent.tap do |payload|
+      payload.fetch("proposal")["refactoring_assessment"] = {
+        "disposition" => "defer_follow_up",
+        "reason" => "Greeting message formatting is duplicated between app and lib.",
+        "scope" => ["utility-lib", "web-app"],
+        "recommended_action" => "create_follow_up_child",
+        "risk" => "medium",
+        "evidence" => ["Both modules format locale fallbacks."]
+      }
+    end
+  end
+
   def generated_parent(client)
     client.created.find { |task| task.fetch("description", "").include?("Decomposition source:") }
   end
@@ -184,6 +197,20 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     expect(parent.fetch("description")).to include("Decomposition source: A3-v2#5300")
     expect(parent.fetch("description")).to include("Proposal fingerprint: fp-1")
     expect(parent.fetch("description")).to include("Implement Japanese and English greeting behavior.")
+  end
+
+  it "records deferred refactoring assessment on the generated parent" do
+    client = FakeProposalClient.new
+    writer = described_class.new(project: "A3-v2", client: client, mode: :draft)
+
+    result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence_with_refactoring_assessment)
+
+    expect(result.success?).to be(true)
+    description = generated_parent(client).fetch("description")
+    expect(description).to include("Refactoring assessment:")
+    expect(description).to include("- disposition: defer_follow_up")
+    expect(description).to include("- recommended_action: create_follow_up_child")
+    expect(description).to include("Greeting message formatting is duplicated between app and lib.")
   end
 
   it "does not overwrite an existing generated parent title or body on reruns" do

@@ -6,6 +6,7 @@ require "json"
 require "open3"
 require "pathname"
 require "tmpdir"
+require "a3/domain/refactoring_assessment"
 require_relative "decomposition_workspace_permissions"
 
 module A3
@@ -257,6 +258,7 @@ module A3
         normalized["questions"] = normalized["questions"].map(&:to_s) if normalized["questions"].is_a?(Array)
         normalized["evidence"] = normalized["evidence"].map(&:to_s) if normalized["evidence"].is_a?(Array)
         normalized["parent"] = normalize_parent(normalized["parent"]) if normalized.key?("parent")
+        normalized["refactoring_assessment"] = normalize_refactoring_assessment(normalized["refactoring_assessment"]) if normalized.key?("refactoring_assessment")
         normalized["unresolved_questions"] = [] if !normalized.key?("unresolved_questions") && normalized["outcome"] != "draft_children"
         if normalized["children"].is_a?(Array)
           normalized["children"] = normalized["children"].map do |child|
@@ -308,6 +310,7 @@ module A3
           errors << "questions must be a non-empty array for needs_clarification outcome" unless proposal["questions"].is_a?(Array) && proposal["questions"].any? { |question| non_empty_string?(question) }
         end
         errors << "evidence must be an array when provided" if proposal.key?("evidence") && !proposal["evidence"].is_a?(Array)
+        errors.concat(A3::Domain::RefactoringAssessment.validation_errors(proposal["refactoring_assessment"])) if proposal.key?("refactoring_assessment")
         errors.concat(parent_validation_errors(proposal["parent"], outcome: proposal["outcome"])) if proposal.key?("parent")
         errors
       end
@@ -343,6 +346,10 @@ module A3
           lines << "Child drafts: #{proposal.fetch('children', []).size}"
           lines << "Reason: #{proposal.fetch('reason')}" if non_empty_string?(proposal["reason"])
           lines << "Questions: #{proposal.fetch('questions', []).size}" if proposal["outcome"] == "needs_clarification"
+          if proposal["refactoring_assessment"].is_a?(Hash)
+            assessment = A3::Domain::RefactoringAssessment.from_persisted_form(proposal["refactoring_assessment"])
+            lines << "Refactoring assessment: #{assessment.summary}" if assessment&.active?
+          end
           questions = proposal.fetch("unresolved_questions")
           lines << "Unresolved questions: #{questions.empty? ? 'none' : questions.size}"
         else
@@ -429,6 +436,13 @@ module A3
         stringify_keys(parent).each_with_object({}) do |(key, value), memo|
           memo[key] = value.is_a?(String) ? value.strip : value
         end
+      end
+
+      def normalize_refactoring_assessment(value)
+        assessment = A3::Domain::RefactoringAssessment.from_persisted_form(value)
+        assessment&.persisted_form || value
+      rescue ArgumentError
+        value
       end
 
       def parent_validation_errors(parent, outcome:)

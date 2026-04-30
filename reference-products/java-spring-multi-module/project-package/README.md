@@ -14,6 +14,13 @@ The `docs` config is intentionally small but complete enough to exercise
 docs-impact decisions, shared specs, interface docs, authority sources, managed
 index blocks, and mirror policy.
 
+Refactoring policy for this sample is project-owned: `utility-lib` owns reusable
+greeting rules, while `web-app` owns HTTP/UI behavior. Repeated greeting
+formatting or locale fallback logic across both modules should be reported as
+`refactoring_assessment`; small cleanup that is required for the current child
+can be included in that child, while cross-module cleanup should be proposed as
+a follow-up child.
+
 Command inventory:
 
 - `commands/verify.sh`: runtime verification command.

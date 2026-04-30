@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "a3/domain/refactoring_assessment"
+
 module A3
   module Application
     class ExecutionResult
@@ -75,6 +77,14 @@ module A3
 
         value = response_bundle["docs_impact"]
         value.is_a?(Hash) ? value : nil
+      end
+
+      def refactoring_assessment
+        return nil if invalid_worker_result?
+        return nil unless response_bundle.is_a?(Hash)
+
+        value = A3::Domain::RefactoringAssessment.from_response_bundle(response_bundle)
+        value&.valid? ? value.persisted_form : nil
       end
 
       def invalid_worker_result?

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "a3/domain/branch_namespace"
+require "a3/domain/refactoring_assessment"
 
 module A3
   module Application
@@ -347,6 +348,7 @@ module A3
 
         append_review_disposition_comment_lines(lines, execution_record&.review_disposition)
         append_docs_impact_comment_lines(lines, execution_record&.docs_impact)
+        append_refactoring_assessment_comment_lines(lines, execution_record&.refactoring_assessment)
         append_clarification_request_comment_lines(lines, execution_record&.clarification_request)
         append_merge_recovery_comment_lines(lines, execution_record&.diagnostics || execution&.diagnostics)
         append_worker_result_diagnostic_comment_lines(
@@ -418,6 +420,17 @@ module A3
         lines << "docs-authorities: #{authorities}" if present?(authorities)
         lines << "docs-rules: #{matched_rules}" if present?(matched_rules)
         lines << "docs-traceability: #{traceability}" if present?(traceability)
+      end
+
+      def append_refactoring_assessment_comment_lines(lines, assessment)
+        return unless assessment.is_a?(Hash)
+
+        value = A3::Domain::RefactoringAssessment.from_persisted_form(assessment)
+        return unless value&.active?
+
+        lines << "refactoring-assessment: #{single_line(value.summary)}"
+        evidence = summary_list(value.evidence, limit: 3)
+        lines << "refactoring-evidence: #{evidence}" if present?(evidence)
       end
 
       def summary_list(value, limit: 5)
@@ -514,6 +527,8 @@ module A3
           review_fields.insert(1, "slot_scopes=#{slot_scopes.join(',')}") unless slot_scopes.empty?
           fields << "review_disposition=#{review_fields.join(' ')}" unless review_fields.empty?
         end
+        assessment = A3::Domain::RefactoringAssessment.from_persisted_form(bundle["refactoring_assessment"])
+        fields << "refactoring_assessment=#{single_line(assessment.summary)}" if assessment&.valid? && assessment.active?
         truncate_comment_value(fields.reject(&:empty?).join(" "))
       end
 

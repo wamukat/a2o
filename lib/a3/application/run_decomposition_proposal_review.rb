@@ -5,6 +5,7 @@ require "json"
 require "open3"
 require "pathname"
 require "tmpdir"
+require "a3/domain/refactoring_assessment"
 require_relative "decomposition_workspace_permissions"
 
 module A3
@@ -99,9 +100,17 @@ module A3
 
       def normalize_result(command:, status:, stdout:, stderr:, raw_result:)
         findings = []
-        valid_result = status.success? && raw_result.is_a?(Hash) && non_empty_string?(raw_result["summary"]) && raw_result["findings"].is_a?(Array)
+        assessment_errors = raw_result.is_a?(Hash) && raw_result.key?("refactoring_assessment") ? A3::Domain::RefactoringAssessment.validation_errors(raw_result["refactoring_assessment"]) : []
+        assessment = normalize_refactoring_assessment(raw_result["refactoring_assessment"]) if raw_result.is_a?(Hash) && raw_result.key?("refactoring_assessment")
+        valid_result = status.success? && raw_result.is_a?(Hash) && non_empty_string?(raw_result["summary"]) && raw_result["findings"].is_a?(Array) && assessment_errors.empty?
         if raw_result.is_a?(Hash) && raw_result["findings"].is_a?(Array)
           findings = raw_result["findings"].map { |finding| normalize_finding(finding) }
+        end
+        assessment_errors.each do |error|
+          findings << {
+            "severity" => "critical",
+            "summary" => error
+          }
         end
         unless valid_result
           findings << {
@@ -114,10 +123,18 @@ module A3
           "success" => valid_result,
           "summary" => raw_result.is_a?(Hash) ? raw_result["summary"].to_s : "",
           "findings" => findings,
+          "refactoring_assessment" => assessment,
           "stdout" => stdout,
           "stderr" => stderr,
           "exit_status" => status.exitstatus
-        }
+        }.compact
+      end
+
+      def normalize_refactoring_assessment(value)
+        assessment = A3::Domain::RefactoringAssessment.from_persisted_form(value)
+        assessment&.persisted_form
+      rescue ArgumentError
+        value
       end
 
       def invalid_review_summary(status:, raw_result:)
@@ -188,6 +205,10 @@ module A3
       def source_ticket_summary_for(summary:, disposition:, critical_findings:, review_results:)
         lines = ["Decomposition proposal review: #{summary}", "Disposition: #{disposition}", "Reviewers: #{review_results.size}"]
         critical_findings.each { |finding| lines << "Critical: #{finding.fetch('summary')}" }
+        review_results.each do |result|
+          assessment = A3::Domain::RefactoringAssessment.from_persisted_form(result["refactoring_assessment"])
+          lines << "Refactoring assessment: #{assessment.summary}" if assessment&.active?
+        end
         lines.join("\n")
       end
 
