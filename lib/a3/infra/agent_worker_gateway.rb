@@ -2,6 +2,7 @@
 
 require "fileutils"
 require "json"
+require "pathname"
 require "securerandom"
 require "a3/infra/workspace_trace_logger"
 
@@ -101,9 +102,11 @@ module A3
         return invalid_configuration_result("workspace_request_builder must be provided for agent-materialized mode") unless @workspace_request_builder
 
         log_request_start(workspace: workspace, task: task, run: run, skill: skill)
+        workspace_request = @workspace_request_builder.call(workspace: workspace, task: task, run: run)
+        protocol_workspace = worker_protocol_workspace(workspace, workspace_request)
         worker_protocol_request = @worker_protocol.request_form(
           skill: skill,
-          workspace: workspace,
+          workspace: protocol_workspace,
           task: task,
           run: run,
           phase_runtime: phase_runtime,
@@ -111,7 +114,6 @@ module A3
           prior_review_feedback: prior_review_feedback
         )
         prompt_metadata = @worker_protocol.project_prompt_metadata(worker_protocol_request)
-        workspace_request = @workspace_request_builder.call(workspace: workspace, task: task, run: run)
         request = build_job_request(
           workspace: workspace,
           task: task,
@@ -214,6 +216,40 @@ module A3
           timeout_seconds: @timeout_seconds,
           artifact_rules: []
         )
+      end
+
+      def worker_protocol_workspace(workspace, workspace_request)
+        source_paths = agent_source_paths_by_alias
+        return workspace if source_paths.empty? || !workspace_request
+
+        A3::Domain::PreparedWorkspace.new(
+          workspace_kind: workspace.workspace_kind,
+          root_path: workspace.root_path,
+          source_descriptor: workspace.source_descriptor,
+          slot_paths: slot_paths_from_agent_sources(workspace_request, source_paths)
+        )
+      end
+
+      def agent_source_paths_by_alias
+        environment = @agent_environment || {}
+        source_paths = environment["source_paths"] || environment[:source_paths] || {}
+        return {} unless source_paths.is_a?(Hash)
+
+        source_paths.each_with_object({}) do |(slot, path), memo|
+          next if slot.to_s.empty? || path.to_s.empty?
+
+          memo[slot.to_sym] = Pathname(path.to_s)
+        end
+      end
+
+      def slot_paths_from_agent_sources(workspace_request, source_paths_by_alias)
+        workspace_request.slots.each_with_object({}) do |(slot, descriptor), memo|
+          alias_name = descriptor.dig("source", "alias").to_s
+          path = source_paths_by_alias[alias_name.to_sym] || source_paths_by_alias[slot.to_sym]
+          next unless path
+
+          memo[slot.to_sym] = path
+        end
       end
 
       def enqueue(request)

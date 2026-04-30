@@ -9,12 +9,14 @@ mkdir -p "$A2O_DEV_SAMPLE_STORAGE_DIR"
 "$A2O_DEV_SAMPLE_ROOT/tools/dev_sample/prepare-sources.sh" >/dev/null
 app_source="$A2O_DEV_SAMPLE_ROOT/.work/a2o-dev-sample/sources/web-app"
 lib_source="$A2O_DEV_SAMPLE_ROOT/.work/a2o-dev-sample/sources/utility-lib"
+docs_source="$A2O_DEV_SAMPLE_ROOT/.work/a2o-dev-sample/sources/docs"
 
 ruby -Ilib bin/a3 execute-until-idle \
   --storage-backend sqlite \
   --storage-dir "$A2O_DEV_SAMPLE_STORAGE_DIR" \
   --repo-source "app=$app_source" \
   --repo-source "lib=$lib_source" \
+  --repo-source "docs=$docs_source" \
   --preset-dir config/presets \
   --kanban-backend subprocess-cli \
   --kanban-command python3 \
@@ -28,6 +30,7 @@ ruby -Ilib bin/a3 execute-until-idle \
   --kanban-trigger-label trigger:auto-implement \
   --kanban-repo-label repo:app=app \
   --kanban-repo-label repo:lib=lib \
+  --kanban-repo-label repo:docs=docs \
   --worker-gateway agent-http \
   --verification-command-runner agent-http \
   --merge-runner agent-http \
@@ -36,8 +39,10 @@ ruby -Ilib bin/a3 execute-until-idle \
   --agent-shared-workspace-mode agent-materialized \
   --agent-source-alias app=app \
   --agent-source-alias lib=lib \
+  --agent-source-alias docs=docs \
   --agent-source-path "app=$app_source" \
   --agent-source-path "lib=$lib_source" \
+  --agent-source-path "docs=$docs_source" \
   --agent-support-ref refs/heads/a2o/dev-sample-live \
   --agent-workspace-root "$A2O_DEV_SAMPLE_AGENT_WORKSPACE_DIR" \
   --worker-command ruby \

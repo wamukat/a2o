@@ -55,6 +55,8 @@ pid = Process.spawn(
   "--control-plane-url", agent_url,
   "--workspace-root", workspace_dir,
   "--source-alias", "app=#{sample_root}",
+  "--source-alias", "lib=#{sample_root}",
+  "--source-alias", "docs=#{sample_root}",
   chdir: "agent-go",
   pgroup: true,
   in: File::NULL,

@@ -11,6 +11,7 @@ COMMON_OPTIONS=(
   --storage-dir "$A2O_DEV_SAMPLE_STORAGE_DIR"
   --repo-source "app=$A2O_DEV_SAMPLE_ROOT/reference-products/java-spring-multi-module/web-app"
   --repo-source "lib=$A2O_DEV_SAMPLE_ROOT/reference-products/java-spring-multi-module/utility-lib"
+  --repo-source "docs=$A2O_DEV_SAMPLE_ROOT/reference-products/java-spring-multi-module/docs"
   --kanban-backend subprocess-cli
   --kanban-command python3
   --kanban-command-arg tools/kanban/kanban_cli.py
@@ -23,6 +24,7 @@ COMMON_OPTIONS=(
   --kanban-trigger-label trigger:investigate
   --kanban-repo-label repo:app=app
   --kanban-repo-label repo:lib=lib
+  --kanban-repo-label repo:docs=docs
 )
 RUNTIME_OPTIONS=(
   "${COMMON_OPTIONS[@]}"

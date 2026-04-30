@@ -677,6 +677,90 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
     expect(request.env).to include("A2O_WORKER_REQUEST_PATH")
   end
 
+  it "builds docs_context from agent source paths in materialized workspace mode" do
+    source_root = Pathname(tmpdir).join("source-repo-beta")
+    FileUtils.mkdir_p(source_root.join("docs", "shared"))
+    source_root.join("docs", "shared", "gateway.md").write(<<~MARKDOWN)
+      ---
+      title: Agent Gateway Docs
+      category: shared_specs
+      related_tickets:
+        - #{task.ref}
+      ---
+
+      Agent gateway docs.
+    MARKDOWN
+    client.on_fetch = lambda do |job_id|
+      client.complete(
+        job_id,
+        agent_result(
+          job_id,
+          :succeeded,
+          0,
+          worker_protocol_result: worker_success.merge("changed_files" => { "repo_beta" => [] }),
+          workspace_descriptor: workspace_descriptor(
+            "repo_beta" => materialized_no_change_slot_descriptor
+          )
+        )
+      )
+    end
+    runtime_with_docs = A3::Domain::PhaseRuntimeConfig.new(
+      task_kind: :child,
+      repo_scope: :repo_beta,
+      phase: :implementation,
+      implementation_skill: "task implementation",
+      review_skill: "task review",
+      verification_commands: [],
+      remediation_commands: [],
+      workspace_hook: "bootstrap",
+      merge_target: :merge_to_parent,
+      merge_policy: :squash,
+      docs_config: {
+        "repoSlot" => "repo_beta",
+        "root" => "docs",
+        "categories" => {
+          "shared_specs" => { "path" => "docs/shared" }
+        }
+      }
+    )
+    gateway = described_class.new(
+      control_plane_client: client,
+      worker_command: "ruby",
+      worker_command_args: ["worker.rb"],
+      runtime_profile: "host-local",
+      shared_workspace_mode: "agent-materialized",
+      timeout_seconds: 30,
+      poll_interval_seconds: 0,
+      job_id_generator: -> { "job-1" },
+      sleeper: ->(_seconds) {},
+      workspace_request_builder: ->(**kwargs) { materialized_workspace_request(publish: kwargs.fetch(:run).phase.to_sym == :implementation) },
+      agent_environment: {
+        "source_paths" => {
+          "sample-catalog-service" => source_root.to_s
+        }
+      }
+    )
+
+    gateway.run(
+      skill: runtime_with_docs.implementation_skill,
+      workspace: workspace,
+      task: task,
+      run: run,
+      phase_runtime: runtime_with_docs,
+      task_packet: task_packet
+    )
+
+    request = client.records.values.first.request
+    docs_context = request.worker_protocol_request.fetch("docs_context")
+    expect(docs_context.fetch("candidate_docs")).to include(
+      hash_including(
+        "path" => "docs/shared/gateway.md",
+        "repo_slot" => "repo_beta",
+        "reason" => "related_ticket:#{task.ref}"
+      )
+    )
+  end
+
   it "rejects materialized implementation when required changed files evidence is missing" do
     client.on_fetch = lambda do |job_id|
       client.complete(

@@ -7,6 +7,7 @@ product_root="$A2O_DEV_SAMPLE_ROOT/reference-products/java-spring-multi-module"
 sources_root="$A2O_DEV_SAMPLE_ROOT/.work/a2o-dev-sample/sources"
 app_source="$sources_root/web-app"
 lib_source="$sources_root/utility-lib"
+docs_source="$sources_root/docs"
 
 chmod -R u+rwX "$sources_root" 2>/dev/null || true
 rm -rf "$sources_root"
@@ -124,10 +125,13 @@ init_repo() {
 
 copy_module "$product_root/utility-lib" "$lib_source"
 copy_module "$product_root/web-app" "$app_source"
+copy_module "$product_root/docs" "$docs_source"
 write_lib_pom
 write_app_pom
 init_repo "$lib_source"
 init_repo "$app_source"
+init_repo "$docs_source"
 
 echo "dev_sample_app_source=$app_source"
 echo "dev_sample_lib_source=$lib_source"
+echo "dev_sample_docs_source=$docs_source"
