@@ -37,7 +37,7 @@ module A3
       end
 
       def load_for_watch_summary
-        selection = load_selection_snapshots(tolerate_invalid_edit_scope: true)
+        selection = load_selection_snapshots(tolerate_invalid_edit_scope: true, include_decomposition_sources: true)
         selection_snapshots = selection.fetch(:snapshots)
         topology = load_topology(selection_snapshots: selection_snapshots)
         tasks = build_tasks(
@@ -93,9 +93,9 @@ module A3
         }
       end
 
-      def load_selection_snapshots(tolerate_invalid_edit_scope: false)
+      def load_selection_snapshots(tolerate_invalid_edit_scope: false, include_decomposition_sources: false)
         args = ["task-snapshot-list", "--project", @project]
-        args += ["--status", @status] if pass_status_filter_to_kanban?
+        args += ["--status", @status] if pass_status_filter_to_kanban? && !include_decomposition_sources
         payload = @client.run_json_command(*args)
         raise A3::Domain::ConfigurationError, "kanban task-snapshot-list must return an array" unless payload.is_a?(Array)
 
@@ -103,7 +103,7 @@ module A3
           snapshots = []
           warnings = []
           payload.each do |raw_snapshot|
-            snapshots << normalize_snapshot(raw_snapshot)
+            snapshots << normalize_snapshot(raw_snapshot, include_decomposition_sources: include_decomposition_sources)
           rescue A3::Domain::ConfigurationError => e
             warnings << watch_summary_warning(raw_snapshot: raw_snapshot, error: e)
           end
@@ -114,7 +114,9 @@ module A3
           }.freeze
         end
 
-        payload.map { |raw_snapshot| normalize_snapshot(raw_snapshot) }.compact.freeze
+        payload.map do |raw_snapshot|
+          normalize_snapshot(raw_snapshot, include_decomposition_sources: include_decomposition_sources)
+        end.compact.freeze
       rescue A3::Domain::ConfigurationError => e
         return tolerate_invalid_edit_scope ? { snapshots: [], warnings: [] }.freeze : [] if missing_project_error?(e)
 
@@ -367,20 +369,25 @@ module A3
         status
       end
 
-      def normalize_snapshot(raw_snapshot, ignore_status_filter: false, ignore_trigger_filter: false)
+      def normalize_snapshot(raw_snapshot, ignore_status_filter: false, ignore_trigger_filter: false, include_decomposition_sources: false)
         raise A3::Domain::ConfigurationError, "kanban task snapshot must be an object" unless raw_snapshot.is_a?(Hash)
 
         labels = Array(raw_snapshot["labels"]).map(&:to_s).reject(&:empty?).freeze
         task_ref = String(raw_snapshot.fetch("ref")).strip
         return nil unless ignore_trigger_filter || @trigger_labels.empty? || (labels & @trigger_labels).any?
         return nil if task_closed?(raw_snapshot.fetch("status", nil), raw_snapshot["done"], raw_snapshot["is_archived"])
-        return nil if decomposed_source_selected_only_for_decomposition?(labels)
-
-        edit_scope = resolve_edit_scope(labels: labels, task_ref: task_ref)
+        return nil if !include_decomposition_sources && decomposed_source_selected_only_for_decomposition?(labels)
 
         status = normalize_status(raw_snapshot.fetch("status", nil), labels: labels)
         return nil unless status
-        return nil if @status && !ignore_status_filter && !status_matches_filter?(raw_status: raw_snapshot.fetch("status", nil), normalized_status: status)
+        ignore_status_for_decomposition_source =
+          include_decomposition_sources && labels.include?(A3::Domain::Task::DECOMPOSITION_TRIGGER_LABEL)
+        if @status && !ignore_status_filter && !ignore_status_for_decomposition_source &&
+            !status_matches_filter?(raw_status: raw_snapshot.fetch("status", nil), normalized_status: status)
+          return nil
+        end
+
+        edit_scope = resolve_edit_scope(labels: labels, task_ref: task_ref)
 
         {
           "task_id" => Integer(raw_snapshot.fetch("id")),
