@@ -118,6 +118,9 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	if err := validateProjectPromptsConfig(runtimePayload, packagePath, projectRepoNames(payload.Repos)); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.prompts: %w", projectFile, err)
 	}
+	if err := validatePromptBackedPhaseSkills(runtimePayload); err != nil {
+		return config, fmt.Errorf("project package config %s has invalid runtime.phases: %w", projectFile, err)
+	}
 	if err := validateProjectDocsConfig(rawPayload["docs"], packagePath, payload.Repos); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid docs: %w", projectFile, err)
 	}
@@ -319,6 +322,38 @@ func validateProjectPromptsConfig(runtimePayload map[string]any, packagePath str
 		}
 	}
 	return nil
+}
+
+func validatePromptBackedPhaseSkills(runtimePayload map[string]any) error {
+	phases, _ := normalizeYAMLValue(runtimePayload["phases"]).(map[string]any)
+	prompts, _ := normalizeYAMLValue(runtimePayload["prompts"]).(map[string]any)
+	promptPhases, _ := normalizeYAMLValue(prompts["phases"]).(map[string]any)
+	for _, phaseName := range []string{"implementation", "review"} {
+		phase, ok := normalizeYAMLValue(phases[phaseName]).(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, hasSkill := phase["skill"]; hasSkill {
+			continue
+		}
+		if promptPhaseHasAuthoringContent(promptPhases[phaseName]) {
+			continue
+		}
+		return fmt.Errorf("%s.skill must be provided", phaseName)
+	}
+	return nil
+}
+
+func promptPhaseHasAuthoringContent(rawPhase any) bool {
+	phase, ok := normalizeYAMLValue(rawPhase).(map[string]any)
+	if !ok {
+		return false
+	}
+	if strings.TrimSpace(scalarString(phase["prompt"])) != "" {
+		return true
+	}
+	skills, ok := normalizeYAMLValue(phase["skills"]).([]any)
+	return ok && len(skills) > 0
 }
 
 func validatePromptPhaseMapping(rawPhases any, label string, packagePath string) error {

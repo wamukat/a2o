@@ -2458,11 +2458,13 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 		"runtime:",
 		"  phases:",
 		"    implementation:",
+		"      skill: skills/implementation/base.md",
 		"      executor:",
 		"        command:",
 		"          - codex",
 		"          - exec",
 		"    review:",
+		"      skill: skills/review/default.md",
 		"      executor:",
 		"        command:",
 		"          - codex",
@@ -4392,6 +4394,160 @@ runtime:
 	}
 	if !strings.Contains(stdout.String(), "lint_status=ok") {
 		t.Fatalf("project validate should report ok, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateAcceptsPromptsOnlyPhaseSkills(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    phases:
+      implementation:
+        prompt: prompts/implementation.md
+      review:
+        skills:
+          - skills/review.md
+  phases:
+    implementation:
+      executor:
+        command:
+          - worker
+    review: {}
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for path, content := range map[string]string{
+		"prompts/implementation.md": "implementation guidance",
+		"skills/review.md":          "review guidance",
+	} {
+		target := filepath.Join(packageDir, path)
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project validate should accept prompts-only phase skills, code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "lint_status=ok") {
+		t.Fatalf("project validate should report ok, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateRejectsSkilllessPhaseWithoutPhasePrompt(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(filepath.Join(packageDir, "prompts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    system:
+      file: prompts/system.md
+  phases:
+    implementation:
+      executor:
+        command:
+          - worker
+    review: {}
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "prompts", "system.md"), []byte("system guidance"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject skillless implementation without a phase prompt, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "invalid runtime.phases") ||
+		!strings.Contains(stdout.String(), "implementation.skill must be provided") {
+		t.Fatalf("project validate should reject skillless implementation, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateRejectsSkilllessReviewWithoutPhasePrompt(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(filepath.Join(packageDir, "prompts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    phases:
+      implementation:
+        prompt: prompts/implementation.md
+  phases:
+    implementation:
+      executor:
+        command:
+          - worker
+    review: {}
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "prompts", "implementation.md"), []byte("implementation guidance"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject skillless review without a phase prompt, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "invalid runtime.phases") ||
+		!strings.Contains(stdout.String(), "review.skill must be provided") {
+		t.Fatalf("project validate should reject skillless review, stdout=%s stderr=%s", stdout.String(), stderr.String())
 	}
 }
 
