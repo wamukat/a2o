@@ -23,7 +23,7 @@ A2O 0.5.55 で現在利用できる公開機能と検証範囲を示す。
 - review rework 後の implementation retry には、直前の review feedback が worker runtime context として渡される。
 - operator が付与した `blocked` label は phase 完了時にも保持され、runtime status publication によって暗黙に外されない。
 - parent review の clean success result は、worker が `review_disposition` を省略または一部だけ返しても completed disposition に正規化される。明示的に矛盾する disposition は引き続き拒否される。frozen worker payload でも、この正規化で scheduler がクラッシュしない。
-- multi-project runtime context の土台として、manual multi-project lifecycle command を有効化する前に、runtime storage、host log / workspace、scheduler pid / log file、temp file、branch namespace を解決済み project key ごとに分離する。
+- multi-project runtime context は runtime storage、host log / workspace、scheduler pid / log file、temp file、branch namespace を解決済み project key ごとに分離する。`a2o runtime resume --all-projects`、`pause --all-projects`、`status --all-projects` は登録 project ごとに scheduler を1つずつ扱い、各 project 内の active task は1件のまま維持する。
 - アップグレード診断: `a2o upgrade check`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
 - investigate decomposition MVP: `runtime.decomposition.investigate.command`、`runtime.decomposition.author.command`、`a2o runtime decomposition investigate`、`propose`、`review`、`create-children`、`status`、`cleanup`

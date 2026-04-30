@@ -437,6 +437,17 @@ func schedulerPaths(config runtimeInstanceConfig) runtimeSchedulerPaths {
 	}
 }
 
+type runtimeResumeOptions struct {
+	Interval                        string
+	MaxSteps                        string
+	AgentAttempts                   string
+	AgentPollInterval               string
+	AgentControlPlaneConnectTimeout string
+	AgentControlPlaneRequestTimeout string
+	AgentControlPlaneRetries        string
+	AgentControlPlaneRetryDelay     string
+}
+
 func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
 	flags := flag.NewFlagSet("a2o runtime resume", flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -449,53 +460,18 @@ func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, std
 	agentControlPlaneRetries := flags.String("agent-control-plane-retries", "", "retry count for transient host agent control plane request failures during each cycle")
 	agentControlPlaneRetryDelay := flags.String("agent-control-plane-retry-delay", "", "delay between transient host agent control plane retries during each cycle")
 	projectKey := flags.String("project", "", "runtime project key")
+	allProjects := flags.Bool("all-projects", false, "resume schedulers for every project in the runtime project registry")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
-	sleepDuration, err := time.ParseDuration(*interval)
-	if err != nil {
-		return fmt.Errorf("parse --interval: %w", err)
+	if *allProjects && strings.TrimSpace(*projectKey) != "" {
+		return fmt.Errorf("--all-projects cannot be combined with --project")
 	}
-	if sleepDuration < 0 {
-		return errors.New("--interval must be >= 0")
-	}
-	if strings.TrimSpace(*maxSteps) != "" {
-		if _, err := parsePositiveInt(*maxSteps, "max steps"); err != nil {
-			return err
-		}
-	}
-	if strings.TrimSpace(*agentAttempts) != "" {
-		if _, err := parsePositiveInt(*agentAttempts, "agent attempts"); err != nil {
-			return err
-		}
-	}
-	if _, err := parseNonNegativeDuration(*agentPollInterval, "agent poll interval"); err != nil {
-		return err
-	}
-	if _, err := parseOptionalPositiveDuration(*agentControlPlaneConnectTimeout, "agent control plane connect timeout"); err != nil {
-		return err
-	}
-	if _, err := parseOptionalPositiveDuration(*agentControlPlaneRequestTimeout, "agent control plane request timeout"); err != nil {
-		return err
-	}
-	if strings.TrimSpace(*agentControlPlaneRetries) != "" {
-		if _, err := parseNonNegativeInt(*agentControlPlaneRetries, "agent control plane retries"); err != nil {
-			return err
-		}
-	}
-	if _, err := parseNonNegativeDuration(*agentControlPlaneRetryDelay, "agent control plane retry delay"); err != nil {
-		return err
-	}
-
-	context, _, err := loadProjectRuntimeContextForCommand(*projectKey, true)
-	if err != nil {
-		return err
-	}
-	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
-	if _, err := buildRuntimeRunOncePlan(effectiveConfig, runtimeRunOnceOverrides{
+	options := runtimeResumeOptions{
+		Interval:                        *interval,
 		MaxSteps:                        *maxSteps,
 		AgentAttempts:                   *agentAttempts,
 		AgentPollInterval:               *agentPollInterval,
@@ -503,6 +479,101 @@ func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, std
 		AgentControlPlaneRequestTimeout: *agentControlPlaneRequestTimeout,
 		AgentControlPlaneRetries:        *agentControlPlaneRetries,
 		AgentControlPlaneRetryDelay:     *agentControlPlaneRetryDelay,
+	}
+	if err := validateRuntimeResumeOptions(options); err != nil {
+		return err
+	}
+	if *allProjects {
+		return runRuntimeResumeAllProjects(options, runner, stdout)
+	}
+
+	context, _, err := loadProjectRuntimeContextForCommand(*projectKey, true)
+	if err != nil {
+		return err
+	}
+	return resumeRuntimeForContext(context, options, runner, stdout)
+}
+
+func validateRuntimeResumeOptions(options runtimeResumeOptions) error {
+	sleepDuration, err := time.ParseDuration(options.Interval)
+	if err != nil {
+		return fmt.Errorf("parse --interval: %w", err)
+	}
+	if sleepDuration < 0 {
+		return errors.New("--interval must be >= 0")
+	}
+	if strings.TrimSpace(options.MaxSteps) != "" {
+		if _, err := parsePositiveInt(options.MaxSteps, "max steps"); err != nil {
+			return err
+		}
+	}
+	if strings.TrimSpace(options.AgentAttempts) != "" {
+		if _, err := parsePositiveInt(options.AgentAttempts, "agent attempts"); err != nil {
+			return err
+		}
+	}
+	if _, err := parseNonNegativeDuration(options.AgentPollInterval, "agent poll interval"); err != nil {
+		return err
+	}
+	if _, err := parseOptionalPositiveDuration(options.AgentControlPlaneConnectTimeout, "agent control plane connect timeout"); err != nil {
+		return err
+	}
+	if _, err := parseOptionalPositiveDuration(options.AgentControlPlaneRequestTimeout, "agent control plane request timeout"); err != nil {
+		return err
+	}
+	if strings.TrimSpace(options.AgentControlPlaneRetries) != "" {
+		if _, err := parseNonNegativeInt(options.AgentControlPlaneRetries, "agent control plane retries"); err != nil {
+			return err
+		}
+	}
+	if _, err := parseNonNegativeDuration(options.AgentControlPlaneRetryDelay, "agent control plane retry delay"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func runRuntimeResumeAllProjects(options runtimeResumeOptions, runner commandRunner, stdout io.Writer) error {
+	registryPath, registry, err := loadProjectRegistryFromWorkingTree("--all-projects")
+	if err != nil {
+		return err
+	}
+	failures := 0
+	for _, key := range sortedProjectKeys(registry) {
+		context, err := projectRuntimeContextFromRegistry(registryPath, registry, key)
+		if err != nil {
+			failures++
+			fmt.Fprintf(stdout, "project_key=%s runtime_resume_error=%s\n", key, singleLine(err.Error()))
+			continue
+		}
+		var projectOutput bytes.Buffer
+		if err := resumeRuntimeForContext(context, options, runner, &projectOutput); err != nil {
+			failures++
+			fmt.Fprintf(stdout, "project_key=%s runtime_resume_error=%s\n", context.ProjectKey, singleLine(err.Error()))
+			continue
+		}
+		for _, line := range strings.Split(strings.TrimRight(projectOutput.String(), "\n"), "\n") {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			fmt.Fprintf(stdout, "project_key=%s %s\n", context.ProjectKey, line)
+		}
+	}
+	if failures > 0 {
+		return fmt.Errorf("runtime resume --all-projects failed for %d project(s)", failures)
+	}
+	return nil
+}
+
+func resumeRuntimeForContext(context *projectRuntimeContext, options runtimeResumeOptions, runner commandRunner, stdout io.Writer) error {
+	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
+	if _, err := buildRuntimeRunOncePlan(effectiveConfig, runtimeRunOnceOverrides{
+		MaxSteps:                        options.MaxSteps,
+		AgentAttempts:                   options.AgentAttempts,
+		AgentPollInterval:               options.AgentPollInterval,
+		AgentControlPlaneConnectTimeout: options.AgentControlPlaneConnectTimeout,
+		AgentControlPlaneRequestTimeout: options.AgentControlPlaneRequestTimeout,
+		AgentControlPlaneRetries:        options.AgentControlPlaneRetries,
+		AgentControlPlaneRetryDelay:     options.AgentControlPlaneRetryDelay,
 	}, ""); err != nil {
 		return err
 	}
@@ -533,18 +604,18 @@ func runRuntimeResume(args []string, runner commandRunner, stdout io.Writer, std
 	if err != nil {
 		return fmt.Errorf("resolve executable: %w", err)
 	}
-	loopArgs := []string{"runtime", "loop", "--interval", *interval}
+	loopArgs := []string{"runtime", "loop", "--interval", options.Interval}
 	if effectiveConfig.MultiProjectMode && context.ProjectKey != "" {
 		loopArgs = append(loopArgs, "--project", context.ProjectKey)
 	}
 	loopArgs = append(loopArgs, buildRunOnceArgs(runtimeRunOnceOverrides{
-		MaxSteps:                        *maxSteps,
-		AgentAttempts:                   *agentAttempts,
-		AgentPollInterval:               *agentPollInterval,
-		AgentControlPlaneConnectTimeout: *agentControlPlaneConnectTimeout,
-		AgentControlPlaneRequestTimeout: *agentControlPlaneRequestTimeout,
-		AgentControlPlaneRetries:        *agentControlPlaneRetries,
-		AgentControlPlaneRetryDelay:     *agentControlPlaneRetryDelay,
+		MaxSteps:                        options.MaxSteps,
+		AgentAttempts:                   options.AgentAttempts,
+		AgentPollInterval:               options.AgentPollInterval,
+		AgentControlPlaneConnectTimeout: options.AgentControlPlaneConnectTimeout,
+		AgentControlPlaneRequestTimeout: options.AgentControlPlaneRequestTimeout,
+		AgentControlPlaneRetries:        options.AgentControlPlaneRetries,
+		AgentControlPlaneRetryDelay:     options.AgentControlPlaneRetryDelay,
 	})...)
 	expectedCommand := schedulerExpectedCommand(executable, loopArgs)
 	pid, err := runner.StartBackground(executable, loopArgs, paths.LogFile)
@@ -570,17 +641,60 @@ func runRuntimePause(args []string, runner commandRunner, stdout io.Writer, stde
 	flags := flag.NewFlagSet("a2o runtime pause", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	projectKey := flags.String("project", "", "runtime project key")
+	allProjects := flags.Bool("all-projects", false, "pause schedulers for every project in the runtime project registry")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
+	if *allProjects && strings.TrimSpace(*projectKey) != "" {
+		return fmt.Errorf("--all-projects cannot be combined with --project")
+	}
+	if *allProjects {
+		return runRuntimePauseAllProjects(runner, stdout)
+	}
 
 	context, _, err := loadProjectRuntimeContextForCommand(*projectKey, true)
 	if err != nil {
 		return err
 	}
+	return pauseRuntimeForContext(context, runner, stdout)
+}
+
+func runRuntimePauseAllProjects(runner commandRunner, stdout io.Writer) error {
+	registryPath, registry, err := loadProjectRegistryFromWorkingTree("--all-projects")
+	if err != nil {
+		return err
+	}
+	failures := 0
+	for _, key := range sortedProjectKeys(registry) {
+		context, err := projectRuntimeContextFromRegistry(registryPath, registry, key)
+		if err != nil {
+			failures++
+			fmt.Fprintf(stdout, "project_key=%s runtime_pause_error=%s\n", key, singleLine(err.Error()))
+			continue
+		}
+		var projectOutput bytes.Buffer
+		if err := pauseRuntimeForContext(context, runner, &projectOutput); err != nil {
+			failures++
+			fmt.Fprintf(stdout, "project_key=%s runtime_pause_error=%s\n", context.ProjectKey, singleLine(err.Error()))
+			continue
+		}
+		for _, line := range strings.Split(strings.TrimRight(projectOutput.String(), "\n"), "\n") {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			fmt.Fprintf(stdout, "project_key=%s %s\n", context.ProjectKey, line)
+		}
+	}
+	if failures > 0 {
+		return fmt.Errorf("runtime pause --all-projects failed for %d project(s)", failures)
+	}
+	return nil
+}
+
+func pauseRuntimeForContext(context *projectRuntimeContext, runner commandRunner, stdout io.Writer) error {
 	effectiveConfig := applyAgentInstallOverrides(context.Config, "", "", "")
 	if err := runtimeSchedulerStateCommand(effectiveConfig, runner, "pause-scheduler"); err != nil {
 		return err
@@ -625,24 +739,11 @@ func runRuntimeStatus(args []string, runner commandRunner, stdout io.Writer, std
 }
 
 func runRuntimeStatusAllProjects(runner commandRunner, stdout io.Writer) error {
-	start, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
-	}
-	registryPath, err := findProjectRegistry(start)
-	if err != nil {
-		return fmt.Errorf("--all-projects requires %s: %w", projectRegistryRelativePath, err)
-	}
-	registry, err := readProjectRegistry(registryPath)
+	registryPath, registry, err := loadProjectRegistryFromWorkingTree("--all-projects")
 	if err != nil {
 		return err
 	}
-	keys := make([]string, 0, len(registry.Projects))
-	for key := range registry.Projects {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
+	for _, key := range sortedProjectKeys(registry) {
 		context, err := projectRuntimeContextFromRegistry(registryPath, registry, key)
 		if err != nil {
 			fmt.Fprintf(stdout, "project_key=%s runtime_status_error=%s\n", key, singleLine(err.Error()))
@@ -661,6 +762,31 @@ func runRuntimeStatusAllProjects(runner commandRunner, stdout io.Writer) error {
 		}
 	}
 	return nil
+}
+
+func loadProjectRegistryFromWorkingTree(optionName string) (string, *runtimeProjectRegistry, error) {
+	start, err := os.Getwd()
+	if err != nil {
+		return "", nil, fmt.Errorf("get working directory: %w", err)
+	}
+	registryPath, err := findProjectRegistry(start)
+	if err != nil {
+		return "", nil, fmt.Errorf("%s requires %s: %w", optionName, projectRegistryRelativePath, err)
+	}
+	registry, err := readProjectRegistry(registryPath)
+	if err != nil {
+		return "", nil, err
+	}
+	return registryPath, registry, nil
+}
+
+func sortedProjectKeys(registry *runtimeProjectRegistry) []string {
+	keys := make([]string, 0, len(registry.Projects))
+	for key := range registry.Projects {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func printRuntimeStatusForContext(context *projectRuntimeContext, configPath string, runner commandRunner, stdout io.Writer) error {

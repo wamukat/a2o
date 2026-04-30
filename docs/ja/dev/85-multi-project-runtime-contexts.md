@@ -179,15 +179,19 @@ runtime state は以下を保存する。
 
 ## Scheduler Model
 
-最終形は project context ごとに1 scheduler を持てるモデルにする。cross-project scheduling は orchestration concern であり、初期実装には含めない。
+最終形は project context ごとに1 scheduler を持てるモデルにする。Phase A では、1つの A2O installation から複数 project scheduler を動かせる。ただし各 project 内は従来通り active task 1件のままであり、これは project 単位の同時実行であって project 内 task 並列ではない。
 
-初期挙動:
+Phase A の挙動:
 
 - `runtime resume --project <key>` は1 project scheduler を動かす。
+- `runtime resume --all-projects` は `.work/a2o/project-registry.json` 内の各 project について scheduler を1つずつ起動する。
+- `runtime pause --project <key>` は current scheduler process を kill せず、1 project scheduler を pause する。
+- `runtime pause --all-projects` は登録済み project scheduler をすべて pause する。
+- `runtime status --all-projects` は全登録 project の status を project label 付きの read-only 行として出力する。
 - `runtime watch-summary --project <key>` は1 project を表示する。
-- `runtime status` は known projects を一覧してもよいが、task lifecycle operation は project-scoped のままにする。
+- 各 scheduler は `.work/a2o/projects/<project>/scheduler` 配下の project-scoped pid、command、log file を使う。
 
-将来 `--all-projects` を追加できるが、per-project lock、storage、reporting が安定してからにする。
+Phase A では、同一 project 内で active task を複数持たせない。Phase B では、project 内 bounded parallelism を別途設計し、durable task claim、親子/同一親 group の排他、merge/publish serialization を扱う必要がある。Phase C では、複数 active run 向けに status、watch-summary、logs、stale claim diagnostics を拡張する必要がある。
 
 ## Agent Binding
 

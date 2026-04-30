@@ -86,6 +86,17 @@ a2o runtime pause
 
 `runtime resume` はタスク処理を常駐実行する。`runtime pause` は現在の作業が終わったあとにスケジューラを止め、新しいタスクを拾わない。`runtime status` はスケジューラが動いているか、pause 済みか、ランタイムイメージが期待通りか、最新実行がどう終わったかを確認する。
 
+multi-project installation では、lifecycle command を1 project または全登録 project に対して実行できる。
+
+```sh
+a2o runtime resume --project <key>
+a2o runtime resume --all-projects
+a2o runtime status --all-projects
+a2o runtime pause --all-projects
+```
+
+`--all-projects` は project ごとに scheduler を1つずつ起動または pause する。各 project 内で同時に動く active task は引き続き最大1件であり、この mode で project 内 task 並列は有効にならない。
+
 すでに実行中のタスクをすぐ止める必要がある場合は、dangerous な強制停止コマンドを使う。
 
 ```sh

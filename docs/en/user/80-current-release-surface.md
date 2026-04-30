@@ -23,7 +23,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Implementation retries after review rework receive prior review feedback in the worker runtime context.
 - Operator-applied `blocked` labels are preserved during phase completion and keep the task blocked instead of being silently removed by runtime status publication.
 - Clean parent review success results are normalized to a completed review disposition when the worker omits or partially fills `review_disposition`; explicitly contradictory dispositions are still rejected. Normalization now handles frozen worker payloads without crashing the scheduler.
-- Multi-project runtime context groundwork scopes runtime storage, host logs/workspaces, scheduler pid/log files, temp files, and branch namespaces by resolved project key before manual multi-project lifecycle commands are enabled.
+- Multi-project runtime context scopes runtime storage, host logs/workspaces, scheduler pid/log files, temp files, and branch namespaces by resolved project key. `a2o runtime resume --all-projects`, `pause --all-projects`, and `status --all-projects` operate one scheduler per registered project while preserving one active task per project.
 - Upgrade diagnosis: `a2o upgrade check`
 - Single-file project package config: `project.yaml`
 - Investigate decomposition MVP: `runtime.decomposition.investigate.command`, `runtime.decomposition.author.command`, `a2o runtime decomposition investigate`, `propose`, `review`, `create-children`, `status`, and `cleanup`

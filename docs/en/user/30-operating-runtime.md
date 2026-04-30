@@ -86,6 +86,17 @@ a2o runtime pause
 
 `runtime resume` runs task processing as a resident scheduler. `runtime pause` reserves scheduler pause after current work finishes and prevents the next task from starting. `runtime status` confirms whether the scheduler is running, whether it is paused, whether the runtime image matches expectations, and how the latest run ended.
 
+For a multi-project installation, project lifecycle commands can target one project or every registered project:
+
+```sh
+a2o runtime resume --project <key>
+a2o runtime resume --all-projects
+a2o runtime status --all-projects
+a2o runtime pause --all-projects
+```
+
+`--all-projects` starts or pauses one scheduler per project. Each project still runs at most one active task; intra-project parallel task execution is not enabled by this mode.
+
 If an already-running task must be interrupted immediately, use the dangerous force-stop commands:
 
 ```sh

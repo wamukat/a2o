@@ -181,15 +181,19 @@ To preserve existing store compatibility, records without `project_key` are read
 
 ## Scheduler Model
 
-The target model supports one scheduler per project context. Cross-project scheduling is an orchestration concern and should not be part of the first implementation.
+The target model supports one scheduler per project context. Phase A allows multiple project schedulers to run from one A2O installation while each project still keeps the existing single active task policy. This is project-level concurrency, not intra-project task parallelism.
 
-Initial behavior:
+Phase A behavior:
 
 - `runtime resume --project <key>` runs one project scheduler.
+- `runtime resume --all-projects` starts one scheduler for each project in `.work/a2o/project-registry.json`.
+- `runtime pause --project <key>` pauses one project scheduler without terminating the current scheduler process.
+- `runtime pause --all-projects` pauses every registered project scheduler.
+- `runtime status --all-projects` prints read-only, project-labelled status rows for every registered project.
 - `runtime watch-summary --project <key>` shows one project.
-- `runtime status` may list known projects, but task lifecycle operations stay project-scoped.
+- Each scheduler uses project-scoped pid, command, and log files under `.work/a2o/projects/<project>/scheduler`.
 
-Future behavior can add `--all-projects`, but only after per-project locks, storage, and reporting are proven.
+Phase A deliberately does not allow more than one active task inside the same project. Phase B must separately design bounded intra-project task parallelism, including durable task claims, parent/child group exclusion, and merge/publish serialization. Phase C must broaden status, watch-summary, logs, and stale-claim diagnostics for multiple active runs.
 
 ## Agent Binding
 

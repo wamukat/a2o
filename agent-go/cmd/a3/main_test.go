@@ -2193,8 +2193,8 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o kanban url",
 		"a2o runtime up [--project KEY] [--build] [--pull]",
 		"a2o runtime down [--project KEY]",
-		"a2o runtime resume [--project KEY] [--interval DURATION] [--agent-poll-interval DURATION] # resume scheduler",
-		"a2o runtime pause [--project KEY]",
+		"a2o runtime resume [--project KEY|--all-projects] [--interval DURATION] [--agent-poll-interval DURATION] # resume scheduler",
+		"a2o runtime pause [--project KEY|--all-projects]",
 		"a2o runtime status",
 		"a2o runtime image-digest [--project KEY]",
 		"a2o runtime doctor [--project KEY]",
@@ -6141,6 +6141,78 @@ func TestRuntimeResumeLaunchesForegroundLoopInBackground(t *testing.T) {
 	}
 }
 
+func TestRuntimeResumeAllProjectsStartsProjectScopedSchedulers(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, multiProjectRegistryPayload(packageDir, tempDir))
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "resume", "--all-projects", "--interval", "5s"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"runtime loop --interval 5s --project a2o",
+		"runtime loop --interval 5s --project beta",
+		filepath.Join(tempDir, ".work", "a2o", "projects", "a2o", "scheduler", "scheduler.log"),
+		filepath.Join(tempDir, ".work", "a2o", "projects", "beta", "scheduler", "scheduler.log"),
+		"docker compose -p a3-a2o -f " + filepath.Join(tempDir, "compose-a2o.yml") + " exec -T a2o-runtime a3 resume-scheduler --storage-backend json --storage-dir /var/lib/a2o/projects/a2o",
+		"docker compose -p a3-beta -f " + filepath.Join(tempDir, "compose-beta.yml") + " exec -T a2o-runtime a3 resume-scheduler --storage-backend json --storage-dir /var/lib/a2o/projects/beta",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("runtime resume --all-projects missing %q in:\n%s", want, joined)
+		}
+	}
+	for _, key := range []string{"a2o", "beta"} {
+		pidPath := filepath.Join(tempDir, ".work", "a2o", "projects", key, "scheduler", "scheduler.pid")
+		if _, err := os.Stat(pidPath); err != nil {
+			t.Fatalf("project %s scheduler pid file missing: %v", key, err)
+		}
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		"project_key=a2o runtime_scheduler_resumed",
+		"project_key=beta runtime_scheduler_resumed",
+		"project_key=a2o describe_task=a2o runtime describe-task --project a2o <task-ref>",
+		"project_key=beta describe_task=a2o runtime describe-task --project beta <task-ref>",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout should include %q in:\n%s", want, output)
+		}
+	}
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, "project_key=") {
+			t.Fatalf("all-projects row should be project-labelled, got %q in:\n%s", line, output)
+		}
+	}
+}
+
+func TestRuntimeResumeAllProjectsRejectsProjectFilter(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"runtime", "resume", "--all-projects", "--project", "a2o"}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("combined --all-projects and --project should fail")
+	}
+	if !strings.Contains(stderr.String(), "--all-projects cannot be combined with --project") {
+		t.Fatalf("stderr should explain invalid option combination, got:\n%s", stderr.String())
+	}
+}
+
 func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -9360,6 +9432,98 @@ func TestRuntimePauseMarksSchedulerPausedWithoutStoppingCurrentProcess(t *testin
 	}
 	if !strings.Contains(stdout.String(), "runtime_scheduler_paused pid=12345") {
 		t.Fatalf("stdout should report scheduler pause, got %q", stdout.String())
+	}
+}
+
+func TestRuntimePauseAllProjectsMarksProjectSchedulersPaused(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeProjectRegistry(t, tempDir, multiProjectRegistryPayload(packageDir, tempDir))
+	runner := &fakeRunner{processCommands: map[int]string{}}
+	for index, key := range []string{"a2o", "beta"} {
+		config := runtimeInstanceConfig{
+			WorkspaceRoot:    tempDir,
+			ProjectKey:       key,
+			MultiProjectMode: true,
+			ComposeFile:      filepath.Join(tempDir, "compose-"+key+".yml"),
+			ComposeProject:   "a3-" + key,
+			RuntimeService:   "a2o-runtime",
+			StorageDir:       "/var/lib/a2o/projects/" + key,
+		}
+		if key == "a2o" {
+			config.ComposeFile = filepath.Join(tempDir, "compose-a2o.yml")
+		}
+		paths := schedulerPaths(config)
+		if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		pid := 12345 + index
+		command := testSchedulerCommand(t, "runtime", "loop", "--interval", "60s", "--project", key)
+		if err := os.WriteFile(paths.PIDFile, []byte(fmt.Sprintf("%d\n", pid)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(paths.CommandFile, []byte(command+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		runner.processCommands[pid] = command
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "pause", "--all-projects"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"docker compose -p a3-a2o -f " + filepath.Join(tempDir, "compose-a2o.yml") + " exec -T a2o-runtime a3 pause-scheduler --storage-backend json --storage-dir /var/lib/a2o/projects/a2o",
+		"docker compose -p a3-beta -f " + filepath.Join(tempDir, "compose-beta.yml") + " exec -T a2o-runtime a3 pause-scheduler --storage-backend json --storage-dir /var/lib/a2o/projects/beta",
+		"process-running 12345",
+		"process-running 12346",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("runtime pause --all-projects missing %q in:\n%s", want, joined)
+		}
+	}
+	if strings.Contains(joined, "terminate-process-group") {
+		t.Fatalf("runtime pause --all-projects must not terminate schedulers, got:\n%s", joined)
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		"project_key=a2o runtime_scheduler_paused pid=12345",
+		"project_key=beta runtime_scheduler_paused pid=12346",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout should include %q in:\n%s", want, output)
+		}
+	}
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, "project_key=") {
+			t.Fatalf("all-projects row should be project-labelled, got %q in:\n%s", line, output)
+		}
+	}
+}
+
+func TestRuntimePauseAllProjectsRejectsProjectFilter(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"runtime", "pause", "--all-projects", "--project", "a2o"}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("combined --all-projects and --project should fail")
+	}
+	if !strings.Contains(stderr.String(), "--all-projects cannot be combined with --project") {
+		t.Fatalf("stderr should explain invalid option combination, got:\n%s", stderr.String())
 	}
 }
 
