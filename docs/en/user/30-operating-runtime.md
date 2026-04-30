@@ -158,23 +158,24 @@ The same Compose project reuses the existing board. If the Compose project or Do
 
 ## Requirement Decomposition
 
-Use `trigger:investigate` when the kanban ticket is a broad requirement that should be investigated and split before implementation. A source ticket with `trigger:investigate` belongs to the decomposition domain even if it also has `trigger:auto-implement`; remove `trigger:investigate` before treating the source ticket itself as ordinary implementation work. The source ticket does not need a `repo:*` scope label because it is not an implementation target. In normal operation, implementation should happen on the generated or accepted child tickets, and those implementation children should carry the appropriate repo labels.
+Use `trigger:investigate` when the kanban ticket is a broad requirement that should be investigated and split before implementation. A source ticket with `trigger:investigate` belongs to the decomposition domain even if it also has `trigger:auto-implement`; remove `trigger:investigate` before treating the source ticket itself as ordinary implementation work. The source ticket does not need a `repo:*` scope label because it is not an implementation target. A2O treats the source ticket as a requirement artifact, not as the implementation parent. In normal operation, implementation should happen on the generated parent/child task tree, and those implementation children should carry the appropriate repo labels.
 
 The runtime scheduler started by `a2o runtime resume` automatically checks the decomposition queue before ordinary implementation work. A single `a2o runtime run-once` cycle does the same check, so label-driven decomposition does not require manually running the individual `a2o runtime decomposition ...` phase commands.
 
 The automatic decomposition flow is:
 
 1. A2O selects a source ticket with `trigger:investigate`.
-2. The project-owned investigation command runs and records investigation evidence.
+2. A2O moves the source ticket to `In progress`; the project-owned investigation command runs and records investigation evidence.
 3. The proposal author creates a normalized child-ticket proposal.
-4. Proposal review decides whether the proposal is eligible for draft child creation.
-5. Eligible proposals create draft child tickets labeled `a2o:draft-child`.
+4. A2O moves the source ticket to `In review`; proposal review decides whether the proposal is eligible for draft child creation.
+5. Eligible proposals create a separate generated implementation parent ticket, link it back to the requirement source ticket, and create draft child tickets labeled `a2o:draft-child` under that generated parent.
+6. A2O marks the source ticket decomposed and moves it to `Done`.
 
 Each completed stage leaves a short comment on the source ticket so operators can follow progress from Kanban. `a2o runtime watch-summary` also shows `trigger:investigate` source tickets in its `Decomposition` section; before any evidence is written they appear as `state=queued`, and after evidence exists the section shows the current decomposition state, disposition, and proposal fingerprint when available. Detailed evidence is stored under the runtime storage directory in `decomposition-evidence/<task>/`; `a2o runtime decomposition status <task-ref>` shows the current decomposition evidence summary, and `a2o runtime describe-task <task-ref>` gives the broader task state.
 
 `a2o runtime logs <task-ref>` is useful for decomposition source tickets as well. If the source ticket has no ordinary implementation/review log artifacts, the command falls back to the decomposition status output and evidence paths. `--follow` is not a live decomposition stream; when no ordinary task run is active it prints the decomposition fallback and reports that live follow is not supported for that source-ticket state.
 
-Draft children are planning artifacts. They are visible on the board, but they are not runnable until a human accepts them by adding `trigger:auto-implement`. Operators can edit the generated child title, body, labels, blockers, and scope before acceptance. Removing `a2o:draft-child` is optional metadata cleanup; the runnable gate is `trigger:auto-implement`.
+Draft children are planning artifacts. They are visible on the board under the generated parent, but they are not runnable until a human accepts them by adding `trigger:auto-implement`. Operators can edit the generated parent and child title, body, labels, blockers, and scope before acceptance. Removing `a2o:draft-child` is optional metadata cleanup; the runnable gate is `trigger:auto-implement`. After accepted child work is ready, add `trigger:auto-parent` to the generated parent, not to the original requirement source ticket.
 
 Useful commands:
 

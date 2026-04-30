@@ -36,7 +36,7 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     end
 
     def run_command(*args)
-      raise A3::Domain::ConfigurationError, "simulated label failure" if @fail_after_first_create && args.first == "task-label-add"
+      raise A3::Domain::ConfigurationError, "simulated label failure" if @fail_after_first_create && args.first == "task-label-add" && !args.include?("5301")
       raise A3::Domain::ConfigurationError, "simulated dependency failure" if @fail_dependency_relation && args.first == "task-relation-create" && args.include?("blocked")
 
       @commands << args
@@ -75,6 +75,14 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     }
   end
 
+  def generated_parent(client)
+    client.created.find { |task| task.fetch("description", "").include?("Decomposition source:") }
+  end
+
+  def generated_child(client, child_key = "child-key-1")
+    (client.created + client.instance_variable_get(:@existing)).find { |task| task.fetch("description", "").include?("Child key: #{child_key}") }
+  end
+
   it "creates a child with idempotency key, labels, trigger, and parent relation" do
     client = FakeProposalClient.new
     writer = described_class.new(project: "A3-v2", client: client)
@@ -82,17 +90,26 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence)
 
     expect(result.success?).to be(true)
-    expect(result.child_refs).to eq(["A3-v2#5301"])
+    expect(result.parent_ref).to eq("A3-v2#5301")
+    expect(result.child_refs).to eq(["A3-v2#5302"])
     expect(result.child_keys).to eq(["child-key-1"])
-    expect(client.created.first.fetch("description")).to include("Child key: child-key-1")
-    expect(client.created.first.fetch("description")).to include("Proposal fingerprint: fp-1")
+    expect(generated_parent(client).fetch("description")).to include("Decomposition source: A3-v2#5300")
+    expect(generated_child(client).fetch("description")).to include("Parent: A3-v2#5301")
+    expect(generated_child(client).fetch("description")).to include("Child key: child-key-1")
+    expect(generated_child(client).fetch("description")).to include("Proposal fingerprint: fp-1")
     expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(true)
     expect(client.labels.any? { |args| args.include?("repo:alpha") }).to be(true)
-    expect(client.relations.size).to eq(1)
+    expect(client.relations).to include(
+      array_including("task-relation-create", "--task-id", "5300", "--other-task-id", "5301", "--relation-kind", "related"),
+      array_including("task-relation-create", "--task-id", "5301", "--other-task-id", "5302", "--relation-kind", "subtask")
+    )
   end
 
   it "reuses an existing child by child key even when proposal fingerprint changes" do
-    existing = [{ "id" => 5301, "ref" => "A3-v2#5301", "description" => "Child key: child-key-1\nProposal fingerprint: old" }]
+    existing = [
+      { "id" => 5300, "ref" => "A3-v2#5300", "description" => "Decomposition source: A3-v2#5299" },
+      { "id" => 5301, "ref" => "A3-v2#5301", "description" => "Child key: child-key-1\nProposal fingerprint: old" }
+    ]
     client = FakeProposalClient.new(existing: existing)
     writer = described_class.new(project: "A3-v2", client: client)
 
@@ -100,7 +117,8 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
 
     expect(result.success?).to be(true)
     expect(result.child_refs).to eq(["A3-v2#5301"])
-    expect(client.created).to eq([])
+    expect(client.created.size).to eq(1)
+    expect(generated_parent(client).fetch("description")).to include("Decomposition source: A3-v2#5300")
     expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(true)
   end
 
@@ -113,9 +131,10 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: payload)
 
     expect(result.success?).to be(true)
-    expect(client.created.first.fetch("description")).to include("Child key: child-key-1")
+    expect(generated_child(client).fetch("description")).to include("Child key: child-key-1")
     expect(client.labels.any? { |args| args.include?("a2o:draft-child") }).to be(true)
     expect(client.labels.any? { |args| args.include?("a2o:decomposed") && args.include?("5300") }).to be(true)
+    expect(client.labels.any? { |args| args.include?("a2o:decomposed") && args.include?("5301") }).to be(true)
     expect(client.labels.any? { |args| args.include?("repo:alpha") }).to be(true)
     expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(false)
     expect(client.comments.any? { |args| args.include?("task-comment-create") }).to be(true)
@@ -128,13 +147,16 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     result = writer.call(parent_task_ref: "wamukat/a2o#16", parent_external_task_id: 240, proposal_evidence: proposal_evidence)
 
     expect(result.success?).to be(true)
-    expect(result.child_refs).to eq(["A3-v2#5301"])
-    expect(client.created.first.fetch("description")).to include("Parent: wamukat/a2o#16")
+    expect(result.parent_ref).to eq("A3-v2#5301")
+    expect(result.child_refs).to eq(["A3-v2#5302"])
+    expect(generated_parent(client).fetch("description")).to include("Decomposition source: wamukat/a2o#16")
+    expect(generated_child(client).fetch("description")).to include("Parent: A3-v2#5301")
     expect(client.labels.any? { |args| args.include?("a2o:draft-child") }).to be(true)
     expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(false)
     expect(client.labels.any? { |args| args.include?("trigger:auto-parent") }).to be(false)
     expect(client.relations).to include(
-      array_including("task-relation-create", "--task-id", "240", "--other-task-id", "5301", "--relation-kind", "subtask")
+      array_including("task-relation-create", "--task-id", "240", "--other-task-id", "5301", "--relation-kind", "related"),
+      array_including("task-relation-create", "--task-id", "5301", "--other-task-id", "5302", "--relation-kind", "subtask")
     )
   end
 
@@ -160,7 +182,8 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence(fingerprint: "new", title: "Generated title"))
 
     expect(result.success?).to be(true)
-    expect(client.created).to eq([])
+    expect(client.created.size).to eq(1)
+    expect(generated_parent(client)).not_to be_nil
     expect(existing.first.fetch("title")).to eq("Human title")
     expect(existing.first.fetch("description")).to eq("Human body\nChild key: child-key-1")
     expect(client.labels.any? { |args| args.include?("a2o:draft-child") }).to be(true)
@@ -220,7 +243,7 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence)
 
     expect(result.success?).to be(false)
-    expect(result.child_refs).to eq(["A3-v2#5301"])
+    expect(result.child_refs).to eq(["A3-v2#5302"])
     expect(result.child_keys).to eq(["child-key-1"])
     expect(result.diagnostics.fetch("failed_write")).to include("child_key" => "child-key-1")
   end
@@ -239,13 +262,13 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: payload)
 
     expect(result.success?).to be(false)
-    expect(result.child_refs).to eq(["A3-v2#5301", "A3-v2#5302"])
+    expect(result.child_refs).to eq(["A3-v2#5302", "A3-v2#5303"])
     expect(result.diagnostics.fetch("failed_write")).to include(
       "type" => "dependency",
       "child_key" => "child-key-2",
       "dependency_key" => "child-key-1",
-      "child_ref" => "A3-v2#5302",
-      "dependency_ref" => "A3-v2#5301"
+      "child_ref" => "A3-v2#5303",
+      "dependency_ref" => "A3-v2#5302"
     )
   end
 end

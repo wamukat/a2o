@@ -313,6 +313,7 @@ module A3
         merge_runner: merge_runner
       ) do |session|
         task = resolve_direct_task(container: session.container, task_ref: session.options.fetch(:task_ref))
+        publish_decomposition_source_status(session: session, task: task, status: :in_progress)
         bridge = build_external_task_bridge(session.options)
         process_runner = build_decomposition_process_runner(options: session.options, task_ref: task.ref, stage: :investigate)
         result = A3::Application::RunDecompositionInvestigation.new(
@@ -350,6 +351,7 @@ module A3
         merge_runner: merge_runner
       ) do |session|
         task = resolve_direct_task(container: session.container, task_ref: session.options.fetch(:task_ref))
+        publish_decomposition_source_status(session: session, task: task, status: :in_progress)
         process_runner = build_decomposition_process_runner(options: session.options, task_ref: task.ref, stage: :propose)
         runner = A3::Application::RunDecompositionProposalAuthor.new(
           storage_dir: session.options.fetch(:storage_dir),
@@ -383,6 +385,7 @@ module A3
         merge_runner: merge_runner
       ) do |session|
         task = resolve_direct_task(container: session.container, task_ref: session.options.fetch(:task_ref))
+        publish_decomposition_source_status(session: session, task: task, status: :in_review)
         process_runner = build_decomposition_process_runner(options: session.options, task_ref: task.ref, stage: :review)
         result = A3::Application::RunDecompositionProposalReview.new(
           storage_dir: session.options.fetch(:storage_dir),
@@ -455,6 +458,8 @@ module A3
         out.puts("status=#{result.status}") if result.status
       end
       out.puts("summary=#{result.summary}")
+      publish_decomposition_source_status_from_options(options: options, task: task, status: :done) if result.success == true
+      out.puts("generated_parent_ref=#{result.respond_to?(:parent_ref) && result.parent_ref}") if result.respond_to?(:parent_ref) && result.parent_ref
       out.puts("child_refs=#{result.child_refs.join(',')}")
       out.puts("child_keys=#{result.child_keys.join(',')}")
       out.puts("evidence_path=#{result.evidence_path}")
@@ -537,6 +542,7 @@ module A3
         proposal_evidence_path: session.options[:proposal_evidence_path],
         review_evidence_path: review_result.evidence_path
       )
+      publish_decomposition_source_status(session: session, task: task, status: :done) if result.success == true
       AutomaticDraftChildCreationResult.executed(result)
     end
 
@@ -560,9 +566,31 @@ module A3
       out.puts("decomposition draft child creation #{task.ref} success=#{child_creation.success}")
       out.puts("draft_status=#{child_creation.status}") if child_creation.status
       out.puts("draft_summary=#{child_creation.summary}")
+      out.puts("draft_parent_ref=#{child_creation.parent_ref}") if child_creation.respond_to?(:parent_ref) && child_creation.parent_ref
       out.puts("draft_child_refs=#{child_creation.child_refs.join(',')}")
       out.puts("draft_child_keys=#{child_creation.child_keys.join(',')}")
       out.puts("draft_evidence_path=#{child_creation.evidence_path}")
+    end
+
+    def publish_decomposition_source_status(session:, task:, status:)
+      publisher = session.container.fetch(:external_task_status_publisher, A3::Infra::NullExternalTaskStatusPublisher.new)
+      publisher.publish(
+        task_ref: task.ref,
+        external_task_id: task.external_task_id,
+        status: status,
+        task_kind: task.kind
+      )
+    end
+
+    def publish_decomposition_source_status_from_options(options:, task:, status:)
+      return unless kanban_child_writer_configured?(options)
+
+      build_decomposition_source_status_publisher(options).publish(
+        task_ref: task.ref,
+        external_task_id: task.external_task_id,
+        status: status,
+        task_kind: task.kind
+      )
     end
 
     def handle_cleanup_decomposition_trial(argv, out:, run_id_generator:, command_runner:, merge_runner:)
@@ -2924,6 +2952,25 @@ module A3
       return build_kanban_cli_task_activity_publisher(options) if kanban_child_writer_configured?(options)
 
       fallback || A3::Infra::NullExternalTaskActivityPublisher.new
+    end
+
+    def build_decomposition_source_status_publisher(options, fallback: nil)
+      return build_kanban_cli_task_status_publisher(options) if kanban_child_writer_configured?(options)
+
+      fallback || A3::Infra::NullExternalTaskStatusPublisher.new
+    end
+
+    def build_kanban_cli_task_status_publisher(options)
+      case kanban_backend(options)
+      when "subprocess-cli"
+        A3::Infra::KanbanCliTaskStatusPublisher.new(
+          command_argv: kanban_command_argv(options),
+          project: options.fetch(:kanban_project),
+          working_dir: options[:kanban_working_dir]
+        )
+      else
+        raise ArgumentError, "Unsupported kanban backend: #{kanban_backend(options)}"
+      end
     end
 
     def build_kanban_cli_task_activity_publisher(options)

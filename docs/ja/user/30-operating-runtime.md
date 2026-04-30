@@ -158,21 +158,22 @@ a2o project bootstrap --kanban-mode external --kanban-url http://127.0.0.1:3470
 
 ## 要求の分解
 
-カンバンチケットが大きな要求であり、実装前に調査して子チケットへ分けたい場合は `trigger:investigate` を使う。`trigger:investigate` が付いた source ticket は、`trigger:auto-implement` が同時に付いていても decomposition domain に属する。source ticket 自体を通常の実装対象として扱うには、先に `trigger:investigate` を外す。source ticket は実装対象ではないため、`repo:*` scope label は不要である。通常運用では、実装は生成または承認された child ticket 側で進め、実装対象の child ticket に適切な repo label を付ける。
+カンバンチケットが大きな要求であり、実装前に調査して子チケットへ分けたい場合は `trigger:investigate` を使う。`trigger:investigate` が付いた source ticket は、`trigger:auto-implement` が同時に付いていても decomposition domain に属する。source ticket 自体を通常の実装対象として扱うには、先に `trigger:investigate` を外す。source ticket は実装対象ではないため、`repo:*` scope label は不要である。A2O は source ticket を implementation parent ではなく、要求 artifact として扱う。通常運用では、実装は生成された parent / child の task tree 側で進め、実装対象の child ticket に適切な repo label を付ける。
 
 自動 decomposition flow は次の順で進む。
 
 1. A2O が `trigger:investigate` 付きの source ticket を選択する。
-2. プロジェクト所有の investigation command が実行され、調査 evidence を記録する。
+2. A2O が source ticket を `In progress` に移動し、プロジェクト所有の investigation command が実行され、調査 evidence を記録する。
 3. proposal author が正規化された child-ticket proposal を作る。
-4. proposal review が draft child creation に進める状態かを判定する。
-5. eligible な proposal から `a2o:draft-child` 付きの draft child ticket を作る。
+4. A2O が source ticket を `In review` に移動し、proposal review が draft child creation に進める状態かを判定する。
+5. eligible な proposal から、要求 source ticket とは別の generated implementation parent ticket を作り、要求 source ticket と関連付け、その generated parent の下に `a2o:draft-child` 付きの draft child ticket を作る。
+6. A2O が source ticket を decomposed として印付けし、`Done` に移動する。
 
 各 stage が完了すると、source ticket に短いコメントが残るため、運用者は Kanban 上で進行を追える。`a2o runtime watch-summary` も `trigger:investigate` の source ticket を `Decomposition` セクションに表示する。まだ evidence がない段階では `state=queued` として表示し、evidence 作成後は decomposition state、disposition、proposal fingerprint があれば表示する。詳細な evidence は runtime storage 配下の `decomposition-evidence/<task>/` に保存される。`a2o runtime decomposition status <task-ref>` は decomposition evidence の概要を表示し、`a2o runtime describe-task <task-ref>` はより広い task 状態を表示する。
 
 `a2o runtime logs <task-ref>` は decomposition source ticket に対しても利用できる。source ticket に通常の implementation / review log artifact がない場合、decomposition status と evidence path の表示にフォールバックする。`--follow` は decomposition の live stream ではない。通常 task run が動いていない場合は decomposition fallback を表示し、その source-ticket 状態では live follow 非対応であることを明示する。
 
-draft child は計画用の artifact である。ボード上には表示されるが、人間が `trigger:auto-implement` を付けて承認するまで runnable にはならない。運用者は承認前に、生成された child の title、body、label、blocker、scope を編集できる。`a2o:draft-child` を外すことは任意の metadata 整理であり、runnable gate は `trigger:auto-implement` である。
+draft child は計画用の artifact である。ボード上では generated parent の下に表示されるが、人間が `trigger:auto-implement` を付けて承認するまで runnable にはならない。運用者は承認前に、生成された parent と child の title、body、label、blocker、scope を編集できる。`a2o:draft-child` を外すことは任意の metadata 整理であり、runnable gate は `trigger:auto-implement` である。accepted child work が親 review に進める状態になったら、元の要求 source ticket ではなく generated parent に `trigger:auto-parent` を付ける。
 
 よく使うコマンド:
 

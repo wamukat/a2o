@@ -6,7 +6,7 @@ require "json"
 module A3
   module Application
     class RunDecompositionChildCreation
-      Result = Struct.new(:success, :status, :summary, :child_refs, :child_keys, :evidence_path, :source_ticket_summary, :source_ticket_summary_published, keyword_init: true)
+      Result = Struct.new(:success, :status, :summary, :parent_ref, :child_refs, :child_keys, :evidence_path, :source_ticket_summary, :source_ticket_summary_published, keyword_init: true)
 
       def initialize(storage_dir:, child_writer:, publish_external_task_activity: nil)
         @storage_dir = storage_dir
@@ -96,10 +96,12 @@ module A3
         path = File.join(evidence_dir, "child-creation.json")
         child_refs = writer_result ? Array(writer_result["child_refs"]) : []
         child_keys = writer_result ? Array(writer_result["child_keys"]) : []
+        parent_ref = writer_result && writer_result["parent_ref"]
         source_ticket_summary = source_ticket_summary_for(
           success: success,
           status: status,
           summary: summary,
+          parent_ref: parent_ref,
           child_refs: child_refs,
           evidence_path: path
         )
@@ -113,6 +115,7 @@ module A3
             "summary" => summary,
             "proposal_fingerprint" => proposal_evidence && proposal_evidence["proposal_fingerprint"],
             "review_disposition" => review_evidence && review_evidence["disposition"],
+            "generated_parent_ref" => parent_ref,
             "child_refs" => child_refs,
             "child_keys" => child_keys,
             "child_refs_by_key" => child_refs_by_key(child_keys: child_keys, child_refs: child_refs),
@@ -127,6 +130,7 @@ module A3
           success: success,
           status: status,
           summary: summary,
+          parent_ref: parent_ref,
           child_refs: child_refs,
           child_keys: child_keys,
           evidence_path: path,
@@ -141,7 +145,7 @@ module A3
         end
       end
 
-      def source_ticket_summary_for(success:, status:, summary:, child_refs:, evidence_path:)
+      def source_ticket_summary_for(success:, status:, summary:, parent_ref:, child_refs:, evidence_path:)
         stage_state =
           if success == true
             "completed"
@@ -152,10 +156,11 @@ module A3
           end
         lines = ["Decomposition draft child creation: #{stage_state}"]
         lines << "Summary: #{summary}"
+        lines << "Generated parent: #{parent_ref || 'none'}"
         lines << "Draft children: #{child_refs.empty? ? 'none' : child_refs.join(', ')}"
         if success == true
           lines << "Accept: add trigger:auto-implement to a draft child when it is ready for implementation."
-          lines << "Parent automation: add trigger:auto-parent to the source parent after accepted child work is ready."
+          lines << "Parent automation: add trigger:auto-parent to the generated parent after accepted child work is ready."
         end
         lines << "Evidence: #{evidence_path}"
         lines.join("\n")
@@ -173,6 +178,7 @@ module A3
 
         {
           "success" => result.success?,
+          "parent_ref" => result.respond_to?(:parent_ref) ? result.parent_ref : nil,
           "child_refs" => result.child_refs,
           "child_keys" => result.child_keys,
           "summary" => result.summary,

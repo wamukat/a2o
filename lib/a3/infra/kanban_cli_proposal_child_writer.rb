@@ -6,7 +6,7 @@ module A3
       DRAFT_LABEL = "a2o:draft-child"
       DECOMPOSED_LABEL = "a2o:decomposed"
       RUNNABLE_LABEL = "trigger:auto-implement"
-      Result = Struct.new(:success?, :child_refs, :child_keys, :summary, :diagnostics, keyword_init: true)
+      Result = Struct.new(:success?, :parent_ref, :child_refs, :child_keys, :summary, :diagnostics, keyword_init: true)
       class PartialChildWriteError < StandardError
         attr_reader :child_ref, :child_key, :original_error
 
@@ -33,11 +33,16 @@ module A3
         refs = []
         keys = []
         failed_write = nil
+        generated_parent = ensure_generated_parent(
+          source_task_ref: parent_task_ref,
+          source_external_task_id: parent_external_task_id,
+          proposal_fingerprint: proposal_fingerprint
+        )
         children.each do |child|
           begin
             ensured = ensure_child(
-              parent_task_ref: parent_task_ref,
-              parent_external_task_id: parent_external_task_id,
+              parent_task_ref: generated_parent.fetch("ref"),
+              parent_external_task_id: generated_parent.fetch("id"),
               proposal_fingerprint: proposal_fingerprint,
               child: child
             )
@@ -54,16 +59,17 @@ module A3
           end
         end
         begin
-          reconcile_dependencies(parent_task_ref: parent_task_ref, children: children, child_refs_by_key: child_refs_by_key)
+          reconcile_dependencies(parent_task_ref: generated_parent.fetch("ref"), children: children, child_refs_by_key: child_refs_by_key)
           ensure_source_decomposed(parent_external_task_id) if draft_mode? && parent_external_task_id
         rescue StandardError => e
           failed_write = dependency_failed_write(e)
           raise
         end
-        Result.new(success?: true, child_refs: refs, child_keys: keys)
+        Result.new(success?: true, parent_ref: generated_parent.fetch("ref"), child_refs: refs, child_keys: keys)
       rescue StandardError => e
         Result.new(
           success?: false,
+          parent_ref: defined?(generated_parent) && generated_parent ? generated_parent["ref"] : nil,
           child_refs: defined?(refs) ? refs : [],
           child_keys: defined?(keys) ? keys : [],
           summary: "decomposition child creation failed",
@@ -73,13 +79,48 @@ module A3
 
       private
 
+      def ensure_generated_parent(source_task_ref:, source_external_task_id:, proposal_fingerprint:)
+        payload = generated_parent_payload(source_task_ref: source_task_ref, proposal_fingerprint: proposal_fingerprint)
+        task = find_existing_generated_parent(source_task_ref) || create_child(payload)
+        ensure_label(task.fetch("id"), DECOMPOSED_LABEL)
+        ensure_relation(source_external_task_id, task.fetch("id"), relation_kind: "related") if source_external_task_id
+        ensure_comment(task.fetch("id"), payload.fetch("comment"))
+        ensure_source_parent_comment(source_external_task_id, generated_parent_ref: task.fetch("ref"), proposal_fingerprint: proposal_fingerprint) if source_external_task_id
+        task
+      end
+
+      def generated_parent_payload(source_task_ref:, proposal_fingerprint:)
+        {
+          "title" => "Implementation plan for #{source_task_ref}",
+          "description" => <<~DESC.strip,
+            Decomposition source: #{source_task_ref}
+            Proposal fingerprint: #{proposal_fingerprint}
+
+            This generated parent groups implementation draft children created from the requirement ticket.
+          DESC
+          "priority" => 2,
+          "comment" => "Created generated implementation parent for requirement #{source_task_ref}; proposal #{proposal_fingerprint}."
+        }
+      end
+
+      def find_existing_generated_parent(source_task_ref)
+        matches = @client.run_json_command("task-find", "--project", @project, "--query", source_task_ref)
+        exact = Array(matches).select { |task| task.fetch("description", "").include?("Decomposition source: #{source_task_ref}") }
+        if exact.size > 1
+          duplicates = exact.map { |task| "#{task["ref"] || "unknown-ref"}(id=#{task["id"] || "unknown"})" }.join(", ")
+          raise A3::Domain::ConfigurationError, "duplicate generated decomposition parents for #{source_task_ref}: #{duplicates}"
+        end
+
+        exact.first
+      end
+
       def ensure_child(parent_task_ref:, parent_external_task_id:, proposal_fingerprint:, child:)
         child_key = child.fetch("child_key")
         payload = canonical_task_payload(parent_task_ref: parent_task_ref, proposal_fingerprint: proposal_fingerprint, child: child)
         existing = find_existing_child(child_key)
         task = existing || create_child(payload)
         labels_for(child, created: !existing).each { |label| ensure_label(task.fetch("id"), label) }
-        ensure_relation(parent_external_task_id, task.fetch("id")) if parent_external_task_id
+        ensure_relation(parent_external_task_id, task.fetch("id"), relation_kind: "subtask") if parent_external_task_id
         ensure_comment(task.fetch("id"), payload.fetch("comment"))
         { "ref" => task.fetch("ref"), "child_key" => child_key, "id" => task.fetch("id") }
       rescue StandardError => e
@@ -223,16 +264,16 @@ module A3
         ensure_label(parent_task_id, DECOMPOSED_LABEL)
       end
 
-      def ensure_relation(parent_task_id, child_task_id)
+      def ensure_relation(parent_task_id, child_task_id, relation_kind:)
         relations = @client.run_json_command("task-relation-list", "--project", @project, "--task-id", parent_task_id.to_s)
-        return if child_relation_exists?(relations, child_task_id: child_task_id)
+        return if relation_exists?(relations, related_task_id: child_task_id, relation_kind: relation_kind)
 
         @client.run_command(
           "task-relation-create",
           "--project", @project,
           "--task-id", parent_task_id.to_s,
           "--other-task-id", child_task_id.to_s,
-          "--relation-kind", "subtask"
+          "--relation-kind", relation_kind
         )
       end
 
@@ -260,12 +301,22 @@ module A3
         )
       end
 
-      def child_relation_exists?(relations, child_task_id:)
+      def ensure_source_parent_comment(source_task_id, generated_parent_ref:, proposal_fingerprint:)
+        ensure_comment(
+          source_task_id,
+          "Generated implementation parent #{generated_parent_ref} from decomposition proposal #{proposal_fingerprint}."
+        )
+      end
+
+      def relation_exists?(relations, related_task_id:, relation_kind:)
         case relations
         when Hash
-          Array(relations["subtask"]).any? { |relation| Integer(relation["id"]) == Integer(child_task_id) }
+          Array(relations[relation_kind]).any? { |relation| Integer(relation["id"]) == Integer(related_task_id) }
         when Array
-          relations.any? { |relation| Integer(relation["related_task_id"]) == Integer(child_task_id) }
+          relations.any? do |relation|
+            (relation["relation_kind"] == relation_kind || relation["kind"] == relation_kind) &&
+              Integer(relation["related_task_id"]) == Integer(related_task_id)
+          end
         else
           false
         end

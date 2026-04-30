@@ -404,6 +404,7 @@ RSpec.describe A3::CLI do
   it "automatically creates draft children after an eligible proposal review when Kanban writing is configured" do
     out = StringIO.new
     task = A3::Domain::Task.new(ref: "A3-v2#5300", kind: :single, edit_scope: [:repo_alpha], labels: ["trigger:investigate"])
+    status_publisher = instance_double(A3::Infra::NullExternalTaskStatusPublisher)
     session = Struct.new(:options, :container, :project_context, :project_surface, keyword_init: true).new(
       options: {
         task_ref: "A3-v2#5300",
@@ -415,7 +416,10 @@ RSpec.describe A3::CLI do
         kanban_project: "A3-v2",
         kanban_working_dir: "/tmp"
       },
-      container: { external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new },
+      container: {
+        external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new,
+        external_task_status_publisher: status_publisher
+      },
       project_context: Object.new,
       project_surface: Object.new
     )
@@ -441,6 +445,18 @@ RSpec.describe A3::CLI do
     allow(described_class).to receive(:with_runtime_session).and_yield(session)
     allow(described_class).to receive(:resolve_direct_task).and_return(task)
     allow(A3::Application::RunDecompositionProposalReview).to receive(:new).and_return(review_service)
+    expect(status_publisher).to receive(:publish).with(
+      task_ref: "A3-v2#5300",
+      external_task_id: nil,
+      status: :in_review,
+      task_kind: :single
+    ).ordered
+    expect(status_publisher).to receive(:publish).with(
+      task_ref: "A3-v2#5300",
+      external_task_id: nil,
+      status: :done,
+      task_kind: :single
+    ).ordered
     expect(A3::Infra::KanbanCliProposalChildWriter).to receive(:new).with(
       command_argv: ["kanban", "--json"],
       project: "A3-v2",
@@ -594,6 +610,7 @@ RSpec.describe A3::CLI do
       )
       allow(A3::Infra::KanbanCliProposalChildWriter).to receive(:new).and_return(writer)
       allow(writer).to receive(:call).and_return(write_result)
+      allow(described_class).to receive(:build_decomposition_source_status_publisher).and_return(A3::Infra::NullExternalTaskStatusPublisher.new)
 
       out = StringIO.new
       described_class.start(

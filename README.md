@@ -41,11 +41,12 @@ Requirement ticket with trigger:investigate
   -> A2O investigates the request
   -> A2O proposes child tickets
   -> A2O reviews the proposal
-  -> A2O creates draft child tickets with a2o:draft-child
+  -> A2O creates a separate generated parent and draft child tickets with a2o:draft-child
+  -> A2O moves the requirement ticket to Done
   -> a human edits / accepts the children by adding trigger:auto-implement
 ```
 
-The source ticket does not need a `repo:*` scope label; repo labels belong on the generated or accepted implementation children. `watch-summary` shows `trigger:investigate` source tickets in its `Decomposition` section even before evidence exists, and `runtime logs <task-ref>` falls back to decomposition status/evidence when the source ticket has no ordinary implementation log. The source ticket receives short comments as the investigate, propose, review, and child creation stages complete. The generated draft children are not runnable until a human accepts them with `trigger:auto-implement`. Configure this flow in `runtime.decomposition` and `runtime.prompts.decomposition` in the project package. See [docs/en/user/30-operating-runtime.md](docs/en/user/30-operating-runtime.md#requirement-decomposition) and [docs/en/user/90-project-package-schema.md](docs/en/user/90-project-package-schema.md#runtime-decomposition).
+The source ticket does not need a `repo:*` scope label; repo labels belong on the generated or accepted implementation children. A2O treats the source ticket as a requirement artifact, not as the implementation parent. During decomposition A2O moves the source ticket through `In progress`, `In review`, and `Done`, then creates a separate generated parent ticket linked back to the requirement and parents draft children under that generated parent. `watch-summary` shows `trigger:investigate` source tickets in its `Decomposition` section even before evidence exists, and `runtime logs <task-ref>` falls back to decomposition status/evidence when the source ticket has no ordinary implementation log. The source ticket receives short comments as the investigate, propose, review, and child creation stages complete. The generated draft children are not runnable until a human accepts them with `trigger:auto-implement`. Configure this flow in `runtime.decomposition` and `runtime.prompts.decomposition` in the project package. See [docs/en/user/30-operating-runtime.md](docs/en/user/30-operating-runtime.md#requirement-decomposition) and [docs/en/user/90-project-package-schema.md](docs/en/user/90-project-package-schema.md#runtime-decomposition).
 
 ## Principles
 
