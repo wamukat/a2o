@@ -30,7 +30,14 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
         @created << task
         task
       when "task-relation-list"
-        { "subtask" => [] }
+        task_id = args.fetch(args.index("--task-id") + 1).to_s
+        @relations.each_with_object(Hash.new { |hash, key| hash[key] = [] }) do |command, grouped|
+          next unless command.fetch(command.index("--task-id") + 1).to_s == task_id
+
+          other_task_id = command.fetch(command.index("--other-task-id") + 1)
+          relation_kind = command.fetch(command.index("--relation-kind") + 1)
+          grouped[relation_kind] << { "id" => other_task_id.to_i, "ref" => ref_for_id(other_task_id) }
+        end
       when "task-comment-list"
         task_id = args.fetch(args.index("--task-id") + 1)
         @comment_texts[task_id].map { |text| { "bodyMarkdown" => text } }
@@ -64,6 +71,11 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
 
     def fetch_task_by_ref(ref)
       (@created + @existing).find { |task| task.fetch("ref") == ref } || raise("missing #{ref}")
+    end
+
+    def ref_for_id(task_id)
+      task = (@created + @existing).find { |item| item.fetch("id").to_s == task_id.to_s }
+      task && task["ref"]
     end
   end
 
@@ -114,7 +126,30 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     expect(client.relations).to include(
       array_including("task-relation-create", "--task-id", "5301", "--other-task-id", "5302", "--relation-kind", "subtask")
     )
+    expect(client.relations).to include(
+      array_including("task-relation-create", "--task-id", "5300", "--other-task-id", "5301", "--relation-kind", "related")
+    )
     expect(client.comments.any? { |args| args.include?("5300") }).to be(true)
+  end
+
+  it "does not duplicate the source to generated parent related relation on reruns" do
+    client = FakeProposalClient.new
+    writer = described_class.new(project: "A3-v2", client: client, mode: :draft)
+
+    first = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence)
+    second = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence)
+
+    expect(first.success?).to be(true)
+    expect(second.success?).to be(true)
+    related_relations = client.relations.select do |args|
+      args.include?("--task-id") &&
+        args.include?("5300") &&
+        args.include?("--other-task-id") &&
+        args.include?("5301") &&
+        args.include?("--relation-kind") &&
+        args.include?("related")
+    end
+    expect(related_relations.size).to eq(1)
   end
 
   it "reuses an existing child by child key even when proposal fingerprint changes" do

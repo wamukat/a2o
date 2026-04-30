@@ -87,6 +87,7 @@ The writer finds existing children by child key, not by mutable title alone. The
 On first creation, A2O writes the proposed title/body/acceptance criteria, `a2o:draft-child`, child key, proposal fingerprint, parent relation, blocker relations, and an audit comment.
 The Kanban-first draft writer must filter proposal labels before applying them to the child ticket: `trigger:auto-implement` is never copied from the proposal into a draft child.
 If the proposal suggests implementation eligibility, A2O records that suggestion in evidence or an audit comment only.
+When the Kanban adapter supports non-blocking relations, A2O also writes an idempotent `related` relation from the requirement source ticket to the generated implementation parent. This relation exists only for traceability and must not affect scheduler runnable decisions.
 
 On rerun, A2O may ensure missing A2O-owned metadata, draft-safe labels, comments, and relations.
 `trigger:auto-implement` is not an A2O-owned label in draft mode and must not be restored or added by reconciliation.
