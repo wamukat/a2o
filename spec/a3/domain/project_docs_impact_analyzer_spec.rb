@@ -143,13 +143,74 @@ RSpec.describe A3::Domain::ProjectDocsImpactAnalyzer do
     expect(decision.candidate_docs).to be_empty
   end
 
-  def task_packet(ref:, title:, description:)
+  it "keeps repo-local docs scoped while always exposing integration surfaces" do
+    app_root = File.join(@repo_root, "app")
+    lib_root = File.join(@repo_root, "lib")
+    docs_root = File.join(@repo_root, "docs")
+    write_file("app/docs/features/greeting.md", <<~MARKDOWN)
+      ---
+      title: Greeting UI
+      category: features
+      ---
+
+      App behavior.
+    MARKDOWN
+    write_file("lib/docs/shared-specs/greeting-format.md", <<~MARKDOWN)
+      ---
+      title: Greeting Format
+      category: shared_specs
+      ---
+
+      Shared spec.
+    MARKDOWN
+    write_file("docs/docs/interfaces/greeting-api.md", <<~MARKDOWN)
+      ---
+      title: Greeting API
+      category: interfaces
+      ---
+
+      Integration contract.
+    MARKDOWN
+    index = A3::Domain::ProjectDocsIndex.load(
+      repo_root: docs_root,
+      repo_roots: { "app" => app_root, "lib" => lib_root, "docs" => docs_root },
+      docs_config: {
+        "surfaces" => {
+          "app" => { "repoSlot" => "app", "root" => "docs", "categories" => { "features" => { "path" => "docs/features" } } },
+          "lib" => { "repoSlot" => "lib", "root" => "docs", "categories" => { "shared_specs" => { "path" => "docs/shared-specs" } } },
+          "integrated" => { "repoSlot" => "docs", "role" => "integration", "root" => "docs", "categories" => { "interfaces" => { "path" => "docs/interfaces" } } }
+        }
+      }
+    )
+    task = A3::Domain::Task.new(ref: "A2O#426", kind: :child, edit_scope: [:lib])
+    packet = task_packet(
+      ref: task.ref,
+      title: "Update shared greeting API",
+      description: "Change shared API behavior.",
+      edit_scope: [:lib]
+    )
+
+    decision = described_class.new(docs_index: index).analyze(task: task, task_packet: packet)
+    form = decision.request_form
+
+    expect(form.fetch("surfaces")).to include(
+      hash_including("id" => "lib", "repo_slot" => "lib"),
+      hash_including("id" => "integrated", "repo_slot" => "docs", "role" => "integration")
+    )
+    expect(form.fetch("candidate_docs")).to include(
+      hash_including("path" => "docs/shared-specs/greeting-format.md", "surface_id" => "lib", "repo_slot" => "lib"),
+      hash_including("path" => "docs/interfaces/greeting-api.md", "surface_id" => "integrated", "repo_slot" => "docs", "role" => "integration")
+    )
+    expect(form.fetch("candidate_docs")).not_to include(hash_including("surface_id" => "app"))
+  end
+
+  def task_packet(ref:, title:, description:, edit_scope: [:repo_alpha])
     A3::Domain::WorkerTaskPacket.new(
       ref: ref,
       external_task_id: nil,
       kind: :child,
-      edit_scope: [:repo_alpha],
-      verification_scope: [:repo_alpha],
+      edit_scope: edit_scope,
+      verification_scope: edit_scope,
       parent_ref: nil,
       child_refs: [],
       title: title,

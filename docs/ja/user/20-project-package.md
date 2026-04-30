@@ -66,7 +66,7 @@ project-package/
 
 `task-templates/` には人間がタスクを作るときのテンプレートを置く。A2O はテンプレートを自動投入しない。実行対象はカンバンに登録されたタスクである。
 
-ドキュメント影響を A2O に判断させたいプロジェクトは、`project.yaml` に `docs` を宣言する。docs 設定では、docs repo slot、root、category directory、managed index、authority source、言語ポリシーを定義する。A2O は implementation / review worker に `docs_context` を渡し、shared spec、interface、architecture、migration、利用者向け挙動が変わる task では `docs_impact` evidence を期待する。
+ドキュメント影響を A2O に判断させたいプロジェクトは、`project.yaml` に `docs` を宣言する。docs 設定では single docs surface だけでなく、異なる repo slot に対応する複数の `docs.surfaces` も定義できる。複数 repo にまたがる interface / architecture docs には `role: integration` を使う。A2O は implementation / review worker に `docs_context` を渡し、shared spec、interface、architecture、migration、利用者向け挙動が変わる task では `docs_impact` evidence を期待する。
 
 `tests/fixtures/` にはパッケージ検証用のフィクスチャや、結果が決まっているテスト用ワーカーを置く。通常運用のランタイムフェーズからフィクスチャを呼ばない。
 

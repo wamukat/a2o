@@ -4840,6 +4840,93 @@ runtime:
 	}
 }
 
+func TestProjectValidateAcceptsMultiSurfaceDocsConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	appDir := filepath.Join(tempDir, "app")
+	libDir := filepath.Join(tempDir, "lib")
+	docsDir := filepath.Join(tempDir, "docs")
+	for _, dir := range []string{
+		filepath.Join(appDir, "docs", "features"),
+		filepath.Join(libDir, "docs", "shared-specs"),
+		filepath.Join(libDir, "schema"),
+		filepath.Join(docsDir, "docs", "interfaces"),
+	} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(libDir, "schema", "greeting.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ../app
+  lib:
+    path: ../lib
+  docs:
+    path: ../docs
+docs:
+  surfaces:
+    app:
+      repoSlot: app
+      root: docs
+      categories:
+        features:
+          path: docs/features
+    lib:
+      repoSlot: lib
+      root: docs
+      categories:
+        shared_specs:
+          path: docs/shared-specs
+    integrated:
+      repoSlot: docs
+      role: integration
+      root: docs
+      categories:
+        interfaces:
+          path: docs/interfaces
+  authorities:
+    greeting_schema:
+      repoSlot: lib
+      source: schema/greeting.json
+      docs:
+        - surface: lib
+          path: docs/shared-specs/greeting-format.md
+        - surface: integrated
+          path: docs/interfaces/greeting-api.md
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project validate should accept multi-surface docs config, code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+}
+
 func TestProjectValidateRejectsInvalidDocsConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -4927,6 +5014,61 @@ runtime:
 	}
 	if !strings.Contains(stdout.String(), "index must stay inside the docs repo slot") {
 		t.Fatalf("project validate should reject intermediate symlink escape, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+
+	body = `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ../app
+  docs:
+    path: ../docs
+docs:
+  surfaces:
+    app:
+      repoSlot: app
+      root: docs
+      categories:
+        features:
+          path: docs/features
+  authorities:
+    openapi:
+      repoSlot: app
+      source: spec/openapi.yaml
+      docs:
+        - surface: missing
+          path: docs/api.md
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.MkdirAll(filepath.Join(repoDir, "spec"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "spec", "openapi.yaml"), []byte("openapi: 3.1.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject unknown authority docs surface, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "surface not found: missing") {
+		t.Fatalf("project validate should reject unknown authority docs surface, stdout=%s stderr=%s", stdout.String(), stderr.String())
 	}
 }
 

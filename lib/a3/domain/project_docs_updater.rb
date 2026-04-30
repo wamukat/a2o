@@ -33,8 +33,8 @@ module A3
         end
       end
 
-      def self.update_document(repo_root:, docs_config:, category:, title:, body: nil, relative_path: nil, metadata: {})
-        new(repo_root: repo_root, docs_config: docs_config).update_document(
+      def self.update_document(repo_root:, docs_config:, category:, title:, body: nil, relative_path: nil, metadata: {}, surface_id: nil, repo_roots: nil)
+        new(repo_root: repo_root, docs_config: docs_config, surface_id: surface_id, repo_roots: repo_roots).update_document(
           category: category,
           title: title,
           body: body,
@@ -43,11 +43,15 @@ module A3
         )
       end
 
-      def initialize(repo_root:, docs_config:)
+      def initialize(repo_root:, docs_config:, surface_id: nil, repo_roots: nil)
         @repo_root = File.expand_path(repo_root)
+        @repo_roots = stringify_keys(repo_roots || {}).transform_values { |path| File.expand_path(path.to_s) }
         @docs_config = stringify_keys(docs_config || {})
+        @surface_id = surface_id && surface_id.to_s
         @diagnostics = []
         @updated_paths = []
+        @surface_config = selected_surface_config
+        @repo_root = repo_root_for_surface
       end
 
       def update_document(category:, title:, body: nil, relative_path: nil, metadata: {})
@@ -83,7 +87,7 @@ module A3
 
       private
 
-      attr_reader :repo_root, :docs_config, :diagnostics, :updated_paths
+      attr_reader :repo_root, :repo_roots, :docs_config, :surface_id, :surface_config, :diagnostics, :updated_paths
 
       def result
         Result.new(updated_paths: updated_paths.uniq.freeze, diagnostics: diagnostics.freeze)
@@ -91,6 +95,7 @@ module A3
 
       def resolve_document_path(category:, title:, relative_path:)
         categories = stringify_keys(docs_config.fetch("categories", {}))
+        categories = stringify_keys(surface_config.fetch("categories", {})) if surface_config
         category_config = stringify_keys(categories.fetch(category, {}))
         category_root = category_config["path"]
         unless category_root.is_a?(String) && !category_root.strip.empty?
@@ -171,8 +176,9 @@ module A3
       end
 
       def configured_index_paths(category)
-        paths = [docs_config["index"]]
-        category_config = stringify_keys(docs_config.fetch("categories", {}).fetch(category, {}))
+        active_config = surface_config || docs_config
+        paths = [active_config["index"]]
+        category_config = stringify_keys(active_config.fetch("categories", {}).fetch(category, {}))
         paths << category_config["index"]
         paths.compact.map(&:to_s).reject(&:empty?).uniq
       end
@@ -240,6 +246,28 @@ module A3
           return nil
         end
         absolute_path
+      end
+
+      def selected_surface_config
+        surfaces = stringify_keys(docs_config.fetch("surfaces", {}))
+        return nil if surfaces.empty?
+
+        if surface_id && surfaces.key?(surface_id)
+          return stringify_keys(surfaces.fetch(surface_id))
+        end
+        if surface_id
+          diagnostic(:blocked, nil, "docs.surfaces.#{surface_id}", "docs surface is not configured")
+          return nil
+        end
+        nil
+      end
+
+      def repo_root_for_surface
+        active_config = surface_config || docs_config
+        slot = active_config["repoSlot"] || docs_config["repoSlot"]
+        return repo_roots.fetch(slot.to_s, repo_root) if slot
+
+        repo_root
       end
 
       def repo_relative_path(path)

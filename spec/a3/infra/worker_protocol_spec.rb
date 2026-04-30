@@ -823,7 +823,15 @@ RSpec.describe A3::Infra::WorkerProtocol do
         "docs_impact" => {
           "disposition" => "yes",
           "categories" => ["shared_specs"],
-          "updated_docs" => ["docs/shared/project-package-schema.md"],
+          "updated_docs" => [
+            "docs/shared/project-package-schema.md",
+            {
+              "surface_id" => "integrated",
+              "repo_slot" => "docs",
+              "path" => "docs/interfaces/project-package-api.md",
+              "expected_action" => "update_or_confirm_integration_docs"
+            }
+          ],
           "updated_authorities" => ["project.yaml schema"],
           "skipped_docs" => [
             { "path" => "docs/ja/shared/project-package-schema.md", "reason" => "mirror follow-up" }
@@ -847,7 +855,14 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(result).to have_attributes(success?: true)
     expect(result.response_bundle.fetch("docs_impact")).to include(
       "disposition" => "yes",
-      "updated_docs" => ["docs/shared/project-package-schema.md"],
+      "updated_docs" => [
+        "docs/shared/project-package-schema.md",
+        hash_including(
+          "surface_id" => "integrated",
+          "repo_slot" => "docs",
+          "path" => "docs/interfaces/project-package-api.md"
+        )
+      ],
       "traceability" => hash_including(
         "related_requirements" => ["A2O#385"],
         "source_issues" => ["wamukat/a2o#53"],
@@ -894,7 +909,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(result).to have_attributes(success?: false)
     expect(result.diagnostics.fetch("validation_errors")).to include(
       "docs_impact.disposition must be one of yes, no, maybe",
-      "docs_impact.updated_docs must be an array of strings when present",
+      "docs_impact.updated_docs[0] must be a string or object",
       "docs_impact.skipped_docs[0].reason must be a string",
       "docs_impact.traceability.related_requirements must be an array of strings when present",
       "docs_impact.traceability.source_issues must be an array of strings when present"

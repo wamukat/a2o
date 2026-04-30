@@ -407,7 +407,7 @@ module A3
         summary << "review=#{single_line(docs_impact['review_disposition'])}" if present?(docs_impact["review_disposition"])
         lines << "docs-impact: #{summary.join(' ')}" unless summary.empty?
 
-        updated_docs = summary_list(docs_impact["updated_docs"])
+        updated_docs = docs_ref_summary(docs_impact["updated_docs"])
         skipped_docs = skipped_docs_summary(docs_impact["skipped_docs"])
         authorities = summary_list(docs_impact["updated_authorities"])
         matched_rules = summary_list(docs_impact["matched_rules"])
@@ -422,6 +422,24 @@ module A3
 
       def summary_list(value, limit: 5)
         entries = Array(value).map { |entry| single_line(entry) }.reject(&:empty?)
+        return nil if entries.empty?
+
+        suffix = entries.length > limit ? ",+#{entries.length - limit}" : ""
+        truncate_comment_value("#{entries.first(limit).join(',')}#{suffix}")
+      end
+
+      def docs_ref_summary(value, limit: 5)
+        entries = Array(value).map do |entry|
+          if entry.is_a?(Hash)
+            path = single_line(entry["path"])
+            surface = single_line(entry["surface_id"] || entry["surface"])
+            repo_slot = single_line(entry["repo_slot"])
+            label = [surface, repo_slot].reject(&:empty?).join("/")
+            label.empty? ? path : "#{path}(#{label})"
+          else
+            single_line(entry)
+          end
+        end.reject(&:empty?)
         return nil if entries.empty?
 
         suffix = entries.length > limit ? ",+#{entries.length - limit}" : ""

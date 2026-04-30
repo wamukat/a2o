@@ -337,6 +337,78 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     expect { loader.load(project_config_path) }.not_to raise_error
   end
 
+  it "validates multi-repo docs surfaces and cross-repo authority docs" do
+    app_root = File.join(@tmpdir, "app")
+    lib_root = File.join(@tmpdir, "lib")
+    docs_root = File.join(@tmpdir, "docs-repo")
+    FileUtils.mkdir_p(File.join(app_root, "docs", "features"))
+    FileUtils.mkdir_p(File.join(lib_root, "docs", "shared-specs"))
+    FileUtils.mkdir_p(File.join(docs_root, "docs", "interfaces"))
+    File.write(File.join(lib_root, "docs", "shared-specs", "greeting-format.md"), "# Greeting\n")
+    project_config_path = write_project_config(
+      "repos" => {
+        "app" => { "path" => "app" },
+        "lib" => { "path" => "lib" },
+        "docs" => { "path" => "docs-repo" }
+      },
+      "docs" => {
+        "surfaces" => {
+          "app" => {
+            "repoSlot" => "app",
+            "root" => "docs",
+            "categories" => {
+              "features" => { "path" => "docs/features" }
+            }
+          },
+          "lib" => {
+            "repoSlot" => "lib",
+            "root" => "docs",
+            "categories" => {
+              "shared_specs" => { "path" => "docs/shared-specs" }
+            }
+          },
+          "integrated" => {
+            "repoSlot" => "docs",
+            "role" => "integration",
+            "root" => "docs",
+            "categories" => {
+              "interfaces" => { "path" => "docs/interfaces" }
+            }
+          }
+        },
+        "authorities" => {
+          "greeting_schema" => {
+            "repoSlot" => "lib",
+            "source" => "docs/shared-specs/greeting-format.md",
+            "docs" => [
+              { "surface" => "lib", "path" => "docs/shared-specs/greeting-format.md" },
+              { "surface" => "integrated", "path" => "docs/interfaces/greeting-api.md" }
+            ]
+          }
+        }
+      },
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }.not_to raise_error
+  end
+
+  it "loads the Java reference product multi-surface docs config" do
+    repo_root = File.expand_path("../../..", __dir__)
+    project_config_path = File.join(repo_root, "reference-products", "java-spring-multi-module", "project-package", "project.yaml")
+
+    expect { loader.load(project_config_path) }.not_to raise_error
+  end
+
   it "rejects invalid docs repo slots, paths, and symlink escapes" do
     project_config_path = write_project_config(
       "repos" => {

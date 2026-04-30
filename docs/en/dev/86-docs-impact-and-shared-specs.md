@@ -426,7 +426,7 @@ Run evidence records the docs-impact decision.
 
 Kanban comments should only include a concise summary.
 
-Reference validation should cover this path with a real project package. The Java Spring multi-module reference product declares `app`, `lib`, and a dedicated `docs` slot. Its docs config includes app feature docs, a shared greeting spec, interface docs, managed index blocks, authorities, and a ja/en mirror policy. Project validation should prove the docs config is loadable; worker protocol tests should prove `docs_context` is present and `docs_impact` evidence is accepted; completion-comment tests should prove only concise summaries are posted back to Kanban.
+Reference validation should cover this path with a real project package. The Java Spring multi-module reference product declares `app`, `lib`, and a dedicated `docs` slot. Its docs config uses `docs.surfaces` so app-local feature docs live under the app repo, shared greeting specs live under the lib repo, and integration interface docs live under the docs repo. Project validation should prove the multi-surface config is loadable; worker protocol tests should prove `docs_context` carries surface id, repo slot, role, and `docs_impact` evidence is accepted; completion-comment tests should prove only concise summaries are posted back to Kanban.
 
 ## 13. Relationship to Prompt / Skill Configuration
 

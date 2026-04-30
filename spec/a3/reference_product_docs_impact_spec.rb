@@ -10,13 +10,21 @@ RSpec.describe "Java Spring reference product docs-impact config" do
   let(:project_config) { YAML.load_file(File.join(package_root, "project.yaml")) }
   let(:docs_config) { project_config.fetch("docs") }
   let(:docs_repo_root) { File.expand_path(project_config.fetch("repos").fetch("docs").fetch("path"), package_root) }
+  let(:repo_roots) do
+    project_config.fetch("repos").each_with_object({}) do |(slot, repo_config), roots|
+      roots[slot] = File.expand_path(repo_config.fetch("path"), package_root)
+    end
+  end
 
   it "provides a traceable docs-impact reference surface" do
-    index = A3::Domain::ProjectDocsIndex.load(repo_root: docs_repo_root, docs_config: docs_config)
+    index = A3::Domain::ProjectDocsIndex.load(repo_root: docs_repo_root, docs_config: docs_config, repo_roots: repo_roots)
 
     expect(index.by_category("features").map(&:path)).to include("docs/features/greeting.md")
     expect(index.by_category("shared_specs").map(&:path)).to include("docs/shared-specs/greeting-format.md")
     expect(index.by_category("interfaces").map(&:path)).to include("docs/interfaces/greeting-api.md")
+    expect(index.by_category("features").first.surface_id).to eq("app")
+    expect(index.by_category("shared_specs").first.surface_id).to eq("lib")
+    expect(index.by_category("interfaces").first.role).to eq("integration")
     expect(index.by_related_requirement("A2O#394").map(&:path)).to include(
       "docs/features/greeting.md",
       "docs/shared-specs/greeting-format.md",
@@ -28,7 +36,7 @@ RSpec.describe "Java Spring reference product docs-impact config" do
   end
 
   it "selects docs candidates for app, shared spec, and interface changes" do
-    index = A3::Domain::ProjectDocsIndex.load(repo_root: docs_repo_root, docs_config: docs_config)
+    index = A3::Domain::ProjectDocsIndex.load(repo_root: docs_repo_root, docs_config: docs_config, repo_roots: repo_roots)
     task = A3::Domain::Task.new(ref: "A2O#394", kind: :child, edit_scope: %i[app lib docs], parent_ref: "A2O#385")
     packet = A3::Domain::WorkerTaskPacket.new(
       ref: task.ref,
@@ -54,8 +62,13 @@ RSpec.describe "Java Spring reference product docs-impact config" do
       "docs/interfaces/greeting-api.md"
     )
     expect(decision.request_form.fetch("authority_sources")).to include(
-      hash_including("name" => "greeting_api", "source" => "docs/interfaces/greeting-api.md", "exists" => true),
-      hash_including("name" => "greeting_shared_spec", "source" => "docs/shared-specs/greeting-format.md", "exists" => true)
+      hash_including("name" => "greeting_api", "source" => "docs/interfaces/greeting-api.md", "exists" => true, "repo_slot" => "docs"),
+      hash_including("name" => "greeting_shared_spec", "source" => "docs/shared-specs/greeting-format.md", "exists" => true, "repo_slot" => "lib")
+    )
+    expect(decision.request_form.fetch("candidate_docs")).to include(
+      hash_including("surface_id" => "app", "repo_slot" => "app"),
+      hash_including("surface_id" => "lib", "repo_slot" => "lib"),
+      hash_including("surface_id" => "integrated", "repo_slot" => "docs", "role" => "integration")
     )
   end
 end

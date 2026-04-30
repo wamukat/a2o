@@ -577,6 +577,60 @@ func validateProjectDocsConfig(rawDocs any, packagePath string, repos map[string
 		return fmt.Errorf("must be a mapping")
 	}
 	repoNames := projectRepoNames(repos)
+	if rawSurfaces, ok := docs["surfaces"]; ok {
+		surfaces, ok := normalizeYAMLValue(rawSurfaces).(map[string]any)
+		if !ok || len(surfaces) == 0 {
+			return fmt.Errorf("surfaces must be a non-empty mapping")
+		}
+		for id, rawSurface := range surfaces {
+			if !projectDocsMachineKey(id) {
+				return fmt.Errorf("surfaces.%s id must be a non-empty machine-readable key", id)
+			}
+			surface, ok := normalizeYAMLValue(rawSurface).(map[string]any)
+			if !ok {
+				return fmt.Errorf("surfaces.%s must be a mapping", id)
+			}
+			repoSlot, err := projectDocsRepoSlot(surface["repoSlot"], repoNames, "surfaces.%s.repoSlot", id)
+			if err != nil {
+				return err
+			}
+			if repoSlot == "" {
+				repoSlot, err = projectDocsRepoSlot(docs["repoSlot"], repoNames, "repoSlot")
+				if err != nil {
+					return err
+				}
+			}
+			if repoSlot == "" && len(repoNames) == 1 {
+				repoSlot = repoNames[0]
+			}
+			if repoSlot == "" && len(repoNames) > 1 {
+				return fmt.Errorf("surfaces.%s.repoSlot must be provided when multiple repos are declared", id)
+			}
+			repoRoot := projectDocsRepoRoot(packagePath, repos, repoSlot)
+			if err := validateProjectDocsPath(surface["root"], "surfaces."+id+".root", repoRoot, true); err != nil {
+				return err
+			}
+			if err := validateProjectDocsPath(surface["index"], "surfaces."+id+".index", repoRoot, false); err != nil {
+				return err
+			}
+			if err := validateProjectDocsCategories(surface["categories"], repoRoot, "surfaces."+id+".categories"); err != nil {
+				return err
+			}
+			if err := validateProjectDocsLanguages(firstPresent(surface["languages"], docs["languages"])); err != nil {
+				return err
+			}
+			if err := validateProjectDocsStringMap(firstPresent(surface["policy"], docs["policy"]), "surfaces."+id+".policy"); err != nil {
+				return err
+			}
+			if err := validateProjectDocsStringMap(firstPresent(surface["impactPolicy"], docs["impactPolicy"]), "surfaces."+id+".impactPolicy"); err != nil {
+				return err
+			}
+		}
+		if err := validateProjectDocsAuthorities(docs["authorities"], packagePath, repos, docs, surfaces); err != nil {
+			return err
+		}
+		return nil
+	}
 	repoSlot := ""
 	if rawRepoSlot, ok := docs["repoSlot"]; ok {
 		value, ok := rawRepoSlot.(string)
@@ -599,7 +653,7 @@ func validateProjectDocsConfig(rawDocs any, packagePath string, repos map[string
 	if err := validateProjectDocsPath(docs["index"], "index", repoRoot, false); err != nil {
 		return err
 	}
-	if err := validateProjectDocsCategories(docs["categories"], repoRoot); err != nil {
+	if err := validateProjectDocsCategories(docs["categories"], repoRoot, "categories"); err != nil {
 		return err
 	}
 	if err := validateProjectDocsLanguages(docs["languages"]); err != nil {
@@ -611,10 +665,35 @@ func validateProjectDocsConfig(rawDocs any, packagePath string, repos map[string
 	if err := validateProjectDocsStringMap(docs["impactPolicy"], "impactPolicy"); err != nil {
 		return err
 	}
-	if err := validateProjectDocsAuthorities(docs["authorities"], repoRoot); err != nil {
+	if err := validateProjectDocsAuthorities(docs["authorities"], packagePath, repos, docs, nil); err != nil {
 		return err
 	}
 	return nil
+}
+
+func projectDocsRepoSlot(rawSlot any, repoNames []string, label string, args ...any) (string, error) {
+	if len(args) > 0 {
+		label = fmt.Sprintf(label, args...)
+	}
+	if rawSlot == nil {
+		return "", nil
+	}
+	value, ok := rawSlot.(string)
+	if !ok || strings.TrimSpace(value) == "" {
+		return "", fmt.Errorf("%s must be a non-empty string", label)
+	}
+	slot := strings.TrimSpace(value)
+	if len(repoNames) > 0 && !containsString(repoNames, slot) {
+		return "", fmt.Errorf("%s must match a repos entry: %s", label, slot)
+	}
+	return slot, nil
+}
+
+func firstPresent(primary any, fallback any) any {
+	if primary != nil {
+		return primary
+	}
+	return fallback
 }
 
 func projectDocsRepoRoot(packagePath string, repos map[string]struct {
@@ -634,33 +713,36 @@ func projectDocsRepoRoot(packagePath string, repos map[string]struct {
 	return filepath.Clean(filepath.Join(packagePath, repo.Path))
 }
 
-func validateProjectDocsCategories(rawCategories any, repoRoot string) error {
+func validateProjectDocsCategories(rawCategories any, repoRoot string, label string) error {
 	if rawCategories == nil {
 		return nil
 	}
 	categories, ok := normalizeYAMLValue(rawCategories).(map[string]any)
 	if !ok {
-		return fmt.Errorf("categories must be a mapping")
+		return fmt.Errorf("%s must be a mapping", label)
 	}
 	for id, rawCategory := range categories {
 		if !projectDocsMachineKey(id) {
-			return fmt.Errorf("categories.%s id must be a non-empty machine-readable key", id)
+			return fmt.Errorf("%s.%s id must be a non-empty machine-readable key", label, id)
 		}
 		category, ok := normalizeYAMLValue(rawCategory).(map[string]any)
 		if !ok {
-			return fmt.Errorf("categories.%s must be a mapping", id)
+			return fmt.Errorf("%s.%s must be a mapping", label, id)
 		}
-		if err := validateProjectDocsPath(category["path"], "categories."+id+".path", repoRoot, true); err != nil {
+		if err := validateProjectDocsPath(category["path"], label+"."+id+".path", repoRoot, true); err != nil {
 			return err
 		}
-		if err := validateProjectDocsPath(category["index"], "categories."+id+".index", repoRoot, false); err != nil {
+		if err := validateProjectDocsPath(category["index"], label+"."+id+".index", repoRoot, false); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func validateProjectDocsAuthorities(rawAuthorities any, repoRoot string) error {
+func validateProjectDocsAuthorities(rawAuthorities any, packagePath string, repos map[string]struct {
+	Path  string `yaml:"path"`
+	Label string `yaml:"label"`
+}, docs map[string]any, rawSurfaces map[string]any) error {
 	if rawAuthorities == nil {
 		return nil
 	}
@@ -676,6 +758,11 @@ func validateProjectDocsAuthorities(rawAuthorities any, repoRoot string) error {
 		if !ok {
 			return fmt.Errorf("authorities.%s must be a mapping", id)
 		}
+		repoSlot, err := projectDocsAuthorityRepoSlot(authority, docs, rawSurfaces, projectRepoNames(repos), id)
+		if err != nil {
+			return err
+		}
+		repoRoot := projectDocsRepoRoot(packagePath, repos, repoSlot)
 		generated, _ := authority["generated"].(bool)
 		if err := validateProjectDocsPath(authority["source"], "authorities."+id+".source", repoRoot, !generated); err != nil {
 			return err
@@ -700,16 +787,78 @@ func validateProjectDocsAuthorities(rawAuthorities any, repoRoot string) error {
 				}
 			case []any:
 				for index, entry := range docsPaths {
+					if docEntry, ok := normalizeYAMLValue(entry).(map[string]any); ok {
+						surfaceID, _ := docEntry["surface"].(string)
+						if strings.TrimSpace(surfaceID) == "" {
+							return fmt.Errorf("authorities.%s.docs[%d].surface must be a non-empty string", id, index)
+						}
+						surfaceRoot, err := projectDocsSurfaceRepoRoot(packagePath, repos, docs, rawSurfaces, strings.TrimSpace(surfaceID))
+						if err != nil {
+							return fmt.Errorf("authorities.%s.docs[%d]: %w", id, index, err)
+						}
+						if err := validateProjectDocsPath(docEntry["path"], fmt.Sprintf("authorities.%s.docs[%d].path", id, index), surfaceRoot, true); err != nil {
+							return err
+						}
+						continue
+					}
 					if err := validateProjectDocsPath(entry, fmt.Sprintf("authorities.%s.docs[%d]", id, index), repoRoot, true); err != nil {
 						return err
 					}
 				}
 			default:
-				return fmt.Errorf("authorities.%s.docs must be a string or array of strings", id)
+				return fmt.Errorf("authorities.%s.docs must be a string or array of strings/maps", id)
 			}
 		}
 	}
 	return nil
+}
+
+func projectDocsAuthorityRepoSlot(authority map[string]any, docs map[string]any, rawSurfaces map[string]any, repoNames []string, id string) (string, error) {
+	if slot, err := projectDocsRepoSlot(authority["repoSlot"], repoNames, "authorities."+id+".repoSlot"); err != nil || slot != "" {
+		return slot, err
+	}
+	if slot, err := projectDocsRepoSlot(docs["repoSlot"], repoNames, "repoSlot"); err != nil || slot != "" {
+		return slot, err
+	}
+	if len(repoNames) == 1 {
+		return repoNames[0], nil
+	}
+	if len(rawSurfaces) > 0 {
+		return "", fmt.Errorf("authorities.%s.repoSlot must be provided when docs.surfaces and multiple repos are declared", id)
+	}
+	return "", nil
+}
+
+func projectDocsSurfaceRepoRoot(packagePath string, repos map[string]struct {
+	Path  string `yaml:"path"`
+	Label string `yaml:"label"`
+}, docs map[string]any, rawSurfaces map[string]any, surfaceID string) (string, error) {
+	rawSurface, ok := rawSurfaces[surfaceID]
+	if !ok {
+		return "", fmt.Errorf("surface not found: %s", surfaceID)
+	}
+	surface, ok := normalizeYAMLValue(rawSurface).(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("surfaces.%s must be a mapping", surfaceID)
+	}
+	repoNames := projectRepoNames(repos)
+	slot, err := projectDocsRepoSlot(surface["repoSlot"], repoNames, "surfaces."+surfaceID+".repoSlot")
+	if err != nil {
+		return "", err
+	}
+	if slot == "" {
+		slot, err = projectDocsRepoSlot(docs["repoSlot"], repoNames, "repoSlot")
+		if err != nil {
+			return "", err
+		}
+	}
+	if slot == "" && len(repoNames) == 1 {
+		slot = repoNames[0]
+	}
+	if slot == "" && len(repoNames) > 1 {
+		return "", fmt.Errorf("surfaces.%s.repoSlot must be provided when multiple repos are declared", surfaceID)
+	}
+	return projectDocsRepoRoot(packagePath, repos, slot), nil
 }
 
 func validateProjectDocsLanguages(rawLanguages any) error {

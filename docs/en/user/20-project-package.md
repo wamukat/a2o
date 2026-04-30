@@ -83,7 +83,7 @@ project-package/
 
 For multi-repo parent-child workflows, write task templates with explicit repo labels. A parent task that affects two repositories should carry both repo labels, for example `repo:catalog` and `repo:storefront`. Avoid synthetic aggregate labels that mean "all repos" or "both repos".
 
-If the project wants A2O to reason about documentation impact, declare `docs` in `project.yaml`. The docs config names the docs repo slot, root, category directories, managed indexes, authority sources, and language policy. A2O then sends `docs_context` to implementation/review workers and expects `docs_impact` evidence when a task changes shared specs, interfaces, architecture, migrations, or user-visible behavior.
+If the project wants A2O to reason about documentation impact, declare `docs` in `project.yaml`. The docs config can be a single docs surface or multiple `docs.surfaces` mapped to different repo slots, including `role: integration` for cross-repo interface or architecture docs. A2O then sends `docs_context` to implementation/review workers and expects `docs_impact` evidence when a task changes shared specs, interfaces, architecture, migrations, or user-visible behavior.
 
 `tests/fixtures/` contains deterministic workers, fake inputs, or package validation fixtures. Runtime production config should not reference this directory.
 

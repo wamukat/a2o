@@ -218,6 +218,44 @@ RSpec.describe A3::Domain::ProjectDocsUpdater do
     expect(result.diagnostics.map(&:message)).to include("docs path must stay inside the configured category path")
   end
 
+  it "updates the selected multi-repo docs surface" do
+    lib_root = File.join(@repo_root, "lib")
+    write_file(
+      "lib/docs/README.md",
+      <<~MARKDOWN
+        # Lib Docs
+
+        <!-- a2o-docs-index:start category=shared_specs -->
+        <!-- a2o-docs-index:end -->
+      MARKDOWN
+    )
+
+    result = described_class.update_document(
+      repo_root: @repo_root,
+      repo_roots: { "lib" => lib_root },
+      docs_config: {
+        "surfaces" => {
+          "lib" => {
+            "repoSlot" => "lib",
+            "index" => "docs/README.md",
+            "categories" => {
+              "shared_specs" => { "path" => "docs/shared-specs" }
+            }
+          }
+        }
+      },
+      surface_id: "lib",
+      category: "shared_specs",
+      title: "Greeting Format",
+      body: "Shared greeting format.\n"
+    )
+
+    expect(result.updated_paths).to contain_exactly("docs/shared-specs/greeting-format.md", "docs/README.md")
+    expect(File.read(File.join(lib_root, "docs/shared-specs/greeting-format.md"))).to include("Shared greeting format.")
+    expect(File.read(File.join(lib_root, "docs/README.md"))).to include("- [Greeting Format](shared-specs/greeting-format.md)")
+    expect(File.exist?(File.join(@repo_root, "docs/shared-specs/greeting-format.md"))).to be(false)
+  end
+
   def docs_config
     {
       "root" => "docs",

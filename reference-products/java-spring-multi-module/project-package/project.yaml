@@ -19,19 +19,32 @@ repos:
     role: docs
     label: repo:docs
 docs:
-  repoSlot: docs
-  root: docs
-  index: docs/README.md
-  categories:
-    features:
-      path: docs/features
-      index: docs/features/README.md
-    shared_specs:
-      path: docs/shared-specs
-      index: docs/shared-specs/README.md
-    interfaces:
-      path: docs/interfaces
-      index: docs/interfaces/README.md
+  surfaces:
+    app:
+      repoSlot: app
+      root: docs
+      index: docs/README.md
+      categories:
+        features:
+          path: docs/features
+          index: docs/features/README.md
+    lib:
+      repoSlot: lib
+      root: docs
+      index: docs/README.md
+      categories:
+        shared_specs:
+          path: docs/shared-specs
+          index: docs/shared-specs/README.md
+    integrated:
+      repoSlot: docs
+      root: docs
+      role: integration
+      index: docs/README.md
+      categories:
+        interfaces:
+          path: docs/interfaces
+          index: docs/interfaces/README.md
   languages:
     primary: en
     secondary:
@@ -43,13 +56,19 @@ docs:
     mirrorPolicy: require_canonical_warn_mirror
   authorities:
     greeting_api:
+      repoSlot: docs
       source: docs/interfaces/greeting-api.md
       docs:
-        - docs/interfaces/greeting-api.md
+        - surface: integrated
+          path: docs/interfaces/greeting-api.md
     greeting_shared_spec:
+      repoSlot: lib
       source: docs/shared-specs/greeting-format.md
       docs:
-        - docs/shared-specs/greeting-format.md
+        - surface: lib
+          path: docs/shared-specs/greeting-format.md
+        - surface: integrated
+          path: docs/interfaces/greeting-api.md
 agent:
   workspace_root: .work/a2o-dev-sample/agent/workspaces
   required_bins:

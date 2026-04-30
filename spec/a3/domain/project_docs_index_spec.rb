@@ -239,6 +239,97 @@ RSpec.describe A3::Domain::ProjectDocsIndex do
     )
   end
 
+  it "indexes multi-repo docs surfaces and authority sources" do
+    app_root = File.join(@repo_root, "app")
+    lib_root = File.join(@repo_root, "lib")
+    docs_root = File.join(@repo_root, "docs-repo")
+    write_file("app/docs/features/greeting.md", <<~MARKDOWN)
+      ---
+      title: Greeting UI
+      category: features
+      related_requirements:
+        - A2O#426
+      ---
+
+      App behavior.
+    MARKDOWN
+    write_file("lib/docs/shared-specs/greeting-format.md", <<~MARKDOWN)
+      ---
+      title: Greeting Format
+      category: shared_specs
+      authorities:
+        - greeting_schema
+      ---
+
+      Shared spec.
+    MARKDOWN
+    write_file("docs-repo/docs/interfaces/greeting-api.md", <<~MARKDOWN)
+      ---
+      title: Greeting API
+      category: interfaces
+      ---
+
+      Integrated API contract.
+    MARKDOWN
+    write_file("lib/schema/greeting.json", "{}\n")
+
+    index = described_class.load(
+      repo_root: docs_root,
+      repo_roots: {
+        "app" => app_root,
+        "lib" => lib_root,
+        "docs" => docs_root
+      },
+      docs_config: {
+        "surfaces" => {
+          "app" => {
+            "repoSlot" => "app",
+            "root" => "docs",
+            "categories" => {
+              "features" => { "path" => "docs/features" }
+            }
+          },
+          "lib" => {
+            "repoSlot" => "lib",
+            "root" => "docs",
+            "categories" => {
+              "shared_specs" => { "path" => "docs/shared-specs" }
+            }
+          },
+          "integrated" => {
+            "repoSlot" => "docs",
+            "role" => "integration",
+            "root" => "docs",
+            "categories" => {
+              "interfaces" => { "path" => "docs/interfaces" }
+            }
+          }
+        },
+        "authorities" => {
+          "greeting_schema" => {
+            "repoSlot" => "lib",
+            "source" => "schema/greeting.json",
+            "docs" => [
+              { "surface" => "lib", "path" => "docs/shared-specs/greeting-format.md" },
+              { "surface" => "integrated", "path" => "docs/interfaces/greeting-api.md" }
+            ]
+          }
+        }
+      }
+    )
+
+    expect(index.by_category("features").first.to_h).to include(path: "docs/features/greeting.md", surface_id: "app", repo_slot: "app")
+    expect(index.by_category("shared_specs").first.to_h).to include(path: "docs/shared-specs/greeting-format.md", surface_id: "lib", repo_slot: "lib")
+    expect(index.by_category("interfaces").first.to_h).to include(path: "docs/interfaces/greeting-api.md", surface_id: "integrated", repo_slot: "docs", role: "integration")
+    expect(index.authority_sources.map(&:to_h)).to include(
+      name: "greeting_schema",
+      source: "schema/greeting.json",
+      exists: true,
+      path: "schema/greeting.json",
+      repo_slot: "lib"
+    )
+  end
+
   def write_file(path, content)
     absolute_path = File.join(@repo_root, path)
     FileUtils.mkdir_p(File.dirname(absolute_path))

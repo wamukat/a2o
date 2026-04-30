@@ -166,13 +166,50 @@ docs:
 
 `docs.root`, `docs.index`, category paths, authority sources, and authority docs are repo-slot-relative paths. A2O rejects absolute paths, `..` escapes, and existing symlinks that resolve outside the selected repo slot. `docs.repoSlot` must match a declared `repos` entry. Category and authority IDs must be non-empty machine-readable keys such as `architecture`, `shared_specs`, or `openapi`.
 
+Multi-repo packages can declare multiple documentation surfaces. A surface is a named docs area with its own `repoSlot`, root, categories, and optional `role`. Use `role: integration` for cross-repo architecture or interface docs that should be visible even when a task edits only one product repo.
+
+```yaml
+docs:
+  surfaces:
+    app:
+      repoSlot: app
+      root: docs
+      categories:
+        features:
+          path: docs/features
+    lib:
+      repoSlot: lib
+      root: docs
+      categories:
+        shared_specs:
+          path: docs/shared-specs
+    integrated:
+      repoSlot: docs
+      root: docs
+      role: integration
+      categories:
+        interfaces:
+          path: docs/interfaces
+  authorities:
+    greeting_schema:
+      repoSlot: lib
+      source: docs/shared-specs/greeting-format.md
+      docs:
+        - surface: lib
+          path: docs/shared-specs/greeting-format.md
+        - surface: integrated
+          path: docs/interfaces/greeting-api.md
+```
+
+When `docs.surfaces` is present, each surface path is relative to that surface's repo slot. Authority sources can also declare `repoSlot`; authority `docs` entries may use `{surface, path}` so a source-of-truth artifact in one repo can point to generated or mirrored docs in another surface. Existing single-surface `docs.repoSlot` configs remain valid.
+
 `docs.impactPolicy.mirrorPolicy` controls mirror debt handling for `docs.languages.secondary`: `require_all` means every declared language should be updated together, `require_canonical_warn_mirror` records mirror debt for missing secondary docs, and `canonical_only` suppresses mirror debt.
 
 Authority sources represent source-of-truth artifacts such as OpenAPI, DB migrations, generated schema files, or existing shared specifications. A non-generated authority source must exist when the repo slot checkout is available. Use `generated: true` only when project policy intentionally treats the source as generated outside the current checkout.
 
 ### Docs-impact workflow
 
-When `docs` is configured, A2O includes `docs_context` in implementation, review, and parent-review worker requests. The context gives workers the configured categories, candidate docs, authority sources, language policy, expected docs actions, and traceability refs. Workers still decide the actual impact per task and report it through the `docs_impact` evidence object.
+When `docs` is configured, A2O includes `docs_context` in implementation, review, and parent-review worker requests. The context gives workers the configured categories, surfaces, candidate docs, authority sources, language policy, expected docs actions, and traceability refs. Candidate docs include `surface_id`, `repo_slot`, optional `role`, and `expected_action`, so workers can distinguish repo-local docs from integration docs. Workers still decide the actual impact per task and report it through the `docs_impact` evidence object.
 
 Implementation results can include:
 

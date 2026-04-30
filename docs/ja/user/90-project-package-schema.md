@@ -172,13 +172,50 @@ docs:
 
 `docs.root`、`docs.index`、category path、authority source、authority docs は repo slot からの相対 path である。A2O は absolute path、`..` による escape、選択した repo slot の外へ解決される既存 symlink を拒否する。`docs.repoSlot` は `repos` に宣言された slot と一致しなければならない。category id と authority id は `architecture`、`shared_specs`、`openapi` のような空でない machine-readable key にする。
 
+multi-repo package では複数の documentation surface を宣言できる。surface は名前付きの docs 領域であり、それぞれが `repoSlot`、root、category、任意の `role` を持つ。複数 repo にまたがる architecture や interface docs には `role: integration` を指定する。integration surface は、タスクの編集対象が単一 product repo の場合でも候補として提示される。
+
+```yaml
+docs:
+  surfaces:
+    app:
+      repoSlot: app
+      root: docs
+      categories:
+        features:
+          path: docs/features
+    lib:
+      repoSlot: lib
+      root: docs
+      categories:
+        shared_specs:
+          path: docs/shared-specs
+    integrated:
+      repoSlot: docs
+      root: docs
+      role: integration
+      categories:
+        interfaces:
+          path: docs/interfaces
+  authorities:
+    greeting_schema:
+      repoSlot: lib
+      source: docs/shared-specs/greeting-format.md
+      docs:
+        - surface: lib
+          path: docs/shared-specs/greeting-format.md
+        - surface: integrated
+          path: docs/interfaces/greeting-api.md
+```
+
+`docs.surfaces` がある場合、各 surface の path はその surface の repo slot からの相対 path である。authority source も `repoSlot` を持てる。authority の `docs` entry は `{surface, path}` 形式を使えるため、ある repo の source-of-truth artifact から別 surface の生成 docs や mirror docs を指せる。既存の single-surface `docs.repoSlot` 設定は引き続き有効である。
+
 `docs.impactPolicy.mirrorPolicy` は `docs.languages.secondary` に対する mirror debt の扱いを制御する。`require_all` は宣言されたすべての言語を同じ変更で更新する方針、`require_canonical_warn_mirror` は不足した secondary docs を mirror debt として記録する方針、`canonical_only` は mirror debt を記録しない方針である。
 
 authority source は OpenAPI、DB migration、生成 schema、既存の shared specification などの source of truth artifact を表す。repo slot checkout が利用できる場合、generated ではない authority source は存在していなければならない。`generated: true` は、project policy としてその source が現在の checkout 外で生成されることを意図的に認める場合だけ使う。
 
 ### docs-impact の流れ
 
-`docs` を設定すると、A2O は implementation、review、parent-review の worker request に `docs_context` を含める。ここには、設定済み category、候補 docs、authority source、言語ポリシー、期待する docs action、traceability refs が入る。実際に docs-impact があるかは task ごとに worker が判断し、`docs_impact` evidence として返す。
+`docs` を設定すると、A2O は implementation、review、parent-review の worker request に `docs_context` を含める。ここには、設定済み category、surface、候補 docs、authority source、言語ポリシー、期待する docs action、traceability refs が入る。候補 docs には `surface_id`、`repo_slot`、任意の `role`、`expected_action` が含まれるため、worker は repo-local docs と integration docs を区別できる。実際に docs-impact があるかは task ごとに worker が判断し、`docs_impact` evidence として返す。
 
 implementation result には次のような値を含められる。
 

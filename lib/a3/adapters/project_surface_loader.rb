@@ -186,6 +186,15 @@ module A3
         end
         repo_slot = nil if repo_slot.to_s.strip.empty?
         repo_names = repos.is_a?(Hash) ? repos.keys.map(&:to_s).sort : []
+        surfaces = docs.fetch("surfaces", nil)
+        if surfaces
+          validate_docs_surfaces(surfaces, docs, project_package_root, repos, repo_names)
+          validate_docs_languages(docs.fetch("languages", nil))
+          validate_docs_mapping(docs.fetch("policy", nil), "docs.policy")
+          validate_docs_mapping(docs.fetch("impactPolicy", nil), "docs.impactPolicy")
+          validate_docs_authorities(docs.fetch("authorities", nil), project_package_root, repos, docs, surfaces)
+          return
+        end
         if repo_slot && !repo_names.empty? && !repo_names.include?(repo_slot)
           raise A3::Domain::ConfigurationError, "project.yaml docs.repoSlot must match a repos entry: #{repo_slot}"
         end
@@ -201,7 +210,46 @@ module A3
         validate_docs_languages(docs.fetch("languages", nil))
         validate_docs_mapping(docs.fetch("policy", nil), "docs.policy")
         validate_docs_mapping(docs.fetch("impactPolicy", nil), "docs.impactPolicy")
-        validate_docs_authorities(docs.fetch("authorities", nil), repo_root)
+        validate_docs_authorities(docs.fetch("authorities", nil), project_package_root, repos, docs, nil)
+      end
+
+      def validate_docs_surfaces(surfaces, docs, project_package_root, repos, repo_names)
+        unless surfaces.is_a?(Hash) && !surfaces.empty?
+          raise A3::Domain::ConfigurationError, "project.yaml docs.surfaces must be a non-empty mapping"
+        end
+        surfaces.each do |id, surface|
+          unless machine_key?(id)
+            raise A3::Domain::ConfigurationError, "project.yaml docs.surfaces.#{id} id must be a non-empty machine-readable key"
+          end
+          unless surface.is_a?(Hash)
+            raise A3::Domain::ConfigurationError, "project.yaml docs.surfaces.#{id} must be a mapping"
+          end
+          surface_slot = docs_repo_slot(surface.fetch("repoSlot", nil), repo_names, "docs.surfaces.#{id}.repoSlot")
+          surface_slot ||= docs_repo_slot(docs.fetch("repoSlot", nil), repo_names, "docs.repoSlot")
+          surface_slot ||= repo_names.first if repo_names.length == 1
+          if surface_slot.nil? && repo_names.length > 1
+            raise A3::Domain::ConfigurationError, "project.yaml docs.surfaces.#{id}.repoSlot must be provided when multiple repos are declared"
+          end
+          repo_root = docs_repo_root(project_package_root, repos, surface_slot)
+          validate_docs_path(surface.fetch("root", nil), "docs.surfaces.#{id}.root", repo_root, required: true)
+          validate_docs_path(surface.fetch("index", nil), "docs.surfaces.#{id}.index", repo_root)
+          validate_docs_categories(surface.fetch("categories", nil), repo_root, "docs.surfaces.#{id}.categories")
+          validate_docs_languages(surface.fetch("languages", docs.fetch("languages", nil)))
+          validate_docs_mapping(surface.fetch("policy", docs.fetch("policy", nil)), "docs.surfaces.#{id}.policy")
+          validate_docs_mapping(surface.fetch("impactPolicy", docs.fetch("impactPolicy", nil)), "docs.surfaces.#{id}.impactPolicy")
+        end
+      end
+
+      def docs_repo_slot(raw_slot, repo_names, location)
+        return nil if raw_slot.nil?
+        unless raw_slot.is_a?(String) && !raw_slot.strip.empty?
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must be a non-empty string"
+        end
+        slot = raw_slot.strip
+        if !repo_names.empty? && !repo_names.include?(slot)
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must match a repos entry: #{slot}"
+        end
+        slot
       end
 
       def docs_repo_root(project_package_root, repos, repo_slot)
@@ -216,25 +264,25 @@ module A3
         Pathname.new(path).absolute? ? File.expand_path(path) : File.expand_path(path, project_package_root)
       end
 
-      def validate_docs_categories(categories, repo_root)
+      def validate_docs_categories(categories, repo_root, location = "docs.categories")
         return unless categories
         unless categories.is_a?(Hash)
-          raise A3::Domain::ConfigurationError, "project.yaml docs.categories must be a mapping"
+          raise A3::Domain::ConfigurationError, "project.yaml #{location} must be a mapping"
         end
 
         categories.each do |id, category|
           unless machine_key?(id)
-            raise A3::Domain::ConfigurationError, "project.yaml docs.categories.#{id} id must be a non-empty machine-readable key"
+            raise A3::Domain::ConfigurationError, "project.yaml #{location}.#{id} id must be a non-empty machine-readable key"
           end
           unless category.is_a?(Hash)
-            raise A3::Domain::ConfigurationError, "project.yaml docs.categories.#{id} must be a mapping"
+            raise A3::Domain::ConfigurationError, "project.yaml #{location}.#{id} must be a mapping"
           end
-          validate_docs_path(category.fetch("path", nil), "docs.categories.#{id}.path", repo_root, required: true)
-          validate_docs_path(category.fetch("index", nil), "docs.categories.#{id}.index", repo_root)
+          validate_docs_path(category.fetch("path", nil), "#{location}.#{id}.path", repo_root, required: true)
+          validate_docs_path(category.fetch("index", nil), "#{location}.#{id}.index", repo_root)
         end
       end
 
-      def validate_docs_authorities(authorities, repo_root)
+      def validate_docs_authorities(authorities, project_package_root, repos, docs, surfaces)
         return unless authorities
         unless authorities.is_a?(Hash)
           raise A3::Domain::ConfigurationError, "project.yaml docs.authorities must be a mapping"
@@ -247,6 +295,14 @@ module A3
           unless authority.is_a?(Hash)
             raise A3::Domain::ConfigurationError, "project.yaml docs.authorities.#{id} must be a mapping"
           end
+          repo_names = repos.is_a?(Hash) ? repos.keys.map(&:to_s).sort : []
+          repo_slot = docs_repo_slot(authority.fetch("repoSlot", nil), repo_names, "docs.authorities.#{id}.repoSlot")
+          repo_slot ||= docs_repo_slot(docs.fetch("repoSlot", nil), repo_names, "docs.repoSlot")
+          repo_slot ||= repo_names.first if repo_names.length == 1
+          if repo_slot.nil? && surfaces && repo_names.length > 1
+            raise A3::Domain::ConfigurationError, "project.yaml docs.authorities.#{id}.repoSlot must be provided when docs.surfaces and multiple repos are declared"
+          end
+          repo_root = docs_repo_root(project_package_root, repos, repo_slot)
           generated = authority.fetch("generated", false) == true
           validate_docs_path(authority.fetch("source", nil), "docs.authorities.#{id}.source", repo_root, required: !generated)
           source = authority.fetch("source", nil)
@@ -264,12 +320,39 @@ module A3
             validate_docs_path(docs_paths, "docs.authorities.#{id}.docs", repo_root)
           when Array
             docs_paths.each_with_index do |entry, index|
+              if entry.is_a?(Hash)
+                surface_id = entry.fetch("surface", nil)
+                unless surface_id.is_a?(String) && !surface_id.strip.empty?
+                  raise A3::Domain::ConfigurationError, "project.yaml docs.authorities.#{id}.docs[#{index}].surface must be a non-empty string"
+                end
+                surface_root = docs_surface_repo_root(project_package_root, repos, docs, surfaces, surface_id.strip)
+                validate_docs_path(entry.fetch("path", nil), "docs.authorities.#{id}.docs[#{index}].path", surface_root, required: true)
+                next
+              end
               validate_docs_path(entry, "docs.authorities.#{id}.docs[#{index}]", repo_root, required: true)
             end
           else
-            raise A3::Domain::ConfigurationError, "project.yaml docs.authorities.#{id}.docs must be a string or array of strings"
+            raise A3::Domain::ConfigurationError, "project.yaml docs.authorities.#{id}.docs must be a string or array of strings/maps"
           end
         end
+      end
+
+      def docs_surface_repo_root(project_package_root, repos, docs, surfaces, surface_id)
+        unless surfaces.is_a?(Hash) && surfaces.key?(surface_id)
+          raise A3::Domain::ConfigurationError, "project.yaml docs surface not found: #{surface_id}"
+        end
+        surface = surfaces.fetch(surface_id)
+        unless surface.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml docs.surfaces.#{surface_id} must be a mapping"
+        end
+        repo_names = repos.is_a?(Hash) ? repos.keys.map(&:to_s).sort : []
+        repo_slot = docs_repo_slot(surface.fetch("repoSlot", nil), repo_names, "docs.surfaces.#{surface_id}.repoSlot")
+        repo_slot ||= docs_repo_slot(docs.fetch("repoSlot", nil), repo_names, "docs.repoSlot")
+        repo_slot ||= repo_names.first if repo_names.length == 1
+        if repo_slot.nil? && repo_names.length > 1
+          raise A3::Domain::ConfigurationError, "project.yaml docs.surfaces.#{surface_id}.repoSlot must be provided when multiple repos are declared"
+        end
+        docs_repo_root(project_package_root, repos, repo_slot)
       end
 
       def validate_docs_languages(languages)

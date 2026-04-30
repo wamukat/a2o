@@ -96,7 +96,7 @@ module A3
         repo_root = docs_repo_root(workspace: workspace, docs_config: docs_config)
         return nil unless repo_root
 
-        docs_index = A3::Domain::ProjectDocsIndex.load(repo_root: repo_root, docs_config: docs_config)
+        docs_index = A3::Domain::ProjectDocsIndex.load(repo_root: repo_root, docs_config: docs_config, repo_roots: docs_repo_roots(workspace))
         context = A3::Domain::ProjectDocsImpactAnalyzer.new(docs_index: docs_index)
           .analyze(task: task, task_packet: task_packet, changed_files: changed_files_from_workspace(workspace))
           .request_form
@@ -129,16 +129,33 @@ module A3
         workspace.root_path.to_s
       end
 
+      def docs_repo_roots(workspace)
+        workspace.slot_paths.each_with_object({}) do |(slot, path), roots|
+          roots[slot.to_s] = path.to_s
+        end
+      end
+
       def docs_config_summary(docs_config)
         categories = stringify_keys(docs_config["categories"] || docs_config[:categories] || {})
         authorities = stringify_keys(docs_config["authorities"] || docs_config[:authorities] || {})
+        raw_surfaces = stringify_keys(docs_config["surfaces"] || docs_config[:surfaces] || {})
+        surfaces = raw_surfaces.each_with_object({}) do |(id, raw_surface), memo|
+          surface = stringify_keys(raw_surface)
+          memo[id] = {
+            "repo_slot" => surface["repoSlot"],
+            "role" => surface["role"],
+            "root" => surface["root"],
+            "categories" => stringify_keys(surface["categories"] || {}).keys.sort
+          }.compact
+        end
         {
           "root" => docs_config["root"] || docs_config[:root],
           "repo_slot" => docs_config["repoSlot"] || docs_config[:repoSlot],
           "index" => docs_config["index"] || docs_config[:index],
           "policy" => docs_config["policy"] || docs_config[:policy],
           "categories" => categories.keys.sort,
-          "authorities" => authorities.keys.sort
+          "authorities" => authorities.keys.sort,
+          "surfaces" => surfaces.empty? ? nil : surfaces
         }.compact
       end
 
@@ -698,7 +715,7 @@ module A3
           errors << "docs_impact.disposition must be present"
         end
         validate_optional_string_array(value, "categories", "docs_impact.categories").each { |error| errors << error }
-        validate_optional_string_array(value, "updated_docs", "docs_impact.updated_docs").each { |error| errors << error }
+        validate_docs_impact_doc_refs(value, "updated_docs", "docs_impact.updated_docs").each { |error| errors << error }
         validate_optional_string_array(value, "updated_authorities", "docs_impact.updated_authorities").each { |error| errors << error }
         validate_optional_string_array(value, "matched_rules", "docs_impact.matched_rules").each { |error| errors << error }
         validate_optional_string(value, "review_disposition", "docs_impact.review_disposition").each { |error| errors << error }
@@ -761,6 +778,26 @@ module A3
         return [] if entries.is_a?(Array) && entries.all? { |entry| entry.is_a?(String) }
 
         ["#{field} must be an array of strings when present"]
+      end
+
+      def validate_docs_impact_doc_refs(value, key, field)
+        return [] unless value.key?(key)
+
+        entries = value[key]
+        return ["#{field} must be an array of strings or objects when present"] unless entries.is_a?(Array)
+
+        entries.each_with_index.flat_map do |entry, index|
+          next [] if entry.is_a?(String)
+          prefix = "#{field}[#{index}]"
+          next ["#{prefix} must be a string or object"] unless entry.is_a?(Hash)
+
+          errors = []
+          errors << "#{prefix}.path must be a string" unless entry["path"].is_a?(String)
+          %w[surface_id repo_slot role expected_action].each do |entry_key|
+            errors << "#{prefix}.#{entry_key} must be a string when present" if entry.key?(entry_key) && !entry[entry_key].is_a?(String)
+          end
+          errors
+        end
       end
 
       def validate_optional_string(value, key, field)

@@ -16,13 +16,14 @@ module A3
       }.freeze
       SHARED_SPEC_CATEGORIES = %w[shared_specs acl external_api].freeze
 
-      CandidateDoc = Struct.new(:path, :title, :category, :reason, :excerpt, keyword_init: true)
-      Decision = Struct.new(:decision, :categories, :matched_rules, :candidate_docs, :authorities, :authority_sources, :mirror_debt, :diagnostics, keyword_init: true) do
+      CandidateDoc = Struct.new(:path, :title, :category, :reason, :excerpt, :surface_id, :repo_slot, :role, :expected_action, keyword_init: true)
+      Decision = Struct.new(:decision, :categories, :matched_rules, :candidate_docs, :authorities, :authority_sources, :mirror_debt, :diagnostics, :surfaces, keyword_init: true) do
         def request_form
           {
             "decision" => decision,
             "categories" => categories,
             "matched_rules" => matched_rules,
+            "surfaces" => surfaces.map { |surface| stringify_hash(surface.to_h) },
             "candidate_docs" => candidate_docs.map { |candidate| stringify_hash(candidate.to_h) },
             "authority_precedence" => A3::Domain::ProjectDocsIndex::AUTHORITY_PRECEDENCE,
             "authorities" => authorities,
@@ -44,6 +45,7 @@ module A3
       end
 
       def analyze(task:, task_packet:, changed_files: {})
+        @current_edit_scope = Array(task_packet.edit_scope.empty? ? task.edit_scope : task_packet.edit_scope)
         refs = trace_refs(task: task, task_packet: task_packet)
         matched = []
         candidates = []
@@ -69,7 +71,8 @@ module A3
           authorities: authorities.map { |name| { "name" => name, "declaration" => @docs_index.authority(name) }.compact },
           authority_sources: @docs_index.authority_sources,
           mirror_debt: @docs_index.mirror_debt,
-          diagnostics: @docs_index.diagnostics
+          diagnostics: @docs_index.diagnostics,
+          surfaces: @docs_index.surfaces
         )
       end
 
@@ -107,8 +110,10 @@ module A3
 
       def add_candidates(candidates, documents, reason)
         documents.each do |document|
-          key = [document.path, reason]
-          next if candidates.any? { |candidate| [candidate.fetch(:document).path, candidate.fetch(:reason)] == key }
+          next unless document_applicable?(document)
+
+          key = [document.surface_id, document.path, reason]
+          next if candidates.any? { |candidate| [candidate.fetch(:document).surface_id, candidate.fetch(:document).path, candidate.fetch(:reason)] == key }
 
           candidates << { document: document, reason: reason }
         end
@@ -127,8 +132,20 @@ module A3
           title: document.title,
           category: document.category,
           reason: reason,
-          excerpt: excerpt(document.body)
+          excerpt: excerpt(document.body),
+          surface_id: document.surface_id,
+          repo_slot: document.repo_slot,
+          role: document.role,
+          expected_action: document.role.to_s == "integration" ? "update_or_confirm_integration_docs" : "update_or_confirm_repo_docs"
         )
+      end
+
+      def document_applicable?(document)
+        return true if document.role.to_s == "integration"
+        return true if document.repo_slot.to_s.empty?
+
+        scope = Array(@current_edit_scope).map(&:to_s)
+        scope.empty? || scope.include?(document.repo_slot.to_s)
       end
 
       def excerpt(text)
