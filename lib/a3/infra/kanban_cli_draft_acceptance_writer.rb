@@ -18,7 +18,8 @@ module A3
 
       def call(parent_task_ref:, parent_external_task_id:, child_refs: [], all: false, ready_only: false, remove_draft_label: false, parent_auto: false)
         parent = parent_task(parent_task_ref: parent_task_ref, parent_external_task_id: parent_external_task_id)
-        related_refs = related_child_refs(parent.fetch("id"))
+        effective_parent = generated_parent_for_source(source_task_ref: parent_task_ref, source_parent: parent) || parent
+        related_refs = related_child_refs(effective_parent.fetch("id"))
         selected_refs, unrelated_explicit_refs = selected_child_refs(related_refs: related_refs, child_refs: child_refs, all: all, ready_only: ready_only)
         accepted = []
         skipped = unrelated_explicit_refs
@@ -35,16 +36,16 @@ module A3
           end
 
           changed = ensure_child_accepted(child: child, labels: labels, remove_draft_label: remove_draft_label)
-          ensure_child_comment(child.fetch("id"), parent_task_ref: parent_task_ref) if changed
+          ensure_child_comment(child.fetch("id"), parent_task_ref: effective_parent.fetch("ref")) if changed
           accepted << child_ref
         end
 
         parent_changed = false
         if parent_auto && accepted.any?
-          parent_labels = label_names(@client.load_task_labels(parent.fetch("id")))
-          parent_changed = ensure_label(parent.fetch("id"), PARENT_RUNNABLE_LABEL, existing_labels: parent_labels)
-          parent_changed = remove_label(parent.fetch("id"), DECOMPOSITION_LABEL, existing_labels: parent_labels) || parent_changed
-          ensure_parent_comment(parent.fetch("id"), accepted_refs: accepted) if parent_changed
+          parent_labels = label_names(@client.load_task_labels(effective_parent.fetch("id")))
+          parent_changed = ensure_label(effective_parent.fetch("id"), PARENT_RUNNABLE_LABEL, existing_labels: parent_labels)
+          parent_changed = remove_label(effective_parent.fetch("id"), DECOMPOSITION_LABEL, existing_labels: parent_labels) || parent_changed
+          ensure_parent_comment(effective_parent.fetch("id"), accepted_refs: accepted) if parent_changed
         end
 
         Result.new(
@@ -88,15 +89,33 @@ module A3
 
       def related_child_refs(parent_id)
         relations = @client.run_json_command("task-relation-list", "--project", @project, "--task-id", parent_id.to_s)
-        normalize_subtask_refs(relations).uniq.freeze
+        normalize_relation_refs(relations, relation_kind: "subtask").uniq.freeze
       end
 
-      def normalize_subtask_refs(relations)
+      def generated_parent_for_source(source_task_ref:, source_parent:)
+        refs = related_parent_refs(source_parent.fetch("id"))
+        candidates = refs.map { |ref| @client.fetch_task_by_ref(ref) }.select do |task|
+          task.fetch("description", "").include?("Decomposition source: #{source_task_ref}")
+        end
+        if candidates.size > 1
+          duplicates = candidates.map { |task| "#{task["ref"] || "unknown-ref"}(id=#{task["id"] || "unknown"})" }.join(", ")
+          raise A3::Domain::ConfigurationError, "duplicate generated decomposition parents for #{source_task_ref}: #{duplicates}"
+        end
+
+        candidates.first
+      end
+
+      def related_parent_refs(source_parent_id)
+        relations = @client.run_json_command("task-relation-list", "--project", @project, "--task-id", source_parent_id.to_s)
+        normalize_relation_refs(relations, relation_kind: "related").uniq.freeze
+      end
+
+      def normalize_relation_refs(relations, relation_kind:)
         case relations
         when Hash
-          Array(relations["subtask"]).filter_map { |item| item["ref"] || item["task_ref"] }
+          Array(relations[relation_kind]).filter_map { |item| item["ref"] || item["task_ref"] }
         when Array
-          relations.select { |item| item["relation_kind"] == "subtask" || item["kind"] == "subtask" }.filter_map { |item| item["ref"] || item["related_task_ref"] }
+          relations.select { |item| item["relation_kind"] == relation_kind || item["kind"] == relation_kind }.filter_map { |item| item["ref"] || item["related_task_ref"] }
         else
           []
         end

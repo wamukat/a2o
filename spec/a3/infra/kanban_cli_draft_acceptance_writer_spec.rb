@@ -9,6 +9,8 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
         "Portal#240" => { "id" => 240, "ref" => "Portal#240" },
         "Portal#241" => { "id" => 241, "ref" => "Portal#241", "title" => "Human title", "description" => "Human body" },
         "Portal#242" => { "id" => 242, "ref" => "Portal#242" },
+        "Portal#243" => { "id" => 243, "ref" => "Portal#243", "description" => "Decomposition source: Portal#240" },
+        "Portal#244" => { "id" => 244, "ref" => "Portal#244" },
         "Portal#999" => { "id" => 999, "ref" => "Portal#999" }
       }
       @tasks_by_id = @tasks.values.each_with_object({}) { |task, memo| memo[task.fetch("id")] = task }
@@ -16,7 +18,13 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
         240 => ["trigger:investigate"],
         241 => ["a2o:draft-child", "a2o:ready-child"],
         242 => ["a2o:draft-child"],
+        243 => [],
+        244 => ["a2o:draft-child"],
         999 => ["a2o:draft-child"]
+      }
+      @relations = {
+        240 => { "subtask" => [{ "ref" => "Portal#241" }, { "ref" => "Portal#242" }], "related" => [] },
+        243 => { "subtask" => [{ "ref" => "Portal#244" }], "related" => [] }
       }
       @commands = []
       @comments = []
@@ -37,7 +45,7 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
 
     def run_json_command(*args)
       @json_calls << args
-      return { "subtask" => [{ "ref" => "Portal#241" }, { "ref" => "Portal#242" }] } if args.first == "task-relation-list"
+      return @relations.fetch(Integer(args.fetch(args.index("--task-id") + 1)), {}) if args.first == "task-relation-list"
 
       {}
     end
@@ -129,6 +137,25 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
     expect(client.labels_for(240)).to include("trigger:auto-parent")
     expect(client.labels_for(240)).not_to include("trigger:investigate")
     expect(client.comments.size).to eq(2)
+  end
+
+  it "accepts generated-parent children when invoked with the requirement source ticket" do
+    client = FakeDraftAcceptanceClient.new
+    client.instance_variable_get(:@relations)[240]["related"] << { "ref" => "Portal#243" }
+    writer = described_class.new(project: "Portal", client: client)
+
+    result = writer.call(
+      parent_task_ref: "Portal#240",
+      parent_external_task_id: 240,
+      child_refs: ["Portal#244"],
+      parent_auto: true
+    )
+
+    expect(result.success?).to be(true)
+    expect(result.accepted_refs).to eq(["Portal#244"])
+    expect(client.labels_for(244)).to include("trigger:auto-implement")
+    expect(client.labels_for(243)).to include("trigger:auto-parent")
+    expect(client.labels_for(240)).not_to include("trigger:auto-parent")
   end
 
   it "does not alter child title or description" do

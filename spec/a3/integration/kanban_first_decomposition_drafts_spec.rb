@@ -10,7 +10,7 @@ RSpec.describe "Kanban-first decomposition draft flow" do
       }
       @tasks_by_id = { 240 => @tasks.fetch("Portal#240") }
       @labels = { 240 => ["trigger:investigate", "repo:portal"] }
-      @relations = Hash.new { |hash, key| hash[key] = { "subtask" => [], "blocked" => [] } }
+      @relations = Hash.new { |hash, key| hash[key] = { "subtask" => [], "blocked" => [], "related" => [] } }
       @created = []
       @commands = []
       @comments = []
@@ -20,7 +20,10 @@ RSpec.describe "Kanban-first decomposition draft flow" do
       case args.first
       when "task-find"
         query = args.fetch(args.index("--query") + 1)
-        @tasks.values.select { |task| task.fetch("description", "").include?("Child key: #{query}") }
+        @tasks.values.select do |task|
+          task.fetch("description", "").include?("Child key: #{query}") ||
+            task.fetch("description", "").include?("Decomposition source: #{query}")
+        end
       when "task-create"
         create_task(args)
       when "task-relation-list"
@@ -90,6 +93,8 @@ RSpec.describe "Kanban-first decomposition draft flow" do
         @relations[task_id]["subtask"] << { "id" => other_id, "ref" => @tasks_by_id.fetch(other_id).fetch("ref") }
       elsif kind == "blocked"
         @relations[task_id]["blocked"] << { "id" => other_id, "ref" => @tasks_by_id.fetch(other_id).fetch("ref") }
+      elsif kind == "related"
+        @relations[task_id]["related"] << { "id" => other_id, "ref" => @tasks_by_id.fetch(other_id).fetch("ref") }
       end
     end
   end
@@ -143,43 +148,45 @@ RSpec.describe "Kanban-first decomposition draft flow" do
       first = child_creation.call(task: source_task, gate: true, proposal_evidence_path: proposal_path, review_evidence_path: review_path)
 
       expect(first.success).to be(true)
-      expect(first.child_refs).to eq(["Portal#241"])
-      expect(client.created.size).to eq(1)
-      expect(client.labels_for(241)).to include("a2o:draft-child", "repo:portal")
-      expect(client.labels_for(241)).not_to include("trigger:auto-implement", "trigger:auto-parent")
+      expect(first.parent_ref).to eq("Portal#241")
+      expect(first.child_refs).to eq(["Portal#242"])
+      expect(client.created.size).to eq(2)
+      expect(client.labels_for(241)).to include("a2o:decomposed")
+      expect(client.labels_for(242)).to include("a2o:draft-child", "repo:portal")
+      expect(client.labels_for(242)).not_to include("trigger:auto-implement", "trigger:auto-parent")
       expect(client.labels_for(240)).not_to include("trigger:auto-parent")
 
       task_repository = A3::Infra::InMemoryTaskRepository.new
       task_repository.save(source_task)
-      task_repository.save(A3::Domain::Task.new(ref: "Portal#241", kind: :child, edit_scope: [:repo_beta], parent_ref: source_task.ref, labels: client.labels_for(241)))
+      task_repository.save(A3::Domain::Task.new(ref: "Portal#242", kind: :child, edit_scope: [:repo_beta], parent_ref: "Portal#241", labels: client.labels_for(242)))
       plan = A3::Application::PlanNextRunnableTask.new(task_repository: task_repository, sync_external_tasks: nil).call
-      draft_assessment = plan.assessments.find { |assessment| assessment.task_ref == "Portal#241" }
+      draft_assessment = plan.assessments.find { |assessment| assessment.task_ref == "Portal#242" }
       expect(draft_assessment.reason).to eq(:draft_child_not_accepted)
 
-      client.fetch_task_by_ref("Portal#241")["title"] = "Human edited title"
+      client.fetch_task_by_ref("Portal#242")["title"] = "Human edited title"
       second = child_creation.call(task: source_task, gate: true, proposal_evidence_path: proposal_path, review_evidence_path: review_path)
       expect(second.success).to be(true)
-      expect(client.created.size).to eq(1)
-      expect(client.fetch_task_by_ref("Portal#241").fetch("title")).to eq("Human edited title")
+      expect(client.created.size).to eq(2)
+      expect(client.fetch_task_by_ref("Portal#242").fetch("title")).to eq("Human edited title")
 
       accept_writer = A3::Infra::KanbanCliDraftAcceptanceWriter.new(project: "Portal", client: client)
-      accepted = accept_writer.call(parent_task_ref: source_task.ref, parent_external_task_id: 240, child_refs: ["Portal#241"], parent_auto: true)
+      accepted = accept_writer.call(parent_task_ref: source_task.ref, parent_external_task_id: 240, child_refs: ["Portal#242"], parent_auto: true)
 
       expect(accepted.success?).to be(true)
-      expect(accepted.accepted_refs).to eq(["Portal#241"])
-      expect(client.labels_for(241)).to include("trigger:auto-implement")
-      expect(client.labels_for(240)).to include("trigger:auto-parent")
-      expect(client.labels_for(240)).not_to include("trigger:investigate")
+      expect(accepted.accepted_refs).to eq(["Portal#242"])
+      expect(client.labels_for(242)).to include("trigger:auto-implement")
+      expect(client.labels_for(241)).to include("trigger:auto-parent")
+      expect(client.labels_for(240)).not_to include("trigger:auto-parent")
 
-      task_repository.save(A3::Domain::Task.new(ref: "Portal#241", kind: :child, edit_scope: [:repo_beta], parent_ref: source_task.ref, labels: client.labels_for(241)))
+      task_repository.save(A3::Domain::Task.new(ref: "Portal#242", kind: :child, edit_scope: [:repo_beta], parent_ref: "Portal#241", labels: client.labels_for(242)))
       accepted_plan = A3::Application::PlanNextRunnableTask.new(task_repository: task_repository, sync_external_tasks: nil).call
-      expect(accepted_plan.task&.ref).to eq("Portal#241")
-      parent_after_acceptance = A3::Domain::Task.new(ref: source_task.ref, kind: :parent, edit_scope: [:repo_beta], child_refs: ["Portal#241"], labels: client.labels_for(240))
+      expect(accepted_plan.task&.ref).to eq("Portal#242")
+      parent_after_acceptance = A3::Domain::Task.new(ref: "Portal#241", kind: :parent, edit_scope: [:repo_beta], child_refs: ["Portal#242"], labels: client.labels_for(241))
       parent_assessment = A3::Domain::RunnableTaskAssessment.evaluate(task: parent_after_acceptance, tasks: [parent_after_acceptance])
       expect(parent_assessment.reason).not_to eq(:decomposition_requested)
 
       comment_count = client.comments.size
-      rerun_accept = accept_writer.call(parent_task_ref: source_task.ref, parent_external_task_id: 240, child_refs: ["Portal#241"], parent_auto: true)
+      rerun_accept = accept_writer.call(parent_task_ref: source_task.ref, parent_external_task_id: 240, child_refs: ["Portal#242"], parent_auto: true)
       expect(rerun_accept.success?).to be(true)
       expect(client.comments.size).to eq(comment_count)
     end

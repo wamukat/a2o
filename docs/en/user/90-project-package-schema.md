@@ -328,7 +328,7 @@ Child ticket creation is behind an explicit gate and requires a Kanban command b
 a2o runtime decomposition create-children A2O#123 --gate
 ```
 
-The command refuses to create children without `--gate`, records `gate_closed` evidence without changing an eligible proposal to `blocked`, requires an eligible proposal review for the same proposal fingerprint, and reuses existing children by child key. In Kanban-first draft mode, created or reused children remain draft planning artifacts: A2O labels them with `a2o:draft-child` and does not apply `trigger:auto-implement` or `trigger:auto-parent`. A child enters implementation scheduling only after an operator accepts it by adding `trigger:auto-implement`.
+The command refuses to create children without `--gate`, records `gate_closed` evidence without changing an eligible proposal to `blocked`, requires an eligible proposal review for the same proposal fingerprint, creates or reuses a generated implementation parent linked to the requirement source ticket, and reuses existing children by child key under that generated parent. In Kanban-first draft mode, created or reused children remain draft planning artifacts: A2O labels them with `a2o:draft-child` and does not apply `trigger:auto-implement` or `trigger:auto-parent`. A child enters implementation scheduling only after an operator accepts it by adding `trigger:auto-implement`; parent automation applies to the generated parent, not the original requirement source ticket.
 
 Trial cleanup is dry-run by default:
 
