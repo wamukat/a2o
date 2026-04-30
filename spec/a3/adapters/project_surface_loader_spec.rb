@@ -45,7 +45,51 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     expect(surface.verification_commands).to eq(["commands/verify-all"])
     expect(surface.remediation_commands).to eq(["commands/apply-remediation"])
     expect(surface.metrics_collection_commands).to eq(["commands/collect-metrics"])
+    expect(surface.scheduler_config.max_parallel_tasks).to eq(1)
     expect(surface.workspace_hook).to be_nil
+  end
+
+  it "loads explicit single-task scheduler config" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "scheduler" => {
+          "max_parallel_tasks" => 1
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    surface = loader.load(project_config_path)
+
+    expect(surface.scheduler_config.max_parallel_tasks).to eq(1)
+  end
+
+  it "rejects max_parallel_tasks greater than one until parallel scheduler prerequisites exist" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "scheduler" => {
+          "max_parallel_tasks" => 2
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, /max_parallel_tasks > 1 is not supported yet/)
   end
 
   it "loads runtime notification hooks" do
