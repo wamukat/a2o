@@ -175,6 +175,8 @@ helper は次を満たす。
 - title、body、relation、order を変更しない
 - idempotent である
 
+helper が runtime-backed Kanban ticket を変更する場合、label batch の前に scheduler processing を pause して guard する。scheduler が active だった場合は、変更 batch が成功した後だけ resume する。もともと paused だった場合は paused のままにする。helper が pause した後に変更が失敗した場合は、runtime が中途半端に承認済みの child を観測しないよう、operator が状態を確認できるまで scheduler を paused のまま残す。
+
 手動で label を編集する導線が主たる承認 path のままである。
 
 ## 11. 検証要件

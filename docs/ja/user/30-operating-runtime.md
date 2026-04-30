@@ -179,9 +179,12 @@ draft child は計画用の artifact である。ボード上では generated pa
 
 ```sh
 a2o runtime decomposition status <task-ref>
+a2o runtime decomposition accept-drafts <parent-ref> --child <child-ref> --remove-draft-label --parent-auto
 a2o runtime decomposition cleanup <task-ref> --dry-run
 a2o runtime decomposition cleanup <task-ref> --apply
 ```
+
+`accept-drafts` は、1つ以上の draft child を一括で承認するための convenience command である。child と generated parent の label を変更している間は scheduler processing を pause し、変更 batch が成功した後だけ resume する。scheduler がもともと paused だった場合は paused のままにする。A2O が pause した後に batch が失敗した場合も、確認のため paused のまま残す。
 
 `runtime.decomposition.investigate.command`、`runtime.decomposition.author.command`、decomposition prompt / template layer などの project package 設定は [90-project-package-schema.md](90-project-package-schema.md#runtime-decomposition) を読む。
 

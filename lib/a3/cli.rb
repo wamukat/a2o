@@ -484,6 +484,7 @@ module A3
         project: options.fetch(:kanban_project),
         working_dir: options[:kanban_working_dir]
       )
+      scheduler_guard = enter_accept_drafts_scheduler_guard(repositories.fetch(:scheduler_state_repository))
       result = writer.call(
         parent_task_ref: task.ref,
         parent_external_task_id: task.external_task_id,
@@ -493,8 +494,14 @@ module A3
         remove_draft_label: options.fetch(:remove_draft_label),
         parent_auto: options.fetch(:parent_auto)
       )
+      scheduler_guard = resume_accept_drafts_scheduler_guard(
+        repositories.fetch(:scheduler_state_repository),
+        scheduler_guard
+      ) if result.success?
 
       out.puts("decomposition draft acceptance #{task.ref} success=#{result.success?}")
+      out.puts("scheduler_guard=#{scheduler_guard.fetch(:status)}")
+      out.puts("scheduler_guard_resumed=#{scheduler_guard.fetch(:resumed)}")
       out.puts("summary=#{result.summary}")
       out.puts("accepted_refs=#{result.accepted_refs.join(',')}")
       out.puts("skipped_refs=#{result.skipped_refs.join(',')}")
@@ -3235,6 +3242,21 @@ module A3
 
     def kanban_bridge_enabled?(options)
       options[:kanban_command] && options[:kanban_project] && !options.fetch(:kanban_repo_label_map, {}).empty?
+    end
+
+    def enter_accept_drafts_scheduler_guard(scheduler_state_repository)
+      state = scheduler_state_repository.fetch
+      return { status: "already_paused", paused_by_guard: false, resumed: false } if state.paused
+
+      A3::Application::PauseScheduler.new(scheduler_state_repository: scheduler_state_repository).call
+      { status: "paused_for_accept_drafts", paused_by_guard: true, resumed: false }
+    end
+
+    def resume_accept_drafts_scheduler_guard(scheduler_state_repository, scheduler_guard)
+      return scheduler_guard unless scheduler_guard.fetch(:paused_by_guard)
+
+      A3::Application::ResumeScheduler.new(scheduler_state_repository: scheduler_state_repository).call
+      scheduler_guard.merge(resumed: true)
     end
 
     def kanban_child_writer_configured?(options)

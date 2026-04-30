@@ -175,6 +175,8 @@ The helper should:
 - leave title, body, relations, and ordering untouched
 - be idempotent
 
+When the helper mutates runtime-backed Kanban tickets, it must guard the label batch by pausing scheduler processing first. If the scheduler was active, the helper resumes it only after a successful mutation batch. If the scheduler was already paused, the helper leaves it paused. If a mutation fails after the helper paused the scheduler, it leaves the scheduler paused so the operator can inspect the partial state instead of letting the runtime observe half-accepted children.
+
 Direct manual label editing remains the primary acceptance path.
 
 ## 11. Validation Requirements

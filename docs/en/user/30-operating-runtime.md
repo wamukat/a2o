@@ -181,9 +181,12 @@ Useful commands:
 
 ```sh
 a2o runtime decomposition status <task-ref>
+a2o runtime decomposition accept-drafts <parent-ref> --child <child-ref> --remove-draft-label --parent-auto
 a2o runtime decomposition cleanup <task-ref> --dry-run
 a2o runtime decomposition cleanup <task-ref> --apply
 ```
+
+`accept-drafts` is a convenience for accepting one or more draft children in a single operation. It pauses scheduler processing while it changes child and generated-parent labels, then resumes the scheduler only after the batch succeeds. If the scheduler was already paused, it stays paused. If the batch fails after A2O paused the scheduler, A2O leaves it paused for inspection.
 
 For package configuration, including `runtime.decomposition.investigate.command`, `runtime.decomposition.author.command`, and decomposition prompt/template layers, read [90-project-package-schema.md](90-project-package-schema.md#runtime-decomposition).
 
