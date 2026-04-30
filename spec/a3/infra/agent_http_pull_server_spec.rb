@@ -23,6 +23,10 @@ RSpec.describe A3::Infra::AgentHttpPullServer do
     server_thread
     base_uri = URI("http://127.0.0.1:#{server.bound_port}")
 
+    health_response = Net::HTTP.get_response(base_uri + "/v1/agent/health")
+    expect(health_response.code).to eq("200")
+    expect(JSON.parse(health_response.body)).to eq("status" => "ok")
+
     enqueue_response = post_json(
       base_uri + "/v1/agent/jobs",
       agent_job_request("job-1").request_form

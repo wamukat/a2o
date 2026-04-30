@@ -3661,7 +3661,7 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	if !strings.Contains(joinedText, "'a3' 'agent-server' '--storage-dir' '/var/lib/a3/test-runtime' '--host' '0.0.0.0' '--port' '7393'") {
 		t.Fatalf("agent-server should listen on container-internal port 7393, calls:\n%s", joinedText)
 	}
-	if !strings.Contains(joinedText, "curl -fsS http://127.0.0.1:7394/v1/agent/jobs/next?agent=probe") {
+	if !strings.Contains(joinedText, "curl -fsS http://127.0.0.1:7394/v1/agent/health") {
 		t.Fatalf("host readiness probe should use configured host agent port, calls:\n%s", joinedText)
 	}
 	if !strings.Contains(joinedText, "'--agent-control-plane-url' 'http://127.0.0.1:7393'") {
@@ -8591,15 +8591,19 @@ func TestRunHostAgentLoopPassesProjectBindingToHostAgent(t *testing.T) {
 	}
 }
 
-func TestWaitForRuntimeControlPlanePassesProjectKey(t *testing.T) {
+func TestWaitForRuntimeControlPlaneUsesNonDestructiveHealthProbe(t *testing.T) {
 	runner := &fakeRunner{}
 	plan := runtimeRunOncePlan{AgentPort: "7394", ProjectKey: "portal"}
 
 	if err := waitForRuntimeControlPlane(plan, runner); err != nil {
 		t.Fatalf("waitForRuntimeControlPlane failed: %v", err)
 	}
-	if !strings.Contains(strings.Join(runner.joinedCalls(), "\n"), "curl -fsS http://127.0.0.1:7394/v1/agent/jobs/next?agent=probe&project_key=portal") {
-		t.Fatalf("readiness probe should include project_key, calls:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(joined, "curl -fsS http://127.0.0.1:7394/v1/agent/health") {
+		t.Fatalf("readiness probe should use health endpoint, calls:\n%s", joined)
+	}
+	if strings.Contains(joined, "/v1/agent/jobs/next") {
+		t.Fatalf("readiness probe must not claim queued jobs, calls:\n%s", joined)
 	}
 }
 

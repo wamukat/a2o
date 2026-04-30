@@ -19,6 +19,8 @@ module A3
 
       def handle(method:, path:, query: {}, body: nil, headers: {})
         case [method.to_s.upcase, path]
+        when ["GET", "/v1/agent/health"]
+          health
         when ["POST", "/v1/agent/jobs"]
           return unauthorized_response unless authorized?(headers, :control)
 
@@ -86,6 +88,10 @@ module A3
 
       def unauthorized_response
         json_response(401, "error" => "unauthorized")
+      end
+
+      def health
+        json_response(200, "status" => "ok")
       end
 
       def enqueue(body)

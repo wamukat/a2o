@@ -13,6 +13,19 @@ RSpec.describe A3::Infra::AgentHttpPullHandler do
     FileUtils.rm_rf(tmpdir)
   end
 
+  it "exposes a non-mutating health endpoint" do
+    store.enqueue(agent_job_request("job-1"))
+
+    response = handler.handle(
+      method: "GET",
+      path: "/v1/agent/health"
+    )
+
+    expect(response.status).to eq(200)
+    expect(JSON.parse(response.body)).to eq("status" => "ok")
+    expect(store.fetch("job-1")).to have_attributes(state: :queued)
+  end
+
   it "exposes enqueue, pull, and result endpoints for an agent" do
     enqueue_response = handler.handle(
       method: "POST",

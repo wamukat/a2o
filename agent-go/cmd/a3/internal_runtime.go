@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -3462,11 +3461,7 @@ func runtimeControlPlaneReady(plan runtimeRunOncePlan, runner commandRunner) boo
 }
 
 func runtimeControlPlaneProbeURL(plan runtimeRunOncePlan) string {
-	probeURL := fmt.Sprintf("http://127.0.0.1:%s/v1/agent/jobs/next?agent=probe", plan.AgentPort)
-	if strings.TrimSpace(plan.ProjectKey) != "" {
-		probeURL = probeURL + "&project_key=" + url.QueryEscape(strings.TrimSpace(plan.ProjectKey))
-	}
-	return probeURL
+	return fmt.Sprintf("http://127.0.0.1:%s/v1/agent/health", plan.AgentPort)
 }
 
 func startRuntimeExecuteUntilIdle(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) error {
