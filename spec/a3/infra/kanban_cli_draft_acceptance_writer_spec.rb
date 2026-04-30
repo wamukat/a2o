@@ -9,7 +9,7 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
         "Portal#240" => { "id" => 240, "ref" => "Portal#240" },
         "Portal#241" => { "id" => 241, "ref" => "Portal#241", "title" => "Human title", "description" => "Human body" },
         "Portal#242" => { "id" => 242, "ref" => "Portal#242" },
-        "Portal#243" => { "id" => 243, "ref" => "Portal#243", "description" => "Decomposition source: Portal#240" },
+        "Portal#243" => { "id" => 243, "ref" => "Portal#243", "description" => "" },
         "Portal#244" => { "id" => 244, "ref" => "Portal#244" },
         "Portal#999" => { "id" => 999, "ref" => "Portal#999" }
       }
@@ -45,6 +45,10 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
 
     def run_json_command(*args)
       @json_calls << args
+      if args.first == "task-find"
+        query = args.fetch(args.index("--query") + 1)
+        return @tasks.values.select { |task| task.fetch("description", "").include?("Decomposition source: #{query}") }
+      end
       return @relations.fetch(Integer(args.fetch(args.index("--task-id") + 1)), {}) if args.first == "task-relation-list"
 
       {}
@@ -141,7 +145,7 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
 
   it "accepts generated-parent children when invoked with the requirement source ticket" do
     client = FakeDraftAcceptanceClient.new
-    client.instance_variable_get(:@relations)[240]["related"] << { "ref" => "Portal#243" }
+    client.fetch_task_by_ref("Portal#243")["description"] = "Decomposition source: Portal#240"
     writer = described_class.new(project: "Portal", client: client)
 
     result = writer.call(

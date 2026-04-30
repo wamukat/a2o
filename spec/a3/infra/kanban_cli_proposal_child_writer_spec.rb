@@ -100,9 +100,9 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(true)
     expect(client.labels.any? { |args| args.include?("repo:alpha") }).to be(true)
     expect(client.relations).to include(
-      array_including("task-relation-create", "--task-id", "5300", "--other-task-id", "5301", "--relation-kind", "related"),
       array_including("task-relation-create", "--task-id", "5301", "--other-task-id", "5302", "--relation-kind", "subtask")
     )
+    expect(client.comments.any? { |args| args.include?("5300") }).to be(true)
   end
 
   it "reuses an existing child by child key even when proposal fingerprint changes" do
@@ -155,9 +155,9 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(false)
     expect(client.labels.any? { |args| args.include?("trigger:auto-parent") }).to be(false)
     expect(client.relations).to include(
-      array_including("task-relation-create", "--task-id", "240", "--other-task-id", "5301", "--relation-kind", "related"),
       array_including("task-relation-create", "--task-id", "5301", "--other-task-id", "5302", "--relation-kind", "subtask")
     )
+    expect(client.comments.any? { |args| args.include?("240") }).to be(true)
   end
 
   it "filters proposed automation trigger labels from draft children" do

@@ -83,7 +83,6 @@ module A3
         payload = generated_parent_payload(source_task_ref: source_task_ref, proposal_fingerprint: proposal_fingerprint)
         task = find_existing_generated_parent(source_task_ref) || create_child(payload)
         ensure_label(task.fetch("id"), DECOMPOSED_LABEL)
-        ensure_relation(source_external_task_id, task.fetch("id"), relation_kind: "related") if source_external_task_id
         ensure_comment(task.fetch("id"), payload.fetch("comment"))
         ensure_source_parent_comment(source_external_task_id, generated_parent_ref: task.fetch("ref"), proposal_fingerprint: proposal_fingerprint) if source_external_task_id
         task

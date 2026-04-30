@@ -18,7 +18,7 @@ module A3
 
       def call(parent_task_ref:, parent_external_task_id:, child_refs: [], all: false, ready_only: false, remove_draft_label: false, parent_auto: false)
         parent = parent_task(parent_task_ref: parent_task_ref, parent_external_task_id: parent_external_task_id)
-        effective_parent = generated_parent_for_source(source_task_ref: parent_task_ref, source_parent: parent) || parent
+        effective_parent = generated_parent_for_source(source_task_ref: parent_task_ref) || parent
         related_refs = related_child_refs(effective_parent.fetch("id"))
         selected_refs, unrelated_explicit_refs = selected_child_refs(related_refs: related_refs, child_refs: child_refs, all: all, ready_only: ready_only)
         accepted = []
@@ -92,11 +92,8 @@ module A3
         normalize_relation_refs(relations, relation_kind: "subtask").uniq.freeze
       end
 
-      def generated_parent_for_source(source_task_ref:, source_parent:)
-        refs = related_parent_refs(source_parent.fetch("id"))
-        candidates = refs.map { |ref| @client.fetch_task_by_ref(ref) }.select do |task|
-          task.fetch("description", "").include?("Decomposition source: #{source_task_ref}")
-        end
+      def generated_parent_for_source(source_task_ref:)
+        candidates = find_generated_parents(source_task_ref)
         if candidates.size > 1
           duplicates = candidates.map { |task| "#{task["ref"] || "unknown-ref"}(id=#{task["id"] || "unknown"})" }.join(", ")
           raise A3::Domain::ConfigurationError, "duplicate generated decomposition parents for #{source_task_ref}: #{duplicates}"
@@ -105,9 +102,9 @@ module A3
         candidates.first
       end
 
-      def related_parent_refs(source_parent_id)
-        relations = @client.run_json_command("task-relation-list", "--project", @project, "--task-id", source_parent_id.to_s)
-        normalize_relation_refs(relations, relation_kind: "related").uniq.freeze
+      def find_generated_parents(source_task_ref)
+        matches = @client.run_json_command("task-find", "--project", @project, "--query", source_task_ref)
+        Array(matches).select { |task| task.fetch("description", "").include?("Decomposition source: #{source_task_ref}") }
       end
 
       def normalize_relation_refs(relations, relation_kind:)

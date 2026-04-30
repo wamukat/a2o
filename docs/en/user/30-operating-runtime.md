@@ -168,7 +168,7 @@ The automatic decomposition flow is:
 2. A2O moves the source ticket to `In progress`; the project-owned investigation command runs and records investigation evidence.
 3. The proposal author creates a normalized child-ticket proposal.
 4. A2O moves the source ticket to `In review`; proposal review decides whether the proposal is eligible for draft child creation.
-5. Eligible proposals create a separate generated implementation parent ticket, link it back to the requirement source ticket, and create draft child tickets labeled `a2o:draft-child` under that generated parent.
+5. Eligible proposals create a separate generated implementation parent ticket, record the requirement source in the generated parent description and source-ticket comments, and create draft child tickets labeled `a2o:draft-child` under that generated parent.
 6. A2O marks the source ticket decomposed and moves it to `Done`.
 
 Each completed stage leaves a short comment on the source ticket so operators can follow progress from Kanban. `a2o runtime watch-summary` also shows `trigger:investigate` source tickets in its `Decomposition` section; before any evidence is written they appear as `state=queued`, and after evidence exists the section shows the current decomposition state, disposition, and proposal fingerprint when available. Detailed evidence is stored under the runtime storage directory in `decomposition-evidence/<task>/`; `a2o runtime decomposition status <task-ref>` shows the current decomposition evidence summary, and `a2o runtime describe-task <task-ref>` gives the broader task state.
