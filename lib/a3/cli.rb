@@ -458,7 +458,7 @@ module A3
         out.puts("status=#{result.status}") if result.status
       end
       out.puts("summary=#{result.summary}")
-      publish_decomposition_source_status_from_options(options: options, task: task, status: :done) if result.success == true
+      publish_decomposition_source_status_from_options(options: options, task: task, status: decomposition_source_terminal_status(result)) if result.success == true
       out.puts("generated_parent_ref=#{result.respond_to?(:parent_ref) && result.parent_ref}") if result.respond_to?(:parent_ref) && result.parent_ref
       out.puts("child_refs=#{result.child_refs.join(',')}")
       out.puts("child_keys=#{result.child_keys.join(',')}")
@@ -549,7 +549,7 @@ module A3
         proposal_evidence_path: session.options[:proposal_evidence_path],
         review_evidence_path: review_result.evidence_path
       )
-      publish_decomposition_source_status(session: session, task: task, status: :done) if result.success == true
+      publish_decomposition_source_status(session: session, task: task, status: decomposition_source_terminal_status(result)) if result.success == true
       AutomaticDraftChildCreationResult.executed(result)
     end
 
@@ -598,6 +598,10 @@ module A3
         status: status,
         task_kind: task.kind
       )
+    end
+
+    def decomposition_source_terminal_status(result)
+      result.respond_to?(:status) && result.status == "needs_clarification" ? :needs_clarification : :done
     end
 
     def handle_cleanup_decomposition_trial(argv, out:, run_id_generator:, command_runner:, merge_runner:)

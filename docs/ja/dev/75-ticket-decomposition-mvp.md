@@ -140,6 +140,21 @@ proposal には次を含める。
 - 各 child draft の安定した boundary と rationale
 - 未解決の質問と、人間判断が必要な項目
 
+proposal の `outcome` は省略時 `draft_children` とする。この outcome では、任意で generated parent の内容も指定できる。
+
+```json
+{
+  "outcome": "draft_children",
+  "parent": {
+    "title": "Implementation plan title",
+    "body": "人間が読む実装計画、設計メモ、child 一覧、全体 acceptance criteria。"
+  },
+  "children": []
+}
+```
+
+調査の結果、要求が既存実装で満たされている場合、author は `outcome: "no_action"`、`children: []`、非空の `reason` を返せる。要求を安全に分解できない場合、author は `outcome: "needs_clarification"`、`children: []`、非空の `reason`、1 件以上の `questions` を返せる。これらの outcome も proposal review を通るが、child creation では generated parent / child を作成しない。
+
 proposal fingerprint は idempotency のために必須とする。source ticket ref、source revision fields、investigation result digest、順序付き child draft content から生成する。
 
 各 child draft には、source ticket ref と child boundary から導出する安定した child idempotency key も必要である。title のような揺れやすい文字列だけから作ってはならない。作成処理は proposal fingerprint で proposal version を識別し、child key で個別チケットを照合する。

@@ -5,14 +5,47 @@ require "json"
 
 request = JSON.parse(File.read(ENV.fetch("A2O_DECOMPOSITION_REVIEW_REQUEST_PATH")))
 proposal = request.dig("proposal_evidence", "proposal") || {}
+outcome = proposal.fetch("outcome", "draft_children").to_s
 children = proposal.fetch("children", [])
 
 findings = []
+unless %w[draft_children no_action needs_clarification].include?(outcome)
+  findings << {
+    "severity" => "critical",
+    "summary" => "proposal outcome is not supported",
+    "details" => "Use draft_children, no_action, or needs_clarification."
+  }
+end
+
 findings << {
   "severity" => "critical",
   "summary" => "proposal must create at least one child ticket",
   "details" => "No child drafts were found in the proposal evidence."
-} if children.empty?
+} if outcome == "draft_children" && children.empty?
+
+if %w[no_action needs_clarification].include?(outcome) && children.any?
+  findings << {
+    "severity" => "critical",
+    "summary" => "proposal outcome must not include child drafts",
+    "details" => "#{outcome} proposals should leave children empty and explain the result on the source ticket."
+  }
+end
+
+if %w[no_action needs_clarification].include?(outcome) && proposal.fetch("reason", "").to_s.strip.empty?
+  findings << {
+    "severity" => "critical",
+    "summary" => "proposal outcome requires a reason",
+    "details" => "#{outcome} proposals need a concise reason for the source-ticket audit comment."
+  }
+end
+
+if outcome == "needs_clarification" && Array(proposal["questions"]).empty?
+  findings << {
+    "severity" => "critical",
+    "summary" => "clarification proposal requires questions",
+    "details" => "Ask at least one concrete question for the requirement owner."
+  }
+end
 
 children.each_with_index do |child, index|
   labels = Array(child["labels"])

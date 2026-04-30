@@ -133,6 +133,22 @@ children = [
 ]
 
 result = {
+  "outcome" => "draft_children",
+  "parent" => {
+    "title" => "Implementation plan for #{title}",
+    "body" => [
+      "## Feature overview",
+      description.empty? ? "Implement the requested sample application change." : description,
+      "",
+      "## Module split",
+      role_summary(module_roles, "app"),
+      role_summary(module_roles, "lib"),
+      "",
+      "## Overall acceptance criteria",
+      "- Generated child tickets complete the contract, utility-lib, web-app, and verification work.",
+      "- The sample passes `mvn test` from the project root."
+    ].reject(&:empty?).join("\n")
+  },
   "children" => children,
   "unresolved_questions" => []
 }

@@ -418,6 +418,91 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
     end
   end
 
+  it "accepts a no_action proposal outcome without child drafts" do
+    Dir.mktmpdir do |dir|
+      process_runner = lambda do |_command, env:, **|
+        File.write(
+          env.fetch("A2O_DECOMPOSITION_AUTHOR_RESULT_PATH"),
+          JSON.generate(
+            "outcome" => "no_action",
+            "children" => [],
+            "reason" => "The requested behavior is already implemented.",
+            "evidence" => ["utility-lib already covers Japanese and English greetings."],
+            "unresolved_questions" => []
+          )
+        )
+        ["", "", FakeAuthorStatus.new(true, 0)]
+      end
+
+      result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
+        task: task,
+        project_surface: project_surface,
+        investigation_evidence: { "summary" => "already done" }
+      )
+
+      expect(result.success).to be(true)
+      expect(result.summary).to include("outcome=no_action")
+      expect(result.proposal).to include(
+        "outcome" => "no_action",
+        "children" => [],
+        "reason" => "The requested behavior is already implemented."
+      )
+      expect(result.source_ticket_summary).to include("Outcome: no_action")
+      expect(result.source_ticket_summary).to include("Reason: The requested behavior is already implemented.")
+    end
+  end
+
+  it "accepts a needs_clarification proposal outcome with questions" do
+    Dir.mktmpdir do |dir|
+      process_runner = lambda do |_command, env:, **|
+        File.write(
+          env.fetch("A2O_DECOMPOSITION_AUTHOR_RESULT_PATH"),
+          JSON.generate(
+            "outcome" => "needs_clarification",
+            "children" => [],
+            "reason" => "The target user role is unclear.",
+            "questions" => ["Which user role should receive the feature?"],
+            "unresolved_questions" => []
+          )
+        )
+        ["", "", FakeAuthorStatus.new(true, 0)]
+      end
+
+      result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
+        task: task,
+        project_surface: project_surface,
+        investigation_evidence: { "summary" => "unclear" }
+      )
+
+      expect(result.success).to be(true)
+      expect(result.summary).to include("outcome=needs_clarification")
+      expect(result.source_ticket_summary).to include("Outcome: needs_clarification")
+      expect(result.source_ticket_summary).to include("Questions: 1")
+    end
+  end
+
+  it "keeps optional parent title and body on draft child proposals" do
+    Dir.mktmpdir do |dir|
+      process_runner = lambda do |_command, env:, **|
+        File.write(
+          env.fetch("A2O_DECOMPOSITION_AUTHOR_RESULT_PATH"),
+          JSON.generate(valid_author_result.merge("parent" => { "title" => "Greeting rollout plan", "body" => "Plan body" }))
+        )
+        ["", "", FakeAuthorStatus.new(true, 0)]
+      end
+
+      result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
+        task: task,
+        project_surface: project_surface,
+        investigation_evidence: { "summary" => "split" }
+      )
+
+      expect(result.success).to be(true)
+      expect(result.proposal.fetch("outcome")).to eq("draft_children")
+      expect(result.proposal.fetch("parent")).to eq("title" => "Greeting rollout plan", "body" => "Plan body")
+    end
+  end
+
   it "blocks instead of coercing non-array schema fields" do
     Dir.mktmpdir do |dir|
       invalid_payload = valid_author_result.merge(

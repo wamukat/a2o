@@ -303,7 +303,11 @@ author command には次を渡す。
 - `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH`
 - `A2O_WORKSPACE_ROOT`
 
-author command は `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH` に proposal JSON object を 1 つ書く。A2O は draft を正規化し、`proposal_fingerprint` と child ごとの `child_key` を導出し、Kanban child ticket は作成せずに proposal evidence を保存する。proposal には 1 件以上の child draft が必要である。各 child draft は `title`、`body`、`acceptance_criteria`、`labels`、`depends_on`、`boundary`、`rationale` を持つ。`boundary` は child idempotency key の導出元になるため rerun 間で安定している必要がある。`unresolved_questions` は配列でなければならない。
+author command は `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH` に proposal JSON object を 1 つ書く。A2O は draft を正規化し、`proposal_fingerprint` と child ごとの `child_key` を導出し、Kanban child ticket は作成せずに proposal evidence を保存する。`outcome` は任意で、省略時は互換性のため `draft_children` として扱う。
+
+`draft_children` proposal には 1 件以上の child draft が必要である。任意で `parent.title` と `parent.body` を指定でき、A2O が generated implementation parent を初回作成するときだけ使われる。A2O 管理の source ticket / proposal fingerprint metadata は必ず保持し、rerun で既存 generated parent の title/body を上書きしない。各 child draft は `title`、`body`、`acceptance_criteria`、`labels`、`depends_on`、`boundary`、`rationale` を持つ。`boundary` は child idempotency key の導出元になるため rerun 間で安定している必要がある。`unresolved_questions` は配列でなければならない。
+
+`no_action` proposal は、要求が既存実装で満たされていて実装 ticket を作らない場合に、`children: []` と非空の `reason` を指定する。`needs_clarification` proposal は、`children: []`、非空の `reason`、1 件以上の `questions` を指定する。A2O は質問サマリを投稿し、既存の clarification status / label 経路で source ticket を扱う。
 
 investigation evidence が存在する状態で proposal step を実行するには次を使う。
 

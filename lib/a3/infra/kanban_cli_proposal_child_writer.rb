@@ -37,7 +37,8 @@ module A3
         generated_parent = ensure_generated_parent(
           source_task_ref: parent_task_ref,
           source_external_task_id: parent_external_task_id,
-          proposal_fingerprint: proposal_fingerprint
+          proposal_fingerprint: proposal_fingerprint,
+          proposal: proposal
         )
         children.each do |child|
           begin
@@ -80,8 +81,8 @@ module A3
 
       private
 
-      def ensure_generated_parent(source_task_ref:, source_external_task_id:, proposal_fingerprint:)
-        payload = generated_parent_payload(source_task_ref: source_task_ref, proposal_fingerprint: proposal_fingerprint)
+      def ensure_generated_parent(source_task_ref:, source_external_task_id:, proposal_fingerprint:, proposal:)
+        payload = generated_parent_payload(source_task_ref: source_task_ref, proposal_fingerprint: proposal_fingerprint, proposal: proposal)
         task = find_existing_generated_parent(source_task_ref) || create_child(payload)
         ensure_label(task.fetch("id"), DECOMPOSED_LABEL)
         ensure_relation(source_external_task_id, task.fetch("id"), relation_kind: "related") if source_external_task_id
@@ -90,14 +91,17 @@ module A3
         task
       end
 
-      def generated_parent_payload(source_task_ref:, proposal_fingerprint:)
+      def generated_parent_payload(source_task_ref:, proposal_fingerprint:, proposal:)
+        parent = proposal["parent"].is_a?(Hash) ? proposal["parent"] : {}
+        parent_title = parent["title"].to_s.strip
+        parent_body = parent["body"].to_s.strip
         {
-          "title" => "Implementation plan for #{source_task_ref}",
+          "title" => parent_title.empty? ? "Implementation plan for #{source_task_ref}" : parent_title,
           "description" => <<~DESC.strip,
             Decomposition source: #{source_task_ref}
             Proposal fingerprint: #{proposal_fingerprint}
 
-            This generated parent groups implementation draft children created from the requirement ticket.
+            #{parent_body.empty? ? "This generated parent groups implementation draft children created from the requirement ticket." : parent_body}
           DESC
           "priority" => 2,
           "comment" => "Created generated implementation parent for requirement #{source_task_ref}; proposal #{proposal_fingerprint}."

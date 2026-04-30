@@ -133,6 +133,65 @@ RSpec.describe A3::Application::RunDecompositionProposalReview do
     end
   end
 
+  it "treats a valid no_action proposal as eligible for the next gate" do
+    Dir.mktmpdir do |dir|
+      proposal_path = File.join(dir, "proposal.json")
+      File.write(proposal_path, JSON.generate(
+        "success" => true,
+        "proposal_fingerprint" => "abc123",
+        "proposal" => {
+          "proposal_fingerprint" => "abc123",
+          "outcome" => "no_action",
+          "children" => [],
+          "reason" => "The requested behavior already exists."
+        }
+      ))
+      process_runner = lambda do |_command, env:, **|
+        File.write(env.fetch("A2O_DECOMPOSITION_REVIEW_RESULT_PATH"), JSON.generate("summary" => "eligible", "findings" => []))
+        ["", "", FakeReviewStatus.new(true, 0)]
+      end
+
+      result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
+        task: task,
+        project_surface: project_surface([["reviewer"]]),
+        proposal_evidence_path: proposal_path
+      )
+
+      expect(result.success).to be(true)
+      expect(result.disposition).to eq("eligible")
+    end
+  end
+
+  it "treats a valid needs_clarification proposal as eligible for the next gate" do
+    Dir.mktmpdir do |dir|
+      proposal_path = File.join(dir, "proposal.json")
+      File.write(proposal_path, JSON.generate(
+        "success" => true,
+        "proposal_fingerprint" => "abc123",
+        "proposal" => {
+          "proposal_fingerprint" => "abc123",
+          "outcome" => "needs_clarification",
+          "children" => [],
+          "reason" => "The target audience is unclear.",
+          "questions" => ["Which user role should receive this?"]
+        }
+      ))
+      process_runner = lambda do |_command, env:, **|
+        File.write(env.fetch("A2O_DECOMPOSITION_REVIEW_RESULT_PATH"), JSON.generate("summary" => "eligible", "findings" => []))
+        ["", "", FakeReviewStatus.new(true, 0)]
+      end
+
+      result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
+        task: task,
+        project_surface: project_surface([["reviewer"]]),
+        proposal_evidence_path: proposal_path
+      )
+
+      expect(result.success).to be(true)
+      expect(result.disposition).to eq("eligible")
+    end
+  end
+
   it "blocks when reviewer output violates the review result schema" do
     Dir.mktmpdir do |dir|
       proposal_path = File.join(dir, "proposal.json")

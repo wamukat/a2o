@@ -105,6 +105,15 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     }
   end
 
+  def proposal_evidence_with_parent
+    proposal_evidence.tap do |payload|
+      payload.fetch("proposal")["parent"] = {
+        "title" => "Greeting rollout implementation plan",
+        "body" => "## Overview\nImplement Japanese and English greeting behavior.\n\n## Acceptance\nAll generated children are complete."
+      }
+    end
+  end
+
   def generated_parent(client)
     client.created.find { |task| task.fetch("description", "").include?("Decomposition source:") }
   end
@@ -161,6 +170,39 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
         args.include?("related")
     end
     expect(related_relations.size).to eq(1)
+  end
+
+  it "uses proposal parent title and body for the generated parent on first creation" do
+    client = FakeProposalClient.new
+    writer = described_class.new(project: "A3-v2", client: client, mode: :draft)
+
+    result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence_with_parent)
+
+    expect(result.success?).to be(true)
+    parent = generated_parent(client)
+    expect(parent.fetch("title")).to eq("Greeting rollout implementation plan")
+    expect(parent.fetch("description")).to include("Decomposition source: A3-v2#5300")
+    expect(parent.fetch("description")).to include("Proposal fingerprint: fp-1")
+    expect(parent.fetch("description")).to include("Implement Japanese and English greeting behavior.")
+  end
+
+  it "does not overwrite an existing generated parent title or body on reruns" do
+    existing = [
+      {
+        "id" => 5301,
+        "ref" => "A3-v2#5301",
+        "title" => "Human edited parent",
+        "description" => "Human edited body\nDecomposition source: A3-v2#5300"
+      }
+    ]
+    client = FakeProposalClient.new(existing: existing)
+    writer = described_class.new(project: "A3-v2", client: client, mode: :draft)
+
+    result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence_with_parent)
+
+    expect(result.success?).to be(true)
+    expect(existing.first.fetch("title")).to eq("Human edited parent")
+    expect(existing.first.fetch("description")).to eq("Human edited body\nDecomposition source: A3-v2#5300")
   end
 
   it "reuses an existing child by child key even when proposal fingerprint changes" do

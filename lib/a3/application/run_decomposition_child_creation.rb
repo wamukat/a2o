@@ -24,6 +24,9 @@ module A3
         validation_errors = validation_errors_for(proposal_evidence: proposal_evidence, review_evidence: review_evidence)
         return blocked_result(task: task, summary: validation_errors.join("; "), proposal_evidence: proposal_evidence, review_evidence: review_evidence) unless validation_errors.empty?
 
+        outcome = proposal_outcome(proposal_evidence.fetch("proposal"))
+        return outcome_result(task: task, outcome: outcome, proposal_evidence: proposal_evidence, review_evidence: review_evidence) unless outcome == "draft_children"
+
         write_result = @child_writer.call(
           parent_task_ref: task.ref,
           parent_external_task_id: task.external_task_id,
@@ -56,7 +59,21 @@ module A3
         errors = []
         errors << "proposal evidence did not succeed" unless proposal_evidence.is_a?(Hash) && proposal_evidence["success"] == true
         proposal = proposal_evidence.is_a?(Hash) ? proposal_evidence["proposal"] : nil
-        errors << "proposal children are missing" unless proposal.is_a?(Hash) && proposal["children"].is_a?(Array) && proposal["children"].any?
+        unless proposal.is_a?(Hash)
+          errors << "proposal is missing"
+        else
+          outcome = proposal_outcome(proposal)
+          errors << "proposal outcome is unsupported: #{outcome}" unless %w[draft_children no_action needs_clarification].include?(outcome)
+          children = proposal["children"]
+          errors << "proposal children must be an array" unless children.is_a?(Array)
+          if outcome == "draft_children"
+            errors << "proposal children are missing" unless children.is_a?(Array) && children.any?
+          elsif children.is_a?(Array) && children.any?
+            errors << "proposal children must be empty for #{outcome} outcome"
+          end
+          errors << "proposal reason is missing for #{outcome} outcome" if %w[no_action needs_clarification].include?(outcome) && blank?(proposal["reason"])
+          errors << "proposal questions are missing for needs_clarification outcome" if outcome == "needs_clarification" && !non_empty_array?(proposal["questions"])
+        end
         errors << "proposal review is not eligible" unless review_evidence.is_a?(Hash) && review_evidence["disposition"] == "eligible"
         if proposal_evidence.is_a?(Hash) && review_evidence.is_a?(Hash)
           proposal_fingerprint = proposal_evidence["proposal_fingerprint"]
@@ -90,6 +107,28 @@ module A3
         )
       end
 
+      def outcome_result(task:, outcome:, proposal_evidence:, review_evidence:)
+        proposal = proposal_evidence.fetch("proposal")
+        summary =
+          case outcome
+          when "no_action"
+            "decomposition completed with no implementation needed: #{proposal.fetch('reason')}"
+          when "needs_clarification"
+            "decomposition needs clarification: #{proposal.fetch('reason')}"
+          else
+            "decomposition completed with outcome #{outcome}"
+          end
+        persist_evidence(
+          task: task,
+          success: true,
+          status: outcome,
+          summary: summary,
+          proposal_evidence: proposal_evidence,
+          review_evidence: review_evidence,
+          writer_result: nil
+        )
+      end
+
       def persist_evidence(task:, success:, status:, summary:, proposal_evidence:, review_evidence:, writer_result:)
         evidence_dir = File.join(@storage_dir, "decomposition-evidence", slugify(task.ref))
         FileUtils.mkdir_p(evidence_dir)
@@ -103,6 +142,7 @@ module A3
           summary: summary,
           parent_ref: parent_ref,
           child_refs: child_refs,
+          proposal: proposal_evidence && proposal_evidence["proposal"],
           evidence_path: path
         )
         File.write(
@@ -115,6 +155,7 @@ module A3
             "summary" => summary,
             "proposal_fingerprint" => proposal_evidence && proposal_evidence["proposal_fingerprint"],
             "review_disposition" => review_evidence && review_evidence["disposition"],
+            "proposal_outcome" => proposal_evidence && proposal_evidence["proposal"] && proposal_outcome(proposal_evidence["proposal"]),
             "generated_parent_ref" => parent_ref,
             "child_refs" => child_refs,
             "child_keys" => child_keys,
@@ -145,7 +186,7 @@ module A3
         end
       end
 
-      def source_ticket_summary_for(success:, status:, summary:, parent_ref:, child_refs:, evidence_path:)
+      def source_ticket_summary_for(success:, status:, summary:, parent_ref:, child_refs:, proposal:, evidence_path:)
         stage_state =
           if success == true
             "completed"
@@ -156,6 +197,12 @@ module A3
           end
         lines = ["Decomposition draft child creation: #{stage_state}"]
         lines << "Summary: #{summary}"
+        lines << "Outcome: #{proposal_outcome(proposal)}" if proposal
+        if proposal && proposal_outcome(proposal) == "needs_clarification"
+          questions = Array(proposal["questions"]).map(&:to_s).reject(&:empty?)
+          lines << "Questions:"
+          questions.each { |question| lines << "- #{question}" }
+        end
         lines << "Generated parent: #{parent_ref || 'none'}"
         lines << "Draft children: #{child_refs.empty? ? 'none' : child_refs.join(', ')}"
         if success == true
@@ -196,6 +243,19 @@ module A3
         JSON.parse(File.read(path))
       rescue JSON::ParserError
         nil
+      end
+
+      def proposal_outcome(proposal)
+        value = proposal["outcome"].to_s.strip
+        value.empty? ? "draft_children" : value
+      end
+
+      def blank?(value)
+        value.to_s.strip.empty?
+      end
+
+      def non_empty_array?(value)
+        value.is_a?(Array) && value.any? { |item| !blank?(item) }
       end
 
       def slugify(value)

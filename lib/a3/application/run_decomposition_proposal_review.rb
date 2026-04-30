@@ -159,7 +159,25 @@ module A3
         proposal = proposal_evidence["proposal"]
         errors = []
         errors << "proposal fingerprint is missing" unless non_empty_string?(proposal_evidence["proposal_fingerprint"]) || (proposal.is_a?(Hash) && non_empty_string?(proposal["proposal_fingerprint"]))
-        errors << "proposal children are missing" unless proposal.is_a?(Hash) && proposal["children"].is_a?(Array) && proposal["children"].any?
+        unless proposal.is_a?(Hash)
+          errors << "proposal is missing"
+          return errors
+        end
+
+        outcome = proposal_outcome(proposal)
+        errors << "proposal outcome is unsupported: #{outcome}" unless %w[draft_children no_action needs_clarification].include?(outcome)
+        children = proposal["children"]
+        errors << "proposal children must be an array" unless children.is_a?(Array)
+        if outcome == "draft_children"
+          errors << "proposal children are missing" unless children.is_a?(Array) && children.any?
+        elsif children.is_a?(Array) && children.any?
+          errors << "proposal children must be empty for #{outcome} outcome"
+        end
+        errors << "proposal reason is missing for #{outcome} outcome" if %w[no_action needs_clarification].include?(outcome) && !non_empty_string?(proposal["reason"])
+        if outcome == "needs_clarification"
+          questions = proposal["questions"]
+          errors << "proposal questions are missing for needs_clarification outcome" unless questions.is_a?(Array) && questions.any? { |question| non_empty_string?(question) }
+        end
         errors
       end
 
@@ -171,6 +189,11 @@ module A3
         lines = ["Decomposition proposal review: #{summary}", "Disposition: #{disposition}", "Reviewers: #{review_results.size}"]
         critical_findings.each { |finding| lines << "Critical: #{finding.fetch('summary')}" }
         lines.join("\n")
+      end
+
+      def proposal_outcome(proposal)
+        value = proposal["outcome"].to_s.strip
+        value.empty? ? "draft_children" : value
       end
 
       def persist_evidence(task:, request:, review_results:, disposition:, success:, summary:, critical_findings:, request_path:, workspace_root:, source_ticket_summary:)

@@ -7,27 +7,28 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
 
   let(:task) { A3::Domain::Task.new(ref: "A3-v2#5300", kind: :single, edit_scope: [:repo_alpha], external_task_id: 5300) }
 
-  def write_evidence(dir, proposal_fingerprint: "fp-1", review_disposition: "eligible")
+  def write_evidence(dir, proposal_fingerprint: "fp-1", review_disposition: "eligible", proposal: nil)
     evidence_dir = File.join(dir, "decomposition-evidence", "A3-v2-5300")
     FileUtils.mkdir_p(evidence_dir)
+    proposal ||= {
+      "proposal_fingerprint" => proposal_fingerprint,
+      "children" => [
+        {
+          "child_key" => "child-key-1",
+          "title" => "Add routing",
+          "body" => "Route work.",
+          "acceptance_criteria" => ["tested"],
+          "labels" => ["repo:alpha"],
+          "rationale" => "small boundary"
+        }
+      ]
+    }
     File.write(
       File.join(evidence_dir, "proposal.json"),
       JSON.generate(
         "success" => true,
         "proposal_fingerprint" => proposal_fingerprint,
-        "proposal" => {
-          "proposal_fingerprint" => proposal_fingerprint,
-          "children" => [
-            {
-              "child_key" => "child-key-1",
-              "title" => "Add routing",
-              "body" => "Route work.",
-              "acceptance_criteria" => ["tested"],
-              "labels" => ["repo:alpha"],
-              "rationale" => "small boundary"
-            }
-          ]
-        }
+        "proposal" => proposal
       )
     )
     File.write(
@@ -108,6 +109,56 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
 
       expect(result.source_ticket_summary_published).to be(true)
       expect(result.source_ticket_summary).to include("Draft children: A3-v2#5301")
+    end
+  end
+
+  it "completes without creating children for no_action outcomes" do
+    Dir.mktmpdir do |dir|
+      write_evidence(
+        dir,
+        proposal: {
+          "proposal_fingerprint" => "fp-1",
+          "outcome" => "no_action",
+          "children" => [],
+          "reason" => "The requested behavior is already implemented."
+        }
+      )
+      writer = instance_double("ProposalChildWriter")
+      expect(writer).not_to receive(:call)
+
+      result = described_class.new(storage_dir: dir, child_writer: writer).call(task: task, gate: true)
+
+      expect(result.success).to be(true)
+      expect(result.status).to eq("no_action")
+      expect(result.child_refs).to eq([])
+      evidence = JSON.parse(File.read(result.evidence_path))
+      expect(evidence.fetch("proposal_outcome")).to eq("no_action")
+      expect(evidence.fetch("source_ticket_summary")).to include("Outcome: no_action")
+      expect(evidence.fetch("source_ticket_summary")).to include("Generated parent: none")
+    end
+  end
+
+  it "routes needs_clarification outcomes without creating children" do
+    Dir.mktmpdir do |dir|
+      write_evidence(
+        dir,
+        proposal: {
+          "proposal_fingerprint" => "fp-1",
+          "outcome" => "needs_clarification",
+          "children" => [],
+          "reason" => "The target audience is unclear.",
+          "questions" => ["Which user role should receive this?"]
+        }
+      )
+      writer = instance_double("ProposalChildWriter")
+      expect(writer).not_to receive(:call)
+
+      result = described_class.new(storage_dir: dir, child_writer: writer).call(task: task, gate: true)
+
+      expect(result.success).to be(true)
+      expect(result.status).to eq("needs_clarification")
+      expect(result.source_ticket_summary).to include("Outcome: needs_clarification")
+      expect(result.source_ticket_summary).to include("Which user role should receive this?")
     end
   end
 

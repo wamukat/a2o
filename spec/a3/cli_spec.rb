@@ -545,6 +545,67 @@ RSpec.describe A3::CLI do
     expect(out.string).to include("decomposition draft child creation A3-v2#5300 success=true")
   end
 
+  it "publishes in-review then needs_clarification for eligible clarification outcomes" do
+    out = StringIO.new
+    task = A3::Domain::Task.new(ref: "A3-v2#5300", kind: :single, edit_scope: [:repo_alpha], labels: ["trigger:investigate"])
+    status_publisher = instance_double(A3::Infra::NullExternalTaskStatusPublisher)
+    session = Struct.new(:options, :container, :project_context, :project_surface, keyword_init: true).new(
+      options: {
+        task_ref: "A3-v2#5300",
+        storage_dir: "/tmp/a2o-state",
+        manifest_path: "/tmp/project.yaml",
+        proposal_evidence_path: "/tmp/proposal.json",
+        kanban_command: "kanban",
+        kanban_project: "A3-v2"
+      },
+      container: {
+        external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new,
+        external_task_status_publisher: status_publisher
+      },
+      project_context: Object.new,
+      project_surface: Object.new
+    )
+    review_result = A3::Application::RunDecompositionProposalReview::Result.new(
+      success: true,
+      summary: "proposal review eligible for next gate",
+      disposition: "eligible",
+      critical_findings: [],
+      review_results: [],
+      evidence_path: "/tmp/proposal-review.json"
+    )
+    child_result = A3::Application::RunDecompositionChildCreation::Result.new(
+      success: true,
+      status: "needs_clarification",
+      summary: "decomposition needs clarification: The target audience is unclear.",
+      child_refs: [],
+      child_keys: [],
+      evidence_path: "/tmp/child-creation.json"
+    )
+    review_service = instance_double(A3::Application::RunDecompositionProposalReview, call: review_result)
+    child_service = instance_double(A3::Application::RunDecompositionChildCreation, call: child_result)
+    allow(described_class).to receive(:with_runtime_session).and_yield(session)
+    allow(described_class).to receive(:resolve_direct_task).and_return(task)
+    allow(A3::Application::RunDecompositionProposalReview).to receive(:new).and_return(review_service)
+    allow(A3::Application::RunDecompositionChildCreation).to receive(:new).and_return(child_service)
+    allow(A3::Infra::KanbanCliProposalChildWriter).to receive(:new).and_return(instance_double(A3::Infra::KanbanCliProposalChildWriter))
+    expect(status_publisher).to receive(:publish).with(
+      task_ref: "A3-v2#5300",
+      external_task_id: nil,
+      status: :in_review,
+      task_kind: :single
+    ).ordered
+    expect(status_publisher).to receive(:publish).with(
+      task_ref: "A3-v2#5300",
+      external_task_id: nil,
+      status: :needs_clarification,
+      task_kind: :single
+    ).ordered
+
+    described_class.start(["run-decomposition-proposal-review", "A3-v2#5300", "/tmp/project.yaml"], out: out)
+
+    expect(out.string).to include("draft_status=needs_clarification")
+  end
+
   it "does not attempt automatic draft creation when proposal review is not eligible" do
     out = StringIO.new
     task = A3::Domain::Task.new(ref: "A3-v2#5300", kind: :single, edit_scope: [:repo_alpha], labels: ["trigger:investigate"])

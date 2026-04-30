@@ -252,6 +252,11 @@ module A3
 
         normalized = stringify_keys(proposal)
         normalized["source_ticket_ref"] = task.ref
+        normalized["outcome"] = normalized_outcome(normalized["outcome"])
+        normalized["reason"] = normalized["reason"].to_s.strip if normalized.key?("reason")
+        normalized["questions"] = normalized["questions"].map(&:to_s) if normalized["questions"].is_a?(Array)
+        normalized["evidence"] = normalized["evidence"].map(&:to_s) if normalized["evidence"].is_a?(Array)
+        normalized["parent"] = normalize_parent(normalized["parent"]) if normalized.key?("parent")
         if normalized["children"].is_a?(Array)
           normalized["children"] = normalized["children"].map do |child|
             normalize_child(task_ref: task.ref, child: stringify_keys(child))
@@ -282,8 +287,14 @@ module A3
         errors = []
         errors << "source_ticket_ref must be a non-empty string" unless non_empty_string?(proposal["source_ticket_ref"])
         errors << "proposal_fingerprint must be a non-empty string" unless non_empty_string?(proposal["proposal_fingerprint"])
+        errors << "outcome must be one of draft_children, no_action, needs_clarification" unless valid_outcome?(proposal["outcome"])
         children = proposal["children"]
-        errors << "children must be a non-empty array" unless children.is_a?(Array) && children.any?
+        errors << "children must be an array" unless children.is_a?(Array)
+        if proposal["outcome"] == "draft_children"
+          errors << "children must be a non-empty array" unless children.is_a?(Array) && children.any?
+        elsif children.is_a?(Array) && children.any?
+          errors << "children must be empty for #{proposal['outcome']} outcome"
+        end
         child_keys = []
         Array(children).each_with_index do |child, index|
           errors.concat(child_validation_errors(child, index))
@@ -291,6 +302,12 @@ module A3
         end
         errors << "children child_key values must be unique" if child_keys.size != child_keys.uniq.size
         errors << "unresolved_questions must be an array" unless proposal["unresolved_questions"].is_a?(Array)
+        errors << "reason must be a non-empty string for #{proposal['outcome']} outcome" if %w[no_action needs_clarification].include?(proposal["outcome"]) && !non_empty_string?(proposal["reason"])
+        if proposal["outcome"] == "needs_clarification"
+          errors << "questions must be a non-empty array for needs_clarification outcome" unless proposal["questions"].is_a?(Array) && proposal["questions"].any? { |question| non_empty_string?(question) }
+        end
+        errors << "evidence must be an array when provided" if proposal.key?("evidence") && !proposal["evidence"].is_a?(Array)
+        errors.concat(parent_validation_errors(proposal["parent"], outcome: proposal["outcome"])) if proposal.key?("parent")
         errors
       end
 
@@ -309,7 +326,7 @@ module A3
       end
 
       def summary_for(success:, command:, status:, proposal:, raw_proposal:, errors:, stderr:)
-        return "proposal #{proposal.fetch('proposal_fingerprint')} with #{proposal.fetch('children').size} child drafts" if success
+        return success_summary_for(proposal) if success
         return "#{command.join(' ')} failed to launch: #{stderr}" if status.exitstatus.nil?
         return "#{command.join(' ')} failed with exit #{status.exitstatus}" unless status.success?
         return "proposal result JSON is missing or invalid" unless raw_proposal
@@ -321,7 +338,10 @@ module A3
         lines = ["Decomposition proposal: #{summary}"]
         if success
           lines << "Proposal fingerprint: #{proposal.fetch('proposal_fingerprint')}"
-          lines << "Child drafts: #{proposal.fetch('children').size}"
+          lines << "Outcome: #{proposal.fetch('outcome')}"
+          lines << "Child drafts: #{proposal.fetch('children', []).size}"
+          lines << "Reason: #{proposal.fetch('reason')}" if non_empty_string?(proposal["reason"])
+          lines << "Questions: #{proposal.fetch('questions', []).size}" if proposal["outcome"] == "needs_clarification"
           questions = proposal.fetch("unresolved_questions")
           lines << "Unresolved questions: #{questions.empty? ? 'none' : questions.size}"
         else
@@ -391,6 +411,52 @@ module A3
 
       def child_key_for(task_ref:, child:)
         Digest::SHA256.hexdigest(canonical_json("source_ticket_ref" => task_ref, "boundary" => child["boundary"].to_s))[0, 24]
+      end
+
+      def normalized_outcome(value)
+        outcome = value.to_s.strip
+        outcome.empty? ? "draft_children" : outcome
+      end
+
+      def valid_outcome?(value)
+        %w[draft_children no_action needs_clarification].include?(value)
+      end
+
+      def normalize_parent(parent)
+        return parent unless parent.is_a?(Hash)
+
+        stringify_keys(parent).each_with_object({}) do |(key, value), memo|
+          memo[key] = value.is_a?(String) ? value.strip : value
+        end
+      end
+
+      def parent_validation_errors(parent, outcome:)
+        prefix = "parent"
+        return ["#{prefix} must be an object"] unless parent.is_a?(Hash)
+        return ["#{prefix} is only supported for draft_children outcome"] unless outcome == "draft_children"
+
+        errors = []
+        %w[title body].each do |key|
+          next unless parent.key?(key)
+
+          errors << "#{prefix}.#{key} must be a non-empty string when provided" unless non_empty_string?(parent[key])
+        end
+        errors
+      end
+
+      def success_summary_for(proposal)
+        fingerprint = proposal.fetch("proposal_fingerprint")
+        outcome = proposal.fetch("outcome")
+        case outcome
+        when "draft_children"
+          "proposal #{fingerprint} with #{proposal.fetch('children').size} child drafts"
+        when "no_action"
+          "proposal #{fingerprint} outcome=no_action"
+        when "needs_clarification"
+          "proposal #{fingerprint} outcome=needs_clarification with #{proposal.fetch('questions', []).size} question(s)"
+        else
+          "proposal #{fingerprint} outcome=#{outcome}"
+        end
       end
 
       def canonical_json(value)

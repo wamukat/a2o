@@ -140,6 +140,21 @@ The proposal should contain:
 - stable boundary and rationale for each child draft
 - unresolved questions and required human decisions
 
+The proposal `outcome` defaults to `draft_children`. In that outcome, the proposal can also include optional generated-parent content:
+
+```json
+{
+  "outcome": "draft_children",
+  "parent": {
+    "title": "Implementation plan title",
+    "body": "Human-readable plan, design notes, child list, and overall acceptance criteria."
+  },
+  "children": []
+}
+```
+
+If investigation shows the requested behavior already exists, the author can return `outcome: "no_action"`, `children: []`, and a non-empty `reason`. If the requirement cannot be decomposed safely, the author can return `outcome: "needs_clarification"`, `children: []`, a non-empty `reason`, and one or more `questions`. These outcomes still go through proposal review, but child creation does not create a generated parent or children.
+
 The proposal fingerprint is required for idempotency. It should be derived from the source ticket ref, source revision fields, investigation result digest, and ordered child draft content.
 
 Each child draft also needs a stable child idempotency key derived from the source ticket ref and the child boundary, not from volatile title text alone. Creation uses the proposal fingerprint to identify the proposal version and child keys to reconcile individual tickets.

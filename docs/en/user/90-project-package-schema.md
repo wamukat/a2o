@@ -299,7 +299,11 @@ The author command receives:
 - `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH`
 - `A2O_WORKSPACE_ROOT`
 
-The author command writes one proposal JSON object to `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH`. A2O normalizes the draft, derives `proposal_fingerprint` and per-child `child_key` values, and stores proposal evidence without creating Kanban child tickets. The proposal must include at least one child draft. Each child draft requires `title`, `body`, `acceptance_criteria`, `labels`, `depends_on`, `boundary`, and `rationale`. `boundary` must be stable across reruns because A2O derives the child idempotency key from it. `unresolved_questions` must be an array.
+The author command writes one proposal JSON object to `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH`. A2O normalizes the draft, derives `proposal_fingerprint` and per-child `child_key` values, and stores proposal evidence without creating Kanban child tickets. `outcome` is optional and defaults to `draft_children` for compatibility.
+
+`draft_children` proposals must include at least one child draft. They may include optional `parent.title` and `parent.body`; those values are used only when A2O first creates the generated implementation parent, while A2O always keeps its own source-ticket and proposal-fingerprint metadata. Existing generated parent title/body are not overwritten on rerun. Each child draft requires `title`, `body`, `acceptance_criteria`, `labels`, `depends_on`, `boundary`, and `rationale`. `boundary` must be stable across reruns because A2O derives the child idempotency key from it. `unresolved_questions` must be an array.
+
+`no_action` proposals use `children: []` plus a non-empty `reason` when the requested behavior is already satisfied and no implementation tickets should be created. `needs_clarification` proposals use `children: []`, a non-empty `reason`, and at least one `questions` entry; A2O posts the question summary and routes the source ticket through the existing clarification status/label behavior.
 
 To run the proposal step after investigation evidence exists:
 
