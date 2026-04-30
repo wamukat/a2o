@@ -160,6 +160,8 @@ The same Compose project reuses the existing board. If the Compose project or Do
 
 Use `trigger:investigate` when the kanban ticket is a broad requirement that should be investigated and split before implementation. A source ticket with `trigger:investigate` belongs to the decomposition domain even if it also has `trigger:auto-implement`; remove `trigger:investigate` before treating the source ticket itself as ordinary implementation work. The source ticket does not need a `repo:*` scope label because it is not an implementation target. In normal operation, implementation should happen on the generated or accepted child tickets, and those implementation children should carry the appropriate repo labels.
 
+The runtime scheduler started by `a2o runtime resume` automatically checks the decomposition queue before ordinary implementation work. A single `a2o runtime run-once` cycle does the same check, so label-driven decomposition does not require manually running the individual `a2o runtime decomposition ...` phase commands.
+
 The automatic decomposition flow is:
 
 1. A2O selects a source ticket with `trigger:investigate`.

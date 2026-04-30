@@ -34,7 +34,7 @@ Start with [docs/en/user/00-overview.md](docs/en/user/00-overview.md) to underst
 
 ## Requirement Decomposition
 
-Use `trigger:investigate` for a high-level requirement that should be broken down before implementation. A2O treats that label as a decomposition request, not as an implementation request:
+Use `trigger:investigate` for a high-level requirement that should be broken down before implementation. A2O treats that label as a decomposition request, not as an implementation request. The runtime scheduler started by `a2o runtime resume`, and each `a2o runtime run-once` cycle, automatically checks this decomposition queue before ordinary implementation work:
 
 ```text
 Requirement ticket with trigger:investigate

@@ -2435,7 +2435,6 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, overrides runtimeRun
 		return err
 	}
 	return withComposeEnv(config, func() error {
-		fmt.Fprintf(stdout, "kanban_run_once=generic\n")
 		if err := cleanupLegacyRuntimeServiceOrphans(config, runner, stdout); err != nil {
 			return err
 		}
@@ -2461,6 +2460,14 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, overrides runtimeRun
 		if err := ensureRuntimeLauncherConfig(plan, stdout); err != nil {
 			return err
 		}
+		handledDecomposition, err := runAutomaticRuntimeDecompositionIfReady(config, plan, runner, stdout)
+		if err != nil {
+			return err
+		}
+		if handledDecomposition {
+			return nil
+		}
+		fmt.Fprintf(stdout, "kanban_run_once=generic\n")
 		if err := ensureRuntimeHostAgent(config, plan, runner, stdout); err != nil {
 			return err
 		}
@@ -2489,6 +2496,75 @@ func runGenericRuntimeRunOnce(config runtimeInstanceConfig, overrides runtimeRun
 		}
 		return printRuntimeSuccessTail(config, plan, runner, stdout)
 	})
+}
+
+type runtimeDecompositionSelection struct {
+	TaskRef       string
+	ActiveTaskRef string
+}
+
+func runAutomaticRuntimeDecompositionIfReady(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer) (bool, error) {
+	selection, err := planNextRuntimeDecomposition(config, plan, runner)
+	if err != nil {
+		return false, err
+	}
+	if selection.ActiveTaskRef != "" {
+		fmt.Fprintf(stdout, "kanban_run_once=decomposition active=%s\n", selection.ActiveTaskRef)
+		return true, nil
+	}
+	if selection.TaskRef == "" {
+		return false, nil
+	}
+
+	fmt.Fprintf(stdout, "kanban_run_once=decomposition task=%s\n", selection.TaskRef)
+	for _, action := range []string{"investigate", "propose", "review"} {
+		command, err := runtimeDecompositionCommand(action, selection.TaskRef, plan, normalizeRuntimeDecompositionRepoSources(plan, nil), runtimeDecompositionOverrides{})
+		if err != nil {
+			return true, err
+		}
+		if err := runRuntimeDecompositionWithHostAgent(config, plan, command, action, runner, stdout); err != nil {
+			return true, err
+		}
+	}
+
+	command, err := runtimeDecompositionCommand("create-children", selection.TaskRef, plan, nil, runtimeDecompositionOverrides{Gate: true})
+	if err != nil {
+		return true, err
+	}
+	output, err := dockerComposeExecOutput(config, plan, runner, runtimeInspectionArgs(command...)...)
+	if err != nil {
+		return true, fmt.Errorf("runtime decomposition create-children failed: %w", err)
+	}
+	fmt.Fprint(stdout, string(output))
+	if len(output) == 0 || output[len(output)-1] != '\n' {
+		fmt.Fprintln(stdout)
+	}
+	return true, nil
+}
+
+func planNextRuntimeDecomposition(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner) (runtimeDecompositionSelection, error) {
+	args := []string{"a3", "plan-next-decomposition-task", "--storage-backend", "json", "--storage-dir", plan.StorageDir}
+	args = append(args, runtimeDecompositionKanbanOptions(plan)...)
+	args = append(args, "--kanban-trigger-label", "trigger:investigate")
+	output, err := dockerComposeExecOutput(config, plan, runner, runtimeInspectionArgs(args...)...)
+	if err != nil {
+		return runtimeDecompositionSelection{}, fmt.Errorf("plan next decomposition task failed: %w", err)
+	}
+	return parseRuntimeDecompositionSelection(string(output)), nil
+}
+
+func parseRuntimeDecompositionSelection(output string) runtimeDecompositionSelection {
+	selection := runtimeDecompositionSelection{}
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "active decomposition "):
+			selection.ActiveTaskRef = strings.TrimSpace(strings.TrimPrefix(line, "active decomposition "))
+		case strings.HasPrefix(line, "next decomposition "):
+			selection.TaskRef = strings.TrimSpace(strings.TrimPrefix(line, "next decomposition "))
+		}
+	}
+	return selection
 }
 
 func ensureRuntimeLauncherConfig(plan runtimeRunOncePlan, stdout io.Writer) error {

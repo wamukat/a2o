@@ -3710,6 +3710,102 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 	assertNoRemovedA3Env(t, runner.lastEnv)
 }
 
+func TestRuntimeRunOnceAutomaticallyRunsTriggerInvestigateDecomposition(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		decompositionPlanOutput: "next decomposition A2O#5200\ncandidate A2O#5200 status=todo\n",
+		hostAgentOutputs: []string{
+			"agent completed decomposition-investigate status=succeeded\n",
+			"agent completed decomposition-propose status=succeeded\n",
+			"agent completed decomposition-review status=succeeded\n",
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once", "--max-steps", "1", "--agent-attempts", "2"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(stdout.String(), "kanban_run_once=decomposition task=A2O#5200") {
+		t.Fatalf("stdout should report automatic decomposition, got:\n%s", stdout.String())
+	}
+	for _, want := range []string{
+		"plan-next-decomposition-task",
+		"'--kanban-trigger-label' 'trigger:investigate'",
+		"run-decomposition-investigation",
+		"run-decomposition-proposal-author",
+		"run-decomposition-proposal-review",
+		"run-decomposition-child-creation",
+		"'--gate'",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("automatic decomposition missing %q in:\n%s", want, joined)
+		}
+	}
+	if strings.Contains(joined, "'a3' 'execute-until-idle'") {
+		t.Fatalf("decomposition cycle should not also run generic implementation tasks:\n%s", joined)
+	}
+}
+
+func TestRuntimeRunOnceDefersWhenDecompositionAlreadyActive(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		decompositionPlanOutput: "active decomposition A2O#5199\ncandidate A2O#5199 status=in_progress\ncandidate A2O#5200 status=todo\n",
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "run-once", "--max-steps", "1", "--agent-attempts", "2"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(stdout.String(), "kanban_run_once=decomposition active=A2O#5199") {
+		t.Fatalf("stdout should report active decomposition, got:\n%s", stdout.String())
+	}
+	if strings.Contains(joined, "run-decomposition-investigation") || strings.Contains(joined, "'a3' 'execute-until-idle'") {
+		t.Fatalf("active decomposition should defer new work:\n%s", joined)
+	}
+}
+
 func TestRuntimeRunOnceFailsWhenLegacySoloBoardVolumeWouldBeOrphaned(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -10241,6 +10337,59 @@ func TestRuntimeLoopRunsConfiguredCycles(t *testing.T) {
 	assertNoRemovedA3Env(t, runner.lastEnv)
 }
 
+func TestRuntimeLoopAutomaticallyRunsTriggerInvestigateDecomposition(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3480",
+		AgentPort:      "7394",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		decompositionPlanOutput: "next decomposition A2O#5200\ncandidate A2O#5200 status=todo\n",
+		hostAgentOutputs: []string{
+			"agent completed decomposition-investigate status=succeeded\n",
+			"agent completed decomposition-propose status=succeeded\n",
+			"agent completed decomposition-review status=succeeded\n",
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "loop", "--max-cycles", "1", "--interval", "0s", "--max-steps", "3", "--agent-attempts", "4"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(stdout.String(), "kanban_loop_cycle_start cycle=1") ||
+		!strings.Contains(stdout.String(), "kanban_run_once=decomposition task=A2O#5200") ||
+		!strings.Contains(stdout.String(), "kanban_loop_finished cycles=1") {
+		t.Fatalf("runtime loop should run automatic decomposition, got:\n%s", stdout.String())
+	}
+	if !strings.Contains(joined, "run-decomposition-investigation") ||
+		!strings.Contains(joined, "run-decomposition-proposal-author") ||
+		!strings.Contains(joined, "run-decomposition-proposal-review") ||
+		!strings.Contains(joined, "run-decomposition-child-creation") {
+		t.Fatalf("runtime loop should execute the decomposition pipeline, calls:\n%s", joined)
+	}
+	if strings.Contains(joined, "'a3' 'execute-until-idle'") {
+		t.Fatalf("decomposition loop cycle should not also run generic implementation tasks:\n%s", joined)
+	}
+}
+
 func TestRuntimeRunOnceEnvDoesNotGenerateRemovedA3CompatibilityInputs(t *testing.T) {
 	env := runtimeRunOnceEnv(runtimeInstanceConfig{
 		WorkspaceRoot:    "/tmp/a2o-workspace",
@@ -10736,6 +10885,7 @@ type fakeRunner struct {
 	hostAgentOutputs         []string
 	hostAgentOutputIndex     int
 	runtimeCommandLogOutput  string
+	decompositionPlanOutput  string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -10787,6 +10937,11 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 			stopReason = "idle"
 		}
 		return []byte(fmt.Sprintf("scheduler paused=%t stop_reason=%s executed_count=%d\n", r.schedulerPaused, stopReason, r.schedulerExecutedCount)), nil
+	case strings.Contains(joined, "plan-next-decomposition-task"):
+		if r.decompositionPlanOutput != "" {
+			return []byte(r.decompositionPlanOutput), nil
+		}
+		return []byte("no decomposition task\n"), nil
 	case name == "docker" && len(args) >= 8 && args[0] == "ps" && containsArg(args, "label=com.docker.compose.service=a3-runtime"):
 		if len(r.legacyRuntimeOrphans) == 0 {
 			return []byte{}, nil
