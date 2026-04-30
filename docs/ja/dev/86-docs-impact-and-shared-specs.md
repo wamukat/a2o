@@ -312,7 +312,7 @@ worker request には少なくとも次を含める。
 - traceability refs
 - 多言語 policy
 
-`docs_context` は任意であり、`docs` config がない project では出力しない。存在する場合は implementation、review、parent review の worker request に載せる。decomposition command も、既存の shared spec を踏まえて child ticket を起案する必要がある場合は同じ形を受け取れる。
+`docs_context` は任意であり、`docs` config がない project では出力しない。存在する場合は implementation、review、parent review の worker request に載せる。decomposition は現時点では prompt guidance と traceability refs を使える。decomposition command へ完全な `docs_context` を渡すことは、別途実装と検証を行う future extension とする。
 
 worker result には構造化された `docs_impact` object を含められる。A2O は docs 更新を全タスクに強制せず、object の形だけを検証する。
 

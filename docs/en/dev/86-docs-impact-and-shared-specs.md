@@ -314,7 +314,7 @@ The worker request includes at least:
 - traceability refs
 - language policy
 
-`docs_context` is optional and absent for projects without `docs` config. When present, it is carried on implementation, review, and parent-review worker requests. Decomposition commands may also receive the same shape when they need to draft child tickets that respect existing shared specs.
+`docs_context` is optional and absent for projects without `docs` config. When present, it is carried on implementation, review, and parent-review worker requests. Decomposition can use prompt guidance and traceability refs today; carrying full `docs_context` into decomposition commands is a future extension unless implemented and validated separately.
 
 The worker result may include a structured `docs_impact` object. A2O validates the object without making docs mandatory for every task:
 

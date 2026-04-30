@@ -172,7 +172,7 @@ Authority sources represent source-of-truth artifacts such as OpenAPI, DB migrat
 
 ### Docs-impact workflow
 
-When `docs` is configured, A2O includes `docs_context` in implementation, review, parent-review, and decomposition worker requests. The context gives workers the configured categories, candidate docs, authority sources, language policy, expected docs actions, and traceability refs. Workers still decide the actual impact per task and report it through the `docs_impact` evidence object.
+When `docs` is configured, A2O includes `docs_context` in implementation, review, and parent-review worker requests. The context gives workers the configured categories, candidate docs, authority sources, language policy, expected docs actions, and traceability refs. Workers still decide the actual impact per task and report it through the `docs_impact` evidence object.
 
 Implementation results can include:
 

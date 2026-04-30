@@ -178,7 +178,7 @@ authority source は OpenAPI、DB migration、生成 schema、既存の shared s
 
 ### docs-impact の流れ
 
-`docs` を設定すると、A2O は implementation、review、parent-review、decomposition の worker request に `docs_context` を含める。ここには、設定済み category、候補 docs、authority source、言語ポリシー、期待する docs action、traceability refs が入る。実際に docs-impact があるかは task ごとに worker が判断し、`docs_impact` evidence として返す。
+`docs` を設定すると、A2O は implementation、review、parent-review の worker request に `docs_context` を含める。ここには、設定済み category、候補 docs、authority source、言語ポリシー、期待する docs action、traceability refs が入る。実際に docs-impact があるかは task ごとに worker が判断し、`docs_impact` evidence として返す。
 
 implementation result には次のような値を含められる。
 
