@@ -175,7 +175,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o runtime force-stop-task [--project KEY] TASK_REF --dangerous")
 	fmt.Fprintln(w, "  a2o runtime force-stop-run [--project KEY] RUN_REF --dangerous")
 	fmt.Fprintln(w, "  a2o runtime watch-summary [--project KEY] [--details]")
-	fmt.Fprintln(w, "  a2o runtime decomposition investigate|propose|review|create-children|status|cleanup [--project KEY] TASK_REF [--project-config project-test.yaml] [--repo-source SLOT=PATH]")
+	fmt.Fprintln(w, "  a2o runtime decomposition investigate|propose|review|create-children|accept-drafts|status|cleanup [--project KEY] TASK_REF [--project-config project-test.yaml] [--repo-source SLOT=PATH]")
 	fmt.Fprintln(w, "  a2o runtime skill-feedback list [--project KEY] [--state STATE] [--target TARGET] [--group]")
 	fmt.Fprintln(w, "  a2o runtime skill-feedback propose [--project KEY] [--state STATE] [--target TARGET] [--format ticket|patch]")
 	fmt.Fprintln(w, "  a2o runtime metrics list [--project KEY] [--format json|csv]")

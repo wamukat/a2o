@@ -2203,6 +2203,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 		"a2o runtime force-stop-task [--project KEY] TASK_REF --dangerous",
 		"a2o runtime force-stop-run [--project KEY] RUN_REF --dangerous",
 		"a2o runtime watch-summary [--project KEY] [--details]",
+		"a2o runtime decomposition investigate|propose|review|create-children|accept-drafts|status|cleanup",
 		"a2o runtime skill-feedback list [--project KEY]",
 		"a2o runtime skill-feedback propose [--project KEY]",
 		"a2o runtime logs [--project KEY] [TASK_REF] [--follow] [--index N] [--no-children]",
