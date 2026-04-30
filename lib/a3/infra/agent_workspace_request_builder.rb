@@ -158,6 +158,7 @@ module A3
 
         normalized = value.to_sym
         return normalized if %i[verification remediation metrics_collection notification].include?(normalized)
+        return normalized if normalized.to_s.start_with?("decomposition_")
 
         raise A3::Domain::ConfigurationError, "unsupported agent command intent: #{value.inspect}"
       end

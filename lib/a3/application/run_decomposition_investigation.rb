@@ -22,13 +22,16 @@ module A3
         vendor/bundle
       ].freeze
 
-      def initialize(storage_dir:, project_root: Dir.pwd, process_runner: nil, clock: -> { Time.now.utc }, progress_io: nil, publish_external_task_activity: nil)
+      def initialize(storage_dir:, project_root: Dir.pwd, process_runner: nil, clock: -> { Time.now.utc }, progress_io: nil, publish_external_task_activity: nil, host_shared_root: nil, container_shared_root: nil, command_workspace_dir: nil)
         @storage_dir = storage_dir
+        @command_workspace_dir = command_workspace_dir
         @project_root = project_root
         @process_runner = process_runner || method(:run_process)
         @clock = clock
         @progress_io = progress_io
         @publish_external_task_activity = publish_external_task_activity
+        @host_shared_root = clean_root(host_shared_root)
+        @container_shared_root = clean_root(container_shared_root)
       end
 
       def call(task:, project_surface:, slot_paths: {}, task_snapshot: nil, previous_evidence_path: nil)
@@ -44,10 +47,10 @@ module A3
         FileUtils.rm_f(result_path)
         request = request_payload(
           task: task,
-          slot_paths: isolated_slot_paths,
-          workspace_root: workspace_root,
+          slot_paths: command_path_hash(isolated_slot_paths),
+          workspace_root: command_path(workspace_root),
           task_snapshot: task_snapshot,
-          previous_evidence_path: previous_evidence_path
+          previous_evidence_path: command_path(previous_evidence_path)
         )
         write_json(request_path, request)
 
@@ -97,11 +100,12 @@ module A3
       def run_command(command:, workspace_root:, request_path:, result_path:)
         @process_runner.call(
           command,
-          chdir: workspace_root,
+          chdir: command_path(workspace_root),
           env: {
-            "A2O_DECOMPOSITION_REQUEST_PATH" => request_path,
-            "A2O_DECOMPOSITION_RESULT_PATH" => result_path,
-            "A2O_WORKSPACE_ROOT" => workspace_root
+            "A2O_DECOMPOSITION_REQUEST_PATH" => command_path(request_path),
+            "A2O_DECOMPOSITION_RESULT_PATH" => command_path(result_path),
+            "A2O_WORKSPACE_ROOT" => command_path(workspace_root),
+            "A2O_ROOT_DIR" => command_path(@project_root)
           }
         )
       rescue SystemCallError => e
@@ -121,7 +125,7 @@ module A3
       end
 
       def prepare_workspace_root(task_ref:)
-        base_dir = File.join(@storage_dir, "decomposition-workspaces", slugify(task_ref))
+        base_dir = File.join(@command_workspace_dir || File.join(@storage_dir, "decomposition-workspaces"), slugify(task_ref))
         FileUtils.mkdir_p(base_dir)
         Dir.mktmpdir("run-#{@clock.call.strftime('%Y%m%d%H%M%S')}-", base_dir)
       end
@@ -181,7 +185,7 @@ module A3
         first, *rest = command
         resolved_first =
           if relative_path_command?(first)
-            File.expand_path(first, @project_root)
+            command_path(File.expand_path(first, @project_root))
           else
             first
           end
@@ -319,6 +323,24 @@ module A3
 
       def write_json(path, payload)
         File.write(path, "#{JSON.pretty_generate(payload)}\n")
+      end
+
+      def command_path(path)
+        value = path.to_s
+        return value if value.empty? || !@host_shared_root || !@container_shared_root
+        return @host_shared_root if value == @container_shared_root
+        return File.join(@host_shared_root, value.delete_prefix("#{@container_shared_root}/")) if value.start_with?("#{@container_shared_root}/")
+
+        value
+      end
+
+      def command_path_hash(paths)
+        stringify_hash(paths).transform_values { |path| command_path(path) }
+      end
+
+      def clean_root(path)
+        value = path.to_s.sub(%r{/+\z}, "")
+        value.empty? ? nil : value
       end
 
       def progress(message)

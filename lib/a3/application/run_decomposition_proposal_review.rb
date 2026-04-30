@@ -11,12 +11,15 @@ module A3
     class RunDecompositionProposalReview
       Result = Struct.new(:success, :summary, :disposition, :critical_findings, :review_results, :request_path, :evidence_path, :source_ticket_summary, keyword_init: true)
 
-      def initialize(storage_dir:, project_root: Dir.pwd, process_runner: nil, publish_external_task_activity: nil, clock: -> { Time.now.utc })
+      def initialize(storage_dir:, project_root: Dir.pwd, process_runner: nil, publish_external_task_activity: nil, clock: -> { Time.now.utc }, host_shared_root: nil, container_shared_root: nil, command_workspace_dir: nil)
         @storage_dir = storage_dir
+        @command_workspace_dir = command_workspace_dir
         @project_root = project_root
         @process_runner = process_runner || method(:run_process)
         @publish_external_task_activity = publish_external_task_activity
         @clock = clock
+        @host_shared_root = clean_root(host_shared_root)
+        @container_shared_root = clean_root(container_shared_root)
       end
 
       def call(task:, project_surface:, proposal_evidence_path: nil)
@@ -29,7 +32,7 @@ module A3
         workspace_root = prepare_workspace_root(task.ref)
         request_path = File.join(workspace_root, ".a2o", "decomposition-review-request.json")
         FileUtils.mkdir_p(File.dirname(request_path))
-        request = request_payload(task: task, proposal_evidence_path: proposal_evidence_path, proposal_evidence: proposal_evidence, workspace_root: workspace_root)
+        request = request_payload(task: task, proposal_evidence_path: command_path(proposal_evidence_path), proposal_evidence: proposal_evidence, workspace_root: command_path(workspace_root))
         write_json(request_path, request)
 
         review_results = commands.map.with_index do |command, index|
@@ -76,11 +79,12 @@ module A3
         FileUtils.rm_f(result_path)
         stdout, stderr, status = @process_runner.call(
           command,
-          chdir: workspace_root,
+          chdir: command_path(workspace_root),
           env: {
-            "A2O_DECOMPOSITION_REVIEW_REQUEST_PATH" => request_path,
-            "A2O_DECOMPOSITION_REVIEW_RESULT_PATH" => result_path,
-            "A2O_WORKSPACE_ROOT" => workspace_root
+            "A2O_DECOMPOSITION_REVIEW_REQUEST_PATH" => command_path(request_path),
+            "A2O_DECOMPOSITION_REVIEW_RESULT_PATH" => command_path(result_path),
+            "A2O_WORKSPACE_ROOT" => command_path(workspace_root),
+            "A2O_ROOT_DIR" => command_path(@project_root)
           }
         )
         raw_result = load_json(result_path)
@@ -200,7 +204,7 @@ module A3
       end
 
       def prepare_workspace_root(task_ref)
-        base_dir = File.join(@storage_dir, "decomposition-workspaces", slugify(task_ref))
+        base_dir = File.join(@command_workspace_dir || File.join(@storage_dir, "decomposition-workspaces"), slugify(task_ref))
         FileUtils.mkdir_p(base_dir)
         Dir.mktmpdir("proposal-review-#{@clock.call.strftime('%Y%m%d%H%M%S')}-", base_dir)
       end
@@ -219,12 +223,26 @@ module A3
 
       def resolve_command(command)
         first, *rest = command
-        resolved_first = first.include?(File::SEPARATOR) && Pathname.new(first).relative? ? File.expand_path(first, @project_root) : first
+        resolved_first = first.include?(File::SEPARATOR) && Pathname.new(first).relative? ? command_path(File.expand_path(first, @project_root)) : first
         [resolved_first, *rest]
       end
 
       def write_json(path, payload)
         File.write(path, "#{JSON.pretty_generate(payload)}\n")
+      end
+
+      def command_path(path)
+        value = path.to_s
+        return value if value.empty? || !@host_shared_root || !@container_shared_root
+        return @host_shared_root if value == @container_shared_root
+        return File.join(@host_shared_root, value.delete_prefix("#{@container_shared_root}/")) if value.start_with?("#{@container_shared_root}/")
+
+        value
+      end
+
+      def clean_root(path)
+        value = path.to_s.sub(%r{/+\z}, "")
+        value.empty? ? nil : value
       end
 
       def slugify(value)

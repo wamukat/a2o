@@ -6259,10 +6259,16 @@ func TestRuntimeDecompositionInvestigationRunsThroughHostLauncher(t *testing.T) 
 		"run-decomposition-investigation",
 		"A2O#245",
 		filepath.Join(packageDir, "project.yaml"),
-		"'--storage-dir' '/var/lib/a3/test-runtime'",
-		"'--repo-source' 'repo_alpha=/workspace/repo-alpha'",
-		"'--kanban-command' 'python3'",
-		"'--kanban-project' 'A2OReferenceMultiRepo'",
+		"--decomposition-command-runner",
+		"agent-http",
+		"--host-shared-root",
+		"--decomposition-workspace-dir",
+		"/workspace/.work/a2o/decomposition-workspaces",
+		"repo_alpha=/workspace/repo-alpha",
+		"--kanban-command",
+		"--kanban-project",
+		"A2OReferenceMultiRepo",
+		"a2o-agent -agent host-local",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("runtime decomposition missing call %q in:\n%s", want, joined)
@@ -6498,11 +6504,51 @@ func TestRuntimeDecompositionForwardsEvidencePathOverrides(t *testing.T) {
 	joined := strings.Join(runner.joinedCalls(), "\n")
 	for _, want := range []string{
 		"run-decomposition-proposal-author",
-		"'--investigation-evidence-path' '/workspace/.work/a2o/custom/investigation.json'",
+		"--decomposition-command-runner",
+		"agent-http",
+		"--investigation-evidence-path",
+		"/workspace/.work/a2o/custom/investigation.json",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("runtime decomposition propose missing call %q in:\n%s", want, joined)
 		}
+	}
+}
+
+func TestRuntimeDecompositionPrintsRuntimeLogBeforeHostAgentFailureCleanup(t *testing.T) {
+	t.Setenv("A2O_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS", "1")
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		runtimeExitMissing:      true,
+		hostAgentOutput:         "agent idle\n",
+		runtimeCommandLogOutput: "decomposition command output before failure\n",
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "decomposition", "propose", "A2O#245"}, runner, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("run returned success, stdout=%s", stdout.String())
+		}
+	})
+
+	if !strings.Contains(stdout.String(), "decomposition command output before failure") {
+		t.Fatalf("stdout should preserve decomposition runtime log before cleanup, got:\n%s", stdout.String())
 	}
 }
 
@@ -10261,6 +10307,7 @@ type fakeRunner struct {
 	hostAgentOutput          string
 	hostAgentOutputs         []string
 	hostAgentOutputIndex     int
+	runtimeCommandLogOutput  string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -10374,6 +10421,11 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 			return []byte("missing\n"), errors.New("missing")
 		}
 		return []byte{}, nil
+	case strings.Contains(joined, " exec -T ") && strings.Contains(joined, " test -f /tmp/a2o-runtime-") && strings.Contains(joined, "decomposition-") && strings.Contains(joined, ".exit"):
+		if r.runtimeExitMissing {
+			return []byte("missing\n"), errors.New("missing")
+		}
+		return []byte{}, nil
 	case strings.Contains(joined, " sh -c ") && strings.Contains(joined, "test -f"):
 		if r.missingRunHistory {
 			return []byte("missing\n"), nil
@@ -10452,8 +10504,10 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		return []byte(`[{"id":61,"comment":"blocked evidence is available","updated":"2026-04-18T07:46:17.996Z"}]` + "\n"), nil
 	case strings.Contains(joined, " date -u +%Y%m%dT%H%M%SZ"):
 		return []byte("20260417T000000Z\n"), nil
-	case strings.Contains(joined, " cat /tmp/a2o-runtime-run-once.exit") || strings.Contains(joined, " cat /tmp/a2o-runtime-") && strings.Contains(joined, "-run-once.exit"):
+	case strings.Contains(joined, " cat /tmp/a2o-runtime-run-once.exit") || strings.Contains(joined, " cat /tmp/a2o-runtime-") && strings.Contains(joined, "-run-once.exit") || strings.Contains(joined, " cat /tmp/a2o-runtime-") && strings.Contains(joined, "decomposition-") && strings.Contains(joined, ".exit"):
 		return []byte("0\n"), nil
+	case strings.Contains(joined, " cat /tmp/a2o-runtime-") && strings.Contains(joined, "decomposition-") && strings.Contains(joined, ".log"):
+		return []byte(r.runtimeCommandLogOutput), nil
 	case name == "docker" && len(args) >= 1 && args[0] == "cp":
 		destination := args[len(args)-1]
 		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {

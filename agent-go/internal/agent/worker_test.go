@@ -354,6 +354,41 @@ func TestWorkerSynthesizesNotificationWorkerProtocolResult(t *testing.T) {
 	}
 }
 
+func TestWorkerSynthesizesDecompositionWorkerProtocolResult(t *testing.T) {
+	tmp := t.TempDir()
+	request := testRequest(tmp)
+	request.Phase = "verification"
+	request.WorkspaceRequest = nil
+	request.WorkerProtocolRequest = map[string]any{
+		"command_intent": "decomposition_propose",
+		"task_ref":       "Sample#42",
+	}
+	client := &fakeClient{request: &request}
+
+	result, idle, err := Worker{
+		AgentName: "host-local",
+		Client:    client,
+		Executor: outputExecutor{
+			stdout: "proposal stdout\n",
+			stderr: "proposal stderr\n",
+		},
+		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+	}.RunOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idle {
+		t.Fatal("expected job result, got idle")
+	}
+	diagnostics, ok := result.WorkerProtocolResult["diagnostics"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing diagnostics: %#v", result.WorkerProtocolResult)
+	}
+	if diagnostics["stdout"] != "proposal stdout\n" || diagnostics["stderr"] != "proposal stderr\n" {
+		t.Fatalf("unexpected decomposition diagnostics: %#v", diagnostics)
+	}
+}
+
 func TestWorkerUsesEngineProvidedAgentEnvironmentForMaterialization(t *testing.T) {
 	tmp := t.TempDir()
 	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")

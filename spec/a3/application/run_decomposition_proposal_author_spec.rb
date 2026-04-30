@@ -130,6 +130,49 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
     end
   end
 
+  it "rewrites project-visible request and environment paths to host paths for agent execution" do
+    Dir.mktmpdir do |dir|
+      host_root = File.join(dir, "host-root")
+      container_root = File.join(dir, "container-root")
+      storage_dir = File.join(dir, "runtime-storage")
+      FileUtils.mkdir_p(container_root)
+      investigation_path = File.join(container_root, "evidence", "investigation.json")
+      FileUtils.mkdir_p(File.dirname(investigation_path))
+      File.write(investigation_path, JSON.generate("summary" => "Need decomposition"))
+      captured = {}
+      process_runner = lambda do |_command, chdir:, env:|
+        captured[:chdir] = chdir
+        captured[:env] = env
+        container_result_path = env.fetch("A2O_DECOMPOSITION_AUTHOR_RESULT_PATH").sub(host_root, container_root)
+        File.write(container_result_path, JSON.generate(valid_author_result))
+        ["", "", FakeAuthorStatus.new(true, 0)]
+      end
+
+      result = described_class.new(
+        storage_dir: storage_dir,
+        project_root: File.join(container_root, "project"),
+        process_runner: process_runner,
+        host_shared_root: host_root,
+        container_shared_root: container_root,
+        command_workspace_dir: File.join(container_root, ".work", "a2o", "decomposition-workspaces"),
+        clock: -> { Time.utc(2026, 4, 26, 4, 0, 0) }
+      ).call(
+        task: task,
+        project_surface: project_surface(command: ["commands/author.sh"]),
+        investigation_evidence_path: investigation_path
+      )
+
+      expect(result.success).to be(true)
+      expect(captured.fetch(:chdir)).to start_with(File.join(host_root, ".work", "a2o", "decomposition-workspaces"))
+      expect(captured.fetch(:env).fetch("A2O_DECOMPOSITION_AUTHOR_REQUEST_PATH")).to start_with(host_root)
+      expect(captured.fetch(:env).fetch("A2O_DECOMPOSITION_AUTHOR_RESULT_PATH")).to start_with(host_root)
+      expect(captured.fetch(:env).fetch("A2O_WORKSPACE_ROOT")).to start_with(host_root)
+      request = JSON.parse(File.read(result.request_path))
+      expect(request.fetch("workspace_root")).to start_with(host_root)
+      expect(request.fetch("investigation_evidence_path")).to start_with(host_root)
+    end
+  end
+
   it "passes decomposition child draft templates to the proposal author request" do
     Dir.mktmpdir do |dir|
       scoped_task = A3::Domain::Task.new(
