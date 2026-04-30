@@ -257,6 +257,7 @@ module A3
         normalized["questions"] = normalized["questions"].map(&:to_s) if normalized["questions"].is_a?(Array)
         normalized["evidence"] = normalized["evidence"].map(&:to_s) if normalized["evidence"].is_a?(Array)
         normalized["parent"] = normalize_parent(normalized["parent"]) if normalized.key?("parent")
+        normalized["unresolved_questions"] = [] if !normalized.key?("unresolved_questions") && normalized["outcome"] != "draft_children"
         if normalized["children"].is_a?(Array)
           normalized["children"] = normalized["children"].map do |child|
             normalize_child(task_ref: task.ref, child: stringify_keys(child))

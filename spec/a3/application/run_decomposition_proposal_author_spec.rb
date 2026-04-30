@@ -427,8 +427,7 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
             "outcome" => "no_action",
             "children" => [],
             "reason" => "The requested behavior is already implemented.",
-            "evidence" => ["utility-lib already covers Japanese and English greetings."],
-            "unresolved_questions" => []
+            "evidence" => ["utility-lib already covers Japanese and English greetings."]
           )
         )
         ["", "", FakeAuthorStatus.new(true, 0)]
@@ -445,6 +444,7 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
       expect(result.proposal).to include(
         "outcome" => "no_action",
         "children" => [],
+        "unresolved_questions" => [],
         "reason" => "The requested behavior is already implemented."
       )
       expect(result.source_ticket_summary).to include("Outcome: no_action")
@@ -461,8 +461,7 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
             "outcome" => "needs_clarification",
             "children" => [],
             "reason" => "The target user role is unclear.",
-            "questions" => ["Which user role should receive the feature?"],
-            "unresolved_questions" => []
+            "questions" => ["Which user role should receive the feature?"]
           )
         )
         ["", "", FakeAuthorStatus.new(true, 0)]
@@ -475,6 +474,7 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
       )
 
       expect(result.success).to be(true)
+      expect(result.proposal.fetch("unresolved_questions")).to eq([])
       expect(result.summary).to include("outcome=needs_clarification")
       expect(result.source_ticket_summary).to include("Outcome: needs_clarification")
       expect(result.source_ticket_summary).to include("Questions: 1")

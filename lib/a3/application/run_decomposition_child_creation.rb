@@ -205,7 +205,7 @@ module A3
         end
         lines << "Generated parent: #{parent_ref || 'none'}"
         lines << "Draft children: #{child_refs.empty? ? 'none' : child_refs.join(', ')}"
-        if success == true
+        if success == true && status == "created"
           lines << "Accept: add trigger:auto-implement to a draft child when it is ready for implementation."
           lines << "Parent automation: add trigger:auto-parent to the generated parent after accepted child work is ready."
         end

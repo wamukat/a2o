@@ -135,6 +135,8 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
       expect(evidence.fetch("proposal_outcome")).to eq("no_action")
       expect(evidence.fetch("source_ticket_summary")).to include("Outcome: no_action")
       expect(evidence.fetch("source_ticket_summary")).to include("Generated parent: none")
+      expect(evidence.fetch("source_ticket_summary")).not_to include("trigger:auto-implement")
+      expect(evidence.fetch("source_ticket_summary")).not_to include("trigger:auto-parent")
     end
   end
 
@@ -159,6 +161,8 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
       expect(result.status).to eq("needs_clarification")
       expect(result.source_ticket_summary).to include("Outcome: needs_clarification")
       expect(result.source_ticket_summary).to include("Which user role should receive this?")
+      expect(result.source_ticket_summary).not_to include("trigger:auto-implement")
+      expect(result.source_ticket_summary).not_to include("trigger:auto-parent")
     end
   end
 
