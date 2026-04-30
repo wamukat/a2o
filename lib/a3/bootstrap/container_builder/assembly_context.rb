@@ -62,6 +62,10 @@ module A3
           @runtime_services.fetch(:external_task_activity_publisher)
         end
 
+        def external_task_status_publisher
+          @runtime_services.fetch(:external_task_status_publisher)
+        end
+
         def external_task_source
           @runtime_services.fetch(:external_task_source)
         end

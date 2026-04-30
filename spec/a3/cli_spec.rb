@@ -980,6 +980,7 @@ RSpec.describe A3::CLI do
           labels: ["trigger:investigate"]
         )
         source = double("ExternalTaskSource")
+        status_publisher = instance_double(A3::Infra::NullExternalTaskStatusPublisher)
         allow(source).to receive(:fetch_by_ref).with("Portal#240").and_return(external_task)
         allow(source).to receive(:fetch_task_packet_by_external_task_id).with(240).and_return(
           "ref" => "Portal#240",
@@ -990,12 +991,18 @@ RSpec.describe A3::CLI do
         )
         bridge = A3::Infra::KanbanBridgeBundle.new(
           task_source: source,
-          task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new,
+          task_status_publisher: status_publisher,
           task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new,
           follow_up_child_writer: nil,
           task_snapshot_reader: A3::Infra::NullExternalTaskSnapshotReader.new
         )
         allow(described_class).to receive(:build_external_task_bridge).and_return(bridge)
+        expect(status_publisher).to receive(:publish).with(
+          task_ref: "Portal#240",
+          external_task_id: 240,
+          status: :in_progress,
+          task_kind: :single
+        )
 
         out = StringIO.new
         described_class.start(
