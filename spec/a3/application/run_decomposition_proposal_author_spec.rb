@@ -253,6 +253,52 @@ RSpec.describe A3::Application::RunDecompositionProposalAuthor do
     end
   end
 
+  it "allows proposal authoring for unscoped investigate tickets without repo labels" do
+    Dir.mktmpdir do |dir|
+      unscoped_task = A3::Domain::Task.new(
+        ref: "A3-v2#5300",
+        kind: :single,
+        edit_scope: [],
+        status: :todo,
+        labels: ["trigger:investigate"],
+        priority: 3,
+        external_task_id: 5300
+      )
+      prompt_config = A3::Domain::ProjectPromptConfig.new(
+        phases: {
+          "decomposition" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+            prompt_document: prompt_document("prompts/decomposition.md", "decomposition guidance")
+          )
+        },
+        repo_slots: {
+          "repo_alpha" => {
+            "decomposition" => A3::Domain::ProjectPromptConfig::PhaseConfig.new(
+              child_draft_template_document: prompt_document("prompts/repo-alpha-child-template.md", "Repo alpha template")
+            )
+          }
+        }
+      )
+      process_runner = lambda do |_command, env:, **|
+        File.write(env.fetch("A2O_DECOMPOSITION_AUTHOR_RESULT_PATH"), JSON.generate(valid_author_result))
+        ["", "", FakeAuthorStatus.new(true, 0)]
+      end
+
+      result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
+        task: unscoped_task,
+        project_surface: project_surface(prompt_config: prompt_config),
+        investigation_evidence: { "summary" => "Need split" }
+      )
+
+      request = JSON.parse(File.read(result.request_path))
+      project_prompt = request.fetch("project_prompt")
+      expect(project_prompt.fetch("repo_slot")).to be_nil
+      expect(project_prompt.fetch("repo_slots")).to eq([])
+      expect(project_prompt.fetch("layers").map { |layer| layer.fetch("kind") }).to include("project_phase_prompt")
+      expect(project_prompt.fetch("layers").map { |layer| layer.fetch("kind") }).not_to include("repo_slot_decomposition_child_draft_template")
+      expect(result.success).to be(true)
+    end
+  end
+
   it "generates a stable proposal fingerprint from investigation evidence and child drafts" do
     Dir.mktmpdir do |dir|
       process_runner = lambda do |_command, env:, **|
