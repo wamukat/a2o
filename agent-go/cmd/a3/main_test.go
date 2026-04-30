@@ -4330,6 +4330,11 @@ func TestProjectValidateRejectsInvalidSchedulerMaxParallelTasks(t *testing.T) {
 			wantDetail: "max_parallel_tasks must be an integer",
 		},
 		{
+			name:       "float",
+			scheduler:  "  scheduler:\n    max_parallel_tasks: 1.0\n",
+			wantDetail: "max_parallel_tasks must be an integer",
+		},
+		{
 			name:       "lower than one",
 			scheduler:  "  scheduler:\n    max_parallel_tasks: 0\n",
 			wantDetail: "max_parallel_tasks must be greater than or equal to 1",

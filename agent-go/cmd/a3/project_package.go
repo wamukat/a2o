@@ -284,7 +284,7 @@ func validateProjectSchedulerConfig(runtimePayload map[string]any) error {
 	if !ok {
 		return nil
 	}
-	scheduler, ok := normalizeYAMLValue(rawScheduler).(map[string]any)
+	scheduler, ok := schedulerMapping(rawScheduler)
 	if !ok {
 		return fmt.Errorf("must be a mapping")
 	}
@@ -310,11 +310,30 @@ func projectSchedulerRawMaxParallelTasks(runtimePayload map[string]any) any {
 	if !ok {
 		return nil
 	}
-	scheduler, ok := normalizeYAMLValue(rawScheduler).(map[string]any)
+	scheduler, ok := schedulerMapping(rawScheduler)
 	if !ok {
 		return nil
 	}
 	return scheduler["max_parallel_tasks"]
+}
+
+func schedulerMapping(value any) (map[string]any, bool) {
+	switch typed := value.(type) {
+	case map[string]any:
+		return typed, true
+	case map[any]any:
+		out := map[string]any{}
+		for key, nested := range typed {
+			keyText, ok := key.(string)
+			if !ok {
+				return nil, false
+			}
+			out[keyText] = nested
+		}
+		return out, true
+	default:
+		return nil, false
+	}
 }
 
 func schedulerInteger(value any) (int64, bool) {
@@ -323,12 +342,6 @@ func schedulerInteger(value any) (int64, bool) {
 		return int64(typed), true
 	case int64:
 		return typed, true
-	case float64:
-		integer := int64(typed)
-		if typed != float64(integer) {
-			return 0, false
-		}
-		return integer, true
 	default:
 		return 0, false
 	}
