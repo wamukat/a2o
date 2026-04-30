@@ -30,7 +30,7 @@ A2O 0.5.58 で現在利用できる公開機能と検証範囲を示す。
 - `trigger:investigate` 付き source ticket は decomposition request であり、`repo:*` scope label は不要である。`trigger:auto-implement` で実行する implementation child には、引き続き適切な repo label が必要である。
 - `a2o runtime decomposition investigate`、`propose`、`review` は、project 側が所有する decomposition command を host agent 経由で実行する。runtime container は orchestrator のまま維持しつつ、implementation worker と同じ host workspace 境界で実行するため、Copilot など host 側にしかない agent CLI を decomposition command から呼び出せる。
 - decomposition command UX: `a2o runtime decomposition <action> --help` の action-level help と、単発 decomposition command の外部 task 同期 / 照合
-- requirement decomposition の source ticket は要求 artifact として扱う。decomposition 成功後は `Done` に移動し、A2O は別の generated implementation work を作成する。Kanbalone が non-blocking relation をサポートする場合、traceability のため source ticket から generated implementation parent へ `related` relation を作る。
+- requirement decomposition の source ticket は要求 artifact として扱う。decomposition 成功後は `Done` に移動し、A2O は別の generated implementation work を作成する。traceability のため source ticket から generated implementation parent へ Kanbalone の `related` relation を作る。
 - `a2o runtime decomposition accept-drafts` は選択した draft child に `trigger:auto-implement` を付けて承認する。任意で `a2o:draft-child` を外し、generated parent に `trigger:auto-parent` を付けられる。この command は label 変更中に scheduler processing を pause し、A2O が pause した場合は変更成功後だけ resume する。失敗時は確認のため scheduler を paused のまま残す。
 - gate closed の decomposition child creation は、空の `success=` を表示せず、`status=gate_closed` と `child_creation_result=not_attempted` を表示する
 - multi-repo documentation surfaces: `docs.surfaces` で repo-local docs と integration docs を分けて宣言できる。`docs.authorities` は source-of-truth file が存在する repo slot を指定でき、worker の `docs_context` には surface id、repo slot、role、candidate docs、authority source metadata が含まれる。
@@ -68,6 +68,7 @@ A2O 0.5.58 で現在利用できる公開機能と検証範囲を示す。
   - release image から新しい launcher を導入する: `docker run --rm -v "$PWD/.work/a2o:/out" ghcr.io/wamukat/a2o-engine:0.5.58 a2o host install --output-dir /out/bin --share-dir /out/share`
   - project の runtime image 参照を `ghcr.io/wamukat/a2o-engine:0.5.58` に更新する
   - decomposition command を実行する前に、新しい image で runtime container を再起動する
+- decomposition source ticket を使う外部 Kanbalone 環境は Kanbalone v0.9.25 以降に更新すること。A2O 0.5.58 は requirement source ticket から generated implementation work へ `related` relation を書き込むため、古い外部 Kanbalone ではその relation surface が提供されない。
 - `docs.surfaces` を採用する project package は、各 surface の `repoSlot` が repo source として設定されていること、および cross-repo `docs.authorities.*.repoSlot` が source-of-truth file を持つ repo を指していることを確認する。既存の単一 docs surface package には移行作業は不要である。
 
 ## 検証範囲
