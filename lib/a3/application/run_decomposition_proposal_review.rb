@@ -195,6 +195,9 @@ module A3
           questions = proposal["questions"]
           errors << "proposal questions are missing for needs_clarification outcome" unless questions.is_a?(Array) && questions.any? { |question| non_empty_string?(question) }
         end
+        if proposal.key?("refactoring_assessment")
+          errors.concat(A3::Domain::RefactoringAssessment.validation_errors(proposal["refactoring_assessment"]))
+        end
         errors
       end
 

@@ -87,6 +87,39 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
     end
   end
 
+  it "blocks child creation when proposal refactoring assessment is invalid" do
+    Dir.mktmpdir do |dir|
+      write_evidence(
+        dir,
+        proposal: {
+          "proposal_fingerprint" => "fp-1",
+          "refactoring_assessment" => {
+            "disposition" => "later",
+            "recommended_action" => "unknown"
+          },
+          "children" => [
+            {
+              "child_key" => "child-key-1",
+              "title" => "Add routing",
+              "body" => "Route work.",
+              "acceptance_criteria" => ["tested"],
+              "labels" => ["repo:alpha"],
+              "rationale" => "small boundary"
+            }
+          ]
+        }
+      )
+      writer = instance_double("ProposalChildWriter")
+      expect(writer).not_to receive(:call)
+
+      result = described_class.new(storage_dir: dir, child_writer: writer).call(task: task, gate: true)
+
+      expect(result.success).to be(false)
+      expect(result.status).to eq("blocked")
+      expect(result.summary).to include("refactoring_assessment.disposition must be one of")
+    end
+  end
+
   it "publishes a concise source-ticket audit comment after creating draft children" do
     Dir.mktmpdir do |dir|
       write_evidence(dir)

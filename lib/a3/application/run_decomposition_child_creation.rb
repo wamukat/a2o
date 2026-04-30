@@ -2,6 +2,7 @@
 
 require "fileutils"
 require "json"
+require "a3/domain/refactoring_assessment"
 
 module A3
   module Application
@@ -73,6 +74,9 @@ module A3
           end
           errors << "proposal reason is missing for #{outcome} outcome" if %w[no_action needs_clarification].include?(outcome) && blank?(proposal["reason"])
           errors << "proposal questions are missing for needs_clarification outcome" if outcome == "needs_clarification" && !non_empty_array?(proposal["questions"])
+          if proposal.key?("refactoring_assessment")
+            errors.concat(A3::Domain::RefactoringAssessment.validation_errors(proposal["refactoring_assessment"]))
+          end
         end
         errors << "proposal review is not eligible" unless review_evidence.is_a?(Hash) && review_evidence["disposition"] == "eligible"
         if proposal_evidence.is_a?(Hash) && review_evidence.is_a?(Hash)

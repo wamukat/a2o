@@ -164,6 +164,40 @@ RSpec.describe A3::Application::RunDecompositionProposalReview do
     end
   end
 
+  it "blocks when proposal evidence contains an invalid refactoring assessment" do
+    Dir.mktmpdir do |dir|
+      proposal_path = File.join(dir, "proposal.json")
+      File.write(proposal_path, JSON.generate(
+        "success" => true,
+        "proposal_fingerprint" => "abc123",
+        "proposal" => {
+          "proposal_fingerprint" => "abc123",
+          "children" => [{ "title" => "child" }],
+          "refactoring_assessment" => {
+            "disposition" => "later",
+            "recommended_action" => "unknown"
+          }
+        }
+      ))
+      process_runner = lambda do |_command, env:, **|
+        File.write(env.fetch("A2O_DECOMPOSITION_REVIEW_RESULT_PATH"), JSON.generate("summary" => "clean", "findings" => []))
+        ["", "", FakeReviewStatus.new(true, 0)]
+      end
+
+      result = described_class.new(storage_dir: dir, process_runner: process_runner).call(
+        task: task,
+        project_surface: project_surface([["reviewer"]]),
+        proposal_evidence_path: proposal_path
+      )
+
+      expect(result.success).to be(false)
+      expect(result.disposition).to eq("blocked")
+      expect(result.critical_findings.map { |finding| finding.fetch("summary") }).to include(
+        "refactoring_assessment.disposition must be one of none, include_child, defer_follow_up, blocked_by_design_debt, needs_clarification"
+      )
+    end
+  end
+
   it "blocks when proposal evidence is missing a successful proposal draft" do
     Dir.mktmpdir do |dir|
       proposal_path = File.join(dir, "proposal.json")

@@ -114,7 +114,7 @@ module A3
 
       def refactoring_assessment_body(value)
         assessment = A3::Domain::RefactoringAssessment.from_persisted_form(value)
-        return "" unless assessment&.active?
+        return "" unless assessment&.valid? && assessment.active?
 
         lines = [
           "",
