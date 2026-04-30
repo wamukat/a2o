@@ -7008,6 +7008,65 @@ func TestRuntimeDecompositionCreateChildrenPassesKanbanReadOptions(t *testing.T)
 	}
 }
 
+func TestRuntimeDecompositionAcceptDraftsDispatchesGuardedRubyCommand(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run(
+			[]string{
+				"runtime",
+				"decomposition",
+				"accept-drafts",
+				"Portal#240",
+				"--child", "Portal#241",
+				"--child=Portal#242",
+				"--remove-draft-label",
+				"--parent-auto",
+			},
+			runner,
+			&stdout,
+			&stderr,
+		)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"accept-decomposition-drafts",
+		"Portal#240",
+		"'--storage-dir' '/var/lib/a3/test-runtime'",
+		"'--kanban-command' 'python3'",
+		"'--kanban-project' 'A2OReferenceMultiRepo'",
+		"'--child' 'Portal#241'",
+		"'--child' 'Portal#242'",
+		"'--remove-draft-label'",
+		"'--parent-auto'",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("runtime decomposition accept-drafts missing call %q in:\n%s", want, joined)
+		}
+	}
+}
+
 func TestRuntimeDecompositionForwardsEvidencePathOverrides(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

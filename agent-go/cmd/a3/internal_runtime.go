@@ -191,6 +191,12 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 	investigationEvidencePath := flags.String("investigation-evidence-path", "", "proposal input evidence path")
 	proposalEvidencePath := flags.String("proposal-evidence-path", "", "proposal evidence path")
 	reviewEvidencePath := flags.String("review-evidence-path", "", "proposal review evidence path")
+	allDrafts := flags.Bool("all", false, "accept all draft children")
+	readyDrafts := flags.Bool("ready", false, "accept draft children marked ready")
+	removeDraftLabel := flags.Bool("remove-draft-label", false, "remove a2o:draft-child from accepted children")
+	parentAuto := flags.Bool("parent-auto", false, "add trigger:auto-parent to the generated parent after accepting children")
+	var childRefs stringListFlag
+	flags.Var(&childRefs, "child", "draft child ref to accept; may be repeated")
 	var repoSources stringListFlag
 	flags.Var(&repoSources, "repo-source", "repo source mapping SLOT=PATH; may be repeated")
 	flagArgs, positionals, err := splitRuntimeDecompositionArgs(action, args[1:])
@@ -226,6 +232,11 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 		InvestigationEvidencePath: *investigationEvidencePath,
 		ProposalEvidencePath:      *proposalEvidencePath,
 		ReviewEvidencePath:        *reviewEvidencePath,
+		ChildRefs:                 childRefs,
+		AllDrafts:                 *allDrafts,
+		ReadyDrafts:               *readyDrafts,
+		RemoveDraftLabel:          *removeDraftLabel,
+		ParentAuto:                *parentAuto,
 	})
 	if err != nil {
 		return err
@@ -325,6 +336,16 @@ func splitRuntimeDecompositionArgs(action string, args []string) ([]string, []st
 			flagArgs = append(flagArgs, arg)
 		case action == "cleanup" && (arg == "--apply" || arg == "--dry-run"):
 			flagArgs = append(flagArgs, arg)
+		case action == "accept-drafts" && (arg == "--all" || arg == "--ready" || arg == "--remove-draft-label" || arg == "--parent-auto"):
+			flagArgs = append(flagArgs, arg)
+		case action == "accept-drafts" && arg == "--child":
+			if i+1 >= len(args) {
+				return nil, nil, fmt.Errorf("%s requires a value", arg)
+			}
+			flagArgs = append(flagArgs, arg, args[i+1])
+			i++
+		case action == "accept-drafts" && strings.HasPrefix(arg, "--child="):
+			flagArgs = append(flagArgs, arg)
 		case arg == "--project" || arg == "--project-config" || arg == "--repo-source" || arg == "--investigation-evidence-path" || arg == "--proposal-evidence-path" || arg == "--review-evidence-path":
 			if i+1 >= len(args) {
 				return nil, nil, fmt.Errorf("%s requires a value", arg)
@@ -348,6 +369,11 @@ type runtimeDecompositionOverrides struct {
 	InvestigationEvidencePath string
 	ProposalEvidencePath      string
 	ReviewEvidencePath        string
+	ChildRefs                 []string
+	AllDrafts                 bool
+	ReadyDrafts               bool
+	RemoveDraftLabel          bool
+	ParentAuto                bool
 }
 
 func runtimeDecompositionCommand(action string, taskRef string, plan runtimeRunOncePlan, repoSources []string, overrides runtimeDecompositionOverrides) ([]string, error) {
@@ -390,6 +416,24 @@ func runtimeDecompositionCommand(action string, taskRef string, plan runtimeRunO
 		if overrides.Gate {
 			args = append(args, "--gate")
 		}
+	case "accept-drafts":
+		args = append(args, "accept-decomposition-drafts", taskRef, "--storage-backend", "json", "--storage-dir", plan.StorageDir)
+		args = append(args, runtimeDecompositionKanbanOptions(plan)...)
+		for _, childRef := range overrides.ChildRefs {
+			args = append(args, "--child", childRef)
+		}
+		if overrides.AllDrafts {
+			args = append(args, "--all")
+		}
+		if overrides.ReadyDrafts {
+			args = append(args, "--ready")
+		}
+		if overrides.RemoveDraftLabel {
+			args = append(args, "--remove-draft-label")
+		}
+		if overrides.ParentAuto {
+			args = append(args, "--parent-auto")
+		}
 	case "status":
 		args = append(args, "show-decomposition-status", taskRef, "--storage-backend", "json", "--storage-dir", plan.StorageDir)
 	case "cleanup":
@@ -404,12 +448,13 @@ func runtimeDecompositionCommand(action string, taskRef string, plan runtimeRunO
 }
 
 func printRuntimeDecompositionUsage(w io.Writer) {
-	fmt.Fprintln(w, "usage: a2o runtime decomposition investigate|propose|review|create-children|status|cleanup [--project KEY] TASK_REF [--project-config project-test.yaml]")
+	fmt.Fprintln(w, "usage: a2o runtime decomposition investigate|propose|review|create-children|accept-drafts|status|cleanup [--project KEY] TASK_REF [--project-config project-test.yaml]")
 	fmt.Fprintln(w, "actions:")
 	fmt.Fprintln(w, "  investigate       run the configured decomposition investigation command")
 	fmt.Fprintln(w, "  propose           create proposal evidence from investigation evidence")
 	fmt.Fprintln(w, "  review            review proposal evidence")
 	fmt.Fprintln(w, "  create-children   create or reconcile Kanban child tickets; requires --gate")
+	fmt.Fprintln(w, "  accept-drafts     accept draft child tickets and optionally enable parent automation")
 	fmt.Fprintln(w, "  status            show local decomposition evidence status")
 	fmt.Fprintln(w, "  cleanup           list or remove local decomposition trial evidence/workspaces")
 }
@@ -424,6 +469,8 @@ func printRuntimeDecompositionActionUsage(w io.Writer, action string) error {
 		fmt.Fprintln(w, "usage: a2o runtime decomposition review [--project KEY] TASK_REF [--project-config project-test.yaml] [--proposal-evidence-path PATH]")
 	case "create-children":
 		fmt.Fprintln(w, "usage: a2o runtime decomposition create-children [--project KEY] TASK_REF [--project-config project-test.yaml] [--proposal-evidence-path PATH] [--review-evidence-path PATH] [--gate]")
+	case "accept-drafts":
+		fmt.Fprintln(w, "usage: a2o runtime decomposition accept-drafts [--project KEY] TASK_REF [--project-config project-test.yaml] (--child CHILD_REF...|--ready|--all) [--remove-draft-label] [--parent-auto]")
 	case "status":
 		fmt.Fprintln(w, "usage: a2o runtime decomposition status [--project KEY] TASK_REF [--project-config project-test.yaml]")
 	case "cleanup":
