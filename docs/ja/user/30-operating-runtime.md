@@ -169,7 +169,7 @@ a2o project bootstrap --kanban-mode external --kanban-url http://127.0.0.1:3470
 5. eligible な proposal から、要求 source ticket とは別の generated implementation parent ticket を作り、generated parent の description と source ticket への comment に要求 source を記録し、その generated parent の下に `a2o:draft-child` 付きの draft child ticket を作る。
 6. A2O が source ticket を decomposed として印付けし、`Done` に移動する。
 
-Kanbalone が non-blocking relation をサポートする場合、A2O は要求 source ticket から generated implementation parent へ `related` relation も作る。この relation は traceability 専用であり、source ticket を runnable にはしない。また child の `subtask` relation や依存関係の `blocked` relation を置き換えない。
+A2O は要求 source ticket から generated implementation parent へ `related` relation も作る。この relation は traceability 専用であり、source ticket を runnable にはしない。また child の `subtask` relation や依存関係の `blocked` relation を置き換えない。外部 Kanbalone 環境では、この decomposition relation 経路のために Kanbalone v0.9.25 以降が必要である。
 
 各 stage が完了すると、source ticket に短いコメントが残るため、運用者は Kanban 上で進行を追える。`a2o runtime watch-summary` も `trigger:investigate` の source ticket を `Decomposition` セクションに表示する。まだ evidence がない段階では `state=queued` として表示し、evidence 作成後は decomposition state、disposition、proposal fingerprint があれば表示する。詳細な evidence は runtime storage 配下の `decomposition-evidence/<task>/` に保存される。`a2o runtime decomposition status <task-ref>` は decomposition evidence の概要を表示し、`a2o runtime describe-task <task-ref>` はより広い task 状態を表示する。
 
