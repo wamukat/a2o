@@ -1016,6 +1016,9 @@ def relation_tasks_payload(base_url: str, token: str, *, task_id: int) -> dict[s
     blocked_by = response.get("blockedBy")
     if isinstance(blocked_by, list) and blocked_by:
         related["blocking"] = [dict(item) for item in blocked_by]
+    related_items = response.get("related")
+    if isinstance(related_items, list) and related_items:
+        related["related"] = [dict(item) for item in related_items]
     return related
 
 
@@ -1110,6 +1113,11 @@ def create_relation(
         blocker_ids = sorted({int(item) for item in (task.get("blockerIds") or [])} | {other_task_id})
         updated = rest_request(base_url, token, "PATCH", f"/api/tickets/{task_id}", payload={"blockerIds": blocker_ids})
         return {"id": int(updated.get("id") or task_id)}
+    if relation_kind == "related":
+        task = rest_request(base_url, token, "GET", f"/api/tickets/{task_id}")
+        related_ids = sorted({int(item) for item in (task.get("relatedIds") or [])} | {other_task_id})
+        updated = rest_request(base_url, token, "PATCH", f"/api/tickets/{task_id}", payload={"relatedIds": related_ids})
+        return {"id": int(updated.get("id") or task_id)}
     raise RuntimeError(f"Unsupported relation kind for Kanbalone: {relation_kind}")
 
 
@@ -1135,6 +1143,11 @@ def delete_relation(
         task = rest_request(base_url, token, "GET", f"/api/tickets/{task_id}")
         blocker_ids = [int(item) for item in (task.get("blockerIds") or []) if int(item) != other_task_id]
         updated = rest_request(base_url, token, "PATCH", f"/api/tickets/{task_id}", payload={"blockerIds": blocker_ids})
+        return {"result": bool(updated)}
+    if relation_kind == "related":
+        task = rest_request(base_url, token, "GET", f"/api/tickets/{task_id}")
+        related_ids = [int(item) for item in (task.get("relatedIds") or []) if int(item) != other_task_id]
+        updated = rest_request(base_url, token, "PATCH", f"/api/tickets/{task_id}", payload={"relatedIds": related_ids})
         return {"result": bool(updated)}
     raise RuntimeError(f"Unsupported relation kind for Kanbalone: {relation_kind}")
 

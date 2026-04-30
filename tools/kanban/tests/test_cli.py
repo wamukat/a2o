@@ -943,6 +943,69 @@ class KanbaloneCliTest(unittest.TestCase):
         self.assertEqual("Done", result["status"])
         self.assertFalse(result["done"])
 
+    def test_relation_tasks_payload_includes_related_relations(self) -> None:
+        def fake_rest_request(_base_url, _token, method, path, *, payload=None):
+            self.assertEqual("GET", method)
+            self.assertEqual("/api/tickets/101/relations", path)
+            return {
+                "parent": None,
+                "children": [],
+                "blockers": [],
+                "blockedBy": [],
+                "related": [{"id": 202, "ref": "Sample#202"}],
+            }
+
+        with patch.object(kanban_cli, "rest_request", side_effect=fake_rest_request):
+            payload = kanban_cli.relation_tasks_payload("http://localhost:3460", "", task_id=101)
+
+        self.assertEqual([{"id": 202, "ref": "Sample#202"}], payload["related"])
+
+    def test_create_related_relation_updates_related_ids(self) -> None:
+        patch_payloads: list[dict[str, object]] = []
+
+        def fake_rest_request(_base_url, _token, method, path, *, payload=None):
+            if method == "GET" and path == "/api/tickets/101":
+                return {"id": 101, "relatedIds": [201]}
+            if method == "PATCH" and path == "/api/tickets/101":
+                patch_payloads.append(payload)
+                return {"id": 101, "relatedIds": payload["relatedIds"]}
+            raise AssertionError(f"unexpected request: {method} {path}")
+
+        with patch.object(kanban_cli, "rest_request", side_effect=fake_rest_request):
+            result = kanban_cli.create_relation(
+                "http://localhost:3460",
+                "",
+                task_id=101,
+                other_task_id=202,
+                relation_kind="related",
+            )
+
+        self.assertEqual({"id": 101}, result)
+        self.assertEqual([{"relatedIds": [201, 202]}], patch_payloads)
+
+    def test_delete_related_relation_updates_related_ids(self) -> None:
+        patch_payloads: list[dict[str, object]] = []
+
+        def fake_rest_request(_base_url, _token, method, path, *, payload=None):
+            if method == "GET" and path == "/api/tickets/101":
+                return {"id": 101, "relatedIds": [201, 202]}
+            if method == "PATCH" and path == "/api/tickets/101":
+                patch_payloads.append(payload)
+                return {"id": 101, "relatedIds": payload["relatedIds"]}
+            raise AssertionError(f"unexpected request: {method} {path}")
+
+        with patch.object(kanban_cli, "rest_request", side_effect=fake_rest_request):
+            result = kanban_cli.delete_relation(
+                "http://localhost:3460",
+                "",
+                task_id=101,
+                other_task_id=202,
+                relation_kind="related",
+            )
+
+        self.assertEqual({"result": True}, result)
+        self.assertEqual([{"relatedIds": [201]}], patch_payloads)
+
 
 if __name__ == "__main__":
     unittest.main()
