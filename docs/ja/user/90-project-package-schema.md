@@ -326,7 +326,7 @@ author command には次を渡す。
 
 author command は `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH` に proposal JSON object を 1 つ書く。A2O は draft を正規化し、`proposal_fingerprint` と child ごとの `child_key` を導出し、Kanban child ticket は作成せずに proposal evidence を保存する。`outcome` は任意で、省略時は互換性のため `draft_children` として扱う。
 
-`draft_children` proposal には 1 件以上の child draft が必要である。任意で `parent.title` と `parent.body` を指定でき、A2O が generated implementation parent を初回作成するときだけ使われる。A2O 管理の source ticket / proposal fingerprint metadata は必ず保持し、rerun で既存 generated parent の title/body を上書きしない。各 child draft は `title`、`body`、`acceptance_criteria`、`labels`、`depends_on`、`boundary`、`rationale` を持つ。`boundary` は child idempotency key の導出元になるため rerun 間で安定している必要がある。`unresolved_questions` は配列でなければならない。
+`draft_children` proposal には 1 件以上の child draft が必要である。任意で `parent.title` と `parent.body` を指定でき、A2O が generated implementation parent を初回作成するときだけ使われる。A2O 管理の source ticket / proposal fingerprint metadata は必ず保持し、rerun で既存 generated parent の title/body を上書きしない。各 child draft は `title`、`body`、`acceptance_criteria`、`labels`、`depends_on`、`boundary`、`rationale` を持つ。`boundary` は child idempotency key の導出元になるため rerun 間で安定している必要がある。`depends_on` は、生成 child が別の生成 child にブロックされる場合に同じ proposal 内の child `boundary` を列挙する。rerun 互換のため、生成済み `child_key` も受け付ける。`unresolved_questions` は配列でなければならない。
 
 generated implementation parent に既定の A2O title / body ではなく、プロジェクト固有の実装計画を持たせたい場合は `parent.title` と `parent.body` を使う。author command は proposal JSON に次のように含める。
 
@@ -346,6 +346,15 @@ generated implementation parent に既定の A2O title / body ではなく、プ
       "depends_on": [],
       "boundary": "address-provider-contract",
       "rationale": "UI 作業から shared service contract を分離するため。"
+    },
+    {
+      "title": "住所補完 UI を接続する",
+      "body": "UI flow から住所 provider contract を呼び出す。",
+      "acceptance_criteria": ["UI が候補を表示する", "fallback 動作がテストされている"],
+      "labels": ["repo:web"],
+      "depends_on": ["address-provider-contract"],
+      "boundary": "address-suggestion-ui",
+      "rationale": "UI 作業は shared provider contract ができてから開始するため。"
     }
   ],
   "unresolved_questions": []
@@ -383,7 +392,7 @@ child ticket creation は明示 gate の後ろに置き、Kanban command boundar
 a2o runtime decomposition create-children A2O#123 --gate
 ```
 
-このコマンドは `--gate` がない場合は child を作成せず、eligible proposal を `blocked` に変えずに `gate_closed` evidence を記録する。同じ proposal fingerprint に対する eligible proposal review が必要であり、要求 source ticket からたどれる generated implementation parent を作成または再利用し、その generated parent 配下で既存 child を child key により再利用する。Kanban-first draft mode では、作成される generated parent と child は `Backlog` に配置され、作成または再利用された child は draft の計画 artifact のままである。A2O は child に `a2o:draft-child` を付け、`trigger:auto-implement` や `trigger:auto-parent` は付けない。child が実装スケジューラに入るのは、運用者が承認として `trigger:auto-implement` を付け、さらに `Backlog` から runnable な `To do` lane へ移動した後である。parent automation は元の要求 source ticket ではなく generated parent に適用する。
+このコマンドは `--gate` がない場合は child を作成せず、eligible proposal を `blocked` に変えずに `gate_closed` evidence を記録する。同じ proposal fingerprint に対する eligible proposal review が必要であり、要求 source ticket からたどれる generated implementation parent を作成または再利用し、その generated parent 配下で既存 child を child key により再利用する。Kanban-first draft mode では、作成される generated parent と child は `Backlog` に配置され、作成または再利用された child は draft の計画 artifact のままである。A2O は child に `a2o:draft-child` を付け、`trigger:auto-implement` や `trigger:auto-parent` は付けない。A2O は child の `depends_on` を、生成された child ticket 間の Kanban `blocked` relation に変換する。依存先は proposal の `boundary` または生成済み `child_key` のいずれかに一致する値で解決する。child が実装スケジューラに入るのは、運用者が承認として `trigger:auto-implement` を付け、さらに `Backlog` から runnable な `To do` lane へ移動した後である。parent automation は元の要求 source ticket ではなく generated parent に適用する。
 
 trial cleanup は既定で dry-run になる。
 

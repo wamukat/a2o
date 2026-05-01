@@ -322,7 +322,7 @@ The author command receives:
 
 The author command writes one proposal JSON object to `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH`. A2O normalizes the draft, derives `proposal_fingerprint` and per-child `child_key` values, and stores proposal evidence without creating Kanban child tickets. `outcome` is optional and defaults to `draft_children` for compatibility.
 
-`draft_children` proposals must include at least one child draft. They may include optional `parent.title` and `parent.body`; those values are used only when A2O first creates the generated implementation parent, while A2O always keeps its own source-ticket and proposal-fingerprint metadata. Existing generated parent title/body are not overwritten on rerun. Each child draft requires `title`, `body`, `acceptance_criteria`, `labels`, `depends_on`, `boundary`, and `rationale`. `boundary` must be stable across reruns because A2O derives the child idempotency key from it. `unresolved_questions` must be an array.
+`draft_children` proposals must include at least one child draft. They may include optional `parent.title` and `parent.body`; those values are used only when A2O first creates the generated implementation parent, while A2O always keeps its own source-ticket and proposal-fingerprint metadata. Existing generated parent title/body are not overwritten on rerun. Each child draft requires `title`, `body`, `acceptance_criteria`, `labels`, `depends_on`, `boundary`, and `rationale`. `boundary` must be stable across reruns because A2O derives the child idempotency key from it. `depends_on` should list other child `boundary` values from the same proposal when one generated child must be blocked by another; A2O also accepts generated `child_key` values for rerun compatibility. `unresolved_questions` must be an array.
 
 Use `parent.title` and `parent.body` when the generated implementation parent should carry a project-specific plan instead of the default A2O title/body. The author command returns them in the proposal JSON:
 
@@ -342,6 +342,15 @@ Use `parent.title` and `parent.body` when the generated implementation parent sh
       "depends_on": [],
       "boundary": "address-provider-contract",
       "rationale": "This isolates the shared service contract from UI work."
+    },
+    {
+      "title": "Wire address suggestions into the UI",
+      "body": "Call the address provider contract from the UI flow.",
+      "acceptance_criteria": ["UI displays suggestions", "Fallback behavior is covered"],
+      "labels": ["repo:web"],
+      "depends_on": ["address-provider-contract"],
+      "boundary": "address-suggestion-ui",
+      "rationale": "UI work should start after the shared provider contract exists."
     }
   ],
   "unresolved_questions": []
@@ -379,7 +388,7 @@ Child ticket creation is behind an explicit gate and requires a Kanban command b
 a2o runtime decomposition create-children A2O#123 --gate
 ```
 
-The command refuses to create children without `--gate`, records `gate_closed` evidence without changing an eligible proposal to `blocked`, requires an eligible proposal review for the same proposal fingerprint, creates or reuses a generated implementation parent traceable to the requirement source ticket, and reuses existing children by child key under that generated parent. In Kanban-first draft mode, created children and the generated parent are placed in `Backlog`; created or reused children remain draft planning artifacts. A2O labels children with `a2o:draft-child` and does not apply `trigger:auto-implement` or `trigger:auto-parent`. A child enters implementation scheduling only after an operator accepts it by adding `trigger:auto-implement` and moves it from `Backlog` to the runnable `To do` lane; parent automation applies to the generated parent, not the original requirement source ticket.
+The command refuses to create children without `--gate`, records `gate_closed` evidence without changing an eligible proposal to `blocked`, requires an eligible proposal review for the same proposal fingerprint, creates or reuses a generated implementation parent traceable to the requirement source ticket, and reuses existing children by child key under that generated parent. In Kanban-first draft mode, created children and the generated parent are placed in `Backlog`; created or reused children remain draft planning artifacts. A2O labels children with `a2o:draft-child` and does not apply `trigger:auto-implement` or `trigger:auto-parent`. A2O converts child `depends_on` entries into Kanban `blocked` relations between generated child tickets, resolving dependencies by matching either proposal `boundary` values or generated `child_key` values. A child enters implementation scheduling only after an operator accepts it by adding `trigger:auto-implement` and moves it from `Backlog` to the runnable `To do` lane; parent automation applies to the generated parent, not the original requirement source ticket.
 
 Trial cleanup is dry-run by default:
 
