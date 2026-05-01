@@ -236,6 +236,34 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "does not keep terminal decomposition evidence running when the source lane update lags" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "Sample#5451",
+          kind: :single,
+          edit_scope: [],
+          status: :in_progress,
+          labels: ["trigger:investigate"]
+        )
+      )
+      evidence_dir = File.join(dir, "decomposition-evidence", "Sample-5451")
+      FileUtils.mkdir_p(evidence_dir)
+      File.write(File.join(evidence_dir, "child-creation.json"), JSON.generate("success" => true))
+
+      out = StringIO.new
+      described_class.start(
+        ["watch-summary", "--storage-backend", "json", "--storage-dir", dir],
+        out: out
+      )
+
+      expect(out.string).to include("Scheduler: idle")
+      expect(out.string).to include("- #5451 state=done stage=done")
+      expect(out.string).to include("[_] #5451")
+    end
+  end
+
   it "hides per-task detail lines unless details are requested" do
     Dir.mktmpdir do |dir|
       task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))

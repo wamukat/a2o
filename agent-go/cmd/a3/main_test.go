@@ -7826,7 +7826,10 @@ func TestRuntimeLogsFollowStreamsDecompositionStatusAndActionLog(t *testing.T) {
 			"decomposition task=A2O#61 state=active\nstage=investigate\n",
 			"decomposition task=A2O#61 state=done\nstage=done\n",
 		},
-		runtimeCommandLogOutput: "investigation log line\n",
+		runtimeCommandLogOutputs: []string{
+			"investigation log line\n",
+			"investigation log line\nfinal investigation log line\n",
+		},
 	}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -7845,6 +7848,7 @@ func TestRuntimeLogsFollowStreamsDecompositionStatusAndActionLog(t *testing.T) {
 		"stage=investigate",
 		"=== decomposition log: investigate ===",
 		"investigation log line",
+		"final investigation log line",
 		"decomposition task=A2O#61 state=done",
 	} {
 		if !strings.Contains(output, want) {
@@ -11239,6 +11243,7 @@ type fakeRunner struct {
 	hostAgentOutputs           []string
 	hostAgentOutputIndex       int
 	runtimeCommandLogOutput    string
+	runtimeCommandLogOutputs   []string
 	decompositionPlanOutput    string
 }
 
@@ -11457,6 +11462,11 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	case strings.Contains(joined, " cat /tmp/a2o-runtime-run-once.exit") || strings.Contains(joined, " cat /tmp/a2o-runtime-") && strings.Contains(joined, "-run-once.exit") || strings.Contains(joined, " cat /tmp/a2o-runtime-") && strings.Contains(joined, "decomposition-") && strings.Contains(joined, ".exit"):
 		return []byte("0\n"), nil
 	case strings.Contains(joined, " cat /tmp/a2o-runtime-") && strings.Contains(joined, "decomposition-") && strings.Contains(joined, ".log"):
+		if len(r.runtimeCommandLogOutputs) > 0 {
+			output := r.runtimeCommandLogOutputs[0]
+			r.runtimeCommandLogOutputs = r.runtimeCommandLogOutputs[1:]
+			return []byte(output), nil
+		}
 		return []byte(r.runtimeCommandLogOutput), nil
 	case name == "docker" && len(args) >= 1 && args[0] == "cp":
 		destination := args[len(args)-1]

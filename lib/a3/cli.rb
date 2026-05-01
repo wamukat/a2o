@@ -2461,6 +2461,8 @@ module A3
     end
 
     def active_decomposition_stage_for(task:, status:)
+      return nil if %w[done blocked].include?(status.state)
+
       task_status = task.status.to_sym
       evidence_paths = status.evidence_paths || {}
       return "review" if task_status == :in_review

@@ -2135,6 +2135,7 @@ func followRuntimeDecompositionLogFallback(config runtimeInstanceConfig, plan ru
 	logOffsets := map[string]int{}
 	taskOutput := initialTaskOutput
 	statusOutput := initialStatusOutput
+	lastAction := ""
 	for {
 		state := parseOutputValue(statusOutput, "state")
 		if state == "none" {
@@ -2146,12 +2147,24 @@ func followRuntimeDecompositionLogFallback(config runtimeInstanceConfig, plan ru
 			lastStatusOutput = trimmedStatus
 		}
 		stage := decompositionFollowStage(taskOutput, statusOutput)
-		if stage != "" {
-			if err := printRuntimeDecompositionActionLogDelta(config, plan, runner, stdout, stage, logOffsets); err != nil {
+		action := decompositionLogActionForStage(stage)
+		if lastAction != "" && lastAction != action {
+			if err := printRuntimeDecompositionActionLogDelta(config, plan, runner, stdout, lastAction, logOffsets); err != nil {
 				return err
 			}
 		}
+		if action != "" {
+			if err := printRuntimeDecompositionActionLogDelta(config, plan, runner, stdout, action, logOffsets); err != nil {
+				return err
+			}
+			lastAction = action
+		}
 		if decompositionFollowTerminal(state, taskOutput) {
+			if lastAction != "" {
+				if err := printRuntimeDecompositionActionLogDelta(config, plan, runner, stdout, lastAction, logOffsets); err != nil {
+					return err
+				}
+			}
 			return nil
 		}
 		time.Sleep(pollInterval)
