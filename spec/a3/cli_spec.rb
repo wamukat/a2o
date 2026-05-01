@@ -611,6 +611,7 @@ RSpec.describe A3::CLI do
   it "does not attempt automatic draft creation when proposal review is not eligible" do
     out = StringIO.new
     task = A3::Domain::Task.new(ref: "A3-v2#5300", kind: :single, edit_scope: [:repo_alpha], labels: ["trigger:investigate"])
+    status_publisher = instance_double(A3::Infra::NullExternalTaskStatusPublisher)
     session = Struct.new(:options, :container, :project_context, :project_surface, keyword_init: true).new(
       options: {
         task_ref: "A3-v2#5300",
@@ -620,7 +621,10 @@ RSpec.describe A3::CLI do
         kanban_command: "kanban",
         kanban_project: "A3-v2"
       },
-      container: { external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new },
+      container: {
+        external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new,
+        external_task_status_publisher: status_publisher
+      },
       project_context: Object.new,
       project_surface: Object.new
     )
@@ -637,6 +641,28 @@ RSpec.describe A3::CLI do
     allow(described_class).to receive(:resolve_direct_task).and_return(task)
     allow(A3::Application::RunDecompositionProposalReview).to receive(:new).and_return(review_service)
     expect(A3::Application::RunDecompositionChildCreation).not_to receive(:new)
+    expect(status_publisher).to receive(:publish).with(
+      task_ref: "A3-v2#5300",
+      external_task_id: nil,
+      status: :in_review,
+      task_kind: :single
+    ).ordered
+    expect(status_publisher).to receive(:publish).with(
+      task_ref: "A3-v2#5300",
+      external_task_id: nil,
+      status: :blocked,
+      task_kind: :single,
+      status_reason: "proposal review blocked by 1 critical finding(s)",
+      status_details: {
+        "disposition" => "blocked",
+        "critical_findings" => [
+          {
+            "severity" => "critical",
+            "summary" => "missing dependency"
+          }
+        ]
+      }
+    ).ordered
 
     described_class.start(["run-decomposition-proposal-review", "A3-v2#5300", "/tmp/project.yaml"], out: out)
 
