@@ -62,6 +62,36 @@ func TestExecutorWritesLiveLogWhenConfigured(t *testing.T) {
 	}
 }
 
+func TestExecutorWritesDecompositionLiveLogByCommandIntent(t *testing.T) {
+	tempDir := t.TempDir()
+	request := testRequest(tempDir)
+	request.TaskRef = "A2O#44"
+	request.Phase = "verification"
+	request.WorkerProtocolRequest = map[string]any{"command_intent": "decomposition_propose"}
+	request.Command = os.Args[0]
+	request.Args = []string{"-test.run=TestHelperProcess", "--", "ok"}
+	request.Env = map[string]string{
+		"GO_WANT_HELPER_PROCESS":  "1",
+		"A2O_AGENT_LIVE_LOG_ROOT": filepath.Join(tempDir, "live-logs"),
+	}
+
+	result := Executor{}.Execute(request)
+	if result.Status != "succeeded" {
+		t.Fatalf("status = %s log=%s", result.Status, string(result.CombinedLog))
+	}
+
+	if _, err := os.Stat(filepath.Join(tempDir, "live-logs", "A2O-44", "verification.log")); !os.IsNotExist(err) {
+		t.Fatalf("decomposition live log should not reuse verification.log, err=%v", err)
+	}
+	body, err := os.ReadFile(filepath.Join(tempDir, "live-logs", "A2O-44", "decomposition_propose.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != string(result.CombinedLog) {
+		t.Fatalf("live log mismatch: got=%q want=%q", string(body), string(result.CombinedLog))
+	}
+}
+
 func TestExecutorPrefersRequestLiveLogRootOverProcessEnv(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("A2O_AGENT_LIVE_LOG_ROOT", filepath.Join(tempDir, "wrong-live-logs"))
