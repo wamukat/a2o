@@ -94,7 +94,7 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
       write_evidence(dir)
       source_remote = {
         "provider" => "github",
-        "display_ref" => "wamukat/a2o#41",
+        "displayRef" => "wamukat/a2o#41",
         "url" => "https://github.com/wamukat/a2o/issues/41"
       }
       writer = instance_double("ProposalChildWriter")

@@ -16,8 +16,8 @@ module A3
         remote = normalize(value)
         return nil unless remote
 
-        display = first_present(remote, "display_ref", "ref", "reference", "issue_ref", "external_ref", "key", "id")
-        url = first_present(remote, "html_url", "web_url", "url")
+        display = first_present(remote, "display_ref", "displayRef", "ref", "reference", "issue_ref", "issueRef", "external_ref", "externalRef", "key", "issue_key", "issueKey", "id")
+        url = first_present(remote, "html_url", "htmlUrl", "web_url", "webUrl", "remote_url", "remoteUrl", "url")
         provider = first_present(remote, "provider", "kind", "source")
         parts = []
         parts << provider if provider
@@ -33,12 +33,12 @@ module A3
         return "" unless remote
 
         lines = ["", "#{heading}:"]
-        %w[provider display_ref ref reference issue_ref external_ref url html_url web_url].each do |key|
+        %w[provider display_ref displayRef ref reference issue_ref issueRef external_ref externalRef url remote_url remoteUrl html_url htmlUrl web_url webUrl].each do |key|
           next unless remote.key?(key)
 
           lines << "- #{key}: #{remote.fetch(key)}"
         end
-        (remote.keys - %w[provider display_ref ref reference issue_ref external_ref url html_url web_url]).sort.each do |key|
+        (remote.keys - %w[provider display_ref displayRef ref reference issue_ref issueRef external_ref externalRef url remote_url remoteUrl html_url htmlUrl web_url webUrl]).sort.each do |key|
           value = remote.fetch(key)
           lines << "- #{key}: #{value}" unless value.is_a?(Hash) || value.is_a?(Array)
         end

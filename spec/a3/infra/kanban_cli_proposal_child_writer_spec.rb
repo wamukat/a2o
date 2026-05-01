@@ -303,7 +303,7 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     writer = described_class.new(project: "Portal", client: client, mode: :draft)
     source_remote = {
       "provider" => "github",
-      "display_ref" => "wamukat/a2o#16",
+      "displayRef" => "wamukat/a2o#16",
       "url" => "https://github.com/wamukat/a2o/issues/16"
     }
 
@@ -314,7 +314,7 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     expect(result.child_refs).to eq(["A3-v2#5302"])
     expect(generated_parent(client).fetch("description")).to include("Decomposition source: wamukat/a2o#16")
     expect(generated_parent(client).fetch("description")).to include("Source remote:")
-    expect(generated_parent(client).fetch("description")).to include("- display_ref: wamukat/a2o#16")
+    expect(generated_parent(client).fetch("description")).to include("- displayRef: wamukat/a2o#16")
     expect(generated_parent(client).fetch("description")).to include("- url: https://github.com/wamukat/a2o/issues/16")
     expect(generated_child(client).fetch("description")).to include("Parent: A3-v2#5301")
     expect(generated_child(client).fetch("description")).not_to include("Source remote")
