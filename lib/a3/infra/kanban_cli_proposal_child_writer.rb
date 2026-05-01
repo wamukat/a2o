@@ -92,7 +92,7 @@ module A3
         ensure_label(task.fetch("id"), DECOMPOSED_LABEL)
         ensure_relation(source_external_task_id, task.fetch("id"), relation_kind: "related") if source_external_task_id
         ensure_comment(task.fetch("id"), payload.fetch("comment"))
-        ensure_source_parent_comment(source_external_task_id, generated_parent_ref: task.fetch("ref"), proposal_fingerprint: proposal_fingerprint, source_remote: source_remote) if source_external_task_id
+        ensure_source_parent_comment(source_external_task_id, generated_parent_ref: task.fetch("ref"), proposal_fingerprint: proposal_fingerprint) if source_external_task_id
         task
       end
 
@@ -361,12 +361,10 @@ module A3
         false
       end
 
-      def ensure_source_parent_comment(source_task_id, generated_parent_ref:, proposal_fingerprint:, source_remote:)
-        remote_summary = A3::Domain::SourceRemote.summary(source_remote)
-        suffix = remote_summary ? " Source remote: #{remote_summary}." : ""
+      def ensure_source_parent_comment(source_task_id, generated_parent_ref:, proposal_fingerprint:)
         ensure_comment(
           source_task_id,
-          "Generated implementation parent #{generated_parent_ref} from decomposition proposal #{proposal_fingerprint}.#{suffix}"
+          "Generated implementation parent #{generated_parent_ref} from decomposition proposal #{proposal_fingerprint}."
         )
       end
 

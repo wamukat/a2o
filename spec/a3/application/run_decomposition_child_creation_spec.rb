@@ -109,7 +109,7 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
 
       evidence = JSON.parse(File.read(result.evidence_path))
       expect(evidence.fetch("source_remote")).to eq(source_remote)
-      expect(evidence.fetch("source_ticket_summary")).to include("Source remote: github wamukat/a2o#41 https://github.com/wamukat/a2o/issues/41")
+      expect(evidence.fetch("source_ticket_summary")).not_to include("Source remote:")
     end
   end
 

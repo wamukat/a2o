@@ -327,7 +327,8 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     )
     expect(client.comments.any? { |args| args.include?("240") }).to be(true)
     source_comment = client.instance_variable_get(:@comment_texts)["240"].join("\n")
-    expect(source_comment).to include("Source remote: github wamukat/a2o#16 https://github.com/wamukat/a2o/issues/16")
+    expect(source_comment).to include("Generated implementation parent A3-v2#5301")
+    expect(source_comment).not_to include("Source remote:")
   end
 
   it "filters proposed automation trigger labels from draft children" do

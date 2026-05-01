@@ -155,8 +155,7 @@ module A3
           parent_ref: parent_ref,
           child_refs: child_refs,
           proposal: proposal_evidence && proposal_evidence["proposal"],
-          evidence_path: path,
-          source_remote: source_remote
+          evidence_path: path
         )
         evidence_payload = {
           "task_ref" => task.ref,
@@ -201,7 +200,7 @@ module A3
         end
       end
 
-      def source_ticket_summary_for(success:, status:, summary:, parent_ref:, child_refs:, proposal:, evidence_path:, source_remote:)
+      def source_ticket_summary_for(success:, status:, summary:, parent_ref:, child_refs:, proposal:, evidence_path:)
         stage_state =
           if success == true
             "completed"
@@ -220,8 +219,6 @@ module A3
         end
         lines << "Generated parent: #{parent_ref || 'none'}"
         lines << "Draft children: #{child_refs.empty? ? 'none' : child_refs.join(', ')}"
-        remote_summary = A3::Domain::SourceRemote.summary(source_remote)
-        lines << "Source remote: #{remote_summary}" if remote_summary
         if success == true && status == "created"
           lines << "Accept: add trigger:auto-implement to a draft child when it is ready for implementation."
           lines << "Parent automation: add trigger:auto-parent to the generated parent after accepted child work is ready."
