@@ -12,39 +12,6 @@ module A3
         compact
       end
 
-      def summary(value)
-        remote = normalize(value)
-        return nil unless remote
-
-        display = first_present(remote, "display_ref", "displayRef", "ref", "reference", "issue_ref", "issueRef", "external_ref", "externalRef", "key", "issue_key", "issueKey", "id")
-        url = first_present(remote, "html_url", "htmlUrl", "web_url", "webUrl", "remote_url", "remoteUrl", "url")
-        provider = first_present(remote, "provider", "kind", "source")
-        parts = []
-        parts << provider if provider
-        parts << display if display
-        parts << url if url && url != display
-        return nil if parts.empty?
-
-        parts.join(" ")
-      end
-
-      def markdown_block(value, heading: "Source remote")
-        remote = normalize(value)
-        return "" unless remote
-
-        lines = ["", "#{heading}:"]
-        %w[provider display_ref displayRef ref reference issue_ref issueRef external_ref externalRef url remote_url remoteUrl html_url htmlUrl web_url webUrl].each do |key|
-          next unless remote.key?(key)
-
-          lines << "- #{key}: #{remote.fetch(key)}"
-        end
-        (remote.keys - %w[provider display_ref displayRef ref reference issue_ref issueRef external_ref externalRef url remote_url remoteUrl html_url htmlUrl web_url webUrl]).sort.each do |key|
-          value = remote.fetch(key)
-          lines << "- #{key}: #{value}" unless value.is_a?(Hash) || value.is_a?(Array)
-        end
-        lines.join("\n")
-      end
-
       def compact_value(value)
         case value
         when Hash
@@ -65,14 +32,6 @@ module A3
           text = value.to_s.strip
           text.empty? ? nil : text
         end
-      end
-
-      def first_present(remote, *keys)
-        keys.each do |key|
-          value = remote[key]
-          return value.to_s if value && !value.to_s.strip.empty?
-        end
-        nil
       end
 
       def blank_compact_value?(value)

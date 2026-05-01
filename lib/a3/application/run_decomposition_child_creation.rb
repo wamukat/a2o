@@ -33,8 +33,7 @@ module A3
         write_result = @child_writer.call(
           parent_task_ref: task.ref,
           parent_external_task_id: task.external_task_id,
-          proposal_evidence: proposal_evidence,
-          source_remote: source_remote
+          proposal_evidence: proposal_evidence
         )
         if write_result.success?
           persist_evidence(

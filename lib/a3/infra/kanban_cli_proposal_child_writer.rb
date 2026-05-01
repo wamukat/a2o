@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 require "a3/domain/refactoring_assessment"
-require "a3/domain/source_remote"
-
 module A3
   module Infra
     class KanbanCliProposalChildWriter
@@ -29,8 +27,7 @@ module A3
         raise A3::Domain::ConfigurationError, "unknown proposal child writer mode: #{mode}" unless %i[runnable draft].include?(@mode)
       end
 
-      def call(parent_task_ref:, parent_external_task_id:, proposal_evidence:, source_remote: nil)
-        source_remote = A3::Domain::SourceRemote.normalize(source_remote)
+      def call(parent_task_ref:, parent_external_task_id:, proposal_evidence:)
         proposal = proposal_evidence.fetch("proposal")
         proposal_fingerprint = proposal_evidence.fetch("proposal_fingerprint")
         children = proposal.fetch("children")
@@ -42,8 +39,7 @@ module A3
           source_task_ref: parent_task_ref,
           source_external_task_id: parent_external_task_id,
           proposal_fingerprint: proposal_fingerprint,
-          proposal: proposal,
-          source_remote: source_remote
+          proposal: proposal
         )
         children.each do |child|
           begin
@@ -86,8 +82,8 @@ module A3
 
       private
 
-      def ensure_generated_parent(source_task_ref:, source_external_task_id:, proposal_fingerprint:, proposal:, source_remote:)
-        payload = generated_parent_payload(source_task_ref: source_task_ref, proposal_fingerprint: proposal_fingerprint, proposal: proposal, source_remote: source_remote)
+      def ensure_generated_parent(source_task_ref:, source_external_task_id:, proposal_fingerprint:, proposal:)
+        payload = generated_parent_payload(source_task_ref: source_task_ref, proposal_fingerprint: proposal_fingerprint, proposal: proposal)
         task = find_existing_generated_parent(source_task_ref) || create_child(payload)
         ensure_label(task.fetch("id"), DECOMPOSED_LABEL)
         ensure_relation(source_external_task_id, task.fetch("id"), relation_kind: "related") if source_external_task_id
@@ -96,21 +92,17 @@ module A3
         task
       end
 
-      def generated_parent_payload(source_task_ref:, proposal_fingerprint:, proposal:, source_remote:)
+      def generated_parent_payload(source_task_ref:, proposal_fingerprint:, proposal:)
         parent = proposal["parent"].is_a?(Hash) ? proposal["parent"] : {}
         parent_title = parent["title"].to_s.strip
         parent_body = parent["body"].to_s.strip
         refactoring_body = refactoring_assessment_body(proposal["refactoring_assessment"])
-        remote_body = A3::Domain::SourceRemote.markdown_block(source_remote)
-        remote_summary = A3::Domain::SourceRemote.summary(source_remote)
         comment = "Created generated implementation parent for requirement #{source_task_ref}; proposal #{proposal_fingerprint}."
-        comment = "#{comment} Source remote: #{remote_summary}." if remote_summary
         {
           "title" => parent_title.empty? ? "Implementation plan for #{source_task_ref}" : parent_title,
           "description" => <<~DESC.strip,
             Decomposition source: #{source_task_ref}
             Proposal fingerprint: #{proposal_fingerprint}
-            #{remote_body}
 
             #{parent_body.empty? ? "This generated parent groups implementation draft children created from the requirement ticket." : parent_body}
             #{refactoring_body}

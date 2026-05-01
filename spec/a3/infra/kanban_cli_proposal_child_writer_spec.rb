@@ -301,24 +301,16 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
   it "creates non-runnable local draft children for a remote source without marking the source parent runnable" do
     client = FakeProposalClient.new
     writer = described_class.new(project: "Portal", client: client, mode: :draft)
-    source_remote = {
-      "provider" => "github",
-      "displayRef" => "wamukat/a2o#16",
-      "url" => "https://github.com/wamukat/a2o/issues/16"
-    }
 
-    result = writer.call(parent_task_ref: "wamukat/a2o#16", parent_external_task_id: 240, proposal_evidence: proposal_evidence, source_remote: source_remote)
+    result = writer.call(parent_task_ref: "wamukat/a2o#16", parent_external_task_id: 240, proposal_evidence: proposal_evidence)
 
     expect(result.success?).to be(true)
     expect(result.parent_ref).to eq("A3-v2#5301")
     expect(result.child_refs).to eq(["A3-v2#5302"])
     expect(generated_parent(client).fetch("description")).to include("Decomposition source: wamukat/a2o#16")
-    expect(generated_parent(client).fetch("description")).to include("Source remote:")
-    expect(generated_parent(client).fetch("description")).to include("- displayRef: wamukat/a2o#16")
-    expect(generated_parent(client).fetch("description")).to include("- url: https://github.com/wamukat/a2o/issues/16")
+    expect(generated_parent(client).fetch("description")).not_to include("Source remote")
     expect(generated_child(client).fetch("description")).to include("Parent: A3-v2#5301")
     expect(generated_child(client).fetch("description")).not_to include("Source remote")
-    expect(generated_child(client).fetch("description")).not_to include("https://github.com/wamukat/a2o/issues/16")
     expect(client.labels.any? { |args| args.include?("a2o:draft-child") }).to be(true)
     expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(false)
     expect(client.labels.any? { |args| args.include?("trigger:auto-parent") }).to be(false)
