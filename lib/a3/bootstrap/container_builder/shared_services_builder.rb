@@ -16,6 +16,7 @@ module A3
           {
             plan_persisted_rerun: plan_persisted_rerun,
             execute_next_runnable_task: execute_next_runnable_task,
+            execute_runnable_task_batch: execute_runnable_task_batch,
             cleanup_terminal_task_workspaces: cleanup_terminal_task_workspaces,
             quarantine_terminal_task_workspaces: quarantine_terminal_task_workspaces,
             scheduler_cycle_journal: scheduler_cycle_journal,
@@ -47,9 +48,22 @@ module A3
         def execute_until_idle
           @execute_until_idle ||= A3::Application::ExecuteUntilIdle.new(
             execute_next_runnable_task: execute_next_runnable_task,
+            execute_runnable_task_batch: execute_runnable_task_batch,
             cycle_journal: scheduler_cycle_journal,
             quarantine_terminal_task_workspaces: quarantine_terminal_task_workspaces,
             cleanup_terminal_task_workspaces: cleanup_terminal_task_workspaces
+          )
+        end
+
+        def execute_runnable_task_batch
+          @execute_runnable_task_batch ||= A3::Application::ExecuteRunnableTaskBatch.new(
+            plan_runnable_task_batch: @context.plan_runnable_task_batch,
+            schedule_next_run: @context.schedule_next_run,
+            task_claim_repository: @context.task_claim_repository,
+            run_repository: @context.run_repository,
+            run_worker_phase: @context.run_worker_phase,
+            run_verification: @context.run_verification,
+            run_merge: @context.run_merge
           )
         end
 

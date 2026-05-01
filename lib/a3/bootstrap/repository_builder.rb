@@ -17,6 +17,7 @@ module A3
           task_metrics_repository: task_metrics_repository,
           scheduler_state_repository: scheduler_state_repository(store),
           scheduler_cycle_repository: scheduler_cycle_repository(store),
+          task_claim_repository: task_claim_repository,
           shared_ref_lock_repository: A3::Infra::InMemorySharedRefLockRepository.new
         }
       end
@@ -67,6 +68,17 @@ module A3
           A3::Infra::SqliteTaskMetricsRepository.new(File.join(storage_dir, "a3.sqlite3"))
         else
           A3::Infra::InMemoryTaskMetricsRepository.new
+        end
+      end
+
+      def task_claim_repository
+        case task_repository
+        when A3::Infra::JsonTaskRepository
+          A3::Infra::JsonSchedulerTaskClaimRepository.new(File.join(storage_dir, "scheduler_task_claims.json"))
+        when A3::Infra::SqliteTaskRepository
+          A3::Infra::SqliteSchedulerTaskClaimRepository.new(File.join(storage_dir, "a3.sqlite3"))
+        else
+          A3::Infra::InMemorySchedulerTaskClaimRepository.new
         end
       end
     end

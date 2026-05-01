@@ -17,6 +17,12 @@ module A3
             task_repository: repositories.fetch(:task_repository),
             sync_external_tasks: sync_external_tasks
           )
+          plan_runnable_task_batch = A3::Application::PlanRunnableTaskBatch.new(
+            task_repository: repositories.fetch(:task_repository),
+            run_repository: repositories.fetch(:run_repository),
+            task_claim_repository: repositories.fetch(:task_claim_repository),
+            sync_external_tasks: sync_external_tasks
+          )
           start_run = A3::Application::StartRun.new(
             start_phase: support_group.fetch(:start_phase),
             register_started_run: support_group.fetch(:register_started_run),
@@ -38,6 +44,7 @@ module A3
           {
             sync_external_tasks: sync_external_tasks,
             plan_next_runnable_task: plan_next_runnable_task,
+            plan_runnable_task_batch: plan_runnable_task_batch,
             plan_next_decomposition_task: plan_next_decomposition_task,
             start_run: start_run,
             schedule_next_run: schedule_next_run

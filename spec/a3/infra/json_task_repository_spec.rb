@@ -42,4 +42,18 @@ RSpec.describe A3::Infra::JsonTaskRepository do
 
     expect { repository.fetch(task.ref) }.to raise_error(A3::Domain::RecordNotFound)
   end
+
+  it "serializes concurrent read-modify-write updates" do
+    threads = 10.times.map do |index|
+      Thread.new do
+        repository.save(
+          A3::Domain::Task.new(ref: "A3-v2##{3100 + index}", kind: :single, edit_scope: [:repo_alpha])
+        )
+      end
+    end
+
+    threads.each(&:join)
+
+    expect(repository.all.map(&:ref)).to contain_exactly(*10.times.map { |index| "A3-v2##{3100 + index}" })
+  end
 end

@@ -71,7 +71,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     expect(surface.scheduler_config.max_parallel_tasks).to eq(1)
   end
 
-  it "rejects max_parallel_tasks greater than one until parallel scheduler prerequisites exist" do
+  it "loads max_parallel_tasks greater than one for the bounded parallel scheduler" do
     project_config_path = write_project_config(
       "runtime" => {
         "scheduler" => {
@@ -88,8 +88,9 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
       }
     )
 
-    expect { loader.load(project_config_path) }
-      .to raise_error(A3::Domain::ConfigurationError, /max_parallel_tasks > 1 is not supported yet/)
+    surface = loader.load(project_config_path)
+
+    expect(surface.scheduler_config.max_parallel_tasks).to eq(2)
   end
 
   it "loads runtime notification hooks" do

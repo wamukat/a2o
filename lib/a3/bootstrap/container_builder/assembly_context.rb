@@ -33,6 +33,10 @@ module A3
           @repositories.fetch(:scheduler_cycle_repository)
         end
 
+        def task_claim_repository
+          @repositories.fetch(:task_claim_repository)
+        end
+
         def build_scope_snapshot
           @runtime_services.fetch(:build_scope_snapshot)
         end
@@ -52,6 +56,10 @@ module A3
 
         def plan_next_runnable_task
           @runtime_services.fetch(:plan_next_runnable_task)
+        end
+
+        def plan_runnable_task_batch
+          @runtime_services.fetch(:plan_runnable_task_batch)
         end
 
         def plan_next_decomposition_task

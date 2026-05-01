@@ -6,12 +6,13 @@ module A3
       RepairAction = Struct.new(:kind, :target_ref, :applied, keyword_init: true)
       Result = Struct.new(:dry_run, :actions, keyword_init: true)
 
-      def initialize(task_repository:, run_repository:, storage_dir:, execution_process_probe: nil, agent_job_store: nil)
+      def initialize(task_repository:, run_repository:, storage_dir:, execution_process_probe: nil, agent_job_store: nil, task_claim_repository: nil)
         @task_repository = task_repository
         @run_repository = run_repository
         @storage_dir = File.expand_path(storage_dir)
         @execution_process_probe = execution_process_probe || A3::Application::ExecutionProcessProbe.new(storage_dir: @storage_dir)
         @agent_job_store = agent_job_store
+        @task_claim_repository = task_claim_repository
       end
 
       def call(apply:)
@@ -57,6 +58,14 @@ module A3
             applied: apply
           )
         end
+
+        repair_stale_task_claims(
+          actions: actions,
+          runs_by_ref: runs_by_ref,
+          apply: apply,
+          shot_active: shot_active,
+          direct_run_active: direct_run_active
+        )
 
         Result.new(dry_run: !apply, actions: actions.freeze)
       end
@@ -132,6 +141,42 @@ module A3
         end
       rescue JSON::ParserError, A3::Domain::ConfigurationError
         []
+      end
+
+      def repair_stale_task_claims(actions:, runs_by_ref:, apply:, shot_active:, direct_run_active:)
+        return unless @task_claim_repository
+
+        @task_claim_repository.active_claims.each do |claim|
+          run = claim.run_ref ? runs_by_ref[claim.run_ref] : nil
+          next if active_task_claim?(claim: claim, run: run, shot_active: shot_active, direct_run_active: direct_run_active)
+
+          if apply
+            @task_claim_repository.mark_claim_stale(
+              claim_ref: claim.claim_ref,
+              reason: stale_task_claim_reason(claim: claim, run: run, shot_active: shot_active, direct_run_active: direct_run_active)
+            )
+          end
+          actions << RepairAction.new(kind: :stale_scheduler_task_claim, target_ref: claim.claim_ref, applied: apply)
+        end
+      end
+
+      def active_task_claim?(claim:, run:, shot_active:, direct_run_active:)
+        return shot_active || direct_run_active unless claim.run_ref
+        return false unless run
+        return false if run.terminal?
+        return false unless workspace_present?(run)
+
+        shot_active || direct_run_active
+      end
+
+      def stale_task_claim_reason(claim:, run:, shot_active:, direct_run_active:)
+        return "scheduler task claim has no linked run and no active scheduler process" unless claim.run_ref
+        return "scheduler task claim references missing run" unless run
+        return "scheduler task claim references terminal run" if run.terminal?
+        return "scheduler task claim run workspace is missing" unless workspace_present?(run)
+        return "scheduler task claim runtime process is not active" unless shot_active || direct_run_active
+
+        "scheduler task claim is stale"
       end
 
       def agent_job_store

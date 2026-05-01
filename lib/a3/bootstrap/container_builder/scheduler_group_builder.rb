@@ -19,7 +19,8 @@ module A3
             repair_runs: A3::Application::RepairRuns.new(
               task_repository: context.task_repository,
               run_repository: context.run_repository,
-              storage_dir: context.storage_dir.to_s
+              storage_dir: context.storage_dir.to_s,
+              task_claim_repository: context.task_claim_repository
             ),
             force_stop_run: A3::Application::ForceStopRun.new(
               task_repository: context.task_repository,

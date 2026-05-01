@@ -23,10 +23,6 @@ module A3
         if max_parallel_tasks < 1
           raise A3::Domain::ConfigurationError, "project.yaml runtime.scheduler.max_parallel_tasks must be greater than or equal to 1"
         end
-        if max_parallel_tasks > 1
-          raise A3::Domain::ConfigurationError,
-                "project.yaml runtime.scheduler.max_parallel_tasks > 1 is not supported yet; requires scheduler task claims, batch planning, and shared-ref publish/merge locks"
-        end
 
         new(max_parallel_tasks: max_parallel_tasks)
       end

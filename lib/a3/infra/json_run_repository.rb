@@ -15,34 +15,52 @@ module A3
       end
 
       def save(run)
-        records = load_records_for_write
-        records[run.ref] = A3::Adapters::RunRecord.dump(run)
-        write_records(records)
+        with_records_lock do
+          records = load_records_for_write
+          records[run.ref] = A3::Adapters::RunRecord.dump(run)
+          write_records(records)
+        end
       end
 
       def fetch(run_ref)
-        record = load_records.fetch(run_ref)
+        record = with_records_lock { load_records.fetch(run_ref) }
         A3::Adapters::RunRecord.load(record)
       rescue *RECORD_CORRUPTION_ERRORS
         raise A3::Domain::RecordNotFound, "Run not found: #{run_ref}"
       end
 
       def all
-        load_records
-          .values
-          .filter_map { |record| load_valid_record(record) }
-          .freeze
+        with_records_lock do
+          load_records
+            .values
+            .filter_map { |record| load_valid_record(record) }
+            .freeze
+        end
       end
 
       def corrupt_run_refs
-        load_records
-          .each_with_object([]) do |(ref, record), refs|
-            refs << ref unless load_valid_record(record)
-          end
-          .freeze
+        with_records_lock do
+          load_records
+            .each_with_object([]) do |(ref, record), refs|
+              refs << ref unless load_valid_record(record)
+            end
+            .freeze
+        end
       end
 
       private
+
+      def with_records_lock
+        FileUtils.mkdir_p(File.dirname(@path))
+        File.open(lock_path, File::RDWR | File::CREAT, 0o644) do |lock|
+          lock.flock(File::LOCK_EX)
+          yield
+        end
+      end
+
+      def lock_path
+        "#{@path}.lock"
+      end
 
       def load_records
         return {} unless File.exist?(@path)

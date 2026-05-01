@@ -9,12 +9,14 @@ RSpec.describe A3::Bootstrap::ContainerBuilder::SharedServicesBuilder do
       task_repository: A3::Infra::InMemoryTaskRepository.new,
       run_repository: A3::Infra::InMemoryRunRepository.new,
       scheduler_state_repository: A3::Infra::InMemorySchedulerStateRepository.new(scheduler_store),
-      scheduler_cycle_repository: A3::Infra::InMemorySchedulerCycleRepository.new(scheduler_store)
+      scheduler_cycle_repository: A3::Infra::InMemorySchedulerCycleRepository.new(scheduler_store),
+      task_claim_repository: A3::Infra::InMemorySchedulerTaskClaimRepository.new
     }
     runtime_services = {
       plan_rerun: instance_double(A3::Application::PlanRerun),
       build_scope_snapshot: instance_double(A3::Application::BuildScopeSnapshot),
       build_artifact_owner: instance_double(A3::Application::BuildArtifactOwner),
+      plan_runnable_task_batch: instance_double(A3::Application::PlanRunnableTaskBatch),
       schedule_next_run: instance_double(A3::Application::ScheduleNextRun),
       run_worker_phase: instance_double(A3::Application::RunWorkerPhase),
       run_verification: instance_double(A3::Application::RunVerification),

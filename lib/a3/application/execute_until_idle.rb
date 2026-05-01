@@ -10,9 +10,10 @@ module A3
     class ExecuteUntilIdle
       Result = SchedulerLoop::Result
 
-      def initialize(execute_next_runnable_task:, cycle_journal:, quarantine_terminal_task_workspaces:, cleanup_terminal_task_workspaces:)
+      def initialize(execute_next_runnable_task:, cycle_journal:, quarantine_terminal_task_workspaces:, cleanup_terminal_task_workspaces:, execute_runnable_task_batch: nil)
         @scheduler_loop = A3::Application::SchedulerLoop.new(
           execute_next_runnable_task: execute_next_runnable_task,
+          execute_runnable_task_batch: execute_runnable_task_batch,
           cycle_journal: cycle_journal,
           cleanup_runner: A3::Application::SchedulerCleanupRunner.new(
             cleanup_terminal_task_workspaces: cleanup_terminal_task_workspaces

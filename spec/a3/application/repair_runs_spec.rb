@@ -254,6 +254,70 @@ RSpec.describe A3::Application::RepairRuns do
     end
   end
 
+  it "marks scheduler task claims stale when their linked run is no longer active" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::InMemoryTaskRepository.new
+      run_repository = A3::Infra::InMemoryRunRepository.new
+      task_claim_repository = A3::Infra::InMemorySchedulerTaskClaimRepository.new(claim_ref_generator: -> { "claim-stale" })
+      run_repository.save(stale_run(ref: "run-terminal", task_ref: "Sample#418").complete(outcome: :completed))
+      claim = task_claim_repository.claim_task(
+        task_ref: "Sample#418",
+        phase: :implementation,
+        parent_group_key: "Sample#418",
+        claimed_by: "scheduler-test",
+        claimed_at: "2026-04-30T01:00:00Z"
+      )
+      task_claim_repository.link_run(claim_ref: claim.claim_ref, run_ref: "run-terminal")
+
+      use_case = described_class.new(
+        task_repository: task_repository,
+        run_repository: run_repository,
+        storage_dir: dir,
+        task_claim_repository: task_claim_repository
+      )
+
+      dry_run = use_case.call(apply: false)
+      expect(dry_run.actions.map(&:kind)).to contain_exactly(:stale_scheduler_task_claim)
+      expect(task_claim_repository.active_claims.map(&:claim_ref)).to eq(["claim-stale"])
+
+      applied = use_case.call(apply: true)
+      expect(applied.actions.map(&:kind)).to contain_exactly(:stale_scheduler_task_claim)
+      expect(task_claim_repository.active_claims).to be_empty
+      expect(task_claim_repository.fetch("claim-stale").stale_reason).to eq("scheduler task claim references terminal run")
+    end
+  end
+
+  it "keeps scheduler task claims active while their run workspace and runtime process are active" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::InMemoryTaskRepository.new
+      run_repository = A3::Infra::InMemoryRunRepository.new
+      task_claim_repository = A3::Infra::InMemorySchedulerTaskClaimRepository.new(claim_ref_generator: -> { "claim-active" })
+      run_repository.save(stale_run(ref: "run-active", task_ref: "Sample#419"))
+      FileUtils.mkdir_p(File.join(dir, "workspaces", "Sample-419", "ticket_workspace"))
+      claim = task_claim_repository.claim_task(
+        task_ref: "Sample#419",
+        phase: :implementation,
+        parent_group_key: "Sample#419",
+        claimed_by: "scheduler-test",
+        claimed_at: "2026-04-30T01:00:00Z"
+      )
+      task_claim_repository.link_run(claim_ref: claim.claim_ref, run_ref: "run-active")
+      probe = instance_double(A3::Application::ExecutionProcessProbe, active_execute_until_idle?: true)
+
+      use_case = described_class.new(
+        task_repository: task_repository,
+        run_repository: run_repository,
+        storage_dir: dir,
+        execution_process_probe: probe,
+        task_claim_repository: task_claim_repository
+      )
+
+      dry_run = use_case.call(apply: false)
+      expect(dry_run.actions).to eq([])
+      expect(task_claim_repository.active_claims.map(&:claim_ref)).to eq(["claim-active"])
+    end
+  end
+
   def agent_job_request(job_id, task_ref:, run_ref:)
     A3::Domain::AgentJobRequest.new(
       job_id: job_id,
@@ -268,6 +332,18 @@ RSpec.describe A3::Application::RepairRuns do
       env: {},
       timeout_seconds: 1800,
       artifact_rules: []
+    )
+  end
+
+  def stale_run(ref:, task_ref:)
+    A3::Domain::Run.new(
+      ref: ref,
+      task_ref: task_ref,
+      phase: :implementation,
+      workspace_kind: :ticket_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.ticket_branch_head(task_ref: task_ref, ref: "refs/heads/a2o/work/#{task_ref.tr("#", "-")}"),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], ownership_scope: :task),
+      artifact_owner: A3::Domain::ArtifactOwner.new(owner_ref: task_ref, owner_scope: :task, snapshot_version: "refs/heads/a2o/work/#{task_ref.tr("#", "-")}")
     )
   end
 end

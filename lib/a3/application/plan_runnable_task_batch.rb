@@ -38,7 +38,7 @@ module A3
         task_repository:,
         run_repository:,
         task_claim_repository:,
-        max_parallel_tasks:,
+        max_parallel_tasks: 1,
         sync_external_tasks: nil,
         scheduler_selection_policy: A3::Domain::SchedulerSelectionPolicy.new
       )
@@ -50,12 +50,12 @@ module A3
         @scheduler_selection_policy = scheduler_selection_policy
       end
 
-      def call
+      def call(max_parallel_tasks: @max_parallel_tasks)
         @sync_external_tasks&.call
         tasks = @task_repository.all
         assessments = tasks.map { |task| A3::Domain::RunnableTaskAssessment.evaluate(task: task, tasks: tasks) }.freeze
         active_reservations = active_reservations_for(tasks: tasks)
-        available_slot_count = [@max_parallel_tasks - active_reservations.task_refs.size, 0].max
+        available_slot_count = [Integer(max_parallel_tasks) - active_reservations.task_refs.size, 0].max
         if available_slot_count.zero?
           return result(
             candidates: [],

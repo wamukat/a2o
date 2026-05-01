@@ -26,11 +26,9 @@ RSpec.describe A3::Domain::ProjectSchedulerConfig do
       .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.scheduler.max_parallel_tasks must be greater than or equal to 1")
   end
 
-  it "fails fast for parallel task counts until scheduler claims and locks exist" do
-    expect { described_class.from_project_config("max_parallel_tasks" => 2) }
-      .to raise_error(
-        A3::Domain::ConfigurationError,
-        "project.yaml runtime.scheduler.max_parallel_tasks > 1 is not supported yet; requires scheduler task claims, batch planning, and shared-ref publish/merge locks"
-      )
+  it "loads explicit bounded parallel task counts" do
+    config = described_class.from_project_config("max_parallel_tasks" => 2)
+
+    expect(config.max_parallel_tasks).to eq(2)
   end
 end

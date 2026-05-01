@@ -27,6 +27,17 @@ module A3
         task, phase = next_schedulable_candidate(plan)
         return Result.new(task: nil, phase: nil, started_run: nil) unless task
 
+        schedule_candidate(project_context: project_context, task: task, phase: phase)
+      end
+
+      def schedulable_candidate?(task:, phase:)
+        tasks = @plan_next_runnable_task.call.assessments.map(&:task)
+        upstream_healthy?(task: task, phase: phase, tasks: tasks, runs: @run_repository.all)
+      end
+
+      def schedule_candidate(project_context:, task:, phase:)
+        return Result.new(task: nil, phase: nil, started_run: nil) unless schedulable_candidate?(task: task, phase: phase)
+
         runtime = project_context.resolve_phase_runtime(task: task, phase: phase)
         source_descriptor = @phase_source_policy.source_descriptor_for(task: task, phase: phase)
         assert_integration_ref_readiness!(task: task, phase: phase, source_descriptor: source_descriptor)

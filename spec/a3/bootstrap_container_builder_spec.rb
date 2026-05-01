@@ -18,7 +18,8 @@ RSpec.describe A3::Bootstrap::ContainerBuilder do
       run_repository: run_repository,
       task_metrics_repository: A3::Infra::InMemoryTaskMetricsRepository.new,
       scheduler_state_repository: A3::Infra::InMemorySchedulerStateRepository.new(scheduler_store),
-      scheduler_cycle_repository: A3::Infra::InMemorySchedulerCycleRepository.new(scheduler_store)
+      scheduler_cycle_repository: A3::Infra::InMemorySchedulerCycleRepository.new(scheduler_store),
+      task_claim_repository: A3::Infra::InMemorySchedulerTaskClaimRepository.new
     }
   end
 
@@ -29,6 +30,7 @@ RSpec.describe A3::Bootstrap::ContainerBuilder do
       prepare_workspace: instance_double(A3::Application::PrepareWorkspace),
       plan_rerun: instance_double(A3::Application::PlanRerun),
       plan_next_runnable_task: instance_double(A3::Application::PlanNextRunnableTask),
+      plan_runnable_task_batch: instance_double(A3::Application::PlanRunnableTaskBatch),
       plan_next_decomposition_task: instance_double(A3::Application::PlanNextDecompositionTask),
       schedule_next_run: instance_double(A3::Application::ScheduleNextRun),
       build_merge_plan: instance_double(A3::Application::BuildMergePlan),

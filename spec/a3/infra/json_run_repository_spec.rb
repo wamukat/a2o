@@ -147,4 +147,14 @@ RSpec.describe A3::Infra::JsonRunRepository do
     expect(quarantined.size).to eq(1)
     expect(File.read(File.join(@tmpdir, quarantined.first))).to eq('{ "run-1": { "ref": "run-1"')
   end
+
+  it "serializes concurrent read-modify-write updates" do
+    threads = 10.times.map do |index|
+      Thread.new { repository.save(build_run("run-#{index}")) }
+    end
+
+    threads.each(&:join)
+
+    expect(repository.all.map(&:ref)).to contain_exactly(*10.times.map { |index| "run-#{index}" })
+  end
 end

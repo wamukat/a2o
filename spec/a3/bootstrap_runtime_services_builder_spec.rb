@@ -8,7 +8,8 @@ RSpec.describe A3::Bootstrap::RuntimeServicesBuilder do
     Dir.mktmpdir do |dir|
       repositories = {
         task_repository: A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json")),
-        run_repository: A3::Infra::JsonRunRepository.new(File.join(dir, "runs.json"))
+        run_repository: A3::Infra::JsonRunRepository.new(File.join(dir, "runs.json")),
+        task_claim_repository: A3::Infra::JsonSchedulerTaskClaimRepository.new(File.join(dir, "scheduler_task_claims.json"))
       }
 
       runtime_services = described_class.new(
@@ -25,6 +26,7 @@ RSpec.describe A3::Bootstrap::RuntimeServicesBuilder do
       expect(runtime_services.fetch(:register_started_run)).to be_a(A3::Application::RegisterStartedRun)
       expect(runtime_services.fetch(:register_completed_run)).to be_a(A3::Application::RegisterCompletedRun)
       expect(runtime_services.fetch(:schedule_next_run)).to be_a(A3::Application::ScheduleNextRun)
+      expect(runtime_services.fetch(:plan_runnable_task_batch)).to be_a(A3::Application::PlanRunnableTaskBatch)
       expect(runtime_services.fetch(:run_worker_phase)).to be_a(A3::Application::RunWorkerPhase)
       expect(runtime_services.fetch(:run_verification)).to be_a(A3::Application::RunVerification)
       expect(runtime_services.fetch(:run_merge)).to be_a(A3::Application::RunMerge)
