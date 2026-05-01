@@ -529,7 +529,19 @@ module A3
     end
 
     def run_automatic_decomposition_draft_child_creation(session:, task:, review_result:)
-      return AutomaticDraftChildCreationResult.skipped("proposal_review_not_eligible") unless review_result.success && review_result.disposition == "eligible"
+      unless review_result.success && review_result.disposition == "eligible"
+        terminal_status = decomposition_review_terminal_status(review_result)
+        if terminal_status
+          publish_decomposition_source_status(
+            session: session,
+            task: task,
+            status: terminal_status,
+            status_reason: review_result.summary,
+            status_details: decomposition_review_status_details(review_result)
+          )
+        end
+        return AutomaticDraftChildCreationResult.skipped("proposal_review_not_eligible")
+      end
       return AutomaticDraftChildCreationResult.skipped("kanban_child_writer_not_configured") unless kanban_child_writer_configured?(session.options)
 
       writer = A3::Infra::KanbanCliProposalChildWriter.new(
@@ -582,14 +594,17 @@ module A3
       out.puts("draft_evidence_path=#{child_creation.evidence_path}")
     end
 
-    def publish_decomposition_source_status(session:, task:, status:)
+    def publish_decomposition_source_status(session:, task:, status:, status_reason: nil, status_details: nil)
       publisher = session.container.fetch(:external_task_status_publisher, A3::Infra::NullExternalTaskStatusPublisher.new)
-      publisher.publish(
+      payload = {
         task_ref: task.ref,
         external_task_id: task.external_task_id,
         status: status,
         task_kind: task.kind
-      )
+      }
+      payload[:status_reason] = status_reason if status_reason
+      payload[:status_details] = status_details if status_details
+      publisher.publish(**payload)
     end
 
     def publish_decomposition_source_status_from_options(options:, task:, status:)
@@ -605,6 +620,19 @@ module A3
 
     def decomposition_source_terminal_status(result)
       result.respond_to?(:status) && result.status == "needs_clarification" ? :needs_clarification : :done
+    end
+
+    def decomposition_review_terminal_status(result)
+      result.disposition == "blocked" ? :blocked : nil
+    end
+
+    def decomposition_review_status_details(result)
+      {
+        "disposition" => result.disposition,
+        "critical_findings" => Array(result.critical_findings).map do |finding|
+          finding.is_a?(Hash) ? finding.slice("severity", "summary", "details") : { "summary" => finding.to_s }
+        end
+      }.compact
     end
 
     def handle_cleanup_decomposition_trial(argv, out:, run_id_generator:, command_runner:, merge_runner:)
