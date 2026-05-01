@@ -395,6 +395,54 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
+  it "imports unscoped parent automation tickets without requiring a decomposed label" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      task_get_includes_labels: false,
+      snapshots: [
+        {
+          "id" => 3053,
+          "ref" => "Sample#3053",
+          "status" => "To do",
+          "priority" => 3,
+          "labels" => ["trigger:auto-parent"],
+          "parent_ref" => nil
+        },
+        {
+          "id" => 3054,
+          "ref" => "Sample#3054",
+          "status" => "Done",
+          "priority" => 2,
+          "labels" => ["repo:api"],
+          "parent_ref" => "Sample#3053"
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:api" => [:repo_alpha],
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-parent"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+      parent = tasks.find { |task| task.ref == "Sample#3053" }
+      child = tasks.find { |task| task.ref == "Sample#3054" }
+
+      expect(tasks.map(&:ref)).to eq(["Sample#3053", "Sample#3054"])
+      expect(parent.kind).to eq(:parent)
+      expect(parent.edit_scope).to eq(%i[repo_alpha repo_beta])
+      expect(parent.child_refs).to eq(["Sample#3054"])
+      expect(child.status).to eq(:done)
+    end
+  end
+
   it "maps clarification-labeled tasks to needs_clarification" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,

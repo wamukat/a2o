@@ -418,7 +418,7 @@ module A3
         edit_scope = labels.flat_map { |label| @repo_label_map.fetch(label, []) }.uniq.freeze
         return edit_scope unless edit_scope.empty?
         return [] if unscoped_decomposition_source?(labels)
-        return configured_edit_scope_universe if unscoped_decomposed_parent_automation?(labels)
+        return configured_edit_scope_universe if unscoped_parent_automation?(labels)
 
         configured_labels = @repo_label_map.keys.sort
         label_summary = labels.empty? ? "(none)" : labels.sort.join(", ")
@@ -433,10 +433,10 @@ module A3
         labels.include?(A3::Domain::Task::DECOMPOSITION_TRIGGER_LABEL)
       end
 
-      def unscoped_decomposed_parent_automation?(labels)
-        return false unless labels.include?(A3::Domain::Task::DECOMPOSED_LABEL)
+      def unscoped_parent_automation?(labels)
         return false unless labels.include?("trigger:auto-parent")
         return false unless @trigger_labels.include?("trigger:auto-parent")
+        return false if labels.any? { |label| label.start_with?("repo:") }
 
         ((labels & @trigger_labels) - ["trigger:auto-parent"]).empty?
       end

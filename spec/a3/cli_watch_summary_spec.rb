@@ -382,7 +382,7 @@ RSpec.describe A3::CLI do
             "ref" => "Sample#4000",
             "title" => "Missing repo label",
             "status" => "To do",
-            "labels" => ["trigger:auto-parent"]
+            "labels" => ["trigger:auto-implement"]
           }
         ]
       )
