@@ -700,6 +700,11 @@ module A3
 
         out.puts("scheduler paused=#{state.scheduler_state.paused} stop_reason=#{state.scheduler_state.last_stop_reason} executed_count=#{state.scheduler_state.last_executed_count}")
         out.puts("shot status=#{state.shot_state.status} pid=#{state.shot_state.pid || '-'}")
+        out.puts("active_claims=#{state.active_claims.size}")
+        state.active_claims.each do |claim|
+          age = claim.claim_age_seconds.nil? ? "?" : "#{claim.claim_age_seconds}s"
+          out.puts("claim #{claim.task_ref} claim_ref=#{claim.claim_ref} phase=#{claim.phase || '-'} parent_group=#{claim.parent_group_key} run_ref=#{claim.run_ref || '-'} age=#{age} claimed_by=#{claim.claimed_by || '-'}")
+        end
         out.puts("active_runs=#{state.active_runs.size}")
         state.active_runs.each do |run|
           out.puts("run #{run.task_ref} run_ref=#{run.run_ref} phase=#{run.phase || '-'} status=#{run.status}")
@@ -1103,7 +1108,8 @@ module A3
         kanban_tasks: tasks,
         kanban_snapshots_by_ref: kanban_snapshot_index.by_ref,
         kanban_snapshots_by_id: kanban_snapshot_index.by_id,
-        agent_jobs_by_task_ref: load_watch_summary_agent_jobs_by_task_ref(options.fetch(:storage_dir))
+        agent_jobs_by_task_ref: load_watch_summary_agent_jobs_by_task_ref(options.fetch(:storage_dir)),
+        task_claim_repository: repositories.fetch(:task_claim_repository, nil)
       ).call
       summary.warnings.concat(watch_summary_warnings)
       attach_decomposition_entries(summary, tasks: tasks, storage_dir: options.fetch(:storage_dir))
@@ -2610,7 +2616,8 @@ module A3
         {
           task_repository: A3::Infra::JsonTaskRepository.new(File.join(storage_dir, "tasks.json")),
           run_repository: A3::Infra::JsonRunRepository.new(File.join(storage_dir, "runs.json")),
-          scheduler_state_repository: A3::Infra::JsonSchedulerStateRepository.new(scheduler_store)
+          scheduler_state_repository: A3::Infra::JsonSchedulerStateRepository.new(scheduler_store),
+          task_claim_repository: A3::Infra::JsonSchedulerTaskClaimRepository.new(File.join(storage_dir, "scheduler_task_claims.json"))
         }
       when :sqlite
         db_path = File.join(options.fetch(:storage_dir), "a3.sqlite3")
@@ -2618,7 +2625,8 @@ module A3
         {
           task_repository: A3::Infra::SqliteTaskRepository.new(db_path),
           run_repository: A3::Infra::SqliteRunRepository.new(db_path),
-          scheduler_state_repository: A3::Infra::SqliteSchedulerStateRepository.new(scheduler_store)
+          scheduler_state_repository: A3::Infra::SqliteSchedulerStateRepository.new(scheduler_store),
+          task_claim_repository: A3::Infra::SqliteSchedulerTaskClaimRepository.new(db_path)
         }
       else
         raise ArgumentError, "Unsupported storage backend: #{options.fetch(:storage_backend)}"

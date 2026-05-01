@@ -11,6 +11,7 @@ module A3
         def lines(run)
           [].tap do |result|
             result << "run #{run.ref} task=#{run.task_ref} phase=#{run.phase} workspace=#{run.workspace_kind} source=#{run.source_type}:#{run.source_ref} outcome=#{run.terminal_outcome}"
+            result << "claim_ref=#{run.claim_ref}" if run.claim_ref
             if run.workspace_kind.to_sym == :runtime_workspace
               result << "workspace_model=runtime_workspace is a logical phase workspace kind; inspect runtime_package_materialization_model for physical isolation"
             end

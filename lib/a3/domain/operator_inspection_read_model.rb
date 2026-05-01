@@ -3,14 +3,17 @@
 module A3
   module Domain
     class OperatorInspectionReadModel
-      def self.from_task(task:, tasks:, skill_feedback: [])
-        return TaskInspection.from_task(task: task, tasks: tasks) if Array(skill_feedback).empty?
-
-        TaskInspection.from_task(task: task, tasks: tasks, skill_feedback: skill_feedback)
+      def self.from_task(task:, tasks:, skill_feedback: [], claim_ref: nil)
+        kwargs = { task: task, tasks: tasks }
+        kwargs[:skill_feedback] = skill_feedback unless Array(skill_feedback).empty?
+        kwargs[:claim_ref] = claim_ref if claim_ref
+        TaskInspection.from_task(**kwargs)
       end
 
-      def self.from_run(run, recovery:)
-        RunInspection.from_run(run, recovery: recovery)
+      def self.from_run(run, recovery:, claim_ref: nil)
+        kwargs = { recovery: recovery }
+        kwargs[:claim_ref] = claim_ref if claim_ref
+        RunInspection.from_run(run, **kwargs)
       end
 
       def self.from_cycles(cycles)

@@ -16,6 +16,7 @@ RSpec.describe A3::Application::ShowWatchSummary do
         "Sample#3" => { "title" => "Parent task", "status" => "To do" }
       },
       agent_jobs_by_task_ref: agent_jobs_by_task_ref,
+      task_claim_repository: task_claim_repository,
       upstream_line_guard: upstream_line_guard,
       clock: clock
     )
@@ -24,9 +25,57 @@ RSpec.describe A3::Application::ShowWatchSummary do
   let(:task_repository) { A3::Infra::InMemoryTaskRepository.new }
   let(:run_repository) { A3::Infra::InMemoryRunRepository.new }
   let(:scheduler_state_repository) { A3::Infra::InMemorySchedulerStateRepository.new }
+  let(:task_claim_repository) { A3::Infra::InMemorySchedulerTaskClaimRepository.new(claim_ref_generator: -> { "claim-visible" }) }
 
   before do
     allow(inherited_parent_state_resolver).to receive(:snapshot_for).and_return(nil)
+  end
+
+  it "adds active claim and waiting conflict diagnostics to task details" do
+    parent = A3::Domain::Task.new(
+      ref: "Sample#4100",
+      kind: :parent,
+      edit_scope: [:repo_alpha],
+      child_refs: %w[Sample#4101 Sample#4102]
+    )
+    claimed_child = A3::Domain::Task.new(
+      ref: "Sample#4101",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      parent_ref: "Sample#4100",
+      status: :in_progress
+    )
+    waiting_child = A3::Domain::Task.new(
+      ref: "Sample#4102",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      parent_ref: "Sample#4100",
+      status: :todo
+    )
+    done_child = A3::Domain::Task.new(
+      ref: "Sample#4103",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      parent_ref: "Sample#4100",
+      status: :done
+    )
+    [parent, claimed_child, waiting_child, done_child].each { |task| task_repository.save(task) }
+    task_claim_repository.claim_task(
+      task_ref: "Sample#4101",
+      phase: :implementation,
+      parent_group_key: "parent-group:Sample#4100",
+      claimed_by: "scheduler-test",
+      claimed_at: "2026-04-24T00:59:30Z"
+    )
+
+    summary = use_case.call
+    claimed_entry = summary.tasks.find { |entry| entry.ref == "Sample#4101" }
+    waiting_entry = summary.tasks.find { |entry| entry.ref == "Sample#4102" }
+    done_entry = summary.tasks.find { |entry| entry.ref == "Sample#4103" }
+
+    expect(claimed_entry.blocked_lines).to include("claim claim_ref=claim-visible phase=implementation parent_group=parent-group:Sample#4100 run_ref=- age=30s claimed_by=scheduler-test")
+    expect(waiting_entry.blocked_lines).to include("waiting_conflict reason=parent_group_claimed holder_claim=claim-visible holder_task=Sample#4101 parent_group=parent-group:Sample#4100")
+    expect(done_entry.blocked_lines).not_to include(/waiting_conflict/)
   end
 
   it "summarizes scheduler state, task tree ordering, and kanban mismatch markers" do

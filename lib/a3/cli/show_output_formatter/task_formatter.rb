@@ -9,6 +9,7 @@ module A3
         def lines(task)
           [].tap do |result|
             result << "task #{task.ref} kind=#{task.kind} status=#{task.status} current_run=#{task.current_run_ref}"
+            result << "claim_ref=#{task.claim_ref}" if task.claim_ref
             result << "edit_scope=#{task.edit_scope.join(',')}"
             result << "verification_scope=#{task.verification_scope.join(',')}"
             result << "runnable_phase=#{task.runnable_assessment.phase}" if task.runnable_assessment.phase

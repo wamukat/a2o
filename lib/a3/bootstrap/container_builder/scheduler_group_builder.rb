@@ -14,7 +14,8 @@ module A3
               run_repository: context.run_repository,
               scheduler_state_repository: context.scheduler_state_repository,
               scheduler_cycle_repository: context.scheduler_cycle_repository,
-              storage_dir: context.storage_dir.to_s
+              storage_dir: context.storage_dir.to_s,
+              task_claim_repository: context.task_claim_repository
             ),
             repair_runs: A3::Application::RepairRuns.new(
               task_repository: context.task_repository,

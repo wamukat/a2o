@@ -1,10 +1,11 @@
 # frozen_string_literal: true
 
 RSpec.describe A3::Application::ShowTask do
-  subject(:use_case) { described_class.new(task_repository: task_repository, run_repository: run_repository) }
+  subject(:use_case) { described_class.new(task_repository: task_repository, run_repository: run_repository, task_claim_repository: task_claim_repository) }
 
   let(:task_repository) { A3::Infra::InMemoryTaskRepository.new }
   let(:run_repository) { A3::Infra::InMemoryRunRepository.new }
+  let(:task_claim_repository) { A3::Infra::InMemorySchedulerTaskClaimRepository.new(claim_ref_generator: -> { "claim-1" }) }
 
   before do
     task_repository.save(
@@ -36,12 +37,27 @@ RSpec.describe A3::Application::ShowTask do
     expect(result.kind).to eq(:child)
     expect(result.status).to eq(:blocked)
     expect(result.current_run_ref).to eq("run-1")
+    expect(result.claim_ref).to be_nil
     expect(result.edit_scope).to eq([:repo_alpha])
     expect(result.verification_scope).to eq(%i[repo_alpha repo_beta])
     expect(result.runnable_assessment.reason).to eq(:already_running)
     expect(result.runnable_assessment.blocking_task_refs).to eq(["run-1"])
     expect(result.topology.parent.ref).to eq("A3-v2#parent")
     expect(result.topology.parent.status).to eq(:in_review)
+  end
+
+  it "includes the active scheduler claim ref when present" do
+    task_claim_repository.claim_task(
+      task_ref: "A3-v2#child",
+      phase: :implementation,
+      parent_group_key: "A3-v2#parent",
+      claimed_by: "scheduler-test",
+      claimed_at: "2026-05-01T00:00:00Z"
+    )
+
+    result = use_case.call(task_ref: "A3-v2#child")
+
+    expect(result.claim_ref).to eq("claim-1")
   end
 
   it "keeps child in_review relations visible as review" do

@@ -9776,6 +9776,7 @@ func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
 		"runtime_image_running_container=runtime-container image_id=running-image-123 digest=ghcr.io/wamukat/a2o-engine@sha256:test",
 		"runtime_image_latest_status=current action=none",
 		"runtime_image_running_status=current action=none",
+		"runtime_active_claims=0",
 		"runtime_latest_run run_ref=run-16 task_ref=A2O#16 phase=implementation state=terminal outcome=blocked",
 	} {
 		if !strings.Contains(stdout.String(), want) {
@@ -9788,6 +9789,46 @@ func TestRuntimeStatusReportsRunningScheduler(t *testing.T) {
 		t.Fatalf("runtime status should evaluate compose with runtime image env, got %#v", runner.lastEnv)
 	}
 	assertNoRemovedA3Env(t, runner.lastEnv)
+}
+
+func TestRuntimeStatusReportsSchedulerClaims(t *testing.T) {
+	t.Setenv("A2O_RUNTIME_IMAGE", "ghcr.io/wamukat/a2o-engine@sha256:pinned")
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{
+		showStateOutput: "scheduler paused=false stop_reason=idle executed_count=0\nshot status=none pid=-\nactive_claims=1\nclaim A2O#419 claim_ref=claim-419 phase=implementation parent_group=parent-group:A2O#317 run_ref=run-419 age=12s claimed_by=scheduler-test\nactive_runs=1\n",
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "status"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	for _, want := range []string{
+		"runtime_active_claims=1",
+		"runtime_claim A2O#419 claim_ref=claim-419 phase=implementation parent_group=parent-group:A2O#317 run_ref=run-419 age=12s claimed_by=scheduler-test",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("stdout should include %q in:\n%s", want, stdout.String())
+		}
+	}
 }
 
 func TestRuntimeStatusReportsEmptyHistoryWithoutRubyReadError(t *testing.T) {
@@ -11462,6 +11503,7 @@ type fakeRunner struct {
 	missingVolumes             map[string]bool
 	legacySoloBoardDBVolumes   map[string]bool
 	failShowTask               bool
+	showStateOutput            string
 	showTaskOutput             string
 	decompositionStatusOutput  string
 	decompositionStatusOutputs []string
@@ -11547,6 +11589,11 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 			stopReason = "idle"
 		}
 		return []byte(fmt.Sprintf("scheduler paused=%t stop_reason=%s executed_count=%d\n", r.schedulerPaused, stopReason, r.schedulerExecutedCount)), nil
+	case strings.Contains(joined, " a3 show-state "):
+		if r.showStateOutput != "" {
+			return []byte(r.showStateOutput), nil
+		}
+		return []byte("scheduler paused=false stop_reason=idle executed_count=0\nshot status=none pid=-\nactive_claims=0\nactive_runs=0\nqueued_tasks=0\nblocked_tasks=0\nrepairable=\n"), nil
 	case strings.Contains(joined, "plan-next-decomposition-task"):
 		if r.decompositionPlanOutput != "" {
 			return []byte(r.decompositionPlanOutput), nil

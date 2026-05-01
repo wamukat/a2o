@@ -3,9 +3,10 @@
 module A3
   module Application
     class ShowTask
-      def initialize(task_repository:, run_repository: nil)
+      def initialize(task_repository:, run_repository: nil, task_claim_repository: nil)
         @task_repository = task_repository
         @run_repository = run_repository
+        @task_claim_repository = task_claim_repository
       end
 
       def call(task_ref:)
@@ -14,7 +15,8 @@ module A3
           task: task,
           tasks: @task_repository.all,
           skill_feedback: latest_skill_feedback(task),
-          clarification_request: latest_clarification_request(task)
+          clarification_request: latest_clarification_request(task),
+          claim_ref: active_claim_for(task)&.claim_ref
         )
       end
 
@@ -49,6 +51,12 @@ module A3
         return @run_repository.fetch(task.current_run_ref) if task.current_run_ref
 
         @run_repository.all.select { |run| run.task_ref == task.ref }.last
+      end
+
+      def active_claim_for(task)
+        return nil unless @task_claim_repository
+
+        @task_claim_repository.active_claims.find { |claim| claim.task_ref == task.ref }
       end
     end
   end

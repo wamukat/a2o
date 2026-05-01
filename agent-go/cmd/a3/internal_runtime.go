@@ -1023,6 +1023,7 @@ func printRuntimeStatusForContext(context *projectRuntimeContext, configPath str
 		fmt.Fprintln(stdout, pauseSummary.Line)
 		printRuntimeServiceStatus(effectiveConfig, runner, stdout)
 		printRuntimeImageStatus(&effectiveConfig, runner, stdout)
+		printRuntimeClaimSummary(effectiveConfig, runner, stdout)
 		printLatestRuntimeSummary(effectiveConfig, runner, stdout)
 		return nil
 	})
@@ -1283,6 +1284,28 @@ func printLatestRuntimeSummary(config runtimeInstanceConfig, runner commandRunne
 		return
 	}
 	fmt.Fprintln(stdout, sanitizePublicCommand(summary))
+}
+
+func printRuntimeClaimSummary(config runtimeInstanceConfig, runner commandRunner, stdout io.Writer) {
+	plan, err := buildRuntimeDescribeTaskPlan(config)
+	if err != nil {
+		fmt.Fprintf(stdout, "runtime_active_claims status=unavailable reason=%s\n", singleLine(err.Error()))
+		return
+	}
+	output, err := dockerComposeExecOutput(config, plan, runner, "a3", "show-state", "--storage-backend", "json", "--storage-dir", plan.StorageDir)
+	if err != nil {
+		fmt.Fprintf(stdout, "runtime_active_claims status=unavailable reason=%s\n", singleLine(err.Error()))
+		return
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "active_claims="):
+			fmt.Fprintf(stdout, "runtime_%s\n", sanitizePublicCommand(line))
+		case strings.HasPrefix(line, "claim "):
+			fmt.Fprintf(stdout, "runtime_%s\n", sanitizePublicCommand(line))
+		}
+	}
 }
 
 func pathsConfig(config *runtimeInstanceConfig) runtimeInstanceConfig {

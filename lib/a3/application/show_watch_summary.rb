@@ -2,6 +2,7 @@
 
 require_relative "../domain/task_phase_projection"
 require_relative "../domain/runnable_task_assessment"
+require_relative "../domain/scheduler_conflict_keys"
 require_relative "../domain/scheduler_selection_policy"
 require_relative "../domain/upstream_line_guard"
 require "json"
@@ -27,6 +28,18 @@ module A3
         :state,
         :heartbeat_age_seconds,
         :detail,
+        :claim_ref,
+        keyword_init: true
+      )
+
+      ClaimEntry = Struct.new(
+        :claim_ref,
+        :task_ref,
+        :phase,
+        :parent_group_key,
+        :run_ref,
+        :claimed_by,
+        :claim_age_seconds,
         keyword_init: true
       )
 
@@ -44,13 +57,14 @@ module A3
         :blocked,
         :blocked_lines,
         :running_entry,
+        :claim_entry,
         :phase_counts,
         :phase_states,
         :latest_phase,
         keyword_init: true
       )
 
-      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_tasks: nil, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {}, agent_jobs_by_task_ref: {}, upstream_line_guard: A3::Domain::UpstreamLineGuard.new, scheduler_selection_policy: A3::Domain::SchedulerSelectionPolicy.new, clock: -> { Time.now.utc })
+      def initialize(task_repository:, run_repository:, scheduler_state_repository:, kanban_tasks: nil, kanban_snapshots_by_ref: {}, kanban_snapshots_by_id: {}, agent_jobs_by_task_ref: {}, task_claim_repository: nil, upstream_line_guard: A3::Domain::UpstreamLineGuard.new, scheduler_selection_policy: A3::Domain::SchedulerSelectionPolicy.new, clock: -> { Time.now.utc })
         @task_repository = task_repository
         @run_repository = run_repository
         @scheduler_state_repository = scheduler_state_repository
@@ -58,6 +72,7 @@ module A3
         @kanban_snapshots_by_ref = kanban_snapshots_by_ref || {}
         @kanban_snapshots_by_id = kanban_snapshots_by_id || {}
         @agent_jobs_by_task_ref = agent_jobs_by_task_ref || {}
+        @task_claim_repository = task_claim_repository
         @upstream_line_guard = upstream_line_guard
         @scheduler_selection_policy = scheduler_selection_policy
         @clock = clock
@@ -69,6 +84,7 @@ module A3
         runs = @run_repository.all
         runs_by_task = runs.group_by(&:task_ref)
         runtime_tasks_by_ref = runtime_tasks.each_with_object({}) { |task, memo| memo[task.ref] = task }
+        active_claims = active_claims_by_task_ref
         assessments_by_ref = tasks.each_with_object({}) do |task, memo|
           memo[task.ref] = A3::Domain::RunnableTaskAssessment.evaluate(task: task, tasks: tasks)
         end
@@ -83,7 +99,8 @@ module A3
             assessment: assessments_by_ref.fetch(task.ref),
             tasks: tasks,
             runs: runs,
-            selected_next_ref: selected_next_ref
+            selected_next_ref: selected_next_ref,
+            active_claims: active_claims
           )
         end
 
@@ -99,17 +116,18 @@ module A3
 
       private
 
-      def build_task_entry(task, runtime_task:, runs_by_task:, assessment:, tasks:, runs:, selected_next_ref:)
+      def build_task_entry(task, runtime_task:, runs_by_task:, assessment:, tasks:, runs:, selected_next_ref:, active_claims:)
         task_runs = runs_by_task.fetch(task.ref, [])
         current_run = runtime_task.current_run_ref && task_runs.find { |candidate| candidate.ref == runtime_task.current_run_ref }
+        claim_entry = active_claims[task.ref]
         latest_run = task_runs.last
         canonical_status = canonical_status_for(runtime_task)
         latest_phase = resolve_latest_phase(task: runtime_task, current_run: current_run, latest_run: latest_run)
-        running_entry = build_running_entry(runtime_task, run: current_run)
+        running_entry = build_running_entry(runtime_task, run: current_run, claim_entry: claim_entry)
         runnable_phase = task.runnable_phase
         upstream_assessment = @upstream_line_guard.evaluate(task: task, phase: runnable_phase, tasks: tasks, runs: runs)
         kanban_snapshot = resolve_kanban_snapshot(task)
-        blocked_lines = build_detail_lines(runtime_task, task_runs, assessment, upstream_assessment, kanban_snapshot: kanban_snapshot)
+        blocked_lines = build_detail_lines(runtime_task, task_runs, assessment, upstream_assessment, kanban_snapshot: kanban_snapshot, claim_entry: claim_entry, tasks: tasks, active_claims: active_claims)
         waiting = waiting_assessment?(assessment) || !upstream_assessment.healthy?
 
         TaskEntry.new(
@@ -126,6 +144,7 @@ module A3
           blocked: %i[blocked needs_clarification].include?(canonical_status),
           blocked_lines: blocked_lines,
           running_entry: running_entry,
+          claim_entry: claim_entry,
           phase_counts: phase_counts_for(task, task_runs),
           phase_states: phase_states_for(task, task_runs),
           latest_phase: latest_phase
@@ -176,7 +195,7 @@ module A3
         }.fetch(status, status.to_s)
       end
 
-      def build_running_entry(task, run:)
+      def build_running_entry(task, run:, claim_entry:)
         return nil unless running_status?(canonical_status_for(task))
         return nil unless run
 
@@ -187,7 +206,8 @@ module A3
           internal_phase: phase,
           state: "running_command",
           heartbeat_age_seconds: heartbeat_age_seconds_for(task.ref),
-          detail: run.source_descriptor.ref
+          detail: run.source_descriptor.ref,
+          claim_ref: claim_entry&.claim_ref
         )
       end
 
@@ -215,9 +235,18 @@ module A3
         %i[in_progress in_review verifying merging].include?(status)
       end
 
-      def build_detail_lines(task, task_runs, assessment, upstream_assessment, kanban_snapshot: nil)
+      def build_detail_lines(task, task_runs, assessment, upstream_assessment, kanban_snapshot: nil, claim_entry: nil, tasks:, active_claims:)
         lines = []
         latest_run = task_runs.last
+        append_claim_lines(lines, claim_entry)
+        append_waiting_conflict_lines(
+          lines,
+          task: task,
+          tasks: tasks,
+          assessment: assessment,
+          upstream_assessment: upstream_assessment,
+          active_claims: active_claims
+        )
         if task.verification_source_ref
           lines << "merge_recovery verification_source_ref=#{task.verification_source_ref}"
         end
@@ -247,6 +276,64 @@ module A3
           end
         end
         lines.freeze
+      end
+
+      def active_claims_by_task_ref
+        return {} unless @task_claim_repository
+
+        @task_claim_repository.active_claims.each_with_object({}) do |claim, memo|
+          memo[claim.task_ref] = ClaimEntry.new(
+            claim_ref: claim.claim_ref,
+            task_ref: claim.task_ref,
+            phase: claim.phase,
+            parent_group_key: claim.parent_group_key,
+            run_ref: claim.run_ref,
+            claimed_by: claim.claimed_by,
+            claim_age_seconds: claim_age_seconds_for(claim)
+          )
+        end
+      end
+
+      def claim_age_seconds_for(claim)
+        claimed_at = Time.iso8601(claim.claimed_at).utc
+        age = (@clock.call - claimed_at).to_i
+        age.negative? ? 0 : age
+      rescue ArgumentError, TypeError
+        nil
+      end
+
+      def append_claim_lines(lines, claim_entry)
+        return unless claim_entry
+
+        age = claim_entry.claim_age_seconds.nil? ? "?" : "#{claim_entry.claim_age_seconds}s"
+        parts = [
+          "claim_ref=#{claim_entry.claim_ref}",
+          "phase=#{claim_entry.phase}",
+          "parent_group=#{claim_entry.parent_group_key}",
+          "run_ref=#{claim_entry.run_ref || '-'}",
+          "age=#{age}"
+        ]
+        parts << "claimed_by=#{claim_entry.claimed_by}" if present?(claim_entry.claimed_by)
+        lines << "claim #{parts.join(' ')}"
+      end
+
+      def append_waiting_conflict_lines(lines, task:, tasks:, assessment:, upstream_assessment:, active_claims:)
+        return if active_claims.empty?
+        return if active_claims.key?(task.ref)
+        return unless conflict_relevant_task?(assessment: assessment, upstream_assessment: upstream_assessment)
+
+        conflict_keys = A3::Domain::SchedulerConflictKeys.for_task(task: task, tasks: tasks)
+        holder = active_claims.values.find do |claim|
+          claim.task_ref == task.ref || claim.parent_group_key == conflict_keys.parent_group_key
+        end
+        return unless holder
+
+        reason = holder.task_ref == task.ref ? "task_claimed" : "parent_group_claimed"
+        lines << "waiting_conflict reason=#{reason} holder_claim=#{holder.claim_ref} holder_task=#{holder.task_ref} parent_group=#{holder.parent_group_key}"
+      end
+
+      def conflict_relevant_task?(assessment:, upstream_assessment:)
+        assessment.runnable? || waiting_assessment?(assessment) || !upstream_assessment.healthy?
       end
 
       def append_kanban_tag_reason_lines(lines, kanban_snapshot)

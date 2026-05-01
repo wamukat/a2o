@@ -8,9 +8,9 @@ module A3
       class RunView
         attr_reader :ref, :task_ref, :task_kind, :phase, :workspace_kind, :source_type, :source_ref,
                     :terminal_outcome, :evidence_summary, :latest_execution, :latest_blocked_diagnosis,
-                    :rerun_decision, :recovery
+                    :rerun_decision, :recovery, :claim_ref
 
-        def initialize(ref:, task_ref:, task_kind: nil, phase:, workspace_kind:, source_type:, source_ref:, terminal_outcome:, evidence_summary:, latest_execution:, latest_blocked_diagnosis:, rerun_decision:, recovery:)
+        def initialize(ref:, task_ref:, task_kind: nil, phase:, workspace_kind:, source_type:, source_ref:, terminal_outcome:, evidence_summary:, latest_execution:, latest_blocked_diagnosis:, rerun_decision:, recovery:, claim_ref: nil)
           @ref = ref
           @task_ref = task_ref
           @task_kind = task_kind&.to_sym
@@ -24,10 +24,11 @@ module A3
           @latest_blocked_diagnosis = latest_blocked_diagnosis
           @rerun_decision = rerun_decision&.to_sym
           @recovery = recovery
+          @claim_ref = claim_ref
           freeze
         end
 
-        def self.from_run(run, recovery:, task_kind: nil)
+        def self.from_run(run, recovery:, task_kind: nil, claim_ref: nil)
           latest_phase_record = run.phase_records.last
           latest_blocked_phase_record = run.phase_records.reverse_each.find { |phase_record| !phase_record.blocked_diagnosis.nil? }
           canonical_task_kind = effective_task_kind(
@@ -48,7 +49,8 @@ module A3
             latest_execution: ExecutionSnapshot.from_phase_record(latest_phase_record, task_kind: canonical_task_kind),
             latest_blocked_diagnosis: BlockedDiagnosisSnapshot.from_phase_record(latest_blocked_phase_record, task_kind: canonical_task_kind),
             rerun_decision: recovery&.decision,
-            recovery: recovery
+            recovery: recovery,
+            claim_ref: claim_ref
           )
         end
 

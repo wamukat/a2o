@@ -267,6 +267,10 @@ RSpec.describe A3::CLI do
   it "hides per-task detail lines unless details are requested" do
     Dir.mktmpdir do |dir|
       task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))
+      task_claim_repository = A3::Infra::JsonSchedulerTaskClaimRepository.new(
+        File.join(dir, "scheduler_task_claims.json"),
+        claim_ref_generator: -> { "claim-detail" }
+      )
       task_repository.save(
         A3::Domain::Task.new(
           ref: "Sample#4200",
@@ -287,6 +291,13 @@ RSpec.describe A3::CLI do
           parent_ref: "Sample#4200"
         )
       )
+      task_claim_repository.claim_task(
+        task_ref: "Sample#4201",
+        phase: :implementation,
+        parent_group_key: "parent-group:Sample#4200",
+        claimed_by: "scheduler-test",
+        claimed_at: "2026-04-24T00:00:00Z"
+      )
 
       default_out = StringIO.new
       described_class.start(
@@ -303,8 +314,10 @@ RSpec.describe A3::CLI do
       expect(default_out.string).to include("[.] #4200")
       expect(default_out.string).not_to include("waiting_reason=parent_waiting_for_children")
       expect(default_out.string).not_to include("waiting_on=Sample#4201")
+      expect(default_out.string).not_to include("claim_ref=claim-detail")
       expect(detailed_out.string).to include("waiting_reason=parent_waiting_for_children")
       expect(detailed_out.string).to include("waiting_on=Sample#4201")
+      expect(detailed_out.string).to include("claim_ref=claim-detail")
     end
   end
 

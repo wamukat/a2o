@@ -7,12 +7,14 @@ RSpec.describe A3::Application::ShowRun do
       task_repository: task_repository,
       plan_rerun: plan_rerun,
       build_scope_snapshot: build_scope_snapshot,
-      build_artifact_owner: build_artifact_owner
+      build_artifact_owner: build_artifact_owner,
+      task_claim_repository: task_claim_repository
     )
   end
 
   let(:run_repository) { A3::Infra::InMemoryRunRepository.new }
   let(:task_repository) { A3::Infra::InMemoryTaskRepository.new }
+  let(:task_claim_repository) { A3::Infra::InMemorySchedulerTaskClaimRepository.new(claim_ref_generator: -> { "claim-run-1" }) }
   let(:plan_rerun) { A3::Application::PlanRerun.new }
   let(:build_scope_snapshot) { A3::Application::BuildScopeSnapshot.new }
   let(:build_artifact_owner) { A3::Application::BuildArtifactOwner.new }
@@ -173,6 +175,7 @@ RSpec.describe A3::Application::ShowRun do
     expect(result.source_type).to eq(:detached_commit)
     expect(result.source_ref).to eq("head456")
     expect(result.terminal_outcome).to eq(:blocked)
+    expect(result.claim_ref).to be_nil
     expect(result.rerun_decision).to eq(:requires_operator_action)
     expect(result.evidence_summary.review_base).to eq("base123")
     expect(result.evidence_summary.review_head).to eq("head456")
@@ -223,6 +226,35 @@ RSpec.describe A3::Application::ShowRun do
       runtime_package_guidance: "run doctor-runtime and inspect repo sources, secret delivery, and scheduler store migration before rerun"
     )
     expect(result.recovery.package_expectation).to eq(:inspect_runtime_package)
+  end
+
+  it "returns the active scheduler claim ref linked to the run" do
+    claim = task_claim_repository.claim_task(
+      task_ref: "A3-v2#child",
+      phase: :review,
+      parent_group_key: "A3-v2#parent",
+      claimed_by: "scheduler-test",
+      claimed_at: "2026-05-01T00:00:00Z"
+    )
+    task_claim_repository.link_run(claim_ref: claim.claim_ref, run_ref: "run-1")
+
+    result = use_case.call(run_ref: "run-1", runtime_package: runtime_package)
+
+    expect(result.claim_ref).to eq("claim-run-1")
+  end
+
+  it "does not attach an unlinked active claim to an arbitrary previous run for the same task" do
+    task_claim_repository.claim_task(
+      task_ref: "A3-v2#child",
+      phase: :implementation,
+      parent_group_key: "A3-v2#parent",
+      claimed_by: "scheduler-test",
+      claimed_at: "2026-05-01T00:00:00Z"
+    )
+
+    result = use_case.call(run_ref: "run-1", runtime_package: runtime_package)
+
+    expect(result.claim_ref).to be_nil
   end
 
   it "surfaces implementation-side review evidence on the latest execution snapshot" do

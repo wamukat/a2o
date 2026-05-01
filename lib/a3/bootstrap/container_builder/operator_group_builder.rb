@@ -24,14 +24,16 @@ module A3
             ),
             show_task: A3::Application::ShowTask.new(
               task_repository: context.task_repository,
-              run_repository: context.run_repository
+              run_repository: context.run_repository,
+              task_claim_repository: context.task_claim_repository
             ),
             show_run: A3::Application::ShowRun.new(
               run_repository: context.run_repository,
               task_repository: context.task_repository,
               plan_rerun: context.plan_rerun,
               build_scope_snapshot: context.build_scope_snapshot,
-              build_artifact_owner: context.build_artifact_owner
+              build_artifact_owner: context.build_artifact_owner,
+              task_claim_repository: context.task_claim_repository
             ),
             show_scheduler_history: A3::Application::ShowSchedulerHistory.new(
               scheduler_cycle_repository: context.scheduler_cycle_repository

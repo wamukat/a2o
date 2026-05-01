@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../domain/task_phase_projection"
+require "time"
 
 module A3
   module Application
@@ -16,10 +17,12 @@ module A3
       end
 
       ActiveRunView = Struct.new(:task_ref, :run_ref, :phase, :status, keyword_init: true)
+      ActiveClaimView = Struct.new(:claim_ref, :task_ref, :phase, :parent_group_key, :run_ref, :claimed_by, :claim_age_seconds, keyword_init: true)
       TaskView = Struct.new(:task_ref, :status, :phase, keyword_init: true)
       Result = Struct.new(
         :scheduler_state,
         :shot_state,
+        :active_claims,
         :active_runs,
         :queued_tasks,
         :blocked_tasks,
@@ -27,13 +30,15 @@ module A3
         keyword_init: true
       )
 
-      def initialize(task_repository:, run_repository:, scheduler_state_repository:, scheduler_cycle_repository:, storage_dir:, execution_process_probe: nil)
+      def initialize(task_repository:, run_repository:, scheduler_state_repository:, scheduler_cycle_repository:, storage_dir:, execution_process_probe: nil, task_claim_repository: nil, clock: -> { Time.now.utc })
         @task_repository = task_repository
         @run_repository = run_repository
         @scheduler_state_repository = scheduler_state_repository
         @scheduler_cycle_repository = scheduler_cycle_repository
         @storage_dir = File.expand_path(storage_dir)
         @execution_process_probe = execution_process_probe || A3::Application::ExecutionProcessProbe.new(storage_dir: @storage_dir)
+        @task_claim_repository = task_claim_repository
+        @clock = clock
       end
 
       def call
@@ -43,6 +48,7 @@ module A3
         shot_state = inspect_shot_lock
         runs_by_ref = @run_repository.all.each_with_object({}) { |run, memo| memo[run.ref] = run }
         tasks = @task_repository.all
+        active_claims = active_claim_views
 
         active_runs = tasks.each_with_object([]) do |task, memo|
           next unless task.current_run_ref
@@ -82,6 +88,7 @@ module A3
         Result.new(
           scheduler_state: scheduler_state,
           shot_state: shot_state,
+          active_claims: active_claims.freeze,
           active_runs: active_runs.freeze,
           queued_tasks: queued_tasks.freeze,
           blocked_tasks: blocked_tasks.freeze,
@@ -90,6 +97,43 @@ module A3
       end
 
       private
+
+      def active_claim_views
+        return [] unless @task_claim_repository
+
+        @task_claim_repository.active_claims.map do |claim|
+          ActiveClaimView.new(
+            claim_ref: claim.claim_ref,
+            task_ref: claim.task_ref,
+            phase: canonical_phase_for_claim(claim),
+            parent_group_key: claim.parent_group_key,
+            run_ref: claim.run_ref,
+            claimed_by: claim.claimed_by,
+            claim_age_seconds: claim_age_seconds_for(claim)
+          )
+        end
+      end
+
+      def canonical_phase_for_claim(claim)
+        task = fetch_optional_task(claim.task_ref)
+        return claim.phase unless task
+
+        canonical_phase_for(task, claim.phase)
+      end
+
+      def fetch_optional_task(task_ref)
+        @task_repository.fetch(task_ref)
+      rescue A3::Domain::RecordNotFound
+        nil
+      end
+
+      def claim_age_seconds_for(claim)
+        claimed_at = Time.iso8601(claim.claimed_at).utc
+        age = (@clock.call - claimed_at).to_i
+        age.negative? ? 0 : age
+      rescue ArgumentError, TypeError
+        nil
+      end
 
       def active_run_status(run, shot_state)
         return :missing_run unless run
