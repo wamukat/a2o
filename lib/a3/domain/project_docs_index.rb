@@ -58,13 +58,33 @@ module A3
       end
 
       Document = Struct.new(:path, :absolute_path, :metadata, :body, :surface_id, :repo_slot, :role, keyword_init: true) do
-        def title = metadata["title"]
-        def category = metadata["category"]
-        def status = metadata["status"]
-        def related_requirements = Array(metadata["related_requirements"])
-        def source_issues = Array(metadata["source_issues"])
-        def related_tickets = Array(metadata["related_tickets"])
-        def authorities = Array(metadata["authorities"])
+        def title
+          metadata["title"]
+        end
+
+        def category
+          metadata["category"]
+        end
+
+        def status
+          metadata["status"]
+        end
+
+        def related_requirements
+          Array(metadata["related_requirements"])
+        end
+
+        def source_issues
+          Array(metadata["source_issues"])
+        end
+
+        def related_tickets
+          Array(metadata["related_tickets"])
+        end
+
+        def authorities
+          Array(metadata["authorities"])
+        end
       end
 
       Diagnostic = Struct.new(:severity, :path, :field, :message, keyword_init: true)

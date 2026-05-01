@@ -2132,7 +2132,7 @@ func printRuntimeDecompositionLogFallback(config runtimeInstanceConfig, plan run
 
 func followRuntimeDecompositionLogFallback(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, taskRef string, initialTaskOutput string, initialStatusOutput string, pollInterval time.Duration) error {
 	lastStatusOutput := ""
-	logOffsets := map[string]int{}
+	logOffsets := map[string]int64{}
 	taskOutput := initialTaskOutput
 	statusOutput := initialStatusOutput
 	lastAction := ""
@@ -2149,19 +2149,19 @@ func followRuntimeDecompositionLogFallback(config runtimeInstanceConfig, plan ru
 		stage := decompositionFollowStage(taskOutput, statusOutput)
 		action := decompositionLogActionForStage(stage)
 		if lastAction != "" && lastAction != action {
-			if err := printRuntimeDecompositionActionLogDelta(config, plan, runner, stdout, lastAction, logOffsets); err != nil {
+			if err := printRuntimeDecompositionDeltas(config, plan, runner, stdout, taskRef, lastAction, logOffsets, false); err != nil {
 				return err
 			}
 		}
 		if action != "" {
-			if err := printRuntimeDecompositionActionLogDelta(config, plan, runner, stdout, action, logOffsets); err != nil {
+			if err := printRuntimeDecompositionDeltas(config, plan, runner, stdout, taskRef, action, logOffsets, true); err != nil {
 				return err
 			}
 			lastAction = action
 		}
 		if decompositionFollowTerminal(state, taskOutput) {
 			if lastAction != "" {
-				if err := printRuntimeDecompositionActionLogDelta(config, plan, runner, stdout, lastAction, logOffsets); err != nil {
+				if err := printRuntimeDecompositionDeltas(config, plan, runner, stdout, taskRef, lastAction, logOffsets, true); err != nil {
 					return err
 				}
 			}
@@ -2181,7 +2181,22 @@ func followRuntimeDecompositionLogFallback(config runtimeInstanceConfig, plan ru
 	}
 }
 
-func printRuntimeDecompositionActionLogDelta(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, stage string, offsets map[string]int) error {
+func printRuntimeDecompositionDeltas(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, taskRef string, action string, offsets map[string]int64, includeLiveLog bool) error {
+	if err := printRuntimeDecompositionActionLogDelta(config, plan, runner, stdout, action, offsets); err != nil {
+		return err
+	}
+	if err := printRuntimeDecompositionAgentEventDelta(stdout, plan, taskRef, action, offsets); err != nil {
+		return err
+	}
+	if includeLiveLog && decompositionAgentEventSeen(plan.HostAgentLog, taskRef, action, "command_start") {
+		if err := printRuntimeDecompositionLiveLogDelta(stdout, plan, taskRef, action, offsets); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printRuntimeDecompositionActionLogDelta(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, stage string, offsets map[string]int64) error {
 	action := decompositionLogActionForStage(stage)
 	if action == "" {
 		return nil
@@ -2192,19 +2207,103 @@ func printRuntimeDecompositionActionLogDelta(config runtimeInstanceConfig, plan 
 		return nil
 	}
 	offset := offsets[actionPlan.RuntimeLog]
-	if offset > len(output) {
+	if offset > int64(len(output)) {
 		offset = 0
 	}
-	if offset == len(output) {
+	if offset == int64(len(output)) {
 		return nil
 	}
 	fmt.Fprintf(stdout, "=== decomposition log: %s ===\n", action)
-	fmt.Fprint(stdout, output[offset:])
+	fmt.Fprint(stdout, output[int(offset):])
 	if !strings.HasSuffix(output, "\n") {
 		fmt.Fprintln(stdout)
 	}
-	offsets[actionPlan.RuntimeLog] = len(output)
+	offsets[actionPlan.RuntimeLog] = int64(len(output))
 	return nil
+}
+
+func printRuntimeDecompositionLiveLogDelta(stdout io.Writer, plan runtimeRunOncePlan, taskRef string, action string, offsets map[string]int64) error {
+	if decompositionLogActionForStage(action) == "" {
+		return nil
+	}
+	livePath := plan.preferredLiveLogPath(taskRef, "decomposition_"+action)
+	offsetKey := "decomposition-live|" + action + "|" + livePath
+	offset := offsets[offsetKey]
+	nextOffset, err := printFileDeltaWithHeader(stdout, livePath, offset, fmt.Sprintf("=== decomposition live log: %s ===\n", action))
+	if err != nil {
+		return err
+	}
+	offsets[offsetKey] = nextOffset
+	return nil
+}
+
+func printRuntimeDecompositionAgentEventDelta(stdout io.Writer, plan runtimeRunOncePlan, taskRef string, action string, offsets map[string]int64) error {
+	if decompositionLogActionForStage(action) == "" {
+		return nil
+	}
+	content, err := os.ReadFile(plan.HostAgentLog)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	offsetKey := "decomposition-agent|" + action + "|" + plan.HostAgentLog
+	offset := offsets[offsetKey]
+	if offset > int64(len(content)) {
+		offset = 0
+	}
+	if offset == int64(len(content)) {
+		return nil
+	}
+	lines := strings.Split(string(content[int(offset):]), "\n")
+	var matched []string
+	for _, line := range lines {
+		if decompositionAgentEventMatches(line, taskRef, action) {
+			matched = append(matched, line)
+		}
+	}
+	if len(matched) > 0 {
+		fmt.Fprintf(stdout, "=== decomposition agent events: %s ===\n", action)
+		for _, line := range matched {
+			fmt.Fprintln(stdout, line)
+		}
+	}
+	offsets[offsetKey] = int64(len(content))
+	return nil
+}
+
+func decompositionAgentEventMatches(line string, taskRef string, action string) bool {
+	return decompositionAgentEventMatchesStage(line, taskRef, action, "")
+}
+
+func decompositionAgentEventSeen(hostAgentLog string, taskRef string, action string, stage string) bool {
+	content, err := os.ReadFile(hostAgentLog)
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(content), "\n") {
+		if decompositionAgentEventMatchesStage(line, taskRef, action, stage) {
+			return true
+		}
+	}
+	return false
+}
+
+func decompositionAgentEventMatchesStage(line string, taskRef string, action string, stage string) bool {
+	const prefix = "a2o_agent_job_event "
+	if !strings.Contains(line, prefix) {
+		return false
+	}
+	raw := strings.TrimSpace(line[strings.Index(line, prefix)+len(prefix):])
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return false
+	}
+	if payload["task_ref"] != taskRef || payload["command_intent"] != "decomposition_"+action {
+		return false
+	}
+	return stage == "" || payload["stage"] == stage
 }
 
 func decompositionFollowStage(taskOutput string, statusOutput string) string {
@@ -3293,6 +3392,10 @@ func printRuntimeArtifactSection(config runtimeInstanceConfig, plan runtimeRunOn
 }
 
 func printFileDelta(stdout io.Writer, livePath string, offset int64) (int64, error) {
+	return printFileDeltaWithHeader(stdout, livePath, offset, "")
+}
+
+func printFileDeltaWithHeader(stdout io.Writer, livePath string, offset int64, header string) (int64, error) {
 	file, err := os.Open(livePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -3308,8 +3411,14 @@ func printFileDelta(stdout io.Writer, livePath string, offset int64) (int64, err
 	if info.Size() < offset {
 		offset = 0
 	}
+	if info.Size() == offset {
+		return offset, nil
+	}
 	if _, err := file.Seek(offset, io.SeekStart); err != nil {
 		return offset, err
+	}
+	if header != "" {
+		fmt.Fprint(stdout, header)
 	}
 	written, err := io.Copy(stdout, file)
 	if err != nil {

@@ -102,7 +102,7 @@ func liveLogWriterFor(request JobRequest) (io.Writer, func()) {
 	if strings.TrimSpace(root) == "" {
 		return nil, func() {}
 	}
-	target := filepath.Join(root, safeID(request.TaskRef), safeID(request.Phase)+".log")
+	target := filepath.Join(root, safeID(request.TaskRef), safeID(liveLogPhaseName(request))+".log")
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return nil, func() {}
 	}
@@ -111,6 +111,14 @@ func liveLogWriterFor(request JobRequest) (io.Writer, func()) {
 		return nil, func() {}
 	}
 	return file, func() { _ = file.Close() }
+}
+
+func liveLogPhaseName(request JobRequest) string {
+	intent := commandIntent(request)
+	if strings.HasPrefix(intent, "decomposition_") {
+		return intent
+	}
+	return request.Phase
 }
 
 func mergeEnv(overrides map[string]string) []string {

@@ -7860,6 +7860,256 @@ func TestRuntimeLogsFollowStreamsDecompositionStatusAndActionLog(t *testing.T) {
 	}
 }
 
+func TestRuntimeLogsFollowStreamsLiveDecompositionAgentOutput(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	hostRoot := filepath.Join(tempDir, ".work", "a2o", "runtime-host-agent")
+	hostAgentLog := filepath.Join(hostRoot, "agent.log")
+	liveLogPath := filepath.Join(hostRoot, "live-logs", "A2O-61", "decomposition_propose.log")
+	if err := os.MkdirAll(filepath.Dir(liveLogPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hostAgentLog, []byte(`a2o_agent_job_event {"stage":"command_start","job_id":"job-1","task_ref":"A2O#61","command_intent":"decomposition_propose"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(liveLogPath, []byte("copilot proposal live output while command is running\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{
+		showTaskOutput:          "task A2O#61 kind=single status=in_progress current_run=\nedit_scope=\nverification_scope=\nrunnable_reason=decomposition_requested\n",
+		runtimeLogTargetsOutput: `{"requested_task_ref":"A2O#61","selected_task_ref":"A2O#61","dynamic_follow":false,"candidates":[]}`,
+		logManifestOutput:       `{"run_ref":"","current_run":"","phase":"","source_type":"","source_ref":"","active":false,"artifacts":[]}`,
+		decompositionStatusOutputs: []string{
+			"decomposition task=A2O#61 state=active\nstage=propose\nevidence.investigation=/var/lib/a3/test-runtime/decomposition-evidence/A2O-61/investigation.json\n",
+			"decomposition task=A2O#61 state=done\nstage=done\nevidence.proposal=/var/lib/a3/test-runtime/decomposition-evidence/A2O-61/proposal.json\n",
+		},
+		decompositionStatusHooks: []func(){
+			nil,
+			func() {
+				if err := os.WriteFile(hostAgentLog, []byte(
+					`a2o_agent_job_event {"stage":"command_start","job_id":"job-1","task_ref":"A2O#61","command_intent":"decomposition_propose"}`+"\n"+
+						`a2o_agent_job_event {"stage":"command_done","job_id":"job-1","task_ref":"A2O#61","command_intent":"decomposition_propose","status":"succeeded"}`+"\n",
+				), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(liveLogPath, []byte(
+					"copilot proposal live output while command is running\n"+
+						"copilot proposal final output before terminal status\n",
+				), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "logs", "A2O#61", "--follow", "--poll-interval", "1ms"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	for _, want := range []string{
+		"=== decomposition: A2O#61 ===",
+		"decomposition task=A2O#61 state=active",
+		"stage=propose",
+		"=== decomposition agent events: propose ===",
+		`"stage":"command_start"`,
+		"=== decomposition live log: propose ===",
+		"copilot proposal live output while command is running",
+		`"stage":"command_done"`,
+		"copilot proposal final output before terminal status",
+		"decomposition task=A2O#61 state=done",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("runtime logs --follow missing %q in:\n%s", want, output)
+		}
+	}
+}
+
+func TestRuntimeLogsFollowKeepsDecompositionLiveLogsStageScoped(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	hostRoot := filepath.Join(tempDir, ".work", "a2o", "runtime-host-agent")
+	hostAgentLog := filepath.Join(hostRoot, "agent.log")
+	proposeLiveLogPath := filepath.Join(hostRoot, "live-logs", "A2O-61", "decomposition_propose.log")
+	reviewLiveLogPath := filepath.Join(hostRoot, "live-logs", "A2O-61", "decomposition_review.log")
+	if err := os.MkdirAll(filepath.Dir(proposeLiveLogPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hostAgentLog, []byte(`a2o_agent_job_event {"stage":"command_start","job_id":"job-propose","task_ref":"A2O#61","command_intent":"decomposition_propose"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(proposeLiveLogPath, []byte("proposal live output\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{
+		showTaskOutput:          "task A2O#61 kind=single status=in_progress current_run=\nedit_scope=\nverification_scope=\nrunnable_reason=decomposition_requested\n",
+		runtimeLogTargetsOutput: `{"requested_task_ref":"A2O#61","selected_task_ref":"A2O#61","dynamic_follow":false,"candidates":[]}`,
+		logManifestOutput:       `{"run_ref":"","current_run":"","phase":"","source_type":"","source_ref":"","active":false,"artifacts":[]}`,
+		decompositionStatusOutputs: []string{
+			"decomposition task=A2O#61 state=active\nstage=propose\nevidence.investigation=/var/lib/a3/test-runtime/decomposition-evidence/A2O-61/investigation.json\n",
+			"decomposition task=A2O#61 state=active\nstage=review\nevidence.proposal=/var/lib/a3/test-runtime/decomposition-evidence/A2O-61/proposal.json\n",
+			"decomposition task=A2O#61 state=done\nstage=done\nevidence.proposal_review=/var/lib/a3/test-runtime/decomposition-evidence/A2O-61/review.json\n",
+		},
+		decompositionStatusHooks: []func(){
+			nil,
+			func() {
+				if err := os.WriteFile(hostAgentLog, []byte(
+					`a2o_agent_job_event {"stage":"command_start","job_id":"job-propose","task_ref":"A2O#61","command_intent":"decomposition_propose"}`+"\n"+
+						`a2o_agent_job_event {"stage":"command_done","job_id":"job-propose","task_ref":"A2O#61","command_intent":"decomposition_propose","status":"succeeded"}`+"\n"+
+						`a2o_agent_job_event {"stage":"command_start","job_id":"job-review","task_ref":"A2O#61","command_intent":"decomposition_review"}`+"\n",
+				), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(reviewLiveLogPath, []byte("review live output\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			},
+			nil,
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "logs", "A2O#61", "--follow", "--poll-interval", "1ms"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	for _, want := range []string{
+		"=== decomposition live log: propose ===",
+		"proposal live output",
+		`"stage":"command_done","job_id":"job-propose"`,
+		"=== decomposition agent events: review ===",
+		`"stage":"command_start","job_id":"job-review"`,
+		"=== decomposition live log: review ===",
+		"review live output",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("runtime logs --follow missing %q in:\n%s", want, output)
+		}
+	}
+	if strings.Contains(output, "=== decomposition live log: propose ===\nreview live output") {
+		t.Fatalf("review live output should not be printed under the propose header:\n%s", output)
+	}
+}
+
+func TestRuntimeLogsFollowWaitsForDecompositionStageCommandStartBeforeLiveLog(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	hostRoot := filepath.Join(tempDir, ".work", "a2o", "runtime-host-agent")
+	hostAgentLog := filepath.Join(hostRoot, "agent.log")
+	staleVerificationLogPath := filepath.Join(hostRoot, "live-logs", "A2O-61", "verification.log")
+	reviewLiveLogPath := filepath.Join(hostRoot, "live-logs", "A2O-61", "decomposition_review.log")
+	if err := os.MkdirAll(filepath.Dir(staleVerificationLogPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hostAgentLog, []byte(
+		`a2o_agent_job_event {"stage":"command_start","job_id":"job-propose","task_ref":"A2O#61","command_intent":"decomposition_propose"}`+"\n"+
+			`a2o_agent_job_event {"stage":"command_done","job_id":"job-propose","task_ref":"A2O#61","command_intent":"decomposition_propose","status":"succeeded"}`+"\n",
+	), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(staleVerificationLogPath, []byte("stale proposal live output\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{
+		showTaskOutput:          "task A2O#61 kind=single status=in_progress current_run=\nedit_scope=\nverification_scope=\nrunnable_reason=decomposition_requested\n",
+		runtimeLogTargetsOutput: `{"requested_task_ref":"A2O#61","selected_task_ref":"A2O#61","dynamic_follow":false,"candidates":[]}`,
+		logManifestOutput:       `{"run_ref":"","current_run":"","phase":"","source_type":"","source_ref":"","active":false,"artifacts":[]}`,
+		decompositionStatusOutputs: []string{
+			"decomposition task=A2O#61 state=active\nstage=review\nevidence.proposal=/var/lib/a3/test-runtime/decomposition-evidence/A2O-61/proposal.json\n",
+			"decomposition task=A2O#61 state=active\nstage=review\nevidence.proposal=/var/lib/a3/test-runtime/decomposition-evidence/A2O-61/proposal.json\n",
+			"decomposition task=A2O#61 state=done\nstage=done\nevidence.proposal_review=/var/lib/a3/test-runtime/decomposition-evidence/A2O-61/review.json\n",
+		},
+		decompositionStatusHooks: []func(){
+			nil,
+			func() {
+				if err := os.WriteFile(hostAgentLog, []byte(
+					`a2o_agent_job_event {"stage":"command_start","job_id":"job-propose","task_ref":"A2O#61","command_intent":"decomposition_propose"}`+"\n"+
+						`a2o_agent_job_event {"stage":"command_done","job_id":"job-propose","task_ref":"A2O#61","command_intent":"decomposition_propose","status":"succeeded"}`+"\n"+
+						`a2o_agent_job_event {"stage":"command_start","job_id":"job-review","task_ref":"A2O#61","command_intent":"decomposition_review"}`+"\n",
+				), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(reviewLiveLogPath, []byte("review live output after command_start\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			},
+			nil,
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run([]string{"runtime", "logs", "A2O#61", "--follow", "--poll-interval", "1ms"}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	if strings.Contains(output, "stale proposal live output") {
+		t.Fatalf("stale proposal live output should not be printed under review before review command_start:\n%s", output)
+	}
+	for _, want := range []string{
+		`"stage":"command_start","job_id":"job-review"`,
+		"=== decomposition live log: review ===",
+		"review live output after command_start",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("runtime logs --follow missing %q in:\n%s", want, output)
+		}
+	}
+}
+
 func TestRuntimeLogsFollowsLatestActiveRunWhenTaskCurrentRunIsBlank(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -11215,6 +11465,7 @@ type fakeRunner struct {
 	showTaskOutput             string
 	decompositionStatusOutput  string
 	decompositionStatusOutputs []string
+	decompositionStatusHooks   []func()
 	taskWithoutCurrentRun      bool
 	staleCurrentRun            bool
 	runtimeExitMissing         bool
@@ -11395,6 +11646,13 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		if len(r.decompositionStatusOutputs) > 0 {
 			output := r.decompositionStatusOutputs[0]
 			r.decompositionStatusOutputs = r.decompositionStatusOutputs[1:]
+			if len(r.decompositionStatusHooks) > 0 {
+				hook := r.decompositionStatusHooks[0]
+				r.decompositionStatusHooks = r.decompositionStatusHooks[1:]
+				if hook != nil {
+					hook()
+				}
+			}
 			return []byte(output), nil
 		}
 		if r.decompositionStatusOutput != "" {
