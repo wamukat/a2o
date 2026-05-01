@@ -67,7 +67,8 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
       expect(writer).to receive(:call).with(
         parent_task_ref: "A3-v2#5300",
         parent_external_task_id: 5300,
-        proposal_evidence: hash_including("proposal_fingerprint" => "fp-1")
+        proposal_evidence: hash_including("proposal_fingerprint" => "fp-1"),
+        source_remote: nil
       ).and_return(WriterResult.new(success?: true, child_refs: ["A3-v2#5301"], child_keys: ["child-key-1"]))
 
       result = described_class.new(storage_dir: dir, child_writer: writer).call(task: task, gate: true)
@@ -88,7 +89,7 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
     end
   end
 
-  it "records imported source remote metadata only in child creation evidence" do
+  it "passes imported source remote metadata to the child writer and records evidence" do
     Dir.mktmpdir do |dir|
       write_evidence(dir)
       source_remote = {
@@ -100,7 +101,8 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
       expect(writer).to receive(:call).with(
         parent_task_ref: "A3-v2#5300",
         parent_external_task_id: 5300,
-        proposal_evidence: hash_including("proposal_fingerprint" => "fp-1")
+        proposal_evidence: hash_including("proposal_fingerprint" => "fp-1"),
+        source_remote: source_remote
       ).and_return(WriterResult.new(success?: true, child_refs: ["A3-v2#5301"], child_keys: ["child-key-1"]))
 
       result = described_class.new(storage_dir: dir, child_writer: writer).call(task: task, gate: true, source_remote: source_remote)

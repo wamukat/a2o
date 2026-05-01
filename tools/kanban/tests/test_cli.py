@@ -178,6 +178,55 @@ class KanbaloneCliTest(unittest.TestCase):
         self.assertEqual("PATCH", request.get_method())
         self.assertEqual("application/json", request.headers["Content-type"])
 
+    def test_task_external_reference_set_uses_kanbalone_api(self) -> None:
+        args = SimpleNamespace(
+            backend="kanbalone",
+            base_url="http://localhost:3460",
+            token="",
+            task_id=52,
+            task=None,
+            project_id=None,
+            project="A2O",
+            kind="source",
+            data_json=json.dumps(
+                {
+                    "provider": "github",
+                    "instanceUrl": "https://github.com",
+                    "projectKey": "wamukat/a2o",
+                    "issueKey": "41",
+                    "displayRef": "wamukat/a2o#41",
+                    "url": "https://github.com/wamukat/a2o/issues/41",
+                }
+            ),
+            data_file=None,
+        )
+
+        with (
+            patch.object(kanban_cli, "resolve_backend_context", return_value=SimpleNamespace(base_url="http://localhost:3460", token="")),
+            patch.object(kanban_cli, "resolve_task_id_from_ref", return_value=52),
+            patch.object(kanban_cli, "resolve_project_title", return_value="A2O"),
+            patch.object(
+                kanban_cli,
+                "rest_request",
+                return_value={
+                    "id": 52,
+                    "boardId": 2,
+                    "laneId": 1,
+                    "ref": "A2O#52",
+                    "title": "Generated parent",
+                    "isResolved": False,
+                    "externalReferences": [{"kind": "source", "displayRef": "wamukat/a2o#41"}],
+                },
+            ) as request,
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            self.assertEqual(0, kanban_cli.cmd_task_external_reference_set(args))
+
+        request.assert_called_once()
+        self.assertEqual(("http://localhost:3460", "", "PUT", "/api/tickets/52/external-references/source"), request.call_args.args)
+        self.assertEqual("github", request.call_args.kwargs["payload"]["provider"])
+        self.assertEqual("wamukat/a2o#41", json.loads(stdout.getvalue())["external_references"][0]["displayRef"])
+
     def test_add_task_label_uses_reasoned_tag_api_when_reason_is_present(self) -> None:
         with (
             patch.object(kanban_cli, "resolve_tag", return_value={"id": 12, "name": "blocked"}),

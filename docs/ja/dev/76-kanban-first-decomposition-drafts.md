@@ -164,7 +164,7 @@ draft creation は source ticket に `trigger:auto-parent` を付けてはなら
 
 orchestration に provider-specific logic を散らさない。remote / local の差分は kanban adapter と child writer boundary の内側に閉じ込める。adapter が provider-backed child を作れない場合、A2O は remote source に紐づく local Kanban child を作り、その mapping を evidence に記録してよい。
 
-source ticket が外部 issue import の metadata を持つ場合でも、generated implementation parent は別の local Kanban ticket として作る。Kanbalone では外部 issue import は単一の source ticket として扱うため、generated parent に同じ外部 import を複製してはならない。A2O は正規化した `source_remote` metadata を child-creation evidence にだけ記録し、source から generated parent への `related` relation を維持する。generated parent や draft child の本文には remote metadata をコピーしない。
+source ticket が外部 issue import の metadata を持つ場合でも、generated implementation parent は別の local Kanban ticket として作る。Kanbalone では外部 issue import は単一の source ticket として扱うため、generated parent に同じ外部 import を複製してはならない。A2O は正規化した `source_remote` metadata を child-creation evidence に記録し、Kanbalone v0.9.28 以降では generated parent に non-tracking な `externalReferences[source]` を書き込み、source から generated parent への `related` relation を維持する。generated parent や draft child の本文には remote metadata をコピーしない。古い外部 Kanbalone endpoint が external references を持たない場合、child creation は non-fatal に継続し、child-creation evidence に warning を記録する。
 
 ## 10. Optional accept-drafts helper
 

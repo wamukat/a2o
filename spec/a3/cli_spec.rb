@@ -762,7 +762,12 @@ RSpec.describe A3::CLI do
       expect(writer).to have_received(:call).with(
         parent_task_ref: "Portal#240",
         parent_external_task_id: 240,
-        proposal_evidence: proposal_evidence
+        proposal_evidence: proposal_evidence,
+        source_remote: {
+          "provider" => "github",
+          "display_ref" => "wamukat/a2o#41",
+          "url" => "https://github.com/wamukat/a2o/issues/41"
+        }
       )
       expect(out.string).to include("decomposition child creation Portal#240 success=true")
       expect(A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json")).fetch("Portal#240").external_task_id).to eq(240)

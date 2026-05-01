@@ -2,8 +2,8 @@
 
 RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
   class FakeProposalClient
-    attr_reader :created, :labels, :relations, :comments, :commands
-    attr_accessor :fail_after_first_create, :fail_dependency_relation, :task_find_returns_summaries
+    attr_reader :created, :labels, :relations, :comments, :commands, :external_references
+    attr_accessor :fail_after_first_create, :fail_dependency_relation, :fail_external_reference_unavailable, :task_find_returns_summaries
 
     def initialize(existing: [])
       @existing = existing
@@ -11,10 +11,12 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
       @labels = []
       @relations = []
       @comments = []
+      @external_references = []
       @comment_texts = Hash.new { |hash, key| hash[key] = [] }
       @commands = []
       @fail_after_first_create = false
       @fail_dependency_relation = false
+      @fail_external_reference_unavailable = false
       @task_find_returns_summaries = false
     end
 
@@ -59,11 +61,15 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     def run_command(*args)
       raise A3::Domain::ConfigurationError, "simulated label failure" if @fail_after_first_create && args.first == "task-label-add" && !args.include?("5301")
       raise A3::Domain::ConfigurationError, "simulated dependency failure" if @fail_dependency_relation && args.first == "task-relation-create" && args.include?("blocked")
+      if @fail_external_reference_unavailable && args.first == "task-external-reference-set"
+        raise A3::Domain::ConfigurationError, "kanbalone command failed: kanbalone_external_references_unavailable migration_required=true minimum_kanbalone_version=v0.9.28 action=upgrade_kanbalone"
+      end
 
       @commands << args
       @labels << args if args.first == "task-label-add"
       @relations << args if args.first == "task-relation-create"
       @comments << args if args.first == "task-comment-create"
+      @external_references << args if args.first == "task-external-reference-set"
       nil
     end
 
@@ -301,8 +307,14 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
   it "creates non-runnable local draft children for a remote source without marking the source parent runnable" do
     client = FakeProposalClient.new
     writer = described_class.new(project: "Portal", client: client, mode: :draft)
+    source_remote = {
+      "provider" => "github",
+      "display_ref" => "wamukat/a2o#16",
+      "url" => "https://github.com/wamukat/a2o/issues/16",
+      "title" => "Remote intake"
+    }
 
-    result = writer.call(parent_task_ref: "wamukat/a2o#16", parent_external_task_id: 240, proposal_evidence: proposal_evidence)
+    result = writer.call(parent_task_ref: "wamukat/a2o#16", parent_external_task_id: 240, proposal_evidence: proposal_evidence, source_remote: source_remote)
 
     expect(result.success?).to be(true)
     expect(result.parent_ref).to eq("A3-v2#5301")
@@ -311,6 +323,15 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     expect(generated_parent(client).fetch("description")).not_to include("Source remote")
     expect(generated_child(client).fetch("description")).to include("Parent: A3-v2#5301")
     expect(generated_child(client).fetch("description")).not_to include("Source remote")
+    expect(client.external_references).to include(
+      array_including(
+        "task-external-reference-set",
+        "--task-id", "5301",
+        "--kind", "source",
+        "--data-json",
+        /"displayRef":"wamukat\/a2o#16"/
+      )
+    )
     expect(client.labels.any? { |args| args.include?("a2o:draft-child") }).to be(true)
     expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(false)
     expect(client.labels.any? { |args| args.include?("trigger:auto-parent") }).to be(false)
@@ -321,6 +342,30 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     source_comment = client.instance_variable_get(:@comment_texts)["240"].join("\n")
     expect(source_comment).to include("Generated implementation parent A3-v2#5301")
     expect(source_comment).not_to include("Source remote:")
+  end
+
+  it "keeps child creation non-fatal when older Kanbalone lacks generated external references" do
+    client = FakeProposalClient.new
+    client.fail_external_reference_unavailable = true
+    writer = described_class.new(project: "Portal", client: client, mode: :draft)
+
+    result = writer.call(
+      parent_task_ref: "wamukat/a2o#16",
+      parent_external_task_id: 240,
+      proposal_evidence: proposal_evidence,
+      source_remote: {
+        "provider" => "github",
+        "display_ref" => "wamukat/a2o#16",
+        "url" => "https://github.com/wamukat/a2o/issues/16"
+      }
+    )
+
+    expect(result.success?).to be(true)
+    expect(result.child_refs).to eq(["A3-v2#5302"])
+    expect(result.diagnostics.fetch("warnings").first).to include(
+      "type" => "external_reference",
+      "status" => "unavailable"
+    )
   end
 
   it "filters proposed automation trigger labels from draft children" do

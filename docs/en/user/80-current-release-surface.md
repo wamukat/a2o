@@ -31,7 +31,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - `a2o runtime decomposition investigate`, `propose`, and `review` execute project-owned decomposition commands through the host agent in the same host workspace boundary as implementation workers. This lets project decomposition commands call host-only agent CLIs such as Copilot while the runtime container remains the orchestrator.
 - Decomposition command UX: action-level help for `a2o runtime decomposition <action> --help`, plus direct external task sync/reconciliation for one-shot decomposition commands
 - Requirement decomposition source tickets are requirement artifacts. After successful decomposition they move to `Done`, and A2O creates separate generated implementation work. The source ticket is linked to the generated implementation parent with a Kanbalone `related` relation for traceability.
-- If a decomposition source ticket was imported from an external issue, A2O records normalized remote metadata only in child-creation evidence as `source_remote`; generated parent and draft child bodies remain local planning surfaces and do not receive copied remote metadata.
+- If a decomposition source ticket was imported from an external issue, A2O records normalized remote metadata in child-creation evidence as `source_remote` and writes a non-tracking generated parent `externalReferences[source]` entry when Kanbalone v0.9.28 or newer is available. Older external Kanbalone endpoints keep relation/evidence traceability and record a child-creation warning instead of copying remote metadata into generated ticket text.
 - `a2o runtime decomposition accept-drafts` accepts selected draft children by adding `trigger:auto-implement`; it can optionally remove `a2o:draft-child` and add `trigger:auto-parent` to the generated parent. The command pauses scheduler processing while mutating labels, resumes only after successful mutation when it paused the scheduler, and leaves the scheduler paused on failure for inspection.
 - Gate-closed decomposition child creation reports `status=gate_closed` and `child_creation_result=not_attempted` without rendering an empty `success=` value
 - Multi-repo documentation surfaces: `docs.surfaces` can declare repo-local docs and integration docs separately, while `docs.authorities` can point to source-of-truth files in a specific repo slot. Worker `docs_context` includes surface id, repo slot, role, candidate docs, and authority source metadata.
@@ -46,7 +46,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - External Kanbalone bootstrap fields: `--kanban-mode external`, `--kanban-url`, `--kanban-runtime-url`
 - Runtime CLI overrides for agent server connectivity: `--agent-control-plane-connect-timeout`, `--agent-control-plane-request-timeout`, `--agent-control-plane-retries`, `--agent-control-plane-retry-delay`
 - Host agent CLI and runtime profile fields for agent server connectivity: `--control-plane-connect-timeout`, `--control-plane-request-timeout`, `--control-plane-retries`, `--control-plane-retry-delay`, `control_plane_connect_timeout`, `control_plane_request_timeout`, `control_plane_retry_count`, `control_plane_retry_delay`
-- Kanbalone adapter and bootstrap tooling, defaulting to Kanbalone `v0.9.25`
+- Kanbalone adapter and bootstrap tooling, defaulting to Kanbalone `v0.9.28`
 - Agent HTTP worker gateway, including claimed-job heartbeats
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates
@@ -69,7 +69,7 @@ Use it to confirm which features can be documented for users and what can be tre
   - install the new launcher from the release image: `docker run --rm -v "$PWD/.work/a2o:/out" ghcr.io/wamukat/a2o-engine:0.5.58 a2o host install --output-dir /out/bin --share-dir /out/share`
   - update project runtime image references to `ghcr.io/wamukat/a2o-engine:0.5.58`
   - restart the runtime container with the new image before running decomposition commands.
-- External Kanbalone deployments used with decomposition source tickets must run Kanbalone v0.9.25 or newer. A2O 0.5.58 writes `related` relations from the requirement source ticket to the generated implementation work; older external Kanbalone versions do not provide that relation surface.
+- External Kanbalone deployments used with decomposition source tickets should run Kanbalone v0.9.28 or newer. A2O writes `related` relations from the requirement source ticket to the generated implementation work and uses v0.9.28 `externalReferences` for imported-source provenance; older external Kanbalone versions do not provide the complete surface.
 - Project packages that adopt `docs.surfaces` should validate that every surface `repoSlot` is backed by a configured repo source and that every cross-repo `docs.authorities.*.repoSlot` points at the repo containing the source-of-truth file. No migration is required for existing single-surface `docs` packages.
 
 ## Validation Scope

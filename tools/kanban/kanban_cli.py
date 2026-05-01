@@ -539,6 +539,7 @@ def kanbalone_normalize_ticket(ticket: dict[str, Any], *, board_title: str, boar
         "description": ticket.get("bodyMarkdown") or "",
         "reference": ticket.get("ref") or canonical_human_task_ref(board_title, f"#{int(ticket['id'])}"),
         "remote": ticket.get("remote"),
+        "external_references": ticket.get("externalReferences") or ticket.get("external_references") or [],
         "identifier": ticket.get("shortRef") or f"#{int(ticket['id'])}",
         "index": int(ticket["id"]),
         "position": int(ticket.get("position") or 0),
@@ -1691,6 +1692,40 @@ def cmd_task_event_create(args: argparse.Namespace) -> int:
     return print_json(created)
 
 
+def cmd_task_external_reference_set(args: argparse.Namespace) -> int:
+    backend = resolve_backend_context(backend=getattr(args, "backend", None), base_url=args.base_url, token=args.token)
+    base_url = backend.base_url
+    token = backend.token
+    task_id = resolve_task_id_from_ref(
+        base_url,
+        token,
+        task_id=args.task_id,
+        task_ref=args.task,
+        project_id=args.project_id,
+        project_title=args.project,
+    )
+    payload = load_json_arg(args.data_json, args.data_file)
+    if not isinstance(payload, dict):
+        raise RuntimeError("--data-json or --data-file must contain a JSON object.")
+    try:
+        updated = rest_request(
+            base_url,
+            token,
+            "PUT",
+            f"/api/tickets/{task_id}/external-references/{args.kind}",
+            payload=payload,
+        )
+    except RuntimeError as error:
+        if api_not_found(error):
+            raise RuntimeError(
+                "kanbalone_external_references_unavailable migration_required=true "
+                "minimum_kanbalone_version=v0.9.28 action=upgrade_kanbalone"
+            ) from error
+        raise
+    project_title = resolve_project_title(base_url, token, project_id=int(updated["boardId"]))
+    return print_json(normalize_task_detail(kanbalone_normalize_ticket(updated, board_title=project_title), project_title=project_title))
+
+
 def cmd_task_label_list(args: argparse.Namespace) -> int:
     backend = resolve_backend_context(backend=getattr(args, "backend", None), base_url=args.base_url, token=args.token)
     base_url = backend.base_url
@@ -2096,6 +2131,21 @@ def build_parser() -> argparse.ArgumentParser:
     task_event_create_fallback_group.add_argument("--fallback-comment")
     task_event_create_fallback_group.add_argument("--fallback-comment-file")
     task_event_create.set_defaults(func=cmd_task_event_create)
+
+    task_external_reference_set = subparsers.add_parser(
+        "task-external-reference-set",
+        help="Set a non-tracking external reference for one task.",
+    )
+    task_external_reference_set_group = task_external_reference_set.add_mutually_exclusive_group(required=True)
+    task_external_reference_set_group.add_argument("--task")
+    task_external_reference_set_group.add_argument("--task-id", type=int)
+    task_external_reference_set.add_argument("--project-id", type=int)
+    task_external_reference_set.add_argument("--project")
+    task_external_reference_set.add_argument("--kind", default="source")
+    task_external_reference_set_data_group = task_external_reference_set.add_mutually_exclusive_group(required=True)
+    task_external_reference_set_data_group.add_argument("--data-json")
+    task_external_reference_set_data_group.add_argument("--data-file")
+    task_external_reference_set.set_defaults(func=cmd_task_external_reference_set)
 
     task_label_list = subparsers.add_parser("task-label-list", help="List tags for one task.")
     task_label_list_group = task_label_list.add_mutually_exclusive_group(required=True)

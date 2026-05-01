@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
+require "json"
 require "a3/domain/refactoring_assessment"
+require "a3/domain/source_remote"
 module A3
   module Infra
     class KanbanCliProposalChildWriter
@@ -27,19 +29,22 @@ module A3
         raise A3::Domain::ConfigurationError, "unknown proposal child writer mode: #{mode}" unless %i[runnable draft].include?(@mode)
       end
 
-      def call(parent_task_ref:, parent_external_task_id:, proposal_evidence:)
+      def call(parent_task_ref:, parent_external_task_id:, proposal_evidence:, source_remote: nil)
         proposal = proposal_evidence.fetch("proposal")
         proposal_fingerprint = proposal_evidence.fetch("proposal_fingerprint")
         children = proposal.fetch("children")
         child_refs_by_key = {}
         refs = []
         keys = []
+        diagnostics = []
         failed_write = nil
         generated_parent = ensure_generated_parent(
           source_task_ref: parent_task_ref,
           source_external_task_id: parent_external_task_id,
           proposal_fingerprint: proposal_fingerprint,
-          proposal: proposal
+          proposal: proposal,
+          source_remote: source_remote,
+          diagnostics: diagnostics
         )
         children.each do |child|
           begin
@@ -68,7 +73,7 @@ module A3
           failed_write = dependency_failed_write(e)
           raise
         end
-        Result.new(success?: true, parent_ref: generated_parent.fetch("ref"), child_refs: refs, child_keys: keys)
+        Result.new(success?: true, parent_ref: generated_parent.fetch("ref"), child_refs: refs, child_keys: keys, diagnostics: diagnostics.empty? ? nil : { "warnings" => diagnostics })
       rescue StandardError => e
         Result.new(
           success?: false,
@@ -82,11 +87,13 @@ module A3
 
       private
 
-      def ensure_generated_parent(source_task_ref:, source_external_task_id:, proposal_fingerprint:, proposal:)
+      def ensure_generated_parent(source_task_ref:, source_external_task_id:, proposal_fingerprint:, proposal:, source_remote:, diagnostics:)
         payload = generated_parent_payload(source_task_ref: source_task_ref, proposal_fingerprint: proposal_fingerprint, proposal: proposal)
         task = find_existing_generated_parent(source_task_ref) || create_child(payload)
         ensure_label(task.fetch("id"), DECOMPOSED_LABEL)
         ensure_relation(source_external_task_id, task.fetch("id"), relation_kind: "related") if source_external_task_id
+        external_reference_warning = ensure_external_source_reference(task.fetch("id"), source_remote)
+        diagnostics << external_reference_warning if external_reference_warning
         ensure_comment(task.fetch("id"), payload.fetch("comment"))
         ensure_source_parent_comment(source_external_task_id, generated_parent_ref: task.fetch("ref"), proposal_fingerprint: proposal_fingerprint) if source_external_task_id
         task
@@ -315,6 +322,28 @@ module A3
           "--other-task-id", child_task_id.to_s,
           "--relation-kind", relation_kind
         )
+      end
+
+      def ensure_external_source_reference(task_id, source_remote)
+        payload = A3::Domain::SourceRemote.external_reference_payload(source_remote)
+        return unless payload
+
+        @client.run_command(
+          "task-external-reference-set",
+          "--project", @project,
+          "--task-id", task_id.to_s,
+          "--kind", "source",
+          "--data-json", JSON.generate(payload)
+        )
+        nil
+      rescue A3::Domain::ConfigurationError => e
+        raise unless e.message.include?("kanbalone_external_references_unavailable")
+
+        {
+          "type" => "external_reference",
+          "status" => "unavailable",
+          "message" => e.message
+        }
       end
 
       def ensure_blocker_relation(blocker_task_id, blocked_task_id)
