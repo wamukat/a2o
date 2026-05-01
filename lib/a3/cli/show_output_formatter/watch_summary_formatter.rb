@@ -76,7 +76,7 @@ module A3
             "Scheduler: paused (paused_at=#{summary.scheduler_paused_at})#{version_suffix}"
           elsif summary.scheduler_paused
             "Scheduler: paused#{version_suffix}"
-          elsif summary.running_entries.any?
+          elsif summary.running_entries.any? || active_decomposition_entries(summary).any?
             "Scheduler: running#{version_suffix}"
           else
             "Scheduler: idle#{version_suffix}"
@@ -104,18 +104,27 @@ module A3
         end
 
         def render_decomposition_section(summary)
-          entries = Array(summary.respond_to?(:decomposition_entries) ? summary.decomposition_entries : [])
+          entries = decomposition_entries(summary)
           return "" if entries.empty?
 
           lines = ["Decomposition"]
           entries.each do |entry|
             parts = ["- #{short_ref(entry.task_ref)}", "state=#{entry.state}"]
+            parts << "stage=#{entry.stage}" if entry.respond_to?(:stage) && entry.stage
             parts << "disposition=#{entry.disposition}" if entry.disposition
             parts << "fingerprint=#{entry.proposal_fingerprint}" if entry.proposal_fingerprint
             lines << parts.join(" ")
             lines << "  blocked_reason=#{single_line(entry.blocked_reason)}" if entry.blocked_reason && entry.state == "blocked"
           end
           lines.join("\n")
+        end
+
+        def decomposition_entries(summary)
+          Array(summary.respond_to?(:decomposition_entries) ? summary.decomposition_entries : [])
+        end
+
+        def active_decomposition_entries(summary)
+          decomposition_entries(summary).select { |entry| entry.respond_to?(:running) && entry.running }
         end
 
         def render_next_section(summary)

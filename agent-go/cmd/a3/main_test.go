@@ -7802,7 +7802,7 @@ func TestRuntimeLogsShowsEvidenceBackedDecompositionStatus(t *testing.T) {
 	}
 }
 
-func TestRuntimeLogsFollowReportsDecompositionFallbackAsNotLiveFollowable(t *testing.T) {
+func TestRuntimeLogsFollowStreamsDecompositionStatusAndActionLog(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -7819,24 +7819,40 @@ func TestRuntimeLogsFollowReportsDecompositionFallbackAsNotLiveFollowable(t *tes
 		StorageDir:     "/var/lib/a3/test-runtime",
 	})
 	runner := &fakeRunner{
-		showTaskOutput:            "task A2O#61 kind=single status=todo current_run=\nedit_scope=\nverification_scope=\nrunnable_reason=decomposition_requested\n",
-		runtimeLogTargetsOutput:   `{"requested_task_ref":"A2O#61","selected_task_ref":"A2O#61","dynamic_follow":false,"candidates":[]}`,
-		logManifestOutput:         `{"run_ref":"","current_run":"","phase":"","source_type":"","source_ref":"","active":false,"artifacts":[]}`,
-		decompositionStatusOutput: "decomposition task=A2O#61 state=none\n",
+		showTaskOutput:          "task A2O#61 kind=single status=in_progress current_run=\nedit_scope=\nverification_scope=\nrunnable_reason=decomposition_requested\n",
+		runtimeLogTargetsOutput: `{"requested_task_ref":"A2O#61","selected_task_ref":"A2O#61","dynamic_follow":false,"candidates":[]}`,
+		logManifestOutput:       `{"run_ref":"","current_run":"","phase":"","source_type":"","source_ref":"","active":false,"artifacts":[]}`,
+		decompositionStatusOutputs: []string{
+			"decomposition task=A2O#61 state=active\nstage=investigate\n",
+			"decomposition task=A2O#61 state=done\nstage=done\n",
+		},
+		runtimeCommandLogOutput: "investigation log line\n",
 	}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
 	withChdir(t, tempDir, func() {
-		code := run([]string{"runtime", "logs", "A2O#61", "--follow"}, runner, &stdout, &stderr)
+		code := run([]string{"runtime", "logs", "A2O#61", "--follow", "--poll-interval", "1ms"}, runner, &stdout, &stderr)
 		if code != 0 {
 			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
 		}
 	})
 
 	output := stdout.String()
-	if !strings.Contains(output, "decomposition_follow=not_supported") {
-		t.Fatalf("runtime logs --follow should explain decomposition fallback, got:\n%s", output)
+	for _, want := range []string{
+		"=== decomposition: A2O#61 ===",
+		"decomposition task=A2O#61 state=active",
+		"stage=investigate",
+		"=== decomposition log: investigate ===",
+		"investigation log line",
+		"decomposition task=A2O#61 state=done",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("runtime logs --follow missing %q in:\n%s", want, output)
+		}
+	}
+	if strings.Contains(output, "decomposition_follow=not_supported") {
+		t.Fatalf("runtime logs --follow should not report decomposition as unsupported, got:\n%s", output)
 	}
 }
 
@@ -11187,42 +11203,43 @@ func assertNoRemovedA3Env(t *testing.T, env map[string]string) {
 }
 
 type fakeRunner struct {
-	calls                     [][]string
-	emptyContainer            bool
-	missingVolumes            map[string]bool
-	legacySoloBoardDBVolumes  map[string]bool
-	failShowTask              bool
-	showTaskOutput            string
-	decompositionStatusOutput string
-	taskWithoutCurrentRun     bool
-	staleCurrentRun           bool
-	runtimeExitMissing        bool
-	legacyRuntimeOrphans      []string
-	failLegacyRuntimeRM       bool
-	missingRunHistory         bool
-	schedulerPaused           bool
-	schedulerStopReason       string
-	schedulerExecutedCount    int
-	startBackgroundErr        error
-	err                       error
-	lastEnv                   map[string]string
-	nextPID                   int
-	processCommands           map[int]string
-	errorOutput               string
-	imageInspectDigests       map[string]string
-	imageInspectIDs           map[string]string
-	containerImageIDs         map[string]string
-	logManifestOutput         string
-	logManifestOutputs        []string
-	runtimeLogTargetsOutput   string
-	runtimeLogTargetsOutputs  []string
-	watchSummaryOutput        string
-	taskStatus                string
-	hostAgentOutput           string
-	hostAgentOutputs          []string
-	hostAgentOutputIndex      int
-	runtimeCommandLogOutput   string
-	decompositionPlanOutput   string
+	calls                      [][]string
+	emptyContainer             bool
+	missingVolumes             map[string]bool
+	legacySoloBoardDBVolumes   map[string]bool
+	failShowTask               bool
+	showTaskOutput             string
+	decompositionStatusOutput  string
+	decompositionStatusOutputs []string
+	taskWithoutCurrentRun      bool
+	staleCurrentRun            bool
+	runtimeExitMissing         bool
+	legacyRuntimeOrphans       []string
+	failLegacyRuntimeRM        bool
+	missingRunHistory          bool
+	schedulerPaused            bool
+	schedulerStopReason        string
+	schedulerExecutedCount     int
+	startBackgroundErr         error
+	err                        error
+	lastEnv                    map[string]string
+	nextPID                    int
+	processCommands            map[int]string
+	errorOutput                string
+	imageInspectDigests        map[string]string
+	imageInspectIDs            map[string]string
+	containerImageIDs          map[string]string
+	logManifestOutput          string
+	logManifestOutputs         []string
+	runtimeLogTargetsOutput    string
+	runtimeLogTargetsOutputs   []string
+	watchSummaryOutput         string
+	taskStatus                 string
+	hostAgentOutput            string
+	hostAgentOutputs           []string
+	hostAgentOutputIndex       int
+	runtimeCommandLogOutput    string
+	decompositionPlanOutput    string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -11370,6 +11387,11 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 		}
 		return []byte(fmt.Sprintf("task A2O#16 kind=single status=%s current_run=run-16\nedit_scope=repo_alpha\nverification_scope=repo_alpha\n", taskStatus)), nil
 	case strings.Contains(joined, " a3 show-decomposition-status "):
+		if len(r.decompositionStatusOutputs) > 0 {
+			output := r.decompositionStatusOutputs[0]
+			r.decompositionStatusOutputs = r.decompositionStatusOutputs[1:]
+			return []byte(output), nil
+		}
 		if r.decompositionStatusOutput != "" {
 			return []byte(r.decompositionStatusOutput), nil
 		}

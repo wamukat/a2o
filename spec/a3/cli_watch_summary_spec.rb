@@ -180,7 +180,7 @@ RSpec.describe A3::CLI do
       )
 
       expect(out.string).to include("Decomposition")
-      expect(out.string).to include("- #5300 state=blocked disposition=blocked fingerprint=abc123")
+      expect(out.string).to include("- #5300 state=blocked stage=blocked disposition=blocked fingerprint=abc123")
       expect(out.string).to include("blocked_reason=blocked by critical finding")
       expect(out.string).to include("Task Tree")
     end
@@ -208,6 +208,31 @@ RSpec.describe A3::CLI do
       expect(out.string).to include("Decomposition")
       expect(out.string).to include("- #5400 state=queued")
       expect(out.string).to include("Task Tree")
+    end
+  end
+
+  it "marks active decomposition sources as running and shows the current stage" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json"))
+      task_repository.save(
+        A3::Domain::Task.new(
+          ref: "Sample#5450",
+          kind: :single,
+          edit_scope: [],
+          status: :in_progress,
+          labels: ["trigger:investigate"]
+        )
+      )
+
+      out = StringIO.new
+      described_class.start(
+        ["watch-summary", "--storage-backend", "json", "--storage-dir", dir],
+        out: out
+      )
+
+      expect(out.string).to include("Scheduler: running")
+      expect(out.string).to include("- #5450 state=active stage=investigate")
+      expect(out.string).to include("[>] #5450")
     end
   end
 

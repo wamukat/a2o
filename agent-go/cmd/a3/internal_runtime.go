@@ -2044,7 +2044,7 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 				printedArtifacts[item.ArtifactID] = true
 			}
 			if len(manifest.CompletedArtifacts) == 0 && !manifest.Active {
-				if printed, err := printRuntimeDecompositionLogFallback(effectiveConfig, plan, runner, stdout, taskRef, *follow); err != nil {
+				if printed, err := printRuntimeDecompositionLogFallback(effectiveConfig, plan, runner, stdout, taskRef, *follow, *pollInterval); err != nil {
 					return err
 				} else if printed {
 					return nil
@@ -2099,7 +2099,7 @@ func runRuntimeLogs(args []string, runner commandRunner, stdout io.Writer, stder
 	})
 }
 
-func printRuntimeDecompositionLogFallback(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, taskRef string, follow bool) (bool, error) {
+func printRuntimeDecompositionLogFallback(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, taskRef string, follow bool, pollInterval time.Duration) (bool, error) {
 	taskOutput, err := runtimeDescribeSectionOutput(config, plan, runner, "task", "a3", "show-task", "--storage-backend", "json", "--storage-dir", plan.StorageDir, taskRef)
 	if err != nil {
 		return false, err
@@ -2115,16 +2115,140 @@ func printRuntimeDecompositionLogFallback(config runtimeInstanceConfig, plan run
 	}
 
 	fmt.Fprintf(stdout, "=== decomposition: %s ===\n", taskRef)
+	if follow {
+		if err := followRuntimeDecompositionLogFallback(config, plan, runner, stdout, taskRef, taskOutput, statusOutput, pollInterval); err != nil {
+			return true, err
+		}
+		return true, nil
+	}
 	if state == "none" {
 		fmt.Fprintf(stdout, "decomposition task=%s state=queued\n", taskRef)
 		fmt.Fprintln(stdout, "decomposition_notice=no evidence has been written yet; the source ticket is waiting for the decomposition scheduler")
 	} else if strings.TrimSpace(statusOutput) != "" {
 		fmt.Fprintln(stdout, strings.TrimSpace(statusOutput))
 	}
-	if follow {
-		fmt.Fprintln(stdout, "decomposition_follow=not_supported reason=no ordinary task run log is active; use `a2o runtime decomposition status` for stage evidence")
-	}
 	return true, nil
+}
+
+func followRuntimeDecompositionLogFallback(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, taskRef string, initialTaskOutput string, initialStatusOutput string, pollInterval time.Duration) error {
+	lastStatusOutput := ""
+	logOffsets := map[string]int{}
+	taskOutput := initialTaskOutput
+	statusOutput := initialStatusOutput
+	for {
+		state := parseOutputValue(statusOutput, "state")
+		if state == "none" {
+			statusOutput = fmt.Sprintf("decomposition task=%s state=queued\n", taskRef)
+		}
+		trimmedStatus := strings.TrimSpace(statusOutput)
+		if trimmedStatus != "" && trimmedStatus != lastStatusOutput {
+			fmt.Fprintln(stdout, trimmedStatus)
+			lastStatusOutput = trimmedStatus
+		}
+		stage := decompositionFollowStage(taskOutput, statusOutput)
+		if stage != "" {
+			if err := printRuntimeDecompositionActionLogDelta(config, plan, runner, stdout, stage, logOffsets); err != nil {
+				return err
+			}
+		}
+		if decompositionFollowTerminal(state, taskOutput) {
+			return nil
+		}
+		time.Sleep(pollInterval)
+
+		var err error
+		taskOutput, err = runtimeDescribeSectionOutput(config, plan, runner, "task", "a3", "show-task", "--storage-backend", "json", "--storage-dir", plan.StorageDir, taskRef)
+		if err != nil {
+			return err
+		}
+		statusOutput, err = runtimeDescribeSectionOutput(config, plan, runner, "decomposition_status", "a3", "show-decomposition-status", "--storage-backend", "json", "--storage-dir", plan.StorageDir, taskRef)
+		if err != nil {
+			return err
+		}
+	}
+}
+
+func printRuntimeDecompositionActionLogDelta(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, stage string, offsets map[string]int) error {
+	action := decompositionLogActionForStage(stage)
+	if action == "" {
+		return nil
+	}
+	actionPlan := decompositionRuntimeProcessPlan(config, plan, action)
+	output := string(dockerComposeExecBestEffort(config, actionPlan, runner, "cat", actionPlan.RuntimeLog))
+	if output == "" {
+		return nil
+	}
+	offset := offsets[actionPlan.RuntimeLog]
+	if offset > len(output) {
+		offset = 0
+	}
+	if offset == len(output) {
+		return nil
+	}
+	fmt.Fprintf(stdout, "=== decomposition log: %s ===\n", action)
+	fmt.Fprint(stdout, output[offset:])
+	if !strings.HasSuffix(output, "\n") {
+		fmt.Fprintln(stdout)
+	}
+	offsets[actionPlan.RuntimeLog] = len(output)
+	return nil
+}
+
+func decompositionFollowStage(taskOutput string, statusOutput string) string {
+	stage := parseOutputValue(statusOutput, "stage")
+	if stage != "" {
+		return stage
+	}
+	taskStatus := strings.ToLower(strings.TrimSpace(parseOutputValue(taskOutput, "status")))
+	if taskStatus == "in_review" {
+		return "review"
+	}
+	if taskStatus == "in_progress" {
+		switch {
+		case parseOutputValue(statusOutput, "disposition") == "eligible":
+			return "create_children"
+		case strings.Contains(statusOutput, "evidence.proposal="):
+			return "review"
+		case strings.Contains(statusOutput, "evidence.investigation="):
+			return "propose"
+		default:
+			return "investigate"
+		}
+	}
+	if strings.Contains(statusOutput, "evidence.proposal_review=") && parseOutputValue(statusOutput, "disposition") == "eligible" {
+		return "create_children"
+	}
+	if strings.Contains(statusOutput, "evidence.proposal=") {
+		return "review"
+	}
+	if strings.Contains(statusOutput, "evidence.investigation=") {
+		return "propose"
+	}
+	return ""
+}
+
+func decompositionLogActionForStage(stage string) string {
+	switch strings.ToLower(strings.TrimSpace(stage)) {
+	case "investigate":
+		return "investigate"
+	case "propose":
+		return "propose"
+	case "review":
+		return "review"
+	default:
+		return ""
+	}
+}
+
+func decompositionFollowTerminal(state string, taskOutput string) bool {
+	switch strings.ToLower(strings.TrimSpace(state)) {
+	case "done", "blocked":
+		return true
+	}
+	if parseOutputValue(taskOutput, "runnable_reason") == "decomposition_requested" {
+		return false
+	}
+	return !runtimeLogsShouldKeepFollowing(parseOutputValue(taskOutput, "status"))
 }
 
 func validateRuntimeLogsTaskRef(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, taskRef string) error {

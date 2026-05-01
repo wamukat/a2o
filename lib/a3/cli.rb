@@ -520,6 +520,7 @@ module A3
       ) do |options, _container|
         status = A3::Application::ShowDecompositionStatus.new(storage_dir: options.fetch(:storage_dir)).call(task_ref: options.fetch(:task_ref))
         out.puts("decomposition task=#{status.task_ref} state=#{status.state}")
+        out.puts("stage=#{status.stage}") if status.stage
         out.puts("proposal_fingerprint=#{status.proposal_fingerprint}") if status.proposal_fingerprint
         out.puts("disposition=#{status.disposition}") if status.disposition
         out.puts("blocked_reason=#{status.blocked_reason}") if status.blocked_reason && status.state == "blocked"
@@ -2437,16 +2438,42 @@ module A3
             status = A3::Application::ShowDecompositionStatus::Status.new(
               task_ref: task.ref,
               state: "queued",
+              stage: nil,
+              running: false,
               proposal_fingerprint: nil,
               disposition: nil,
               blocked_reason: nil,
               evidence_paths: {}
             )
           end
+          active_stage = active_decomposition_stage_for(task: task, status: status)
+          if active_stage
+            status.stage = active_stage
+            status.state = "active" if status.state == "queued"
+            status.running = true
+          end
 
           status
         end
+      active_refs = entries.select { |entry| entry.respond_to?(:running) && entry.running }.map(&:task_ref)
+      summary.tasks.each { |task| task.running = true if active_refs.include?(task.ref) && task.respond_to?(:running=) }
       summary.define_singleton_method(:decomposition_entries) { entries.freeze }
+    end
+
+    def active_decomposition_stage_for(task:, status:)
+      task_status = task.status.to_sym
+      evidence_paths = status.evidence_paths || {}
+      return "review" if task_status == :in_review
+
+      if task_status == :in_progress
+        return "create_children" if status.disposition == "eligible"
+        return "review" if evidence_paths.key?("proposal")
+        return "propose" if evidence_paths.key?("investigation")
+
+        return "investigate"
+      end
+
+      nil
     end
 
     def decomposition_task_snapshot(bridge:, task:)
