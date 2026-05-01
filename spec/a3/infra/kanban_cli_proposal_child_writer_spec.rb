@@ -431,16 +431,20 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     client = FakeProposalClient.new
     writer = described_class.new(project: "A3-v2", client: client)
     payload = proposal_evidence
+    payload["proposal"]["children"].first["boundary"] = "starter-boundary"
     payload["proposal"]["children"] << payload["proposal"]["children"].first.merge(
       "child_key" => "child-key-2",
+      "boundary" => "ui-boundary",
       "title" => "Add review",
-      "depends_on" => ["child-key-1"]
+      "depends_on" => ["starter-boundary"]
     )
 
     result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: payload)
 
     expect(result.success?).to be(true)
-    expect(client.relations.any? { |args| args.include?("blocked") }).to be(true)
+    expect(client.relations).to include(
+      array_including("task-relation-create", "--task-id", "5303", "--other-task-id", "5302", "--relation-kind", "blocked")
+    )
   end
 
   it "returns already-created refs when a later reconciliation write fails" do

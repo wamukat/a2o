@@ -33,7 +33,7 @@ module A3
         proposal = proposal_evidence.fetch("proposal")
         proposal_fingerprint = proposal_evidence.fetch("proposal_fingerprint")
         children = proposal.fetch("children")
-        child_refs_by_key = {}
+        child_refs_by_dependency_key = {}
         refs = []
         keys = []
         diagnostics = []
@@ -54,7 +54,7 @@ module A3
               proposal_fingerprint: proposal_fingerprint,
               child: child
             )
-            child_refs_by_key[ensured.fetch("child_key")] = ensured.fetch("ref")
+            register_child_dependency_keys(child: child, ensured: ensured, child_refs_by_dependency_key: child_refs_by_dependency_key)
             refs << ensured.fetch("ref")
             keys << ensured.fetch("child_key")
           rescue StandardError => e
@@ -67,7 +67,7 @@ module A3
           end
         end
         begin
-          reconcile_dependencies(parent_task_ref: generated_parent.fetch("ref"), children: children, child_refs_by_key: child_refs_by_key)
+          reconcile_dependencies(parent_task_ref: generated_parent.fetch("ref"), children: children, child_refs_by_dependency_key: child_refs_by_dependency_key)
           ensure_source_decomposed(parent_external_task_id) if draft_mode? && parent_external_task_id
         rescue StandardError => e
           failed_write = dependency_failed_write(e)
@@ -220,11 +220,18 @@ module A3
         @mode == :draft
       end
 
-      def reconcile_dependencies(parent_task_ref:, children:, child_refs_by_key:)
+      def register_child_dependency_keys(child:, ensured:, child_refs_by_dependency_key:)
+        ref = ensured.fetch("ref")
+        [ensured.fetch("child_key"), child["boundary"]].map(&:to_s).map(&:strip).reject(&:empty?).each do |key|
+          child_refs_by_dependency_key[key] = ref
+        end
+      end
+
+      def reconcile_dependencies(parent_task_ref:, children:, child_refs_by_dependency_key:)
         children.each do |child|
           Array(child["depends_on"]).each do |dependency_key|
-            dependency_ref = child_refs_by_key[dependency_key]
-            child_ref = child_refs_by_key[child.fetch("child_key")]
+            dependency_ref = child_refs_by_dependency_key[dependency_key.to_s]
+            child_ref = child_refs_by_dependency_key[child.fetch("child_key")]
             next unless dependency_ref && child_ref
 
             begin
