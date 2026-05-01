@@ -89,7 +89,8 @@ module A3
           "description" => String(payload["description"]),
           "status" => String(payload["status"]),
           "labels" => Array(payload["labels"]).map(&:to_s).reject(&:empty?).freeze,
-          "parent_ref" => normalize_parent_ref(payload["parent_ref"])
+          "parent_ref" => normalize_parent_ref(payload["parent_ref"]),
+          "remote" => payload["remote"]
         }
       end
 

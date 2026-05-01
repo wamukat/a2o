@@ -164,6 +164,8 @@ After one or more draft children are accepted and receive `trigger:auto-implemen
 
 The implementation should avoid provider-specific logic in orchestration. Remote/local differences belong behind the kanban adapter and child writer boundary. If the adapter cannot create provider-backed children, A2O may create local Kanban children linked to the remote source and record that mapping in evidence.
 
+When a source ticket carries imported external issue metadata, the generated implementation parent is still a separate local Kanban ticket. A2O must not duplicate the external import onto that parent because Kanbalone treats an external issue import as a single source ticket. The child writer records normalized `source_remote` metadata on the generated parent description/comment and in child-creation evidence, keeps the source-to-generated-parent `related` relation, and does not copy the remote metadata onto draft children.
+
 ## 10. Optional Accept-Drafts Helper
 
 The optional helper from A2O#357 should only mutate existing draft children. It must not create new tickets.

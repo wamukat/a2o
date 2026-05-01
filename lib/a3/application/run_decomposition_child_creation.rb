@@ -3,6 +3,7 @@
 require "fileutils"
 require "json"
 require "a3/domain/refactoring_assessment"
+require "a3/domain/source_remote"
 
 module A3
   module Application
@@ -15,23 +16,25 @@ module A3
         @publish_external_task_activity = publish_external_task_activity
       end
 
-      def call(task:, gate:, proposal_evidence_path: nil, review_evidence_path: nil)
+      def call(task:, gate:, proposal_evidence_path: nil, review_evidence_path: nil, source_remote: nil)
+        source_remote = A3::Domain::SourceRemote.normalize(source_remote)
         proposal_evidence_path ||= evidence_path_for(task.ref, "proposal.json")
         review_evidence_path ||= evidence_path_for(task.ref, "proposal-review.json")
         proposal_evidence = load_json(proposal_evidence_path)
         review_evidence = load_json(review_evidence_path)
-        return gate_closed_result(task: task, proposal_evidence: proposal_evidence, review_evidence: review_evidence) unless gate
+        return gate_closed_result(task: task, proposal_evidence: proposal_evidence, review_evidence: review_evidence, source_remote: source_remote) unless gate
 
         validation_errors = validation_errors_for(proposal_evidence: proposal_evidence, review_evidence: review_evidence)
-        return blocked_result(task: task, summary: validation_errors.join("; "), proposal_evidence: proposal_evidence, review_evidence: review_evidence) unless validation_errors.empty?
+        return blocked_result(task: task, summary: validation_errors.join("; "), proposal_evidence: proposal_evidence, review_evidence: review_evidence, source_remote: source_remote) unless validation_errors.empty?
 
         outcome = proposal_outcome(proposal_evidence.fetch("proposal"))
-        return outcome_result(task: task, outcome: outcome, proposal_evidence: proposal_evidence, review_evidence: review_evidence) unless outcome == "draft_children"
+        return outcome_result(task: task, outcome: outcome, proposal_evidence: proposal_evidence, review_evidence: review_evidence, source_remote: source_remote) unless outcome == "draft_children"
 
         write_result = @child_writer.call(
           parent_task_ref: task.ref,
           parent_external_task_id: task.external_task_id,
-          proposal_evidence: proposal_evidence
+          proposal_evidence: proposal_evidence,
+          source_remote: source_remote
         )
         if write_result.success?
           persist_evidence(
@@ -41,7 +44,8 @@ module A3
             summary: "created or reconciled #{write_result.child_refs.size} decomposition child ticket(s)",
             proposal_evidence: proposal_evidence,
             review_evidence: review_evidence,
-            writer_result: writer_result_payload(write_result)
+            writer_result: writer_result_payload(write_result),
+            source_remote: source_remote
           )
         else
           blocked_result(
@@ -49,7 +53,8 @@ module A3
             summary: write_result.summary || "decomposition child creation failed",
             proposal_evidence: proposal_evidence,
             review_evidence: review_evidence,
-            writer_result: writer_result_payload(write_result)
+            writer_result: writer_result_payload(write_result),
+            source_remote: source_remote
           )
         end
       end
@@ -87,7 +92,7 @@ module A3
         errors
       end
 
-      def blocked_result(task:, summary:, proposal_evidence: nil, review_evidence: nil, writer_result: nil)
+      def blocked_result(task:, summary:, proposal_evidence: nil, review_evidence: nil, writer_result: nil, source_remote: nil)
         persist_evidence(
           task: task,
           success: false,
@@ -95,11 +100,12 @@ module A3
           summary: summary,
           proposal_evidence: proposal_evidence,
           review_evidence: review_evidence,
-          writer_result: writer_result
+          writer_result: writer_result,
+          source_remote: source_remote
         )
       end
 
-      def gate_closed_result(task:, proposal_evidence:, review_evidence:)
+      def gate_closed_result(task:, proposal_evidence:, review_evidence:, source_remote:)
         persist_evidence(
           task: task,
           success: nil,
@@ -107,11 +113,12 @@ module A3
           summary: "decomposition child creation gate is closed",
           proposal_evidence: proposal_evidence,
           review_evidence: review_evidence,
-          writer_result: nil
+          writer_result: nil,
+          source_remote: source_remote
         )
       end
 
-      def outcome_result(task:, outcome:, proposal_evidence:, review_evidence:)
+      def outcome_result(task:, outcome:, proposal_evidence:, review_evidence:, source_remote:)
         proposal = proposal_evidence.fetch("proposal")
         summary =
           case outcome
@@ -129,11 +136,12 @@ module A3
           summary: summary,
           proposal_evidence: proposal_evidence,
           review_evidence: review_evidence,
-          writer_result: nil
+          writer_result: nil,
+          source_remote: source_remote
         )
       end
 
-      def persist_evidence(task:, success:, status:, summary:, proposal_evidence:, review_evidence:, writer_result:)
+      def persist_evidence(task:, success:, status:, summary:, proposal_evidence:, review_evidence:, writer_result:, source_remote:)
         evidence_dir = File.join(@storage_dir, "decomposition-evidence", slugify(task.ref))
         FileUtils.mkdir_p(evidence_dir)
         path = File.join(evidence_dir, "child-creation.json")
@@ -147,28 +155,31 @@ module A3
           parent_ref: parent_ref,
           child_refs: child_refs,
           proposal: proposal_evidence && proposal_evidence["proposal"],
-          evidence_path: path
+          evidence_path: path,
+          source_remote: source_remote
         )
+        evidence_payload = {
+          "task_ref" => task.ref,
+          "phase" => "child_creation",
+          "success" => success,
+          "status" => status,
+          "summary" => summary,
+          "proposal_fingerprint" => proposal_evidence && proposal_evidence["proposal_fingerprint"],
+          "review_disposition" => review_evidence && review_evidence["disposition"],
+          "proposal_outcome" => proposal_evidence && proposal_evidence["proposal"] && proposal_outcome(proposal_evidence["proposal"]),
+          "generated_parent_ref" => parent_ref,
+          "child_refs" => child_refs,
+          "child_keys" => child_keys,
+          "child_refs_by_key" => child_refs_by_key(child_keys: child_keys, child_refs: child_refs),
+          "source_ticket_summary" => source_ticket_summary,
+          "proposal_evidence" => proposal_evidence,
+          "review_evidence" => review_evidence,
+          "writer_result" => writer_result
+        }
+        evidence_payload["source_remote"] = source_remote if source_remote
         File.write(
           path,
-          "#{JSON.pretty_generate(
-            "task_ref" => task.ref,
-            "phase" => "child_creation",
-            "success" => success,
-            "status" => status,
-            "summary" => summary,
-            "proposal_fingerprint" => proposal_evidence && proposal_evidence["proposal_fingerprint"],
-            "review_disposition" => review_evidence && review_evidence["disposition"],
-            "proposal_outcome" => proposal_evidence && proposal_evidence["proposal"] && proposal_outcome(proposal_evidence["proposal"]),
-            "generated_parent_ref" => parent_ref,
-            "child_refs" => child_refs,
-            "child_keys" => child_keys,
-            "child_refs_by_key" => child_refs_by_key(child_keys: child_keys, child_refs: child_refs),
-            "source_ticket_summary" => source_ticket_summary,
-            "proposal_evidence" => proposal_evidence,
-            "review_evidence" => review_evidence,
-            "writer_result" => writer_result
-          )}\n"
+          "#{JSON.pretty_generate(evidence_payload)}\n"
         )
         summary_published = publish_source_ticket_summary(task: task, body: source_ticket_summary)
         Result.new(
@@ -190,7 +201,7 @@ module A3
         end
       end
 
-      def source_ticket_summary_for(success:, status:, summary:, parent_ref:, child_refs:, proposal:, evidence_path:)
+      def source_ticket_summary_for(success:, status:, summary:, parent_ref:, child_refs:, proposal:, evidence_path:, source_remote:)
         stage_state =
           if success == true
             "completed"
@@ -209,6 +220,8 @@ module A3
         end
         lines << "Generated parent: #{parent_ref || 'none'}"
         lines << "Draft children: #{child_refs.empty? ? 'none' : child_refs.join(', ')}"
+        remote_summary = A3::Domain::SourceRemote.summary(source_remote)
+        lines << "Source remote: #{remote_summary}" if remote_summary
         if success == true && status == "created"
           lines << "Accept: add trigger:auto-implement to a draft child when it is ready for implementation."
           lines << "Parent automation: add trigger:auto-parent to the generated parent after accepted child work is ready."

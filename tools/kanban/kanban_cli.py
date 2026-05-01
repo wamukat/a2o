@@ -538,6 +538,7 @@ def kanbalone_normalize_ticket(ticket: dict[str, Any], *, board_title: str, boar
         "title": ticket.get("title") or "",
         "description": ticket.get("bodyMarkdown") or "",
         "reference": ticket.get("ref") or canonical_human_task_ref(board_title, f"#{int(ticket['id'])}"),
+        "remote": ticket.get("remote"),
         "identifier": ticket.get("shortRef") or f"#{int(ticket['id'])}",
         "index": int(ticket["id"]),
         "position": int(ticket.get("position") or 0),

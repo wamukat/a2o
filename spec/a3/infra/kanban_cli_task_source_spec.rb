@@ -1297,7 +1297,12 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
           "description" => "Replace the JDBC implementation with a MyBatis-backed one.",
           "status" => "In progress",
           "labels" => ["repo:alpha", "trigger:auto-implement"],
-          "parent_ref" => nil
+          "parent_ref" => nil,
+          "remote" => {
+            "provider" => "github",
+            "display_ref" => "wamukat/a2o#41",
+            "url" => "https://github.com/wamukat/a2o/issues/41"
+          }
         }
       ]
     )
@@ -1321,7 +1326,12 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
         "title" => "Migrate persistence from JDBC to MyBatis",
         "description" => "Replace the JDBC implementation with a MyBatis-backed one.",
         "status" => "In progress",
-        "labels" => ["repo:alpha", "trigger:auto-implement"]
+        "labels" => ["repo:alpha", "trigger:auto-implement"],
+        "remote" => {
+          "provider" => "github",
+          "display_ref" => "wamukat/a2o#41",
+          "url" => "https://github.com/wamukat/a2o/issues/41"
+        }
       )
     end
   end

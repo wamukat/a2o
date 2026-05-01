@@ -447,7 +447,8 @@ module A3
         task: task,
         gate: options.fetch(:gate),
         proposal_evidence_path: options[:proposal_evidence_path],
-        review_evidence_path: options[:review_evidence_path]
+        review_evidence_path: options[:review_evidence_path],
+        source_remote: source_remote_for_task(task: task, external_task_source: external_task_source)
       )
 
       if result.success.nil? && result.status == "gate_closed"
@@ -547,7 +548,8 @@ module A3
         task: task,
         gate: true,
         proposal_evidence_path: session.options[:proposal_evidence_path],
-        review_evidence_path: review_result.evidence_path
+        review_evidence_path: review_result.evidence_path,
+        source_remote: source_remote_for_task(task: task, external_task_source: session.container[:external_task_source])
       )
       publish_decomposition_source_status(session: session, task: task, status: decomposition_source_terminal_status(result)) if result.success == true
       AutomaticDraftChildCreationResult.executed(result)
@@ -2455,6 +2457,20 @@ module A3
       if bridge.task_source.respond_to?(:fetch_task_packet_by_ref)
         bridge.task_source.fetch_task_packet_by_ref(task.ref)
       end
+    rescue A3::Domain::ConfigurationError, KeyError, RuntimeError
+      nil
+    end
+
+    def source_remote_for_task(task:, external_task_source:)
+      return nil unless external_task_source
+
+      packet =
+        if task.external_task_id && external_task_source.respond_to?(:fetch_task_packet_by_external_task_id)
+          external_task_source.fetch_task_packet_by_external_task_id(task.external_task_id)
+        elsif external_task_source.respond_to?(:fetch_task_packet_by_ref)
+          external_task_source.fetch_task_packet_by_ref(task.ref)
+        end
+      packet && packet["remote"]
     rescue A3::Domain::ConfigurationError, KeyError, RuntimeError
       nil
     end

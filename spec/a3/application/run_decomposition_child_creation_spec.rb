@@ -67,7 +67,8 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
       expect(writer).to receive(:call).with(
         parent_task_ref: "A3-v2#5300",
         parent_external_task_id: 5300,
-        proposal_evidence: hash_including("proposal_fingerprint" => "fp-1")
+        proposal_evidence: hash_including("proposal_fingerprint" => "fp-1"),
+        source_remote: nil
       ).and_return(WriterResult.new(success?: true, child_refs: ["A3-v2#5301"], child_keys: ["child-key-1"]))
 
       result = described_class.new(storage_dir: dir, child_writer: writer).call(task: task, gate: true)
@@ -81,9 +82,34 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
       expect(evidence.fetch("review_disposition")).to eq("eligible")
       expect(evidence.fetch("child_keys")).to eq(["child-key-1"])
       expect(evidence.fetch("child_refs_by_key")).to eq("child-key-1" => "A3-v2#5301")
+      expect(evidence).not_to have_key("source_remote")
       expect(evidence.fetch("source_ticket_summary")).to include("Decomposition draft child creation: completed")
       expect(evidence.fetch("source_ticket_summary")).to include("Accept: add trigger:auto-implement")
       expect(evidence.fetch("source_ticket_summary")).to include("Parent automation: add trigger:auto-parent")
+    end
+  end
+
+  it "passes imported source remote metadata to the writer and child creation evidence" do
+    Dir.mktmpdir do |dir|
+      write_evidence(dir)
+      source_remote = {
+        "provider" => "github",
+        "display_ref" => "wamukat/a2o#41",
+        "url" => "https://github.com/wamukat/a2o/issues/41"
+      }
+      writer = instance_double("ProposalChildWriter")
+      expect(writer).to receive(:call).with(
+        parent_task_ref: "A3-v2#5300",
+        parent_external_task_id: 5300,
+        proposal_evidence: hash_including("proposal_fingerprint" => "fp-1"),
+        source_remote: source_remote
+      ).and_return(WriterResult.new(success?: true, child_refs: ["A3-v2#5301"], child_keys: ["child-key-1"]))
+
+      result = described_class.new(storage_dir: dir, child_writer: writer).call(task: task, gate: true, source_remote: source_remote)
+
+      evidence = JSON.parse(File.read(result.evidence_path))
+      expect(evidence.fetch("source_remote")).to eq(source_remote)
+      expect(evidence.fetch("source_ticket_summary")).to include("Source remote: github wamukat/a2o#41 https://github.com/wamukat/a2o/issues/41")
     end
   end
 

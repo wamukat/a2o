@@ -301,14 +301,24 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
   it "creates non-runnable local draft children for a remote source without marking the source parent runnable" do
     client = FakeProposalClient.new
     writer = described_class.new(project: "Portal", client: client, mode: :draft)
+    source_remote = {
+      "provider" => "github",
+      "display_ref" => "wamukat/a2o#16",
+      "url" => "https://github.com/wamukat/a2o/issues/16"
+    }
 
-    result = writer.call(parent_task_ref: "wamukat/a2o#16", parent_external_task_id: 240, proposal_evidence: proposal_evidence)
+    result = writer.call(parent_task_ref: "wamukat/a2o#16", parent_external_task_id: 240, proposal_evidence: proposal_evidence, source_remote: source_remote)
 
     expect(result.success?).to be(true)
     expect(result.parent_ref).to eq("A3-v2#5301")
     expect(result.child_refs).to eq(["A3-v2#5302"])
     expect(generated_parent(client).fetch("description")).to include("Decomposition source: wamukat/a2o#16")
+    expect(generated_parent(client).fetch("description")).to include("Source remote:")
+    expect(generated_parent(client).fetch("description")).to include("- display_ref: wamukat/a2o#16")
+    expect(generated_parent(client).fetch("description")).to include("- url: https://github.com/wamukat/a2o/issues/16")
     expect(generated_child(client).fetch("description")).to include("Parent: A3-v2#5301")
+    expect(generated_child(client).fetch("description")).not_to include("Source remote")
+    expect(generated_child(client).fetch("description")).not_to include("https://github.com/wamukat/a2o/issues/16")
     expect(client.labels.any? { |args| args.include?("a2o:draft-child") }).to be(true)
     expect(client.labels.any? { |args| args.include?("trigger:auto-implement") }).to be(false)
     expect(client.labels.any? { |args| args.include?("trigger:auto-parent") }).to be(false)
@@ -316,6 +326,8 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
       array_including("task-relation-create", "--task-id", "5301", "--other-task-id", "5302", "--relation-kind", "subtask")
     )
     expect(client.comments.any? { |args| args.include?("240") }).to be(true)
+    source_comment = client.instance_variable_get(:@comment_texts)["240"].join("\n")
+    expect(source_comment).to include("Source remote: github wamukat/a2o#16 https://github.com/wamukat/a2o/issues/16")
   end
 
   it "filters proposed automation trigger labels from draft children" do

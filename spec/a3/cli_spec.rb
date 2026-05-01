@@ -393,7 +393,8 @@ RSpec.describe A3::CLI do
       task: task,
       gate: false,
       proposal_evidence_path: "/tmp/custom-proposal.json",
-      review_evidence_path: "/tmp/custom-review.json"
+      review_evidence_path: "/tmp/custom-review.json",
+      source_remote: nil
     )
     expect(out.string).to include("decomposition child creation A3-v2#5300 status=gate_closed")
     expect(out.string).to include("child_creation_result=not_attempted")
@@ -472,7 +473,8 @@ RSpec.describe A3::CLI do
       task: task,
       gate: true,
       proposal_evidence_path: "/tmp/proposal.json",
-      review_evidence_path: "/tmp/proposal-review.json"
+      review_evidence_path: "/tmp/proposal-review.json",
+      source_remote: nil
     ).and_return(child_result)
 
     described_class.start(["run-decomposition-proposal-review", "A3-v2#5300", "/tmp/project.yaml"], out: out)
@@ -722,6 +724,13 @@ RSpec.describe A3::CLI do
       )
       source = double("ExternalTaskSource")
       allow(source).to receive(:fetch_by_ref).with("Portal#240").and_return(external_task)
+      allow(source).to receive(:fetch_task_packet_by_external_task_id).with(240).and_return(
+        "remote" => {
+          "provider" => "github",
+          "display_ref" => "wamukat/a2o#41",
+          "url" => "https://github.com/wamukat/a2o/issues/41"
+        }
+      )
       allow(described_class).to receive(:build_external_task_source).and_return(source)
       allow(described_class).to receive(:build_decomposition_source_activity_publisher).and_return(A3::Infra::NullExternalTaskActivityPublisher.new)
       writer = instance_double(A3::Infra::KanbanCliProposalChildWriter)
@@ -753,7 +762,12 @@ RSpec.describe A3::CLI do
       expect(writer).to have_received(:call).with(
         parent_task_ref: "Portal#240",
         parent_external_task_id: 240,
-        proposal_evidence: proposal_evidence
+        proposal_evidence: proposal_evidence,
+        source_remote: {
+          "provider" => "github",
+          "display_ref" => "wamukat/a2o#41",
+          "url" => "https://github.com/wamukat/a2o/issues/41"
+        }
       )
       expect(out.string).to include("decomposition child creation Portal#240 success=true")
       expect(A3::Infra::JsonTaskRepository.new(File.join(dir, "tasks.json")).fetch("Portal#240").external_task_id).to eq(240)
