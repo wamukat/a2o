@@ -324,6 +324,32 @@ The author command writes one proposal JSON object to `A2O_DECOMPOSITION_AUTHOR_
 
 `draft_children` proposals must include at least one child draft. They may include optional `parent.title` and `parent.body`; those values are used only when A2O first creates the generated implementation parent, while A2O always keeps its own source-ticket and proposal-fingerprint metadata. Existing generated parent title/body are not overwritten on rerun. Each child draft requires `title`, `body`, `acceptance_criteria`, `labels`, `depends_on`, `boundary`, and `rationale`. `boundary` must be stable across reruns because A2O derives the child idempotency key from it. `unresolved_questions` must be an array.
 
+Use `parent.title` and `parent.body` when the generated implementation parent should carry a project-specific plan instead of the default A2O title/body. The author command returns them in the proposal JSON:
+
+```json
+{
+  "outcome": "draft_children",
+  "parent": {
+    "title": "Implementation plan for address suggestions",
+    "body": "## Feature overview\nAdd address suggestion support.\n\n## Design notes\nKeep provider integration behind the existing address service boundary.\n\n## Overall acceptance criteria\n- All generated child tickets are Done.\n- The parent verification confirms the end-to-end address suggestion flow."
+  },
+  "children": [
+    {
+      "title": "Add address provider contract",
+      "body": "Define the provider-facing contract.",
+      "acceptance_criteria": ["Contract is documented", "Tests cover fallback behavior"],
+      "labels": ["repo:app"],
+      "depends_on": [],
+      "boundary": "address-provider-contract",
+      "rationale": "This isolates the shared service contract from UI work."
+    }
+  ],
+  "unresolved_questions": []
+}
+```
+
+Project prompts should tell the proposal author what belongs in `parent.body`, such as a feature overview, design notes, child-ticket summary, and cross-child acceptance criteria. Do not put imported remote issue metadata in `parent.body`; A2O preserves source provenance through relations, evidence, and external references where supported.
+
 `no_action` proposals use `children: []` plus a non-empty `reason` when the requested behavior is already satisfied and no implementation tickets should be created. `needs_clarification` proposals use `children: []`, a non-empty `reason`, and at least one `questions` entry; A2O posts the question summary and routes the source ticket through the existing clarification status/label behavior.
 
 To run the proposal step after investigation evidence exists:

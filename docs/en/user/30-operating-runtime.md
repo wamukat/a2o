@@ -168,7 +168,7 @@ The automatic decomposition flow is:
 2. A2O moves the source ticket to `In progress`; the project-owned investigation command runs and records investigation evidence.
 3. The proposal author creates a normalized child-ticket proposal.
 4. A2O moves the source ticket to `In review`; proposal review decides whether the proposal is eligible for draft child creation.
-5. Eligible proposals create a separate generated implementation parent ticket in `Backlog`, record the requirement source in the generated parent description and source-ticket comments, and create draft child tickets labeled `a2o:draft-child` under that generated parent in `Backlog`.
+5. Eligible proposals create a separate generated implementation parent ticket in `Backlog`, record the requirement source in the generated parent description and source-ticket comments, and create draft child tickets labeled `a2o:draft-child` under that generated parent in `Backlog`. If the proposal includes `parent.title` or `parent.body`, A2O uses them when first creating the generated parent so the parent can carry the project-specific implementation plan.
 6. A2O marks the source ticket decomposed and moves it to `Done`.
 
 A2O also creates a `related` relation from the requirement source ticket to the generated implementation parent. The relation is traceability only; it does not make the source ticket runnable and it does not replace child `subtask` relations or dependency `blocked` relations. External Kanbalone deployments must run Kanbalone v0.9.25 or newer for this decomposition relation path.
@@ -180,6 +180,8 @@ Each completed stage leaves a short comment on the source ticket so operators ca
 `a2o runtime logs <task-ref>` is useful for decomposition source tickets as well. If the source ticket has no ordinary implementation/review log artifacts, the command falls back to the decomposition status output and evidence paths. `--follow` is not a live decomposition stream; when no ordinary task run is active it prints the decomposition fallback and reports that live follow is not supported for that source-ticket state.
 
 Draft children are planning artifacts. They are created in `Backlog` under the generated parent, and they are not runnable until a human accepts them by adding `trigger:auto-implement` and then moves the accepted child work to the runnable `To do` lane. Operators can edit the generated parent and child title, body, labels, blockers, and scope before acceptance. Removing `a2o:draft-child` is optional metadata cleanup; the runnable label gate is `trigger:auto-implement`, while the lane gate remains the operator-controlled move to `To do`. After accepted child work is ready, add `trigger:auto-parent` to the generated parent, not to the original requirement source ticket.
+
+The project-package proposal author controls the generated parent content with optional `parent.title` and `parent.body` fields in the proposal JSON. See [90-project-package-schema.md](90-project-package-schema.md#runtime-decomposition) for the concrete proposal shape and example.
 
 Useful commands:
 

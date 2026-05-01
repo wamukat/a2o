@@ -328,6 +328,32 @@ author command は `A2O_DECOMPOSITION_AUTHOR_RESULT_PATH` に proposal JSON obje
 
 `draft_children` proposal には 1 件以上の child draft が必要である。任意で `parent.title` と `parent.body` を指定でき、A2O が generated implementation parent を初回作成するときだけ使われる。A2O 管理の source ticket / proposal fingerprint metadata は必ず保持し、rerun で既存 generated parent の title/body を上書きしない。各 child draft は `title`、`body`、`acceptance_criteria`、`labels`、`depends_on`、`boundary`、`rationale` を持つ。`boundary` は child idempotency key の導出元になるため rerun 間で安定している必要がある。`unresolved_questions` は配列でなければならない。
 
+generated implementation parent に既定の A2O title / body ではなく、プロジェクト固有の実装計画を持たせたい場合は `parent.title` と `parent.body` を使う。author command は proposal JSON に次のように含める。
+
+```json
+{
+  "outcome": "draft_children",
+  "parent": {
+    "title": "住所入力補完機能の実装計画",
+    "body": "## 機能概要\n住所候補の補完機能を追加する。\n\n## 設計メモ\n外部 provider 連携は既存の address service 境界の内側に閉じる。\n\n## 全体 Acceptance Criteria\n- 生成された child ticket がすべて Done である。\n- parent verification で住所補完の end-to-end flow を確認できる。"
+  },
+  "children": [
+    {
+      "title": "住所 provider contract を追加する",
+      "body": "provider 向け contract を定義する。",
+      "acceptance_criteria": ["contract が文書化されている", "fallback 動作のテストがある"],
+      "labels": ["repo:app"],
+      "depends_on": [],
+      "boundary": "address-provider-contract",
+      "rationale": "UI 作業から shared service contract を分離するため。"
+    }
+  ],
+  "unresolved_questions": []
+}
+```
+
+project prompt では、`parent.body` に何を書くべきかを指定しておく。例えば、機能概要、設計メモ、child ticket の要約、child をまたぐ acceptance criteria などである。import 元の remote issue metadata は `parent.body` に書かせない。A2O は source provenance を relation、evidence、対応する Kanbalone では external reference として保持する。
+
 `no_action` proposal は、要求が既存実装で満たされていて実装 ticket を作らない場合に、`children: []` と非空の `reason` を指定する。`needs_clarification` proposal は、`children: []`、非空の `reason`、1 件以上の `questions` を指定する。A2O は質問サマリを投稿し、既存の clarification status / label 経路で source ticket を扱う。
 
 investigation evidence が存在する状態で proposal step を実行するには次を使う。
