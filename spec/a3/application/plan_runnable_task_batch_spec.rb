@@ -80,6 +80,31 @@ RSpec.describe A3::Application::PlanRunnableTaskBatch do
     expect(result.skipped_conflicts.first.reason).to eq(:active_claim)
   end
 
+  it "does not select a child task when an active parent claim holds the parent group" do
+    parent = save_task(
+      ref: "A2O#35",
+      kind: :parent,
+      status: :todo,
+      child_refs: %w[A2O#36]
+    )
+    save_task(ref: "A2O#36", kind: :child, parent_ref: parent.ref, status: :todo)
+    claim_repository.claim_task(
+      task_ref: parent.ref,
+      phase: :review,
+      parent_group_key: "parent-group:A2O#35",
+      claimed_by: "scheduler-1",
+      claimed_at: "2026-04-30T00:00:00Z"
+    )
+
+    result = use_case.call
+
+    expect(result.candidates).to be_empty
+    expect(result).to be_waiting
+    conflict = result.skipped_conflicts.find { |skipped| skipped.task_ref == "A2O#36" }
+    expect(conflict.conflict_key).to eq("parent-group:A2O#35")
+    expect(conflict.reason).to eq(:active_claim)
+  end
+
   it "does not select sibling tasks when an active run holds the parent group" do
     parent = save_task(
       ref: "A2O#60",

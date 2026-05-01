@@ -45,4 +45,36 @@ RSpec.describe A3::Infra::SharedRefLockingMergeRunner do
     expect(result.observed_state).to eq("waiting_for_shared_ref_lock")
     expect(inner).not_to have_received(:run)
   end
+
+  it "serializes concurrent merge attempts for the same shared ref" do
+    entered = Queue.new
+    release = Queue.new
+    allow(inner).to receive(:run) do |plan, workspace:|
+      entered << plan.run_ref
+      release.pop
+      A3::Application::ExecutionResult.new(success: true, summary: "merged #{plan.run_ref}")
+    end
+    runner = described_class.new(inner: inner, lock_guard: lock_guard)
+    competing_plan = A3::Domain::MergePlan.new(
+      project_key: "a2o",
+      task_ref: "A2O#2",
+      run_ref: "run-2",
+      merge_source: A3::Domain::MergeSource.new(source_ref: "refs/heads/a2o/work/A2O-2"),
+      integration_target: A3::Domain::IntegrationTarget.new(target_ref: "refs/heads/main"),
+      merge_policy: :ff_only,
+      merge_slots: [:repo_beta]
+    )
+
+    first = Thread.new { runner.run(merge_plan, workspace: Object.new) }
+    expect(entered.pop).to eq("run-1")
+    second_result = runner.run(competing_plan, workspace: Object.new)
+    release << true
+    first_result = first.value
+
+    expect(first_result.success).to be(true)
+    expect(second_result.success).to be(false)
+    expect(second_result.observed_state).to eq("waiting_for_shared_ref_lock")
+    expect(inner).to have_received(:run).once
+    expect(lock_repository.active_locks).to be_empty
+  end
 end

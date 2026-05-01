@@ -78,6 +78,38 @@ RSpec.describe "scheduler task claim repositories" do
         end.to raise_error(A3::Domain::SchedulerTaskClaimConflict)
       end
 
+      it "allows only one active claim when duplicate claim attempts race" do
+        ready = Queue.new
+        release = Queue.new
+        outcomes = Queue.new
+        threads = 2.times.map do |index|
+          Thread.new do
+            ready << true
+            release.pop
+            begin
+              claim = @repository.claim_task(
+                task_ref: "A2O#1",
+                phase: :implementation,
+                parent_group_key: "single:A2O#1",
+                claimed_by: "scheduler-#{index + 1}",
+                claimed_at: "2026-04-30T00:00:0#{index}Z"
+              )
+              outcomes << [:claimed, claim.claim_ref]
+            rescue A3::Domain::SchedulerTaskClaimConflict => e
+              outcomes << [:conflict, e.message]
+            end
+          end
+        end
+
+        2.times { ready.pop }
+        2.times { release << true }
+        threads.each(&:join)
+        observed = 2.times.map { outcomes.pop }
+
+        expect(observed.map(&:first).sort).to eq(%i[claimed conflict])
+        expect(@repository.active_claims.map(&:task_ref)).to eq(["A2O#1"])
+      end
+
       it "rejects active parent group conflicts" do
         @repository.claim_task(
           task_ref: "A2O#2",

@@ -287,6 +287,34 @@ RSpec.describe A3::Application::RepairRuns do
     end
   end
 
+  it "marks unlinked scheduler task claims stale when no scheduler process is active" do
+    Dir.mktmpdir do |dir|
+      task_repository = A3::Infra::InMemoryTaskRepository.new
+      run_repository = A3::Infra::InMemoryRunRepository.new
+      task_claim_repository = A3::Infra::InMemorySchedulerTaskClaimRepository.new(claim_ref_generator: -> { "claim-unlinked" })
+      task_claim_repository.claim_task(
+        task_ref: "Sample#420",
+        phase: :implementation,
+        parent_group_key: "Sample#420",
+        claimed_by: "scheduler-test",
+        claimed_at: "2026-04-30T01:00:00Z"
+      )
+
+      use_case = described_class.new(
+        task_repository: task_repository,
+        run_repository: run_repository,
+        storage_dir: dir,
+        task_claim_repository: task_claim_repository
+      )
+
+      applied = use_case.call(apply: true)
+
+      expect(applied.actions.map(&:kind)).to contain_exactly(:stale_scheduler_task_claim)
+      expect(task_claim_repository.active_claims).to be_empty
+      expect(task_claim_repository.fetch("claim-unlinked").stale_reason).to eq("scheduler task claim has no linked run and no active scheduler process")
+    end
+  end
+
   it "keeps scheduler task claims active while their run workspace and runtime process are active" do
     Dir.mktmpdir do |dir|
       task_repository = A3::Infra::InMemoryTaskRepository.new
