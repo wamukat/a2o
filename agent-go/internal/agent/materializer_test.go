@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -717,6 +718,11 @@ func TestWorkspaceMaterializerPushesRemoteBranchDelivery(t *testing.T) {
 	tmp := t.TempDir()
 	sourceRoot := createGitSource(t, tmp, "repo-alpha")
 	remoteRoot := filepath.Join(tmp, "origin.git")
+	hookPath := filepath.Join(tmp, "after-push.sh")
+	eventPath := filepath.Join(tmp, "after-push-event.json")
+	if err := os.WriteFile(hookPath, []byte("#!/bin/sh\ncat > \"$1\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	git(t, tmp, "init", "--bare", "-q", remoteRoot)
 	git(t, sourceRoot, "remote", "add", "origin", remoteRoot)
 	git(t, sourceRoot, "push", "-q", "origin", "HEAD:refs/heads/main")
@@ -734,14 +740,17 @@ func TestWorkspaceMaterializerPushesRemoteBranchDelivery(t *testing.T) {
 			"repo-alpha": sourceRoot,
 		},
 	}.Merge(MergeRequest{
-		WorkspaceID: "merge-Sample-42",
-		Policy:      "ff_only",
+		WorkspaceID:    "merge-Sample-42",
+		Policy:         "ff_only",
+		TaskRef:        "Sample#42",
+		ExternalTaskID: intPtr(42),
 		Delivery: &MergeDeliveryRequest{
-			Mode:       "remote_branch",
-			Remote:     "origin",
-			BaseBranch: "main",
-			Push:       true,
-			Sync:       map[string]string{"before_push": "fetch"},
+			Mode:             "remote_branch",
+			Remote:           "origin",
+			BaseBranch:       "main",
+			Push:             true,
+			Sync:             map[string]string{"before_push": "fetch"},
+			AfterPushCommand: []string{hookPath, eventPath},
 		},
 		Slots: map[string]MergeSlotRequest{
 			"repo_alpha": {
@@ -766,9 +775,86 @@ func TestWorkspaceMaterializerPushesRemoteBranchDelivery(t *testing.T) {
 	if slot["delivery_mode"] != "remote_branch" || slot["remote"] != "origin" || slot["push_status"] != "pushed" {
 		t.Fatalf("missing remote branch delivery evidence: %#v", slot)
 	}
+	if slot["after_push_status"] != "succeeded" {
+		t.Fatalf("missing after_push evidence: %#v", slot)
+	}
+	eventBytes, err := os.ReadFile(eventPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var event map[string]any
+	if err := json.Unmarshal(eventBytes, &event); err != nil {
+		t.Fatal(err)
+	}
+	if event["task_ref"] != "Sample#42" || event["remote"] != "origin" || event["base_branch"] != "main" ||
+		event["branch"] != "a2o/tasks/Sample-42" || event["pushed_ref"] != "refs/heads/a2o/tasks/Sample-42" ||
+		event["commit"] != source || event["slot"] != "repo_alpha" {
+		t.Fatalf("unexpected after_push event: %#v", event)
+	}
+	remoteIssue, ok := event["remote_issue"].(map[string]any)
+	if !ok || remoteIssue["id"] != float64(42) {
+		t.Fatalf("unexpected remote issue event: %#v", event["remote_issue"])
+	}
 	mergeLog := string(execution.CombinedLog)
 	if !strings.Contains(mergeLog, "push=pushed remote=origin branch=a2o/tasks/Sample-42") {
 		t.Fatalf("merge log missing push evidence:\n%s", mergeLog)
+	}
+}
+
+func TestWorkspaceMaterializerFailsWhenRemoteBranchAfterPushHookFails(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "repo-alpha")
+	remoteRoot := filepath.Join(tmp, "origin.git")
+	hookPath := filepath.Join(tmp, "after-push-fail.sh")
+	if err := os.WriteFile(hookPath, []byte("#!/bin/sh\ncat >/dev/null\necho hook failed >&2\nexit 23\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git(t, tmp, "init", "--bare", "-q", remoteRoot)
+	git(t, sourceRoot, "remote", "add", "origin", remoteRoot)
+	git(t, sourceRoot, "push", "-q", "origin", "HEAD:refs/heads/main")
+	if err := os.WriteFile(filepath.Join(sourceRoot, "feature.txt"), []byte("feature\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "feature.txt")
+	git(t, sourceRoot, "commit", "-q", "-m", "feature")
+	git(t, sourceRoot, "branch", "-f", "a2o/work/Sample-42", "HEAD")
+
+	descriptor, execution := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": sourceRoot,
+		},
+	}.Merge(MergeRequest{
+		WorkspaceID: "merge-Sample-42",
+		Policy:      "ff_only",
+		TaskRef:     "Sample#42",
+		Delivery: &MergeDeliveryRequest{
+			Mode:             "remote_branch",
+			Remote:           "origin",
+			BaseBranch:       "main",
+			Push:             true,
+			Sync:             map[string]string{"before_push": "fetch"},
+			AfterPushCommand: []string{hookPath},
+		},
+		Slots: map[string]MergeSlotRequest{
+			"repo_alpha": {
+				Source: WorkspaceSourceRequest{
+					Kind:  "local_git",
+					Alias: "repo-alpha",
+				},
+				SourceRef:    "refs/heads/a2o/work/Sample-42",
+				TargetRef:    "refs/heads/a2o/tasks/Sample-42",
+				BootstrapRef: "refs/remotes/origin/main",
+			},
+		},
+	})
+
+	if execution.Status != "failed" || !strings.Contains(string(execution.CombinedLog), "after_push command failed") {
+		t.Fatalf("expected after_push failure, got %#v", execution)
+	}
+	slot := descriptor.SlotDescriptors["repo_alpha"]
+	if slot["after_push_status"] != "failed" || !strings.Contains(fmt.Sprint(slot["after_push_log"]), "hook failed") {
+		t.Fatalf("missing after_push failure evidence: %#v", slot)
 	}
 }
 

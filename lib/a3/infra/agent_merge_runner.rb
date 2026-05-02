@@ -83,6 +83,8 @@ module A3
       def merge_request_form(merge_plan)
         {
           "workspace_id" => workspace_id_for(merge_plan),
+          "task_ref" => merge_plan.task_ref,
+          "external_task_id" => merge_plan.external_task_id,
           "policy" => merge_plan.merge_policy.to_s,
           "delivery" => delivery_request_form(merge_plan.delivery_config),
           "slots" => merge_plan.merge_slots.each_with_object({}) do |slot_name, slots|
@@ -111,7 +113,8 @@ module A3
           "base_branch" => delivery_config.base_branch,
           "branch_prefix" => delivery_config.branch_prefix,
           "push" => delivery_config.push,
-          "sync" => delivery_config.sync
+          "sync" => delivery_config.sync,
+          "after_push_command" => delivery_config.after_push_command
         }
       end
 
@@ -469,6 +472,9 @@ module A3
             errors << "#{slot_name}.remote must match delivery config" unless descriptor["remote"] == merge_plan.delivery_config.remote
             errors << "#{slot_name}.pushed_ref must match merge plan" unless descriptor["pushed_ref"] == merge_plan.integration_target.target_ref
             errors << "#{slot_name}.push_commit must match merge_after_head" unless descriptor["push_commit"] == descriptor["merge_after_head"]
+            if merge_plan.delivery_config.after_push_command
+              errors << "#{slot_name}.after_push_status must be succeeded" unless descriptor["after_push_status"] == "succeeded"
+            end
           end
           errors << "#{slot_name}.merge_before_head must be present" unless present_string?(descriptor["merge_before_head"])
           errors << "#{slot_name}.merge_after_head must be present" unless present_string?(descriptor["merge_after_head"])

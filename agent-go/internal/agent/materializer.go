@@ -166,7 +166,7 @@ func (m WorkspaceMaterializer) Merge(request MergeRequest) (WorkspaceDescriptor,
 	if err != nil {
 		return descriptor, failedMergeExecution(err)
 	}
-	if err := deliverMergePlans(mergedPlans, request.Delivery); err != nil {
+	if err := deliverMergePlans(mergedPlans, request); err != nil {
 		return descriptor, failedMergeExecution(err)
 	}
 	return descriptor, successfulMergeExecution(request, descriptor)
@@ -408,7 +408,8 @@ func prepareMergeDeliverySource(sourceRoot string, delivery *MergeDeliveryReques
 	return fmt.Errorf("unsupported remote_branch delivery sync.before_push: %s", delivery.Sync["before_push"])
 }
 
-func deliverMergePlans(plans []mergePlan, delivery *MergeDeliveryRequest) error {
+func deliverMergePlans(plans []mergePlan, request MergeRequest) error {
+	delivery := request.Delivery
 	if delivery == nil || delivery.Mode == "" || delivery.Mode == "local_merge" || !delivery.Push {
 		return nil
 	}
@@ -416,7 +417,7 @@ func deliverMergePlans(plans []mergePlan, delivery *MergeDeliveryRequest) error 
 		return fmt.Errorf("unsupported merge delivery mode: %s", delivery.Mode)
 	}
 	for _, plan := range plans {
-		if err := pushRemoteBranchPlan(plan, delivery); err != nil {
+		if err := pushRemoteBranchPlan(plan, request); err != nil {
 			plan.descriptor["push_status"] = "failed"
 			plan.descriptor["push_error"] = err.Error()
 			return err
@@ -425,7 +426,8 @@ func deliverMergePlans(plans []mergePlan, delivery *MergeDeliveryRequest) error 
 	return nil
 }
 
-func pushRemoteBranchPlan(plan mergePlan, delivery *MergeDeliveryRequest) error {
+func pushRemoteBranchPlan(plan mergePlan, request MergeRequest) error {
+	delivery := request.Delivery
 	branchName, err := branchNameForRef(plan.targetRef)
 	if err != nil {
 		return err
@@ -446,7 +448,55 @@ func pushRemoteBranchPlan(plan mergePlan, delivery *MergeDeliveryRequest) error 
 	plan.descriptor["pushed_ref"] = "refs/heads/" + branchName
 	plan.descriptor["push_commit"] = plan.afterHead
 	plan.descriptor["push_status"] = "pushed"
+	if len(delivery.AfterPushCommand) > 0 {
+		if err := runAfterPushHook(plan, request, branchName); err != nil {
+			plan.descriptor["after_push_status"] = "failed"
+			plan.descriptor["after_push_error"] = err.Error()
+			return err
+		}
+	}
 	return nil
+}
+
+func runAfterPushHook(plan mergePlan, request MergeRequest, branchName string) error {
+	delivery := request.Delivery
+	event := map[string]any{
+		"workspace_id":     request.WorkspaceID,
+		"task_ref":         request.TaskRef,
+		"external_task_id": request.ExternalTaskID,
+		"remote_issue":     remoteIssueEvent(request.ExternalTaskID),
+		"slot":             plan.slotName,
+		"base_branch":      delivery.BaseBranch,
+		"remote":           delivery.Remote,
+		"branch":           branchName,
+		"pushed_ref":       "refs/heads/" + branchName,
+		"commit":           plan.afterHead,
+		"merge_source_ref": plan.sourceRef,
+		"merge_target_ref": plan.targetRef,
+	}
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	command := delivery.AfterPushCommand
+	cmd := exec.Command(command[0], command[1:]...)
+	cmd.Dir = plan.sourceRoot
+	cmd.Stdin = bytes.NewReader(append(payload, '\n'))
+	out, err := cmd.CombinedOutput()
+	plan.descriptor["after_push_command"] = strings.Join(command, " ")
+	plan.descriptor["after_push_log"] = trimTrailingNewline(string(out))
+	if err != nil {
+		return fmt.Errorf("remote_branch after_push command failed: %w: %s", err, trimTrailingNewline(string(out)))
+	}
+	plan.descriptor["after_push_status"] = "succeeded"
+	return nil
+}
+
+func remoteIssueEvent(externalTaskID *int) map[string]any {
+	if externalTaskID == nil {
+		return nil
+	}
+	return map[string]any{"id": *externalTaskID}
 }
 
 func refreshMergedSourceWorktrees(plans []mergePlan) error {

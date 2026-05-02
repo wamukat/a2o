@@ -106,7 +106,14 @@ RSpec.describe A3::Infra::AgentMergeRunner do
       integration_target: A3::Domain::IntegrationTarget.new(target_ref: "refs/heads/a2o/tasks/Sample-42", bootstrap_ref: "refs/remotes/origin/main"),
       merge_policy: :ff_only,
       merge_slots: [:repo_alpha],
-      delivery_config: A3::Domain::DeliveryConfig.new(mode: :remote_branch, remote: "origin", base_branch: "main", branch_prefix: "a2o/tasks/")
+      delivery_config: A3::Domain::DeliveryConfig.new(
+        mode: :remote_branch,
+        remote: "origin",
+        base_branch: "main",
+        branch_prefix: "a2o/tasks/",
+        after_push_command: { "command" => ["hooks/open-pr"] }
+      ),
+      external_task_id: 42
     )
     client.on_fetch = lambda do |job_id|
       client.complete(job_id, agent_result(job_id, workspace_descriptor(
@@ -125,6 +132,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
           "pushed_ref" => "refs/heads/a2o/tasks/Sample-42",
           "push_commit" => "def456",
           "push_status" => "pushed",
+          "after_push_status" => "succeeded",
           "project_repo_mutator" => "a2o-agent"
         }
       )))
@@ -138,7 +146,12 @@ RSpec.describe A3::Infra::AgentMergeRunner do
       "remote" => "origin",
       "base_branch" => "main",
       "branch_prefix" => "a2o/tasks/",
-      "push" => true
+      "push" => true,
+      "after_push_command" => ["hooks/open-pr"]
+    )
+    expect(request.merge_request).to include(
+      "task_ref" => "Sample#42",
+      "external_task_id" => 42
     )
     expect(execution).to have_attributes(success?: true)
   end

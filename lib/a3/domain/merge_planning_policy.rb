@@ -22,7 +22,8 @@ module A3
           ),
           merge_policy: merge_config.policy,
           merge_slots: task.edit_scope,
-          delivery_config: delivery_config
+          delivery_config: delivery_config,
+          external_task_id: task.external_task_id
         )
       end
 
