@@ -19,7 +19,7 @@ A2O must work across common product shapes rather than depending on one stack. T
 | TypeScript API/Web | `reference-products/typescript-api-web/` | API and browser UI in one repository |
 | Go API/CLI | `reference-products/go-api-cli/` | server and CLI in one Go module |
 | Python Service | `reference-products/python-service/` | lightweight service and Python verification |
-| Java Spring multi-module | `reference-products/java-spring-multi-module/` | Maven reactor with `utility-lib`, a Spring Boot `web-app`, and a dedicated docs slot |
+| Java Spring multi-module | `reference-products/java-spring-multi-module/` | Maven reactor with `utility-lib`, a Spring Boot `web-app`, a dedicated docs slot, and split-slot verification support |
 | Multi-repo Fixture | `reference-products/multi-repo-fixture/` | parent-child and cross-repo validation |
 
 Each product keeps its package at `project-package/`.
@@ -39,6 +39,8 @@ The package must define deterministic test or build commands, agent prerequisite
 `project.yaml` is the single author-facing package config file. It owns package identity, kanban selection, repo slots, agent prerequisites, runtime surface commands, and merge defaults.
 
 Reference packages that exercise docs-impact should also declare `docs` config in `project.yaml`. The Java Spring multi-module package is the canonical docs-impact reference: it has `app`, `lib`, and `docs` repo slots, feature docs, shared specs, interface docs, authority sources, managed index blocks, and mirror policy.
+
+The Java Spring package is also valid for split-slot real-task smoke. Its verification command handles A2O workspaces where `app` and `lib` are materialized separately by installing the checked-in reactor parent POM into the local Maven repository before running per-slot module checks. This keeps release validation from depending on a hidden reactor parent in the runtime workspace.
 
 ## Validation Boundary
 

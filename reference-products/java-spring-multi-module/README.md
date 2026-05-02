@@ -19,3 +19,8 @@ mvn test
 mvn -pl web-app spring-boot:run
 curl http://127.0.0.1:8080/greetings/A2O
 ```
+
+The project package verification script also supports A2O split-slot runtime
+workspaces. When `A2O_WORKER_REQUEST_PATH` provides separate `app` and `lib`
+slot paths, `project-package/commands/verify.sh` installs the reactor parent POM
+from this reference product before testing the separated modules.

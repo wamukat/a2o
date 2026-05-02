@@ -30,9 +30,12 @@ else
   product_root="$(cd "$(dirname "$0")/../.." && pwd)"
 fi
 
+package_product_root="$(cd "$(dirname "$0")/../.." && pwd)"
+
 case "$verification_mode" in
   split_slots)
     maven_repo="${MAVEN_REPO_LOCAL:-$PWD/.work/m2/repository}"
+    mvn -q -N -f "$package_product_root/pom.xml" -Dmaven.repo.local="$maven_repo" install
     (cd "$lib_root" && mvn -q -Dmaven.repo.local="$maven_repo" install)
     (cd "$app_root" && mvn -q -Dmaven.repo.local="$maven_repo" test)
     ;;

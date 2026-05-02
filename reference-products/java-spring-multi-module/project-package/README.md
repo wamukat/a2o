@@ -31,5 +31,12 @@ Command inventory:
 - `commands/build.sh`: local Maven packaging helper used during manual sample
   development.
 
+`commands/verify.sh` supports both full reactor verification and split-slot
+runtime verification. In split-slot mode A2O may materialize `app` and `lib` as
+separate workspaces without the reactor parent directory. The verifier installs
+the checked-in reactor parent POM into an isolated local Maven repository before
+running `mvn install` in `lib` and `mvn test` in `app`, so the sample can be used
+for real-task smoke without copying the whole reactor into every slot.
+
 Use `tools/dev_sample/README.md` from the repository root to start the isolated
 Kanbalone instance and run the development engine.
