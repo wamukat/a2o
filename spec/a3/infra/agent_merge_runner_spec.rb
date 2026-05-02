@@ -97,6 +97,95 @@ RSpec.describe A3::Infra::AgentMergeRunner do
     )
   end
 
+  it "includes remote-branch delivery config and validates push evidence" do
+    remote_merge_plan = A3::Domain::MergePlan.new(
+      project_key: "a2o",
+      task_ref: "Sample#42",
+      run_ref: "run-merge-1",
+      merge_source: A3::Domain::MergeSource.new(source_ref: "refs/heads/a2o/work/Sample-42"),
+      integration_target: A3::Domain::IntegrationTarget.new(target_ref: "refs/heads/a2o/tasks/Sample-42", bootstrap_ref: "refs/remotes/origin/main"),
+      merge_policy: :ff_only,
+      merge_slots: [:repo_alpha],
+      delivery_config: A3::Domain::DeliveryConfig.new(mode: :remote_branch, remote: "origin", base_branch: "main", branch_prefix: "a2o/tasks/")
+    )
+    client.on_fetch = lambda do |job_id|
+      client.complete(job_id, agent_result(job_id, workspace_descriptor(
+        "repo_alpha" => {
+          "runtime_path" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo_alpha",
+          "source_alias" => "sample-catalog-service",
+          "merge_source_ref" => "refs/heads/a2o/work/Sample-42",
+          "merge_target_ref" => "refs/heads/a2o/tasks/Sample-42",
+          "merge_policy" => "ff_only",
+          "merge_before_head" => "abc123",
+          "merge_after_head" => "def456",
+          "resolved_head" => "def456",
+          "merge_status" => "merged",
+          "delivery_mode" => "remote_branch",
+          "remote" => "origin",
+          "pushed_ref" => "refs/heads/a2o/tasks/Sample-42",
+          "push_commit" => "def456",
+          "push_status" => "pushed",
+          "project_repo_mutator" => "a2o-agent"
+        }
+      )))
+    end
+
+    execution = runner.run(remote_merge_plan, workspace: workspace)
+
+    request = client.records.values.first.request
+    expect(request.merge_request.fetch("delivery")).to include(
+      "mode" => "remote_branch",
+      "remote" => "origin",
+      "base_branch" => "main",
+      "branch_prefix" => "a2o/tasks/",
+      "push" => true
+    )
+    expect(execution).to have_attributes(success?: true)
+  end
+
+  it "rejects remote-branch push evidence for the wrong pushed ref" do
+    remote_merge_plan = A3::Domain::MergePlan.new(
+      project_key: "a2o",
+      task_ref: "Sample#42",
+      run_ref: "run-merge-1",
+      merge_source: A3::Domain::MergeSource.new(source_ref: "refs/heads/a2o/work/Sample-42"),
+      integration_target: A3::Domain::IntegrationTarget.new(target_ref: "refs/heads/a2o/tasks/Sample-42", bootstrap_ref: "refs/remotes/origin/main"),
+      merge_policy: :ff_only,
+      merge_slots: [:repo_alpha],
+      delivery_config: A3::Domain::DeliveryConfig.new(mode: :remote_branch, remote: "origin", base_branch: "main", branch_prefix: "a2o/tasks/")
+    )
+    client.on_fetch = lambda do |job_id|
+      client.complete(job_id, agent_result(job_id, workspace_descriptor(
+        "repo_alpha" => {
+          "runtime_path" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo_alpha",
+          "source_alias" => "sample-catalog-service",
+          "merge_source_ref" => "refs/heads/a2o/work/Sample-42",
+          "merge_target_ref" => "refs/heads/a2o/tasks/Sample-42",
+          "merge_policy" => "ff_only",
+          "merge_before_head" => "abc123",
+          "merge_after_head" => "def456",
+          "resolved_head" => "def456",
+          "merge_status" => "merged",
+          "delivery_mode" => "remote_branch",
+          "remote" => "origin",
+          "pushed_ref" => "refs/heads/wrong",
+          "push_commit" => "def456",
+          "push_status" => "pushed",
+          "project_repo_mutator" => "a2o-agent"
+        }
+      )))
+    end
+
+    execution = runner.run(remote_merge_plan, workspace: workspace)
+
+    expect(execution).to have_attributes(
+      success?: false,
+      failing_command: "agent_merge_evidence",
+      observed_state: "agent_merge_evidence_invalid"
+    )
+    expect(execution.diagnostics.fetch("validation_errors")).to include("repo_alpha.pushed_ref must match merge plan")
+  end
+
   it "rejects missing agent merge evidence" do
     client.on_fetch = lambda do |job_id|
       client.complete(job_id, agent_result(job_id, workspace_descriptor(

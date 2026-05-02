@@ -17,7 +17,8 @@ module A3
         merge_plan = @merge_planning_policy.build(
           task: task,
           run: run,
-          merge_config: project_context.merge_config_for(task: task, phase: run.phase)
+          merge_config: project_context.merge_config_for(task: task, phase: run.phase),
+          delivery_config: project_context.delivery_config
         )
 
         Result.new(task: task, run: run, merge_plan: merge_plan)

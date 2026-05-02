@@ -713,6 +713,130 @@ func TestWorkspaceMaterializerMergesBranchRefs(t *testing.T) {
 	}
 }
 
+func TestWorkspaceMaterializerPushesRemoteBranchDelivery(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "repo-alpha")
+	remoteRoot := filepath.Join(tmp, "origin.git")
+	git(t, tmp, "init", "--bare", "-q", remoteRoot)
+	git(t, sourceRoot, "remote", "add", "origin", remoteRoot)
+	git(t, sourceRoot, "push", "-q", "origin", "HEAD:refs/heads/main")
+	if err := os.WriteFile(filepath.Join(sourceRoot, "feature.txt"), []byte("feature\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "feature.txt")
+	git(t, sourceRoot, "commit", "-q", "-m", "feature")
+	git(t, sourceRoot, "branch", "-f", "a2o/work/Sample-42", "HEAD")
+	source := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "refs/heads/a2o/work/Sample-42"))
+
+	descriptor, execution := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": sourceRoot,
+		},
+	}.Merge(MergeRequest{
+		WorkspaceID: "merge-Sample-42",
+		Policy:      "ff_only",
+		Delivery: &MergeDeliveryRequest{
+			Mode:       "remote_branch",
+			Remote:     "origin",
+			BaseBranch: "main",
+			Push:       true,
+			Sync:       map[string]string{"before_push": "fetch"},
+		},
+		Slots: map[string]MergeSlotRequest{
+			"repo_alpha": {
+				Source: WorkspaceSourceRequest{
+					Kind:  "local_git",
+					Alias: "repo-alpha",
+				},
+				SourceRef:    "refs/heads/a2o/work/Sample-42",
+				TargetRef:    "refs/heads/a2o/tasks/Sample-42",
+				BootstrapRef: "refs/remotes/origin/main",
+			},
+		},
+	})
+
+	if execution.Status != "succeeded" {
+		t.Fatalf("merge failed: %#v", execution)
+	}
+	if head := trimTrailingNewline(git(t, remoteRoot, "rev-parse", "refs/heads/a2o/tasks/Sample-42")); head != source {
+		t.Fatalf("remote branch was not pushed: got=%s want=%s", head, source)
+	}
+	slot := descriptor.SlotDescriptors["repo_alpha"]
+	if slot["delivery_mode"] != "remote_branch" || slot["remote"] != "origin" || slot["push_status"] != "pushed" {
+		t.Fatalf("missing remote branch delivery evidence: %#v", slot)
+	}
+	mergeLog := string(execution.CombinedLog)
+	if !strings.Contains(mergeLog, "push=pushed remote=origin branch=a2o/tasks/Sample-42") {
+		t.Fatalf("merge log missing push evidence:\n%s", mergeLog)
+	}
+}
+
+func TestWorkspaceMaterializerBootstrapsRemoteBranchDeliveryFromExistingRemoteTaskBranch(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "repo-alpha")
+	remoteRoot := filepath.Join(tmp, "origin.git")
+	git(t, tmp, "init", "--bare", "-q", remoteRoot)
+	git(t, sourceRoot, "remote", "add", "origin", remoteRoot)
+	git(t, sourceRoot, "push", "-q", "origin", "HEAD:refs/heads/main")
+	if err := os.WriteFile(filepath.Join(sourceRoot, "remote-task.txt"), []byte("remote task\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "remote-task.txt")
+	git(t, sourceRoot, "commit", "-q", "-m", "remote task seed")
+	remoteTaskHead := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "HEAD"))
+	git(t, sourceRoot, "push", "-q", "origin", "HEAD:refs/heads/a2o/tasks/Sample-42")
+	if err := os.WriteFile(filepath.Join(sourceRoot, "feature.txt"), []byte("feature\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "add", "feature.txt")
+	git(t, sourceRoot, "commit", "-q", "-m", "feature")
+	git(t, sourceRoot, "branch", "-f", "a2o/work/Sample-42", "HEAD")
+	source := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "refs/heads/a2o/work/Sample-42"))
+
+	descriptor, execution := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": sourceRoot,
+		},
+	}.Merge(MergeRequest{
+		WorkspaceID: "merge-Sample-42",
+		Policy:      "ff_only",
+		Delivery: &MergeDeliveryRequest{
+			Mode:       "remote_branch",
+			Remote:     "origin",
+			BaseBranch: "main",
+			Push:       true,
+			Sync:       map[string]string{"before_push": "fetch"},
+		},
+		Slots: map[string]MergeSlotRequest{
+			"repo_alpha": {
+				Source: WorkspaceSourceRequest{
+					Kind:  "local_git",
+					Alias: "repo-alpha",
+				},
+				SourceRef:    "refs/heads/a2o/work/Sample-42",
+				TargetRef:    "refs/heads/a2o/tasks/Sample-42",
+				BootstrapRef: "refs/remotes/origin/main",
+			},
+		},
+	})
+
+	if execution.Status != "succeeded" {
+		t.Fatalf("merge failed: %#v", execution)
+	}
+	if head := trimTrailingNewline(git(t, remoteRoot, "rev-parse", "refs/heads/a2o/tasks/Sample-42")); head != source {
+		t.Fatalf("remote branch was not advanced: got=%s want=%s", head, source)
+	}
+	slot := descriptor.SlotDescriptors["repo_alpha"]
+	if slot["merge_before_head"] != remoteTaskHead {
+		t.Fatalf("merge did not bootstrap from existing remote task branch: got=%v want=%s slot=%#v", slot["merge_before_head"], remoteTaskHead, slot)
+	}
+	if slot["merge_bootstrap_ref"] != "refs/remotes/origin/a2o/tasks/Sample-42" {
+		t.Fatalf("unexpected bootstrap ref: %#v", slot)
+	}
+}
+
 func TestWorkspaceMaterializerRejectsUnknownMergePolicy(t *testing.T) {
 	tmp := t.TempDir()
 	sourceRoot := createGitSource(t, tmp, "repo-alpha")

@@ -84,6 +84,7 @@ module A3
         {
           "workspace_id" => workspace_id_for(merge_plan),
           "policy" => merge_plan.merge_policy.to_s,
+          "delivery" => delivery_request_form(merge_plan.delivery_config),
           "slots" => merge_plan.merge_slots.each_with_object({}) do |slot_name, slots|
             alias_name = @source_aliases.fetch(slot_name) do
               raise A3::Domain::ConfigurationError, "missing agent source alias for merge slot #{slot_name}"
@@ -98,6 +99,19 @@ module A3
               "bootstrap_ref" => merge_plan.integration_target.bootstrap_ref
             }.compact
           end
+        }.compact
+      end
+
+      def delivery_request_form(delivery_config)
+        return nil unless delivery_config.remote_branch?
+
+        {
+          "mode" => delivery_config.mode.to_s,
+          "remote" => delivery_config.remote,
+          "base_branch" => delivery_config.base_branch,
+          "branch_prefix" => delivery_config.branch_prefix,
+          "push" => delivery_config.push,
+          "sync" => delivery_config.sync
         }
       end
 
@@ -449,6 +463,13 @@ module A3
           errors << "#{slot_name}.merge_target_ref must match merge plan" unless descriptor["merge_target_ref"] == merge_plan.integration_target.target_ref
           errors << "#{slot_name}.merge_policy must match merge plan" unless descriptor["merge_policy"] == merge_plan.merge_policy.to_s
           errors << "#{slot_name}.merge_status must be merged" unless descriptor["merge_status"] == "merged"
+          if merge_plan.delivery_config.remote_branch? && merge_plan.delivery_config.push
+            errors << "#{slot_name}.delivery_mode must be remote_branch" unless descriptor["delivery_mode"] == "remote_branch"
+            errors << "#{slot_name}.push_status must be pushed" unless descriptor["push_status"] == "pushed"
+            errors << "#{slot_name}.remote must match delivery config" unless descriptor["remote"] == merge_plan.delivery_config.remote
+            errors << "#{slot_name}.pushed_ref must match merge plan" unless descriptor["pushed_ref"] == merge_plan.integration_target.target_ref
+            errors << "#{slot_name}.push_commit must match merge_after_head" unless descriptor["push_commit"] == descriptor["merge_after_head"]
+          end
           errors << "#{slot_name}.merge_before_head must be present" unless present_string?(descriptor["merge_before_head"])
           errors << "#{slot_name}.merge_after_head must be present" unless present_string?(descriptor["merge_after_head"])
           errors << "#{slot_name}.resolved_head must match merge_after_head" unless descriptor["resolved_head"] == descriptor["merge_after_head"]

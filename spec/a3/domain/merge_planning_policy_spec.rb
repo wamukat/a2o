@@ -184,6 +184,55 @@ RSpec.describe A3::Domain::MergePlanningPolicy do
     expect(plan.merge_slots).to eq(%i[repo_alpha repo_beta])
   end
 
+  it "builds a remote-branch merge-to-live plan for parent tasks" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3022",
+      kind: :parent,
+      edit_scope: [:repo_alpha]
+    )
+    run = A3::Domain::Run.new(
+      ref: "run-remote",
+      task_ref: task.ref,
+      phase: :merge,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :integration_record,
+        ref: "refs/heads/a2o/parent/A3-v2-3022",
+        task_ref: task.ref
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        ownership_scope: :parent
+      ),
+      review_target: A3::Domain::ReviewTarget.new(
+        base_commit: "base123",
+        head_commit: "head456",
+        task_ref: task.ref,
+        phase_ref: :review
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: task.ref,
+        owner_scope: :parent,
+        snapshot_version: "head456"
+      )
+    )
+    merge_config = A3::Domain::MergeConfig.new(target: :merge_to_live, policy: :ff_only, target_ref: "refs/heads/main")
+    delivery_config = A3::Domain::DeliveryConfig.new(
+      mode: :remote_branch,
+      remote: "origin",
+      base_branch: "main",
+      branch_prefix: "a2o/tasks/"
+    )
+
+    plan = policy.build(task: task, run: run, merge_config: merge_config, delivery_config: delivery_config)
+
+    expect(plan.integration_target.target_ref).to eq("refs/heads/a2o/tasks/A3-v2-3022")
+    expect(plan.integration_target.bootstrap_ref).to eq("refs/remotes/origin/main")
+    expect(plan.delivery_config).to eq(delivery_config)
+  end
+
   it "rejects merge_to_parent for a task without parent topology" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",

@@ -162,7 +162,11 @@ func (m WorkspaceMaterializer) Merge(request MergeRequest) (WorkspaceDescriptor,
 	if err != nil {
 		return descriptor, failedMergeExecution(err)
 	}
-	if err := executeMergePlans(plans, request.Policy); err != nil {
+	mergedPlans, err := executeMergePlans(plans, request.Policy)
+	if err != nil {
+		return descriptor, failedMergeExecution(err)
+	}
+	if err := deliverMergePlans(mergedPlans, request.Delivery); err != nil {
 		return descriptor, failedMergeExecution(err)
 	}
 	return descriptor, successfulMergeExecution(request, descriptor)
@@ -248,6 +252,10 @@ func (m WorkspaceMaterializer) prepareMergePlans(request MergeRequest, descripto
 			rollbackMergePlans(plans)
 			return nil, err
 		}
+		if err := prepareMergeDeliverySource(sourceRoot, request.Delivery); err != nil {
+			rollbackMergePlans(plans)
+			return nil, err
+		}
 		if dirtyFiles, err := gitDirtyFiles(sourceRoot); err != nil {
 			rollbackMergePlans(plans)
 			return nil, err
@@ -255,7 +263,12 @@ func (m WorkspaceMaterializer) prepareMergePlans(request MergeRequest, descripto
 			rollbackMergePlans(plans)
 			return nil, fmt.Errorf("source alias %s is dirty before merge: changed_files=%v", slot.Source.Alias, dirtyFiles)
 		}
-		beforeHead, createdRef, err := ensureMergeTargetRef(sourceRoot, slot.TargetRef, slot.BootstrapRef)
+		effectiveBootstrapRef, err := mergeBootstrapRef(sourceRoot, slot.TargetRef, slot.BootstrapRef, request.Delivery)
+		if err != nil {
+			rollbackMergePlans(plans)
+			return nil, err
+		}
+		beforeHead, createdRef, err := ensureMergeTargetRef(sourceRoot, slot.TargetRef, effectiveBootstrapRef)
 		if err != nil {
 			rollbackMergePlans(plans)
 			return nil, err
@@ -286,6 +299,7 @@ func (m WorkspaceMaterializer) prepareMergePlans(request MergeRequest, descripto
 			"source_alias":         slot.Source.Alias,
 			"merge_source_ref":     slot.SourceRef,
 			"merge_target_ref":     slot.TargetRef,
+			"merge_bootstrap_ref":  effectiveBootstrapRef,
 			"merge_before_head":    beforeHead,
 			"source_head_commit":   sourceHead,
 			"merge_policy":         request.Policy,
@@ -309,12 +323,12 @@ func (m WorkspaceMaterializer) prepareMergePlans(request MergeRequest, descripto
 	return plans, nil
 }
 
-func executeMergePlans(plans []mergePlan, policy string) error {
+func executeMergePlans(plans []mergePlan, policy string) ([]mergePlan, error) {
 	merged := []mergePlan{}
 	for _, plan := range plans {
 		current := plan
 		if err := runGit(current.sourceRoot, "worktree", "add", "--force", current.worktree, branchNameMust(current.targetRef)); err != nil {
-			return errors.Join(err, rollbackMergePlans(append(merged, current)))
+			return nil, errors.Join(err, rollbackMergePlans(append(merged, current)))
 		}
 		current.initialized = true
 		if err := runGit(current.worktree, mergeGitArgs(policy, current.sourceRef)...); err != nil {
@@ -328,19 +342,19 @@ func executeMergePlans(plans []mergePlan, policy string) error {
 					current.descriptor["merge_recovery_candidate"] = true
 					current.descriptor["merge_recovery_workspace_retained"] = true
 					current.descriptor["resolved_conflict_files"] = []string{}
-					return errors.Join(mergeConflictError{plan: current, err: err}, rollbackMergePlans(merged))
+					return nil, errors.Join(mergeConflictError{plan: current, err: err}, rollbackMergePlans(merged))
 				}
 				rollbackErr := rollbackMergePlans(append(merged, current))
 				current.descriptor["merge_status"] = "failed"
 				current.descriptor["merge_recovery_candidate"] = false
 				current.descriptor["merge_recovery_workspace_retained"] = false
-				return errors.Join(err, rollbackErr)
+				return nil, errors.Join(err, rollbackErr)
 			}
-			return errors.Join(err, rollbackMergePlans(append(merged, current)))
+			return nil, errors.Join(err, rollbackMergePlans(append(merged, current)))
 		}
 		afterHead, err := gitOutput(current.worktree, "rev-parse", "HEAD")
 		if err != nil {
-			return errors.Join(err, rollbackMergePlans(append(merged, current)))
+			return nil, errors.Join(err, rollbackMergePlans(append(merged, current)))
 		}
 		current.afterHead = afterHead
 		current.descriptor["merge_after_head"] = afterHead
@@ -349,9 +363,90 @@ func executeMergePlans(plans []mergePlan, policy string) error {
 		merged = append(merged, current)
 	}
 	if err := cleanupMergeWorktrees(merged); err != nil {
+		return nil, err
+	}
+	if err := refreshMergedSourceWorktrees(merged); err != nil {
+		return nil, err
+	}
+	return merged, nil
+}
+
+func mergeBootstrapRef(sourceRoot, targetRef, defaultBootstrapRef string, delivery *MergeDeliveryRequest) (string, error) {
+	if delivery == nil || delivery.Mode != "remote_branch" {
+		return defaultBootstrapRef, nil
+	}
+	if _, err := gitOutput(sourceRoot, "rev-parse", targetRef); err == nil {
+		return defaultBootstrapRef, nil
+	}
+	branchName, err := branchNameForRef(targetRef)
+	if err != nil {
+		return "", err
+	}
+	remoteRef := "refs/remotes/" + delivery.Remote + "/" + branchName
+	if _, err := gitOutput(sourceRoot, "rev-parse", remoteRef); err == nil {
+		return remoteRef, nil
+	}
+	return defaultBootstrapRef, nil
+}
+
+func prepareMergeDeliverySource(sourceRoot string, delivery *MergeDeliveryRequest) error {
+	if delivery == nil || delivery.Mode == "" || delivery.Mode == "local_merge" {
+		return nil
+	}
+	if delivery.Mode != "remote_branch" {
+		return fmt.Errorf("unsupported merge delivery mode: %s", delivery.Mode)
+	}
+	if strings.TrimSpace(delivery.Remote) == "" {
+		return fmt.Errorf("remote_branch delivery remote is required")
+	}
+	if strings.TrimSpace(delivery.BaseBranch) == "" {
+		return fmt.Errorf("remote_branch delivery base_branch is required")
+	}
+	if delivery.Sync == nil || delivery.Sync["before_push"] == "" || delivery.Sync["before_push"] == "fetch" {
+		return runGit(sourceRoot, "fetch", delivery.Remote)
+	}
+	return fmt.Errorf("unsupported remote_branch delivery sync.before_push: %s", delivery.Sync["before_push"])
+}
+
+func deliverMergePlans(plans []mergePlan, delivery *MergeDeliveryRequest) error {
+	if delivery == nil || delivery.Mode == "" || delivery.Mode == "local_merge" || !delivery.Push {
+		return nil
+	}
+	if delivery.Mode != "remote_branch" {
+		return fmt.Errorf("unsupported merge delivery mode: %s", delivery.Mode)
+	}
+	for _, plan := range plans {
+		if err := pushRemoteBranchPlan(plan, delivery); err != nil {
+			plan.descriptor["push_status"] = "failed"
+			plan.descriptor["push_error"] = err.Error()
+			return err
+		}
+	}
+	return nil
+}
+
+func pushRemoteBranchPlan(plan mergePlan, delivery *MergeDeliveryRequest) error {
+	branchName, err := branchNameForRef(plan.targetRef)
+	if err != nil {
 		return err
 	}
-	return refreshMergedSourceWorktrees(merged)
+	remoteRef := "refs/remotes/" + delivery.Remote + "/" + branchName
+	if remoteHead, err := gitOutput(plan.sourceRoot, "rev-parse", remoteRef); err == nil {
+		if err := runGit(plan.sourceRoot, "merge-base", "--is-ancestor", remoteHead, plan.targetRef); err != nil {
+			return fmt.Errorf("remote branch %s/%s is not an ancestor of %s; refusing non-fast-forward push", delivery.Remote, branchName, plan.targetRef)
+		}
+		plan.descriptor["remote_before_head"] = remoteHead
+	}
+	if err := runGit(plan.sourceRoot, "push", delivery.Remote, plan.targetRef+":refs/heads/"+branchName); err != nil {
+		return err
+	}
+	plan.descriptor["delivery_mode"] = "remote_branch"
+	plan.descriptor["remote"] = delivery.Remote
+	plan.descriptor["remote_branch"] = branchName
+	plan.descriptor["pushed_ref"] = "refs/heads/" + branchName
+	plan.descriptor["push_commit"] = plan.afterHead
+	plan.descriptor["push_status"] = "pushed"
+	return nil
 }
 
 func refreshMergedSourceWorktrees(plans []mergePlan) error {
@@ -690,7 +785,7 @@ func successfulMergeExecution(request MergeRequest, descriptor WorkspaceDescript
 		slot := descriptor.SlotDescriptors[slotName]
 		fmt.Fprintf(
 			&log,
-			"slot=%s status=%s source=%s target=%s before=%s after=%s\n",
+			"slot=%s status=%s source=%s target=%s before=%s after=%s",
 			slotName,
 			logValue(slot["merge_status"]),
 			logValue(slot["merge_source_ref"]),
@@ -698,6 +793,16 @@ func successfulMergeExecution(request MergeRequest, descriptor WorkspaceDescript
 			logValue(slot["merge_before_head"]),
 			logValue(slot["merge_after_head"]),
 		)
+		if slot["push_status"] != nil {
+			fmt.Fprintf(
+				&log,
+				" push=%s remote=%s branch=%s",
+				logValue(slot["push_status"]),
+				logValue(slot["remote"]),
+				logValue(slot["remote_branch"]),
+			)
+		}
+		fmt.Fprintf(&log, "\n")
 	}
 	return ExecutionResult{Status: "succeeded", ExitCode: intPtr(0), CombinedLog: log.Bytes()}
 }

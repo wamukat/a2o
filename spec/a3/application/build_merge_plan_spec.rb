@@ -72,5 +72,6 @@ RSpec.describe A3::Application::BuildMergePlan do
     expect(result.merge_plan.merge_policy).to eq(:ff_only)
     expect(result.merge_plan.merge_slots).to eq([:repo_alpha])
     expect(result.merge_plan.project_key).to eq("a2o")
+    expect(result.merge_plan.delivery_config).to eq(A3::Domain::DeliveryConfig.local_merge)
   end
 end

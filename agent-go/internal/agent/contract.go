@@ -38,6 +38,7 @@ type AgentEnvironment struct {
 type MergeRequest struct {
 	WorkspaceID string                      `json:"workspace_id"`
 	Policy      string                      `json:"policy"`
+	Delivery    *MergeDeliveryRequest       `json:"delivery,omitempty"`
 	Slots       map[string]MergeSlotRequest `json:"slots"`
 }
 
@@ -46,6 +47,15 @@ type MergeSlotRequest struct {
 	SourceRef    string                 `json:"source_ref"`
 	TargetRef    string                 `json:"target_ref"`
 	BootstrapRef string                 `json:"bootstrap_ref,omitempty"`
+}
+
+type MergeDeliveryRequest struct {
+	Mode         string            `json:"mode"`
+	Remote       string            `json:"remote"`
+	BaseBranch   string            `json:"base_branch"`
+	BranchPrefix string            `json:"branch_prefix"`
+	Push         bool              `json:"push"`
+	Sync         map[string]string `json:"sync,omitempty"`
 }
 
 type MergeRecoveryRequest struct {
