@@ -1,6 +1,6 @@
 # 現在の公開機能
 
-A2O 0.5.61 で現在利用できる公開機能と検証範囲を示す。
+A2O 0.5.63 で現在利用できる公開機能と検証範囲を示す。
 
 この文書は、リリース時点で「利用者に案内してよい機能」と「検証済みとして扱える範囲」を確認するための一覧である。導入手順を知りたい場合は [10-quickstart.md](10-quickstart.md)、設定項目を知りたい場合は [90-project-package-schema.md](90-project-package-schema.md) を読む。
 
@@ -44,16 +44,19 @@ A2O 0.5.61 で現在利用できる公開機能と検証範囲を示す。
 - prompt diagnostics / evidence は順序付きの `project_prompt.repo_slots` を出力する。従来の単数 `repo_slot` は single-slot task の場合だけ設定される。
 - prompt preview は `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib A2O#123` または `a2o prompt preview --phase implementation --repo-slot app,lib A2O#123` のように、複数 repo slot を指定した multi-repo 合成確認に対応する。
 - prompts-only の implementation / review phase に対応する。`runtime.prompts.phases.<phase>` に prompt または skill がある場合、`runtime.phases.<phase>.skill` は省略でき、その phase では no-op の `a2o_core_instruction` layer を出力しない。
+- Remote-branch delivery mode: `runtime.delivery.mode: remote_branch` は、完了した親タスクまたは単独タスクの成果を local の本流ブランチへ直接反映せず、configured remote 上の provider 非依存 task branch として公開する。
+- Remote-branch merge / push は、remote、branch、pushed ref、pushed commit、push status を merge evidence に記録する。rerun 時は既存 remote task branch を起点にし、non-fast-forward push は拒否する。
+- 任意の `runtime.delivery.after_push.command` は remote branch push 成功後に実行され、stdin に JSON event を受け取る。provider 固有の PR/MR 作成や通知は A2O core ではなく、この project-owned hook に置く。
 - agent server 接続向けの project runtime 調整項目: `runtime.agent_control_plane_connect_timeout`、`runtime.agent_control_plane_request_timeout`、`runtime.agent_control_plane_retry_count`、`runtime.agent_control_plane_retry_delay`
 - child / single タスク向けの任意 review gate 項目: `runtime.review_gate.child`、`runtime.review_gate.single`、`runtime.review_gate.skip_labels`、`runtime.review_gate.require_labels`
 - 外部 Kanbalone bootstrap 項目: `--kanban-mode external`、`--kanban-url`、`--kanban-runtime-url`
 - agent server 接続向けの runtime CLI 上書き: `--agent-control-plane-connect-timeout`、`--agent-control-plane-request-timeout`、`--agent-control-plane-retries`、`--agent-control-plane-retry-delay`
 - agent server 接続向けの host agent CLI / runtime profile 項目: `--control-plane-connect-timeout`、`--control-plane-request-timeout`、`--control-plane-retries`、`--control-plane-retry-delay`、`control_plane_connect_timeout`、`control_plane_request_timeout`、`control_plane_retry_count`、`control_plane_retry_delay`
-- Kanbalone アダプターと初期化ツール。既定の Kanbalone イメージは `v0.9.28`
+- Kanbalone アダプターと初期化ツール。既定の Kanbalone イメージは `v0.9.31`
 - エージェント HTTP ワーカー境界。取得済みジョブの heartbeat を含む
 - エージェントが具体化するワークスペース方式
 - TypeScript、Go、Python、複数リポジトリタスクテンプレートの参照用プロダクトパッケージ
-- GHCR ランタイムイメージタグ: `latest`、`0.5.61`、`sha-*`
+- GHCR ランタイムイメージタグ: `latest`、`0.5.63`、`sha-*`
 - タグリリースでは `latest` も同時に公開する。そのため、公開完了後はリリース版タグと `latest` が同じランタイムイメージを指す前提で確認する。
 - ローカルリリース判定: RSpec 全体、release package doctor、local RC host smoke、および runtime 実行 / worker launcher / scheduler / Kanban / env generation 変更時の real-task local RC smoke
 
@@ -62,19 +65,20 @@ A2O 0.5.61 で現在利用できる公開機能と検証範囲を示す。
 - 既に `runtime.prompts.repoSlots` を定義している project package は、upgrade 前に multi-repo task を確認すること。multi-repo task では `repo_slots` / `edit_scope` 順にすべての repo-slot addon を渡す。以前の release では単数 repo-slot layer だけが適用対象だったため、slot 固有の指示が組み合わさって広すぎる、または衝突する場合がある。その場合は repo slot 単位の child task に分割するか、package prompt を調整する。worker 実行前に `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib <task-ref>` で合成後の instruction を確認する。
 - validation を満たすためだけの no-op `runtime.phases.implementation.skill` / `runtime.phases.review.skill` stub を使っている project package は、対応する `runtime.prompts.phases.<phase>` に prompt または skills を定義したうえで stub を削除できる。system prompt だけでは不十分であり、phase skill と対応する phase prompt / skill のどちらも無い場合、`a2o project validate` は引き続き `runtime.phases.<phase>.skill must be provided` で失敗する。
 - `a2o runtime start` と `a2o runtime stop` は互換 alias ではなくなった。常駐スケジューラを再開する場合は `a2o runtime resume`、現在の作業後に停止予約する場合は `a2o runtime pause` を使う。削除済みコマンドを実行した場合、A2O は非ゼロで終了し、`migration_required=true` と移行先コマンドを表示する。
-- custom worker は review disposition の scope 欄として `review_disposition.slot_scopes` を返す必要がある。0.5.61 の worker result では `review_disposition.repo_scope` を受け付けない。`"repo_alpha"` のような値は `slot_scopes: ["repo_alpha"]` に、複数リポジトリの指摘は対象 slot 名の配列に移行する。保存済み worker result は `a2o worker validate-result --request request.json --result result.json --review-slot-scope <slot>` で検証する。
+- custom worker は review disposition の scope 欄として `review_disposition.slot_scopes` を返す必要がある。0.5.63 の worker result では `review_disposition.repo_scope` を受け付けない。`"repo_alpha"` のような値は `slot_scopes: ["repo_alpha"]` に、複数リポジトリの指摘は対象 slot 名の配列に移行する。保存済み worker result は `a2o worker validate-result --request request.json --result result.json --review-slot-scope <slot>` で検証する。
 - SoloBoard 時代の Kanbalone 互換名は削除された。`KANBAN_BACKEND=kanbalone`、`KANBALONE_BASE_URL`、`KANBALONE_API_TOKEN`、`--kanbalone-port`、`A2O_BUNDLE_KANBALONE_PORT`、`A2O_KANBALONE_INTERNAL_URL` を使う。削除済み SoloBoard 入力を使った場合は `migration_required=true` と置き換え先を表示する。
 - 同梱 Kanbalone のデータ名は `<compose-project>_soloboard-data` / `soloboard.sqlite` から `<compose-project>_kanbalone-data` / `kanbalone.sqlite` に変わった。旧 volume が存在し、新 volume が存在しない場合、`a2o kanban up` は空の board を作らず `migration_required=true` で停止する。同梱サービスを起動する前に、既存の Kanban data を copy または rename する。
 - runtime / agent / worker / root utility 設定の公開 `A3_*` 環境変数 fallback は、`A2O_*` 置き換えがあるものから削除された。`A2O_RUNTIME_IMAGE`、`A2O_COMPOSE_PROJECT`、`A2O_COMPOSE_FILE`、`A2O_RUNTIME_SERVICE`、`A2O_BUNDLE_AGENT_PORT`、`A2O_BUNDLE_STORAGE_DIR`、`A2O_AGENT_PACKAGE_DIR`、`A2O_AGENT_TOKEN`、`A2O_AGENT_TOKEN_FILE`、`A2O_AGENT_CONTROL_TOKEN`、`A2O_AGENT_CONTROL_TOKEN_FILE`、`A2O_AGENT_*`、`A2O_WORKER_*`、`A2O_WORKSPACE_ROOT`、`A2O_ROOT_DIR`、`A2O_ROOT_*` root utility controls を使う。削除済み `A3_*` 入力を使った場合は `migration_required=true` と置き換え先を表示する。
 - `worker-runs.json` は activity state source ではなくなった。operator diagnostics、cleanup、rerun readiness、reconcile、watch-summary は `agent_jobs.json` を使う。残存する `worker-runs.json` は `migration_required=true` として報告される。
 - 公開 agent package と host launcher artifact は `a2o-agent` / `a2o` 名を使う。リリース archive は `a2o-agent-<version>-<os>-<arch>.tar.gz`、archive 内バイナリは `a2o-agent`、host install は `a2o` と `a2o-<os>-<arch>` のみを書き出す。shell installer は install directory に残った `a3*` ファイルを削除する。旧 package / cache 環境変数名は `migration_required=true` で失敗する。runtime image 内の `a3 agent package ...` も `migration_required=true` で失敗するため、`a2o agent package ...` を使う。
 - decomposition command 実行は host launcher と同梱 host agent に依存する。`a2o runtime decomposition investigate`、`propose`、`review` を使う前に、host launcher / shared assets と runtime image を同じ版へ更新すること。古い host launcher のままでは decomposition の host-agent 実行経路を認識できない場合がある。典型的な更新手順は次の通り。
-  - release image から新しい launcher を導入する: `docker run --rm -v "$PWD/.work/a2o:/out" ghcr.io/wamukat/a2o-engine:0.5.61 a2o host install --output-dir /out/bin --share-dir /out/share`
-  - project の runtime image 参照を `ghcr.io/wamukat/a2o-engine:0.5.61` に更新する
+  - release image から新しい launcher を導入する: `docker run --rm -v "$PWD/.work/a2o:/out" ghcr.io/wamukat/a2o-engine:0.5.63 a2o host install --output-dir /out/bin --share-dir /out/share`
+  - project の runtime image 参照を `ghcr.io/wamukat/a2o-engine:0.5.63` に更新する
   - decomposition command を実行する前に、新しい image で runtime container を再起動する
-- 0.5.61 の decomposition 監視改善を使うには、host launcher と runtime image の両方を更新する必要がある。古い host launcher は 0.5.61 より前の decomposition log fallback 表示のままであり、古い runtime image は `decomposition_propose.log` など action 別 decomposition live log を書き出さない。
+- 0.5.63 の decomposition 監視改善を使うには、host launcher と runtime image の両方を更新する必要がある。古い host launcher は 0.5.63 より前の decomposition log fallback 表示のままであり、古い runtime image は `decomposition_propose.log` など action 別 decomposition live log を書き出さない。
 - decomposition source ticket を使う外部 Kanbalone 環境は Kanbalone v0.9.28 以降への更新を推奨する。A2O は requirement source ticket から generated implementation work へ `related` relation を書き込み、imported source の provenance には v0.9.28 の `externalReferences` を使う。古い外部 Kanbalone では完全な surface が提供されない。
 - `docs.surfaces` を採用する project package は、各 surface の `repoSlot` が repo source として設定されていること、および cross-repo `docs.authorities.*.repoSlot` が source-of-truth file を持つ repo を指していることを確認する。既存の単一 docs surface package には移行作業は不要である。
+- `runtime.delivery.mode: remote_branch` を使う場合は、host launcher / shared assets と runtime image を同じ版へ更新したうえで、`project.yaml` に `runtime.delivery.remote`、`base_branch`、必要に応じて `branch_prefix` / `after_push.command` を追加する。`after_push.command` は repo source root から実行されるため、PATH 上のコマンド、絶対パス、または source-root-relative path を使う。
 
 ## 検証範囲
 

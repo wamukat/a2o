@@ -1,6 +1,6 @@
-# A2O 0.5.61 Current Release Surface
+# A2O 0.5.63 Current Release Surface
 
-This document describes the currently supported A2O 0.5.61 user surface and validation boundary.
+This document describes the currently supported A2O 0.5.63 user surface and validation boundary.
 
 Use it to confirm which features can be documented for users and what can be treated as validated at this release. For setup steps, read [10-quickstart.md](10-quickstart.md). For configuration fields, read [90-project-package-schema.md](90-project-package-schema.md).
 
@@ -44,16 +44,19 @@ Use it to confirm which features can be documented for users and what can be tre
 - Prompt diagnostics and evidence expose ordered `project_prompt.repo_slots`; the legacy singular `repo_slot` field is populated only for single-slot tasks.
 - Prompt preview supports multi-repo composition with repeatable or comma-separated repo slots, for example `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib A2O#123` or `a2o prompt preview --phase implementation --repo-slot app,lib A2O#123`.
 - Prompts-only implementation and review phases are supported: when `runtime.prompts.phases.<phase>` contains prompt or skill content, `runtime.phases.<phase>.skill` may be omitted and A2O does not emit a no-op `a2o_core_instruction` layer for that phase.
+- Remote-branch delivery mode: `runtime.delivery.mode: remote_branch` publishes completed parent or single-task work to a provider-neutral task branch on a configured remote instead of directly updating the local live branch.
+- Remote-branch merge/push records remote, branch, pushed ref, pushed commit, and push status in merge evidence; existing remote task branches are used as the rerun bootstrap and non-fast-forward pushes are refused.
+- Optional `runtime.delivery.after_push.command` runs after a successful remote branch push with a JSON event on stdin. The hook is project-owned and is the place for provider-specific PR/MR or notification automation.
 - Project runtime tuning fields for agent server connectivity: `runtime.agent_control_plane_connect_timeout`, `runtime.agent_control_plane_request_timeout`, `runtime.agent_control_plane_retry_count`, `runtime.agent_control_plane_retry_delay`
 - Optional child/single review gate fields: `runtime.review_gate.child`, `runtime.review_gate.single`, `runtime.review_gate.skip_labels`, `runtime.review_gate.require_labels`
 - External Kanbalone bootstrap fields: `--kanban-mode external`, `--kanban-url`, `--kanban-runtime-url`
 - Runtime CLI overrides for agent server connectivity: `--agent-control-plane-connect-timeout`, `--agent-control-plane-request-timeout`, `--agent-control-plane-retries`, `--agent-control-plane-retry-delay`
 - Host agent CLI and runtime profile fields for agent server connectivity: `--control-plane-connect-timeout`, `--control-plane-request-timeout`, `--control-plane-retries`, `--control-plane-retry-delay`, `control_plane_connect_timeout`, `control_plane_request_timeout`, `control_plane_retry_count`, `control_plane_retry_delay`
-- Kanbalone adapter and bootstrap tooling, defaulting to Kanbalone `v0.9.28`
+- Kanbalone adapter and bootstrap tooling, defaulting to Kanbalone `v0.9.31`
 - Agent HTTP worker gateway, including claimed-job heartbeats
 - Agent-materialized workspace mode
 - Reference product packages for TypeScript, Go, Python, and multi-repo task templates
-- GHCR runtime image tags: `latest`, `0.5.61`, and `sha-*`
+- GHCR runtime image tags: `latest`, `0.5.63`, and `sha-*`
 - Tag releases also publish `latest`, so the released version tag and `latest` are expected to point to the same runtime image after release publication finishes.
 - Local release gate: full RSpec suite, release package doctor, local RC host smoke, and real-task local RC smoke for runtime execution / worker launcher / scheduler / Kanban / env generation changes
 
@@ -62,19 +65,20 @@ Use it to confirm which features can be documented for users and what can be tre
 - Project packages that already define `runtime.prompts.repoSlots` should audit multi-repo tasks before upgrading. Multi-repo tasks receive every repo-slot addon in the task `repo_slots` / `edit_scope` order; earlier releases only applied a singular repo-slot layer. If slot-specific instructions conflict or become too broad when combined, split the work into repo-slot child tasks or adjust the package prompts. Use `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib <task-ref>` before running workers to inspect the composed instruction.
 - Project packages that use no-op `runtime.phases.implementation.skill` or `runtime.phases.review.skill` stubs only to satisfy validation may remove those stubs after defining the matching `runtime.prompts.phases.<phase>` prompt or skills. A system prompt alone is not enough; `a2o project validate` still fails with `runtime.phases.<phase>.skill must be provided` when neither a phase skill nor a matching phase prompt/skill exists.
 - `a2o runtime start` and `a2o runtime stop` are no longer compatibility aliases. Use `a2o runtime resume` to resume the resident scheduler and `a2o runtime pause` to pause it after the current work. If the removed commands are invoked, A2O exits non-zero and prints `migration_required=true` with the replacement command.
-- Custom workers must return `review_disposition.slot_scopes` as the review disposition scope field. `review_disposition.repo_scope` is not accepted in 0.5.61 worker results; migrate values such as `"repo_alpha"` to `slot_scopes: ["repo_alpha"]`, and multi-repo findings to all affected slot names. Validate saved worker results with `a2o worker validate-result --request request.json --result result.json --review-slot-scope <slot>`.
+- Custom workers must return `review_disposition.slot_scopes` as the review disposition scope field. `review_disposition.repo_scope` is not accepted in 0.5.63 worker results; migrate values such as `"repo_alpha"` to `slot_scopes: ["repo_alpha"]`, and multi-repo findings to all affected slot names. Validate saved worker results with `a2o worker validate-result --request request.json --result result.json --review-slot-scope <slot>`.
 - SoloBoard-era Kanbalone compatibility names are removed. Use `KANBAN_BACKEND=kanbalone`, `KANBALONE_BASE_URL`, `KANBALONE_API_TOKEN`, `--kanbalone-port`, `A2O_BUNDLE_KANBALONE_PORT`, and `A2O_KANBALONE_INTERNAL_URL`. Removed SoloBoard inputs fail with `migration_required=true` and the replacement name.
 - Bundled Kanbalone data names changed from `<compose-project>_soloboard-data` / `soloboard.sqlite` to `<compose-project>_kanbalone-data` / `kanbalone.sqlite`. If the old volume exists and the new one does not, `a2o kanban up` fails with `migration_required=true` instead of silently creating an empty board. Copy or rename the existing Kanban data before starting the bundled service.
 - Public `A3_*` environment fallbacks for runtime, agent, worker, and root utility configuration are removed where `A2O_*` replacements exist. Use `A2O_RUNTIME_IMAGE`, `A2O_COMPOSE_PROJECT`, `A2O_COMPOSE_FILE`, `A2O_RUNTIME_SERVICE`, `A2O_BUNDLE_AGENT_PORT`, `A2O_BUNDLE_STORAGE_DIR`, `A2O_AGENT_PACKAGE_DIR`, `A2O_AGENT_TOKEN`, `A2O_AGENT_TOKEN_FILE`, `A2O_AGENT_CONTROL_TOKEN`, `A2O_AGENT_CONTROL_TOKEN_FILE`, `A2O_AGENT_*`, `A2O_WORKER_*`, `A2O_WORKSPACE_ROOT`, `A2O_ROOT_DIR`, and `A2O_ROOT_*` root utility controls. Removed `A3_*` inputs fail with `migration_required=true` and the replacement name.
 - `worker-runs.json` is no longer an activity state source. Operator diagnostics, cleanup, rerun readiness, reconcile, and watch-summary use `agent_jobs.json`; leftover `worker-runs.json` is reported with `migration_required=true`.
 - Public agent package and host launcher artifacts use `a2o-agent` / `a2o` names. Release archives are named `a2o-agent-<version>-<os>-<arch>.tar.gz`, archives contain `a2o-agent`, host install writes `a2o` and `a2o-<os>-<arch>` only, shell installers remove stale `a3*` files from their install directory, and old package/cache environment names fail with `migration_required=true`. Runtime-image `a3 agent package ...` also fails with `migration_required=true`; use `a2o agent package ...`.
 - Decomposition command execution now depends on the host launcher and packaged host agent. Upgrade the host launcher/shared assets and runtime image together before using `a2o runtime decomposition investigate`, `propose`, or `review`; otherwise an older host launcher may not recognize the decomposition host-agent command path. A typical upgrade is:
-  - install the new launcher from the release image: `docker run --rm -v "$PWD/.work/a2o:/out" ghcr.io/wamukat/a2o-engine:0.5.61 a2o host install --output-dir /out/bin --share-dir /out/share`
-  - update project runtime image references to `ghcr.io/wamukat/a2o-engine:0.5.61`
+  - install the new launcher from the release image: `docker run --rm -v "$PWD/.work/a2o:/out" ghcr.io/wamukat/a2o-engine:0.5.63 a2o host install --output-dir /out/bin --share-dir /out/share`
+  - update project runtime image references to `ghcr.io/wamukat/a2o-engine:0.5.63`
   - restart the runtime container with the new image before running decomposition commands.
-- Decomposition observability improvements in 0.5.61 require updating both the host launcher and runtime image. Older host launchers still print the pre-0.5.61 decomposition log fallback behavior, and older runtime images do not write action-specific decomposition live logs such as `decomposition_propose.log`.
+- Decomposition observability improvements in 0.5.63 require updating both the host launcher and runtime image. Older host launchers still print the pre-0.5.63 decomposition log fallback behavior, and older runtime images do not write action-specific decomposition live logs such as `decomposition_propose.log`.
 - External Kanbalone deployments used with decomposition source tickets should run Kanbalone v0.9.28 or newer. A2O writes `related` relations from the requirement source ticket to the generated implementation work and uses v0.9.28 `externalReferences` for imported-source provenance; older external Kanbalone versions do not provide the complete surface.
 - Project packages that adopt `docs.surfaces` should validate that every surface `repoSlot` is backed by a configured repo source and that every cross-repo `docs.authorities.*.repoSlot` points at the repo containing the source-of-truth file. No migration is required for existing single-surface `docs` packages.
+- To use `runtime.delivery.mode: remote_branch`, update the host launcher/shared assets and runtime image together, then add `runtime.delivery.remote`, `base_branch`, and optional `branch_prefix` / `after_push.command` to `project.yaml`. The `after_push.command` runs from the repo source root; use a PATH command, absolute path, or source-root-relative path.
 
 ## Validation Scope
 
