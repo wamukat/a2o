@@ -34,13 +34,9 @@ An A2O release is not complete until all of the following are true:
      - run `VERSION=<version> agent-go/scripts/validation-local-rc-smoke.sh`
      - record the local image ID, smoke output, and any expected local-only digest limitations on the release ticket
    - The local RC smoke must exercise the installed host launcher, not only direct Ruby/runtime internals. It should catch project package validation drift, local image diagnostics, agent package export/install, and user-facing runtime commands before GHCR publish.
-   - For any release that changes runtime execution, worker launcher config, scheduler selection, Kanban integration, or agent env/config generation, also run a real-task local RC smoke before tagging. This smoke must:
-     - provision Kanbalone through `a2o kanban up` so lanes use the same display names A2O expects
-     - create a task in the configured runnable lane with the repo label and `trigger:auto-implement`
-     - run `a2o runtime watch-summary` and confirm the task is visible before execution
-     - run `a2o runtime run-once` against the local RC image with the installed host launcher
-     - use an executor that writes a valid worker result to `{{result_path}}`; implementation success must include `changed_files` and a non-empty `review_disposition.finding_key`
-     - confirm the task reaches a terminal successful state such as `Done` / `status=done`, and confirm no removed runtime surface such as `A3_WORKSPACE_ROOT`, `A3_ROOT_DIR`, `A3_REPO_ROOT`, or `A3_BUNDLE` appears in the smoke logs
+   - For any release that changes runtime execution, worker launcher config, scheduler selection, Kanban integration, or agent env/config generation, also run the real-task local RC smoke before tagging:
+     - `VERSION=<version> IMAGE=ghcr.io/wamukat/a2o-engine:<version>-local agent-go/scripts/validation-real-task-rc-smoke.sh`
+     - The script provisions Kanbalone through `a2o kanban up`, creates a runnable task with the repo label and `trigger:auto-implement`, checks `a2o runtime watch-summary`, runs `a2o runtime run-once` with the installed host launcher, verifies implementation / verification / merge reach `Done`, and fails if removed runtime surfaces such as `A3_WORKSPACE_ROOT`, `A3_ROOT_DIR`, `A3_REPO_ROOT`, or `A3_BUNDLE` appear in smoke logs.
    - Do not treat `validation-local-rc-smoke.sh` alone as sufficient for execution-path changes; it uses `run-once --max-steps 0` and does not launch an actual task worker.
    - For release-reference-only changes, verify with targeted commands such as version specs, CLI specs, `git diff --check`, and stale-version searches; do not rerun the full suite after every small follow-up unless behavior changed or the previous full-suite result is stale.
    - Run the full suite once before tagging when the release candidate includes behavior changes or accumulated unreleased work warrants it. If a later review fix only touches release metadata, release bookkeeping constants that do not affect build/publish/runtime behavior, docs, or CLI help text, repeat only the focused checks that cover that fix.

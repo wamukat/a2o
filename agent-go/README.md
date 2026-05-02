@@ -54,6 +54,14 @@ The smoke exports the host launcher from the local image, creates a temporary pr
 
 `validation-local-rc-smoke.sh` intentionally runs `runtime run-once --max-steps 0`, so it verifies the installed host launcher path but does not launch a task worker. For releases that change runtime execution, worker launcher config, scheduler selection, Kanban integration, or agent env/config generation, also run a real-task local RC smoke before tagging: provision Kanbalone with `a2o kanban up`, create a runnable task with the repo label and `trigger:auto-implement`, confirm it appears in `a2o runtime watch-summary`, run `a2o runtime run-once` against the local RC image, and confirm the task reaches `Done`. The smoke worker must write a valid result to `{{result_path}}`; implementation success includes `changed_files` and a non-empty `review_disposition.finding_key`.
 
+The reusable real-task smoke automates that release gate:
+
+```bash
+VERSION=0.5.63 IMAGE=ghcr.io/wamukat/a2o-engine:0.5.63-local ./scripts/validation-real-task-rc-smoke.sh
+```
+
+It installs the host launcher from the local RC image, bootstraps an isolated minimal project and Kanbalone instance, checks `watch-summary`, runs a real implementation / verification / merge task through `runtime run-once`, verifies the task reaches `Done`, and fails if removed A3 runtime surfaces appear in the smoke logs.
+
 `package-compatibility.json` is the package-set contract for both embedded runtime-image packages and future external package publication. The current contract is exact-version compatibility: the runtime consuming the package set and the package set itself must report the same A2O version.
 
 `package-publication.json` defines the publication surface for external package distribution. It is emitted only when `PACKAGE_ARCHIVES=1`. The current publication contract uses:
