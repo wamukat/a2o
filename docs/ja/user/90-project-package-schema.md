@@ -136,6 +136,32 @@ task_templates:
 
 `runtime.review_gate.skip_labels` と `runtime.review_gate.require_labels` は任意のカンバンラベル名配列である。`require_labels` は task kind の既定値が `false` でも一致タスクの review gate を有効にする。`skip_labels` は task kind の既定値が `true` でも一致タスクの review gate を無効にする。両方に一致した場合は `skip_labels` を優先する。
 
+`runtime.delivery` は任意である。省略時、A2O は `local_merge` を使い、merge phase は設定された local target ref を更新する。
+
+A2O が完了した親タスクまたは単独タスクの成果を、local の本流ブランチへ直接反映せず、provider 非依存の remote branch として公開する場合は `runtime.delivery.mode: remote_branch` を使う。
+
+```yaml
+runtime:
+  delivery:
+    mode: remote_branch
+    remote: origin
+    base_branch: main
+    branch_prefix: a2o/
+    push: true
+    sync:
+      before_start: fetch
+      before_resume: fetch
+      before_push: fetch
+      integrate_base: none
+      conflict_policy: stop
+    after_push:
+      command: [after-push-remote-branch]
+```
+
+`remote_branch` では `remote` と `base_branch` が必須である。`branch_prefix` の既定値は `a2o/` である。A2O はタスク ref から `refs/heads/a2o/A2O-286` のような delivery branch を導出し、remote を fetch し、その task branch に merge して configured remote へ push する。remote 側に同じ task branch が既に存在する場合、rerun はその remote branch を起点にする。non-fast-forward push は拒否する。
+
+`after_push.command` は任意である。push 成功後に、repo source root を current working directory として実行される。`PATH` で解決できるコマンド、絶対パス、または各 repo source root からの相対パスを使う。project package directory からの相対パスとして解決されるとは考えない。A2O は stdin に JSON event を渡す。event には `task_ref`, `external_task_id`, `remote_issue`, `base_branch`, `remote`, `branch`, `pushed_ref`, `commit`, `slot`, merge refs が含まれる。hook が失敗した場合は merge phase を失敗扱いにし、hook log を merge diagnostics に残す。A2O core は provider の pull request / merge request 作成、merge、remote issue close を行わない。provider 固有の自動化は hook に置く。
+
 `kanban` はボード名、プロジェクトが所有するラベル、タスク選択条件を持つ。カンバンの接続先は `a2o project bootstrap` で作るランタイムインスタンス側の設定であり、作成者向けの `project.yaml` 設定ではない。A2O が管理するレーンと内部調整ラベルはランタイム実装の詳細であり、通常のパッケージスキーマには書かせない。
 
 複数リポジトリの親タスクには、対象リポジトリラベルをすべて付ける。「全リポジトリ」や「両方」を意味する合成ラベルは作らない。合成ラベルは 2 リポジトリを超える構成に拡張できず、リポジトリスロットと直接対応しない。

@@ -84,3 +84,7 @@ A2O は利用者に見えるブランチ参照を `refs/heads/a2o/...` 配下へ
 - 単独タスクから本流ターゲット
 
 マージ方針はプロジェクトパッケージの一部である。パッケージが別方針を明示しない限り、既定の方針は fast-forward only である。
+
+Remote-branch delivery でも、最終的な親タスクまたは単独タスクの merge までは同じ内部 merge topology を使う。その境界で、A2O は `runtime.delivery.branch_prefix` と task ref から task branch を導出し、configured remote を fetch する。remote 側に既存 task branch があればそこを起点にし、なければ `refs/remotes/<remote>/<base_branch>` を起点にする。その上で A2O source ref を merge し、non-fast-forward remote update を拒否し、`refs/heads/<derived-task-branch>` を push する。
+
+任意の `after_push` hook は project-owned な拡張点である。A2O は stdin に JSON event を渡し、hook status / log evidence を記録する。ただし provider 固有の PR/MR 作成や remote issue 状態更新は A2O core の外側に置く。

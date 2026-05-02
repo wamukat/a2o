@@ -95,6 +95,8 @@ A2O derives parent and child task kind from the `subtask` relation. Do not add `
 
 Users configure merge policy and the live target ref. Users do not configure `merge_to_parent` or `merge_to_live`; A2O derives child-to-parent and parent-to-live behavior from the parent-child topology.
 
+With `runtime.delivery.mode: remote_branch`, child tasks still merge to the parent integration branch. The parent task remains the final integration gate. After parent review and verification, the parent merge publishes a task branch such as `refs/heads/a2o/<parent-ref>` to the configured remote instead of treating provider PR/MR creation as an A2O core responsibility. Human operators or project hooks then decide how that remote branch becomes a provider pull request or merge request.
+
 ## Inspecting Progress
 
 Use the runtime summary to see the active phase and result.

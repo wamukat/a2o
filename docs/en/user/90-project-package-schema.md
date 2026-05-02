@@ -120,6 +120,32 @@ runtime:
 
 `runtime.review_gate.skip_labels` and `runtime.review_gate.require_labels` are optional arrays of kanban label names. `require_labels` forces the review gate on for matching tasks even when the task-kind default is `false`; `skip_labels` forces it off for matching tasks even when the task-kind default is `true`. If both lists match the same task, `skip_labels` takes precedence.
 
+`runtime.delivery` is optional. When omitted, A2O uses `local_merge` and the merge phase updates the configured local target ref.
+
+Use `runtime.delivery.mode: remote_branch` when A2O should publish completed parent or single-task work to a provider-neutral remote branch instead of directly updating the live branch locally:
+
+```yaml
+runtime:
+  delivery:
+    mode: remote_branch
+    remote: origin
+    base_branch: main
+    branch_prefix: a2o/
+    push: true
+    sync:
+      before_start: fetch
+      before_resume: fetch
+      before_push: fetch
+      integrate_base: none
+      conflict_policy: stop
+    after_push:
+      command: [after-push-remote-branch]
+```
+
+For `remote_branch`, `remote` and `base_branch` are required. `branch_prefix` defaults to `a2o/`. A2O derives the final branch from the task ref, for example `refs/heads/a2o/A2O-286`, fetches the remote, merges into that task branch, and pushes it to the configured remote. If the remote task branch already exists, A2O bootstraps from that remote branch so reruns update the same delivery branch. A2O refuses non-fast-forward pushes.
+
+`after_push.command` is optional. It runs after a successful push with the repo source root as the current working directory. Prefer a command available on `PATH`, an absolute path, or a path relative to each repo source root; do not assume paths are relative to the project package directory. A2O writes a JSON event to stdin containing `task_ref`, `external_task_id`, `remote_issue`, `base_branch`, `remote`, `branch`, `pushed_ref`, `commit`, `slot`, and merge refs. Hook failure fails the merge phase and records the hook log in merge diagnostics. A2O core does not create provider pull requests, merge requests, merge commits, or close remote issues; use the hook for project-specific provider automation.
+
 Project-specific human labels can be declared in `kanban.labels`. A2O-owned trigger and internal coordination labels are not user-authored.
 
 For multi-repo parent tasks, add every affected repo label to the kanban task. Do not create aggregate labels that mean "all repos" or "both repos"; aggregate labels do not scale beyond two repositories and do not map directly to repo slots.

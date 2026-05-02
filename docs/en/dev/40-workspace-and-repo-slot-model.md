@@ -84,3 +84,7 @@ Internal merge targets:
 - single task to live target
 
 Merge policy is part of the project package. The default policy is fast-forward only unless the package explicitly declares another policy.
+
+Remote-branch delivery keeps the same internal merge topology until the final parent or single-task merge. At that boundary, A2O derives a task branch from `runtime.delivery.branch_prefix` and the task ref, fetches the configured remote, bootstraps from an existing remote task branch when present, otherwise bootstraps from `refs/remotes/<remote>/<base_branch>`, merges the A2O source ref, refuses non-fast-forward remote updates, and pushes `refs/heads/<derived-task-branch>`.
+
+The optional `after_push` hook is a project-owned extension point. A2O passes a JSON event on stdin and records hook status/log evidence, but provider-specific PR/MR creation and remote issue state remain outside A2O core.

@@ -97,6 +97,8 @@ A2O は `subtask` の関連から親 / 子のタスク種別を判断する。`k
 
 利用者が設定するのはマージ方針と本流のターゲット参照である。`merge_to_parent` や `merge_to_live` は利用者が設定しない。A2O は親子タスクの構造から、子タスクから親タスクへのマージと、親タスクから本流へのマージを導出する。
 
+`runtime.delivery.mode: remote_branch` を使う場合も、子タスクは親タスクの統合ブランチへマージされる。親タスクは最終統合ゲートのままである。親レビューと検証が完了した後、親タスクの merge は provider の PR/MR 作成を A2O core の責務にせず、`refs/heads/a2o/<parent-ref>` のような task branch を configured remote へ push する。その remote branch を pull request / merge request にするかどうかは、人間または project hook が判断する。
+
 ## 進行状況の確認
 
 進行状況はランタイムの要約で確認する。
