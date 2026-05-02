@@ -1179,6 +1179,13 @@ func TestWorkerPayloadRejectsInvalidParentReviewDisposition(t *testing.T) {
 			expected: "review_disposition.kind must be completed when success is true for parent review",
 		},
 		{
+			name: "legacy repo_scope",
+			mutate: func(payload map[string]any) {
+				payload["review_disposition"].(map[string]any)["repo_scope"] = "repo_alpha"
+			},
+			expected: "review_disposition.repo_scope is not supported; use review_disposition.slot_scopes",
+		},
+		{
 			name: "invalid kind",
 			mutate: func(payload map[string]any) {
 				payload["review_disposition"].(map[string]any)["kind"] = "done"

@@ -7,6 +7,7 @@ require "open3"
 require "pathname"
 require "tmpdir"
 require "a3/domain/refactoring_assessment"
+require "a3/domain/repo_scope_compatibility"
 require_relative "decomposition_workspace_permissions"
 
 module A3
@@ -181,15 +182,11 @@ module A3
       end
 
       def decomposition_prompt_repo_slots(task)
-        task_slots = task.respond_to?(:repo_slots) ? Array(task.repo_slots).map(&:to_s).reject(&:empty?) : []
-        return task_slots unless task_slots.empty?
-        return [] if task.edit_scope.empty?
-
-        repo_scope = task.repo_scope_key.to_s
-        return [] if repo_scope.empty?
-        return [repo_scope] unless repo_scope == "both"
-
-        task.edit_scope.map(&:to_s).reject(&:empty?).uniq
+        A3::Domain::RepoScopeCompatibility.prompt_slots(
+          repo_scope: task.edit_scope.empty? ? nil : task.repo_scope_key,
+          repo_slots: task.respond_to?(:repo_slots) ? task.repo_slots : [],
+          fallback_slots: task.edit_scope
+        )
       end
 
       def prompt_layer(kind, title, content)

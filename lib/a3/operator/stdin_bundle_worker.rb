@@ -5,6 +5,7 @@ require "pathname"
 require "tempfile"
 require "open3"
 require "thread"
+require_relative "../domain/repo_scope_compatibility"
 require_relative "../domain/refactoring_assessment"
 require_relative "../domain/skill_feedback"
 
@@ -598,7 +599,9 @@ def validate_payload(payload, request:)
     %w[kind summary description finding_key].each do |key|
       errors << "review_disposition.#{key} must be a string" unless disposition[key].is_a?(String)
     end
-    errors << "review_disposition.repo_scope is not supported; use review_disposition.slot_scopes" if disposition.key?("repo_scope")
+    if disposition.key?(A3::Domain::RepoScopeCompatibility::LEGACY_REPO_SCOPE_FIELD)
+      errors << A3::Domain::RepoScopeCompatibility::REMOVED_REVIEW_DISPOSITION_REPO_SCOPE_ERROR
+    end
     slot_scope_errors = validate_review_disposition_slot_scopes(disposition["slot_scopes"])
     errors.concat(slot_scope_errors)
     if parent_review

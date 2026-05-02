@@ -10,6 +10,11 @@ import (
 	"strings"
 )
 
+// Keep this compatibility diagnostic aligned with the Ruby worker protocol and
+// bundled stdin worker. The canonical review disposition scope field is
+// review_disposition.slot_scopes; review_disposition.repo_scope is rejected.
+const removedReviewDispositionRepoScopeError = "review_disposition.repo_scope is not supported; use review_disposition.slot_scopes"
+
 func runWorker(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "missing worker subcommand")
@@ -276,7 +281,7 @@ func validatePublicWorkerPayload(payload map[string]any, request map[string]any,
 				}
 			}
 			if _, ok := disposition["repo_scope"]; ok {
-				errors = append(errors, "review_disposition.repo_scope is not supported; use review_disposition.slot_scopes")
+				errors = append(errors, removedReviewDispositionRepoScopeError)
 			}
 			errors = append(errors, validatePublicReviewDispositionSlotScopes(disposition["slot_scopes"])...)
 			errors = append(errors, validateReviewDisposition(disposition, request, options)...)

@@ -5,6 +5,7 @@ require "digest"
 require "fileutils"
 require "open3"
 require "a3/domain/refactoring_assessment"
+require "a3/domain/repo_scope_compatibility"
 require "a3/domain/skill_feedback"
 
 module A3
@@ -259,14 +260,11 @@ module A3
       end
 
       def repo_prompt_slots(phase_runtime, task_packet)
-        runtime_slots = phase_runtime.respond_to?(:repo_slots) ? Array(phase_runtime.repo_slots).map(&:to_s).reject(&:empty?) : []
-        return runtime_slots unless runtime_slots.empty?
-
-        repo_scope = phase_runtime.repo_scope.to_s
-        return [] if repo_scope.empty?
-        return [repo_scope] unless repo_scope == "both"
-
-        Array(task_packet.edit_scope).map(&:to_s).reject(&:empty?).uniq
+        A3::Domain::RepoScopeCompatibility.prompt_slots(
+          repo_scope: phase_runtime.repo_scope,
+          repo_slots: phase_runtime.respond_to?(:repo_slots) ? phase_runtime.repo_slots : [],
+          fallback_slots: task_packet.edit_scope
+        )
       end
 
       def prompt_layer(kind, title, content)
@@ -517,7 +515,9 @@ module A3
           %w[kind summary description finding_key].each do |key|
             errors << "review_disposition.#{key} must be present" unless disposition[key].is_a?(String)
           end
-          errors << "review_disposition.repo_scope is not supported; use review_disposition.slot_scopes" if disposition.key?("repo_scope")
+          if disposition.key?(A3::Domain::RepoScopeCompatibility::LEGACY_REPO_SCOPE_FIELD)
+            errors << A3::Domain::RepoScopeCompatibility::REMOVED_REVIEW_DISPOSITION_REPO_SCOPE_ERROR
+          end
           slot_scope_errors = validate_review_disposition_slot_scopes(disposition["slot_scopes"])
           errors.concat(slot_scope_errors)
           if parent_review

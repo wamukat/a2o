@@ -1838,6 +1838,7 @@ func TestWorkerValidateResultRejectsRuntimeProtocolShapeMismatches(t *testing.T)
 		"review_disposition": map[string]any{
 			"kind":        "follow_up_child",
 			"slot_scopes": []string{"all"},
+			"repo_scope":  "app",
 			"summary":     "bad disposition",
 			"description": "bad disposition",
 			"finding_key": "bad-disposition",
@@ -1857,6 +1858,7 @@ func TestWorkerValidateResultRejectsRuntimeProtocolShapeMismatches(t *testing.T)
 		"worker_protocol_error=observed_state must be a string or null when success is true",
 		"worker_protocol_error=diagnostics must be an object",
 		"worker_protocol_error=changed_files for app must be an array of strings",
+		"worker_protocol_error=review_disposition.repo_scope is not supported; use review_disposition.slot_scopes",
 		"worker_protocol_error=review_disposition.kind must be completed for implementation evidence",
 		"worker_protocol_error=review_disposition.slot_scopes must be one of app",
 	} {

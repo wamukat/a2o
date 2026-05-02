@@ -22,6 +22,11 @@ type executorProfile struct {
 const maxWorkerResultCorrectionAttempts = 2
 const maxInvalidWorkerResultSalvageArtifacts = 5
 
+// Keep this compatibility diagnostic aligned with the host worker validator and
+// Ruby worker protocol. The canonical review disposition scope field is
+// review_disposition.slot_scopes; review_disposition.repo_scope is rejected.
+const removedReviewDispositionRepoScopeError = "review_disposition.repo_scope is not supported; use review_disposition.slot_scopes"
+
 func envPublic(publicName string) string {
 	return strings.TrimSpace(os.Getenv(publicName))
 }
@@ -946,7 +951,7 @@ func validateWorkerPayload(payload map[string]any, request map[string]any) []str
 				}
 			}
 			if _, ok := disposition["repo_scope"]; ok {
-				errors = append(errors, "review_disposition.repo_scope is not supported; use review_disposition.slot_scopes")
+				errors = append(errors, removedReviewDispositionRepoScopeError)
 			}
 			errors = append(errors, validateWorkerReviewDispositionSlotScopes(disposition["slot_scopes"])...)
 			errors = append(errors, validateWorkerReviewDisposition(disposition, request, success)...)
