@@ -803,6 +803,31 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
+  it "keeps shared worker protocol fixture cases aligned with public validators" do
+    worker_protocol_fixture_cases.each do |test_case|
+      request = test_case.fetch("request")
+      result = described_class.new.build_execution_result(
+        test_case.fetch("result"),
+        workspace: workspace,
+        expected_task_ref: request.fetch("task_ref"),
+        expected_run_ref: request.fetch("run_ref"),
+        expected_phase: request.fetch("phase").to_sym,
+        expected_task_kind: request.fetch("phase_runtime", {})["task_kind"]&.to_sym,
+        canonical_changed_files: test_case.fetch("result")["changed_files"]
+      )
+
+      if test_case.fetch("valid")
+        expect(result.summary).not_to eq("worker result schema invalid"), test_case.fetch("name")
+        expect(result.diagnostics.fetch("validation_errors", [])).to be_empty, test_case.fetch("name")
+      else
+        expect(result.summary).to eq("worker result schema invalid"), test_case.fetch("name")
+        test_case.fetch("expected_errors").each do |expected_error|
+          expect(result.diagnostics.fetch("validation_errors")).to include(expected_error), test_case.fetch("name")
+        end
+      end
+    end
+  end
+
   it "preserves structured docs-impact worker results" do
     result = described_class.new.build_execution_result(
       {
@@ -1430,6 +1455,10 @@ RSpec.describe A3::Infra::WorkerProtocol do
       absolute_path: File.join(tmpdir, path),
       content: content
     )
+  end
+
+  def worker_protocol_fixture_cases
+    JSON.parse(File.read(File.expand_path("../../../test/fixtures/worker_protocol/cases.json", __dir__)))
   end
 
   def phase_runtime_with_prompt_config(prompt_config, phase: :review, repo_scope: :ui_app, repo_slots: nil, implementation_skill: "task implementation", review_skill: "task review")

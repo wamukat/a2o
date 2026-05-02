@@ -1,0 +1,203 @@
+[
+  {
+    "name": "implementation_success_completed_review_disposition",
+    "description": "Implementation success must include completed review evidence scoped to the edited slot.",
+    "valid": true,
+    "request": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-implementation-1",
+      "phase": "implementation",
+      "slot_paths": {
+        "repo_beta": "/workspace/repo-beta"
+      }
+    },
+    "result": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-implementation-1",
+      "phase": "implementation",
+      "success": true,
+      "summary": "implemented",
+      "failing_command": null,
+      "observed_state": null,
+      "rework_required": false,
+      "changed_files": {
+        "repo_beta": ["lib/example.rb"]
+      },
+      "review_disposition": {
+        "kind": "completed",
+        "slot_scopes": ["repo_beta"],
+        "summary": "self-review clean",
+        "description": "No findings.",
+        "finding_key": "none"
+      }
+    }
+  },
+  {
+    "name": "implementation_success_missing_review_disposition",
+    "description": "Implementation success without review evidence is rejected.",
+    "valid": false,
+    "expected_errors": [
+      "review_disposition must be present for implementation success"
+    ],
+    "request": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-implementation-1",
+      "phase": "implementation",
+      "slot_paths": {
+        "repo_beta": "/workspace/repo-beta"
+      }
+    },
+    "result": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-implementation-1",
+      "phase": "implementation",
+      "success": true,
+      "summary": "implemented",
+      "failing_command": "parent_review",
+      "observed_state": null,
+      "rework_required": false,
+      "changed_files": {
+        "repo_beta": ["lib/example.rb"]
+      }
+    }
+  },
+  {
+    "name": "parent_review_follow_up_child",
+    "description": "Parent review can route code follow-up to a child slot without rework_required.",
+    "valid": true,
+    "request": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-1",
+      "phase": "review",
+      "phase_runtime": {
+        "task_kind": "parent"
+      },
+      "slot_paths": {
+        "repo_beta": "/workspace/repo-beta"
+      }
+    },
+    "result": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-1",
+      "phase": "review",
+      "success": false,
+      "summary": "review found follow-up work",
+      "failing_command": "parent_review",
+      "observed_state": "review_findings",
+      "rework_required": false,
+      "review_disposition": {
+        "kind": "follow_up_child",
+        "slot_scopes": ["repo_beta"],
+        "summary": "add missing coverage",
+        "description": "The child slot needs an additional assertion.",
+        "finding_key": "missing-coverage"
+      }
+    }
+  },
+  {
+    "name": "parent_review_clarification_without_review_disposition",
+    "description": "Parent review can ask the requester a clarification question instead of creating review disposition.",
+    "valid": true,
+    "request": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-1",
+      "phase": "review",
+      "phase_runtime": {
+        "task_kind": "parent"
+      },
+      "slot_paths": {
+        "repo_beta": "/workspace/repo-beta"
+      }
+    },
+    "result": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-1",
+      "phase": "review",
+      "success": false,
+      "summary": "parent review needs requester input",
+      "failing_command": null,
+      "observed_state": null,
+      "rework_required": false,
+      "clarification_request": {
+        "question": "Which child boundary should be used?",
+        "context": "Both decompositions are plausible.",
+        "options": ["Split by API", "Split by UI"],
+        "recommended_option": "Split by API",
+        "impact": "The parent waits for requester input."
+      }
+    }
+  },
+  {
+    "name": "removed_review_disposition_repo_scope",
+    "description": "The removed review_disposition.repo_scope key is rejected even when slot_scopes is valid.",
+    "valid": false,
+    "expected_errors": [
+      "review_disposition.repo_scope is not supported; use review_disposition.slot_scopes"
+    ],
+    "request": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-implementation-1",
+      "phase": "implementation",
+      "slot_paths": {
+        "repo_beta": "/workspace/repo-beta"
+      }
+    },
+    "result": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-implementation-1",
+      "phase": "implementation",
+      "success": true,
+      "summary": "implemented",
+      "failing_command": null,
+      "observed_state": null,
+      "rework_required": false,
+      "changed_files": {
+        "repo_beta": ["lib/example.rb"]
+      },
+      "review_disposition": {
+        "kind": "completed",
+        "slot_scopes": ["repo_beta"],
+        "repo_scope": "repo_beta",
+        "summary": "self-review clean",
+        "description": "No findings.",
+        "finding_key": "none"
+      }
+    }
+  },
+  {
+    "name": "invalid_review_disposition_slot_scope",
+    "description": "Review disposition slot scopes must use configured request slots.",
+    "valid": false,
+    "expected_errors": [
+      "review_disposition.slot_scopes must be one of repo_beta"
+    ],
+    "request": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-implementation-1",
+      "phase": "implementation",
+      "slot_paths": {
+        "repo_beta": "/workspace/repo-beta"
+      }
+    },
+    "result": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-implementation-1",
+      "phase": "implementation",
+      "success": true,
+      "summary": "implemented",
+      "failing_command": null,
+      "observed_state": null,
+      "rework_required": false,
+      "changed_files": {
+        "repo_beta": ["lib/example.rb"]
+      },
+      "review_disposition": {
+        "kind": "completed",
+        "slot_scopes": ["repo_alpha"],
+        "summary": "self-review clean",
+        "description": "No findings.",
+        "finding_key": "none"
+      }
+    }
+  }
+]

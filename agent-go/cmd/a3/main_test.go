@@ -1940,6 +1940,25 @@ func TestWorkerValidateResultMatchesRuntimeEmptyStringSemantics(t *testing.T) {
 	}
 }
 
+func TestWorkerPublicValidatorMatchesSharedProtocolFixtures(t *testing.T) {
+	for _, tc := range loadSharedWorkerProtocolCases(t) {
+		t.Run(tc.Name, func(t *testing.T) {
+			errors := validatePublicWorkerPayload(tc.Result, tc.Request, workerValidationOptions{})
+			if tc.Valid {
+				if len(errors) != 0 {
+					t.Fatalf("expected valid shared protocol fixture, got %#v", errors)
+				}
+				return
+			}
+			for _, expected := range tc.ExpectedErrors {
+				if !containsString(errors, expected) {
+					t.Fatalf("expected %q in %#v", expected, errors)
+				}
+			}
+		})
+	}
+}
+
 func TestWorkerValidateResultHonorsConfiguredReviewSlotScopes(t *testing.T) {
 	tempDir := t.TempDir()
 	requestPath := filepath.Join(tempDir, "request.json")
@@ -2036,6 +2055,22 @@ func readJSONFileForTest(t *testing.T, path string, target any) {
 	if err := json.Unmarshal(body, target); err != nil {
 		t.Fatal(err)
 	}
+}
+
+type sharedWorkerProtocolCase struct {
+	Name           string         `json:"name"`
+	Valid          bool           `json:"valid"`
+	ExpectedErrors []string       `json:"expected_errors"`
+	Request        map[string]any `json:"request"`
+	Result         map[string]any `json:"result"`
+}
+
+func loadSharedWorkerProtocolCases(t *testing.T) []sharedWorkerProtocolCase {
+	t.Helper()
+	path := filepath.Join("..", "..", "..", "test", "fixtures", "worker_protocol", "cases.json")
+	var cases []sharedWorkerProtocolCase
+	readJSONFileForTest(t, path, &cases)
+	return cases
 }
 
 func TestProjectTemplateRefusesToOverwriteWithoutForce(t *testing.T) {
