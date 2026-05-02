@@ -35,6 +35,121 @@ RSpec.describe A3::Adapters::ProjectContextLoader do
     expect(context.merge_config.target).to eq(:merge_to_live)
     expect(context.merge_config.policy).to eq(:ff_only)
     expect(context.merge_config.target_ref).to eq("refs/heads/feature/prototype")
+    expect(context.delivery_config).to eq(A3::Domain::DeliveryConfig.local_merge)
+  end
+
+  it "loads remote-branch delivery config" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "delivery" => {
+          "mode" => "remote_branch",
+          "remote" => "origin",
+          "base_branch" => "main",
+          "branch_prefix" => "a2o/",
+          "push" => true,
+          "sync" => {
+            "before_start" => "fetch",
+            "before_resume" => "fetch",
+            "before_push" => "fetch",
+            "integrate_base" => "none",
+            "conflict_policy" => "stop"
+          },
+          "after_push" => {
+            "command" => ["commands/after-push"]
+          }
+        },
+        "phases" => base_phases.merge(
+          "merge" => {
+            "policy" => "ff_only",
+            "target_ref" => "refs/heads/main"
+          }
+        )
+      }
+    )
+
+    context = loader.load(project_config_path)
+
+    expect(context.delivery_config).to have_attributes(
+      mode: :remote_branch,
+      remote: "origin",
+      base_branch: "main",
+      branch_prefix: "a2o/",
+      push: true,
+      after_push_command: ["commands/after-push"]
+    )
+    expect(context.delivery_config.sync).to include(
+      "before_start" => "fetch",
+      "before_resume" => "fetch",
+      "before_push" => "fetch",
+      "integrate_base" => "none",
+      "conflict_policy" => "stop"
+    )
+  end
+
+  it "rejects remote-branch delivery without a remote" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "delivery" => {
+          "mode" => "remote_branch",
+          "base_branch" => "main"
+        },
+        "phases" => base_phases.merge(
+          "merge" => {
+            "policy" => "ff_only",
+            "target_ref" => "refs/heads/main"
+          }
+        )
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.delivery.remote must be provided for remote_branch mode")
+  end
+
+  it "rejects unsupported delivery sync integration" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "delivery" => {
+          "mode" => "remote_branch",
+          "remote" => "origin",
+          "base_branch" => "main",
+          "sync" => {
+            "integrate_base" => "squash"
+          }
+        },
+        "phases" => base_phases.merge(
+          "merge" => {
+            "policy" => "ff_only",
+            "target_ref" => "refs/heads/main"
+          }
+        )
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "unsupported project.yaml runtime.delivery.sync.integrate_base: squash")
+  end
+
+  it "rejects blank remote-branch delivery branch prefix" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "delivery" => {
+          "mode" => "remote_branch",
+          "remote" => "origin",
+          "base_branch" => "main",
+          "branch_prefix" => "   "
+        },
+        "phases" => base_phases.merge(
+          "merge" => {
+            "policy" => "ff_only",
+            "target_ref" => "refs/heads/main"
+          }
+        )
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.delivery.branch_prefix must not be blank")
   end
 
   it "loads optional review gate policy for child and single tasks" do

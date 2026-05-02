@@ -120,6 +120,9 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	if err := validateProjectSchedulerConfig(runtimePayload); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.scheduler: %w", projectFile, err)
 	}
+	if err := validateProjectDeliveryConfig(runtimePayload); err != nil {
+		return config, fmt.Errorf("project package config %s has invalid runtime.delivery: %w", projectFile, err)
+	}
 	if err := validateProjectPromptsConfig(runtimePayload, packagePath, projectRepoNames(payload.Repos)); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.prompts: %w", projectFile, err)
 	}
@@ -345,6 +348,129 @@ func schedulerInteger(value any) (int64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func validateProjectDeliveryConfig(runtimePayload map[string]any) error {
+	rawDelivery, ok := runtimePayload["delivery"]
+	if !ok || rawDelivery == nil {
+		return nil
+	}
+	delivery, ok := normalizeYAMLValue(rawDelivery).(map[string]any)
+	if !ok {
+		return fmt.Errorf("must be a mapping")
+	}
+	mode := scalarString(delivery["mode"])
+	if strings.TrimSpace(mode) == "" {
+		return fmt.Errorf("mode must be provided")
+	}
+	remote, err := projectDeliveryOptionalString(delivery, "remote")
+	if err != nil {
+		return err
+	}
+	baseBranch, err := projectDeliveryOptionalString(delivery, "base_branch")
+	if err != nil {
+		return err
+	}
+	if _, err := projectDeliveryOptionalString(delivery, "branch_prefix"); err != nil {
+		return err
+	}
+	if _, ok := delivery["push"]; ok {
+		if _, ok := delivery["push"].(bool); !ok {
+			return fmt.Errorf("push must be true or false")
+		}
+	}
+	if err := validateProjectDeliverySync(delivery["sync"]); err != nil {
+		return fmt.Errorf("sync.%w", err)
+	}
+	if err := validateProjectDeliveryAfterPush(delivery["after_push"]); err != nil {
+		return err
+	}
+	switch mode {
+	case "local_merge":
+		return nil
+	case "remote_branch":
+	default:
+		return fmt.Errorf("unsupported mode: %s", mode)
+	}
+	if remote == "" {
+		return fmt.Errorf("remote must be provided for remote_branch mode")
+	}
+	if baseBranch == "" {
+		return fmt.Errorf("base_branch must be provided for remote_branch mode")
+	}
+	return nil
+}
+
+func projectDeliveryOptionalString(delivery map[string]any, key string) (string, error) {
+	raw, ok := delivery[key]
+	if !ok || raw == nil {
+		return "", nil
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return "", fmt.Errorf("%s must be a string", key)
+	}
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", fmt.Errorf("%s must not be blank", key)
+	}
+	return trimmed, nil
+}
+
+func validateProjectDeliverySync(rawSync any) error {
+	if rawSync == nil {
+		return nil
+	}
+	sync, ok := normalizeYAMLValue(rawSync).(map[string]any)
+	if !ok {
+		return fmt.Errorf("must be a mapping")
+	}
+	for _, key := range []string{"before_start", "before_resume", "before_push"} {
+		if _, ok := sync[key]; !ok {
+			continue
+		}
+		value := scalarString(sync[key])
+		if strings.TrimSpace(value) == "" {
+			return fmt.Errorf("%s must not be blank", key)
+		}
+		if value != "fetch" {
+			return fmt.Errorf("%s must be fetch", key)
+		}
+	}
+	if _, ok := sync["integrate_base"]; ok {
+		value := scalarString(sync["integrate_base"])
+		if !containsString([]string{"none", "merge", "rebase"}, value) {
+			return fmt.Errorf("integrate_base has unsupported value: %s", value)
+		}
+	}
+	if _, ok := sync["conflict_policy"]; ok {
+		value := scalarString(sync["conflict_policy"])
+		if value != "stop" {
+			return fmt.Errorf("conflict_policy has unsupported value: %s", value)
+		}
+	}
+	return nil
+}
+
+func validateProjectDeliveryAfterPush(rawAfterPush any) error {
+	if rawAfterPush == nil {
+		return nil
+	}
+	afterPush, ok := normalizeYAMLValue(rawAfterPush).(map[string]any)
+	if !ok {
+		return fmt.Errorf("after_push must be a mapping")
+	}
+	rawCommand, ok := normalizeYAMLValue(afterPush["command"]).([]any)
+	if !ok || len(rawCommand) == 0 {
+		return fmt.Errorf("after_push.command must be a non-empty array of strings")
+	}
+	for index, rawPart := range rawCommand {
+		part, ok := rawPart.(string)
+		if !ok || strings.TrimSpace(part) == "" {
+			return fmt.Errorf("after_push.command[%d] must be a non-empty string", index)
+		}
+	}
+	return nil
 }
 
 func validateProjectPromptsConfig(runtimePayload map[string]any, packagePath string, repoNames []string) error {

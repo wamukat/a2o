@@ -4464,6 +4464,78 @@ func TestProjectValidateRejectsInvalidSchedulerMaxParallelTasks(t *testing.T) {
 	}
 }
 
+func TestProjectValidateAcceptsRemoteBranchDeliveryConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	writeSchedulerValidationProjectPackage(t, packageDir, `  delivery:
+    mode: remote_branch
+    remote: origin
+    base_branch: main
+    branch_prefix: a2o/
+    push: true
+    sync:
+      before_start: fetch
+      before_resume: fetch
+      before_push: fetch
+      integrate_base: none
+      conflict_policy: stop
+    after_push:
+      command:
+        - commands/after-push
+`)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project validate should accept remote_branch delivery, code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "lint_check name=project_package status=ok") {
+		t.Fatalf("project validate should report ok, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateRejectsInvalidRemoteBranchDeliveryConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	writeSchedulerValidationProjectPackage(t, packageDir, `  delivery:
+    mode: remote_branch
+    base_branch: main
+`)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject missing remote, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "invalid runtime.delivery") ||
+		!strings.Contains(stdout.String(), "remote must be provided for remote_branch mode") {
+		t.Fatalf("project validate should reject missing remote, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateRejectsNonStringRemoteBranchDeliveryRemote(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	writeSchedulerValidationProjectPackage(t, packageDir, `  delivery:
+    mode: remote_branch
+    remote: 123
+    base_branch: main
+`)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject non-string remote, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "invalid runtime.delivery") ||
+		!strings.Contains(stdout.String(), "remote must be a string") {
+		t.Fatalf("project validate should reject non-string remote, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
 func writeSchedulerValidationProjectPackage(t *testing.T, packageDir string, schedulerYAML string) {
 	t.Helper()
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {

@@ -5,12 +5,13 @@ require "set"
 module A3
   module Domain
     class ProjectContext
-      attr_reader :surface, :merge_config, :review_gate
+      attr_reader :surface, :merge_config, :delivery_config, :review_gate
 
-      def initialize(surface:, merge_config:, merge_config_resolver: nil, review_gate: {})
+      def initialize(surface:, merge_config:, merge_config_resolver: nil, delivery_config: A3::Domain::DeliveryConfig.local_merge, review_gate: {})
         @surface = surface
         @merge_config = merge_config
         @merge_config_resolver = merge_config_resolver
+        @delivery_config = delivery_config || A3::Domain::DeliveryConfig.local_merge
         @review_gate = normalize_review_gate(review_gate)
         freeze
       end

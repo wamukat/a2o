@@ -59,11 +59,33 @@ module A3
           surface: surface,
           merge_config: merge_config_resolver.default_merge_config,
           merge_config_resolver: merge_config_resolver,
+          delivery_config: delivery_config(runtime.fetch("delivery", nil)),
           review_gate: review_gate_config(runtime)
         )
       end
 
       private
+
+      def delivery_config(raw)
+        return A3::Domain::DeliveryConfig.local_merge if raw.nil?
+        unless raw.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.delivery must be a mapping"
+        end
+
+        mode = raw.fetch("mode") do
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.delivery.mode must be provided"
+        end
+        after_push = raw.fetch("after_push", nil)
+        A3::Domain::DeliveryConfig.new(
+          mode: mode,
+          remote: raw.fetch("remote", nil),
+          base_branch: raw.fetch("base_branch", nil),
+          branch_prefix: raw.fetch("branch_prefix", "a2o/"),
+          push: raw.fetch("push", true),
+          sync: raw.fetch("sync", {}),
+          after_push_command: after_push
+        )
+      end
 
       def review_gate_config(runtime)
         gate = runtime.fetch("review_gate", {})
