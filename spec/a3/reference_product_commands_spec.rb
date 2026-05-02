@@ -68,7 +68,7 @@ RSpec.describe "reference product commands" do
       _stdout, stderr, status = Open3.capture3(env, script, chdir: command_dir)
 
       expect(status).to be_success, stderr
-      expect(File.readlines(log_path, chomp: true)).to eq([lib, app])
+      expect(File.readlines(log_path, chomp: true)).to eq([File.realpath(command_dir), lib, app])
     end
   end
 
