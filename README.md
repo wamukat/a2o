@@ -74,16 +74,17 @@ Developer documentation:
 
 1. [docs/en/dev/00-architecture.md](docs/en/dev/00-architecture.md)
 2. [docs/en/dev/10-engineering-rulebook.md](docs/en/dev/10-engineering-rulebook.md)
-3. [docs/en/dev/20-bounded-context-and-language.md](docs/en/dev/20-bounded-context-and-language.md)
-4. [docs/en/dev/30-core-domain-model.md](docs/en/dev/30-core-domain-model.md)
-5. [docs/en/dev/40-workspace-and-repo-slot-model.md](docs/en/dev/40-workspace-and-repo-slot-model.md)
-6. [docs/en/dev/50-project-surface.md](docs/en/dev/50-project-surface.md)
-7. [docs/en/dev/55-project-script-contract.md](docs/en/dev/55-project-script-contract.md)
-8. [docs/en/dev/60-evidence-and-rerun-diagnosis.md](docs/en/dev/60-evidence-and-rerun-diagnosis.md)
-9. [docs/en/dev/70-agent-worker-gateway-design.md](docs/en/dev/70-agent-worker-gateway-design.md)
-10. [docs/en/dev/80-runtime-extension-boundary.md](docs/en/dev/80-runtime-extension-boundary.md)
-11. [docs/en/dev/90-reference-product-suite.md](docs/en/dev/90-reference-product-suite.md)
-12. [docs/en/dev/95-kanban-adapter-boundary.md](docs/en/dev/95-kanban-adapter-boundary.md)
+3. [docs/en/dev/15-test-feedback-loop.md](docs/en/dev/15-test-feedback-loop.md)
+4. [docs/en/dev/20-bounded-context-and-language.md](docs/en/dev/20-bounded-context-and-language.md)
+5. [docs/en/dev/30-core-domain-model.md](docs/en/dev/30-core-domain-model.md)
+6. [docs/en/dev/40-workspace-and-repo-slot-model.md](docs/en/dev/40-workspace-and-repo-slot-model.md)
+7. [docs/en/dev/50-project-surface.md](docs/en/dev/50-project-surface.md)
+8. [docs/en/dev/55-project-script-contract.md](docs/en/dev/55-project-script-contract.md)
+9. [docs/en/dev/60-evidence-and-rerun-diagnosis.md](docs/en/dev/60-evidence-and-rerun-diagnosis.md)
+10. [docs/en/dev/70-agent-worker-gateway-design.md](docs/en/dev/70-agent-worker-gateway-design.md)
+11. [docs/en/dev/80-runtime-extension-boundary.md](docs/en/dev/80-runtime-extension-boundary.md)
+12. [docs/en/dev/90-reference-product-suite.md](docs/en/dev/90-reference-product-suite.md)
+13. [docs/en/dev/95-kanban-adapter-boundary.md](docs/en/dev/95-kanban-adapter-boundary.md)
 
 ## Main Entrypoints
 
