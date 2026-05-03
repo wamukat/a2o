@@ -14,7 +14,7 @@ services:
     restart: unless-stopped
 
   kanbalone:
-    image: ${KANBALONE_IMAGE:-ghcr.io/wamukat/kanbalone:v0.9.31}
+    image: ${KANBALONE_IMAGE:-ghcr.io/wamukat/kanbalone:v0.9.32}
     environment:
       HOST: 0.0.0.0
       PORT: 3000
