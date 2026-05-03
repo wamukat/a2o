@@ -131,7 +131,11 @@ module A3
     end
 
     def install_host_share_assets(share_dir:)
-      source_dir = ENV.fetch("A2O_SHARE_DIR", ENV.fetch("A3_SHARE_DIR", "/opt/a2o/share"))
+      if ENV.key?("A3_SHARE_DIR") && ENV.fetch("A2O_SHARE_DIR", "").to_s.strip.empty?
+        raise A3::Domain::ConfigurationError,
+              "removed A3 compatibility input: environment variable A3_SHARE_DIR; migration_required=true replacement=environment variable A2O_SHARE_DIR"
+      end
+      source_dir = ENV.fetch("A2O_SHARE_DIR", "/opt/a2o/share")
       return nil unless Dir.exist?(source_dir)
 
       FileUtils.mkdir_p(File.dirname(share_dir))
