@@ -86,7 +86,10 @@ build_ruby_file_shards() {
     shard_number=$((index % shard_count + 1))
     printf "%s\n" "${spec_file}" >>"${shard_dir}/ruby_${shard_number}.lst"
     index=$((index + 1))
-  done < <(find spec -type f -name '*_spec.rb' | LC_ALL=C sort)
+  done < <(
+    cd "${ROOT_DIR}" || exit 1
+    find spec -type f -name '*_spec.rb' | LC_ALL=C sort
+  )
 
   if [[ "${index}" -eq 0 ]]; then
     echo "No Ruby spec files found under spec/" >&2
