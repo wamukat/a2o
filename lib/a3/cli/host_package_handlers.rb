@@ -52,10 +52,11 @@ module A3
       package_dir = options.fetch(:package_dir)
       output_dir = options.fetch(:output_dir)
       share_dir = options.fetch(:share_dir)
+      share_source_dir = host_share_source_dir
       FileUtils.mkdir_p(output_dir)
 
       installed_targets = install_host_launchers(package_dir: package_dir, output_dir: output_dir)
-      installed_share_dir = install_host_share_assets(share_dir: share_dir)
+      installed_share_dir = install_host_share_assets(share_dir: share_dir, source_dir: share_source_dir)
       install_runtime_image_reference(share_dir: share_dir, runtime_image: options[:runtime_image])
       wrapper_path = File.join(output_dir, "a2o")
       File.write(wrapper_path, host_launcher_wrapper)
@@ -130,12 +131,15 @@ module A3
       store
     end
 
-    def install_host_share_assets(share_dir:)
-      if ENV.key?("A3_SHARE_DIR") && ENV.fetch("A2O_SHARE_DIR", "").to_s.strip.empty?
+    def host_share_source_dir
+      if ENV.fetch("A3_SHARE_DIR", "").to_s.strip != "" && ENV.fetch("A2O_SHARE_DIR", "").to_s.strip.empty?
         raise A3::Domain::ConfigurationError,
               "removed A3 compatibility input: environment variable A3_SHARE_DIR; migration_required=true replacement=environment variable A2O_SHARE_DIR"
       end
-      source_dir = ENV.fetch("A2O_SHARE_DIR", "/opt/a2o/share")
+      ENV.fetch("A2O_SHARE_DIR", "/opt/a2o/share")
+    end
+
+    def install_host_share_assets(share_dir:, source_dir:)
       return nil unless Dir.exist?(source_dir)
 
       FileUtils.mkdir_p(File.dirname(share_dir))

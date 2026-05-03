@@ -74,15 +74,30 @@ RSpec.describe "A3 host install CLI" do
   it "rejects legacy A3 share dir fallback with migration guidance" do
     package_dir = File.join(@tmp_dir, "packages")
     write_host_launcher(package_dir, "darwin-amd64", "darwin launcher\n")
+    output_dir = File.join(@tmp_dir, "out")
 
     with_env("A2O_SHARE_DIR" => nil, "A3_SHARE_DIR" => File.join(@tmp_dir, "legacy-share")) do
       expect do
-        A3::CLI.start(["host", "install", "--package-dir", package_dir, "--output-dir", File.join(@tmp_dir, "out")])
+        A3::CLI.start(["host", "install", "--package-dir", package_dir, "--output-dir", output_dir])
       end.to raise_error(
         A3::Domain::ConfigurationError,
         /removed A3 compatibility input: environment variable A3_SHARE_DIR; migration_required=true replacement=environment variable A2O_SHARE_DIR/
       )
     end
+
+    expect(File.exist?(output_dir)).to be(false)
+  end
+
+  it "treats blank legacy A3 share dir as unset" do
+    package_dir = File.join(@tmp_dir, "packages")
+    write_host_launcher(package_dir, "darwin-amd64", "darwin launcher\n")
+    output_dir = File.join(@tmp_dir, "out")
+
+    with_env("A2O_SHARE_DIR" => nil, "A3_SHARE_DIR" => "") do
+      A3::CLI.start(["host", "install", "--package-dir", package_dir, "--output-dir", output_dir], out: StringIO.new)
+    end
+
+    expect(File.read(File.join(output_dir, "a2o-darwin-amd64"))).to eq("darwin launcher\n")
   end
 
   it "fails host install when the compatibility contract points to a missing manifest" do
