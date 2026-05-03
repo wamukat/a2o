@@ -61,14 +61,6 @@ func runRuntimeResetTask(args []string, stdout io.Writer, stderr io.Writer) erro
 	return nil
 }
 
-func runtimeProjectCommandArg(projectKey string, multiProjectMode bool) string {
-	trimmed := strings.TrimSpace(projectKey)
-	if !multiProjectMode || trimmed == "" {
-		return ""
-	}
-	return " --project " + trimmed
-}
-
 func runRuntimeForceStop(kind string, args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) error {
 	commandName := "force-stop-" + kind
 	flags := flag.NewFlagSet("a2o runtime "+commandName, flag.ContinueOnError)
