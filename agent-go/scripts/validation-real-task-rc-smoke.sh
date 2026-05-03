@@ -6,7 +6,7 @@ ENGINE_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"
 
 VERSION="${VERSION:-}"
 if [[ -z "${VERSION}" ]]; then
-  echo "VERSION is required, for example: VERSION=0.5.65 $0" >&2
+  echo "VERSION is required, for example: VERSION=0.5.66 $0" >&2
   exit 2
 fi
 
