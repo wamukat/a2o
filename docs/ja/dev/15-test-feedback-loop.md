@@ -4,12 +4,13 @@
 
 ## 現在のコストプロファイル
 
-2026-05-02 に計測した結果:
+2026-05-03 に計測した結果:
 
 | Suite | Command | Result |
 |---|---|---|
-| Ruby full suite | `bundle exec rspec` | 5 分超実行しても完了しなかったため中断 |
-| Go full suite | `cd agent-go && go test ./...` | 成功。最も遅い package は `agent-go/internal/agent` で約 104 秒 |
+| Ruby full suite | `bundle exec rspec --profile 20 --format progress` | 13 分 32 秒で成功。1335 examples |
+| Ruby full suite, 3 example shards | `A2O_TEST_RUBY_SHARDS=3 tools/dev/test-core.sh` | 最長 Ruby shard 400 秒で成功。合計 1335 examples |
+| Go full suite | `cd agent-go && go test ./...` | cached internal packages を含む状態で約 56 秒で成功 |
 | Kanban Python suite | `python3 -m unittest discover -s tools/kanban/tests` | 約 1 秒で成功 |
 
 このコストの多くは実際の integration coverage に由来する。Ruby suite と Go internal agent package は runtime、workspace、worker、process behavior を検証している。リリース検証では、これらを軽い確認に置き換えない。
@@ -25,6 +26,20 @@ tools/dev/test-core.sh
 このスクリプトは Ruby、Go、Kanban Python suite を並列実行し、デフォルトでは `.work/test-core/` にログを書く。ログ出力先は `A2O_TEST_LOG_DIR` で変更できる。
 
 Ruby -> Go -> Python を順番に実行する無駄をなくすため、wall-clock time を短縮できる。assertion や package は削らない。
+
+Ruby suite が local machine の律速になっており CPU に余裕がある場合は、Ruby spec file を deterministic shard に分割できる。
+
+```sh
+A2O_TEST_RUBY_SHARDS=2 tools/dev/test-core.sh
+```
+
+デフォルトでは、script が RSpec example を `--dry-run --format json` で検出し、各 shard に重複しない `file:line` selector を渡す。全体ではデフォルトの Ruby suite と同じ Ruby example を実行する。integration-heavy な spec は CPU と I/O を使うため、machine の余力がある範囲で shard 数を増やす。
+
+custom Ruby command が RSpec JSON dry-run に対応できない場合は、file-level sharding に切り替える。
+
+```sh
+A2O_TEST_RUBY_SHARDS=2 A2O_TEST_RUBY_SHARD_GRANULARITY=file tools/dev/test-core.sh
+```
 
 診断やスクリプト自体の検証では、デフォルトコマンドを上書きできる。
 

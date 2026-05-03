@@ -4,12 +4,13 @@ Use this document when choosing how much validation to run before review or rele
 
 ## Current Cost Profile
 
-Measured on 2026-05-02:
+Measured on 2026-05-03:
 
 | Suite | Command | Result |
 |---|---|---|
-| Ruby full suite | `bundle exec rspec` | interrupted after more than 5 minutes while still running |
-| Go full suite | `cd agent-go && go test ./...` | passed; slowest package was `agent-go/internal/agent` at about 104 seconds |
+| Ruby full suite | `bundle exec rspec --profile 20 --format progress` | passed in 13 minutes 32 seconds; 1335 examples |
+| Ruby full suite, 3 example shards | `A2O_TEST_RUBY_SHARDS=3 tools/dev/test-core.sh` | passed with the slowest Ruby shard at 400 seconds; 1335 examples total |
+| Go full suite | `cd agent-go && go test ./...` | passed in about 56 seconds with cached internal packages |
 | Kanban Python suite | `python3 -m unittest discover -s tools/kanban/tests` | passed in about 1 second |
 
 The cost is mostly real integration coverage. The Ruby suite and Go internal agent package exercise runtime, workspace, worker, and process behavior. Do not replace them with lighter checks for release validation.
@@ -25,6 +26,20 @@ tools/dev/test-core.sh
 This runs the Ruby, Go, and Kanban Python suites in parallel and writes logs under `.work/test-core/` by default. Override the log directory with `A2O_TEST_LOG_DIR`.
 
 This reduces wall-clock time by avoiding serial Ruby -> Go -> Python execution. It does not remove assertions or skip packages.
+
+If the Ruby suite is the limiting path on a local machine with spare CPU, split the Ruby spec files into deterministic shards:
+
+```sh
+A2O_TEST_RUBY_SHARDS=2 tools/dev/test-core.sh
+```
+
+By default, the script discovers RSpec examples with `--dry-run --format json` and gives each shard a disjoint set of `file:line` selectors. Together, the shards execute the same Ruby examples as the default Ruby suite. Increase the shard count only while the machine still has enough CPU and I/O headroom, because over-sharding can make integration-heavy specs slower.
+
+If a custom Ruby command cannot be discovered through RSpec JSON dry-run, fall back to file-level sharding:
+
+```sh
+A2O_TEST_RUBY_SHARDS=2 A2O_TEST_RUBY_SHARD_GRANULARITY=file tools/dev/test-core.sh
+```
 
 The default commands can be overridden for diagnostics or for validating the script itself:
 
