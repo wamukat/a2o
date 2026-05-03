@@ -160,7 +160,7 @@ A2O#286 の remote issue intake では、remote issue が `trigger:investigate` 
 
 draft creation は source ticket に `trigger:auto-parent` を付けてはならない。子の実装作業がまだ承認されていない段階で remote issue parent を runnable にしてしまうためである。
 
-1つ以上の draft child が承認され、`trigger:auto-implement` を持った後は、generated implementation parent を parent automation に進める導線が必要である。この導線は、運用者による手動 label、helper command、または明示的な project policy のいずれでもよい。ただし実行タイミングは draft creation 時ではなく child acceptance 後である。適用時には generated parent に `trigger:auto-parent` を付け、A2O#286 の parent flow が accepted child の delivery work を観測できるようにする。元の requirement source ticket は runnable な implementation parent ではなく、要求 artifact のまま扱う。
+1つ以上の draft child が承認され、`trigger:auto-implement` を持った後は、generated implementation parent を parent automation に進める必要がある。実行タイミングは draft creation 時ではなく child acceptance 後である。`accept-drafts` helper は既定で generated parent に `trigger:auto-parent` と accepted child の `repo:*` label の和集合を付ける。元の requirement source ticket は runnable な implementation parent ではなく、要求 artifact のまま扱う。
 
 orchestration に provider-specific logic を散らさない。remote / local の差分は kanban adapter と child writer boundary の内側に閉じ込める。adapter が provider-backed child を作れない場合、A2O は remote source に紐づく local Kanban child を作り、その mapping を evidence に記録してよい。
 

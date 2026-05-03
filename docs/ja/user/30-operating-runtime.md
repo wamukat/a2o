@@ -185,12 +185,12 @@ project-package の proposal author は、proposal JSON の任意 `parent.title`
 
 ```sh
 a2o runtime decomposition status <task-ref>
-a2o runtime decomposition accept-drafts <parent-ref> --child <child-ref> --remove-draft-label --parent-auto
+a2o runtime decomposition accept-drafts <parent-ref> --child <child-ref> --remove-draft-label
 a2o runtime decomposition cleanup <task-ref> --dry-run
 a2o runtime decomposition cleanup <task-ref> --apply
 ```
 
-`accept-drafts` は、1つ以上の draft child を一括で承認するための convenience command である。child と generated parent の label を変更している間は scheduler processing を pause し、変更 batch が成功した後だけ resume する。scheduler がもともと paused だった場合は paused のままにする。A2O が pause した後に batch が失敗した場合も、確認のため paused のまま残す。
+`accept-drafts` は、1つ以上の draft child を一括で承認するための convenience command である。child に `trigger:auto-implement` を付け、generated parent には既定で `trigger:auto-parent` と accepted child の `repo:*` label の和集合を付ける。child と generated parent の label を変更している間は scheduler processing を pause し、変更 batch が成功した後だけ resume する。scheduler がもともと paused だった場合は paused のままにする。A2O が pause した後に batch が失敗した場合も、確認のため paused のまま残す。child acceptance 後も generated parent を runnable にしたくない場合だけ `--no-parent-auto` を使う。
 
 `runtime.decomposition.investigate.command`、`runtime.decomposition.author.command`、decomposition prompt / template layer などの project package 設定は [90-project-package-schema.md](90-project-package-schema.md#runtime-decomposition) を読む。
 

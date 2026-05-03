@@ -16,12 +16,13 @@ module A3
         @client = client || KanbanCommandClient.subprocess(command_argv: command_argv, project: @project, working_dir: working_dir)
       end
 
-      def call(parent_task_ref:, parent_external_task_id:, child_refs: [], all: false, ready_only: false, remove_draft_label: false, parent_auto: false)
+      def call(parent_task_ref:, parent_external_task_id:, child_refs: [], all: false, ready_only: false, remove_draft_label: false, parent_auto: true)
         parent = parent_task(parent_task_ref: parent_task_ref, parent_external_task_id: parent_external_task_id)
         effective_parent = generated_parent_for_source(source_task_ref: parent_task_ref) || parent
         related_refs = related_child_refs(effective_parent.fetch("id"))
         selected_refs, unrelated_explicit_refs = selected_child_refs(related_refs: related_refs, child_refs: child_refs, all: all, ready_only: ready_only)
         accepted = []
+        accepted_repo_labels = []
         skipped = unrelated_explicit_refs
         selected_refs.each do |child_ref|
           child = @client.fetch_task_by_ref(child_ref)
@@ -38,14 +39,18 @@ module A3
           changed = ensure_child_accepted(child: child, labels: labels, remove_draft_label: remove_draft_label)
           ensure_child_comment(child.fetch("id"), parent_task_ref: effective_parent.fetch("ref")) if changed
           accepted << child_ref
+          accepted_repo_labels.concat(repo_labels(labels))
         end
 
         parent_changed = false
         if parent_auto && accepted.any?
           parent_labels = label_names(@client.load_task_labels(effective_parent.fetch("id")))
           parent_changed = ensure_label(effective_parent.fetch("id"), PARENT_RUNNABLE_LABEL, existing_labels: parent_labels)
+          repo_labels(accepted_repo_labels).each do |label|
+            parent_changed = ensure_label(effective_parent.fetch("id"), label, existing_labels: parent_labels) || parent_changed
+          end
           parent_changed = remove_label(effective_parent.fetch("id"), DECOMPOSITION_LABEL, existing_labels: parent_labels) || parent_changed
-          ensure_parent_comment(effective_parent.fetch("id"), accepted_refs: accepted) if parent_changed
+          ensure_parent_comment(effective_parent.fetch("id"), accepted_refs: accepted, repo_labels: repo_labels(accepted_repo_labels)) if parent_changed
         end
 
         Result.new(
@@ -161,15 +166,20 @@ module A3
         )
       end
 
-      def ensure_parent_comment(task_id, accepted_refs:)
+      def ensure_parent_comment(task_id, accepted_refs:, repo_labels:)
+        label_summary = ([PARENT_RUNNABLE_LABEL] + repo_labels).join(", ")
         @client.run_command_with_text_file_option(
           "task-comment-create",
           "--project", @project,
           "--task-id", task_id.to_s,
           option_name: "--comment",
-          text: "Accepted decomposition child work: #{accepted_refs.join(', ')}. Added #{PARENT_RUNNABLE_LABEL}.",
+          text: "Accepted decomposition child work: #{accepted_refs.join(', ')}. Added parent automation labels: #{label_summary}.",
           tempfile_prefix: "a2o-accept-draft-parent-comment"
         )
+      end
+
+      def repo_labels(labels)
+        Array(labels).map(&:to_s).select { |label| label.start_with?("repo:") }.uniq.sort.freeze
       end
 
       def label_names(labels)

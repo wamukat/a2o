@@ -33,7 +33,8 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 	allDrafts := flags.Bool("all", false, "accept all draft children")
 	readyDrafts := flags.Bool("ready", false, "accept draft children marked ready")
 	removeDraftLabel := flags.Bool("remove-draft-label", false, "remove a2o:draft-child from accepted children")
-	parentAuto := flags.Bool("parent-auto", false, "add trigger:auto-parent to the generated parent after accepting children")
+	parentAuto := flags.Bool("parent-auto", true, "add trigger:auto-parent and accepted child repo labels to the generated parent after accepting children")
+	noParentAuto := flags.Bool("no-parent-auto", false, "do not add parent automation labels after accepting children")
 	var childRefs stringListFlag
 	flags.Var(&childRefs, "child", "draft child ref to accept; may be repeated")
 	var repoSources stringListFlag
@@ -75,7 +76,7 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 		AllDrafts:                 *allDrafts,
 		ReadyDrafts:               *readyDrafts,
 		RemoveDraftLabel:          *removeDraftLabel,
-		ParentAuto:                *parentAuto,
+		ParentAuto:                *parentAuto && !*noParentAuto,
 	})
 	if err != nil {
 		return err
@@ -175,7 +176,7 @@ func splitRuntimeDecompositionArgs(action string, args []string) ([]string, []st
 			flagArgs = append(flagArgs, arg)
 		case action == "cleanup" && (arg == "--apply" || arg == "--dry-run"):
 			flagArgs = append(flagArgs, arg)
-		case action == "accept-drafts" && (arg == "--all" || arg == "--ready" || arg == "--remove-draft-label" || arg == "--parent-auto"):
+		case action == "accept-drafts" && (arg == "--all" || arg == "--ready" || arg == "--remove-draft-label" || arg == "--parent-auto" || arg == "--no-parent-auto"):
 			flagArgs = append(flagArgs, arg)
 		case action == "accept-drafts" && arg == "--child":
 			if i+1 >= len(args) {
@@ -272,6 +273,8 @@ func runtimeDecompositionCommand(action string, taskRef string, plan runtimeRunO
 		}
 		if overrides.ParentAuto {
 			args = append(args, "--parent-auto")
+		} else {
+			args = append(args, "--no-parent-auto")
 		}
 	case "status":
 		args = append(args, "show-decomposition-status", taskRef, "--storage-backend", "json", "--storage-dir", plan.StorageDir)
@@ -293,7 +296,7 @@ func printRuntimeDecompositionUsage(w io.Writer) {
 	fmt.Fprintln(w, "  propose           create proposal evidence from investigation evidence")
 	fmt.Fprintln(w, "  review            review proposal evidence")
 	fmt.Fprintln(w, "  create-children   create or reconcile Kanban child tickets; requires --gate")
-	fmt.Fprintln(w, "  accept-drafts     accept draft child tickets and optionally enable parent automation")
+	fmt.Fprintln(w, "  accept-drafts     accept draft child tickets and enable generated-parent automation")
 	fmt.Fprintln(w, "  status            show local decomposition evidence status")
 	fmt.Fprintln(w, "  cleanup           list or remove local decomposition trial evidence/workspaces")
 }
@@ -309,7 +312,7 @@ func printRuntimeDecompositionActionUsage(w io.Writer, action string) error {
 	case "create-children":
 		fmt.Fprintln(w, "usage: a2o runtime decomposition create-children [--project KEY] TASK_REF [--project-config project-test.yaml] [--proposal-evidence-path PATH] [--review-evidence-path PATH] [--gate]")
 	case "accept-drafts":
-		fmt.Fprintln(w, "usage: a2o runtime decomposition accept-drafts [--project KEY] TASK_REF [--project-config project-test.yaml] (--child CHILD_REF...|--ready|--all) [--remove-draft-label] [--parent-auto]")
+		fmt.Fprintln(w, "usage: a2o runtime decomposition accept-drafts [--project KEY] TASK_REF [--project-config project-test.yaml] (--child CHILD_REF...|--ready|--all) [--remove-draft-label] [--parent-auto|--no-parent-auto]")
 	case "status":
 		fmt.Fprintln(w, "usage: a2o runtime decomposition status [--project KEY] TASK_REF [--project-config project-test.yaml]")
 	case "cleanup":

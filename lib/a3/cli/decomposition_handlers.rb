@@ -560,7 +560,7 @@ module A3
           all: false,
           ready_only: false,
           remove_draft_label: false,
-          parent_auto: false
+          parent_auto: true
         }
         parser = OptionParser.new
         parser.on("--storage-backend BACKEND") { |value| options[:storage_backend] = value.to_sym }
@@ -571,6 +571,7 @@ module A3
         parser.on("--ready") { options[:ready_only] = true }
         parser.on("--remove-draft-label") { options[:remove_draft_label] = true }
         parser.on("--parent-auto") { options[:parent_auto] = true }
+        parser.on("--no-parent-auto") { options[:parent_auto] = false }
         options[:kanban_repo_label_map] = {}
         options[:kanban_trigger_labels] = []
         add_kanban_bridge_options(parser, options)

@@ -871,7 +871,8 @@ RSpec.describe A3::CLI do
       summary: "accepted 1 draft child ticket(s); skipped 0"
     )
     allow(A3::Infra::KanbanCliDraftAcceptanceWriter).to receive(:new).and_return(writer)
-    expect(writer).to receive(:call) do
+    expect(writer).to receive(:call) do |args|
+      expect(args.fetch(:parent_auto)).to be(true)
       expect(scheduler_state_repository.fetch.paused).to be(true)
       result
     end
@@ -890,6 +891,44 @@ RSpec.describe A3::CLI do
     expect(out.string).to include("scheduler_guard=paused_for_accept_drafts")
     expect(out.string).to include("scheduler_guard_resumed=true")
     expect(scheduler_state_repository.fetch.paused).to be(false)
+  end
+
+  it "allows accept-decomposition-drafts to suppress generated parent automation" do
+    out = StringIO.new
+    task = A3::Domain::Task.new(ref: "Portal#240", kind: :single, edit_scope: [:repo_alpha], external_task_id: 240)
+    repository = instance_double(A3::Infra::JsonTaskRepository, fetch: task)
+    scheduler_state_repository = A3::Infra::InMemorySchedulerStateRepository.new
+    allow(described_class).to receive(:build_watch_summary_repositories).and_return(
+      task_repository: repository,
+      scheduler_state_repository: scheduler_state_repository
+    )
+    writer = instance_double(A3::Infra::KanbanCliDraftAcceptanceWriter)
+    result = A3::Infra::KanbanCliDraftAcceptanceWriter::Result.new(
+      success?: true,
+      accepted_refs: ["Portal#241"],
+      skipped_refs: [],
+      parent_automation_applied: false,
+      summary: "accepted 1 draft child ticket(s); skipped 0"
+    )
+    allow(A3::Infra::KanbanCliDraftAcceptanceWriter).to receive(:new).and_return(writer)
+    expect(writer).to receive(:call) do |args|
+      expect(args.fetch(:parent_auto)).to be(false)
+      result
+    end
+
+    described_class.start(
+      [
+        "accept-decomposition-drafts",
+        "Portal#240",
+        "--child", "Portal#241",
+        "--no-parent-auto",
+        "--kanban-command", "kanban",
+        "--kanban-project", "Portal"
+      ],
+      out: out
+    )
+
+    expect(out.string).to include("parent_automation_applied=false")
   end
 
   it "keeps an already paused scheduler paused after accepting decomposition drafts" do

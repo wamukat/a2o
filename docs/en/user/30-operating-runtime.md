@@ -179,7 +179,7 @@ Each completed stage leaves a short comment on the source ticket so operators ca
 
 `a2o runtime logs <task-ref>` is useful for decomposition source tickets as well. If the source ticket has no ordinary implementation/review log artifacts, the command falls back to the decomposition status output and evidence paths. With `--follow`, A2O polls the decomposition status and streams available investigate/propose/review action logs while the source ticket is being decomposed.
 
-Draft children are planning artifacts. They are created in `Backlog` under the generated parent, and they are not runnable until a human accepts them by adding `trigger:auto-implement` and then moves the accepted child work to the runnable `To do` lane. Operators can edit the generated parent and child title, body, labels, blockers, and scope before acceptance. When the proposal includes child `depends_on` entries, A2O resolves each dependency against the proposed child `boundary` values and generated `child_key` values, then creates Kanban `blocked` relations between the generated child tickets. Removing `a2o:draft-child` is optional metadata cleanup; the runnable label gate is `trigger:auto-implement`, while the lane gate remains the operator-controlled move to `To do`. After accepted child work is ready, add `trigger:auto-parent` to the generated parent, not to the original requirement source ticket.
+Draft children are planning artifacts. They are created in `Backlog` under the generated parent, and they are not runnable until a human accepts them by adding `trigger:auto-implement` and then moves the accepted child work to the runnable `To do` lane. Operators can edit the generated parent and child title, body, labels, blockers, and scope before acceptance. When the proposal includes child `depends_on` entries, A2O resolves each dependency against the proposed child `boundary` values and generated `child_key` values, then creates Kanban `blocked` relations between the generated child tickets. Removing `a2o:draft-child` is optional metadata cleanup; the runnable label gate is `trigger:auto-implement`, while the lane gate remains the operator-controlled move to `To do`. When draft children are accepted, A2O also enables the generated parent by default: it adds `trigger:auto-parent` plus the union of accepted child `repo:*` labels to the generated parent, not to the original requirement source ticket.
 
 The project-package proposal author controls the generated parent content with optional `parent.title` and `parent.body` fields in the proposal JSON. See [90-project-package-schema.md](90-project-package-schema.md#runtime-decomposition) for the concrete proposal shape and example.
 
@@ -187,12 +187,12 @@ Useful commands:
 
 ```sh
 a2o runtime decomposition status <task-ref>
-a2o runtime decomposition accept-drafts <parent-ref> --child <child-ref> --remove-draft-label --parent-auto
+a2o runtime decomposition accept-drafts <parent-ref> --child <child-ref> --remove-draft-label
 a2o runtime decomposition cleanup <task-ref> --dry-run
 a2o runtime decomposition cleanup <task-ref> --apply
 ```
 
-`accept-drafts` is a convenience for accepting one or more draft children in a single operation. It pauses scheduler processing while it changes child and generated-parent labels, then resumes the scheduler only after the batch succeeds. If the scheduler was already paused, it stays paused. If the batch fails after A2O paused the scheduler, A2O leaves it paused for inspection.
+`accept-drafts` is a convenience for accepting one or more draft children in a single operation. It pauses scheduler processing while it changes child and generated-parent labels, then resumes the scheduler only after the batch succeeds. If the scheduler was already paused, it stays paused. If the batch fails after A2O paused the scheduler, A2O leaves it paused for inspection. Use `--no-parent-auto` only when the generated parent should not be made runnable after accepting children.
 
 For package configuration, including `runtime.decomposition.investigate.command`, `runtime.decomposition.author.command`, and decomposition prompt/template layers, read [90-project-package-schema.md](90-project-package-schema.md#runtime-decomposition).
 

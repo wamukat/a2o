@@ -17,10 +17,10 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
       @tasks_by_id = @tasks.values.each_with_object({}) { |task, memo| memo[task.fetch("id")] = task }
       @labels = {
         240 => ["trigger:investigate"],
-        241 => ["a2o:draft-child", "a2o:ready-child"],
-        242 => ["a2o:draft-child"],
+        241 => ["a2o:draft-child", "a2o:ready-child", "repo:portal"],
+        242 => ["a2o:draft-child", "repo:admin"],
         243 => [],
-        244 => ["a2o:draft-child"],
+        244 => ["a2o:draft-child", "repo:generated"],
         999 => ["a2o:draft-child"]
       }
       @relations = {
@@ -91,8 +91,10 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
     expect(client.labels_for(241)).to include("trigger:auto-implement")
     expect(client.labels_for(241)).to include("a2o:draft-child")
     expect(client.labels_for(242)).not_to include("trigger:auto-implement")
+    expect(client.labels_for(240)).to include("trigger:auto-parent", "repo:portal")
+    expect(client.labels_for(240)).not_to include("repo:admin")
     expect(client.commands.none? { |args| args.first == "task-create" }).to be(true)
-    expect(client.comments.size).to eq(1)
+    expect(client.comments.size).to eq(2)
   end
 
   it "is idempotent and does not duplicate comments when labels already exist" do
@@ -104,7 +106,8 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
 
     expect(result.success?).to be(true)
     expect(result.accepted_refs).to eq(["Portal#241"])
-    expect(client.comments).to eq([])
+    expect(client.labels_for(240)).to include("trigger:auto-parent", "repo:portal")
+    expect(client.comments.size).to eq(1)
     expect(client.commands.none? { |args| args.first == "task-label-add" && args.include?("trigger:auto-implement") }).to be(true)
   end
 
@@ -128,7 +131,7 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
     expect(client.comments).to eq([])
   end
 
-  it "optionally removes draft labels and applies parent automation only by explicit request" do
+  it "removes draft labels and applies parent automation with accepted child repo labels" do
     client = FakeDraftAcceptanceClient.new
     writer = described_class.new(project: "Portal", client: client)
 
@@ -143,9 +146,28 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
     expect(result.parent_automation_applied).to be(true)
     expect(client.labels_for(241)).to include("trigger:auto-implement")
     expect(client.labels_for(241)).not_to include("a2o:draft-child")
-    expect(client.labels_for(240)).to include("trigger:auto-parent")
+    expect(client.labels_for(240)).to include("trigger:auto-parent", "repo:portal")
+    expect(client.labels_for(240)).not_to include("repo:admin")
     expect(client.labels_for(240)).not_to include("trigger:investigate")
     expect(client.comments.size).to eq(2)
+  end
+
+  it "can accept children without enabling parent automation when explicitly disabled" do
+    client = FakeDraftAcceptanceClient.new
+    writer = described_class.new(project: "Portal", client: client)
+
+    result = writer.call(
+      parent_task_ref: "Portal#240",
+      parent_external_task_id: 240,
+      child_refs: ["Portal#241"],
+      parent_auto: false
+    )
+
+    expect(result.success?).to be(true)
+    expect(result.accepted_refs).to eq(["Portal#241"])
+    expect(result.parent_automation_applied).to be(false)
+    expect(client.labels_for(241)).to include("trigger:auto-implement")
+    expect(client.labels_for(240)).not_to include("trigger:auto-parent", "repo:portal")
   end
 
   it "accepts generated-parent children when invoked with the requirement source ticket" do
@@ -164,7 +186,7 @@ RSpec.describe A3::Infra::KanbanCliDraftAcceptanceWriter do
     expect(result.success?).to be(true)
     expect(result.accepted_refs).to eq(["Portal#244"])
     expect(client.labels_for(244)).to include("trigger:auto-implement")
-    expect(client.labels_for(243)).to include("trigger:auto-parent")
+    expect(client.labels_for(243)).to include("trigger:auto-parent", "repo:generated")
     expect(client.labels_for(240)).not_to include("trigger:auto-parent")
   end
 

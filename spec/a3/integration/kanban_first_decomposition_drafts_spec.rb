@@ -183,7 +183,7 @@ RSpec.describe "Kanban-first decomposition draft flow" do
       expect(accepted.success?).to be(true)
       expect(accepted.accepted_refs).to eq(["Portal#242"])
       expect(client.labels_for(242)).to include("trigger:auto-implement")
-      expect(client.labels_for(241)).to include("trigger:auto-parent")
+      expect(client.labels_for(241)).to include("trigger:auto-parent", "repo:portal")
       expect(client.labels_for(240)).not_to include("trigger:auto-parent")
       expect(client.fetch_task_by_ref("Portal#242").fetch("status")).to eq("Backlog")
 

@@ -160,7 +160,7 @@ For remote issue intake from A2O#286, the remote issue can be the source ticket 
 
 Draft creation must not add `trigger:auto-parent` to the source ticket. That would make the remote issue parent runnable before the operator has accepted any child implementation work.
 
-After one or more draft children are accepted and receive `trigger:auto-implement`, the workflow needs a parent-automation path for the generated implementation parent. That path may be a manual operator label, a helper command, or explicit project policy, but it happens after child acceptance rather than during draft creation. When it is applied, the generated parent receives `trigger:auto-parent` so the A2O#286 parent flow can observe accepted child delivery work. The original requirement source ticket stays a requirement artifact rather than the runnable implementation parent.
+After one or more draft children are accepted and receive `trigger:auto-implement`, the generated implementation parent must become eligible for the parent flow. This happens after child acceptance rather than during draft creation. By default the `accept-drafts` helper applies `trigger:auto-parent` and the union of accepted child `repo:*` labels to the generated parent. The original requirement source ticket stays a requirement artifact rather than the runnable implementation parent.
 
 The implementation should avoid provider-specific logic in orchestration. Remote/local differences belong behind the kanban adapter and child writer boundary. If the adapter cannot create provider-backed children, A2O may create local Kanban children linked to the remote source and record that mapping in evidence.
 

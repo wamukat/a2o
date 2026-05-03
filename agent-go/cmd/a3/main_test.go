@@ -4459,6 +4459,54 @@ func TestRuntimeDecompositionAcceptDraftsDispatchesGuardedRubyCommand(t *testing
 	}
 }
 
+func TestRuntimeDecompositionAcceptDraftsCanSuppressParentAutomation(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a3-test",
+		RuntimeService: "a2o-runtime",
+		StorageDir:     "/var/lib/a3/test-runtime",
+	})
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	withChdir(t, tempDir, func() {
+		code := run(
+			[]string{
+				"runtime",
+				"decomposition",
+				"accept-drafts",
+				"Portal#240",
+				"--child", "Portal#241",
+				"--no-parent-auto",
+			},
+			runner,
+			&stdout,
+			&stderr,
+		)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(joined, "'--no-parent-auto'") {
+		t.Fatalf("runtime decomposition accept-drafts should forward --no-parent-auto, got:\n%s", joined)
+	}
+	if strings.Contains(joined, "'--parent-auto'") {
+		t.Fatalf("runtime decomposition accept-drafts should not forward --parent-auto when suppressed, got:\n%s", joined)
+	}
+}
+
 func TestRuntimeDecompositionForwardsEvidencePathOverrides(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
