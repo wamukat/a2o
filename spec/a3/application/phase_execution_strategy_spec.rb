@@ -140,6 +140,62 @@ RSpec.describe "phase execution strategies" do
     expect(result.summary).to include("published workspace changes for repo_alpha")
   end
 
+  it "feeds prior implementation completion hook rework back into the next implementation run" do
+    run_repository = A3::Infra::InMemoryRunRepository.new
+    prior_execution = A3::Application::ExecutionResult.new(
+      success: false,
+      summary: "implementation completion hook verify failed for slot repo_alpha",
+      failing_command: "implementation_completion_hooks.verify",
+      observed_state: "exit status 7",
+      diagnostics: {
+        "completion_hook_attempt_refs" => {
+          "repo_alpha" => "abc123"
+        }
+      },
+      response_bundle: {
+        "success" => false,
+        "rework_required" => true
+      }
+    )
+    prior_run = implementation_run
+      .append_phase_evidence(
+        phase: :implementation,
+        source_descriptor: implementation_run.source_descriptor,
+        scope_snapshot: implementation_run.scope_snapshot,
+        execution_record: A3::Domain::PhaseExecutionRecord.from_execution_result(prior_execution)
+      )
+      .complete(outcome: :rework)
+    run_repository.save(prior_run)
+    worker_gateway = instance_double("WorkerGateway")
+    allow(worker_gateway).to receive(:agent_owned_publication?).and_return(true)
+    strategy = A3::Application::WorkerPhaseExecutionStrategy.new(
+      worker_gateway: worker_gateway,
+      task_packet_builder: task_packet_builder,
+      run_repository: run_repository
+    )
+    allow(worker_gateway).to receive(:run).and_return(
+      A3::Application::ExecutionResult.new(success: true, summary: "implementation completed")
+    )
+
+    strategy.execute(task: task, run: implementation_run, runtime: runtime, workspace: workspace)
+
+    expect(worker_gateway).to have_received(:run).with(
+      hash_including(
+        prior_review_feedback: hash_including(
+          "run_ref" => "run-1",
+          "phase" => "implementation",
+          "summary" => "implementation completion hook verify failed for slot repo_alpha",
+          "failing_command" => "implementation_completion_hooks.verify",
+          "completion_hook_diagnostics" => {
+            "completion_hook_attempt_refs" => {
+              "repo_alpha" => "abc123"
+            }
+          }
+        )
+      )
+    )
+  end
+
   it "fails closed when a non-agent implementation would require Engine-side publication" do
     worker_gateway = instance_double("WorkerGateway")
     strategy = A3::Application::WorkerPhaseExecutionStrategy.new(

@@ -146,6 +146,69 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 	if workerProtocolResult == nil {
 		workerProtocolResult = commandOutputWorkerProtocolResult(runRequest, execution)
 	}
+	if prepared != nil && request.WorkspaceRequest != nil && workerProtocolResult != nil && workerProtocolResult["success"] == true && execution.Status == "succeeded" {
+		hookReport, hookErr := RunCompletionHooks(*prepared, *request.WorkspaceRequest)
+		if hookReport.Ran() {
+			if upload, err := w.uploadCompletionHookReport(runRequest, hookReport); err != nil {
+				w.logJobEvent(runRequest, "upload_error", map[string]any{"role": "completion-hooks", "error": err.Error()})
+				return nil, false, err
+			} else {
+				artifactUploads = append(artifactUploads, upload)
+			}
+		}
+		if hookErr != nil {
+			if publishErr := PublishCompletionHookAttempt(*prepared, *request.WorkspaceRequest); publishErr != nil {
+				if refreshErr := RefreshWorkspaceEvidence(*prepared); refreshErr == nil {
+					workspaceDescriptor = requestedWorkspaceDescriptor(runRequest, prepared.SlotDescriptors)
+				}
+				w.logJobEvent(runRequest, "publish_error", map[string]any{"operation": "completion_hook_attempt", "error": publishErr.Error()})
+				result := postExecutionFailureResult(*request, workspaceDescriptor, startedAt, finishedAt, logUpload, artifactUploads, "A2O agent completion hook attempt publish failed", "completion_hook_attempt_publish", publishErr)
+				w.logJobEvent(runRequest, "submit_start", map[string]any{"status": result.Status})
+				stopHeartbeat()
+				submitErr := w.Client.SubmitResult(result)
+				if submitErr != nil {
+					w.logJobEvent(runRequest, "submit_error", map[string]any{"error": submitErr.Error()})
+				} else {
+					w.logJobEvent(runRequest, "submit_done", map[string]any{"status": result.Status})
+				}
+				w.logJobEvent(runRequest, "cleanup_start", nil)
+				cleanupErr := w.cleanupPrepared(*request, prepared)
+				if cleanupErr != nil {
+					w.logJobEvent(runRequest, "cleanup_error", map[string]any{"error": cleanupErr.Error()})
+				} else {
+					w.logJobEvent(runRequest, "cleanup_done", nil)
+				}
+				if submitErr != nil {
+					return &result, false, submitErr
+				}
+				return &result, false, cleanupErr
+			}
+			if refreshErr := RefreshWorkspaceEvidence(*prepared); refreshErr == nil {
+				workspaceDescriptor = requestedWorkspaceDescriptor(runRequest, prepared.SlotDescriptors)
+			}
+			w.logJobEvent(runRequest, "completion_hook_failed", map[string]any{"error": hookErr.Error()})
+			result := postCompletionHookReworkResult(*request, workspaceDescriptor, startedAt, finishedAt, logUpload, artifactUploads, hookReport, hookErr)
+			w.logJobEvent(runRequest, "submit_start", map[string]any{"status": result.Status})
+			stopHeartbeat()
+			submitErr := w.Client.SubmitResult(result)
+			if submitErr != nil {
+				w.logJobEvent(runRequest, "submit_error", map[string]any{"error": submitErr.Error()})
+			} else {
+				w.logJobEvent(runRequest, "submit_done", map[string]any{"status": result.Status})
+			}
+			w.logJobEvent(runRequest, "cleanup_start", nil)
+			cleanupErr := w.cleanupPrepared(*request, prepared)
+			if cleanupErr != nil {
+				w.logJobEvent(runRequest, "cleanup_error", map[string]any{"error": cleanupErr.Error()})
+			} else {
+				w.logJobEvent(runRequest, "cleanup_done", nil)
+			}
+			if submitErr != nil {
+				return &result, false, submitErr
+			}
+			return &result, false, cleanupErr
+		}
+	}
 	if metadataUpload, err := w.uploadExecutionMetadata(*request, execution, startedAt, finishedAt); err != nil {
 		w.logJobEvent(*request, "upload_error", map[string]any{"role": "execution-metadata", "error": err.Error()})
 		return nil, false, err
@@ -442,6 +505,65 @@ func postExecutionFailureResult(request JobRequest, descriptor WorkspaceDescript
 	}
 }
 
+func postCompletionHookReworkResult(request JobRequest, descriptor WorkspaceDescriptor, startedAt, finishedAt string, logUpload ArtifactUpload, artifactUploads []ArtifactUpload, report CompletionHookReport, cause error) JobResult {
+	code := 0
+	failingCommand := "implementation_completion_hooks"
+	observedState := "completion_hook_failed"
+	summary := "implementation completion hook requested rework"
+	if entry := report.FailingEntry(); entry != nil {
+		failingCommand = "implementation_completion_hooks." + entry.Name
+		observedState = entry.Reason
+		if observedState == "" {
+			observedState = "completion_hook_failed"
+		}
+		summary = fmt.Sprintf("implementation completion hook %s failed for slot %s", entry.Name, entry.Slot)
+	}
+	diagnostics := map[string]any{
+		"completion_hooks":             report,
+		"completion_hook_attempt_refs": completionHookAttemptRefs(descriptor),
+	}
+	return JobResult{
+		JobID:               request.JobID,
+		ProjectKey:          request.ProjectKey,
+		Status:              "succeeded",
+		ExitCode:            &code,
+		StartedAt:           startedAt,
+		FinishedAt:          finishedAt,
+		Summary:             summary,
+		LogUploads:          []ArtifactUpload{logUpload},
+		ArtifactUploads:     artifactUploads,
+		WorkspaceDescriptor: descriptor,
+		WorkerProtocolResult: map[string]any{
+			"task_ref":         request.TaskRef,
+			"run_ref":          request.RunRef,
+			"phase":            request.Phase,
+			"success":          false,
+			"summary":          summary,
+			"failing_command":  failingCommand,
+			"observed_state":   observedState,
+			"rework_required":  true,
+			"diagnostics":      diagnostics,
+			"completion_hooks": report,
+			"error":            cause.Error(),
+		},
+		Heartbeat: finishedAt,
+	}
+}
+
+func completionHookAttemptRefs(descriptor WorkspaceDescriptor) map[string]string {
+	refs := map[string]string{}
+	for slotName, slot := range descriptor.SlotDescriptors {
+		for _, key := range []string{"publish_after_head", "resolved_head"} {
+			value, ok := slot[key].(string)
+			if ok && strings.TrimSpace(value) != "" {
+				refs[slotName] = value
+				break
+			}
+		}
+	}
+	return refs
+}
+
 func (w Worker) prepareRequest(request JobRequest) (JobRequest, *PreparedWorkspace, WorkspaceDescriptor, error) {
 	if request.WorkspaceRequest == nil {
 		return request, nil, legacyWorkspaceDescriptor(request), nil
@@ -626,6 +748,14 @@ func (w Worker) uploadExecutionMetadata(request JobRequest, execution ExecutionR
 		return nil, err
 	}
 	return &upload, nil
+}
+
+func (w Worker) uploadCompletionHookReport(request JobRequest, report CompletionHookReport) (ArtifactUpload, error) {
+	content, err := report.JSON()
+	if err != nil {
+		return ArtifactUpload{}, err
+	}
+	return w.upload(request, "completion-hooks", safeID(request.JobID+"-completion-hooks"), "evidence", "application/json", content)
 }
 
 func (w Worker) uploadWorkerProtocolResult(request JobRequest) (*ArtifactUpload, map[string]any, error) {

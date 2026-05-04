@@ -108,26 +108,31 @@ module A3
         return nil unless @run_repository
         return nil unless run.phase.to_sym == :implementation
 
-        review_run = @run_repository.all.reverse.find do |candidate|
+        rework_run = @run_repository.all.reverse.find do |candidate|
           candidate.task_ref == task.ref &&
-            candidate.phase.to_sym == :review &&
+            %i[implementation review].include?(candidate.phase.to_sym) &&
             candidate.terminal_outcome == :rework
         end
-        return nil unless review_run
+        return nil unless rework_run
 
-        execution_record = review_run.phase_records.reverse
-          .find { |record| record.phase.to_sym == :review && record.execution_record }
+        execution_record = rework_run.phase_records.reverse
+          .find { |record| record.phase.to_sym == rework_run.phase.to_sym && record.execution_record }
           &.execution_record
         return nil unless execution_record
 
         feedback = {
-          "run_ref" => review_run.ref,
-          "phase" => "review",
+          "run_ref" => rework_run.ref,
+          "phase" => rework_run.phase.to_s,
           "summary" => execution_record.summary,
           "observed_state" => execution_record.observed_state,
           "failing_command" => execution_record.failing_command
         }.compact
         feedback["review_disposition"] = execution_record.review_disposition if execution_record.review_disposition
+        completion_hook_diagnostics = execution_record.diagnostics.slice(
+          "completion_hooks",
+          "completion_hook_attempt_refs"
+        )
+        feedback["completion_hook_diagnostics"] = completion_hook_diagnostics unless completion_hook_diagnostics.empty?
         worker_response = execution_record.diagnostics["worker_response_bundle"] if execution_record.diagnostics.is_a?(Hash)
         feedback["worker_response_bundle"] = worker_response if worker_response.is_a?(Hash)
         feedback

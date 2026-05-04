@@ -757,6 +757,148 @@ func TestPublishWorkspaceChangesFailsWhenCommitPreflightCommandMutatesFiles(t *t
 	}
 }
 
+func TestRunCompletionHooksAllowsMutatingHookOnEditSlot(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	request := testWorkspaceRequest("repo-alpha")
+	request.CompletionHooks = []WorkspaceCompletionHook{
+		{
+			Name:      "fmt",
+			Command:   "printf formatted > formatted.txt",
+			Mode:      "mutating",
+			OnFailure: "rework",
+		},
+	}
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{"repo-alpha": alphaRoot},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "changed.txt"), []byte("changed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := RunCompletionHooks(prepared, request)
+
+	if err != nil {
+		t.Fatalf("completion hook should pass: %v", err)
+	}
+	if report.Status != "succeeded" || len(report.Entries) != 1 {
+		t.Fatalf("unexpected hook report: %#v", report)
+	}
+	changed, err := gitChangedPaths(filepath.Join(prepared.Root, "repo_alpha"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if join(changed) != "changed.txt,formatted.txt" {
+		t.Fatalf("mutating hook output should remain dirty, got %v", changed)
+	}
+}
+
+func TestRunCompletionHooksRejectsCheckModeMutationAndRestoresHookEffects(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	request := testWorkspaceRequest("repo-alpha")
+	request.CompletionHooks = []WorkspaceCompletionHook{
+		{
+			Name:      "fmt",
+			Command:   "printf formatted > formatted.txt",
+			Mode:      "mutating",
+			OnFailure: "rework",
+		},
+		{
+			Name:      "verify",
+			Command:   "printf illegal > illegal.txt",
+			Mode:      "check",
+			OnFailure: "rework",
+		},
+	}
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{"repo-alpha": alphaRoot},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "changed.txt"), []byte("changed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := RunCompletionHooks(prepared, request)
+
+	if err == nil || !strings.Contains(err.Error(), "mutated slot repo_alpha in check mode") {
+		t.Fatalf("expected check mutation failure, got report=%#v err=%v", report, err)
+	}
+	changed, err := gitChangedPaths(filepath.Join(prepared.Root, "repo_alpha"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if join(changed) != "changed.txt,formatted.txt" {
+		t.Fatalf("failed hook side effects should be restored while prior successful hooks remain, got %v", changed)
+	}
+	if _, err := os.Stat(filepath.Join(prepared.Root, "repo_alpha", "illegal.txt")); !os.IsNotExist(err) {
+		t.Fatalf("failed check hook file should be removed, err=%v", err)
+	}
+}
+
+func TestRunCompletionHooksRejectsNonTargetSlotMutation(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	betaRoot := createGitSource(t, tmp, "repo-beta")
+	request := testWorkspaceRequest("repo-alpha")
+	request.Slots["repo_beta"] = WorkspaceSlotRequest{
+		Source:    WorkspaceSourceRequest{Kind: "local_git", Alias: "repo-beta"},
+		Ref:       "refs/heads/a3/work/Sample-42",
+		Checkout:  "worktree_branch",
+		Access:    "read_only",
+		SyncClass: "lazy_but_guaranteed",
+		Ownership: "support",
+		Required:  true,
+	}
+	request.CompletionHooks = []WorkspaceCompletionHook{
+		{
+			Name:      "fmt",
+			Command:   "printf leak > \"$A2O_WORKSPACE_ROOT/repo_beta/leak.txt\"",
+			Mode:      "mutating",
+			OnFailure: "rework",
+		},
+	}
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"repo-alpha": alphaRoot,
+			"repo-beta":  betaRoot,
+		},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "changed.txt"), []byte("changed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := RunCompletionHooks(prepared, request)
+
+	if err == nil || !strings.Contains(err.Error(), "mutated non-target slot repo_beta") {
+		t.Fatalf("expected non-target mutation failure, got report=%#v err=%v", report, err)
+	}
+	if _, err := os.Stat(filepath.Join(prepared.Root, "repo_beta", "leak.txt")); !os.IsNotExist(err) {
+		t.Fatalf("non-target hook mutation should be restored, err=%v", err)
+	}
+	changed, err := gitChangedPaths(filepath.Join(prepared.Root, "repo_alpha"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if join(changed) != "changed.txt" {
+		t.Fatalf("target slot should be restored to pre-hook state, got %v", changed)
+	}
+}
+
 func TestPublishWorkspaceChangesRejectsSupportSlotChangesDuringCommandPublish(t *testing.T) {
 	tmp := t.TempDir()
 	alphaRoot := createGitSource(t, tmp, "repo-alpha")

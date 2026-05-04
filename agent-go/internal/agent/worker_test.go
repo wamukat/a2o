@@ -237,6 +237,7 @@ func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T)
 	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	request := testRequest(".")
 	request.Phase = "implementation"
+	request.RunRef = "run-1"
 	request.SourceDescriptor.WorkspaceKind = "ticket_workspace"
 	request.WorkspaceRequest = ptr(testWorkspaceRequest("sample-catalog-service"))
 	request.WorkspaceRequest.CleanupPolicy = "cleanup_after_job"
@@ -301,6 +302,79 @@ func TestWorkerMaterializesWorkspaceAndReturnsWorkerProtocolResult(t *testing.T)
 	}
 	if roles := uploadRoles(client.uploads); !bytes.Equal([]byte(roles), []byte("combined-log,worker-result,execution-metadata")) {
 		t.Fatalf("unexpected upload roles: %s", roles)
+	}
+	if _, err := os.Stat(filepath.Join(tmp, "agent-workspaces", "Sample-42-ticket")); !os.IsNotExist(err) {
+		t.Fatalf("workspace was not cleaned up: %v", err)
+	}
+}
+
+func TestWorkerCompletionHookFailureReturnsImplementationRework(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
+	request := testRequest(".")
+	request.Phase = "implementation"
+	request.RunRef = "run-1"
+	request.SourceDescriptor.WorkspaceKind = "ticket_workspace"
+	request.WorkspaceRequest = ptr(testWorkspaceRequest("sample-catalog-service"))
+	request.WorkspaceRequest.CleanupPolicy = "cleanup_after_job"
+	request.WorkspaceRequest.CompletionHooks = []WorkspaceCompletionHook{
+		{
+			Name:      "verify",
+			Command:   "printf hook-error >&2; exit 7",
+			Mode:      "check",
+			OnFailure: "rework",
+		},
+	}
+	request.WorkerProtocolRequest = map[string]any{
+		"task_ref": "Sample#42",
+		"phase":    "implementation",
+	}
+	client := &fakeClient{request: &request}
+	beforeHead := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "a3/work/Sample-42"))
+
+	result, idle, err := Worker{
+		AgentName: "host-local",
+		Client:    client,
+		Executor:  workerProtocolExecutor{requireSlotPaths: true},
+		Materializer: WorkspaceMaterializer{
+			WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+			SourceAliases: map[string]string{
+				"sample-catalog-service": sourceRoot,
+			},
+		},
+		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+	}.RunOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idle {
+		t.Fatal("expected job result, got idle")
+	}
+	if result.Status != "succeeded" {
+		t.Fatalf("hook feedback should be a controlled worker result, got status=%s", result.Status)
+	}
+	if result.WorkerProtocolResult["success"] != false || result.WorkerProtocolResult["rework_required"] != true {
+		t.Fatalf("expected implementation rework worker result: %#v", result.WorkerProtocolResult)
+	}
+	if result.WorkerProtocolResult["task_ref"] != "Sample#42" || result.WorkerProtocolResult["phase"] != "implementation" {
+		t.Fatalf("hook rework worker result should preserve task identity: %#v", result.WorkerProtocolResult)
+	}
+	if result.WorkerProtocolResult["failing_command"] != "implementation_completion_hooks.verify" {
+		t.Fatalf("unexpected failing command: %#v", result.WorkerProtocolResult)
+	}
+	if roles := uploadRoles(client.uploads); !strings.Contains(roles, "completion-hooks") {
+		t.Fatalf("completion hook report artifact was not uploaded: %s", roles)
+	}
+	slot := result.WorkspaceDescriptor.SlotDescriptors["repo_alpha"]
+	if slot["publish_status"] != "committed" || slot["publish_after_head"] == nil {
+		t.Fatalf("completion hook failure should publish a rework attempt ref: %#v", slot)
+	}
+	if head := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "a3/work/Sample-42")); head == beforeHead || head != slot["publish_after_head"] {
+		t.Fatalf("work branch should advance to attempt ref: before=%s head=%s slot=%#v", beforeHead, head, slot)
+	}
+	diagnostics, ok := result.WorkerProtocolResult["diagnostics"].(map[string]any)
+	if !ok || diagnostics["completion_hook_attempt_refs"] == nil {
+		t.Fatalf("hook rework diagnostics should include attempt refs: %#v", result.WorkerProtocolResult)
 	}
 	if _, err := os.Stat(filepath.Join(tmp, "agent-workspaces", "Sample-42-ticket")); !os.IsNotExist(err) {
 		t.Fatalf("workspace was not cleaned up: %v", err)

@@ -232,6 +232,54 @@ RSpec.describe A3::Application::PhaseExecutionOrchestrator do
     expect(result.run.terminal_outcome).to eq(:rework)
   end
 
+  it "routes implementation completion hook failures back to implementation rework" do
+    execution = A3::Application::ExecutionResult.new(
+      success: false,
+      summary: "implementation completion hook verify failed for slot repo_alpha",
+      failing_command: "implementation_completion_hooks.verify",
+      observed_state: "exit status 7",
+      response_bundle: {
+        "success" => false,
+        "rework_required" => true,
+        "completion_hooks" => {
+          "status" => "failed"
+        }
+      }
+    )
+    blocked_diagnosis = A3::Domain::BlockedDiagnosis.new(
+      task_ref: task.ref,
+      run_ref: run.ref,
+      phase: :implementation,
+      outcome: :blocked,
+      review_target: run.evidence.review_target,
+      source_descriptor: run.source_descriptor,
+      scope_snapshot: run.scope_snapshot,
+      artifact_owner: run.artifact_owner,
+      expected_state: "implementation completion hooks pass",
+      observed_state: "exit status 7",
+      failing_command: "implementation_completion_hooks.verify",
+      diagnostic_summary: "implementation completion hook failed",
+      infra_diagnostics: {}
+    )
+
+    result = orchestrator.persist_and_complete(
+      task_ref: task.ref,
+      run_ref: run.ref,
+      task: task,
+      run: run,
+      runtime: runtime,
+      execution: execution,
+      blocked_diagnosis: blocked_diagnosis
+    )
+
+    expect(result.task.status).to eq(:in_progress)
+    expect(result.run.terminal_outcome).to eq(:rework)
+    expect(result.run.phase_records.last.execution_record).to have_attributes(
+      failing_command: "implementation_completion_hooks.verify",
+      observed_state: "exit status 7"
+    )
+  end
+
   it "blocks invalid review worker results instead of salvaging rework from the raw payload" do
     review_task = A3::Domain::Task.new(
       ref: "A3-v2#3026",

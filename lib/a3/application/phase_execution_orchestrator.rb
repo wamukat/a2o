@@ -70,6 +70,7 @@ module A3
         end
         return :completed if execution.success?
         return :retryable if run.phase == :merge && execution.merge_recovery_required?
+        return :rework if run.phase == :implementation && execution.rework_required?
         return :rework if run.phase == :review && execution.rework_required?
 
         :blocked
