@@ -67,6 +67,8 @@ agent:
 publish:
   commit_preflight:
     native_git_hooks: bypass
+    commands:
+      - ./project-package/commands/publish-preflight.sh
 
 runtime:
   max_steps: 20
@@ -309,6 +311,10 @@ decomposition では、`include_child` は refactoring work を通常の child d
 ## Publish
 
 `publish.commit_preflight` は、A2O が agent-owned workspace の変更を publish commit するときに実行する、A2O 管理の commit 前チェックを定義する。
+
+`publish.commit_preflight.commands` は、project-owned な shell command の任意リストである。A2O は publish 対象の変更を stage した後、publish commit を作成する前に、各 repo slot の checkout root で command を順に実行する。command は agent workspace 上で決定的に動作し、ファイルを変更してはならない。format や code generation は phase remediation command に置く。
+
+いずれかの command が non-zero で終了した場合、A2O は publish commit を block し、失敗した command と出力を workspace publish evidence に記録する。slot branch は publish 前の head に rollback される。
 
 `publish.commit_preflight.native_git_hooks` は、その publish commit でリポジトリの Git commit hook を実行させるかを制御する。
 

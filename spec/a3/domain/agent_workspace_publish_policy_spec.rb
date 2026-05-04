@@ -3,6 +3,7 @@
 RSpec.describe A3::Domain::AgentWorkspacePublishPolicy do
   it "defaults missing commit preflight native git hooks to bypass" do
     expect(described_class.native_git_hooks_from({})).to eq("bypass")
+    expect(described_class.commands_from({})).to eq([])
   end
 
   it "normalizes supported commit preflight native git hook policies and rejects unknown values" do
@@ -28,6 +29,26 @@ RSpec.describe A3::Domain::AgentWorkspacePublishPolicy do
     expect do
       described_class.native_git_hooks_from("commit_preflight" => "run")
     end.to raise_error(A3::Domain::ConfigurationError, /commit_preflight must be a mapping/)
+  end
+
+  it "normalizes commit preflight commands" do
+    expect(
+      described_class.commands_from("commit_preflight" => { "commands" => [" mvn test ", "npm run lint"] })
+    ).to eq(["mvn test", "npm run lint"])
+  end
+
+  it "rejects malformed commit preflight commands" do
+    expect do
+      described_class.commands_from("commit_preflight" => { "commands" => "mvn test" })
+    end.to raise_error(A3::Domain::ConfigurationError, /commit_preflight\.commands must be an array/)
+
+    expect do
+      described_class.commands_from("commit_preflight" => { "commands" => [" "] })
+    end.to raise_error(A3::Domain::ConfigurationError, /commit_preflight\.commands\[0\]/)
+
+    expect do
+      described_class.commands_from("commit_preflight" => { "commands" => [true] })
+    end.to raise_error(A3::Domain::ConfigurationError, /commit_preflight\.commands\[0\]/)
   end
 
   it "rejects unsupported commit preflight keys" do

@@ -975,23 +975,23 @@ func PublishWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceReques
 		if err != nil {
 			return err
 		}
-		return publishDeclaredWorkspaceChanges(prepared, request, declaredChangedFiles, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeNativeGitHooks(policy.CommitPreflight.NativeGitHooks))
+		return publishDeclaredWorkspaceChanges(prepared, request, declaredChangedFiles, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeNativeGitHooks(policy.CommitPreflight.NativeGitHooks), normalizePreflightCommands(policy.CommitPreflight.Commands))
 	case "commit_all_edit_target_changes_on_worker_success":
 		if workerProtocolResult == nil || workerProtocolResult["success"] != true {
 			return nil
 		}
-		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeNativeGitHooks(policy.CommitPreflight.NativeGitHooks))
+		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeNativeGitHooks(policy.CommitPreflight.NativeGitHooks), normalizePreflightCommands(policy.CommitPreflight.Commands))
 	case "commit_all_edit_target_changes_on_success":
 		if !commandSucceeded {
 			return nil
 		}
-		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeNativeGitHooks(policy.CommitPreflight.NativeGitHooks))
+		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeNativeGitHooks(policy.CommitPreflight.NativeGitHooks), normalizePreflightCommands(policy.CommitPreflight.Commands))
 	default:
 		return fmt.Errorf("unsupported publish policy mode: %s", policy.Mode)
 	}
 }
 
-func publishDeclaredWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceRequest, declaredChangedFiles map[string][]string, commitMessage string, commitHookPolicy string) error {
+func publishDeclaredWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceRequest, declaredChangedFiles map[string][]string, commitMessage string, commitHookPolicy string, preflightCommands []string) error {
 	plans, err := buildPublishPlans(prepared, request, func(slotName string, actual []string) ([]string, error) {
 		declared := normalizePathList(declaredChangedFiles[slotName])
 		if !sameStrings(actual, declared) {
@@ -1002,17 +1002,17 @@ func publishDeclaredWorkspaceChanges(prepared PreparedWorkspace, request Workspa
 	if err != nil {
 		return err
 	}
-	return executePublishPlans(prepared, plans, commitMessage, commitHookPolicy)
+	return executePublishPlans(prepared, plans, commitMessage, commitHookPolicy, preflightCommands)
 }
 
-func publishAllEditTargetWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceRequest, commitMessage string, commitHookPolicy string) error {
+func publishAllEditTargetWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceRequest, commitMessage string, commitHookPolicy string, preflightCommands []string) error {
 	plans, err := buildPublishPlans(prepared, request, func(_ string, actual []string) ([]string, error) {
 		return normalizePathList(actual), nil
 	})
 	if err != nil {
 		return err
 	}
-	return executePublishPlans(prepared, plans, commitMessage, commitHookPolicy)
+	return executePublishPlans(prepared, plans, commitMessage, commitHookPolicy, preflightCommands)
 }
 
 func buildPublishPlans(prepared PreparedWorkspace, request WorkspaceRequest, changedFilesFor func(string, []string) ([]string, error)) ([]publishPlan, error) {
@@ -1056,7 +1056,7 @@ func buildPublishPlans(prepared PreparedWorkspace, request WorkspaceRequest, cha
 	return plans, nil
 }
 
-func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commitMessage string, nativeGitHooks string) error {
+func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commitMessage string, nativeGitHooks string, preflightCommands []string) error {
 	if commitMessage == "" {
 		commitMessage = "A2O agent implementation update"
 	}
@@ -1089,6 +1089,10 @@ func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commit
 			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
 			return err
 		}
+		if err := runPublishPreflightCommands(plan, descriptor, preflightCommands); err != nil {
+			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
+			return err
+		}
 		if err := runGit(plan.runtimePath, commitArgs(commitMessage, nativeGitHooks)...); err != nil {
 			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
 			return err
@@ -1108,12 +1112,100 @@ func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commit
 	return nil
 }
 
+func normalizePreflightCommands(commands []string) []string {
+	normalized := []string{}
+	for _, command := range commands {
+		if trimmed := strings.TrimSpace(command); trimmed != "" {
+			normalized = append(normalized, trimmed)
+		}
+	}
+	return normalized
+}
+
+func runPublishPreflightCommands(plan publishPlan, descriptor map[string]any, commands []string) error {
+	if len(commands) == 0 {
+		return nil
+	}
+	beforeState, err := gitPreflightState(plan.runtimePath)
+	if err != nil {
+		return err
+	}
+	logs := []map[string]any{}
+	for index, command := range commands {
+		cmd := exec.Command("sh", "-c", command)
+		cmd.Dir = plan.runtimePath
+		cmd.Env = append(os.Environ(),
+			"A2O_COMMIT_PREFLIGHT_SLOT="+plan.slotName,
+			"A2O_COMMIT_PREFLIGHT_CHANGED_FILES="+strings.Join(plan.declared, "\n"),
+		)
+		out, err := cmd.CombinedOutput()
+		logEntry := map[string]any{
+			"command":     command,
+			"exit_status": 0,
+			"output":      trimTrailingNewline(string(out)),
+		}
+		if err != nil {
+			exitStatus := -1
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				exitStatus = exitErr.ExitCode()
+			}
+			logEntry["exit_status"] = exitStatus
+			logs = append(logs, logEntry)
+			descriptor["commit_preflight_status"] = "failed"
+			descriptor["commit_preflight_command"] = command
+			descriptor["commit_preflight_logs"] = logs
+			return fmt.Errorf("publish commit_preflight.commands[%d] failed for slot %s: %w: %s", index, plan.slotName, err, trimTrailingNewline(string(out)))
+		}
+		afterState, err := gitPreflightState(plan.runtimePath)
+		if err != nil {
+			return err
+		}
+		if afterState != beforeState {
+			logs = append(logs, logEntry)
+			descriptor["commit_preflight_status"] = "failed"
+			descriptor["commit_preflight_command"] = command
+			descriptor["commit_preflight_logs"] = logs
+			return fmt.Errorf("publish commit_preflight.commands[%d] mutated slot %s after staging; preflight commands must be check-only", index, plan.slotName)
+		}
+		logs = append(logs, logEntry)
+	}
+	descriptor["commit_preflight_status"] = "succeeded"
+	descriptor["commit_preflight_logs"] = logs
+	return nil
+}
+
 func commitArgs(commitMessage string, nativeGitHooks string) []string {
 	args := []string{"-c", "user.name=A3 Agent", "-c", "user.email=a2o-agent@example.invalid", "commit", "--no-gpg-sign"}
 	if nativeGitHooks != publishpolicy.NativeGitHooksRun {
 		args = append(args, "--no-verify")
 	}
 	return append(args, "-m", commitMessage)
+}
+
+func gitStatusPorcelain(root string) (string, error) {
+	return gitOutput(root, "status", "--porcelain", "--untracked-files=all", "--", ".", ":(exclude).a3")
+}
+
+type preflightGitState struct {
+	status       string
+	stagedDiff   string
+	worktreeDiff string
+}
+
+func gitPreflightState(root string) (preflightGitState, error) {
+	status, err := gitStatusPorcelain(root)
+	if err != nil {
+		return preflightGitState{}, err
+	}
+	stagedDiff, err := gitOutput(root, "diff", "--cached", "--binary", "HEAD", "--", ".", ":(exclude).a3")
+	if err != nil {
+		return preflightGitState{}, err
+	}
+	worktreeDiff, err := gitOutput(root, "diff", "--binary", "--", ".", ":(exclude).a3")
+	if err != nil {
+		return preflightGitState{}, err
+	}
+	return preflightGitState{status: status, stagedDiff: stagedDiff, worktreeDiff: worktreeDiff}, nil
 }
 
 func rollbackPublishedPlans(prepared PreparedWorkspace, plans []publishPlan, beforeHeads map[string]string) {

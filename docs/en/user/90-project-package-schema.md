@@ -61,6 +61,8 @@ agent:
 publish:
   commit_preflight:
     native_git_hooks: bypass
+    commands:
+      - ./project-package/commands/publish-preflight.sh
 runtime:
   max_steps: 20
   agent_attempts: 200
@@ -307,6 +309,10 @@ Toolchain-specific environment variables are also package-owned. A2O exposes gen
 ## Publish
 
 `publish.commit_preflight` defines A2O-managed checks that run when A2O creates an agent-owned publish commit.
+
+`publish.commit_preflight.commands` is an optional list of project-owned shell commands. A2O runs each command from the repo slot checkout root after staging the publish changes and before creating the publish commit. Commands must be deterministic in the agent workspace and must not mutate files; use phase remediation commands for formatting or code generation.
+
+If any command exits non-zero, A2O blocks the publish commit and records the failing command and output in the workspace publish evidence. The slot branch is rolled back to the pre-publish head.
 
 `publish.commit_preflight.native_git_hooks` controls whether A2O lets repository Git commit hooks run for that publish commit.
 

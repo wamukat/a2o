@@ -28,7 +28,7 @@ A2O 0.5.69 で現在利用できる公開機能と検証範囲を示す。
 - multi-project runtime context は runtime storage、host log / workspace、scheduler pid / log file、temp file、branch namespace を解決済み project key ごとに分離する。`a2o runtime resume --all-projects`、`pause --all-projects`、`status --all-projects` は登録 project ごとに scheduler を1つずつ扱い、各 project 内の active task は1件のまま維持する。
 - アップグレード診断: `a2o upgrade check`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
-- publish commit preflight 設定: `publish.commit_preflight.native_git_hooks` で、A2O 管理の publish commit 時にリポジトリの Git commit hook を実行するかを制御できる。詳細は [90-project-package-schema.md#publish](90-project-package-schema.md#publish) を参照する。
+- publish commit preflight 設定: `publish.commit_preflight.commands` で A2O 管理の publish commit 前に project-owned command を実行でき、`publish.commit_preflight.native_git_hooks` でリポジトリの Git commit hook を実行するかを制御できる。詳細は [90-project-package-schema.md#publish](90-project-package-schema.md#publish) を参照する。
 - investigate decomposition MVP: `runtime.decomposition.investigate.command`、`runtime.decomposition.author.command`、`a2o runtime decomposition investigate`、`propose`、`review`、`create-children`、`accept-drafts`、`status`、`cleanup`
 - `trigger:investigate` 付き source ticket は decomposition request であり、`repo:*` scope label は不要である。`trigger:auto-implement` で実行する implementation child には、引き続き適切な repo label が必要である。
 - `a2o runtime decomposition investigate`、`propose`、`review` は、project 側が所有する decomposition command を host agent 経由で実行する。runtime container は orchestrator のまま維持しつつ、implementation worker と同じ host workspace 境界で実行するため、Copilot など host 側にしかない agent CLI を decomposition command から呼び出せる。

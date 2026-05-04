@@ -29,6 +29,7 @@ type projectPackageConfig struct {
 	AgentWorkspaceRoot                   string
 	AgentRequiredBins                    []string
 	PublishCommitPreflightNativeGitHooks string
+	PublishCommitPreflightCommands       []string
 	SchedulerMaxParallelTasks            string
 	Executor                             map[string]any
 	Repos                                map[string]projectPackageRepo
@@ -85,6 +86,7 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	config.AgentWorkspaceRoot = payload.Agent.WorkspaceRoot
 	config.AgentRequiredBins = payload.Agent.RequiredBins
 	config.PublishCommitPreflightNativeGitHooks = scalarString(payload.Publish.CommitPreflight.NativeGitHooks)
+	config.PublishCommitPreflightCommands = compactStringList(payload.Publish.CommitPreflight.Commands)
 	config.SchedulerMaxParallelTasks = scalarString(projectSchedulerRawMaxParallelTasks(runtimePayload))
 	if strings.TrimSpace(config.SchemaVersion) == "" {
 		return config, fmt.Errorf("project package config %s is missing schema_version", projectFile)
@@ -237,7 +239,8 @@ type projectPackageYAML struct {
 	} `yaml:"agent"`
 	Publish struct {
 		CommitPreflight struct {
-			NativeGitHooks any `yaml:"native_git_hooks"`
+			NativeGitHooks any   `yaml:"native_git_hooks"`
+			Commands       []any `yaml:"commands"`
 		} `yaml:"commit_preflight"`
 	} `yaml:"publish"`
 	Runtime struct {
@@ -505,8 +508,20 @@ func validatePublishConfig(rawPublish any) error {
 		return fmt.Errorf("commit_preflight must be a mapping")
 	}
 	for key := range commitPreflight {
-		if key != "native_git_hooks" {
+		if key != "native_git_hooks" && key != "commands" {
 			return fmt.Errorf("commit_preflight.%s is not supported", key)
+		}
+	}
+	if rawCommands, ok := commitPreflight["commands"]; ok {
+		commands, ok := rawCommands.([]any)
+		if !ok {
+			return fmt.Errorf("commit_preflight.commands must be an array of non-empty strings")
+		}
+		for index, rawCommand := range commands {
+			command, ok := rawCommand.(string)
+			if !ok || strings.TrimSpace(command) == "" {
+				return fmt.Errorf("commit_preflight.commands[%d] must be a non-empty string", index)
+			}
 		}
 	}
 	if _, ok := commitPreflight["native_git_hooks"]; !ok {
@@ -514,6 +529,17 @@ func validatePublishConfig(rawPublish any) error {
 	}
 	policy := scalarString(commitPreflight["native_git_hooks"])
 	return publishpolicy.ValidateConfiguredNativeGitHooks(policy)
+}
+
+func compactStringList(values []any) []string {
+	normalized := []string{}
+	for _, value := range values {
+		text := strings.TrimSpace(scalarString(value))
+		if text != "" {
+			normalized = append(normalized, text)
+		}
+	}
+	return normalized
 }
 
 func rejectMergeTarget(runtimePayload map[string]any) error {

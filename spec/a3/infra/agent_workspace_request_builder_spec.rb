@@ -33,7 +33,8 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       "mode" => "commit_all_edit_target_changes_on_worker_success",
       "commit_message" => "A2O implementation update for Sample#42",
       "commit_preflight" => {
-        "native_git_hooks" => "bypass"
+        "native_git_hooks" => "bypass",
+        "commands" => []
       }
     )
     expect(request.slots.keys).to eq(%w[repo_alpha repo_beta])
@@ -278,7 +279,8 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
       "mode" => "commit_all_edit_target_changes_on_success",
       "commit_message" => "A2O remediation update for Sample#42",
       "commit_preflight" => {
-        "native_git_hooks" => "bypass"
+        "native_git_hooks" => "bypass",
+        "commands" => []
       }
     )
     expect(request.slots.fetch("repo_alpha")).to include("access" => "read_write", "ownership" => "edit_target")
@@ -292,14 +294,28 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
         repo_beta: "sample-beta"
       },
       support_ref: "refs/heads/feature/prototype",
-      publish_commit_preflight_native_git_hooks: "run"
+      publish_commit_preflight_native_git_hooks: "run",
+      publish_commit_preflight_commands: ["mvn test", "npm run lint"]
     ).call(workspace: workspace, task: task, run: run(:implementation))
 
     expect(request.publish_policy).to include(
       "commit_preflight" => {
-        "native_git_hooks" => "run"
+        "native_git_hooks" => "run",
+        "commands" => ["mvn test", "npm run lint"]
       }
     )
+  end
+
+  it "rejects malformed publish commit preflight commands" do
+    expect do
+      described_class.new(
+        source_aliases: {
+          repo_alpha: "sample-alpha",
+          repo_beta: "sample-beta"
+        },
+        publish_commit_preflight_commands: [true]
+      )
+    end.to raise_error(A3::Domain::ConfigurationError, /publish_commit_preflight_commands\[0\]/)
   end
 
   it "keeps metrics collection commands read-only and non-publishable" do

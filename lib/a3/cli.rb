@@ -1879,6 +1879,10 @@ module A3
       parser.on("--agent-workspace-freshness-policy VALUE") { |value| options[:agent_workspace_freshness_policy] = value.to_sym }
       parser.on("--agent-workspace-cleanup-policy VALUE") { |value| options[:agent_workspace_cleanup_policy] = value.to_sym }
       parser.on("--agent-publish-commit-preflight-native-git-hooks VALUE") { |value| options[:agent_publish_commit_preflight_native_git_hooks] = value }
+      parser.on("--agent-publish-commit-preflight-command VALUE") do |value|
+        options[:agent_publish_commit_preflight_commands] ||= []
+        options[:agent_publish_commit_preflight_commands] << value
+      end
       parser.on("--agent-job-timeout-seconds VALUE") { |value| options[:agent_job_timeout_seconds] = Integer(value) }
       parser.on("--agent-job-poll-interval-seconds VALUE") { |value| options[:agent_job_poll_interval_seconds] = Float(value) }
     end
@@ -2196,6 +2200,7 @@ module A3
         freshness_policy: options.fetch(:agent_workspace_freshness_policy, :reuse_if_clean_and_ref_matches),
         cleanup_policy: options.fetch(:agent_workspace_cleanup_policy, :retain_until_a3_cleanup),
         publish_commit_preflight_native_git_hooks: options.fetch(:agent_publish_commit_preflight_native_git_hooks, :bypass),
+        publish_commit_preflight_commands: options.fetch(:agent_publish_commit_preflight_commands, []),
         support_ref: options[:agent_support_ref],
         support_refs: options.fetch(:agent_support_refs, {})
       )

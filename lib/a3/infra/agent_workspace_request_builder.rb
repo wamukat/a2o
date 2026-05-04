@@ -8,13 +8,14 @@ require "a3/infra/agent_workspace_repo_policy"
 module A3
   module Infra
     class AgentWorkspaceRequestBuilder
-      def initialize(source_aliases:, repo_slot_policy: nil, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, publish_commit_preflight_native_git_hooks: :bypass, support_ref: nil, support_refs: {}, branch_namespace: A3::Domain::BranchNamespace.from_env)
+      def initialize(source_aliases:, repo_slot_policy: nil, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, publish_commit_preflight_native_git_hooks: :bypass, publish_commit_preflight_commands: [], support_ref: nil, support_refs: {}, branch_namespace: A3::Domain::BranchNamespace.from_env)
         @source_aliases = source_aliases.transform_keys(&:to_sym).transform_values(&:to_s).freeze
         @branch_namespace = A3::Domain::BranchNamespace.normalize(branch_namespace)
         @repo_slot_policy = repo_slot_policy || A3::Infra::AgentWorkspaceRepoPolicy.new(available_slots: @source_aliases.keys)
         @freshness_policy = freshness_policy.to_sym
         @cleanup_policy = cleanup_policy.to_sym
         @publish_commit_preflight_native_git_hooks = publish_commit_preflight_native_git_hooks.to_s
+        @publish_commit_preflight_commands = normalize_preflight_commands(publish_commit_preflight_commands)
         @support_refs = normalize_support_refs(support_ref: support_ref, support_refs: support_refs)
         validate_policy!(:freshness_policy, @freshness_policy, A3::Domain::AgentWorkspaceRequest::FRESHNESS_POLICIES)
         validate_policy!(:cleanup_policy, @cleanup_policy, A3::Domain::AgentWorkspaceRequest::CLEANUP_POLICIES)
@@ -138,6 +139,18 @@ module A3
         normalized.freeze
       end
 
+      def normalize_preflight_commands(commands)
+        Array(commands).map.with_index do |command, index|
+          unless command.is_a?(String)
+            raise A3::Domain::ConfigurationError, "publish_commit_preflight_commands[#{index}] must be a non-empty string"
+          end
+          normalized = command.strip
+          raise A3::Domain::ConfigurationError, "publish_commit_preflight_commands[#{index}] must be a non-empty string" if normalized.empty?
+
+          normalized
+        end.freeze
+      end
+
       def publish_policy_for(task:, run:, command_intent:)
         return nil if command_intent == :notification
 
@@ -146,7 +159,8 @@ module A3
             mode: "commit_all_edit_target_changes_on_success",
             commit_message: "A2O remediation update for #{task.ref}",
             commit_preflight: {
-              native_git_hooks: @publish_commit_preflight_native_git_hooks
+              native_git_hooks: @publish_commit_preflight_native_git_hooks,
+              commands: @publish_commit_preflight_commands
             }
           }
         end
@@ -156,7 +170,8 @@ module A3
           mode: "commit_all_edit_target_changes_on_worker_success",
           commit_message: "A2O implementation update for #{task.ref}",
           commit_preflight: {
-            native_git_hooks: @publish_commit_preflight_native_git_hooks
+            native_git_hooks: @publish_commit_preflight_native_git_hooks,
+            commands: @publish_commit_preflight_commands
           }
         }
       end

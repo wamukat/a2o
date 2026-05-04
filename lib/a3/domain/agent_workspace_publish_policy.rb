@@ -21,23 +21,42 @@ module A3
       end
 
       def native_git_hooks_from(record)
+        commit_preflight_record(record).fetch("native_git_hooks", DEFAULT_NATIVE_GIT_HOOKS).to_s
+      end
+
+      def commands_from(record)
+        commands = commit_preflight_record(record).fetch("commands", [])
+        unless commands.is_a?(Array)
+          raise ConfigurationError, "agent workspace publish_policy commit_preflight.commands must be an array"
+        end
+        commands.map.with_index do |command, index|
+          unless command.is_a?(String)
+            raise ConfigurationError, "agent workspace publish_policy commit_preflight.commands[#{index}] must be a non-empty string"
+          end
+          normalized = command.strip
+          if normalized.empty?
+            raise ConfigurationError, "agent workspace publish_policy commit_preflight.commands[#{index}] must be a non-empty string"
+          end
+          normalized
+        end.freeze
+      end
+
+      def commit_preflight_record(record)
         if record.key?("commit_hook_policy")
           raise ConfigurationError, "unsupported agent workspace publish_policy commit_hook_policy; use commit_preflight.native_git_hooks"
         end
         commit_preflight = record["commit_preflight"]
-        return DEFAULT_NATIVE_GIT_HOOKS if commit_preflight.nil?
+        return {} if commit_preflight.nil?
         unless commit_preflight.respond_to?(:transform_keys)
           raise ConfigurationError, "agent workspace publish_policy commit_preflight must be a mapping"
         end
 
         preflight_record = commit_preflight.transform_keys(&:to_s)
-        unsupported_keys = preflight_record.keys - ["native_git_hooks"]
+        unsupported_keys = preflight_record.keys - %w[native_git_hooks commands]
         unless unsupported_keys.empty?
           raise ConfigurationError, "unsupported agent workspace publish_policy commit_preflight.#{unsupported_keys.first}"
         end
-        return DEFAULT_NATIVE_GIT_HOOKS unless preflight_record.key?("native_git_hooks")
-
-        preflight_record["native_git_hooks"].to_s
+        preflight_record
       end
 
       def required_string(value, name)

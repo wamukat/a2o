@@ -132,6 +132,41 @@ func TestWorkspacePublishPolicyRejectsRemovedCommitHookPolicy(t *testing.T) {
 	}
 }
 
+func TestWorkspacePublishPolicyAcceptsCommitPreflightCommands(t *testing.T) {
+	payload := []byte(`{
+		"mode": "commit_all_edit_target_changes_on_worker_success",
+		"commit_message": "A3 implementation update for Sample#42",
+		"commit_preflight": {
+			"native_git_hooks": "bypass",
+			"commands": ["mvn test", "npm run lint"]
+		}
+	}`)
+
+	var policy WorkspacePublishPolicy
+	if err := json.Unmarshal(payload, &policy); err != nil {
+		t.Fatalf("expected commit preflight commands to decode: %v", err)
+	}
+	if len(policy.CommitPreflight.Commands) != 2 || policy.CommitPreflight.Commands[0] != "mvn test" {
+		t.Fatalf("unexpected commit preflight commands: %#v", policy.CommitPreflight.Commands)
+	}
+}
+
+func TestWorkspacePublishPolicyRejectsBlankCommitPreflightCommand(t *testing.T) {
+	payload := []byte(`{
+		"mode": "commit_all_edit_target_changes_on_worker_success",
+		"commit_message": "A3 implementation update for Sample#42",
+		"commit_preflight": {
+			"commands": [" "]
+		}
+	}`)
+
+	var policy WorkspacePublishPolicy
+	err := json.Unmarshal(payload, &policy)
+	if err == nil || !strings.Contains(err.Error(), "commit_preflight.commands[0]") {
+		t.Fatalf("expected blank commit preflight command error, got %v", err)
+	}
+}
+
 func TestWorkspacePublishPolicyRejectsUnknownCommitPreflightKey(t *testing.T) {
 	payload := []byte(`{
 		"mode": "commit_all_edit_target_changes_on_worker_success",

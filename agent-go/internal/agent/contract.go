@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 type SourceDescriptor struct {
@@ -130,7 +131,8 @@ func (p *WorkspacePublishPolicy) UnmarshalJSON(data []byte) error {
 }
 
 type WorkspaceCommitPreflight struct {
-	NativeGitHooks string `json:"native_git_hooks,omitempty"`
+	NativeGitHooks string   `json:"native_git_hooks,omitempty"`
+	Commands       []string `json:"commands,omitempty"`
 }
 
 func (p *WorkspaceCommitPreflight) UnmarshalJSON(data []byte) error {
@@ -140,13 +142,18 @@ func (p *WorkspaceCommitPreflight) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	for key := range raw {
-		if key != "native_git_hooks" {
+		if key != "native_git_hooks" && key != "commands" {
 			return fmt.Errorf("unsupported publish_policy.commit_preflight.%s", key)
 		}
 	}
 	var decoded workspaceCommitPreflight
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
+	}
+	for index, command := range decoded.Commands {
+		if strings.TrimSpace(command) == "" {
+			return fmt.Errorf("publish_policy.commit_preflight.commands[%d] must be a non-empty string", index)
+		}
 	}
 	*p = WorkspaceCommitPreflight(decoded)
 	return nil

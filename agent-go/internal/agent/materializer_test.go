@@ -655,6 +655,108 @@ func TestPublishWorkspaceChangesRunsCommitHooksWhenRequested(t *testing.T) {
 	}
 }
 
+func TestPublishWorkspaceChangesRunsCommitPreflightCommands(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	request := testWorkspaceRequest("repo-alpha")
+	request.PublishPolicy = &WorkspacePublishPolicy{
+		Mode:          "commit_all_edit_target_changes_on_worker_success",
+		CommitMessage: "A3 implementation update for Sample#42",
+		CommitPreflight: WorkspaceCommitPreflight{
+			Commands: []string{"test -f change.txt"},
+		},
+	}
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{"repo-alpha": alphaRoot},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "change.txt"), []byte("change\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err = PublishWorkspaceChanges(prepared, request, map[string]any{"success": true}, true)
+
+	if err != nil {
+		t.Fatalf("commit preflight command should pass: %v", err)
+	}
+	descriptor := prepared.SlotDescriptors["repo_alpha"]
+	if descriptor["commit_preflight_status"] != "succeeded" {
+		t.Fatalf("expected preflight success evidence, got %#v", descriptor)
+	}
+}
+
+func TestPublishWorkspaceChangesFailsWhenCommitPreflightCommandFails(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	request := testWorkspaceRequest("repo-alpha")
+	request.PublishPolicy = &WorkspacePublishPolicy{
+		Mode:          "commit_all_edit_target_changes_on_worker_success",
+		CommitMessage: "A3 implementation update for Sample#42",
+		CommitPreflight: WorkspaceCommitPreflight{
+			Commands: []string{"printf preflight-blocked >&2; exit 7"},
+		},
+	}
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{"repo-alpha": alphaRoot},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeHead := trimTrailingNewline(git(t, alphaRoot, "rev-parse", "a3/work/Sample-42"))
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "change.txt"), []byte("change\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err = PublishWorkspaceChanges(prepared, request, map[string]any{"success": true}, true)
+
+	if err == nil || !strings.Contains(err.Error(), "commit_preflight.commands[0]") || !strings.Contains(err.Error(), "preflight-blocked") {
+		t.Fatalf("expected commit preflight command failure, got %v", err)
+	}
+	if head := trimTrailingNewline(git(t, alphaRoot, "rev-parse", "a3/work/Sample-42")); head != beforeHead {
+		t.Fatalf("branch advanced despite failing preflight command: before=%s after=%s", beforeHead, head)
+	}
+}
+
+func TestPublishWorkspaceChangesFailsWhenCommitPreflightCommandMutatesFiles(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	request := testWorkspaceRequest("repo-alpha")
+	request.PublishPolicy = &WorkspacePublishPolicy{
+		Mode:          "commit_all_edit_target_changes_on_worker_success",
+		CommitMessage: "A3 implementation update for Sample#42",
+		CommitPreflight: WorkspaceCommitPreflight{
+			Commands: []string{"printf mutated >> change.txt && git add change.txt"},
+		},
+	}
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{"repo-alpha": alphaRoot},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeHead := trimTrailingNewline(git(t, alphaRoot, "rev-parse", "a3/work/Sample-42"))
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "change.txt"), []byte("change\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err = PublishWorkspaceChanges(prepared, request, map[string]any{"success": true}, true)
+
+	if err == nil || !strings.Contains(err.Error(), "mutated slot repo_alpha") {
+		t.Fatalf("expected commit preflight mutation failure, got %v", err)
+	}
+	if head := trimTrailingNewline(git(t, alphaRoot, "rev-parse", "a3/work/Sample-42")); head != beforeHead {
+		t.Fatalf("branch advanced despite mutating preflight command: before=%s after=%s", beforeHead, head)
+	}
+}
+
 func TestPublishWorkspaceChangesRejectsSupportSlotChangesDuringCommandPublish(t *testing.T) {
 	tmp := t.TempDir()
 	alphaRoot := createGitSource(t, tmp, "repo-alpha")
@@ -712,7 +814,7 @@ func TestPublishWorkspaceChangesRollsBackAlreadyCommittedSlots(t *testing.T) {
 	err = executePublishPlans(prepared, []publishPlan{
 		{slotName: "repo_alpha", runtimePath: filepath.Join(prepared.Root, "repo_alpha"), declared: []string{"alpha.txt"}},
 		{slotName: "repo_beta", runtimePath: filepath.Join(prepared.Root, "missing-repo"), declared: []string{"beta.txt"}},
-	}, "test rollback", "bypass")
+	}, "test rollback", "bypass", nil)
 
 	if err == nil || !strings.Contains(err.Error(), "rev-parse") {
 		t.Fatalf("expected publish failure after first commit, got %v", err)
@@ -749,7 +851,7 @@ func TestPublishWorkspaceChangesRollsBackCurrentSlotOnStageFailure(t *testing.T)
 
 	err = executePublishPlans(prepared, []publishPlan{
 		{slotName: "repo_alpha", runtimePath: alphaPath, declared: []string{"missing.txt"}},
-	}, "test rollback current", "bypass")
+	}, "test rollback current", "bypass", nil)
 
 	if err == nil || !strings.Contains(err.Error(), "add") {
 		t.Fatalf("expected stage failure, got %v", err)

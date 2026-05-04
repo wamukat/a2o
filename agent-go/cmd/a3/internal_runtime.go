@@ -826,6 +826,7 @@ type runtimeRunOncePlan struct {
 	AgentRequiredBins                         []string
 	AgentSourceAliases                        []string
 	AgentPublishCommitPreflightNativeGitHooks string
+	AgentPublishCommitPreflightCommands       []string
 	KanbanProject                             string
 	KanbanStatus                              string
 	KanbanRepoLabels                          []string
@@ -1084,6 +1085,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 		AgentRequiredBins:                         envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_AGENT_REQUIRED_BINS", "A3_RUNTIME_RUN_ONCE_AGENT_REQUIRED_BINS", "A2O_RUNTIME_SCHEDULER_AGENT_REQUIRED_BINS", "A3_RUNTIME_SCHEDULER_AGENT_REQUIRED_BINS", requiredBins),
 		AgentSourceAliases:                        envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_AGENT_SOURCE_ALIASES", "A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_ALIASES", "A2O_RUNTIME_SCHEDULER_AGENT_SOURCE_ALIASES", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_ALIASES", agentSourceAliases),
 		AgentPublishCommitPreflightNativeGitHooks: publishCommitPreflightNativeGitHooks,
+		AgentPublishCommitPreflightCommands:       append([]string{}, packageConfig.PublishCommitPreflightCommands...),
 		KanbanProject:                             envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_PROJECT", "A3_RUNTIME_RUN_ONCE_KANBAN_PROJECT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_PROJECT", "A3_RUNTIME_SCHEDULER_KANBAN_PROJECT", defaultKanbanProject)),
 		KanbanStatus:                              envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_STATUS", "A3_RUNTIME_RUN_ONCE_KANBAN_STATUS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_STATUS", "A3_RUNTIME_SCHEDULER_KANBAN_STATUS", defaultKanbanStatus)),
 		KanbanRepoLabels:                          envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A3_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A2O_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", "A3_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", repoLabels),
@@ -1706,6 +1708,9 @@ func executeUntilIdleArgs(plan runtimeRunOncePlan) []string {
 	}
 	for _, agentEnv := range plan.AgentEnv {
 		args = append(args, "--agent-env", agentEnv)
+	}
+	for _, command := range plan.AgentPublishCommitPreflightCommands {
+		args = append(args, "--agent-publish-commit-preflight-command", command)
 	}
 	for _, sourcePath := range plan.AgentSourcePaths {
 		args = append(args, "--agent-source-path", sourcePath)

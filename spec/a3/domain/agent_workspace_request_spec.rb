@@ -14,7 +14,8 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
         mode: "commit_declared_changes_on_success",
         commit_message: "A2O implementation update for Sample#42",
         commit_preflight: {
-          native_git_hooks: "run"
+          native_git_hooks: "run",
+          commands: ["mvn test"]
         }
       },
       slots: {
@@ -43,7 +44,8 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
         "mode" => "commit_declared_changes_on_success",
         "commit_message" => "A2O implementation update for Sample#42",
         "commit_preflight" => {
-          "native_git_hooks" => "run"
+          "native_git_hooks" => "run",
+          "commands" => ["mvn test"]
         }
       },
       "slots" => {

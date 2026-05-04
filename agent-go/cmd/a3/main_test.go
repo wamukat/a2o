@@ -957,6 +957,8 @@ repos:
 publish:
   commit_preflight:
     native_git_hooks: run
+    commands:
+      - ./project-package/commands/preflight.sh
 runtime:
   phases:
     implementation:
@@ -980,6 +982,9 @@ runtime:
 	}
 	if config.PublishCommitPreflightNativeGitHooks != "run" {
 		t.Fatalf("PublishCommitPreflightNativeGitHooks=%q, want run", config.PublishCommitPreflightNativeGitHooks)
+	}
+	if len(config.PublishCommitPreflightCommands) != 1 || config.PublishCommitPreflightCommands[0] != "./project-package/commands/preflight.sh" {
+		t.Fatalf("PublishCommitPreflightCommands=%#v, want preflight command", config.PublishCommitPreflightCommands)
 	}
 }
 
@@ -1099,6 +1104,88 @@ runtime:
 	_, err := loadProjectPackageConfig(packageDir)
 	if err == nil || !strings.Contains(err.Error(), "publish") || !strings.Contains(err.Error(), "commit_preflight.native_git_hooks must be bypass or run") {
 		t.Fatalf("expected blank publish commit preflight validation error, got %v", err)
+	}
+}
+
+func TestProjectPackageLoaderRejectsBlankPublishCommitPreflightCommand(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "project-package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: blank-commit-preflight-command
+kanban:
+  project: CommitPreflight
+repos:
+  app:
+    path: ..
+publish:
+  commit_preflight:
+    commands:
+      - "   "
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := loadProjectPackageConfig(packageDir)
+	if err == nil || !strings.Contains(err.Error(), "commit_preflight.commands[0] must be a non-empty string") {
+		t.Fatalf("expected blank commit preflight command validation error, got %v", err)
+	}
+}
+
+func TestProjectPackageLoaderRejectsNonStringPublishCommitPreflightCommand(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "project-package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: non-string-commit-preflight-command
+kanban:
+  project: CommitPreflight
+repos:
+  app:
+    path: ..
+publish:
+  commit_preflight:
+    commands:
+      - true
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := loadProjectPackageConfig(packageDir)
+	if err == nil || !strings.Contains(err.Error(), "commit_preflight.commands[0] must be a non-empty string") {
+		t.Fatalf("expected non-string commit preflight command validation error, got %v", err)
 	}
 }
 
@@ -7580,7 +7667,7 @@ func TestRuntimeRunOncePlanPropagatesPublishCommitPreflightNativeGitHooks(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	body = bytes.Replace(body, []byte("runtime:\n"), []byte("publish:\n  commit_preflight:\n    native_git_hooks: run\nruntime:\n"), 1)
+	body = bytes.Replace(body, []byte("runtime:\n"), []byte("publish:\n  commit_preflight:\n    native_git_hooks: run\n    commands:\n      - ./project-package/commands/preflight.sh\nruntime:\n"), 1)
 	if err := os.WriteFile(projectYamlPath, body, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -7601,9 +7688,15 @@ func TestRuntimeRunOncePlanPropagatesPublishCommitPreflightNativeGitHooks(t *tes
 	if plan.AgentPublishCommitPreflightNativeGitHooks != "run" {
 		t.Fatalf("AgentPublishCommitPreflightNativeGitHooks=%q, want run", plan.AgentPublishCommitPreflightNativeGitHooks)
 	}
+	if len(plan.AgentPublishCommitPreflightCommands) != 1 || plan.AgentPublishCommitPreflightCommands[0] != "./project-package/commands/preflight.sh" {
+		t.Fatalf("AgentPublishCommitPreflightCommands=%#v, want preflight command", plan.AgentPublishCommitPreflightCommands)
+	}
 	args := executeUntilIdleArgs(plan)
 	if !containsString(args, "--agent-publish-commit-preflight-native-git-hooks") || !containsString(args, "run") {
 		t.Fatalf("runtime args should pass commit preflight native git hooks, got %#v", args)
+	}
+	if !containsString(args, "--agent-publish-commit-preflight-command") || !containsString(args, "./project-package/commands/preflight.sh") {
+		t.Fatalf("runtime args should pass commit preflight commands, got %#v", args)
 	}
 }
 

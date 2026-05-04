@@ -374,7 +374,8 @@ RSpec.describe A3::Infra::AgentCommandRunner do
       "mode" => "commit_all_edit_target_changes_on_success",
       "commit_message" => "A2O remediation update for Sample#42",
       "commit_preflight" => {
-        "native_git_hooks" => "bypass"
+        "native_git_hooks" => "bypass",
+        "commands" => []
       }
     )
     expect(request.workspace_request.slots.fetch("repo_alpha")).to include("access" => "read_write")
