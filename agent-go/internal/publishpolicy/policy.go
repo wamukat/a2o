@@ -28,3 +28,10 @@ func ValidateCommitHook(policy string) error {
 	}
 	return fmt.Errorf("commit_hook_policy must be %s or %s", CommitHookBypass, CommitHookRun)
 }
+
+func ValidateConfiguredCommitHook(policy string) error {
+	if ValidCommitHook(policy) {
+		return nil
+	}
+	return fmt.Errorf("commit_hook_policy must be %s or %s", CommitHookBypass, CommitHookRun)
+}

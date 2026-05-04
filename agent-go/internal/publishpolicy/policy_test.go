@@ -21,3 +21,9 @@ func TestValidateCommitHookRejectsUnknownPolicy(t *testing.T) {
 		t.Fatal("ValidateCommitHook should reject unknown policy")
 	}
 }
+
+func TestValidateConfiguredCommitHookRejectsExplicitBlankPolicy(t *testing.T) {
+	if err := ValidateConfiguredCommitHook("   "); err == nil {
+		t.Fatal("ValidateConfiguredCommitHook should reject explicit whitespace policy")
+	}
+}

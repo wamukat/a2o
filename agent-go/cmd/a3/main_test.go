@@ -1021,6 +1021,45 @@ runtime:
 	}
 }
 
+func TestProjectPackageLoaderRejectsBlankPublishCommitHookPolicy(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "project-package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: blank-commit-hook-policy
+kanban:
+  project: CommitHookPolicy
+repos:
+  app:
+    path: ..
+publish:
+  commit_hook_policy: "   "
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := loadProjectPackageConfig(packageDir)
+	if err == nil || !strings.Contains(err.Error(), "publish") || !strings.Contains(err.Error(), "commit_hook_policy must be bypass or run") {
+		t.Fatalf("expected blank publish commit hook policy validation error, got %v", err)
+	}
+}
+
 func TestUnsupportedRuntimeCommandsAreNotPublicEntrypoints(t *testing.T) {
 	for _, command := range [][]string{
 		{"runtime", "command-plan"},

@@ -492,7 +492,10 @@ func validatePublishConfig(rawPublish any) error {
 		}
 	}
 	policy := scalarString(publish["commit_hook_policy"])
-	return publishpolicy.ValidateCommitHook(policy)
+	if policy == "" {
+		return nil
+	}
+	return publishpolicy.ValidateConfiguredCommitHook(policy)
 }
 
 func rejectMergeTarget(runtimePayload map[string]any) error {

@@ -20,8 +20,10 @@ module A3
         raise ConfigurationError, "unsupported agent workspace publish_policy commit_hook_policy: #{policy}"
       end
 
-      def default_commit_hook_policy(value)
-        value.nil? ? DEFAULT_COMMIT_HOOK_POLICY : value.to_s
+      def commit_hook_policy_from(record)
+        return DEFAULT_COMMIT_HOOK_POLICY unless record.key?("commit_hook_policy")
+
+        record["commit_hook_policy"].to_s
       end
 
       def required_string(value, name)

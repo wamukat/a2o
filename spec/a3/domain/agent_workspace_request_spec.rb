@@ -243,4 +243,32 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       )
     end.to raise_error(A3::Domain::ConfigurationError, /unsupported agent workspace publish_policy commit_hook_policy/)
   end
+
+  it "rejects explicit nil publish commit hook policy instead of defaulting it" do
+    expect do
+      described_class.new(
+        mode: :agent_materialized,
+        workspace_kind: :ticket_workspace,
+        workspace_id: "Sample-42-ticket",
+        freshness_policy: :reuse_if_clean_and_ref_matches,
+        cleanup_policy: :retain_until_a3_cleanup,
+        publish_policy: {
+          mode: "commit_declared_changes_on_success",
+          commit_message: "A2O implementation update for Sample#42",
+          commit_hook_policy: nil
+        },
+        slots: {
+          repo_alpha: {
+            source: { kind: "local_git", alias: "sample-catalog-service" },
+            ref: "refs/heads/a2o/work/Sample-42",
+            checkout: "worktree_branch",
+            access: "read_write",
+            sync_class: "eager",
+            ownership: "edit_target",
+            required: true
+          }
+        }
+      )
+    end.to raise_error(A3::Domain::ConfigurationError, /publish policy commit_hook_policy must be provided/)
+  end
 end

@@ -2,7 +2,7 @@
 
 RSpec.describe A3::Domain::AgentWorkspacePublishPolicy do
   it "defaults missing commit hook policy to bypass" do
-    expect(described_class.default_commit_hook_policy(nil)).to eq("bypass")
+    expect(described_class.commit_hook_policy_from({})).to eq("bypass")
   end
 
   it "normalizes supported commit hook policies and rejects unknown values" do
@@ -12,5 +12,9 @@ RSpec.describe A3::Domain::AgentWorkspacePublishPolicy do
     expect do
       described_class.normalize_commit_hook_policy("sometimes")
     end.to raise_error(A3::Domain::ConfigurationError, /unsupported agent workspace publish_policy commit_hook_policy/)
+  end
+
+  it "keeps explicit nil distinct from a missing commit hook policy" do
+    expect(described_class.commit_hook_policy_from("commit_hook_policy" => nil)).to eq("")
   end
 end

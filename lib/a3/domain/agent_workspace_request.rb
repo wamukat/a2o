@@ -88,7 +88,7 @@ module A3
         record = value.transform_keys(&:to_s)
         mode = required_string(record.fetch("mode"), "publish policy mode")
         raise ConfigurationError, "unsupported agent workspace publish_policy mode: #{mode}" unless PUBLISH_POLICY_MODES.include?(mode)
-        commit_hook_policy = A3::Domain::AgentWorkspacePublishPolicy.default_commit_hook_policy(record["commit_hook_policy"])
+        commit_hook_policy = A3::Domain::AgentWorkspacePublishPolicy.commit_hook_policy_from(record)
 
         {
           "mode" => mode,
