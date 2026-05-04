@@ -11,15 +11,16 @@ module A3
       CLEANUP_POLICIES = %i[retain_until_a3_cleanup cleanup_after_job].freeze
       PUBLISH_POLICY_MODES = A3::Domain::AgentWorkspacePublishPolicy::MODES
 
-      attr_reader :mode, :workspace_kind, :workspace_id, :freshness_policy, :cleanup_policy, :publish_policy, :slots, :topology
+      attr_reader :mode, :workspace_kind, :workspace_id, :freshness_policy, :cleanup_policy, :publish_policy, :completion_hooks, :slots, :topology
 
-      def initialize(mode:, workspace_kind:, workspace_id:, freshness_policy:, cleanup_policy:, slots:, publish_policy: nil, topology: nil)
+      def initialize(mode:, workspace_kind:, workspace_id:, freshness_policy:, cleanup_policy:, slots:, publish_policy: nil, completion_hooks: [], topology: nil)
         @mode = normalize_symbol(mode, "mode", MODES)
         @workspace_kind = normalize_symbol(workspace_kind, "workspace_kind", WORKSPACE_KINDS)
         @workspace_id = required_string(workspace_id, "workspace_id")
         @freshness_policy = normalize_symbol(freshness_policy, "freshness_policy", FRESHNESS_POLICIES)
         @cleanup_policy = normalize_symbol(cleanup_policy, "cleanup_policy", CLEANUP_POLICIES)
         @publish_policy = normalize_publish_policy(publish_policy)
+        @completion_hooks = normalize_completion_hooks(completion_hooks)
         @topology = normalize_topology(topology)
         @slots = normalize_slots(slots)
         validate_slots!
@@ -34,6 +35,7 @@ module A3
           freshness_policy: record.fetch("freshness_policy"),
           cleanup_policy: record.fetch("cleanup_policy"),
           publish_policy: record["publish_policy"],
+          completion_hooks: record.fetch("completion_hooks", []),
           topology: record["topology"],
           slots: record.fetch("slots")
         )
@@ -49,6 +51,7 @@ module A3
           "slots" => slots
         }
         form["publish_policy"] = publish_policy if publish_policy
+        form["completion_hooks"] = completion_hooks unless completion_hooks.empty?
         form["topology"] = topology if topology
         form
       end
@@ -106,6 +109,40 @@ module A3
             "commands" => commands
           }
         }.freeze
+      end
+
+      def normalize_completion_hooks(value)
+        Array(value).map.with_index do |hook, index|
+          unless hook.respond_to?(:transform_keys)
+            raise ConfigurationError, "agent workspace completion_hooks[#{index}] must be a mapping"
+          end
+          record = hook.transform_keys(&:to_s)
+          unsupported_keys = record.keys - %w[name command mode on_failure]
+          unless unsupported_keys.empty?
+            raise ConfigurationError, "unsupported agent workspace completion_hooks[#{index}].#{unsupported_keys.first}"
+          end
+          name = required_completion_hook_string(record, "name", index)
+          command = required_completion_hook_string(record, "command", index)
+          mode = required_completion_hook_string(record, "mode", index)
+          raise ConfigurationError, "unsupported agent workspace completion_hooks[#{index}].mode: #{mode}" unless %w[mutating check].include?(mode)
+
+          on_failure = record.fetch("on_failure", "rework").to_s.strip
+          on_failure = "rework" if on_failure.empty?
+          raise ConfigurationError, "unsupported agent workspace completion_hooks[#{index}].on_failure: #{on_failure}" unless on_failure == "rework"
+
+          {
+            "name" => name,
+            "command" => command,
+            "mode" => mode,
+            "on_failure" => on_failure
+          }.freeze
+        end.freeze
+      end
+
+      def required_completion_hook_string(record, key, index)
+        raise ConfigurationError, "agent workspace completion_hooks[#{index}].#{key} must be provided" unless record.key?(key)
+
+        required_string(record.fetch(key), "completion_hooks[#{index}].#{key}")
       end
 
       def normalize_topology(value)

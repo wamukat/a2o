@@ -128,7 +128,15 @@ RSpec.describe "A3 CLI worker gateway options" do
         agent_support_ref: "refs/heads/feature/prototype",
         agent_workspace_cleanup_policy: :cleanup_after_job,
         agent_publish_commit_preflight_native_git_hooks: "run",
-        agent_publish_commit_preflight_commands: ["mvn test"]
+        agent_publish_commit_preflight_commands: ["mvn test"],
+        agent_implementation_completion_hooks: [
+          {
+            "name" => "fmt",
+            "command" => "./project-package/commands/fmt-apply.sh",
+            "mode" => "mutating",
+            "on_failure" => "rework"
+          }
+        ]
       },
       command_runner: instance_double(A3::Infra::LocalCommandRunner)
     )
@@ -140,6 +148,16 @@ RSpec.describe "A3 CLI worker gateway options" do
     expect(builder.instance_variable_get(:@support_refs)).to include(default: "refs/heads/feature/prototype")
     expect(builder.instance_variable_get(:@publish_commit_preflight_native_git_hooks)).to eq("run")
     expect(builder.instance_variable_get(:@publish_commit_preflight_commands)).to eq(["mvn test"])
+    expect(builder.instance_variable_get(:@implementation_completion_hooks)).to eq(
+      [
+        {
+          "name" => "fmt",
+          "command" => "./project-package/commands/fmt-apply.sh",
+          "mode" => "mutating",
+          "on_failure" => "rework"
+        }
+      ]
+    )
   end
 
   it "builds an agent materialized HTTP worker gateway with slot-specific support refs" do

@@ -28,6 +28,14 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 				"mode": "commit_all_edit_target_changes_on_worker_success",
 				"commit_message": "A3 implementation update for Sample#42"
 			},
+			"completion_hooks": [
+				{
+					"name": "fmt",
+					"command": "./project-package/commands/fmt-apply.sh",
+					"mode": "mutating",
+					"on_failure": "rework"
+				}
+			],
 			"slots": {
 				"repo_alpha": {
 					"source": {
@@ -75,6 +83,9 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 	}
 	if request.WorkspaceRequest.PublishPolicy == nil || request.WorkspaceRequest.PublishPolicy.Mode != "commit_all_edit_target_changes_on_worker_success" {
 		t.Fatalf("workspace publish policy was not decoded: %#v", request.WorkspaceRequest.PublishPolicy)
+	}
+	if len(request.WorkspaceRequest.CompletionHooks) != 1 || request.WorkspaceRequest.CompletionHooks[0].Name != "fmt" {
+		t.Fatalf("workspace completion hooks were not decoded: %#v", request.WorkspaceRequest.CompletionHooks)
 	}
 	if request.WorkerProtocolRequest["task_ref"] != "Sample#42" {
 		t.Fatalf("worker protocol request was not decoded: %#v", request.WorkerProtocolRequest)

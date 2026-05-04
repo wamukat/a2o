@@ -30,9 +30,17 @@ type projectPackageConfig struct {
 	AgentRequiredBins                    []string
 	PublishCommitPreflightNativeGitHooks string
 	PublishCommitPreflightCommands       []string
+	ImplementationCompletionHooks        []projectPackageCompletionHook
 	SchedulerMaxParallelTasks            string
 	Executor                             map[string]any
 	Repos                                map[string]projectPackageRepo
+}
+
+type projectPackageCompletionHook struct {
+	Name      string `json:"name"`
+	Command   string `json:"command"`
+	Mode      string `json:"mode"`
+	OnFailure string `json:"on_failure"`
 }
 
 type projectPackageRepo struct {
@@ -87,6 +95,7 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	config.AgentRequiredBins = payload.Agent.RequiredBins
 	config.PublishCommitPreflightNativeGitHooks = scalarString(payload.Publish.CommitPreflight.NativeGitHooks)
 	config.PublishCommitPreflightCommands = compactStringList(payload.Publish.CommitPreflight.Commands)
+	config.ImplementationCompletionHooks = normalizeProjectCompletionHooks(payload.Runtime.Phases["implementation"].CompletionHooks.Commands)
 	config.SchedulerMaxParallelTasks = scalarString(projectSchedulerRawMaxParallelTasks(runtimePayload))
 	if strings.TrimSpace(config.SchemaVersion) == "" {
 		return config, fmt.Errorf("project package config %s is missing schema_version", projectFile)
@@ -117,6 +126,9 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	}
 	if err := rejectLegacyPhaseWorkspaceHook(runtimePayload); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.phases: %w", projectFile, err)
+	}
+	if err := validateProjectCompletionHooksConfig(runtimePayload); err != nil {
+		return config, fmt.Errorf("project package config %s has invalid runtime.phases.implementation.completion_hooks: %w", projectFile, err)
 	}
 	if err := validateProjectSchedulerConfig(runtimePayload); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.scheduler: %w", projectFile, err)
@@ -256,11 +268,21 @@ type projectPackageYAML struct {
 }
 
 type projectPackagePhaseYAML struct {
-	Skill     any            `yaml:"skill"`
-	Executor  map[string]any `yaml:"executor"`
-	Commands  []string       `yaml:"commands"`
-	Policy    any            `yaml:"policy"`
-	TargetRef any            `yaml:"target_ref"`
+	Skill           any            `yaml:"skill"`
+	Executor        map[string]any `yaml:"executor"`
+	Commands        []string       `yaml:"commands"`
+	CompletionHooks struct {
+		Commands []projectPackageCompletionHookYAML `yaml:"commands"`
+	} `yaml:"completion_hooks"`
+	Policy    any `yaml:"policy"`
+	TargetRef any `yaml:"target_ref"`
+}
+
+type projectPackageCompletionHookYAML struct {
+	Name      any `yaml:"name"`
+	Command   any `yaml:"command"`
+	Mode      any `yaml:"mode"`
+	OnFailure any `yaml:"on_failure"`
 }
 
 func projectRepoNames(repos map[string]struct {
@@ -316,6 +338,120 @@ func validateProjectSchedulerConfig(runtimePayload map[string]any) error {
 		return fmt.Errorf("max_parallel_tasks > 1 is not supported yet; requires scheduler task claims, batch planning, and shared-ref publish/merge locks")
 	}
 	return nil
+}
+
+func validateProjectCompletionHooksConfig(runtimePayload map[string]any) error {
+	phases, ok := normalizeYAMLValue(runtimePayload["phases"]).(map[string]any)
+	if !ok {
+		return nil
+	}
+	for phaseName, rawPhase := range phases {
+		phase, ok := normalizeYAMLValue(rawPhase).(map[string]any)
+		if !ok {
+			continue
+		}
+		rawCompletionHooks, ok := phase["completion_hooks"]
+		if !ok || rawCompletionHooks == nil {
+			continue
+		}
+		if phaseName != "implementation" {
+			return fmt.Errorf("%s.completion_hooks is not supported; completion_hooks are only supported for implementation", phaseName)
+		}
+		completionHooks, ok := normalizeYAMLValue(rawCompletionHooks).(map[string]any)
+		if !ok {
+			return fmt.Errorf("must be a mapping")
+		}
+		for key := range completionHooks {
+			if key != "commands" {
+				return fmt.Errorf("%s is not supported", key)
+			}
+		}
+		rawCommands, ok := completionHooks["commands"]
+		if !ok {
+			return fmt.Errorf("commands must be provided")
+		}
+		commands, ok := normalizeYAMLValue(rawCommands).([]any)
+		if !ok || len(commands) == 0 {
+			return fmt.Errorf("commands must be a non-empty array")
+		}
+		seenNames := map[string]bool{}
+		for index, rawCommand := range commands {
+			hook, ok := normalizeYAMLValue(rawCommand).(map[string]any)
+			if !ok {
+				return fmt.Errorf("commands[%d] must be a mapping", index)
+			}
+			for key := range hook {
+				if key != "name" && key != "command" && key != "mode" && key != "on_failure" {
+					return fmt.Errorf("commands[%d].%s is not supported", index, key)
+				}
+			}
+			name, err := requiredProjectHookString(hook, "name")
+			if err != nil {
+				return fmt.Errorf("commands[%d].%w", index, err)
+			}
+			if seenNames[name] {
+				return fmt.Errorf("commands[%d].name must be unique: %s", index, name)
+			}
+			seenNames[name] = true
+			if _, err := requiredProjectHookString(hook, "command"); err != nil {
+				return fmt.Errorf("commands[%d].%w", index, err)
+			}
+			mode, err := requiredProjectHookString(hook, "mode")
+			if err != nil {
+				return fmt.Errorf("commands[%d].%w", index, err)
+			}
+			if mode != "mutating" && mode != "check" {
+				return fmt.Errorf("commands[%d].mode must be mutating or check", index)
+			}
+			onFailure := scalarString(hook["on_failure"])
+			if strings.TrimSpace(onFailure) == "" {
+				onFailure = "rework"
+			}
+			if onFailure != "rework" {
+				return fmt.Errorf("commands[%d].on_failure must be rework", index)
+			}
+		}
+	}
+	return nil
+}
+
+func requiredProjectHookString(record map[string]any, key string) (string, error) {
+	raw, ok := record[key]
+	if !ok {
+		return "", fmt.Errorf("%s must be provided", key)
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return "", fmt.Errorf("%s must be a non-empty string", key)
+	}
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", fmt.Errorf("%s must be a non-empty string", key)
+	}
+	return trimmed, nil
+}
+
+func normalizeProjectCompletionHooks(values []projectPackageCompletionHookYAML) []projectPackageCompletionHook {
+	normalized := []projectPackageCompletionHook{}
+	for _, value := range values {
+		name := strings.TrimSpace(scalarString(value.Name))
+		command := strings.TrimSpace(scalarString(value.Command))
+		mode := strings.TrimSpace(scalarString(value.Mode))
+		onFailure := strings.TrimSpace(scalarString(value.OnFailure))
+		if onFailure == "" {
+			onFailure = "rework"
+		}
+		if name == "" || command == "" || mode == "" {
+			continue
+		}
+		normalized = append(normalized, projectPackageCompletionHook{
+			Name:      name,
+			Command:   command,
+			Mode:      mode,
+			OnFailure: onFailure,
+		})
+	}
+	return normalized
 }
 
 func projectSchedulerRawMaxParallelTasks(runtimePayload map[string]any) any {

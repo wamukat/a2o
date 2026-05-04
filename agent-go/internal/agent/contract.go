@@ -89,8 +89,50 @@ type WorkspaceRequest struct {
 	FreshnessPolicy string                          `json:"freshness_policy"`
 	CleanupPolicy   string                          `json:"cleanup_policy"`
 	PublishPolicy   *WorkspacePublishPolicy         `json:"publish_policy,omitempty"`
+	CompletionHooks []WorkspaceCompletionHook       `json:"completion_hooks,omitempty"`
 	Topology        *WorkspaceTopology              `json:"topology,omitempty"`
 	Slots           map[string]WorkspaceSlotRequest `json:"slots"`
+}
+
+type WorkspaceCompletionHook struct {
+	Name      string `json:"name"`
+	Command   string `json:"command"`
+	Mode      string `json:"mode"`
+	OnFailure string `json:"on_failure"`
+}
+
+func (h *WorkspaceCompletionHook) UnmarshalJSON(data []byte) error {
+	type workspaceCompletionHook WorkspaceCompletionHook
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	for key := range raw {
+		if key != "name" && key != "command" && key != "mode" && key != "on_failure" {
+			return fmt.Errorf("unsupported completion_hooks.%s", key)
+		}
+	}
+	var decoded workspaceCompletionHook
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if strings.TrimSpace(decoded.Name) == "" {
+		return fmt.Errorf("completion_hooks.name must be a non-empty string")
+	}
+	if strings.TrimSpace(decoded.Command) == "" {
+		return fmt.Errorf("completion_hooks.command must be a non-empty string")
+	}
+	if decoded.Mode != "mutating" && decoded.Mode != "check" {
+		return fmt.Errorf("completion_hooks.mode must be mutating or check")
+	}
+	if strings.TrimSpace(decoded.OnFailure) == "" {
+		decoded.OnFailure = "rework"
+	}
+	if decoded.OnFailure != "rework" {
+		return fmt.Errorf("completion_hooks.on_failure must be rework")
+	}
+	*h = WorkspaceCompletionHook(decoded)
+	return nil
 }
 
 type WorkspaceTopology struct {

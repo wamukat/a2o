@@ -8,7 +8,7 @@ require "a3/infra/agent_workspace_repo_policy"
 module A3
   module Infra
     class AgentWorkspaceRequestBuilder
-      def initialize(source_aliases:, repo_slot_policy: nil, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, publish_commit_preflight_native_git_hooks: :bypass, publish_commit_preflight_commands: [], support_ref: nil, support_refs: {}, branch_namespace: A3::Domain::BranchNamespace.from_env)
+      def initialize(source_aliases:, repo_slot_policy: nil, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, publish_commit_preflight_native_git_hooks: :bypass, publish_commit_preflight_commands: [], implementation_completion_hooks: [], support_ref: nil, support_refs: {}, branch_namespace: A3::Domain::BranchNamespace.from_env)
         @source_aliases = source_aliases.transform_keys(&:to_sym).transform_values(&:to_s).freeze
         @branch_namespace = A3::Domain::BranchNamespace.normalize(branch_namespace)
         @repo_slot_policy = repo_slot_policy || A3::Infra::AgentWorkspaceRepoPolicy.new(available_slots: @source_aliases.keys)
@@ -16,6 +16,7 @@ module A3
         @cleanup_policy = cleanup_policy.to_sym
         @publish_commit_preflight_native_git_hooks = publish_commit_preflight_native_git_hooks.to_s
         @publish_commit_preflight_commands = normalize_preflight_commands(publish_commit_preflight_commands)
+        @implementation_completion_hooks = normalize_completion_hooks(implementation_completion_hooks)
         @support_refs = normalize_support_refs(support_ref: support_ref, support_refs: support_refs)
         validate_policy!(:freshness_policy, @freshness_policy, A3::Domain::AgentWorkspaceRequest::FRESHNESS_POLICIES)
         validate_policy!(:cleanup_policy, @cleanup_policy, A3::Domain::AgentWorkspaceRequest::CLEANUP_POLICIES)
@@ -53,6 +54,7 @@ module A3
           topology: topology_for(task: task, workspace: workspace),
           cleanup_policy: @cleanup_policy,
           publish_policy: publish_policy_for(task: task, run: run, command_intent: command_intent),
+          completion_hooks: completion_hooks_for(run: run, command_intent: command_intent),
           slots: slots
         )
       end
@@ -149,6 +151,54 @@ module A3
 
           normalized
         end.freeze
+      end
+
+      def normalize_completion_hooks(hooks)
+        Array(hooks).map.with_index do |hook, index|
+          unless hook.respond_to?(:transform_keys)
+            raise A3::Domain::ConfigurationError, "implementation_completion_hooks[#{index}] must be a mapping"
+          end
+          record = hook.transform_keys(&:to_s)
+          unsupported = record.keys - %w[name command mode on_failure]
+          unless unsupported.empty?
+            raise A3::Domain::ConfigurationError, "implementation_completion_hooks[#{index}].#{unsupported.first} is not supported"
+          end
+          name = required_hook_string(record, "name", index)
+          command = required_hook_string(record, "command", index)
+          mode = required_hook_string(record, "mode", index)
+          unless %w[mutating check].include?(mode)
+            raise A3::Domain::ConfigurationError, "implementation_completion_hooks[#{index}].mode must be mutating or check"
+          end
+          on_failure = record.fetch("on_failure", "rework").to_s.strip
+          on_failure = "rework" if on_failure.empty?
+          unless on_failure == "rework"
+            raise A3::Domain::ConfigurationError, "implementation_completion_hooks[#{index}].on_failure must be rework"
+          end
+          {
+            "name" => name,
+            "command" => command,
+            "mode" => mode,
+            "on_failure" => on_failure
+          }
+        end.freeze
+      end
+
+      def required_hook_string(record, key, index)
+        value = record[key]
+        unless value.is_a?(String)
+          raise A3::Domain::ConfigurationError, "implementation_completion_hooks[#{index}].#{key} must be a non-empty string"
+        end
+        normalized = value.strip
+        raise A3::Domain::ConfigurationError, "implementation_completion_hooks[#{index}].#{key} must be a non-empty string" if normalized.empty?
+
+        normalized
+      end
+
+      def completion_hooks_for(run:, command_intent:)
+        return [] unless run.phase.to_sym == :implementation
+        return [] unless command_intent.nil?
+
+        @implementation_completion_hooks
       end
 
       def publish_policy_for(task:, run:, command_intent:)

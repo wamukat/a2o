@@ -827,6 +827,7 @@ type runtimeRunOncePlan struct {
 	AgentSourceAliases                        []string
 	AgentPublishCommitPreflightNativeGitHooks string
 	AgentPublishCommitPreflightCommands       []string
+	AgentImplementationCompletionHooks        []projectPackageCompletionHook
 	KanbanProject                             string
 	KanbanStatus                              string
 	KanbanRepoLabels                          []string
@@ -1086,6 +1087,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 		AgentSourceAliases:                        envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_AGENT_SOURCE_ALIASES", "A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_ALIASES", "A2O_RUNTIME_SCHEDULER_AGENT_SOURCE_ALIASES", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_ALIASES", agentSourceAliases),
 		AgentPublishCommitPreflightNativeGitHooks: publishCommitPreflightNativeGitHooks,
 		AgentPublishCommitPreflightCommands:       append([]string{}, packageConfig.PublishCommitPreflightCommands...),
+		AgentImplementationCompletionHooks:        append([]projectPackageCompletionHook{}, packageConfig.ImplementationCompletionHooks...),
 		KanbanProject:                             envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_PROJECT", "A3_RUNTIME_RUN_ONCE_KANBAN_PROJECT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_PROJECT", "A3_RUNTIME_SCHEDULER_KANBAN_PROJECT", defaultKanbanProject)),
 		KanbanStatus:                              envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_STATUS", "A3_RUNTIME_RUN_ONCE_KANBAN_STATUS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_STATUS", "A3_RUNTIME_SCHEDULER_KANBAN_STATUS", defaultKanbanStatus)),
 		KanbanRepoLabels:                          envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A3_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A2O_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", "A3_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", repoLabels),
@@ -1711,6 +1713,13 @@ func executeUntilIdleArgs(plan runtimeRunOncePlan) []string {
 	}
 	for _, command := range plan.AgentPublishCommitPreflightCommands {
 		args = append(args, "--agent-publish-commit-preflight-command", command)
+	}
+	for _, hook := range plan.AgentImplementationCompletionHooks {
+		encoded, err := json.Marshal(hook)
+		if err != nil {
+			continue
+		}
+		args = append(args, "--agent-implementation-completion-hook", string(encoded))
 	}
 	for _, sourcePath := range plan.AgentSourcePaths {
 		args = append(args, "--agent-source-path", sourcePath)

@@ -988,6 +988,100 @@ runtime:
 	}
 }
 
+func TestProjectPackageLoaderAcceptsImplementationCompletionHooks(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "project-package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: completion-hooks
+kanban:
+  project: CompletionHooks
+repos:
+  app:
+    path: ..
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      completion_hooks:
+        commands:
+          - name: fmt
+            command: ./project-package/commands/fmt-apply.sh
+            mode: mutating
+          - name: verify
+            command: ./project-package/commands/impl-verify.sh
+            mode: check
+            on_failure: rework
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	config, err := loadProjectPackageConfig(packageDir)
+	if err != nil {
+		t.Fatalf("implementation completion hooks should load: %v", err)
+	}
+	if len(config.ImplementationCompletionHooks) != 2 {
+		t.Fatalf("ImplementationCompletionHooks=%#v, want 2 hooks", config.ImplementationCompletionHooks)
+	}
+	if config.ImplementationCompletionHooks[0].Name != "fmt" || config.ImplementationCompletionHooks[0].Mode != "mutating" || config.ImplementationCompletionHooks[0].OnFailure != "rework" {
+		t.Fatalf("unexpected first hook: %#v", config.ImplementationCompletionHooks[0])
+	}
+}
+
+func TestProjectPackageLoaderRejectsMalformedImplementationCompletionHooks(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "project-package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: bad-completion-hooks
+kanban:
+  project: CompletionHooks
+repos:
+  app:
+    path: ..
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      completion_hooks:
+        commands:
+          - name: fmt
+            command: ./project-package/commands/fmt-apply.sh
+            mode: rewrite
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := loadProjectPackageConfig(packageDir)
+	if err == nil || !strings.Contains(err.Error(), "completion_hooks") || !strings.Contains(err.Error(), "mode must be mutating or check") {
+		t.Fatalf("expected completion hook validation error, got %v", err)
+	}
+}
+
 func TestProjectPackageLoaderRejectsUnsupportedPublishCommitPreflightNativeGitHooks(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "project-package")
@@ -7697,6 +7791,45 @@ func TestRuntimeRunOncePlanPropagatesPublishCommitPreflightNativeGitHooks(t *tes
 	}
 	if !containsString(args, "--agent-publish-commit-preflight-command") || !containsString(args, "./project-package/commands/preflight.sh") {
 		t.Fatalf("runtime args should pass commit preflight commands, got %#v", args)
+	}
+}
+
+func TestRuntimeRunOncePlanPropagatesImplementationCompletionHooks(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	projectYamlPath := filepath.Join(packageDir, "project.yaml")
+	body, err := os.ReadFile(projectYamlPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body = bytes.Replace(body, []byte("    implementation:\n"), []byte("    implementation:\n      completion_hooks:\n        commands:\n          - name: fmt\n            command: ./project-package/commands/fmt-apply.sh\n            mode: mutating\n"), 1)
+	if err := os.WriteFile(projectYamlPath, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := buildRuntimeRunOncePlan(runtimeInstanceConfig{
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeProject: "a2o-test",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3471",
+		RuntimeImage:   "ghcr.io/wamukat/a2o-engine:test",
+		ComposeFile:    "docker/compose/a2o-kanbalone.yml",
+	}, runtimeRunOnceOverrides{}, "")
+	if err != nil {
+		t.Fatalf("buildRuntimeRunOncePlan failed: %v", err)
+	}
+
+	if len(plan.AgentImplementationCompletionHooks) != 1 || plan.AgentImplementationCompletionHooks[0].Name != "fmt" {
+		t.Fatalf("AgentImplementationCompletionHooks=%#v, want fmt hook", plan.AgentImplementationCompletionHooks)
+	}
+	args := executeUntilIdleArgs(plan)
+	if !containsString(args, "--agent-implementation-completion-hook") || !containsString(args, `{"name":"fmt","command":"./project-package/commands/fmt-apply.sh","mode":"mutating","on_failure":"rework"}`) {
+		t.Fatalf("runtime args should pass implementation completion hook, got %#v", args)
 	}
 }
 

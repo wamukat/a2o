@@ -306,6 +306,51 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     )
   end
 
+  it "adds completion hooks only to primary implementation requests" do
+    hooks = [
+      {
+        "name" => "fmt",
+        "command" => "./project-package/commands/fmt-apply.sh",
+        "mode" => "mutating",
+        "on_failure" => "rework"
+      }
+    ]
+    builder = described_class.new(
+      source_aliases: {
+        repo_alpha: "sample-alpha",
+        repo_beta: "sample-beta"
+      },
+      support_ref: "refs/heads/feature/prototype",
+      implementation_completion_hooks: hooks
+    )
+
+    implementation_request = builder.call(workspace: workspace, task: task, run: run(:implementation))
+    remediation_request = builder.call(workspace: workspace, task: task, run: run(:verification), command_intent: :remediation)
+    review_request = builder.call(workspace: workspace, task: task, run: run(:review))
+
+    expect(implementation_request.completion_hooks).to eq(hooks)
+    expect(remediation_request.completion_hooks).to eq([])
+    expect(review_request.completion_hooks).to eq([])
+  end
+
+  it "rejects malformed implementation completion hooks" do
+    expect do
+      described_class.new(
+        source_aliases: {
+          repo_alpha: "sample-alpha",
+          repo_beta: "sample-beta"
+        },
+        implementation_completion_hooks: [
+          {
+            "name" => "fmt",
+            "command" => "./project-package/commands/fmt-apply.sh",
+            "mode" => "invalid"
+          }
+        ]
+      )
+    end.to raise_error(A3::Domain::ConfigurationError, /implementation_completion_hooks\[0\].mode/)
+  end
+
   it "rejects malformed publish commit preflight commands" do
     expect do
       described_class.new(

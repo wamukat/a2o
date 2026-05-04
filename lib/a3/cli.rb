@@ -1883,6 +1883,12 @@ module A3
         options[:agent_publish_commit_preflight_commands] ||= []
         options[:agent_publish_commit_preflight_commands] << value
       end
+      parser.on("--agent-implementation-completion-hook JSON") do |value|
+        options[:agent_implementation_completion_hooks] ||= []
+        options[:agent_implementation_completion_hooks] << JSON.parse(value)
+      rescue JSON::ParserError => e
+        raise ArgumentError, "--agent-implementation-completion-hook must be JSON: #{e.message}"
+      end
       parser.on("--agent-job-timeout-seconds VALUE") { |value| options[:agent_job_timeout_seconds] = Integer(value) }
       parser.on("--agent-job-poll-interval-seconds VALUE") { |value| options[:agent_job_poll_interval_seconds] = Float(value) }
     end
@@ -2201,6 +2207,7 @@ module A3
         cleanup_policy: options.fetch(:agent_workspace_cleanup_policy, :retain_until_a3_cleanup),
         publish_commit_preflight_native_git_hooks: options.fetch(:agent_publish_commit_preflight_native_git_hooks, :bypass),
         publish_commit_preflight_commands: options.fetch(:agent_publish_commit_preflight_commands, []),
+        implementation_completion_hooks: options.fetch(:agent_implementation_completion_hooks, []),
         support_ref: options[:agent_support_ref],
         support_refs: options.fetch(:agent_support_refs, {})
       )

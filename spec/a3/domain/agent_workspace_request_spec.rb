@@ -18,6 +18,13 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
           commands: ["mvn test"]
         }
       },
+      completion_hooks: [
+        {
+          name: "fmt",
+          command: "./project-package/commands/fmt-apply.sh",
+          mode: "mutating"
+        }
+      ],
       slots: {
         repo_alpha: {
           source: {
@@ -48,6 +55,14 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
           "commands" => ["mvn test"]
         }
       },
+      "completion_hooks" => [
+        {
+          "name" => "fmt",
+          "command" => "./project-package/commands/fmt-apply.sh",
+          "mode" => "mutating",
+          "on_failure" => "rework"
+        }
+      ],
       "slots" => {
         "repo_alpha" => {
           "source" => {
@@ -64,6 +79,36 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       }
     )
     expect(described_class.from_request_form(request.request_form)).to eq(request)
+  end
+
+  it "rejects malformed completion hooks" do
+    expect do
+      described_class.new(
+        mode: :agent_materialized,
+        workspace_kind: :ticket_workspace,
+        workspace_id: "Sample-42-ticket",
+        freshness_policy: :reuse_if_clean_and_ref_matches,
+        cleanup_policy: :retain_until_a3_cleanup,
+        completion_hooks: [
+          {
+            name: "verify",
+            command: "./verify.sh",
+            mode: "rewrite"
+          }
+        ],
+        slots: {
+          repo_alpha: {
+            source: { kind: "local_git", alias: "sample-catalog-service" },
+            ref: "refs/heads/a2o/work/Sample-42",
+            checkout: "worktree_branch",
+            access: "read_write",
+            sync_class: "eager",
+            ownership: "edit_target",
+            required: true
+          }
+        }
+      )
+    end.to raise_error(A3::Domain::ConfigurationError, /completion_hooks\[0\].mode/)
   end
 
   it "round-trips parent-child workspace topology" do
