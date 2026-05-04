@@ -66,6 +66,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(request.env).to include(
       "AUTOMATION_ISSUE_WORKSPACE" => "/tmp/a3-workspace"
     )
+    expect(request.env).not_to include("MAVEN_REPO_LOCAL")
     expect(result).to have_attributes(success?: true, summary: "task test:all ok")
     expect(result.diagnostics.fetch("agent_artifacts").fetch(0)).to include(
       "artifact_id" => "command-run-1-verification-job-1-combined-log",
@@ -350,6 +351,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(request.env).to include(
       "AUTOMATION_ISSUE_WORKSPACE" => "/tmp/a3-workspace"
     )
+    expect(request.env).not_to include("MAVEN_REPO_LOCAL")
   end
 
   it "marks remediation command jobs as publishable edit-target mutations" do

@@ -7021,6 +7021,9 @@ runtime:
 	if !strings.Contains(joined, "'--agent-env' 'A2O_WORKER_LAUNCHER_CONFIG_PATH="+launcherPath+"'") {
 		t.Fatalf("run-once should pass launcher config path to agent jobs, calls:\n%s", joined)
 	}
+	if strings.Contains(joined, "MAVEN_WORKSPACE_BOOTSTRAP_MODE") {
+		t.Fatalf("run-once must not inject Maven-specific bootstrap env, calls:\n%s", joined)
+	}
 	if runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"] != "" {
 		t.Fatalf("agent attempts should come from package plan, not env override, got %q", runner.lastEnv["A3_RUNTIME_RUN_ONCE_AGENT_ATTEMPTS"])
 	}

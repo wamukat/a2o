@@ -421,6 +421,7 @@ func TestWorkerUsesEngineProvidedAgentEnvironmentForMaterialization(t *testing.T
 			checks: map[string]string{
 				"AUTOMATION_ISSUE_WORKSPACE": filepath.Join(tmp, "engine-managed-workspaces", "Sample-42-ticket"),
 			},
+			forbidden: []string{"MAVEN_REPO_LOCAL"},
 		},
 		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
 	}.RunOnce()
@@ -672,9 +673,10 @@ type workerProtocolExecutor struct {
 }
 
 type envAwareWorkerProtocolExecutor struct {
-	key    string
-	value  string
-	checks map[string]string
+	key       string
+	value     string
+	checks    map[string]string
+	forbidden []string
 }
 
 func (executor envAwareWorkerProtocolExecutor) Execute(request JobRequest) ExecutionResult {
@@ -686,6 +688,12 @@ func (executor envAwareWorkerProtocolExecutor) Execute(request JobRequest) Execu
 		if request.Env[key] != value {
 			code := 1
 			return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte("missing workspace automation environment")}
+		}
+	}
+	for _, key := range executor.forbidden {
+		if _, ok := request.Env[key]; ok {
+			code := 1
+			return ExecutionResult{Status: "failed", ExitCode: &code, CombinedLog: []byte("unexpected product-specific environment")}
 		}
 	}
 	return workerProtocolExecutor{requireSlotPaths: true}.Execute(request)
