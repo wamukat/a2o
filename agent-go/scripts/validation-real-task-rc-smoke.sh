@@ -6,7 +6,7 @@ ENGINE_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"
 
 VERSION="${VERSION:-}"
 if [[ -z "${VERSION}" ]]; then
-  echo "VERSION is required, for example: VERSION=0.5.69 $0" >&2
+  echo "VERSION is required, for example: VERSION=0.5.70 $0" >&2
   exit 2
 fi
 
@@ -139,6 +139,11 @@ repos:
 agent:
   required_bins:
     - ruby
+    - sh
+publish:
+  commit_preflight:
+    commands:
+      - sh -c 'test -f SMOKE.txt'
 runtime:
   max_steps: 20
   agent_attempts: 120
