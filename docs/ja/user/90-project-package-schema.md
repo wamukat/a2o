@@ -301,6 +301,8 @@ decomposition では、`include_child` は refactoring work を通常の child d
 
 `agent` はホスト側ワークスペース、プロダクトのツールチェーン要件、実行コマンド要件を持つ。`required_bins` は、エージェントが作業開始前に前提条件を検証できるよう宣言的に残す。省略した場合、A2O は host-agent の最低要件である `git` だけを確認し、Node、npm、Maven、Gradle などのプロダクト固有ツールは仮定しない。
 
+ツールチェーン固有の環境変数も project package の責務である。A2O は `A2O_WORKSPACE_ROOT` や `AUTOMATION_ISSUE_WORKSPACE` のような汎用 workspace path は公開するが、Maven、npm、Gradle、言語固有 cache の環境変数は注入しない。必要な値は phase executor の `env` または package command script に置く。
+
 `runtime` は実行時の既定値とフェーズ定義を持つ。
 
 ## Runtime Decomposition

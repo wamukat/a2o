@@ -297,6 +297,8 @@ For decomposition, `include_child` means the proposal should include a normal ch
 
 `agent.required_bins` lists project-owned commands that must exist where `a2o-agent` runs, such as the product toolchain and the configured AI worker executable. If it is omitted, A2O checks only its own minimum host-agent prerequisite, `git`; it does not assume product-specific tools such as Node, npm, Maven, or Gradle.
 
+Toolchain-specific environment variables are also package-owned. A2O exposes generic workspace paths such as `A2O_WORKSPACE_ROOT` and `AUTOMATION_ISSUE_WORKSPACE`, but it does not inject Maven, npm, Gradle, or language-specific cache variables. Put those values in the phase executor `env` block or in package command scripts.
+
 `agent.workspace_root` is disposable runtime output. It should normally live under `.work/a2o/`.
 
 ## Runtime Decomposition

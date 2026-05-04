@@ -26,6 +26,7 @@ This document defines how far the A2O core runtime goes and where it delegates t
 - repo slot aliases and source paths
 - build, test, and formatting commands
 - `a2o-agent` environment prerequisites
+- product/toolchain-specific environment variables and cache settings
 - verification task templates
 - project-specific initialization, remediation, and verification hooks
 

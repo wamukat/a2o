@@ -340,8 +340,7 @@ RSpec.describe A3::Infra::AgentMergeRunner do
         expect(request.args).to eq(["--resolve"])
         expect(request.env.fetch("A3_EXTRA")).to eq("1")
         expect(request.env).to include(
-          "AUTOMATION_ISSUE_WORKSPACE" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo_alpha",
-          "MAVEN_REPO_LOCAL" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo_alpha/.work/m2/repository"
+          "AUTOMATION_ISSUE_WORKSPACE" => "/agent/workspaces/merge-Sample-42-run-merge-1/repo_alpha"
         )
         client.complete(job_id, agent_result(job_id, workspace_descriptor({}), summary: "recovery worker resolved conflict"))
       when "a2o-agent-merge-recovery"

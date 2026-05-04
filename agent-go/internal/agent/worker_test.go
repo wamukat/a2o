@@ -420,7 +420,6 @@ func TestWorkerUsesEngineProvidedAgentEnvironmentForMaterialization(t *testing.T
 			value: "true",
 			checks: map[string]string{
 				"AUTOMATION_ISSUE_WORKSPACE": filepath.Join(tmp, "engine-managed-workspaces", "Sample-42-ticket"),
-				"MAVEN_REPO_LOCAL":           filepath.Join(tmp, "engine-managed-workspaces", "Sample-42-ticket", ".work", "m2", "repository"),
 			},
 		},
 		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },

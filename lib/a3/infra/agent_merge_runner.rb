@@ -314,8 +314,7 @@ module A3
         return {} if workspace_root.to_s.empty? || workspace_root == "."
 
         {
-          "AUTOMATION_ISSUE_WORKSPACE" => workspace_root,
-          "MAVEN_REPO_LOCAL" => File.join(workspace_root, ".work", "m2", "repository")
+          "AUTOMATION_ISSUE_WORKSPACE" => workspace_root
         }
       end
 
