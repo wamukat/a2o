@@ -626,9 +626,11 @@ func TestPublishWorkspaceChangesRunsCommitHooksWhenRequested(t *testing.T) {
 	installFailingPreCommitHook(t, alphaRoot)
 	request := testWorkspaceRequest("repo-alpha")
 	request.PublishPolicy = &WorkspacePublishPolicy{
-		Mode:             "commit_all_edit_target_changes_on_worker_success",
-		CommitMessage:    "A3 implementation update for Sample#42",
-		CommitHookPolicy: "run",
+		Mode:          "commit_all_edit_target_changes_on_worker_success",
+		CommitMessage: "A3 implementation update for Sample#42",
+		CommitPreflight: WorkspaceCommitPreflight{
+			NativeGitHooks: "run",
+		},
 	}
 	materializer := WorkspaceMaterializer{
 		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),

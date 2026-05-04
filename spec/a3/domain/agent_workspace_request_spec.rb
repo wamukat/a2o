@@ -13,7 +13,9 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       publish_policy: {
         mode: "commit_declared_changes_on_success",
         commit_message: "A2O implementation update for Sample#42",
-        commit_hook_policy: "run"
+        commit_preflight: {
+          native_git_hooks: "run"
+        }
       },
       slots: {
         repo_alpha: {
@@ -40,7 +42,9 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       "publish_policy" => {
         "mode" => "commit_declared_changes_on_success",
         "commit_message" => "A2O implementation update for Sample#42",
-        "commit_hook_policy" => "run"
+        "commit_preflight" => {
+          "native_git_hooks" => "run"
+        }
       },
       "slots" => {
         "repo_alpha" => {
@@ -191,7 +195,7 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
     end.to raise_error(A3::Domain::ConfigurationError, /unsupported agent workspace publish_policy mode/)
   end
 
-  it "defaults publish commit hook policy to bypass and rejects unknown values" do
+  it "defaults publish commit preflight native git hooks to bypass and rejects unknown values" do
     request = described_class.new(
       mode: :agent_materialized,
       workspace_kind: :ticket_workspace,
@@ -215,7 +219,7 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
       }
     )
 
-    expect(request.publish_policy.fetch("commit_hook_policy")).to eq("bypass")
+    expect(request.publish_policy.fetch("commit_preflight").fetch("native_git_hooks")).to eq("bypass")
 
     expect do
       described_class.new(
@@ -227,7 +231,9 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
         publish_policy: {
           mode: "commit_declared_changes_on_success",
           commit_message: "A2O implementation update for Sample#42",
-          commit_hook_policy: "sometimes"
+          commit_preflight: {
+            native_git_hooks: "sometimes"
+          }
         },
         slots: {
           repo_alpha: {
@@ -241,10 +247,10 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
           }
         }
       )
-    end.to raise_error(A3::Domain::ConfigurationError, /unsupported agent workspace publish_policy commit_hook_policy/)
+    end.to raise_error(A3::Domain::ConfigurationError, /unsupported agent workspace publish_policy commit_preflight\.native_git_hooks/)
   end
 
-  it "rejects explicit nil publish commit hook policy instead of defaulting it" do
+  it "rejects explicit nil publish commit preflight native git hooks instead of defaulting it" do
     expect do
       described_class.new(
         mode: :agent_materialized,
@@ -255,7 +261,9 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
         publish_policy: {
           mode: "commit_declared_changes_on_success",
           commit_message: "A2O implementation update for Sample#42",
-          commit_hook_policy: nil
+          commit_preflight: {
+            native_git_hooks: nil
+          }
         },
         slots: {
           repo_alpha: {
@@ -269,6 +277,6 @@ RSpec.describe A3::Domain::AgentWorkspaceRequest do
           }
         }
       )
-    end.to raise_error(A3::Domain::ConfigurationError, /publish policy commit_hook_policy must be provided/)
+    end.to raise_error(A3::Domain::ConfigurationError, /publish policy commit_preflight\.native_git_hooks must be provided/)
   end
 end

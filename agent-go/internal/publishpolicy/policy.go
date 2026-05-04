@@ -6,32 +6,32 @@ import (
 )
 
 const (
-	CommitHookBypass = "bypass"
-	CommitHookRun    = "run"
+	NativeGitHooksBypass = "bypass"
+	NativeGitHooksRun    = "run"
 )
 
-func NormalizeCommitHook(policy string) string {
+func NormalizeNativeGitHooks(policy string) string {
 	policy = strings.TrimSpace(policy)
 	if policy == "" {
-		return CommitHookBypass
+		return NativeGitHooksBypass
 	}
 	return policy
 }
 
-func ValidCommitHook(policy string) bool {
-	return policy == CommitHookBypass || policy == CommitHookRun
+func ValidNativeGitHooks(policy string) bool {
+	return policy == NativeGitHooksBypass || policy == NativeGitHooksRun
 }
 
-func ValidateCommitHook(policy string) error {
-	if ValidCommitHook(NormalizeCommitHook(policy)) {
+func ValidateNativeGitHooks(policy string) error {
+	if ValidNativeGitHooks(NormalizeNativeGitHooks(policy)) {
 		return nil
 	}
-	return fmt.Errorf("commit_hook_policy must be %s or %s", CommitHookBypass, CommitHookRun)
+	return fmt.Errorf("commit_preflight.native_git_hooks must be %s or %s", NativeGitHooksBypass, NativeGitHooksRun)
 }
 
-func ValidateConfiguredCommitHook(policy string) error {
-	if ValidCommitHook(policy) {
+func ValidateConfiguredNativeGitHooks(policy string) error {
+	if ValidNativeGitHooks(policy) {
 		return nil
 	}
-	return fmt.Errorf("commit_hook_policy must be %s or %s", CommitHookBypass, CommitHookRun)
+	return fmt.Errorf("commit_preflight.native_git_hooks must be %s or %s", NativeGitHooksBypass, NativeGitHooksRun)
 }

@@ -88,12 +88,14 @@ module A3
         record = value.transform_keys(&:to_s)
         mode = required_string(record.fetch("mode"), "publish policy mode")
         raise ConfigurationError, "unsupported agent workspace publish_policy mode: #{mode}" unless PUBLISH_POLICY_MODES.include?(mode)
-        commit_hook_policy = A3::Domain::AgentWorkspacePublishPolicy.commit_hook_policy_from(record)
+        native_git_hooks = A3::Domain::AgentWorkspacePublishPolicy.native_git_hooks_from(record)
 
         {
           "mode" => mode,
           "commit_message" => required_string(record.fetch("commit_message"), "publish policy commit_message"),
-          "commit_hook_policy" => A3::Domain::AgentWorkspacePublishPolicy.normalize_commit_hook_policy(commit_hook_policy)
+          "commit_preflight" => {
+            "native_git_hooks" => A3::Domain::AgentWorkspacePublishPolicy.normalize_native_git_hooks(native_git_hooks)
+          }
         }.freeze
       end
 

@@ -1,20 +1,20 @@
 # frozen_string_literal: true
 
 RSpec.describe A3::Domain::AgentWorkspacePublishPolicy do
-  it "defaults missing commit hook policy to bypass" do
-    expect(described_class.commit_hook_policy_from({})).to eq("bypass")
+  it "defaults missing commit preflight native git hooks to bypass" do
+    expect(described_class.native_git_hooks_from({})).to eq("bypass")
   end
 
-  it "normalizes supported commit hook policies and rejects unknown values" do
-    expect(described_class.normalize_commit_hook_policy("bypass")).to eq("bypass")
-    expect(described_class.normalize_commit_hook_policy("run")).to eq("run")
+  it "normalizes supported commit preflight native git hook policies and rejects unknown values" do
+    expect(described_class.normalize_native_git_hooks("bypass")).to eq("bypass")
+    expect(described_class.normalize_native_git_hooks("run")).to eq("run")
 
     expect do
-      described_class.normalize_commit_hook_policy("sometimes")
-    end.to raise_error(A3::Domain::ConfigurationError, /unsupported agent workspace publish_policy commit_hook_policy/)
+      described_class.normalize_native_git_hooks("sometimes")
+    end.to raise_error(A3::Domain::ConfigurationError, /unsupported agent workspace publish_policy commit_preflight\.native_git_hooks/)
   end
 
-  it "keeps explicit nil distinct from a missing commit hook policy" do
-    expect(described_class.commit_hook_policy_from("commit_hook_policy" => nil)).to eq("")
+  it "keeps explicit nil distinct from a missing native git hooks setting" do
+    expect(described_class.native_git_hooks_from("commit_preflight" => { "native_git_hooks" => nil })).to eq("")
   end
 end

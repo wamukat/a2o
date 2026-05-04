@@ -787,54 +787,54 @@ func runRuntimeRunOnce(args []string, runner commandRunner, stdout io.Writer, st
 }
 
 type runtimeRunOncePlan struct {
-	ProjectKey                      string
-	MultiProjectMode                bool
-	ComposePrefix                   []string
-	MaxSteps                        string
-	AgentAttempts                   int
-	AgentIdleLimit                  int
-	AgentPollInterval               time.Duration
-	AgentControlPlaneConnectTimeout time.Duration
-	AgentControlPlaneRequestTimeout time.Duration
-	AgentControlPlaneRetryCount     int
-	AgentControlPlaneRetryDelay     time.Duration
-	AgentPort                       string
-	AgentInternalPort               string
-	StorageDir                      string
-	HostRootDir                     string
-	HostRoot                        string
-	WorkspaceRoot                   string
-	HostAgentBin                    string
-	HostAgentSource                 string
-	HostAgentTarget                 string
-	HostAgentLog                    string
-	LiveLogRoot                     string
-	AIRawLogRoot                    string
-	LauncherConfigPath              string
-	LauncherConfig                  map[string]any
-	ServerLog                       string
-	RuntimeLog                      string
-	RuntimeExitFile                 string
-	RuntimePIDFile                  string
-	ServerPIDFile                   string
-	PresetDir                       string
-	ManifestPath                    string
-	SoloBoardInternalURL            string
-	LiveRef                         string
-	AgentEnv                        []string
-	AgentSourcePaths                []string
-	AgentRequiredBins               []string
-	AgentSourceAliases              []string
-	AgentPublishCommitHookPolicy    string
-	KanbanProject                   string
-	KanbanStatus                    string
-	KanbanRepoLabels                []string
-	RepoSources                     []string
-	LocalSourceAliases              []string
-	WorkerCommand                   string
-	WorkerArgs                      []string
-	JobTimeoutSeconds               string
-	BranchNamespace                 string
+	ProjectKey                                string
+	MultiProjectMode                          bool
+	ComposePrefix                             []string
+	MaxSteps                                  string
+	AgentAttempts                             int
+	AgentIdleLimit                            int
+	AgentPollInterval                         time.Duration
+	AgentControlPlaneConnectTimeout           time.Duration
+	AgentControlPlaneRequestTimeout           time.Duration
+	AgentControlPlaneRetryCount               int
+	AgentControlPlaneRetryDelay               time.Duration
+	AgentPort                                 string
+	AgentInternalPort                         string
+	StorageDir                                string
+	HostRootDir                               string
+	HostRoot                                  string
+	WorkspaceRoot                             string
+	HostAgentBin                              string
+	HostAgentSource                           string
+	HostAgentTarget                           string
+	HostAgentLog                              string
+	LiveLogRoot                               string
+	AIRawLogRoot                              string
+	LauncherConfigPath                        string
+	LauncherConfig                            map[string]any
+	ServerLog                                 string
+	RuntimeLog                                string
+	RuntimeExitFile                           string
+	RuntimePIDFile                            string
+	ServerPIDFile                             string
+	PresetDir                                 string
+	ManifestPath                              string
+	SoloBoardInternalURL                      string
+	LiveRef                                   string
+	AgentEnv                                  []string
+	AgentSourcePaths                          []string
+	AgentRequiredBins                         []string
+	AgentSourceAliases                        []string
+	AgentPublishCommitPreflightNativeGitHooks string
+	KanbanProject                             string
+	KanbanStatus                              string
+	KanbanRepoLabels                          []string
+	RepoSources                               []string
+	LocalSourceAliases                        []string
+	WorkerCommand                             string
+	WorkerArgs                                []string
+	JobTimeoutSeconds                         string
+	BranchNamespace                           string
 }
 
 type runtimeRunOnceOverrides struct {
@@ -1029,7 +1029,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 	if len(requiredBins) == 0 {
 		requiredBins = []string{"git"}
 	}
-	publishCommitHookPolicy := envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_PUBLISH_COMMIT_HOOK_POLICY", "A3_RUNTIME_RUN_ONCE_AGENT_PUBLISH_COMMIT_HOOK_POLICY", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_PUBLISH_COMMIT_HOOK_POLICY", "A3_RUNTIME_SCHEDULER_AGENT_PUBLISH_COMMIT_HOOK_POLICY", envDefaultValue(packageConfig.PublishCommitHookPolicy, "bypass")))
+	publishCommitPreflightNativeGitHooks := envDefaultValue(packageConfig.PublishCommitPreflightNativeGitHooks, "bypass")
 	defaultMaxSteps := envDefaultValue(packageConfig.MaxSteps, "16")
 	defaultLiveRef := envDefaultValue(packageConfig.LiveRef, "refs/heads/feature/prototype")
 	defaultKanbanProject := envDefaultValue(config.KanbanProject, packageConfig.KanbanProject)
@@ -1080,19 +1080,19 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 			"A2O_AGENT_LIVE_LOG_ROOT=" + envDefaultCompat("A2O_AGENT_LIVE_LOG_ROOT", "A3_AGENT_LIVE_LOG_ROOT", filepath.Join(hostRoot, "live-logs")),
 			"A2O_AGENT_AI_RAW_LOG_ROOT=" + envDefaultCompat("A2O_AGENT_AI_RAW_LOG_ROOT", "A3_AGENT_AI_RAW_LOG_ROOT", filepath.Join(hostRoot, "ai-raw-logs")),
 		}, projectAgentEnv(projectKey, config.MultiProjectMode)...),
-		AgentSourcePaths:             envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS", "A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS", "A2O_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS", agentSourcePaths),
-		AgentRequiredBins:            envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_AGENT_REQUIRED_BINS", "A3_RUNTIME_RUN_ONCE_AGENT_REQUIRED_BINS", "A2O_RUNTIME_SCHEDULER_AGENT_REQUIRED_BINS", "A3_RUNTIME_SCHEDULER_AGENT_REQUIRED_BINS", requiredBins),
-		AgentSourceAliases:           envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_AGENT_SOURCE_ALIASES", "A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_ALIASES", "A2O_RUNTIME_SCHEDULER_AGENT_SOURCE_ALIASES", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_ALIASES", agentSourceAliases),
-		AgentPublishCommitHookPolicy: publishCommitHookPolicy,
-		KanbanProject:                envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_PROJECT", "A3_RUNTIME_RUN_ONCE_KANBAN_PROJECT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_PROJECT", "A3_RUNTIME_SCHEDULER_KANBAN_PROJECT", defaultKanbanProject)),
-		KanbanStatus:                 envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_STATUS", "A3_RUNTIME_RUN_ONCE_KANBAN_STATUS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_STATUS", "A3_RUNTIME_SCHEDULER_KANBAN_STATUS", defaultKanbanStatus)),
-		KanbanRepoLabels:             envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A3_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A2O_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", "A3_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", repoLabels),
-		RepoSources:                  envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_REPO_SOURCES", "A3_RUNTIME_RUN_ONCE_REPO_SOURCES", "A2O_RUNTIME_SCHEDULER_REPO_SOURCES", "A3_RUNTIME_SCHEDULER_REPO_SOURCES", repoSources),
-		LocalSourceAliases:           envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_LOCAL_SOURCE_ALIASES", "A3_RUNTIME_RUN_ONCE_LOCAL_SOURCE_ALIASES", "A2O_RUNTIME_SCHEDULER_LOCAL_SOURCE_ALIASES", "A3_RUNTIME_SCHEDULER_LOCAL_SOURCE_ALIASES", localSourceAliases),
-		WorkerCommand:                workerCommand,
-		WorkerArgs:                   workerArgs,
-		JobTimeoutSeconds:            envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_JOB_TIMEOUT_SECONDS", "A3_RUNTIME_RUN_ONCE_AGENT_JOB_TIMEOUT_SECONDS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_JOB_TIMEOUT_SECONDS", "A3_RUNTIME_SCHEDULER_AGENT_JOB_TIMEOUT_SECONDS", "7200")),
-		BranchNamespace:              defaultProjectBranchNamespace(config),
+		AgentSourcePaths:                          envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS", "A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_PATHS", "A2O_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_PATHS", agentSourcePaths),
+		AgentRequiredBins:                         envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_AGENT_REQUIRED_BINS", "A3_RUNTIME_RUN_ONCE_AGENT_REQUIRED_BINS", "A2O_RUNTIME_SCHEDULER_AGENT_REQUIRED_BINS", "A3_RUNTIME_SCHEDULER_AGENT_REQUIRED_BINS", requiredBins),
+		AgentSourceAliases:                        envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_AGENT_SOURCE_ALIASES", "A3_RUNTIME_RUN_ONCE_AGENT_SOURCE_ALIASES", "A2O_RUNTIME_SCHEDULER_AGENT_SOURCE_ALIASES", "A3_RUNTIME_SCHEDULER_AGENT_SOURCE_ALIASES", agentSourceAliases),
+		AgentPublishCommitPreflightNativeGitHooks: publishCommitPreflightNativeGitHooks,
+		KanbanProject:                             envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_PROJECT", "A3_RUNTIME_RUN_ONCE_KANBAN_PROJECT", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_PROJECT", "A3_RUNTIME_SCHEDULER_KANBAN_PROJECT", defaultKanbanProject)),
+		KanbanStatus:                              envDefaultCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_STATUS", "A3_RUNTIME_RUN_ONCE_KANBAN_STATUS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_KANBAN_STATUS", "A3_RUNTIME_SCHEDULER_KANBAN_STATUS", defaultKanbanStatus)),
+		KanbanRepoLabels:                          envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A3_RUNTIME_RUN_ONCE_KANBAN_REPO_LABELS", "A2O_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", "A3_RUNTIME_SCHEDULER_KANBAN_REPO_LABELS", repoLabels),
+		RepoSources:                               envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_REPO_SOURCES", "A3_RUNTIME_RUN_ONCE_REPO_SOURCES", "A2O_RUNTIME_SCHEDULER_REPO_SOURCES", "A3_RUNTIME_SCHEDULER_REPO_SOURCES", repoSources),
+		LocalSourceAliases:                        envDefaultListCompat("A2O_RUNTIME_RUN_ONCE_LOCAL_SOURCE_ALIASES", "A3_RUNTIME_RUN_ONCE_LOCAL_SOURCE_ALIASES", "A2O_RUNTIME_SCHEDULER_LOCAL_SOURCE_ALIASES", "A3_RUNTIME_SCHEDULER_LOCAL_SOURCE_ALIASES", localSourceAliases),
+		WorkerCommand:                             workerCommand,
+		WorkerArgs:                                workerArgs,
+		JobTimeoutSeconds:                         envDefaultCompat("A2O_RUNTIME_RUN_ONCE_AGENT_JOB_TIMEOUT_SECONDS", "A3_RUNTIME_RUN_ONCE_AGENT_JOB_TIMEOUT_SECONDS", envDefaultCompat("A2O_RUNTIME_SCHEDULER_AGENT_JOB_TIMEOUT_SECONDS", "A3_RUNTIME_SCHEDULER_AGENT_JOB_TIMEOUT_SECONDS", "7200")),
+		BranchNamespace:                           defaultProjectBranchNamespace(config),
 	}, nil
 }
 
@@ -1699,7 +1699,7 @@ func executeUntilIdleArgs(plan runtimeRunOncePlan) []string {
 		"--agent-support-ref", plan.LiveRef,
 		"--agent-workspace-root", plan.WorkspaceRoot,
 		"--agent-workspace-cleanup-policy", "cleanup_after_job",
-		"--agent-publish-commit-hook-policy", plan.AgentPublishCommitHookPolicy,
+		"--agent-publish-commit-preflight-native-git-hooks", plan.AgentPublishCommitPreflightNativeGitHooks,
 		"--agent-job-timeout-seconds", plan.JobTimeoutSeconds,
 		"--agent-job-poll-interval-seconds", "1.0",
 		"--worker-command", plan.WorkerCommand,

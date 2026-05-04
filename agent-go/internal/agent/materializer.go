@@ -975,17 +975,17 @@ func PublishWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceReques
 		if err != nil {
 			return err
 		}
-		return publishDeclaredWorkspaceChanges(prepared, request, declaredChangedFiles, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeCommitHook(policy.CommitHookPolicy))
+		return publishDeclaredWorkspaceChanges(prepared, request, declaredChangedFiles, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeNativeGitHooks(policy.CommitPreflight.NativeGitHooks))
 	case "commit_all_edit_target_changes_on_worker_success":
 		if workerProtocolResult == nil || workerProtocolResult["success"] != true {
 			return nil
 		}
-		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeCommitHook(policy.CommitHookPolicy))
+		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeNativeGitHooks(policy.CommitPreflight.NativeGitHooks))
 	case "commit_all_edit_target_changes_on_success":
 		if !commandSucceeded {
 			return nil
 		}
-		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeCommitHook(policy.CommitHookPolicy))
+		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeNativeGitHooks(policy.CommitPreflight.NativeGitHooks))
 	default:
 		return fmt.Errorf("unsupported publish policy mode: %s", policy.Mode)
 	}
@@ -1056,12 +1056,12 @@ func buildPublishPlans(prepared PreparedWorkspace, request WorkspaceRequest, cha
 	return plans, nil
 }
 
-func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commitMessage string, commitHookPolicy string) error {
+func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commitMessage string, nativeGitHooks string) error {
 	if commitMessage == "" {
 		commitMessage = "A2O agent implementation update"
 	}
-	if !publishpolicy.ValidCommitHook(commitHookPolicy) {
-		return fmt.Errorf("unsupported publish commit_hook_policy: %s", commitHookPolicy)
+	if !publishpolicy.ValidNativeGitHooks(nativeGitHooks) {
+		return fmt.Errorf("unsupported publish commit_preflight.native_git_hooks: %s", nativeGitHooks)
 	}
 	published := []publishPlan{}
 	beforeHeads := map[string]string{}
@@ -1089,7 +1089,7 @@ func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commit
 			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
 			return err
 		}
-		if err := runGit(plan.runtimePath, commitArgs(commitMessage, commitHookPolicy)...); err != nil {
+		if err := runGit(plan.runtimePath, commitArgs(commitMessage, nativeGitHooks)...); err != nil {
 			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
 			return err
 		}
@@ -1108,9 +1108,9 @@ func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commit
 	return nil
 }
 
-func commitArgs(commitMessage string, commitHookPolicy string) []string {
+func commitArgs(commitMessage string, nativeGitHooks string) []string {
 	args := []string{"-c", "user.name=A3 Agent", "-c", "user.email=a2o-agent@example.invalid", "commit", "--no-gpg-sign"}
-	if commitHookPolicy != publishpolicy.CommitHookRun {
+	if nativeGitHooks != publishpolicy.NativeGitHooksRun {
 		args = append(args, "--no-verify")
 	}
 	return append(args, "-m", commitMessage)

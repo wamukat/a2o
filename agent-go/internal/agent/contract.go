@@ -96,9 +96,13 @@ type WorkspaceTopology struct {
 }
 
 type WorkspacePublishPolicy struct {
-	Mode             string `json:"mode"`
-	CommitMessage    string `json:"commit_message"`
-	CommitHookPolicy string `json:"commit_hook_policy,omitempty"`
+	Mode            string                   `json:"mode"`
+	CommitMessage   string                   `json:"commit_message"`
+	CommitPreflight WorkspaceCommitPreflight `json:"commit_preflight,omitempty"`
+}
+
+type WorkspaceCommitPreflight struct {
+	NativeGitHooks string `json:"native_git_hooks,omitempty"`
 }
 
 type WorkspaceSlotRequest struct {

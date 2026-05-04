@@ -940,7 +940,7 @@ runtime:
 	}
 }
 
-func TestProjectPackageLoaderAcceptsPublishCommitHookPolicy(t *testing.T) {
+func TestProjectPackageLoaderAcceptsPublishCommitPreflightNativeGitHooks(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "project-package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -948,14 +948,15 @@ func TestProjectPackageLoaderAcceptsPublishCommitHookPolicy(t *testing.T) {
 	}
 	body := `schema_version: 1
 package:
-  name: commit-hook-policy
+  name: commit-preflight
 kanban:
-  project: CommitHookPolicy
+  project: CommitPreflight
 repos:
   app:
     path: ..
 publish:
-  commit_hook_policy: run
+  commit_preflight:
+    native_git_hooks: run
 runtime:
   phases:
     implementation:
@@ -975,14 +976,14 @@ runtime:
 
 	config, err := loadProjectPackageConfig(packageDir)
 	if err != nil {
-		t.Fatalf("publish commit hook policy should load: %v", err)
+		t.Fatalf("publish commit preflight should load: %v", err)
 	}
-	if config.PublishCommitHookPolicy != "run" {
-		t.Fatalf("PublishCommitHookPolicy=%q, want run", config.PublishCommitHookPolicy)
+	if config.PublishCommitPreflightNativeGitHooks != "run" {
+		t.Fatalf("PublishCommitPreflightNativeGitHooks=%q, want run", config.PublishCommitPreflightNativeGitHooks)
 	}
 }
 
-func TestProjectPackageLoaderRejectsUnsupportedPublishCommitHookPolicy(t *testing.T) {
+func TestProjectPackageLoaderRejectsUnsupportedPublishCommitPreflightNativeGitHooks(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "project-package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -990,14 +991,15 @@ func TestProjectPackageLoaderRejectsUnsupportedPublishCommitHookPolicy(t *testin
 	}
 	body := `schema_version: 1
 package:
-  name: bad-commit-hook-policy
+  name: bad-commit-preflight
 kanban:
-  project: CommitHookPolicy
+  project: CommitPreflight
 repos:
   app:
     path: ..
 publish:
-  commit_hook_policy: sometimes
+  commit_preflight:
+    native_git_hooks: sometimes
 runtime:
   phases:
     implementation:
@@ -1016,12 +1018,12 @@ runtime:
 	}
 
 	_, err := loadProjectPackageConfig(packageDir)
-	if err == nil || !strings.Contains(err.Error(), "publish") || !strings.Contains(err.Error(), "commit_hook_policy must be bypass or run") {
-		t.Fatalf("expected publish commit hook policy validation error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "publish") || !strings.Contains(err.Error(), "commit_preflight.native_git_hooks must be bypass or run") {
+		t.Fatalf("expected publish commit preflight validation error, got %v", err)
 	}
 }
 
-func TestProjectPackageLoaderRejectsBlankPublishCommitHookPolicy(t *testing.T) {
+func TestProjectPackageLoaderRejectsBlankPublishCommitPreflightNativeGitHooks(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "project-package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -1029,14 +1031,15 @@ func TestProjectPackageLoaderRejectsBlankPublishCommitHookPolicy(t *testing.T) {
 	}
 	body := `schema_version: 1
 package:
-  name: blank-commit-hook-policy
+  name: blank-commit-preflight
 kanban:
-  project: CommitHookPolicy
+  project: CommitPreflight
 repos:
   app:
     path: ..
 publish:
-  commit_hook_policy: "   "
+  commit_preflight:
+    native_git_hooks: "   "
 runtime:
   phases:
     implementation:
@@ -1055,8 +1058,8 @@ runtime:
 	}
 
 	_, err := loadProjectPackageConfig(packageDir)
-	if err == nil || !strings.Contains(err.Error(), "publish") || !strings.Contains(err.Error(), "commit_hook_policy must be bypass or run") {
-		t.Fatalf("expected blank publish commit hook policy validation error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "publish") || !strings.Contains(err.Error(), "commit_preflight.native_git_hooks must be bypass or run") {
+		t.Fatalf("expected blank publish commit preflight validation error, got %v", err)
 	}
 }
 
@@ -7526,7 +7529,7 @@ func TestRuntimeRunOncePlanPropagatesProjectKeyToAgentEnv(t *testing.T) {
 	}
 }
 
-func TestRuntimeRunOncePlanPropagatesPublishCommitHookPolicy(t *testing.T) {
+func TestRuntimeRunOncePlanPropagatesPublishCommitPreflightNativeGitHooks(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
 	if err := os.MkdirAll(packageDir, 0o755); err != nil {
@@ -7538,7 +7541,7 @@ func TestRuntimeRunOncePlanPropagatesPublishCommitHookPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body = bytes.Replace(body, []byte("runtime:\n"), []byte("publish:\n  commit_hook_policy: run\nruntime:\n"), 1)
+	body = bytes.Replace(body, []byte("runtime:\n"), []byte("publish:\n  commit_preflight:\n    native_git_hooks: run\nruntime:\n"), 1)
 	if err := os.WriteFile(projectYamlPath, body, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -7556,12 +7559,12 @@ func TestRuntimeRunOncePlanPropagatesPublishCommitHookPolicy(t *testing.T) {
 		t.Fatalf("buildRuntimeRunOncePlan failed: %v", err)
 	}
 
-	if plan.AgentPublishCommitHookPolicy != "run" {
-		t.Fatalf("AgentPublishCommitHookPolicy=%q, want run", plan.AgentPublishCommitHookPolicy)
+	if plan.AgentPublishCommitPreflightNativeGitHooks != "run" {
+		t.Fatalf("AgentPublishCommitPreflightNativeGitHooks=%q, want run", plan.AgentPublishCommitPreflightNativeGitHooks)
 	}
 	args := executeUntilIdleArgs(plan)
-	if !containsString(args, "--agent-publish-commit-hook-policy") || !containsString(args, "run") {
-		t.Fatalf("runtime args should pass hook policy, got %#v", args)
+	if !containsString(args, "--agent-publish-commit-preflight-native-git-hooks") || !containsString(args, "run") {
+		t.Fatalf("runtime args should pass commit preflight native git hooks, got %#v", args)
 	}
 }
 

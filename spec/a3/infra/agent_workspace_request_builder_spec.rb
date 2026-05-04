@@ -32,7 +32,9 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     expect(request.publish_policy).to eq(
       "mode" => "commit_all_edit_target_changes_on_worker_success",
       "commit_message" => "A2O implementation update for Sample#42",
-      "commit_hook_policy" => "bypass"
+      "commit_preflight" => {
+        "native_git_hooks" => "bypass"
+      }
     )
     expect(request.slots.keys).to eq(%w[repo_alpha repo_beta])
     expect(request.slots.fetch("repo_alpha")).to include(
@@ -275,23 +277,29 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     expect(request.publish_policy).to eq(
       "mode" => "commit_all_edit_target_changes_on_success",
       "commit_message" => "A2O remediation update for Sample#42",
-      "commit_hook_policy" => "bypass"
+      "commit_preflight" => {
+        "native_git_hooks" => "bypass"
+      }
     )
     expect(request.slots.fetch("repo_alpha")).to include("access" => "read_write", "ownership" => "edit_target")
     expect(request.slots.fetch("repo_beta")).to include("access" => "read_only", "ownership" => "support")
   end
 
-  it "passes an explicit publish commit hook policy into publishable requests" do
+  it "passes an explicit publish commit preflight native git hooks policy into publishable requests" do
     request = described_class.new(
       source_aliases: {
         repo_alpha: "sample-alpha",
         repo_beta: "sample-beta"
       },
       support_ref: "refs/heads/feature/prototype",
-      publish_commit_hook_policy: "run"
+      publish_commit_preflight_native_git_hooks: "run"
     ).call(workspace: workspace, task: task, run: run(:implementation))
 
-    expect(request.publish_policy).to include("commit_hook_policy" => "run")
+    expect(request.publish_policy).to include(
+      "commit_preflight" => {
+        "native_git_hooks" => "run"
+      }
+    )
   end
 
   it "keeps metrics collection commands read-only and non-publishable" do

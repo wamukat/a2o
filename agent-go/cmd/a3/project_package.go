@@ -13,25 +13,25 @@ import (
 )
 
 type projectPackageConfig struct {
-	SchemaVersion                   string
-	PackageName                     string
-	KanbanProject                   string
-	KanbanLabels                    []string
-	KanbanStatus                    string
-	LiveRef                         string
-	MaxSteps                        string
-	AgentAttempts                   string
-	AgentPollInterval               string
-	AgentControlPlaneConnectTimeout string
-	AgentControlPlaneRequestTimeout string
-	AgentControlPlaneRetryCount     string
-	AgentControlPlaneRetryDelay     string
-	AgentWorkspaceRoot              string
-	AgentRequiredBins               []string
-	PublishCommitHookPolicy         string
-	SchedulerMaxParallelTasks       string
-	Executor                        map[string]any
-	Repos                           map[string]projectPackageRepo
+	SchemaVersion                        string
+	PackageName                          string
+	KanbanProject                        string
+	KanbanLabels                         []string
+	KanbanStatus                         string
+	LiveRef                              string
+	MaxSteps                             string
+	AgentAttempts                        string
+	AgentPollInterval                    string
+	AgentControlPlaneConnectTimeout      string
+	AgentControlPlaneRequestTimeout      string
+	AgentControlPlaneRetryCount          string
+	AgentControlPlaneRetryDelay          string
+	AgentWorkspaceRoot                   string
+	AgentRequiredBins                    []string
+	PublishCommitPreflightNativeGitHooks string
+	SchedulerMaxParallelTasks            string
+	Executor                             map[string]any
+	Repos                                map[string]projectPackageRepo
 }
 
 type projectPackageRepo struct {
@@ -84,7 +84,7 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	config.AgentControlPlaneRetryDelay = scalarString(payload.Runtime.AgentControlPlaneRetryDelay)
 	config.AgentWorkspaceRoot = payload.Agent.WorkspaceRoot
 	config.AgentRequiredBins = payload.Agent.RequiredBins
-	config.PublishCommitHookPolicy = scalarString(payload.Publish.CommitHookPolicy)
+	config.PublishCommitPreflightNativeGitHooks = scalarString(payload.Publish.CommitPreflight.NativeGitHooks)
 	config.SchedulerMaxParallelTasks = scalarString(projectSchedulerRawMaxParallelTasks(runtimePayload))
 	if strings.TrimSpace(config.SchemaVersion) == "" {
 		return config, fmt.Errorf("project package config %s is missing schema_version", projectFile)
@@ -236,7 +236,9 @@ type projectPackageYAML struct {
 		RequiredBins  []string `yaml:"required_bins"`
 	} `yaml:"agent"`
 	Publish struct {
-		CommitHookPolicy any `yaml:"commit_hook_policy"`
+		CommitPreflight struct {
+			NativeGitHooks any `yaml:"native_git_hooks"`
+		} `yaml:"commit_preflight"`
 	} `yaml:"publish"`
 	Runtime struct {
 		MaxSteps                        any                                `yaml:"max_steps"`
@@ -487,15 +489,28 @@ func validatePublishConfig(rawPublish any) error {
 		return fmt.Errorf("must be a mapping")
 	}
 	for key := range publish {
-		if key != "commit_hook_policy" {
+		if key != "commit_preflight" {
 			return fmt.Errorf("%s is not supported", key)
 		}
 	}
-	policy := scalarString(publish["commit_hook_policy"])
-	if policy == "" {
+	rawCommitPreflight, ok := publish["commit_preflight"]
+	if !ok || rawCommitPreflight == nil {
 		return nil
 	}
-	return publishpolicy.ValidateConfiguredCommitHook(policy)
+	commitPreflight, ok := normalizeYAMLValue(rawCommitPreflight).(map[string]any)
+	if !ok {
+		return fmt.Errorf("commit_preflight must be a mapping")
+	}
+	for key := range commitPreflight {
+		if key != "native_git_hooks" {
+			return fmt.Errorf("commit_preflight.%s is not supported", key)
+		}
+	}
+	if _, ok := commitPreflight["native_git_hooks"]; !ok {
+		return nil
+	}
+	policy := scalarString(commitPreflight["native_git_hooks"])
+	return publishpolicy.ValidateConfiguredNativeGitHooks(policy)
 }
 
 func rejectMergeTarget(runtimePayload map[string]any) error {

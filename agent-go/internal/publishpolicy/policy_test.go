@@ -2,28 +2,28 @@ package publishpolicy
 
 import "testing"
 
-func TestNormalizeCommitHookDefaultsBlankPolicyToBypass(t *testing.T) {
-	if got := NormalizeCommitHook("  "); got != CommitHookBypass {
-		t.Fatalf("NormalizeCommitHook blank = %q, want %q", got, CommitHookBypass)
+func TestNormalizeNativeGitHooksDefaultsBlankPolicyToBypass(t *testing.T) {
+	if got := NormalizeNativeGitHooks("  "); got != NativeGitHooksBypass {
+		t.Fatalf("NormalizeNativeGitHooks blank = %q, want %q", got, NativeGitHooksBypass)
 	}
 }
 
-func TestValidateCommitHookAcceptsKnownPolicies(t *testing.T) {
-	for _, policy := range []string{"", CommitHookBypass, CommitHookRun} {
-		if err := ValidateCommitHook(policy); err != nil {
-			t.Fatalf("ValidateCommitHook(%q) returned error: %v", policy, err)
+func TestValidateNativeGitHooksAcceptsKnownPolicies(t *testing.T) {
+	for _, policy := range []string{"", NativeGitHooksBypass, NativeGitHooksRun} {
+		if err := ValidateNativeGitHooks(policy); err != nil {
+			t.Fatalf("ValidateNativeGitHooks(%q) returned error: %v", policy, err)
 		}
 	}
 }
 
-func TestValidateCommitHookRejectsUnknownPolicy(t *testing.T) {
-	if err := ValidateCommitHook("sometimes"); err == nil {
-		t.Fatal("ValidateCommitHook should reject unknown policy")
+func TestValidateNativeGitHooksRejectsUnknownPolicy(t *testing.T) {
+	if err := ValidateNativeGitHooks("sometimes"); err == nil {
+		t.Fatal("ValidateNativeGitHooks should reject unknown policy")
 	}
 }
 
-func TestValidateConfiguredCommitHookRejectsExplicitBlankPolicy(t *testing.T) {
-	if err := ValidateConfiguredCommitHook("   "); err == nil {
-		t.Fatal("ValidateConfiguredCommitHook should reject explicit whitespace policy")
+func TestValidateConfiguredNativeGitHooksRejectsExplicitBlankPolicy(t *testing.T) {
+	if err := ValidateConfiguredNativeGitHooks("   "); err == nil {
+		t.Fatal("ValidateConfiguredNativeGitHooks should reject explicit whitespace policy")
 	}
 }

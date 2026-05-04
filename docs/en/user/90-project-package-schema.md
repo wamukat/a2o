@@ -59,7 +59,8 @@ agent:
     - npm
     - your-ai-worker
 publish:
-  commit_hook_policy: bypass
+  commit_preflight:
+    native_git_hooks: bypass
 runtime:
   max_steps: 20
   agent_attempts: 200
@@ -305,7 +306,9 @@ Toolchain-specific environment variables are also package-owned. A2O exposes gen
 
 ## Publish
 
-`publish.commit_hook_policy` controls whether A2O's agent-owned publish commit runs repository commit hooks.
+`publish.commit_preflight` defines A2O-managed checks that run when A2O creates an agent-owned publish commit.
+
+`publish.commit_preflight.native_git_hooks` controls whether A2O lets repository Git commit hooks run for that publish commit.
 
 - `bypass` is the default and preserves the historical behavior. A2O commits with `--no-verify`, so repository `pre-commit` hooks do not block the mechanical publish commit.
 - `run` is opt-in. A2O omits `--no-verify`, so configured Git commit hooks such as `pre-commit` can block the publish commit.

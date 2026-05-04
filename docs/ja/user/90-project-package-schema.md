@@ -65,7 +65,8 @@ agent:
     - npm
     - your-ai-worker
 publish:
-  commit_hook_policy: bypass
+  commit_preflight:
+    native_git_hooks: bypass
 
 runtime:
   max_steps: 20
@@ -307,7 +308,9 @@ decomposition では、`include_child` は refactoring work を通常の child d
 
 ## Publish
 
-`publish.commit_hook_policy` は、A2O が agent-owned workspace の変更を publish commit するときに、リポジトリの commit hook を実行するかを制御する。
+`publish.commit_preflight` は、A2O が agent-owned workspace の変更を publish commit するときに実行する、A2O 管理の commit 前チェックを定義する。
+
+`publish.commit_preflight.native_git_hooks` は、その publish commit でリポジトリの Git commit hook を実行させるかを制御する。
 
 - `bypass` が既定値で、従来どおり `--no-verify` 付きで commit する。`pre-commit` などの hook は A2O の機械的な publish commit を block しない。
 - `run` は opt-in で、A2O が `--no-verify` を付けずに commit する。設定済みの Git commit hook が publish commit を block できる。
