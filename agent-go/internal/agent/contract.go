@@ -1,5 +1,10 @@
 package agent
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 type SourceDescriptor struct {
 	WorkspaceKind string `json:"workspace_kind"`
 	SourceType    string `json:"source_type"`
@@ -101,8 +106,50 @@ type WorkspacePublishPolicy struct {
 	CommitPreflight WorkspaceCommitPreflight `json:"commit_preflight,omitempty"`
 }
 
+func (p *WorkspacePublishPolicy) UnmarshalJSON(data []byte) error {
+	type workspacePublishPolicy WorkspacePublishPolicy
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	for key := range raw {
+		switch key {
+		case "mode", "commit_message", "commit_preflight":
+		case "commit_hook_policy":
+			return fmt.Errorf("unsupported publish_policy.commit_hook_policy; use commit_preflight.native_git_hooks")
+		default:
+			return fmt.Errorf("unsupported publish_policy.%s", key)
+		}
+	}
+	var decoded workspacePublishPolicy
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*p = WorkspacePublishPolicy(decoded)
+	return nil
+}
+
 type WorkspaceCommitPreflight struct {
 	NativeGitHooks string `json:"native_git_hooks,omitempty"`
+}
+
+func (p *WorkspaceCommitPreflight) UnmarshalJSON(data []byte) error {
+	type workspaceCommitPreflight WorkspaceCommitPreflight
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	for key := range raw {
+		if key != "native_git_hooks" {
+			return fmt.Errorf("unsupported publish_policy.commit_preflight.%s", key)
+		}
+	}
+	var decoded workspaceCommitPreflight
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*p = WorkspaceCommitPreflight(decoded)
+	return nil
 }
 
 type WorkspaceSlotRequest struct {

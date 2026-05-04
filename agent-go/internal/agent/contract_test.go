@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -114,6 +115,36 @@ func TestJobRequestWorkspaceRequestRoundTrip(t *testing.T) {
 	}
 	if roundTrip.AgentEnvironment == nil || roundTrip.AgentEnvironment.SourcePaths["sample-catalog-service"] != "/agent/repos/starters" {
 		t.Fatalf("unexpected roundtrip agent environment: %#v", roundTrip.AgentEnvironment)
+	}
+}
+
+func TestWorkspacePublishPolicyRejectsRemovedCommitHookPolicy(t *testing.T) {
+	payload := []byte(`{
+		"mode": "commit_all_edit_target_changes_on_worker_success",
+		"commit_message": "A3 implementation update for Sample#42",
+		"commit_hook_policy": "run"
+	}`)
+
+	var policy WorkspacePublishPolicy
+	err := json.Unmarshal(payload, &policy)
+	if err == nil || !strings.Contains(err.Error(), "commit_hook_policy") || !strings.Contains(err.Error(), "commit_preflight.native_git_hooks") {
+		t.Fatalf("expected removed commit hook policy error, got %v", err)
+	}
+}
+
+func TestWorkspacePublishPolicyRejectsUnknownCommitPreflightKey(t *testing.T) {
+	payload := []byte(`{
+		"mode": "commit_all_edit_target_changes_on_worker_success",
+		"commit_message": "A3 implementation update for Sample#42",
+		"commit_preflight": {
+			"unknown": "run"
+		}
+	}`)
+
+	var policy WorkspacePublishPolicy
+	err := json.Unmarshal(payload, &policy)
+	if err == nil || !strings.Contains(err.Error(), "commit_preflight.unknown") {
+		t.Fatalf("expected unknown commit preflight key error, got %v", err)
 	}
 }
 
