@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -923,13 +924,18 @@ func TestRunCompletionHooksUsesProvidedTimeoutContext(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "changed.txt"), []byte("changed\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := CompletionHookContext(1, time.Now().UTC())
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
+	started := time.Now()
 
 	report, err := RunCompletionHooksWithContext(ctx, prepared, request)
+	elapsed := time.Since(started)
 
 	if err == nil || !strings.Contains(err.Error(), "completion hook timed out") {
 		t.Fatalf("expected hook timeout failure, got report=%#v err=%v", report, err)
+	}
+	if elapsed >= 4*time.Second {
+		t.Fatalf("timeout should kill hook process group promptly, elapsed=%s", elapsed)
 	}
 	if report.FailingEntry() == nil || report.FailingEntry().ExitStatus != -1 {
 		t.Fatalf("expected timeout entry with exit_status=-1, got %#v", report)

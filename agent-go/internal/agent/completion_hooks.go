@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -191,7 +192,7 @@ func runCompletionHook(ctx context.Context, prepared PreparedWorkspace, request 
 }
 
 func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, request WorkspaceRequest, runtimePath, slotName string, hook WorkspaceCompletionHook) CompletionHookEntry {
-	cmd := exec.CommandContext(ctx, "sh", "-c", hook.Command)
+	cmd := exec.Command("sh", "-c", hook.Command)
 	cmd.Dir = runtimePath
 	cmd.Env = append(os.Environ(),
 		"A2O_WORKSPACE_ROOT="+prepared.Root,
@@ -205,7 +206,7 @@ func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, requ
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	err := cmd.Run()
+	err := runCompletionHookCommand(ctx, cmd)
 	exitStatus := 0
 	status := "succeeded"
 	reason := ""
@@ -231,6 +232,28 @@ func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, requ
 		Stderr:     stderr.String(),
 		Status:     status,
 		Reason:     reason,
+	}
+}
+
+func runCompletionHookCommand(ctx context.Context, cmd *exec.Cmd) error {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		if cmd.Process != nil {
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			_ = cmd.Process.Kill()
+		}
+		<-done
+		return ctx.Err()
 	}
 }
 
