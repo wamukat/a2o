@@ -61,6 +61,8 @@ hook が失敗した場合でも、A2O は次の rework run が参照する sour
 
 failed-attempt ref は通常の implementation work branch と同じ namespace を使い、execution diagnostics に `completion_hook_attempt_ref` のような形で記録する。直前の implementation outcome が `rework` の場合、次の implementation run はこの ref を source descriptor として使う。
 
+A2O は各 hook command の前に edit-target slot ごとの snapshot を取る。hook が失敗、timeout、または `mode: check` 違反を起こした場合、failed-attempt ref を publish する前に、対象 slot を hook 実行前の snapshot に戻す。failed-attempt ref には AI worker の出力と、それ以前に成功した mutating hook の出力を含めるが、失敗した hook 自身の副作用は含めてはならない。これにより、失敗した check hook や途中失敗した mutating hook の意図しない編集が次の rework source に混入することを防ぐ。
+
 ## Command Workspace
 
 MVP では、各 hook を edit-target repo slot ごとに 1 回、その slot checkout root で実行する。agent は次の環境変数を提供する。

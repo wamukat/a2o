@@ -59,6 +59,8 @@ When hooks fail, A2O still needs a source for the next rework run. The MVP must 
 
 The failed-attempt ref should use the same work-branch namespace as normal implementation work and should be recorded in the execution diagnostics, for example `completion_hook_attempt_ref`. The next implementation run must use that ref as its source descriptor when the previous implementation outcome is `rework`.
 
+A2O snapshots each edit-target slot before every hook command. If a hook fails, times out, or violates `mode: check`, A2O restores the affected slot to the pre-hook snapshot before publishing the failed-attempt ref. The failed-attempt ref includes the AI worker output and all successful earlier mutating hooks, but it must exclude side effects from the failing hook itself. This prevents a failed check hook or a partially failed mutating hook from leaking unintended edits into the next rework source.
+
 ## Command Workspace
 
 The MVP executes each hook once per edit-target repo slot from that slot checkout root. The agent provides these environment variables:
