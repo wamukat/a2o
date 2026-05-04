@@ -105,6 +105,53 @@ func TestWorkspaceMaterializerRepairsStaleWorktreeBeforePreparingSlot(t *testing
 	}
 }
 
+func TestWorkspaceMaterializerRemovesUntrackedFilesBeforeReusingSlot(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{
+			"sample-catalog-service": sourceRoot,
+		},
+	}
+	request := testWorkspaceRequest("sample-catalog-service")
+
+	stale, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	staleSlotPath := filepath.Join(stale.Root, "repo_alpha")
+	staleDir := filepath.Join(staleSlotPath, "port", "in", "feature-A")
+	if err := os.MkdirAll(staleDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	staleFile := filepath.Join(staleDir, "Client.java")
+	if err := os.WriteFile(staleFile, []byte("stale\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if status := git(t, staleSlotPath, "status", "--porcelain", "--untracked-files=all"); !strings.Contains(status, "Client.java") {
+		t.Fatalf("expected stale untracked file before reuse, got %s", status)
+	}
+
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prepared.Root != stale.Root {
+		t.Fatalf("unexpected workspace root: got=%s want=%s", prepared.Root, stale.Root)
+	}
+	slotPath := filepath.Join(prepared.Root, "repo_alpha")
+	if _, err := os.Stat(staleFile); !os.IsNotExist(err) {
+		t.Fatalf("stale untracked file survived workspace reuse: %v", err)
+	}
+	if status := git(t, slotPath, "status", "--porcelain", "--untracked-files=all"); status != "" {
+		t.Fatalf("reused worktree should be clean, got %s", status)
+	}
+	if err := materializer.Cleanup(prepared); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestWorkspaceMaterializerUsesParentChildTopologyRoot(t *testing.T) {
 	tmp := t.TempDir()
 	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")

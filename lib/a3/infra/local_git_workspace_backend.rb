@@ -16,6 +16,7 @@ module A3
         ensure_safe_directory!(source_root)
         assert_repo_identity!(source_root, source_root, label: "source_root")
         run_git!(source_root, "worktree", "prune")
+        remove(source_root: source_root, destination: destination)
         if create_branch_if_missing
           ensure_branch_ref!(source_root, ref, reset_to: reset_branch_to)
         elsif reset_branch_to
@@ -37,23 +38,24 @@ module A3
 
         expected = rev_parse(source_root, ref)
         actual = rev_parse(destination, "HEAD")
-        expected == actual
+        expected == actual && clean_worktree?(destination)
       rescue A3::Domain::ConfigurationError
         false
       end
 
       def remove(source_root:, destination:)
-        return unless destination.exist?
-
         ensure_safe_directory!(source_root)
-        ensure_safe_directory!(destination)
-        unless registered_worktree?(source_root, destination)
-          FileUtils.rm_rf(destination)
+        if destination.exist?
+          ensure_safe_directory!(destination)
+        end
+        if registered_worktree?(source_root, destination)
+          run_git!(source_root, "worktree", "remove", "--force", destination.to_s)
+          run_git!(source_root, "worktree", "prune")
           return
         end
-
-        run_git!(source_root, "worktree", "remove", "--force", destination.to_s)
-        run_git!(source_root, "worktree", "prune")
+        if destination.exist?
+          FileUtils.rm_rf(destination)
+        end
       end
 
       private
@@ -75,6 +77,13 @@ module A3
         git_common_dir(path) == git_common_dir(expected_root)
       rescue A3::Domain::ConfigurationError
         false
+      end
+
+      def clean_worktree?(destination)
+        stdout, stderr, status = Open3.capture3("git", "-C", destination.to_s, "status", "--porcelain", "--untracked-files=all")
+        raise A3::Domain::ConfigurationError, "git status failed: #{stderr}" unless status.success?
+
+        stdout.strip.empty?
       end
 
       def assert_repo_identity!(path, expected_root, label:)

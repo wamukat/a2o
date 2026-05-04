@@ -133,6 +133,37 @@ RSpec.describe A3::Infra::LocalGitWorkspaceBackend do
     end
   end
 
+  it "treats untracked destination files as not ready" do
+    Dir.mktmpdir do |dir|
+      source_root = Pathname(File.join(dir, "repo"))
+      destination = Pathname(File.join(dir, "worktree"))
+
+      head_sha = create_git_repo_source(dir, name: "repo")
+      backend.materialize(source_root: source_root, destination: destination, ref: "HEAD")
+      destination.join("stale.java").write("untracked\n")
+
+      expect(
+        backend.ready?(source_root: source_root, destination: destination, ref: head_sha)
+      ).to be(false)
+    end
+  end
+
+  it "removes a registered stale worktree before materializing again" do
+    Dir.mktmpdir do |dir|
+      source_root = Pathname(File.join(dir, "repo"))
+      destination = Pathname(File.join(dir, "worktree"))
+
+      head_sha = create_git_repo_source(dir, name: "repo")
+      backend.materialize(source_root: source_root, destination: destination, ref: "HEAD")
+      destination.join("stale.java").write("untracked\n")
+
+      backend.materialize(source_root: source_root, destination: destination, ref: "HEAD")
+
+      expect(destination.join("stale.java")).not_to exist
+      expect(`git -C #{destination} rev-parse HEAD`.strip).to eq(head_sha)
+    end
+  end
+
   it "returns false when destination belongs to a different git repository" do
     Dir.mktmpdir do |dir|
       source_root = Pathname(File.join(dir, "repo-alpha"))

@@ -1346,6 +1346,11 @@ func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot
 		_ = rollbackWorkspaceSlotRefs(sourceRoot, slot.Ref, slot.BootstrapRef, bootstrappedRef, bootstrappedBaseRef)
 		return nil, err
 	}
+	if err := cleanGitWorktree(slotPath); err != nil {
+		_ = runGit(sourceRoot, "worktree", "remove", "--force", slotPath)
+		_ = rollbackWorkspaceSlotRefs(sourceRoot, slot.Ref, slot.BootstrapRef, bootstrappedRef, bootstrappedBaseRef)
+		return nil, err
+	}
 	head, err := gitOutput(slotPath, "rev-parse", "HEAD")
 	if err != nil {
 		_ = runGit(sourceRoot, "worktree", "remove", "--force", slotPath)
@@ -1573,6 +1578,13 @@ func gitOutput(root string, args ...string) (string, error) {
 		return "", gitError(args, err)
 	}
 	return trimTrailingNewline(string(out)), nil
+}
+
+func cleanGitWorktree(root string) error {
+	return errors.Join(
+		runGit(root, "reset", "--hard", "HEAD"),
+		runGit(root, "clean", "-fd"),
+	)
 }
 
 func runGit(root string, args ...string) error {
