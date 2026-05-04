@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestWorkspaceMaterializerPreparesAndCleansWorktreeSlots(t *testing.T) {
@@ -896,6 +897,49 @@ func TestRunCompletionHooksRejectsNonTargetSlotMutation(t *testing.T) {
 	}
 	if join(changed) != "changed.txt" {
 		t.Fatalf("target slot should be restored to pre-hook state, got %v", changed)
+	}
+}
+
+func TestRunCompletionHooksUsesProvidedTimeoutContext(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	request := testWorkspaceRequest("repo-alpha")
+	request.CompletionHooks = []WorkspaceCompletionHook{
+		{
+			Name:      "verify",
+			Command:   "sleep 5",
+			Mode:      "check",
+			OnFailure: "rework",
+		},
+	}
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{"repo-alpha": alphaRoot},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "changed.txt"), []byte("changed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := CompletionHookContext(1, time.Now().UTC())
+	defer cancel()
+
+	report, err := RunCompletionHooksWithContext(ctx, prepared, request)
+
+	if err == nil || !strings.Contains(err.Error(), "completion hook timed out") {
+		t.Fatalf("expected hook timeout failure, got report=%#v err=%v", report, err)
+	}
+	if report.FailingEntry() == nil || report.FailingEntry().ExitStatus != -1 {
+		t.Fatalf("expected timeout entry with exit_status=-1, got %#v", report)
+	}
+	changed, err := gitChangedPaths(filepath.Join(prepared.Root, "repo_alpha"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if join(changed) != "changed.txt" {
+		t.Fatalf("timeout should restore hook side effects while preserving implementation changes, got %v", changed)
 	}
 }
 

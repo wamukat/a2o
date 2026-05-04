@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"time"
 )
 
 type CompletionHookReport struct {
@@ -50,6 +52,10 @@ func (r CompletionHookReport) FailingEntry() *CompletionHookEntry {
 }
 
 func RunCompletionHooks(prepared PreparedWorkspace, request WorkspaceRequest) (CompletionHookReport, error) {
+	return RunCompletionHooksWithContext(context.Background(), prepared, request)
+}
+
+func RunCompletionHooksWithContext(ctx context.Context, prepared PreparedWorkspace, request WorkspaceRequest) (CompletionHookReport, error) {
 	report := CompletionHookReport{Status: "skipped"}
 	if len(request.CompletionHooks) == 0 {
 		return report, nil
@@ -67,7 +73,7 @@ func RunCompletionHooks(prepared PreparedWorkspace, request WorkspaceRequest) (C
 	report.Status = "succeeded"
 	for _, hook := range request.CompletionHooks {
 		for _, slotName := range editSlots {
-			entry, err := runCompletionHook(prepared, request, slotPaths, slotName, hook)
+			entry, err := runCompletionHook(ctx, prepared, request, slotPaths, slotName, hook)
 			report.Entries = append(report.Entries, entry)
 			recordCompletionHookEntry(prepared, slotName, entry)
 			if err != nil {
@@ -79,6 +85,14 @@ func RunCompletionHooks(prepared PreparedWorkspace, request WorkspaceRequest) (C
 	}
 	markCompletionHooksSucceeded(prepared)
 	return report, nil
+}
+
+func CompletionHookContext(timeoutSeconds int, startedAt time.Time) (context.Context, context.CancelFunc) {
+	if timeoutSeconds <= 0 {
+		return context.WithCancel(context.Background())
+	}
+	deadline := startedAt.Add(time.Duration(timeoutSeconds) * time.Second)
+	return context.WithDeadline(context.Background(), deadline)
 }
 
 func PublishCompletionHookAttempt(prepared PreparedWorkspace, request WorkspaceRequest) error {
@@ -128,7 +142,7 @@ func completionHookEditSlots(request WorkspaceRequest, slotPaths map[string]stri
 	return slots
 }
 
-func runCompletionHook(prepared PreparedWorkspace, request WorkspaceRequest, slotPaths map[string]string, slotName string, hook WorkspaceCompletionHook) (CompletionHookEntry, error) {
+func runCompletionHook(ctx context.Context, prepared PreparedWorkspace, request WorkspaceRequest, slotPaths map[string]string, slotName string, hook WorkspaceCompletionHook) (CompletionHookEntry, error) {
 	beforeStates, err := gitStates(slotPaths)
 	if err != nil {
 		return failedCompletionHookEntry(slotName, hook, "snapshot failed: "+err.Error()), err
@@ -144,7 +158,7 @@ func runCompletionHook(prepared PreparedWorkspace, request WorkspaceRequest, slo
 		}
 	}()
 
-	entry := executeCompletionHook(prepared, request, slotPaths[slotName], slotName, hook)
+	entry := executeCompletionHook(ctx, prepared, request, slotPaths[slotName], slotName, hook)
 	afterStates, stateErr := gitStates(slotPaths)
 	if entry.Status == "succeeded" && stateErr != nil {
 		entry.Status = "failed"
@@ -176,8 +190,8 @@ func runCompletionHook(prepared PreparedWorkspace, request WorkspaceRequest, slo
 	return entry, nil
 }
 
-func executeCompletionHook(prepared PreparedWorkspace, request WorkspaceRequest, runtimePath, slotName string, hook WorkspaceCompletionHook) CompletionHookEntry {
-	cmd := exec.Command("sh", "-c", hook.Command)
+func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, request WorkspaceRequest, runtimePath, slotName string, hook WorkspaceCompletionHook) CompletionHookEntry {
+	cmd := exec.CommandContext(ctx, "sh", "-c", hook.Command)
 	cmd.Dir = runtimePath
 	cmd.Env = append(os.Environ(),
 		"A2O_WORKSPACE_ROOT="+prepared.Root,
@@ -199,7 +213,11 @@ func executeCompletionHook(prepared PreparedWorkspace, request WorkspaceRequest,
 		status = "failed"
 		reason = err.Error()
 		exitStatus = 1
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		if ctx.Err() == context.DeadlineExceeded {
+			reason = "completion hook timed out"
+			exitStatus = -1
+			stderr.WriteString("A2O completion hook timed out\n")
+		} else if exitErr, ok := err.(*exec.ExitError); ok {
 			exitStatus = exitErr.ExitCode()
 		}
 	}

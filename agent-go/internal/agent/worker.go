@@ -147,7 +147,9 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 		workerProtocolResult = commandOutputWorkerProtocolResult(runRequest, execution)
 	}
 	if prepared != nil && request.WorkspaceRequest != nil && workerProtocolResult != nil && workerProtocolResult["success"] == true && execution.Status == "succeeded" {
-		hookReport, hookErr := RunCompletionHooks(*prepared, *request.WorkspaceRequest)
+		hookCtx, cancelHooks := CompletionHookContext(request.TimeoutSeconds, now)
+		hookReport, hookErr := RunCompletionHooksWithContext(hookCtx, *prepared, *request.WorkspaceRequest)
+		cancelHooks()
 		if hookReport.Ran() {
 			if upload, err := w.uploadCompletionHookReport(runRequest, hookReport); err != nil {
 				w.logJobEvent(runRequest, "upload_error", map[string]any{"role": "completion-hooks", "error": err.Error()})
