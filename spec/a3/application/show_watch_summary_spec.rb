@@ -1,6 +1,32 @@
 # frozen_string_literal: true
 
 RSpec.describe A3::Application::ShowWatchSummary do
+  def build_watch_summary_run(ref:, task_ref:, phase:, workspace_kind: :runtime_workspace, terminal_outcome: nil)
+    run = A3::Domain::Run.new(
+      ref: ref,
+      task_ref: task_ref,
+      phase: phase,
+      workspace_kind: workspace_kind,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: workspace_kind,
+        source_type: :branch_head,
+        ref: "refs/heads/a2o/work/#{task_ref.tr('#', '-')}",
+        task_ref: task_ref
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        ownership_scope: :task
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: task_ref,
+        owner_scope: :task,
+        snapshot_version: "refs/heads/a2o/work/#{task_ref.tr('#', '-')}"
+      )
+    )
+    terminal_outcome ? run.complete(outcome: terminal_outcome) : run
+  end
+
   let(:inherited_parent_state_resolver) { instance_double("InheritedParentStateResolver") }
   let(:upstream_line_guard) { A3::Domain::UpstreamLineGuard.new(inherited_parent_state_resolver: inherited_parent_state_resolver) }
   let(:agent_jobs_by_task_ref) { {} }
@@ -918,6 +944,30 @@ RSpec.describe A3::Application::ShowWatchSummary do
     expect(task_entry.latest_phase).to eq("review")
     expect(result.running_entries.map(&:task_ref)).to eq(["Sample#3141"])
     expect(result.running_entries.first.phase).to eq("review")
+  end
+
+  it "hides later phase results from an older cycle while an earlier phase is rerunning" do
+    task = A3::Domain::Task.new(
+      ref: "Sample#82",
+      kind: :single,
+      edit_scope: [:repo_alpha],
+      verification_scope: [:repo_alpha],
+      status: :in_review,
+      current_run_ref: "run-review-new"
+    )
+    task_repository.save(task)
+    run_repository.save(build_watch_summary_run(ref: "run-implementation-old", task_ref: task.ref, phase: :implementation, terminal_outcome: :completed))
+    run_repository.save(build_watch_summary_run(ref: "run-review-old", task_ref: task.ref, phase: :review, terminal_outcome: :completed))
+    run_repository.save(build_watch_summary_run(ref: "run-verification-old", task_ref: task.ref, phase: :verification, terminal_outcome: :completed))
+    run_repository.save(build_watch_summary_run(ref: "run-implementation-new", task_ref: task.ref, phase: :implementation, terminal_outcome: :completed))
+    run_repository.save(build_watch_summary_run(ref: "run-review-new", task_ref: task.ref, phase: :review))
+
+    result = use_case.call
+
+    task_entry = result.tasks.find { |item| item.ref == "Sample#82" }
+    expect(task_entry.latest_phase).to eq("review")
+    expect(task_entry.phase_counts).to eq("implementation" => 2, "review" => 2)
+    expect(A3::CLI::ShowOutputFormatter::WatchSummaryFormatter.task_phase_bar(task_entry)).to eq("o/>/./.")
   end
 
   it "marks review rework separately from clean review completion" do

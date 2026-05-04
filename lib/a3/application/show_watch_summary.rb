@@ -145,8 +145,8 @@ module A3
           blocked_lines: blocked_lines,
           running_entry: running_entry,
           claim_entry: claim_entry,
-          phase_counts: phase_counts_for(task, task_runs),
-          phase_states: phase_states_for(task, task_runs),
+          phase_counts: phase_counts_for(task, task_runs, latest_phase: latest_phase),
+          phase_states: phase_states_for(task, task_runs, latest_phase: latest_phase),
           latest_phase: latest_phase
         )
       end
@@ -412,17 +412,21 @@ module A3
         %i[blocked_by_tasks sibling_running parent_waiting_for_children upstream_unhealthy].include?(assessment.reason)
       end
 
-      def phase_counts_for(task, task_runs)
+      def phase_counts_for(task, task_runs, latest_phase:)
+        latest_phase_index = phase_order_index(latest_phase)
         task_runs.each_with_object(Hash.new(0)) do |run, counts|
           phase = normalize_phase(canonical_phase_for(task, run.phase).to_s)
+          next unless visible_phase_for_current_cycle?(phase, latest_phase_index: latest_phase_index)
+
           counts[phase] += 1 if phase
         end
       end
 
-      def phase_states_for(task, task_runs)
+      def phase_states_for(task, task_runs, latest_phase:)
+        latest_phase_index = phase_order_index(latest_phase)
         task_runs.each_with_object({}) do |run, states|
           phase = normalize_phase(canonical_phase_for(task, run.phase).to_s)
-          next unless phase
+          next unless visible_phase_for_current_cycle?(phase, latest_phase_index: latest_phase_index)
 
           outcome = run.terminal_outcome&.to_sym
           if phase == "review" && outcome == :rework
@@ -431,6 +435,18 @@ module A3
             states[phase] = :done
           end
         end
+      end
+
+      def visible_phase_for_current_cycle?(phase, latest_phase_index:)
+        return false unless phase
+        return true unless latest_phase_index
+
+        phase_index = phase_order_index(phase)
+        phase_index && phase_index <= latest_phase_index
+      end
+
+      def phase_order_index(phase)
+        %w[implementation review inspection merge].index(phase.to_s)
       end
 
       def resolve_latest_phase(task:, current_run:, latest_run:)
