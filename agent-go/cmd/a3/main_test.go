@@ -1023,6 +1023,45 @@ runtime:
 	}
 }
 
+func TestProjectPackageLoaderRejectsRemovedPublishCommitHookPolicyWithReplacement(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "project-package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: removed-commit-hook-policy
+kanban:
+  project: CommitPreflight
+repos:
+  app:
+    path: ..
+publish:
+  commit_hook_policy: run
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := loadProjectPackageConfig(packageDir)
+	if err == nil || !strings.Contains(err.Error(), "commit_hook_policy is not supported") || !strings.Contains(err.Error(), "publish.commit_preflight.native_git_hooks") {
+		t.Fatalf("expected removed commit hook policy replacement error, got %v", err)
+	}
+}
+
 func TestProjectPackageLoaderRejectsBlankPublishCommitPreflightNativeGitHooks(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "project-package")

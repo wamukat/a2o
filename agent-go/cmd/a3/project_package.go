@@ -489,6 +489,9 @@ func validatePublishConfig(rawPublish any) error {
 		return fmt.Errorf("must be a mapping")
 	}
 	for key := range publish {
+		if key == "commit_hook_policy" {
+			return fmt.Errorf("commit_hook_policy is not supported; use publish.commit_preflight.native_git_hooks")
+		}
 		if key != "commit_preflight" {
 			return fmt.Errorf("%s is not supported", key)
 		}
