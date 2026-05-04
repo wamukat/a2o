@@ -58,6 +58,8 @@ agent:
     - node
     - npm
     - your-ai-worker
+publish:
+  commit_hook_policy: bypass
 runtime:
   max_steps: 20
   agent_attempts: 200
@@ -300,6 +302,15 @@ For decomposition, `include_child` means the proposal should include a normal ch
 Toolchain-specific environment variables are also package-owned. A2O exposes generic workspace paths such as `A2O_WORKSPACE_ROOT` and `AUTOMATION_ISSUE_WORKSPACE`, but it does not inject Maven, npm, Gradle, or language-specific cache variables. Put those values in the phase executor `env` block or in package command scripts.
 
 `agent.workspace_root` is disposable runtime output. It should normally live under `.work/a2o/`.
+
+## Publish
+
+`publish.commit_hook_policy` controls whether A2O's agent-owned publish commit runs repository commit hooks.
+
+- `bypass` is the default and preserves the historical behavior. A2O commits with `--no-verify`, so repository `pre-commit` hooks do not block the mechanical publish commit.
+- `run` is opt-in. A2O omits `--no-verify`, so configured Git commit hooks such as `pre-commit` can block the publish commit.
+
+Use `run` only when the hook is deterministic in the agent workspace and its required tools are declared in `agent.required_bins`. A failing hook blocks the phase publish and leaves the task needing remediation or operator attention.
 
 ## Runtime Decomposition
 

@@ -940,6 +940,87 @@ runtime:
 	}
 }
 
+func TestProjectPackageLoaderAcceptsPublishCommitHookPolicy(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "project-package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: commit-hook-policy
+kanban:
+  project: CommitHookPolicy
+repos:
+  app:
+    path: ..
+publish:
+  commit_hook_policy: run
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	config, err := loadProjectPackageConfig(packageDir)
+	if err != nil {
+		t.Fatalf("publish commit hook policy should load: %v", err)
+	}
+	if config.PublishCommitHookPolicy != "run" {
+		t.Fatalf("PublishCommitHookPolicy=%q, want run", config.PublishCommitHookPolicy)
+	}
+}
+
+func TestProjectPackageLoaderRejectsUnsupportedPublishCommitHookPolicy(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "project-package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: bad-commit-hook-policy
+kanban:
+  project: CommitHookPolicy
+repos:
+  app:
+    path: ..
+publish:
+  commit_hook_policy: sometimes
+runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    review:
+      skill: skills/review/default.md
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := loadProjectPackageConfig(packageDir)
+	if err == nil || !strings.Contains(err.Error(), "publish") || !strings.Contains(err.Error(), "commit_hook_policy must be bypass or run") {
+		t.Fatalf("expected publish commit hook policy validation error, got %v", err)
+	}
+}
+
 func TestUnsupportedRuntimeCommandsAreNotPublicEntrypoints(t *testing.T) {
 	for _, command := range [][]string{
 		{"runtime", "command-plan"},
@@ -7403,6 +7484,45 @@ func TestRuntimeRunOncePlanPropagatesProjectKeyToAgentEnv(t *testing.T) {
 	}
 	if !containsString(plan.AgentEnv, "A2O_MULTI_PROJECT_MODE=1") {
 		t.Fatalf("agent env should include multi-project mode, got %#v", plan.AgentEnv)
+	}
+}
+
+func TestRuntimeRunOncePlanPropagatesPublishCommitHookPolicy(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	projectYamlPath := filepath.Join(packageDir, "project.yaml")
+	body, err := os.ReadFile(projectYamlPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body = bytes.Replace(body, []byte("runtime:\n"), []byte("publish:\n  commit_hook_policy: run\nruntime:\n"), 1)
+	if err := os.WriteFile(projectYamlPath, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := buildRuntimeRunOncePlan(runtimeInstanceConfig{
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeProject: "a2o-test",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3471",
+		RuntimeImage:   "ghcr.io/wamukat/a2o-engine:test",
+		ComposeFile:    "docker/compose/a2o-kanbalone.yml",
+	}, runtimeRunOnceOverrides{}, "")
+	if err != nil {
+		t.Fatalf("buildRuntimeRunOncePlan failed: %v", err)
+	}
+
+	if plan.AgentPublishCommitHookPolicy != "run" {
+		t.Fatalf("AgentPublishCommitHookPolicy=%q, want run", plan.AgentPublishCommitHookPolicy)
+	}
+	args := executeUntilIdleArgs(plan)
+	if !containsString(args, "--agent-publish-commit-hook-policy") || !containsString(args, "run") {
+		t.Fatalf("runtime args should pass hook policy, got %#v", args)
 	}
 }
 

@@ -592,6 +592,67 @@ func TestPublishWorkspaceChangesCommitsAllEditTargetChangesOnWorkerSuccess(t *te
 	}
 }
 
+func TestPublishWorkspaceChangesBypassesCommitHooksByDefault(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	installFailingPreCommitHook(t, alphaRoot)
+	request := testWorkspaceRequest("repo-alpha")
+	request.PublishPolicy = &WorkspacePublishPolicy{
+		Mode:          "commit_all_edit_target_changes_on_worker_success",
+		CommitMessage: "A3 implementation update for Sample#42",
+	}
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{"repo-alpha": alphaRoot},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "change.txt"), []byte("change\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err = PublishWorkspaceChanges(prepared, request, map[string]any{"success": true}, true)
+
+	if err != nil {
+		t.Fatalf("default publish hook bypass should commit despite failing pre-commit hook: %v", err)
+	}
+}
+
+func TestPublishWorkspaceChangesRunsCommitHooksWhenRequested(t *testing.T) {
+	tmp := t.TempDir()
+	alphaRoot := createGitSource(t, tmp, "repo-alpha")
+	installFailingPreCommitHook(t, alphaRoot)
+	request := testWorkspaceRequest("repo-alpha")
+	request.PublishPolicy = &WorkspacePublishPolicy{
+		Mode:             "commit_all_edit_target_changes_on_worker_success",
+		CommitMessage:    "A3 implementation update for Sample#42",
+		CommitHookPolicy: "run",
+	}
+	materializer := WorkspaceMaterializer{
+		WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
+		SourceAliases: map[string]string{"repo-alpha": alphaRoot},
+	}
+	prepared, err := materializer.Prepare(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeHead := trimTrailingNewline(git(t, alphaRoot, "rev-parse", "a3/work/Sample-42"))
+	if err := os.WriteFile(filepath.Join(prepared.Root, "repo_alpha", "change.txt"), []byte("change\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err = PublishWorkspaceChanges(prepared, request, map[string]any{"success": true}, true)
+
+	if err == nil || !strings.Contains(err.Error(), "pre-commit blocked") {
+		t.Fatalf("expected failing pre-commit hook to block publish, got %v", err)
+	}
+	if head := trimTrailingNewline(git(t, alphaRoot, "rev-parse", "a3/work/Sample-42")); head != beforeHead {
+		t.Fatalf("branch advanced despite failing pre-commit hook: before=%s after=%s", beforeHead, head)
+	}
+}
+
 func TestPublishWorkspaceChangesRejectsSupportSlotChangesDuringCommandPublish(t *testing.T) {
 	tmp := t.TempDir()
 	alphaRoot := createGitSource(t, tmp, "repo-alpha")
@@ -649,7 +710,7 @@ func TestPublishWorkspaceChangesRollsBackAlreadyCommittedSlots(t *testing.T) {
 	err = executePublishPlans(prepared, []publishPlan{
 		{slotName: "repo_alpha", runtimePath: filepath.Join(prepared.Root, "repo_alpha"), declared: []string{"alpha.txt"}},
 		{slotName: "repo_beta", runtimePath: filepath.Join(prepared.Root, "missing-repo"), declared: []string{"beta.txt"}},
-	}, "test rollback")
+	}, "test rollback", "bypass")
 
 	if err == nil || !strings.Contains(err.Error(), "rev-parse") {
 		t.Fatalf("expected publish failure after first commit, got %v", err)
@@ -686,7 +747,7 @@ func TestPublishWorkspaceChangesRollsBackCurrentSlotOnStageFailure(t *testing.T)
 
 	err = executePublishPlans(prepared, []publishPlan{
 		{slotName: "repo_alpha", runtimePath: alphaPath, declared: []string{"missing.txt"}},
-	}, "test rollback current")
+	}, "test rollback current", "bypass")
 
 	if err == nil || !strings.Contains(err.Error(), "add") {
 		t.Fatalf("expected stage failure, got %v", err)
@@ -1407,6 +1468,22 @@ func createGitSource(t *testing.T, root string, name string) string {
 	git(t, sourceRoot, "commit", "-q", "-m", "initial commit")
 	git(t, sourceRoot, "branch", "a3/work/Sample-42", "HEAD")
 	return sourceRoot
+}
+
+func installFailingPreCommitHook(t *testing.T, sourceRoot string) {
+	t.Helper()
+	hookDir := filepath.Join(sourceRoot, ".githooks")
+	if err := os.MkdirAll(hookDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	hookPath := filepath.Join(hookDir, "pre-commit")
+	if err := os.WriteFile(hookPath, []byte("#!/bin/sh\necho pre-commit blocked >&2\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git(t, sourceRoot, "config", "core.hooksPath", ".githooks")
+	git(t, sourceRoot, "add", ".githooks/pre-commit")
+	git(t, sourceRoot, "commit", "-q", "-m", "add failing pre-commit hook")
+	git(t, sourceRoot, "branch", "-f", "a3/work/Sample-42", "HEAD")
 }
 
 func createRetainedContentConflict(t *testing.T, tmp string, sourceRoot string) (string, string, string) {

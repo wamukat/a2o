@@ -1878,6 +1878,7 @@ module A3
       parser.on("--agent-support-ref SLOT=REF") { |value| add_agent_support_ref_option(options, value) }
       parser.on("--agent-workspace-freshness-policy VALUE") { |value| options[:agent_workspace_freshness_policy] = value.to_sym }
       parser.on("--agent-workspace-cleanup-policy VALUE") { |value| options[:agent_workspace_cleanup_policy] = value.to_sym }
+      parser.on("--agent-publish-commit-hook-policy VALUE") { |value| options[:agent_publish_commit_hook_policy] = value }
       parser.on("--agent-job-timeout-seconds VALUE") { |value| options[:agent_job_timeout_seconds] = Integer(value) }
       parser.on("--agent-job-poll-interval-seconds VALUE") { |value| options[:agent_job_poll_interval_seconds] = Float(value) }
     end
@@ -2194,6 +2195,7 @@ module A3
         ),
         freshness_policy: options.fetch(:agent_workspace_freshness_policy, :reuse_if_clean_and_ref_matches),
         cleanup_policy: options.fetch(:agent_workspace_cleanup_policy, :retain_until_a3_cleanup),
+        publish_commit_hook_policy: options.fetch(:agent_publish_commit_hook_policy, :bypass),
         support_ref: options[:agent_support_ref],
         support_refs: options.fetch(:agent_support_refs, {})
       )

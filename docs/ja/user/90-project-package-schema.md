@@ -64,6 +64,8 @@ agent:
     - node
     - npm
     - your-ai-worker
+publish:
+  commit_hook_policy: bypass
 
 runtime:
   max_steps: 20
@@ -302,6 +304,15 @@ decomposition では、`include_child` は refactoring work を通常の child d
 `agent` はホスト側ワークスペース、プロダクトのツールチェーン要件、実行コマンド要件を持つ。`required_bins` は、エージェントが作業開始前に前提条件を検証できるよう宣言的に残す。省略した場合、A2O は host-agent の最低要件である `git` だけを確認し、Node、npm、Maven、Gradle などのプロダクト固有ツールは仮定しない。
 
 ツールチェーン固有の環境変数も project package の責務である。A2O は `A2O_WORKSPACE_ROOT` や `AUTOMATION_ISSUE_WORKSPACE` のような汎用 workspace path は公開するが、Maven、npm、Gradle、言語固有 cache の環境変数は注入しない。必要な値は phase executor の `env` または package command script に置く。
+
+## Publish
+
+`publish.commit_hook_policy` は、A2O が agent-owned workspace の変更を publish commit するときに、リポジトリの commit hook を実行するかを制御する。
+
+- `bypass` が既定値で、従来どおり `--no-verify` 付きで commit する。`pre-commit` などの hook は A2O の機械的な publish commit を block しない。
+- `run` は opt-in で、A2O が `--no-verify` を付けずに commit する。設定済みの Git commit hook が publish commit を block できる。
+
+`run` を使う場合は、hook が agent workspace 上で決定的に動作し、必要なコマンドを `agent.required_bins` に宣言している必要がある。hook が失敗すると phase publish は block され、task は remediation または operator 対応が必要な状態になる。
 
 `runtime` は実行時の既定値とフェーズ定義を持つ。
 

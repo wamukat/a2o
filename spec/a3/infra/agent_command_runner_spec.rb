@@ -372,7 +372,8 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(result.success?).to eq(true)
     expect(request.workspace_request.publish_policy).to eq(
       "mode" => "commit_all_edit_target_changes_on_success",
-      "commit_message" => "A2O remediation update for Sample#42"
+      "commit_message" => "A2O remediation update for Sample#42",
+      "commit_hook_policy" => "bypass"
     )
     expect(request.workspace_request.slots.fetch("repo_alpha")).to include("access" => "read_write")
   end

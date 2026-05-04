@@ -27,6 +27,7 @@ type projectPackageConfig struct {
 	AgentControlPlaneRetryDelay     string
 	AgentWorkspaceRoot              string
 	AgentRequiredBins               []string
+	PublishCommitHookPolicy         string
 	SchedulerMaxParallelTasks       string
 	Executor                        map[string]any
 	Repos                           map[string]projectPackageRepo
@@ -82,6 +83,7 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	config.AgentControlPlaneRetryDelay = scalarString(payload.Runtime.AgentControlPlaneRetryDelay)
 	config.AgentWorkspaceRoot = payload.Agent.WorkspaceRoot
 	config.AgentRequiredBins = payload.Agent.RequiredBins
+	config.PublishCommitHookPolicy = scalarString(payload.Publish.CommitHookPolicy)
 	config.SchedulerMaxParallelTasks = scalarString(projectSchedulerRawMaxParallelTasks(runtimePayload))
 	if strings.TrimSpace(config.SchemaVersion) == "" {
 		return config, fmt.Errorf("project package config %s is missing schema_version", projectFile)
@@ -127,6 +129,9 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	}
 	if err := validateProjectDocsConfig(rawPayload["docs"], packagePath, payload.Repos); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid docs: %w", projectFile, err)
+	}
+	if err := validatePublishConfig(rawPayload["publish"]); err != nil {
+		return config, fmt.Errorf("project package config %s has invalid publish: %w", projectFile, err)
 	}
 	executor, err := buildProjectExecutorConfig(payload.Runtime.Phases)
 	if err != nil {
@@ -229,6 +234,9 @@ type projectPackageYAML struct {
 		WorkspaceRoot string   `yaml:"workspace_root"`
 		RequiredBins  []string `yaml:"required_bins"`
 	} `yaml:"agent"`
+	Publish struct {
+		CommitHookPolicy any `yaml:"commit_hook_policy"`
+	} `yaml:"publish"`
 	Runtime struct {
 		MaxSteps                        any                                `yaml:"max_steps"`
 		AgentAttempts                   any                                `yaml:"agent_attempts"`
@@ -467,6 +475,26 @@ func validateProjectDeliveryAfterPush(rawAfterPush any) error {
 		}
 	}
 	return nil
+}
+
+func validatePublishConfig(rawPublish any) error {
+	if rawPublish == nil {
+		return nil
+	}
+	publish, ok := normalizeYAMLValue(rawPublish).(map[string]any)
+	if !ok {
+		return fmt.Errorf("must be a mapping")
+	}
+	for key := range publish {
+		if key != "commit_hook_policy" {
+			return fmt.Errorf("%s is not supported", key)
+		}
+	}
+	policy := scalarString(publish["commit_hook_policy"])
+	if policy == "" || policy == "bypass" || policy == "run" {
+		return nil
+	}
+	return fmt.Errorf("commit_hook_policy must be bypass or run")
 }
 
 func rejectMergeTarget(runtimePayload map[string]any) error {

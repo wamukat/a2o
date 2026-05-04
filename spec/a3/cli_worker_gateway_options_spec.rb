@@ -126,7 +126,8 @@ RSpec.describe "A3 CLI worker gateway options" do
           "repo_beta" => "sample-beta"
         },
         agent_support_ref: "refs/heads/feature/prototype",
-        agent_workspace_cleanup_policy: :cleanup_after_job
+        agent_workspace_cleanup_policy: :cleanup_after_job,
+        agent_publish_commit_hook_policy: "run"
       },
       command_runner: instance_double(A3::Infra::LocalCommandRunner)
     )
@@ -136,6 +137,7 @@ RSpec.describe "A3 CLI worker gateway options" do
     repo_slot_policy = builder.instance_variable_get(:@repo_slot_policy)
     expect(repo_slot_policy.required_slots).to eq(%i[repo_alpha repo_beta])
     expect(builder.instance_variable_get(:@support_refs)).to include(default: "refs/heads/feature/prototype")
+    expect(builder.instance_variable_get(:@publish_commit_hook_policy)).to eq("run")
   end
 
   it "builds an agent materialized HTTP worker gateway with slot-specific support refs" do

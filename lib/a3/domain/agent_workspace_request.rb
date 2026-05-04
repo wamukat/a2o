@@ -12,6 +12,7 @@ module A3
         commit_all_edit_target_changes_on_worker_success
         commit_all_edit_target_changes_on_success
       ].freeze
+      PUBLISH_COMMIT_HOOK_POLICIES = %w[bypass run].freeze
 
       attr_reader :mode, :workspace_kind, :workspace_id, :freshness_policy, :cleanup_policy, :publish_policy, :slots, :topology
 
@@ -90,11 +91,20 @@ module A3
         record = value.transform_keys(&:to_s)
         mode = required_string(record.fetch("mode"), "publish policy mode")
         raise ConfigurationError, "unsupported agent workspace publish_policy mode: #{mode}" unless PUBLISH_POLICY_MODES.include?(mode)
+        commit_hook_policy = record.fetch("commit_hook_policy", "bypass").to_s
 
         {
           "mode" => mode,
-          "commit_message" => required_string(record.fetch("commit_message"), "publish policy commit_message")
+          "commit_message" => required_string(record.fetch("commit_message"), "publish policy commit_message"),
+          "commit_hook_policy" => normalize_publish_commit_hook_policy(commit_hook_policy)
         }.freeze
+      end
+
+      def normalize_publish_commit_hook_policy(value)
+        policy = required_string(value, "publish policy commit_hook_policy")
+        return policy if PUBLISH_COMMIT_HOOK_POLICIES.include?(policy)
+
+        raise ConfigurationError, "unsupported agent workspace publish_policy commit_hook_policy: #{policy}"
       end
 
       def normalize_topology(value)

@@ -974,23 +974,23 @@ func PublishWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceReques
 		if err != nil {
 			return err
 		}
-		return publishDeclaredWorkspaceChanges(prepared, request, declaredChangedFiles, strings.TrimSpace(policy.CommitMessage))
+		return publishDeclaredWorkspaceChanges(prepared, request, declaredChangedFiles, strings.TrimSpace(policy.CommitMessage), normalizeCommitHookPolicy(policy.CommitHookPolicy))
 	case "commit_all_edit_target_changes_on_worker_success":
 		if workerProtocolResult == nil || workerProtocolResult["success"] != true {
 			return nil
 		}
-		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage))
+		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage), normalizeCommitHookPolicy(policy.CommitHookPolicy))
 	case "commit_all_edit_target_changes_on_success":
 		if !commandSucceeded {
 			return nil
 		}
-		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage))
+		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage), normalizeCommitHookPolicy(policy.CommitHookPolicy))
 	default:
 		return fmt.Errorf("unsupported publish policy mode: %s", policy.Mode)
 	}
 }
 
-func publishDeclaredWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceRequest, declaredChangedFiles map[string][]string, commitMessage string) error {
+func publishDeclaredWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceRequest, declaredChangedFiles map[string][]string, commitMessage string, commitHookPolicy string) error {
 	plans, err := buildPublishPlans(prepared, request, func(slotName string, actual []string) ([]string, error) {
 		declared := normalizePathList(declaredChangedFiles[slotName])
 		if !sameStrings(actual, declared) {
@@ -1001,17 +1001,17 @@ func publishDeclaredWorkspaceChanges(prepared PreparedWorkspace, request Workspa
 	if err != nil {
 		return err
 	}
-	return executePublishPlans(prepared, plans, commitMessage)
+	return executePublishPlans(prepared, plans, commitMessage, commitHookPolicy)
 }
 
-func publishAllEditTargetWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceRequest, commitMessage string) error {
+func publishAllEditTargetWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceRequest, commitMessage string, commitHookPolicy string) error {
 	plans, err := buildPublishPlans(prepared, request, func(_ string, actual []string) ([]string, error) {
 		return normalizePathList(actual), nil
 	})
 	if err != nil {
 		return err
 	}
-	return executePublishPlans(prepared, plans, commitMessage)
+	return executePublishPlans(prepared, plans, commitMessage, commitHookPolicy)
 }
 
 func buildPublishPlans(prepared PreparedWorkspace, request WorkspaceRequest, changedFilesFor func(string, []string) ([]string, error)) ([]publishPlan, error) {
@@ -1055,9 +1055,12 @@ func buildPublishPlans(prepared PreparedWorkspace, request WorkspaceRequest, cha
 	return plans, nil
 }
 
-func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commitMessage string) error {
+func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commitMessage string, commitHookPolicy string) error {
 	if commitMessage == "" {
 		commitMessage = "A2O agent implementation update"
+	}
+	if !validCommitHookPolicy(commitHookPolicy) {
+		return fmt.Errorf("unsupported publish commit_hook_policy: %s", commitHookPolicy)
 	}
 	published := []publishPlan{}
 	beforeHeads := map[string]string{}
@@ -1085,7 +1088,7 @@ func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commit
 			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
 			return err
 		}
-		if err := runGit(plan.runtimePath, "-c", "user.name=A3 Agent", "-c", "user.email=a2o-agent@example.invalid", "commit", "--no-gpg-sign", "--no-verify", "-m", commitMessage); err != nil {
+		if err := runGit(plan.runtimePath, commitArgs(commitMessage, commitHookPolicy)...); err != nil {
 			rollbackPublishedPlans(prepared, append(published, plan), beforeHeads)
 			return err
 		}
@@ -1102,6 +1105,26 @@ func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commit
 		published = append(published, plan)
 	}
 	return nil
+}
+
+func normalizeCommitHookPolicy(policy string) string {
+	policy = strings.TrimSpace(policy)
+	if policy == "" {
+		return "bypass"
+	}
+	return policy
+}
+
+func validCommitHookPolicy(policy string) bool {
+	return policy == "bypass" || policy == "run"
+}
+
+func commitArgs(commitMessage string, commitHookPolicy string) []string {
+	args := []string{"-c", "user.name=A3 Agent", "-c", "user.email=a2o-agent@example.invalid", "commit", "--no-gpg-sign"}
+	if commitHookPolicy != "run" {
+		args = append(args, "--no-verify")
+	}
+	return append(args, "-m", commitMessage)
 }
 
 func rollbackPublishedPlans(prepared PreparedWorkspace, plans []publishPlan, beforeHeads map[string]string) {
