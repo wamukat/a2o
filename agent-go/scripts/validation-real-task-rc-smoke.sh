@@ -102,6 +102,7 @@ RUN_ONCE_SERVER_LOG="${WORK_DIR}/run-once-agent-server.log"
 RUN_ONCE_EXIT_FILE="${WORK_DIR}/run-once.exit"
 RUN_ONCE_PID_FILE="${WORK_DIR}/run-once.pid"
 RUN_ONCE_SERVER_PID_FILE="${WORK_DIR}/run-once-agent-server.pid"
+PREFLIGHT_MARKER="${WORK_DIR}/commit-preflight-smoke.log"
 
 mkdir -p "${HOST_INSTALL_DIR}" "${PACKAGE_DIR}/skills/implementation" "${PACKAGE_DIR}/skills/review" "${SOURCE_DIR}" "${WORKER_DIR}"
 
@@ -123,7 +124,7 @@ printf 'minimal real task smoke\n' > "${SOURCE_DIR}/README.md"
 git -C "${SOURCE_DIR}" add README.md
 git -C "${SOURCE_DIR}" commit -q -m "initial smoke source"
 
-cat > "${PACKAGE_DIR}/project.yaml" <<'EOF'
+cat > "${PACKAGE_DIR}/project.yaml" <<EOF
 schema_version: 1
 package:
   name: real-task-rc-smoke
@@ -143,7 +144,7 @@ agent:
 publish:
   commit_preflight:
     commands:
-      - sh -c 'test -f SMOKE.txt'
+      - sh -c 'printf "%s\n" "a2o_commit_preflight_smoke_ok slot=\$A2O_COMMIT_PREFLIGHT_SLOT" >> "${PREFLIGHT_MARKER}" && test -f SMOKE.txt'
 runtime:
   max_steps: 20
   agent_attempts: 120
@@ -162,7 +163,7 @@ runtime:
           - "{{root_dir}}/project-package/commands/worker.rb"
     verification:
       commands:
-        - sh -c 'test -f "$A2O_WORKSPACE_ROOT/app/SMOKE.txt"'
+        - sh -c 'test -f "\$A2O_WORKSPACE_ROOT/app/SMOKE.txt"'
     merge:
       policy: ff_only
       target_ref: refs/heads/main
@@ -300,6 +301,7 @@ grep -Fq "task ${task_ref} kind=single status=done" "${WORK_DIR}/describe-task.o
 grep -Fq "phase=merge" "${WORK_DIR}/describe-task.out"
 grep -Fq "outcome=completed" "${WORK_DIR}/describe-task.out"
 grep -Fq "review_disposition=kind=completed slot_scopes=app finding_key=minimal-real-task-rc-smoke-clean" "${WORK_DIR}/describe-task.out"
+grep -Fq "a2o_commit_preflight_smoke_ok slot=app" "${PREFLIGHT_MARKER}"
 grep -Fq "o/o/o/o" "${WORK_DIR}/watch-summary-after.out"
 git -C "${SOURCE_DIR}" log --oneline --max-count=1 | grep -Fq "A2O implementation update for ${task_ref}"
 
