@@ -289,7 +289,7 @@ func validatePublicWorkerPayload(payload map[string]any, request map[string]any,
 				errors = append(errors, removedReviewDispositionRepoScopeError)
 			}
 			errors = append(errors, validatePublicReviewDispositionSlotScopes(disposition["slot_scopes"])...)
-			errors = append(errors, validateReviewDisposition(disposition, request, options)...)
+			errors = append(errors, validateReviewDisposition(disposition, request, success, options)...)
 		}
 	}
 	return errors
@@ -316,7 +316,7 @@ func validateChangedFiles(changedFiles map[string]any) []string {
 	return errors
 }
 
-func validateReviewDisposition(disposition map[string]any, request map[string]any, options workerValidationOptions) []string {
+func validateReviewDisposition(disposition map[string]any, request map[string]any, success bool, options workerValidationOptions) []string {
 	phase := workerStringValue(request["phase"])
 	parentReview := phase == "review" && workerNestedString(request, "phase_runtime", "task_kind") == "parent"
 	validScopes := validReviewDispositionSlotScopes(request, parentReview, options)
@@ -331,6 +331,9 @@ func validateReviewDisposition(disposition map[string]any, request map[string]an
 		}
 		if invalid := invalidWorkerStringMembers(slotScopes, validScopes); len(invalid) > 0 {
 			errors = append(errors, "review_disposition.slot_scopes must be one of "+strings.Join(validScopes, ", "))
+		}
+		if success && workerStringValue(disposition["kind"]) != "completed" {
+			errors = append(errors, "review_disposition.kind must be completed when success is true for parent review")
 		}
 		return errors
 	}
