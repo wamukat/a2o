@@ -1,6 +1,6 @@
 # 現在の公開機能
 
-A2O 0.5.66 で現在利用できる公開機能と検証範囲を示す。
+A2O 0.5.67 で現在利用できる公開機能と検証範囲を示す。
 
 この文書は、リリース時点で「利用者に案内してよい機能」と「検証済みとして扱える範囲」を確認するための一覧である。導入手順を知りたい場合は [10-quickstart.md](10-quickstart.md)、設定項目を知りたい場合は [90-project-package-schema.md](90-project-package-schema.md) を読む。
 
@@ -23,6 +23,7 @@ A2O 0.5.66 で現在利用できる公開機能と検証範囲を示す。
 - review rework 後の implementation retry には、直前の review feedback が worker runtime context として渡される。
 - operator が付与した `blocked` label は phase 完了時にも保持され、runtime status publication によって暗黙に外されない。
 - parent review の clean success result は、worker が `review_disposition` を省略または一部だけ返しても completed disposition に正規化される。明示的に矛盾する disposition は引き続き拒否される。frozen worker payload でも、この正規化で scheduler がクラッシュしない。
+- review result validation は、stdin から渡される任意の `review_disposition` payload について、follow-up 専用の項目を不要に要求しない。`finding_key` は review finding が実際に follow-up child または blocked outcome を作る場合だけ必要であり、clean / completed review evidence が無関係な項目不足で拒否されない。
 - multi-project runtime context は runtime storage、host log / workspace、scheduler pid / log file、temp file、branch namespace を解決済み project key ごとに分離する。`a2o runtime resume --all-projects`、`pause --all-projects`、`status --all-projects` は登録 project ごとに scheduler を1つずつ扱い、各 project 内の active task は1件のまま維持する。
 - アップグレード診断: `a2o upgrade check`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
@@ -36,6 +37,7 @@ A2O 0.5.66 で現在利用できる公開機能と検証範囲を示す。
 - `a2o runtime logs <source-ref> --follow` は decomposition source ticket に対して、decomposition status を polling し、実行中の host-agent event と action 別 investigate / propose / review command output をリアルタイムに stream 表示する。command 完了後の action log も引き続き表示する。
 - decomposition proposal の `depends_on` は、生成された child ticket 間の Kanban `blocked` relation に変換される。依存先は proposal の `boundary` と生成済み `child_key` の両方で解決される。
 - `a2o runtime decomposition accept-drafts` は選択した draft child に `trigger:auto-implement` を付けて承認する。任意で `a2o:draft-child` を外せる。既定では generated parent に `trigger:auto-parent` と accepted child の `repo:*` label の和集合も付ける。これを抑止したい場合だけ `--no-parent-auto` を使う。この command は label 変更中に scheduler processing を pause し、A2O が pause した場合は変更成功後だけ resume する。失敗時は確認のため scheduler を paused のまま残す。
+- `a2o runtime decomposition accept-drafts <task-ref>` は、`--child`、`--ready`、`--all` のうちちょうど 1 つが指定されていない場合、runtime dispatch 前に selector guidance を表示して失敗する。内部 runtime の `ArgumentError` stack trace は利用者向け出力へ漏れない。
 - gate closed の decomposition child creation は、空の `success=` を表示せず、`status=gate_closed` と `child_creation_result=not_attempted` を表示する
 - multi-repo documentation surfaces: `docs.surfaces` で repo-local docs と integration docs を分けて宣言できる。`docs.authorities` は source-of-truth file が存在する repo slot を指定でき、worker の `docs_context` には surface id、repo slot、role、candidate docs、authority source metadata が含まれる。
 - agent-materialized execution では、host agent が具体化した実際の source alias / path から documentation context を解決する。これにより、host agent が workspace を所有する実行経路でも repo-local docs と cross-repo authority を参照できる。
@@ -57,7 +59,7 @@ A2O 0.5.66 で現在利用できる公開機能と検証範囲を示す。
 - エージェント HTTP ワーカー境界。取得済みジョブの heartbeat を含む
 - エージェントが具体化するワークスペース方式
 - TypeScript、Go、Python、複数リポジトリタスクテンプレートの参照用プロダクトパッケージ
-- GHCR ランタイムイメージタグ: `latest`、`0.5.66`、`sha-*`
+- GHCR ランタイムイメージタグ: `latest`、`0.5.67`、`sha-*`
 - タグリリースでは `latest` も同時に公開する。そのため、公開完了後はリリース版タグと `latest` が同じランタイムイメージを指す前提で確認する。
 - ローカルリリース判定: RSpec 全体、release package doctor、local RC host smoke、および runtime 実行 / worker launcher / scheduler / Kanban / env generation 変更時の real-task local RC smoke
 - 開発者向け feedback loop: `tools/dev/test-core.sh` は `A2O_TEST_RUBY_SHARDS` による deterministic Ruby example sharding に対応する。RSpec JSON dry-run discovery を使えない custom Ruby command では `A2O_TEST_RUBY_SHARD_GRANULARITY=file` を fallback として使える。
@@ -68,7 +70,7 @@ A2O 0.5.66 で現在利用できる公開機能と検証範囲を示す。
 - 既に `runtime.prompts.repoSlots` を定義している project package は、upgrade 前に multi-repo task を確認すること。multi-repo task では `repo_slots` / `edit_scope` 順にすべての repo-slot addon を渡す。以前の release では単数 repo-slot layer だけが適用対象だったため、slot 固有の指示が組み合わさって広すぎる、または衝突する場合がある。その場合は repo slot 単位の child task に分割するか、package prompt を調整する。worker 実行前に `a2o prompt preview --phase implementation --repo-slot app --repo-slot lib <task-ref>` で合成後の instruction を確認する。
 - validation を満たすためだけの no-op `runtime.phases.implementation.skill` / `runtime.phases.review.skill` stub を使っている project package は、対応する `runtime.prompts.phases.<phase>` に prompt または skills を定義したうえで stub を削除できる。system prompt だけでは不十分であり、phase skill と対応する phase prompt / skill のどちらも無い場合、`a2o project validate` は引き続き `runtime.phases.<phase>.skill must be provided` で失敗する。
 - `a2o runtime start` と `a2o runtime stop` は互換 alias ではなくなった。常駐スケジューラを再開する場合は `a2o runtime resume`、現在の作業後に停止予約する場合は `a2o runtime pause` を使う。削除済みコマンドを実行した場合、A2O は非ゼロで終了し、`migration_required=true` と移行先コマンドを表示する。
-- custom worker は review disposition の scope 欄として `review_disposition.slot_scopes` を返す必要がある。0.5.66 の worker result では `review_disposition.repo_scope` を受け付けない。`"repo_alpha"` のような値は `slot_scopes: ["repo_alpha"]` に、複数リポジトリの指摘は対象 slot 名の配列に移行する。保存済み worker result は `a2o worker validate-result --request request.json --result result.json --review-slot-scope <slot>` で検証する。
+- custom worker は review disposition の scope 欄として `review_disposition.slot_scopes` を返す必要がある。0.5.67 の worker result では `review_disposition.repo_scope` を受け付けない。`"repo_alpha"` のような値は `slot_scopes: ["repo_alpha"]` に、複数リポジトリの指摘は対象 slot 名の配列に移行する。保存済み worker result は `a2o worker validate-result --request request.json --result result.json --review-slot-scope <slot>` で検証する。
 - SoloBoard 時代の Kanbalone 互換名は削除された。`KANBAN_BACKEND=kanbalone`、`KANBALONE_BASE_URL`、`KANBALONE_API_TOKEN`、`--kanbalone-port`、`A2O_BUNDLE_KANBALONE_PORT`、`A2O_KANBALONE_INTERNAL_URL` を使う。削除済み SoloBoard 入力を使った場合は `migration_required=true` と置き換え先を表示する。
 - 同梱 Kanbalone のデータ名は `<compose-project>_soloboard-data` / `soloboard.sqlite` から `<compose-project>_kanbalone-data` / `kanbalone.sqlite` に変わった。旧 volume が存在し、新 volume が存在しない場合、`a2o kanban up` は空の board を作らず `migration_required=true` で停止する。同梱サービスを起動する前に、既存の Kanban data を copy または rename する。
 - runtime / agent / worker / host package / root utility 設定の公開 `A3_*` 環境変数 fallback は、`A2O_*` 置き換えがあるものから削除された。`A2O_RUNTIME_IMAGE`、`A2O_COMPOSE_PROJECT`、`A2O_COMPOSE_FILE`、`A2O_RUNTIME_SERVICE`、`A2O_BUNDLE_AGENT_PORT`、`A2O_BUNDLE_STORAGE_DIR`、`A2O_SHARE_DIR`、`A2O_AGENT_PACKAGE_DIR`、`A2O_AGENT_TOKEN`、`A2O_AGENT_TOKEN_FILE`、`A2O_AGENT_CONTROL_TOKEN`、`A2O_AGENT_CONTROL_TOKEN_FILE`、`A2O_AGENT_*`、`A2O_WORKER_*`、`A2O_WORKSPACE_ROOT`、`A2O_ROOT_DIR`、`A2O_ROOT_*` root utility controls を使う。削除済み `A3_*` 入力を使った場合は `migration_required=true` と置き換え先を表示する。
@@ -76,10 +78,10 @@ A2O 0.5.66 で現在利用できる公開機能と検証範囲を示す。
 - `worker-runs.json` は activity state source ではなくなった。operator diagnostics、cleanup、rerun readiness、reconcile、watch-summary は `agent_jobs.json` を使う。残存する `worker-runs.json` は `migration_required=true` として報告される。
 - 公開 agent package と host launcher artifact は `a2o-agent` / `a2o` 名を使う。リリース archive は `a2o-agent-<version>-<os>-<arch>.tar.gz`、archive 内バイナリは `a2o-agent`、host install は `a2o` と `a2o-<os>-<arch>` のみを書き出す。shell installer は install directory に残った `a3*` ファイルを削除する。旧 package / cache 環境変数名は `migration_required=true` で失敗する。runtime image 内の `a3 agent package ...` も `migration_required=true` で失敗するため、`a2o agent package ...` を使う。
 - decomposition command 実行は host launcher と同梱 host agent に依存する。`a2o runtime decomposition investigate`、`propose`、`review` を使う前に、host launcher / shared assets と runtime image を同じ版へ更新すること。古い host launcher のままでは decomposition の host-agent 実行経路を認識できない場合がある。典型的な更新手順は次の通り。
-  - release image から新しい launcher を導入する: `docker run --rm -v "$PWD/.work/a2o:/out" ghcr.io/wamukat/a2o-engine:0.5.66 a2o host install --output-dir /out/bin --share-dir /out/share`
-  - project の runtime image 参照を `ghcr.io/wamukat/a2o-engine:0.5.66` に更新する
+  - release image から新しい launcher を導入する: `docker run --rm -v "$PWD/.work/a2o:/out" ghcr.io/wamukat/a2o-engine:0.5.67 a2o host install --output-dir /out/bin --share-dir /out/share`
+  - project の runtime image 参照を `ghcr.io/wamukat/a2o-engine:0.5.67` に更新する
   - decomposition command を実行する前に、新しい image で runtime container を再起動する
-- 0.5.66 の decomposition draft acceptance は、既定で generated parent automation を有効化する。upgrade 後の `a2o runtime decomposition accept-drafts` は、`--no-parent-auto` を渡さない限り generated parent に `trigger:auto-parent` と accepted child の `repo:*` label の和集合を付ける。この挙動を使う前に host launcher / shared assets と runtime image の両方を更新すること。
+- 0.5.67 の decomposition draft acceptance は、既定で generated parent automation を有効化する。upgrade 後の `a2o runtime decomposition accept-drafts` は、`--no-parent-auto` を渡さない限り generated parent に `trigger:auto-parent` と accepted child の `repo:*` label の和集合を付ける。この挙動を使う前に host launcher / shared assets と runtime image の両方を更新すること。
 - decomposition source ticket を使う外部 Kanbalone 環境は Kanbalone v0.9.28 以降への更新を推奨する。A2O は requirement source ticket から generated implementation work へ `related` relation を書き込み、imported source の provenance には v0.9.28 の `externalReferences` を使う。古い外部 Kanbalone では完全な surface が提供されない。
 - `docs.surfaces` を採用する project package は、各 surface の `repoSlot` が repo source として設定されていること、および cross-repo `docs.authorities.*.repoSlot` が source-of-truth file を持つ repo を指していることを確認する。既存の単一 docs surface package には移行作業は不要である。
 - `runtime.delivery.mode: remote_branch` を使う場合は、host launcher / shared assets と runtime image を同じ版へ更新したうえで、`project.yaml` に `runtime.delivery.remote`、`base_branch`、必要に応じて `branch_prefix` / `after_push.command` を追加する。`after_push.command` は repo source root から実行されるため、PATH 上のコマンド、絶対パス、または source-root-relative path を使う。
