@@ -1039,6 +1039,40 @@ func TestWorkerPayloadAcceptsParentReviewClarificationWithoutReviewDisposition(t
 	}
 }
 
+func TestWorkerPayloadValidatesOptionalReviewDispositionWhenPresent(t *testing.T) {
+	request := map[string]any{
+		"task_ref": "A2O#7",
+		"run_ref":  "run-1",
+		"phase":    "review",
+		"phase_runtime": map[string]any{
+			"task_kind": "parent",
+		},
+		"slot_paths": map[string]any{"repo_alpha": "/tmp/repo-alpha"},
+	}
+	payload := map[string]any{
+		"task_ref":        "A2O#7",
+		"run_ref":         "run-1",
+		"phase":           "review",
+		"success":         false,
+		"summary":         "parent review needs requester input",
+		"rework_required": false,
+		"clarification_request": map[string]any{
+			"question": "Which behavior should win?",
+		},
+		"review_disposition": map[string]any{
+			"kind":        "follow_up_child",
+			"slot_scopes": []any{"repo_alpha"},
+			"summary":     "missing assertion",
+			"description": "A follow-up child would need a stable finding key.",
+		},
+	}
+
+	errors := validateWorkerPayload(payload, request)
+	if !containsString(errors, "review_disposition.finding_key must be a non-empty string for follow_up_child or blocked") {
+		t.Fatalf("optional review_disposition should still be validated when present, got %#v", errors)
+	}
+}
+
 func TestWorkerPayloadNormalizesParentReviewSuccessWithoutReviewDisposition(t *testing.T) {
 	request := map[string]any{
 		"task_ref": "A2O#7",

@@ -936,13 +936,17 @@ func validateWorkerPayload(payload map[string]any, request map[string]any) []str
 			errors = append(errors, "changed_files must be present for implementation success")
 		}
 	}
-	if needsReviewDisposition(request, success) && !clarificationRequestPresent(payload) {
-		disposition, ok := payload["review_disposition"].(map[string]any)
+	reviewDispositionRequired := needsReviewDisposition(request, success) && !clarificationRequestPresent(payload)
+	rawReviewDisposition, reviewDispositionPresent := payload["review_disposition"]
+	if reviewDispositionRequired || rawReviewDisposition != nil {
+		disposition, ok := rawReviewDisposition.(map[string]any)
 		if !ok {
-			if stringValue(request["phase"]) == "implementation" {
+			if reviewDispositionRequired && stringValue(request["phase"]) == "implementation" {
 				errors = append(errors, "review_disposition must be present for implementation success")
-			} else {
+			} else if reviewDispositionRequired && !reviewDispositionPresent {
 				errors = append(errors, "review_disposition must be present for parent review")
+			} else {
+				errors = append(errors, "review_disposition must be an object")
 			}
 		} else {
 			for _, key := range []string{"kind", "summary", "description"} {
