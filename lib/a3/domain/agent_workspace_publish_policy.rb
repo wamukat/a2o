@@ -21,10 +21,20 @@ module A3
       end
 
       def native_git_hooks_from(record)
+        if record.key?("commit_hook_policy")
+          raise ConfigurationError, "unsupported agent workspace publish_policy commit_hook_policy; use commit_preflight.native_git_hooks"
+        end
         commit_preflight = record["commit_preflight"]
         return DEFAULT_NATIVE_GIT_HOOKS if commit_preflight.nil?
+        unless commit_preflight.respond_to?(:transform_keys)
+          raise ConfigurationError, "agent workspace publish_policy commit_preflight must be a mapping"
+        end
 
         preflight_record = commit_preflight.transform_keys(&:to_s)
+        unsupported_keys = preflight_record.keys - ["native_git_hooks"]
+        unless unsupported_keys.empty?
+          raise ConfigurationError, "unsupported agent workspace publish_policy commit_preflight.#{unsupported_keys.first}"
+        end
         return DEFAULT_NATIVE_GIT_HOOKS unless preflight_record.key?("native_git_hooks")
 
         preflight_record["native_git_hooks"].to_s
