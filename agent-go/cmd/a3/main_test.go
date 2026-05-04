@@ -4344,6 +4344,44 @@ func TestRuntimeDecompositionAcceptDraftsCanSuppressParentAutomation(t *testing.
 	}
 }
 
+func TestRuntimeDecompositionAcceptDraftsRequiresSelectorBeforeRuntimeDispatch(t *testing.T) {
+	runner := &fakeRunner{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run(
+		[]string{
+			"runtime",
+			"decomposition",
+			"accept-drafts",
+			"Portal#240",
+		},
+		runner,
+		&stdout,
+		&stderr,
+	)
+
+	if code == 0 {
+		t.Fatalf("accept-drafts without selector should fail")
+	}
+	if len(runner.calls) != 0 {
+		t.Fatalf("accept-drafts selector error should be caught before runtime dispatch, got calls: %#v", runner.calls)
+	}
+	for _, want := range []string{
+		"Error: accept-drafts requires exactly one selector: --child, --ready, or --all",
+		"--child CHILD_REF...",
+		"--ready",
+		"--all",
+	} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Fatalf("missing %q in stderr:\n%s", want, stderr.String())
+		}
+	}
+	if strings.Contains(stderr.String(), "ArgumentError") || strings.Contains(stderr.String(), "parse_accept_decomposition_drafts_options") {
+		t.Fatalf("selector error should not leak runtime stack traces, got:\n%s", stderr.String())
+	}
+}
+
 func TestRuntimeDecompositionForwardsEvidencePathOverrides(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

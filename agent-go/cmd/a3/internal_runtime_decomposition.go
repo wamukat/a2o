@@ -52,6 +52,21 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 	if len(positionals) != 1 {
 		return fmt.Errorf("usage: a2o runtime decomposition %s TASK_REF", action)
 	}
+	if action == "accept-drafts" {
+		selectorCount := 0
+		if len(childRefs) > 0 {
+			selectorCount++
+		}
+		if *readyDrafts {
+			selectorCount++
+		}
+		if *allDrafts {
+			selectorCount++
+		}
+		if selectorCount != 1 {
+			return errors.New(acceptDraftsSelectorErrorMessage())
+		}
+	}
 	resolvedProject, taskRef, err := resolveRuntimeProjectTaskRef(*projectKey, positionals[0])
 	if err != nil {
 		return err
@@ -101,6 +116,15 @@ func runRuntimeDecomposition(args []string, runner commandRunner, stdout io.Writ
 
 func runtimeDecompositionUsesHostAgent(action string) bool {
 	return action == "investigate" || action == "propose" || action == "review"
+}
+
+func acceptDraftsSelectorErrorMessage() string {
+	return strings.Join([]string{
+		"Error: accept-drafts requires exactly one selector: --child, --ready, or --all",
+		"  --child CHILD_REF...  accept only the specified child ticket(s)",
+		"  --ready               accept only children labeled a2o:ready-child",
+		"  --all                 accept all draft child tickets",
+	}, "\n")
 }
 
 func runRuntimeDecompositionWithHostAgent(config runtimeInstanceConfig, plan runtimeRunOncePlan, command []string, action string, runner commandRunner, stdout io.Writer) error {
