@@ -730,9 +730,9 @@ RSpec.describe A3::Infra::LocalWorkerGateway do
     expect(execution.response_bundle.fetch("review_disposition")).to include(
       "kind" => "completed",
       "slot_scopes" => ["repo_alpha"],
-      "summary" => "parent review clean",
-      "finding_key" => "parent-review-completed"
+      "summary" => "parent review clean"
     )
+    expect(execution.response_bundle.fetch("review_disposition")).not_to have_key("finding_key")
   end
 
   it "accepts a parent review result with changed_files null when review_disposition is present" do

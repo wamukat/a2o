@@ -62,6 +62,71 @@
     }
   },
   {
+    "name": "implementation_success_completed_review_disposition_null_finding_key",
+    "description": "Clean implementation self-review may set finding_key to null.",
+    "valid": true,
+    "request": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-implementation-1",
+      "phase": "implementation",
+      "slot_paths": {
+        "repo_beta": "/workspace/repo-beta"
+      }
+    },
+    "result": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-implementation-1",
+      "phase": "implementation",
+      "success": true,
+      "summary": "implemented",
+      "failing_command": null,
+      "observed_state": null,
+      "rework_required": false,
+      "changed_files": {
+        "repo_beta": ["lib/example.rb"]
+      },
+      "review_disposition": {
+        "kind": "completed",
+        "slot_scopes": ["repo_beta"],
+        "summary": "self-review clean",
+        "description": "No findings.",
+        "finding_key": null
+      }
+    }
+  },
+  {
+    "name": "implementation_success_completed_review_disposition_omitted_finding_key",
+    "description": "Clean implementation self-review may omit finding_key.",
+    "valid": true,
+    "request": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-implementation-1",
+      "phase": "implementation",
+      "slot_paths": {
+        "repo_beta": "/workspace/repo-beta"
+      }
+    },
+    "result": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-implementation-1",
+      "phase": "implementation",
+      "success": true,
+      "summary": "implemented",
+      "failing_command": null,
+      "observed_state": null,
+      "rework_required": false,
+      "changed_files": {
+        "repo_beta": ["lib/example.rb"]
+      },
+      "review_disposition": {
+        "kind": "completed",
+        "slot_scopes": ["repo_beta"],
+        "summary": "self-review clean",
+        "description": "No findings."
+      }
+    }
+  },
+  {
     "name": "parent_review_follow_up_child",
     "description": "Parent review can route code follow-up to a child slot without rework_required.",
     "valid": true,
@@ -91,6 +156,41 @@
         "summary": "add missing coverage",
         "description": "The child slot needs an additional assertion.",
         "finding_key": "missing-coverage"
+      }
+    }
+  },
+  {
+    "name": "parent_review_follow_up_child_missing_finding_key",
+    "description": "Actionable parent review findings need a stable finding key.",
+    "valid": false,
+    "expected_errors": [
+      "review_disposition.finding_key must be a non-empty string for follow_up_child or blocked"
+    ],
+    "request": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-1",
+      "phase": "review",
+      "phase_runtime": {
+        "task_kind": "parent"
+      },
+      "slot_paths": {
+        "repo_beta": "/workspace/repo-beta"
+      }
+    },
+    "result": {
+      "task_ref": "A3-v2#3028",
+      "run_ref": "run-1",
+      "phase": "review",
+      "success": false,
+      "summary": "review found follow-up work",
+      "failing_command": "parent_review",
+      "observed_state": "review_findings",
+      "rework_required": false,
+      "review_disposition": {
+        "kind": "follow_up_child",
+        "slot_scopes": ["repo_beta"],
+        "summary": "add missing coverage",
+        "description": "The child slot needs an additional assertion."
       }
     }
   },

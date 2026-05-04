@@ -115,7 +115,13 @@ Worker commands write one JSON object to `A2O_WORKER_RESULT_PATH`. Required keys
 - `observed_state`
 - `rework_required`
 
-Implementation success also includes `changed_files` keyed by repo slot. Review and parent review may include `review_disposition` according to the worker response schema. The canonical review disposition scope key is `slot_scopes`, a non-empty array of repo slot names such as `["repo_alpha"]` or `["repo_alpha", "repo_beta"]`; `repo_scope` is not accepted in `review_disposition`.
+Implementation success also includes `changed_files` keyed by repo slot. Review and parent review may include `review_disposition` according to the worker response schema. The canonical review disposition scope key is `slot_scopes`, a non-empty array of repo slot names such as `["repo_alpha"]` or `["repo_alpha", "repo_beta"]`; `repo_scope` is not accepted in `review_disposition`. `finding_key` is required only for actionable `follow_up_child` or `blocked` findings. Clean `completed` review evidence may omit `finding_key` or set it to `null`.
+
+Validation is split deliberately:
+
+- JSON Schema / basic-shape validation checks parseability, object shape, primitive types, and keys that are always required.
+- Semantic validation checks phase- and disposition-specific invariants, such as `changed_files` on implementation success, valid `slot_scopes`, and non-empty `finding_key` only when a review disposition represents an actionable finding.
+- Clean review evidence must not be blocked just because it lacks a finding identifier. A2O should reject contradictions that affect routing or follow-up creation, not harmless absence of non-actionable metadata.
 
 Worker results may include optional `refactoring_assessment` when implementation or review identifies design debt. A2O owns the schema, validation, evidence retention, and short Kanban comment summary. The project package owns the policy for what counts as debt, when debt can be included in the current child, and when it must become a separate child or follow-up. Valid `disposition` values are `none`, `include_child`, `defer_follow_up`, `blocked_by_design_debt`, and `needs_clarification`. Valid `recommended_action` values are `none`, `document_only`, `include_in_current_child`, `create_refactoring_child`, `create_follow_up_child`, `request_clarification`, and `block_until_decision`.
 

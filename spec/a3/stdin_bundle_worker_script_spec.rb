@@ -786,6 +786,9 @@ RSpec.describe "worker:stdin-bundle" do
       expect(status.success?).to eq(true), "#{stdout}\n#{stderr}"
       schema = JSON.parse(stdout)
       expect(schema.fetch("properties").fetch("review_disposition").fetch("type")).to eq("object")
+      review_disposition_schema = schema.fetch("properties").fetch("review_disposition")
+      expect(review_disposition_schema.fetch("required")).not_to include("finding_key")
+      expect(review_disposition_schema.fetch("properties").fetch("finding_key").fetch("type")).to eq(%w[string null])
       expect(schema.fetch("properties")).to have_key("clarification_request")
       expect(schema.fetch("required")).not_to include("review_disposition")
       expect(schema.fetch("properties")).not_to have_key("changed_files")
@@ -897,8 +900,7 @@ RSpec.describe "worker:stdin-bundle" do
           "kind" => "completed",
           "slot_scopes" => ["repo_alpha"],
           "summary" => "parent review clean",
-          "description" => "parent review clean",
-          "finding_key" => "parent-review-completed"
+          "description" => "parent review clean"
         )
       end
     end
@@ -1027,5 +1029,36 @@ RSpec.describe "worker:stdin-bundle" do
         "review_disposition.kind must be completed when success is true for parent review"
       )
     end
+  end
+
+  it "requires finding_key for actionable parent review dispositions" do
+    request = {
+      "task_ref" => "Sample#3140",
+      "run_ref" => "run-parent-review-1",
+      "phase" => "review",
+      "phase_runtime" => { "task_kind" => "parent", "review_skill" => "skill.md" },
+      "slot_paths" => { "repo_alpha" => "/tmp/workspace/repo-alpha", "repo_beta" => "/tmp/workspace/repo-beta" }
+    }
+    payload = {
+      "task_ref" => "Sample#3140",
+      "run_ref" => "run-parent-review-1",
+      "phase" => "review",
+      "success" => false,
+      "summary" => "follow-up child needed",
+      "failing_command" => "parent_review",
+      "observed_state" => "review_findings",
+      "rework_required" => false,
+      "review_disposition" => {
+        "kind" => "follow_up_child",
+        "slot_scopes" => ["repo_beta"],
+        "summary" => "follow-up child needed",
+        "description" => "Reviewer found a follow-up task.",
+        "finding_key" => nil
+      }
+    }
+
+    expect(validate_payload(payload, request: request)).to include(
+      "review_disposition.finding_key must be a non-empty string for follow_up_child or blocked"
+    )
   end
 end

@@ -182,7 +182,9 @@ module A3
           return unless review_disposition.is_a?(Hash)
 
           slot_scopes = Array(review_disposition["slot_scopes"]).map(&:to_s).reject(&:empty?)
-          result << "review_disposition kind=#{review_disposition['kind']} slot_scopes=#{slot_scopes.join(',')} finding_key=#{review_disposition['finding_key']}"
+          fields = ["kind=#{review_disposition['kind']}", "slot_scopes=#{slot_scopes.join(',')}"]
+          fields << "finding_key=#{review_disposition['finding_key']}" if review_disposition["finding_key"].is_a?(String) && !review_disposition["finding_key"].strip.empty?
+          result << "review_disposition #{fields.join(' ')}"
           result << "review_disposition_summary=#{review_disposition['summary']}" if review_disposition["summary"]
           result << "review_disposition_description=#{review_disposition['description']}" if review_disposition["description"]
         end

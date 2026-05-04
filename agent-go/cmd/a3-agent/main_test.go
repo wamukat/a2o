@@ -893,6 +893,18 @@ func TestWorkerResponseSchemaIncludesPhaseSpecificProperties(t *testing.T) {
 					t.Fatalf("schema should not require %q when clarification_request can replace failure diagnostics: %s", property, body)
 				}
 			}
+			if reviewDisposition, ok := properties["review_disposition"].(map[string]any); ok {
+				dispositionRequired := stringSet(reviewDisposition["required"].([]any))
+				if dispositionRequired["finding_key"] {
+					t.Fatalf("review_disposition schema should not require finding_key for clean completed reviews: %s", body)
+				}
+				dispositionProperties := reviewDisposition["properties"].(map[string]any)
+				findingKeyType := dispositionProperties["finding_key"].(map[string]any)["type"].([]any)
+				findingKeyTypes := stringSet(findingKeyType)
+				if !findingKeyTypes["string"] || !findingKeyTypes["null"] {
+					t.Fatalf("review_disposition.finding_key schema should allow string or null: %s", body)
+				}
+			}
 		})
 	}
 }
@@ -1056,7 +1068,6 @@ func TestWorkerPayloadNormalizesParentReviewSuccessWithoutReviewDisposition(t *t
 		"slot_scopes": []string{"repo_alpha"},
 		"summary":     "parent review clean",
 		"description": "parent review clean",
-		"finding_key": "parent-review-completed",
 	}
 	if !reflect.DeepEqual(disposition, expected) {
 		t.Fatalf("unexpected normalized disposition: %#v", disposition)
@@ -1091,8 +1102,11 @@ func TestWorkerPayloadCompletesIncompleteParentReviewSuccessDisposition(t *testi
 		t.Fatalf("incomplete parent review success disposition should be completed, got %#v", errors)
 	}
 	disposition := payload["review_disposition"].(map[string]any)
-	if disposition["summary"] != "parent review clean" || disposition["description"] != "parent review clean" || disposition["finding_key"] != "parent-review-completed" {
+	if disposition["summary"] != "parent review clean" || disposition["description"] != "parent review clean" {
 		t.Fatalf("missing normalized parent review fields: %#v", disposition)
+	}
+	if _, ok := disposition["finding_key"]; ok {
+		t.Fatalf("clean parent review normalization should not inject finding_key: %#v", disposition)
 	}
 }
 

@@ -1162,8 +1162,7 @@ RSpec.describe A3::Infra::WorkerProtocol do
       "kind" => "completed",
       "slot_scopes" => ["repo_beta"],
       "summary" => "parent review completed",
-      "description" => "parent review completed",
-      "finding_key" => "parent-review-completed"
+      "description" => "parent review completed"
     )
   end
 
@@ -1192,9 +1191,9 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(result).to have_attributes(success?: true)
     expect(result.response_bundle.fetch("review_disposition")).to include(
       "kind" => "completed",
-      "slot_scopes" => ["repo_beta"],
-      "finding_key" => "parent-review-completed"
+      "slot_scopes" => ["repo_beta"]
     )
+    expect(result.response_bundle.fetch("review_disposition")).not_to have_key("finding_key")
     expect(worker_response).not_to have_key("review_disposition")
   end
 

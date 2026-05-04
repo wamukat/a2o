@@ -979,6 +979,57 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     expect(result).to include("review_disposition_description=Implementation finished and final self-review found no outstanding issues.")
   end
 
+  it "omits finding_key in run output when clean review evidence has no finding key" do
+    run_view = A3::Domain::OperatorInspectionReadModel::RunView.new(
+      ref: "run-123",
+      task_ref: "A3-v2#child",
+      task_kind: :child,
+      phase: :implementation,
+      workspace_kind: :ticket_workspace,
+      source_type: :branch_head,
+      source_ref: "refs/heads/a2o/work/child",
+      terminal_outcome: :completed,
+      evidence_summary: A3::Domain::OperatorInspectionReadModel::EvidenceSummary.new(
+        workspace_kind: :ticket_workspace,
+        source_type: :branch_head,
+        source_ref: "refs/heads/a2o/work/child",
+        review_base: "base123",
+        review_head: "head456",
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        ownership_scope: :task,
+        artifact_owner_ref: "A3-v2#child",
+        artifact_owner_scope: :task,
+        artifact_snapshot_version: "head456",
+        phase_records_count: 1
+      ),
+      latest_execution: A3::Domain::OperatorInspectionReadModel::RunView::ExecutionSnapshot.new(
+        phase: :implementation,
+        summary: "implementation completed",
+        verification_summary: nil,
+        failing_command: nil,
+        observed_state: nil,
+        diagnostics: {},
+        worker_response_bundle: nil,
+        runtime_snapshot: nil,
+        review_disposition: {
+          "kind" => "completed",
+          "slot_scopes" => ["repo_alpha"],
+          "summary" => "No findings",
+          "description" => "Implementation finished and final self-review found no outstanding issues."
+        }
+      ),
+      latest_blocked_diagnosis: nil,
+      rerun_decision: :same_phase_retry,
+      recovery: nil
+    )
+
+    result = described_class.run_lines(run_view)
+
+    expect(result).to include("review_disposition kind=completed slot_scopes=repo_alpha")
+    expect(result).not_to include(a_string_matching(/finding_key=/))
+  end
+
   it "formats agent artifacts without leaking control-plane diagnostics" do
     artifact = {
       "artifact_id" => "worker-run-combined-log",

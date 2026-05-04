@@ -275,9 +275,14 @@ func validatePublicWorkerPayload(payload map[string]any, request map[string]any,
 				errors = append(errors, "review_disposition must be an object")
 				return errors
 			}
-			for _, key := range []string{"kind", "summary", "description", "finding_key"} {
+			for _, key := range []string{"kind", "summary", "description"} {
 				if _, ok := disposition[key].(string); !ok {
 					errors = append(errors, "review_disposition."+key+" must be a string")
+				}
+			}
+			if value, ok := disposition["finding_key"]; ok && value != nil {
+				if _, ok := value.(string); !ok {
+					errors = append(errors, "review_disposition.finding_key must be a string or null")
 				}
 			}
 			if _, ok := disposition["repo_scope"]; ok {
@@ -317,6 +322,9 @@ func validateReviewDisposition(disposition map[string]any, request map[string]an
 	validScopes := validReviewDispositionSlotScopes(request, parentReview, options)
 	slotScopes := workerStringSliceValue(disposition["slot_scopes"])
 	errors := []string{}
+	if containsString([]string{"follow_up_child", "blocked"}, workerStringValue(disposition["kind"])) && strings.TrimSpace(workerStringValue(disposition["finding_key"])) == "" {
+		errors = append(errors, "review_disposition.finding_key must be a non-empty string for follow_up_child or blocked")
+	}
 	if parentReview {
 		if !containsString([]string{"completed", "follow_up_child", "blocked"}, workerStringValue(disposition["kind"])) {
 			errors = append(errors, "review_disposition.kind must be one of completed, follow_up_child, blocked")
@@ -504,7 +512,6 @@ def main():
             "slot_scopes": [slot_scope],
             "summary": "scaffold worker self-review clean",
             "description": "No changes were required by the scaffold worker.",
-            "finding_key": "none",
         },
     }
     with open(args.result, "w", encoding="utf-8") as handle:
@@ -705,8 +712,7 @@ result = {
     "kind" => "completed",
     "slot_scopes" => [slot_scope],
     "summary" => "scaffold worker self-review clean",
-    "description" => "No changes were required by the scaffold worker.",
-    "finding_key" => "none"
+    "description" => "No changes were required by the scaffold worker."
   }
 }
 
@@ -783,13 +789,12 @@ cat > "$result_path" <<JSON
   "observed_state": null,
   "rework_required": false,
   "changed_files": {},
-  "review_disposition": {
-    "kind": "completed",
-    "slot_scopes": ["$(json_escape "$slot_scope")"],
-    "summary": "scaffold worker self-review clean",
-    "description": "No changes were required by the scaffold worker.",
-    "finding_key": "none"
-  }
+    "review_disposition": {
+      "kind": "completed",
+      "slot_scopes": ["$(json_escape "$slot_scope")"],
+      "summary": "scaffold worker self-review clean",
+      "description": "No changes were required by the scaffold worker."
+    }
 }
 JSON
 `
@@ -842,7 +847,6 @@ func main() {
 			"slot_scopes": []string{slotScope},
 			"summary":     "scaffold worker self-review clean",
 			"description": "No changes were required by the scaffold worker.",
-			"finding_key": "none",
 		},
 	}
 	file, err := os.Create(*resultPath)

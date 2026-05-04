@@ -512,8 +512,14 @@ module A3
             return errors
           end
 
-          %w[kind summary description finding_key].each do |key|
+          %w[kind summary description].each do |key|
             errors << "review_disposition.#{key} must be present" unless disposition[key].is_a?(String)
+          end
+          if disposition.key?("finding_key") && !disposition["finding_key"].nil? && !disposition["finding_key"].is_a?(String)
+            errors << "review_disposition.finding_key must be a string or null"
+          end
+          if %w[follow_up_child blocked].include?(disposition["kind"]) && !present_string?(disposition["finding_key"])
+            errors << "review_disposition.finding_key must be a non-empty string for follow_up_child or blocked"
           end
           if disposition.key?(A3::Domain::RepoScopeCompatibility::LEGACY_REPO_SCOPE_FIELD)
             errors << A3::Domain::RepoScopeCompatibility::REMOVED_REVIEW_DISPOSITION_REPO_SCOPE_ERROR
@@ -618,7 +624,6 @@ module A3
         normalized_disposition["slot_scopes"] = [default_parent_review_slot_scope(workspace)] if Array(normalized_disposition["slot_scopes"]).empty?
         normalized_disposition["summary"] = worker_response["summary"] unless present_string?(normalized_disposition["summary"])
         normalized_disposition["description"] = worker_response["summary"] unless present_string?(normalized_disposition["description"])
-        normalized_disposition["finding_key"] = "parent-review-completed" unless present_string?(normalized_disposition["finding_key"])
         worker_response["review_disposition"] = normalized_disposition
       end
 

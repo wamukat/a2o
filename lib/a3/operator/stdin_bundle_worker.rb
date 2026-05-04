@@ -152,7 +152,7 @@ def bundle_for(request)
           "Optionally include refactoring_assessment when implementation or review finds design debt. Use disposition one of none, include_child, defer_follow_up, blocked_by_design_debt, needs_clarification and recommended_action one of none, document_only, include_in_current_child, create_refactoring_child, create_follow_up_child, request_clarification, block_until_decision.",
           "For review failures caused by findings, include rework_required=true.",
           "Copy task_ref, run_ref, and phase exactly from request. If you are uncertain, omit them rather than inventing values.",
-          "For parent review, include review_disposition with kind, slot_scopes, summary, description, and finding_key unless you return clarification_request.",
+          "For parent review, include review_disposition with kind, slot_scopes, summary, and description unless you return clarification_request. Include finding_key only for actionable follow_up_child or blocked findings; completed clean reviews may omit it or set it to null.",
           "For parent review success with no findings, set success=true, observed_state=null, rework_required=false, and review_disposition.kind=completed.",
           "For parent review code follow-up findings, set success=false, observed_state to a concise string such as review_findings, rework_required=false, and review_disposition.kind=follow_up_child with configured slot_scopes.",
           "For parent review blocked findings, set success=false, observed_state to a concise string such as blocked_finding, rework_required=false, and review_disposition.kind=blocked with slot_scopes=[unresolved].",
@@ -283,9 +283,9 @@ def response_schema(request)
         "slot_scopes" => { "type" => "array", "items" => { "type" => "string" }, "minItems" => 1 },
         "summary" => { "type" => "string" },
         "description" => { "type" => "string" },
-        "finding_key" => { "type" => "string" }
+        "finding_key" => { "type" => ["string", "null"] }
       },
-      "required" => %w[kind slot_scopes summary description finding_key],
+      "required" => %w[kind slot_scopes summary description],
       "additionalProperties" => false
     }
   end
@@ -297,9 +297,9 @@ def response_schema(request)
         "slot_scopes" => { "type" => "array", "items" => { "type" => "string" }, "minItems" => 1 },
         "summary" => { "type" => "string" },
         "description" => { "type" => "string" },
-        "finding_key" => { "type" => "string" }
+        "finding_key" => { "type" => ["string", "null"] }
       },
-      "required" => %w[kind slot_scopes summary description finding_key],
+      "required" => %w[kind slot_scopes summary description],
       "additionalProperties" => false
     }
   end
@@ -596,8 +596,14 @@ def validate_payload(payload, request:)
       errors << "review_disposition must be an object"
       return errors
     end
-    %w[kind summary description finding_key].each do |key|
+    %w[kind summary description].each do |key|
       errors << "review_disposition.#{key} must be a string" unless disposition[key].is_a?(String)
+    end
+    if disposition.key?("finding_key") && !disposition["finding_key"].nil? && !disposition["finding_key"].is_a?(String)
+      errors << "review_disposition.finding_key must be a string or null"
+    end
+    if %w[follow_up_child blocked].include?(disposition["kind"]) && !present_string?(disposition["finding_key"])
+      errors << "review_disposition.finding_key must be a non-empty string for follow_up_child or blocked"
     end
     if disposition.key?(A3::Domain::RepoScopeCompatibility::LEGACY_REPO_SCOPE_FIELD)
       errors << A3::Domain::RepoScopeCompatibility::REMOVED_REVIEW_DISPOSITION_REPO_SCOPE_ERROR
@@ -684,7 +690,6 @@ def normalize_parent_review_success!(payload, request:)
   normalized_disposition["slot_scopes"] = [default_parent_review_slot_scope(request)] if Array(normalized_disposition["slot_scopes"]).empty?
   normalized_disposition["summary"] = payload["summary"] unless present_string?(normalized_disposition["summary"])
   normalized_disposition["description"] = payload["summary"] unless present_string?(normalized_disposition["description"])
-  normalized_disposition["finding_key"] = "parent-review-completed" unless present_string?(normalized_disposition["finding_key"])
   payload["review_disposition"] = normalized_disposition
 end
 

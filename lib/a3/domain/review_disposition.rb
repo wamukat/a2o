@@ -27,7 +27,7 @@ module A3
           slot_scopes: payload.fetch("slot_scopes"),
           summary: payload.fetch("summary"),
           description: payload.fetch("description"),
-          finding_key: payload.fetch("finding_key")
+          finding_key: payload["finding_key"]
         )
       rescue KeyError
         nil
@@ -50,7 +50,7 @@ module A3
           !slot_scopes.empty? &&
           !summary.strip.empty? &&
           !description.strip.empty? &&
-          !finding_key.strip.empty?
+          (completed? || !finding_key.strip.empty?)
       end
     end
   end

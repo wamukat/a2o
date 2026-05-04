@@ -183,7 +183,7 @@ When developing a custom worker, save one worker request and result pair and val
 a2o worker validate-result --request request.json --result result.json
 ```
 
-The validator reports concrete missing keys, type errors, and `task_ref` / `run_ref` / `phase` mismatches before runtime execution. If your executor uses configured review disposition slot scopes, pass the same public values with repeated `--review-slot-scope SCOPE`.
+The validator reports concrete missing keys, type errors, and `task_ref` / `run_ref` / `phase` mismatches before runtime execution. If your executor uses configured review disposition slot scopes, pass the same public values with repeated `--review-slot-scope SCOPE`. The canonical review disposition scope key is `slot_scopes`; `repo_scope` is rejected. `review_disposition.finding_key` is required only for actionable `follow_up_child` or `blocked` findings. Clean `completed` reviews may omit it or set it to `null`.
 
 If the worker cannot continue because the requested product behavior is ambiguous or conflicts with an existing contract, return `success=false`, `rework_required=false`, and `clarification_request` instead of using `blocked` diagnostics:
 

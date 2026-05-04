@@ -513,9 +513,9 @@ func reviewDispositionSchema(schemaType any) map[string]any {
 			"slot_scopes": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "minItems": 1},
 			"summary":     map[string]any{"type": "string"},
 			"description": map[string]any{"type": "string"},
-			"finding_key": map[string]any{"type": "string"},
+			"finding_key": map[string]any{"type": []string{"string", "null"}},
 		},
-		"required":             []string{"kind", "slot_scopes", "summary", "description", "finding_key"},
+		"required":             []string{"kind", "slot_scopes", "summary", "description"},
 		"additionalProperties": false,
 	}
 }
@@ -754,7 +754,7 @@ func workerBundle(correction *workerResultCorrection) string {
 				"For implementation success, include changed_files keyed by slot name with relative paths to publish.",
 				"For implementation success, include review_disposition with kind=completed when self-review is clean.",
 				"For review failures caused by findings, include rework_required=true.",
-				"For parent review, include review_disposition with kind, slot_scopes, summary, description, and finding_key unless you return clarification_request.",
+				"For parent review, include review_disposition with kind, slot_scopes, summary, and description unless you return clarification_request. Include finding_key only for actionable follow_up_child or blocked findings; completed clean reviews may omit it or set it to null.",
 				"Copy task_ref, run_ref, and phase exactly from request. If you are uncertain, omit them rather than inventing values.",
 				"For parent review success with no findings, set success=true, observed_state=null, rework_required=false, and review_disposition.kind=completed.",
 				"For parent review code follow-up findings, set success=false, observed_state to a concise string such as review_findings, rework_required=false, and review_disposition.kind=follow_up_child with configured slot_scopes.",
@@ -945,9 +945,14 @@ func validateWorkerPayload(payload map[string]any, request map[string]any) []str
 				errors = append(errors, "review_disposition must be present for parent review")
 			}
 		} else {
-			for _, key := range []string{"kind", "summary", "description", "finding_key"} {
+			for _, key := range []string{"kind", "summary", "description"} {
 				if stringValue(disposition[key]) == "" {
 					errors = append(errors, "review_disposition."+key+" must be a string")
+				}
+			}
+			if value, ok := disposition["finding_key"]; ok && value != nil {
+				if _, ok := value.(string); !ok {
+					errors = append(errors, "review_disposition.finding_key must be a string or null")
 				}
 			}
 			if _, ok := disposition["repo_scope"]; ok {
@@ -966,6 +971,9 @@ func validateWorkerReviewDisposition(disposition map[string]any, request map[str
 	validScopes := validWorkerReviewDispositionSlotScopes(request, parentReview)
 	slotScopes := stringSliceValue(disposition["slot_scopes"])
 	errors := []string{}
+	if containsString([]string{"follow_up_child", "blocked"}, stringValue(disposition["kind"])) && strings.TrimSpace(stringValue(disposition["finding_key"])) == "" {
+		errors = append(errors, "review_disposition.finding_key must be a non-empty string for follow_up_child or blocked")
+	}
 	if parentReview {
 		validKinds := []string{"completed", "follow_up_child", "blocked"}
 		if !containsString(validKinds, stringValue(disposition["kind"])) {
@@ -1094,9 +1102,6 @@ func normalizeParentReviewSuccess(payload map[string]any, request map[string]any
 	}
 	if stringValue(normalized["description"]) == "" {
 		normalized["description"] = stringValue(payload["summary"])
-	}
-	if stringValue(normalized["finding_key"]) == "" {
-		normalized["finding_key"] = "parent-review-completed"
 	}
 	payload["review_disposition"] = normalized
 }
