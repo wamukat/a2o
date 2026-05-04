@@ -232,6 +232,92 @@ RSpec.describe A3::Application::PhaseExecutionOrchestrator do
     expect(result.run.terminal_outcome).to eq(:rework)
   end
 
+  it "blocks invalid review worker results instead of salvaging rework from the raw payload" do
+    review_task = A3::Domain::Task.new(
+      ref: "A3-v2#3026",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      verification_scope: %i[repo_alpha repo_beta],
+      status: :in_review,
+      current_run_ref: "run-review-invalid",
+      parent_ref: "A3-v2#3022"
+    )
+    review_run = A3::Domain::Run.new(
+      ref: "run-review-invalid",
+      task_ref: review_task.ref,
+      phase: :review,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :detached_commit,
+        ref: "head456",
+        task_ref: review_task.ref
+      ),
+      scope_snapshot: run.scope_snapshot,
+      review_target: run.evidence.review_target,
+      artifact_owner: run.artifact_owner
+    )
+    execution = A3::Application::ExecutionResult.new(
+      success: false,
+      summary: "worker result schema invalid",
+      failing_command: "worker_result_schema",
+      observed_state: "invalid_worker_result",
+      diagnostics: {
+        "validation_errors" => [
+          "docs_impact.review_disposition must be present for review phases when docs-impact is yes or maybe"
+        ]
+      },
+      response_bundle: {
+        "success" => false,
+        "summary" => "review found docs placement gap",
+        "rework_required" => true,
+        "review_disposition" => {
+          "kind" => "follow_up_child",
+          "slot_scopes" => ["repo_alpha"],
+          "summary" => "docs placement follow-up",
+          "description" => "Update the affected docs section.",
+          "finding_key" => "docs-section-X-placement"
+        },
+        "docs_impact" => { "required" => "yes" }
+      }
+    )
+    blocked_diagnosis = A3::Domain::BlockedDiagnosis.new(
+      task_ref: review_task.ref,
+      run_ref: review_run.ref,
+      phase: :review,
+      outcome: :blocked,
+      review_target: review_run.evidence.review_target,
+      source_descriptor: review_run.source_descriptor,
+      scope_snapshot: review_run.scope_snapshot,
+      artifact_owner: review_run.artifact_owner,
+      expected_state: "worker phase succeeds",
+      observed_state: "invalid_worker_result",
+      failing_command: "worker_result_schema",
+      diagnostic_summary: "worker result schema invalid",
+      infra_diagnostics: execution.diagnostics
+    )
+
+    task_repository.save(review_task)
+    run_repository.save(review_run)
+
+    result = orchestrator.persist_and_complete(
+      task_ref: review_task.ref,
+      run_ref: review_run.ref,
+      task: review_task,
+      run: review_run,
+      runtime: runtime,
+      execution: execution,
+      blocked_diagnosis: blocked_diagnosis
+    )
+
+    expect(result.task.status).to eq(:blocked)
+    expect(result.run.terminal_outcome).to eq(:blocked)
+    expect(result.run.phase_records.last.blocked_diagnosis).to have_attributes(
+      failing_command: "worker_result_schema",
+      observed_state: "invalid_worker_result"
+    )
+  end
+
   it "stops a task in needs_clarification without recording blocked diagnostics" do
     clarification = {
       "question" => "Which API contract should win?",
@@ -364,6 +450,101 @@ RSpec.describe A3::Application::PhaseExecutionOrchestrator do
 
     expect(result.run.terminal_outcome).to eq(:follow_up_child)
     expect(handler).to have_received(:call)
+  end
+
+  it "blocks invalid parent review worker results instead of salvaging follow-up disposition" do
+    handler = instance_double(A3::Application::HandleParentReviewDisposition)
+    allow(handler).to receive(:call)
+    overridden_register_completed_run = A3::Application::RegisterCompletedRun.new(
+      task_repository: task_repository,
+      run_repository: run_repository,
+      plan_next_phase: A3::Application::PlanNextPhase.new,
+      integration_ref_readiness_checker: integration_ref_readiness_checker,
+      handle_parent_review_disposition: handler
+    )
+    overridden_orchestrator = described_class.new(
+      run_repository: run_repository,
+      register_completed_run: overridden_register_completed_run,
+      prepare_workspace: prepare_workspace
+    )
+    parent_task = A3::Domain::Task.new(
+      ref: "Sample#3142",
+      kind: :parent,
+      edit_scope: %i[repo_alpha repo_beta],
+      verification_scope: %i[repo_alpha repo_beta],
+      status: :in_review,
+      current_run_ref: "run-parent-review-invalid"
+    )
+    parent_run = A3::Domain::Run.new(
+      ref: "run-parent-review-invalid",
+      task_ref: parent_task.ref,
+      phase: :review,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :runtime_workspace,
+        source_type: :integration_record,
+        ref: "refs/heads/a2o/parent/Sample-3142",
+        task_ref: parent_task.ref
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: %i[repo_alpha repo_beta],
+        verification_scope: %i[repo_alpha repo_beta],
+        ownership_scope: :parent
+      ),
+      review_target: run.evidence.review_target,
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: parent_task.ref,
+        owner_scope: :parent,
+        snapshot_version: "snap-1"
+      )
+    )
+    execution = A3::Application::ExecutionResult.new(
+      success: false,
+      summary: "worker result schema invalid",
+      failing_command: "worker_result_schema",
+      observed_state: "invalid_worker_result",
+      response_bundle: {
+        "rework_required" => false,
+        "review_disposition" => {
+          "kind" => "follow_up_child",
+          "slot_scopes" => ["repo_beta"],
+          "summary" => "repo_beta follow-up required",
+          "description" => "legacy malformed params should redirect",
+          "finding_key" => "parent-review-invalid"
+        }
+      }
+    )
+    blocked_diagnosis = A3::Domain::BlockedDiagnosis.new(
+      task_ref: parent_task.ref,
+      run_ref: parent_run.ref,
+      phase: :review,
+      outcome: :blocked,
+      review_target: parent_run.evidence.review_target,
+      source_descriptor: parent_run.source_descriptor,
+      scope_snapshot: parent_run.scope_snapshot,
+      artifact_owner: parent_run.artifact_owner,
+      expected_state: "worker phase succeeds",
+      observed_state: "invalid_worker_result",
+      failing_command: "worker_result_schema",
+      diagnostic_summary: "worker result schema invalid",
+      infra_diagnostics: {}
+    )
+
+    task_repository.save(parent_task)
+    run_repository.save(parent_run)
+
+    result = overridden_orchestrator.persist_and_complete(
+      task_ref: parent_task.ref,
+      run_ref: parent_run.ref,
+      task: parent_task,
+      run: parent_run,
+      runtime: runtime,
+      execution: execution,
+      blocked_diagnosis: blocked_diagnosis
+    )
+
+    expect(result.run.terminal_outcome).to eq(:blocked)
+    expect(handler).not_to have_received(:call)
   end
 
   it "fails closed when parent review success carries a blocked disposition" do

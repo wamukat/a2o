@@ -22,18 +22,25 @@ module A3
       end
 
       def rework_required?
+        return false if invalid_worker_result?
+
         response_bundle.is_a?(Hash) && response_bundle["rework_required"] == true
       end
 
       def merge_recovery_required?
+        return false if invalid_worker_result?
+
         response_bundle.is_a?(Hash) && response_bundle["merge_recovery_required"] == true
       end
 
       def merge_recovery_verification_required?
+        return false if invalid_worker_result?
+
         response_bundle.is_a?(Hash) && response_bundle["merge_recovery_verification_required"] == true
       end
 
       def merge_recovery_verification_source_ref
+        return nil if invalid_worker_result?
         return nil unless response_bundle.is_a?(Hash)
 
         value = response_bundle["merge_recovery_verification_source_ref"]
@@ -41,6 +48,7 @@ module A3
       end
 
       def review_disposition
+        return nil if invalid_worker_result?
         return nil unless response_bundle.is_a?(Hash)
 
         disposition = A3::Domain::ReviewDisposition.from_response_bundle(response_bundle)

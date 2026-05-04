@@ -127,6 +127,7 @@ module A3
         return nil unless run.phase.to_sym == :review
         return nil if outcome.to_sym == :completed
         return nil if outcome.to_sym == :needs_clarification
+        return nil if outcome.to_sym == :blocked && execution&.invalid_worker_result?
 
         unless @handle_parent_review_disposition
           return finalize_parent_review_disposition(
