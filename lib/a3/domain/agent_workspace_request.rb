@@ -86,6 +86,13 @@ module A3
         return nil if value.nil?
 
         record = value.transform_keys(&:to_s)
+        if record.key?("commit_hook_policy")
+          raise ConfigurationError, "unsupported agent workspace publish_policy commit_hook_policy; use commit_preflight.native_git_hooks"
+        end
+        unsupported_keys = record.keys - %w[mode commit_message commit_preflight]
+        unless unsupported_keys.empty?
+          raise ConfigurationError, "unsupported agent workspace publish_policy.#{unsupported_keys.first}"
+        end
         mode = required_string(record.fetch("mode"), "publish policy mode")
         raise ConfigurationError, "unsupported agent workspace publish_policy mode: #{mode}" unless PUBLISH_POLICY_MODES.include?(mode)
         native_git_hooks = A3::Domain::AgentWorkspacePublishPolicy.native_git_hooks_from(record)
