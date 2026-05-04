@@ -103,7 +103,7 @@ Package authors should author only `project.yaml` and files under the project pa
 
 - The package can be initialized with `a2o project bootstrap`; use `--package DIR` when it is not under `./a2o-project` or `./project-package`.
 - Repo aliases are stable and do not embed local machine paths.
-- Required binaries are listed in `agent.required_bins`.
+- Product/toolchain required binaries are listed in `agent.required_bins`; A2O core must not add product-specific defaults.
 - Build and verification commands can run from the agent-materialized workspace.
 - Scenario tasks are small enough for deterministic validation.
 - External A2O specification changes required by the package are tracked as separate tickets before implementation.

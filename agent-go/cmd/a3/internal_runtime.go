@@ -1026,7 +1026,7 @@ func buildRuntimeRunOncePlan(config runtimeInstanceConfig, overrides runtimeRunO
 	agentSourcePaths, agentSourceAliases, localSourceAliases, repoSources, repoLabels := packageRuntimeRepoArgs(hostRootDir, effectivePackagePath, packageConfig)
 	requiredBins := packageConfig.AgentRequiredBins
 	if len(requiredBins) == 0 {
-		requiredBins = []string{"git", "node"}
+		requiredBins = []string{"git"}
 	}
 	defaultMaxSteps := envDefaultValue(packageConfig.MaxSteps, "16")
 	defaultLiveRef := envDefaultValue(packageConfig.LiveRef, "refs/heads/feature/prototype")
