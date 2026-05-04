@@ -50,10 +50,14 @@ For agent-materialized implementation jobs, the lifecycle becomes:
 3. Load worker result and uploaded artifacts.
 4. Run `implementation.completion_hooks`.
 5. Refresh slot evidence and canonical changed files.
-6. Publish the implementation commit.
+6. Publish either the accepted implementation commit or a failed-attempt work ref, depending on the hook result.
 7. Submit the implementation result to the runtime control plane.
 
 Hooks must run before publish, not after publish. This lets mutating hooks contribute to the implementation commit and lets failed hooks produce implementation rework feedback before the reviewer phase starts.
+
+When hooks fail, A2O still needs a source for the next rework run. The MVP must therefore publish the failed implementation attempt to an internal work ref without advancing the task to review. The failed-attempt ref is not a final implementation commit and is not merged or reviewed; it exists so the next implementation rework can start from the code the AI just produced plus any successful mutating hook output before the failing hook.
+
+The failed-attempt ref should use the same work-branch namespace as normal implementation work and should be recorded in the execution diagnostics, for example `completion_hook_attempt_ref`. The next implementation run must use that ref as its source descriptor when the previous implementation outcome is `rework`.
 
 ## Command Workspace
 
@@ -67,6 +71,8 @@ The MVP executes each hook once per edit-target repo slot from that slot checkou
 - `A2O_WORKER_RESULT_PATH`: worker result JSON path when available.
 
 Commands that need multi-repo context should use `A2O_WORKSPACE_ROOT` and the request JSON `slot_paths` map. A future `scope: workspace` mode can be added after a concrete multi-repo use case requires one.
+
+Ordering is deterministic and hook-major: A2O runs hook 1 for every edit-target slot in sorted slot-name order, then hook 2 for every edit-target slot, and so on. This preserves the configured sequence globally, so a package can express `fmt` before `verify` across all slots. Within each hook, slot order is lexical by repo slot name.
 
 ## Mutating vs Check Hooks
 
@@ -103,9 +109,13 @@ When a hook exits non-zero, times out, or violates `mode: check`, the agent subm
 }
 ```
 
-The runtime outcome for implementation `rework_required=true` must be `rework`, matching the existing review-to-implementation feedback shape. The next implementation request carries the hook diagnostics in `phase_runtime.prior_review_feedback` or its successor feedback field so the AI can address the failure without parsing free-form comments.
+The runtime outcome for implementation `rework_required=true` must be `rework`, matching the existing review-to-implementation feedback shape. This requires an explicit runtime change: `PhaseExecutionOrchestrator` must map implementation failures with `rework_required=true` to outcome `rework`, and `PlanNextPhase` / run registration must preserve a rework source descriptor instead of treating the task as blocked. Without this change, hook failures will be misclassified as blocked.
+
+The next implementation request carries the hook diagnostics in `phase_runtime.prior_review_feedback` or its successor feedback field so the AI can address the failure without parsing free-form comments. It must also materialize from the failed-attempt ref described above; otherwise the AI would lose the failed implementation it needs to repair.
 
 The name `prior_review_feedback` is historically review-specific. The implementation may continue to populate it for compatibility, but the design should prefer a neutral internal concept such as `prior_phase_feedback` when adding new persisted evidence.
+
+Timeout is intentionally simple in the MVP. Hooks use the existing agent job timeout budget; there is no per-hook timeout key. If a per-hook timeout becomes necessary, it must be added later with a documented default and maximum.
 
 ## Observability
 
