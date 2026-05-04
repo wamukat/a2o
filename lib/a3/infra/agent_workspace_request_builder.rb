@@ -18,7 +18,7 @@ module A3
         @support_refs = normalize_support_refs(support_ref: support_ref, support_refs: support_refs)
         validate_policy!(:freshness_policy, @freshness_policy, A3::Domain::AgentWorkspaceRequest::FRESHNESS_POLICIES)
         validate_policy!(:cleanup_policy, @cleanup_policy, A3::Domain::AgentWorkspaceRequest::CLEANUP_POLICIES)
-        validate_policy!(:publish_commit_hook_policy, @publish_commit_hook_policy, A3::Domain::AgentWorkspaceRequest::PUBLISH_COMMIT_HOOK_POLICIES)
+        validate_policy!(:publish_commit_hook_policy, @publish_commit_hook_policy, A3::Domain::AgentWorkspacePublishPolicy::COMMIT_HOOK_POLICIES)
       end
 
       def call(workspace:, task:, run:, command_intent: nil)

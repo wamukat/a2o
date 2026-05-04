@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/wamukat/a3-engine/agent-go/internal/publishpolicy"
 	"os"
 	"path/filepath"
 	"sort"
@@ -491,10 +492,7 @@ func validatePublishConfig(rawPublish any) error {
 		}
 	}
 	policy := scalarString(publish["commit_hook_policy"])
-	if policy == "" || policy == "bypass" || policy == "run" {
-		return nil
-	}
-	return fmt.Errorf("commit_hook_policy must be bypass or run")
+	return publishpolicy.ValidateCommitHook(policy)
 }
 
 func rejectMergeTarget(runtimePayload map[string]any) error {

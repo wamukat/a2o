@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/wamukat/a3-engine/agent-go/internal/publishpolicy"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -974,17 +975,17 @@ func PublishWorkspaceChanges(prepared PreparedWorkspace, request WorkspaceReques
 		if err != nil {
 			return err
 		}
-		return publishDeclaredWorkspaceChanges(prepared, request, declaredChangedFiles, strings.TrimSpace(policy.CommitMessage), normalizeCommitHookPolicy(policy.CommitHookPolicy))
+		return publishDeclaredWorkspaceChanges(prepared, request, declaredChangedFiles, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeCommitHook(policy.CommitHookPolicy))
 	case "commit_all_edit_target_changes_on_worker_success":
 		if workerProtocolResult == nil || workerProtocolResult["success"] != true {
 			return nil
 		}
-		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage), normalizeCommitHookPolicy(policy.CommitHookPolicy))
+		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeCommitHook(policy.CommitHookPolicy))
 	case "commit_all_edit_target_changes_on_success":
 		if !commandSucceeded {
 			return nil
 		}
-		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage), normalizeCommitHookPolicy(policy.CommitHookPolicy))
+		return publishAllEditTargetWorkspaceChanges(prepared, request, strings.TrimSpace(policy.CommitMessage), publishpolicy.NormalizeCommitHook(policy.CommitHookPolicy))
 	default:
 		return fmt.Errorf("unsupported publish policy mode: %s", policy.Mode)
 	}
@@ -1059,7 +1060,7 @@ func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commit
 	if commitMessage == "" {
 		commitMessage = "A2O agent implementation update"
 	}
-	if !validCommitHookPolicy(commitHookPolicy) {
+	if !publishpolicy.ValidCommitHook(commitHookPolicy) {
 		return fmt.Errorf("unsupported publish commit_hook_policy: %s", commitHookPolicy)
 	}
 	published := []publishPlan{}
@@ -1107,21 +1108,9 @@ func executePublishPlans(prepared PreparedWorkspace, plans []publishPlan, commit
 	return nil
 }
 
-func normalizeCommitHookPolicy(policy string) string {
-	policy = strings.TrimSpace(policy)
-	if policy == "" {
-		return "bypass"
-	}
-	return policy
-}
-
-func validCommitHookPolicy(policy string) bool {
-	return policy == "bypass" || policy == "run"
-}
-
 func commitArgs(commitMessage string, commitHookPolicy string) []string {
 	args := []string{"-c", "user.name=A3 Agent", "-c", "user.email=a2o-agent@example.invalid", "commit", "--no-gpg-sign"}
-	if commitHookPolicy != "run" {
+	if commitHookPolicy != publishpolicy.CommitHookRun {
 		args = append(args, "--no-verify")
 	}
 	return append(args, "-m", commitMessage)
