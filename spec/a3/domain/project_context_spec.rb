@@ -81,8 +81,7 @@ RSpec.describe A3::Domain::ProjectContext do
       "verification_commands" => ["commands/verify-all"],
       "remediation_commands" => ["commands/apply-remediation"],
       "metrics_collection_commands" => [],
-      "notifications" => {
-        "failure_policy" => "best_effort",
+      "observers" => {
         "hooks" => []
       },
       "merge_target" => "merge_to_parent",

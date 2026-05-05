@@ -381,7 +381,7 @@ func TestWorkerCompletionHookFailureReturnsImplementationRework(t *testing.T) {
 	}
 }
 
-func TestWorkerSynthesizesNotificationWorkerProtocolResult(t *testing.T) {
+func TestWorkerSynthesizesObserverWorkerProtocolResult(t *testing.T) {
 	tmp := t.TempDir()
 	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	request := testRequest(".")
@@ -391,9 +391,9 @@ func TestWorkerSynthesizesNotificationWorkerProtocolResult(t *testing.T) {
 	request.WorkspaceRequest.PublishPolicy = nil
 	request.WorkspaceRequest.CleanupPolicy = "cleanup_after_job"
 	request.WorkerProtocolRequest = map[string]any{
-		"command_intent": "notification",
-		"schema":         "a2o.notification/v1",
-		"event":          "task.blocked",
+		"command_intent": "observer",
+		"schema":         "a2o.observer/v1",
+		"event":          "phase.completed",
 		"task_ref":       "Sample#42",
 	}
 	client := &fakeClient{request: &request}
@@ -402,8 +402,8 @@ func TestWorkerSynthesizesNotificationWorkerProtocolResult(t *testing.T) {
 		AgentName: "host-local",
 		Client:    client,
 		Executor: outputExecutor{
-			stdout: "notification stdout\n",
-			stderr: "notification stderr\n",
+			stdout: "observer stdout\n",
+			stderr: "observer stderr\n",
 		},
 		Materializer: WorkspaceMaterializer{
 			WorkspaceRoot: filepath.Join(tmp, "agent-workspaces"),
@@ -423,8 +423,8 @@ func TestWorkerSynthesizesNotificationWorkerProtocolResult(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing diagnostics: %#v", result.WorkerProtocolResult)
 	}
-	if diagnostics["stdout"] != "notification stdout\n" || diagnostics["stderr"] != "notification stderr\n" {
-		t.Fatalf("unexpected notification diagnostics: %#v", diagnostics)
+	if diagnostics["stdout"] != "observer stdout\n" || diagnostics["stderr"] != "observer stderr\n" {
+		t.Fatalf("unexpected observer diagnostics: %#v", diagnostics)
 	}
 }
 

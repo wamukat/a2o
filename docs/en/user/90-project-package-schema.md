@@ -785,33 +785,32 @@ a2o runtime metrics summary --group-by parent --format json
 a2o runtime metrics trends --group-by parent --format json
 ```
 
-### Notification Hooks
+### Observer Hooks
 
-`runtime.notifications` is optional. It declares project-owned commands that receive structured notification events. A2O emits events; the project package decides whether and how to notify external systems.
+`runtime.observers` is optional. It declares project-owned commands that receive structured observer events. A2O emits events; the project package decides whether and how to notify external systems.
 
 ```yaml
 runtime:
-  notifications:
-    failure_policy: best_effort # best_effort or blocking
+  observers:
     hooks:
-      - event: task.blocked
+      - event: phase.started
         command: [app/project-package/commands/notify.sh]
-      - event: task.completed
+      - event: phase.completed
         command: [app/project-package/commands/notify.sh]
 ```
 
-`failure_policy` defaults to `best_effort`. With `best_effort`, command failures are recorded in evidence and task progress continues. With `blocking`, command failures are recorded and the runtime command fails after the task/run transition has been persisted.
+Observer hooks are read-only, best-effort event observers. A2O records hook failures in evidence but does not let observer results change task progress, phase outcomes, agent feedback, or workspace outputs. Commands should send notifications or audit records to external systems only. A2O runs local observer commands outside repo slot working directories where practical, and agent-materialized observer jobs request read-only repo access.
 
-Hook `command` must be a non-empty array of non-empty strings. A2O runs the command in the prepared workspace and exposes:
+Hook `command` must be a non-empty array of non-empty strings. A2O exposes:
 
-- `A2O_NOTIFICATION_EVENT_PATH`: JSON event payload path
+- `A2O_OBSERVER_EVENT_PATH`: JSON event payload path
 
-The payload uses schema `a2o.notification/v1`:
+The payload uses schema `a2o.observer/v1`:
 
 ```json
 {
-  "schema": "a2o.notification/v1",
-  "event": "task.blocked",
+  "schema": "a2o.observer/v1",
+  "event": "phase.completed",
   "task_ref": "A2O#283",
   "task_kind": "child",
   "status": "blocked",
@@ -824,9 +823,9 @@ The payload uses schema `a2o.notification/v1`:
 }
 ```
 
-The initial emitted event set is `task.phase_completed`, `task.blocked`, `task.needs_clarification`, `task.completed`, `task.reworked`, and `parent.follow_up_child_created`. `task.started`, `runtime.idle`, and `runtime.error` are reserved event names for later scheduler-level hook points.
+The initial emitted event set is `phase.started`, `phase.completed`, `task.blocked`, `task.needs_clarification`, `task.completed`, `task.reworked`, and `parent.follow_up_child_created`. `runtime.idle` and `runtime.error` are reserved event names for later scheduler-level observer points.
 
-Hook execution records are stored in the latest phase execution diagnostics under `notification_hooks` with stdout, stderr, exit status, timing, command, event, and payload path.
+Hook execution records are stored in the latest phase execution diagnostics under `observer_hooks` with stdout, stderr, exit status, timing, command, event, and payload path.
 
 ## Template Generator
 
@@ -900,7 +899,7 @@ For any AI CLI, the `source alias` main working tree is input for worktree creat
 ## Current Contract
 
 1. `project.yaml` schema version `1` is the public config contract.
-2. Runtime bridge data is derived from `runtime.phases` and optional runtime extensions such as `runtime.notifications`.
+2. Runtime bridge data is derived from `runtime.phases` and optional runtime extensions such as `runtime.observers`.
 3. Reference product packages use only `project.yaml`.
 4. Package loading rejects unsupported split config files.
 5. Schema, docs, and diagnostics use A2O-facing names.

@@ -2,10 +2,10 @@
 
 module A3
   module Domain
-    class NotificationConfig
+    class ObserverConfig
       KNOWN_EVENTS = %w[
-        task.started
-        task.phase_completed
+        phase.started
+        phase.completed
         task.blocked
         task.needs_clarification
         task.completed
@@ -14,8 +14,6 @@ module A3
         runtime.idle
         runtime.error
       ].freeze
-      FAILURE_POLICIES = %w[best_effort blocking].freeze
-
       Hook = Struct.new(:event, :command, keyword_init: true) do
         def persisted_form
           {
@@ -25,48 +23,41 @@ module A3
         end
       end
 
-      attr_reader :failure_policy, :hooks
+      attr_reader :hooks
 
       def self.empty
-        new(failure_policy: "best_effort", hooks: [])
+        new(hooks: [])
       end
 
       def self.from_project_config(value)
         return empty if value.nil?
         unless value.is_a?(Hash)
-          raise A3::Domain::ConfigurationError, "project.yaml runtime.notifications must be a mapping"
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.observers must be a mapping"
         end
-
-        failure_policy = value.fetch("failure_policy", "best_effort").to_s
-        unless FAILURE_POLICIES.include?(failure_policy)
-          raise A3::Domain::ConfigurationError,
-                "project.yaml runtime.notifications.failure_policy must be one of: #{FAILURE_POLICIES.join(', ')}"
+        unsupported = value.keys.map(&:to_s) - %w[hooks]
+        unless unsupported.empty?
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.observers.#{unsupported.first} is not supported; observers are best-effort read-only event observers"
         end
 
         raw_hooks = value.fetch("hooks", [])
         unless raw_hooks.is_a?(Array)
-          raise A3::Domain::ConfigurationError, "project.yaml runtime.notifications.hooks must be an array"
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.observers.hooks must be an array"
         end
 
-        new(
-          failure_policy: failure_policy,
-          hooks: raw_hooks.map.with_index { |hook, index| parse_hook(hook, index: index) }
-        )
+        new(hooks: raw_hooks.map.with_index { |hook, index| parse_hook(hook, index: index) })
       end
 
       def self.from_persisted_form(value)
         return empty if value.nil?
 
         new(
-          failure_policy: value.fetch("failure_policy", "best_effort"),
           hooks: Array(value.fetch("hooks", [])).map do |hook|
             Hook.new(event: hook.fetch("event"), command: Array(hook.fetch("command")))
           end
         )
       end
 
-      def initialize(failure_policy:, hooks:)
-        @failure_policy = failure_policy.to_s
+      def initialize(hooks:)
         @hooks = Array(hooks).map { |hook| Hook.new(event: hook.event.to_s, command: hook.command.map(&:to_s).freeze) }.freeze
         freeze
       end
@@ -75,26 +66,18 @@ module A3
         hooks.select { |hook| hook.event == event.to_s }
       end
 
-      def blocking?
-        failure_policy == "blocking"
-      end
-
       def persisted_form
-        {
-          "failure_policy" => failure_policy,
-          "hooks" => hooks.map(&:persisted_form)
-        }
+        { "hooks" => hooks.map(&:persisted_form) }
       end
 
       def ==(other)
         other.is_a?(self.class) &&
-          other.failure_policy == failure_policy &&
           other.hooks == hooks
       end
       alias eql? ==
 
       def self.parse_hook(value, index:)
-        path = "project.yaml runtime.notifications.hooks[#{index}]"
+        path = "project.yaml runtime.observers.hooks[#{index}]"
         unless value.is_a?(Hash)
           raise A3::Domain::ConfigurationError, "#{path} must be a mapping"
         end

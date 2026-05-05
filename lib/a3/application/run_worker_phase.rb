@@ -24,7 +24,7 @@ module A3
           prepare_workspace: prepare_workspace,
           inherited_parent_state_resolver: inherited_parent_state_resolver,
           blocked_diagnosis_factory: blocked_diagnosis_factory,
-          notification_hook_runner: A3::Application::RunNotificationHooks.new(command_runner: command_runner)
+          observer_hook_runner: A3::Application::RunObserverHooks.new(command_runner: command_runner)
         )
       end
 

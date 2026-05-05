@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "tmpdir"
-require_relative "run_notification_hooks"
+require_relative "run_observer_hooks"
 require "a3/infra/workspace_trace_logger"
 
 module A3
@@ -9,13 +9,13 @@ module A3
     class PhaseExecutionFlow
       Result = Struct.new(:task, :run, :workspace, keyword_init: true)
 
-      def initialize(task_repository:, run_repository:, register_completed_run:, prepare_workspace:, inherited_parent_state_resolver: nil, blocked_diagnosis_factory: A3::Domain::BlockedDiagnosisFactory.new, notification_hook_runner: A3::Application::RunNotificationHooks.new)
+      def initialize(task_repository:, run_repository:, register_completed_run:, prepare_workspace:, inherited_parent_state_resolver: nil, blocked_diagnosis_factory: A3::Domain::BlockedDiagnosisFactory.new, observer_hook_runner: A3::Application::RunObserverHooks.new)
         @task_repository = task_repository
         @run_repository = run_repository
         @register_completed_run = register_completed_run
         @inherited_parent_state_resolver = inherited_parent_state_resolver
         @blocked_diagnosis_factory = blocked_diagnosis_factory
-        @notification_hook_runner = notification_hook_runner
+        @observer_hook_runner = observer_hook_runner
         @orchestrator = A3::Application::PhaseExecutionOrchestrator.new(
           run_repository: run_repository,
           register_completed_run: register_completed_run,
@@ -38,6 +38,13 @@ module A3
             "workspace_kind" => prepared_workspace.workspace.workspace_kind.to_s
           }
         )
+        start_observer_result = run_observer_hooks_for(
+          events: ["phase.started"],
+          task: task,
+          run: run,
+          runtime: runtime,
+          workspace: prepared_workspace.workspace
+        )
         execution = strategy.execute(
           task: task,
           run: run,
@@ -45,6 +52,7 @@ module A3
           workspace: prepared_workspace.workspace
         )
         execution_with_context = merge_inherited_parent_diagnostics(task: task, run: run, execution: execution)
+        execution_with_context = merge_start_observer_diagnostics(execution_with_context, start_observer_result)
         A3::Infra::WorkspaceTraceLogger.log(
           workspace_root: prepared_workspace.workspace.root_path,
           event: "phase_execution.execute.finish",
@@ -76,7 +84,7 @@ module A3
           ),
           execution_record: execution_record || default_execution_record(task: task, run: run, execution: execution_with_context, runtime: runtime)
         )
-        completion = run_notification_hooks(
+        completion = run_observer_hooks(
           completion: completion,
           runtime: runtime,
           workspace: prepared_workspace.workspace
@@ -98,7 +106,6 @@ module A3
       private
 
       def prepare_for_strategy(strategy:, task:, run:, runtime:)
-        return @orchestrator.prepare(task: task, run: run, runtime: runtime) if notification_hooks_required?(runtime)
         return @orchestrator.prepare(task: task, run: run, runtime: runtime) unless strategy.respond_to?(:requires_workspace?) && !strategy.requires_workspace?
 
         Struct.new(:workspace).new(
@@ -129,10 +136,9 @@ module A3
         execution.with_diagnostics(diagnostics)
       end
 
-      def run_notification_hooks(completion:, runtime:, workspace:)
-        events = notification_events_for(task: completion.task, run: completion.run)
-        result = @notification_hook_runner.call(
-          events: events,
+      def run_observer_hooks(completion:, runtime:, workspace:)
+        result = run_observer_hooks_for(
+          events: observer_events_for(task: completion.task, run: completion.run),
           task: completion.task,
           run: completion.run,
           runtime: runtime,
@@ -141,15 +147,12 @@ module A3
         return completion if result.hook_results.empty?
 
         @run_repository.save(result.run)
-        if runtime.notification_config.blocking? && result.failed?
-          raise A3::Domain::ConfigurationError, "notification hook failed and runtime.notifications.failure_policy=blocking"
-        end
 
         Result.new(task: completion.task, run: result.run, workspace: workspace)
       end
 
-      def notification_events_for(task:, run:)
-        events = ["task.phase_completed"]
+      def observer_events_for(task:, run:)
+        events = ["phase.completed"]
         events << "task.blocked" if task.status == :blocked
         events << "task.needs_clarification" if task.status == :needs_clarification
         events << "task.completed" if task.status == :done
@@ -158,16 +161,23 @@ module A3
         events
       end
 
-      def notification_hooks_required?(runtime)
-        emitted_events = %w[
-          task.phase_completed
-          task.blocked
-          task.needs_clarification
-          task.completed
-          task.reworked
-          parent.follow_up_child_created
-        ]
-        emitted_events.any? { |event| runtime.notification_config.hooks_for(event).any? }
+      def run_observer_hooks_for(events:, task:, run:, runtime:, workspace:)
+        @observer_hook_runner.call(
+          events: events,
+          task: task,
+          run: run,
+          runtime: runtime,
+          workspace: workspace
+        )
+      end
+
+      def merge_start_observer_diagnostics(execution, result)
+        return execution if result.hook_results.empty?
+
+        diagnostics = execution.diagnostics.merge(
+          "observer_hooks" => Array(execution.diagnostics["observer_hooks"]) + result.hook_results
+        )
+        execution.with_diagnostics(diagnostics)
       end
     end
   end

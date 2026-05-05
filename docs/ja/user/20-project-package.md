@@ -283,33 +283,33 @@ a2o runtime metrics trends --group-by parent --format json
 
 Grafana、表計算ソフト、BI ツールは、これらの export またはその下流コピーを読む。初期のメトリクス実装では、これらはランタイムの必須依存ではない。
 
-## 通知 hook
+## Observer hook
 
-プロジェクトは `runtime.notifications` に通知 hook を追加できる。A2O は phase 遷移が確定して保存された後、対象イベントに一致するコマンドを実行し、`A2O_NOTIFICATION_EVENT_PATH` にイベント payload の JSON パスを渡す。
+プロジェクトは `runtime.observers` に read-only な observer hook を追加できる。A2O は phase / task event に一致するコマンドを実行し、`A2O_OBSERVER_EVENT_PATH` にイベント payload の JSON パスを渡す。
 
 ```yaml
 runtime:
-  notifications:
-    failure_policy: best_effort
+  observers:
     hooks:
-      - event: task.blocked
+      - event: phase.started
         command: [app/project-package/commands/notify.sh]
-      - event: task.completed
+      - event: phase.completed
         command: [app/project-package/commands/notify.sh]
 ```
 
-A2O が所有するのは hook の発火タイミングと payload 形状だけである。Slack、Discord、GitHub comment、email、社内通知などの通知先は project package が所有する。A2O core には通知先固有の処理を入れない。
+A2O が所有するのは hook の発火タイミングと payload 形状だけである。Slack、Discord、GitHub comment、email、社内通知などの通知先は project package が所有する。A2O core には通知先固有の処理を入れない。Observer hook は best-effort であり、A2O の進行制御、agent feedback、workspace output の変更には使わない。A2O は可能な限り repo slot working directory の外で observer を実行し、失敗してもタスク進行は変えず診断だけを記録する。
 
-初期実装で発火する phase 完了系イベントは次の通り。
+初期実装で発火する observer event は次の通り。
 
-- `task.phase_completed`
+- `phase.started`
+- `phase.completed`
 - `task.blocked`
 - `task.needs_clarification`
 - `task.completed`
 - `task.reworked`
 - `parent.follow_up_child_created`
 
-`failure_policy` の既定値は `best_effort` で、hook が失敗してもタスク進行は変えず、失敗内容だけを記録する。`blocking` は同じ診断を記録したうえで、保存済み状態を見えるようにした後、runtime command を失敗させる。hook の stdout、stderr、exit status、実行時間、command、payload path は最新 phase execution diagnostics の `notification_hooks` に保存される。
+hook の stdout、stderr、exit status、実行時間、command、payload path は最新 phase execution diagnostics の `observer_hooks` に保存される。
 
 ## タスクテンプレートの位置づけ
 

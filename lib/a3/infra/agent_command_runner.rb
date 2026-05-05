@@ -185,7 +185,7 @@ module A3
       end
 
       def command_output_diagnostics?(command_intent)
-        %i[metrics_collection notification].include?(command_intent&.to_sym) || decomposition_command_intent?(command_intent)
+        %i[metrics_collection observer].include?(command_intent&.to_sym) || decomposition_command_intent?(command_intent)
       end
 
       def decomposition_command_intent?(command_intent)

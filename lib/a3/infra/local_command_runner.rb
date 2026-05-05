@@ -47,7 +47,7 @@ module A3
       private
 
       def success_diagnostics(results, command_intent:)
-        return {} unless %i[metrics_collection notification].include?(command_intent&.to_sym) || command_intent.to_s.start_with?("decomposition_")
+        return {} unless %i[metrics_collection observer].include?(command_intent&.to_sym) || command_intent.to_s.start_with?("decomposition_")
 
         {
           "stdout" => results.map { |result| result.fetch(:stdout) }.join,

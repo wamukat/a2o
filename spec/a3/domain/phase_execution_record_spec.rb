@@ -42,8 +42,7 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
         "verification_commands" => ["commands/check-style", "commands/verify-all"],
         "remediation_commands" => ["commands/apply-remediation"],
         "metrics_collection_commands" => [],
-        "notifications" => {
-          "failure_policy" => "best_effort",
+        "observers" => {
           "hooks" => []
         },
         "workspace_hook" => "sample-bootstrap",

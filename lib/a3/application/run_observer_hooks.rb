@@ -4,13 +4,14 @@ require "fileutils"
 require "json"
 require "securerandom"
 require "shellwords"
+require "tmpdir"
 require "time"
 require "a3/infra/local_command_runner"
 require "a3/infra/workspace_trace_logger"
 
 module A3
   module Application
-    class RunNotificationHooks
+    class RunObserverHooks
       Result = Struct.new(:run, :hook_results, keyword_init: true) do
         def failed?
           hook_results.any? { |result| result.fetch("success") == false }
@@ -25,7 +26,7 @@ module A3
       def call(events:, task:, run:, runtime:, workspace:)
         hook_results = []
         Array(events).each do |event|
-          runtime.notification_config.hooks_for(event).each_with_index do |hook, index|
+          runtime.observer_config.hooks_for(event).each_with_index do |hook, index|
             hook_results << execute_hook(
               event: event.to_s,
               hook: hook,
@@ -49,18 +50,19 @@ module A3
 
       def execute_hook(event:, hook:, hook_index:, task:, run:, workspace:)
         payload = payload_for(event: event, task: task, run: run)
-        payload_path = payload_path_for(payload: payload, event: event, hook_index: hook_index, run: run, workspace: workspace)
+        hook_workspace = observer_workspace_for(workspace: workspace, event: event, hook_index: hook_index, run: run)
+        payload_path = payload_path_for(payload: payload, event: event, hook_index: hook_index, run: run, workspace: hook_workspace)
         started_at = @clock.call
         A3::Infra::WorkspaceTraceLogger.log(
           workspace_root: workspace.root_path,
-          event: "notification_hook.start",
+          event: "observer_hook.start",
           payload: {
-            "notification_event" => event,
+            "observer_event" => event,
             "command" => hook.command,
             "payload_path" => payload_path
           }
         )
-        result = run_command(command: hook.command, workspace: workspace, payload: payload, payload_path: payload_path, task: task, run: run)
+        result = run_command(command: hook.command, workspace: hook_workspace, payload: payload, payload_path: payload_path, task: task, run: run)
         finished_at = @clock.call
         record = result.merge(
           "event" => event,
@@ -72,7 +74,7 @@ module A3
         )
         A3::Infra::WorkspaceTraceLogger.log(
           workspace_root: workspace.root_path,
-          event: "notification_hook.finish",
+          event: "observer_hook.finish",
           payload: record.slice("event", "command", "exit_status", "success")
         )
         record
@@ -81,9 +83,8 @@ module A3
       def payload_path_for(payload:, event:, hook_index:, run:, workspace:)
         return "$A2O_WORKER_REQUEST_PATH" if agent_owned_workspace?
 
-        dir = File.join(workspace.root_path.to_s, ".a2o", "notifications")
-        FileUtils.mkdir_p(dir)
-        path = File.join(dir, "#{safe_id(run.ref)}-#{event.tr('.', '-')}-#{hook_index}-#{SecureRandom.hex(4)}.json")
+        FileUtils.mkdir_p(workspace.root_path)
+        path = File.join(workspace.root_path.to_s, "#{safe_id(run.ref)}-#{event.tr('.', '-')}-#{hook_index}-#{SecureRandom.hex(4)}.json")
         File.write(path, JSON.pretty_generate(payload))
         path
       end
@@ -104,7 +105,7 @@ module A3
         ) if blocked_diagnosis
 
         {
-          "schema" => "a2o.notification/v1",
+          "schema" => "a2o.observer/v1",
           "event" => event,
           "task_ref" => task.ref,
           "task_kind" => task.kind.to_s,
@@ -123,11 +124,11 @@ module A3
         execution = @command_runner.run(
           [shell_command_for(command)],
           workspace: workspace,
-          env: notification_env(payload_path),
+          env: observer_env(payload_path),
           task: task,
           run: run,
-          command_intent: :notification,
-          worker_protocol_request: notification_worker_protocol_request(payload)
+          command_intent: :observer,
+          worker_protocol_request: observer_worker_protocol_request(payload)
         )
         {
           "success" => execution.success?,
@@ -163,19 +164,22 @@ module A3
         command_text = Shellwords.join(command)
         return command_text unless agent_owned_workspace?
 
-        "A2O_NOTIFICATION_EVENT_PATH=\"$A2O_WORKER_REQUEST_PATH\" #{command_text}"
+        "A2O_OBSERVER_EVENT_PATH=\"$A2O_WORKER_REQUEST_PATH\" #{command_text}"
       end
 
-      def notification_env(payload_path)
+      def observer_env(payload_path)
         return {} if agent_owned_workspace?
 
-        { "A2O_NOTIFICATION_EVENT_PATH" => payload_path }
+        {
+          "A2O_OBSERVER_EVENT_PATH" => payload_path,
+          "A2O_ROOT_DIR" => File.dirname(payload_path)
+        }
       end
 
-      def notification_worker_protocol_request(payload)
+      def observer_worker_protocol_request(payload)
         return nil unless agent_owned_workspace?
 
-        payload.merge("command_intent" => "notification")
+        payload.merge("command_intent" => "observer")
       end
 
       def agent_owned_workspace?
@@ -187,13 +191,22 @@ module A3
         return run unless latest&.execution_record
 
         diagnostics = latest.execution_record.diagnostics.merge(
-          "notification_hooks" => Array(latest.execution_record.diagnostics["notification_hooks"]) + hook_results
+          "observer_hooks" => Array(latest.execution_record.diagnostics["observer_hooks"]) + hook_results
         )
         run.replace_latest_phase_record(latest.with_execution_record(latest.execution_record.with_diagnostics(diagnostics)))
       end
 
       def safe_id(value)
         value.to_s.gsub(/[^A-Za-z0-9._:-]/, "-")
+      end
+
+      def observer_workspace_for(workspace:, event:, hook_index:, run:)
+        A3::Domain::PreparedWorkspace.new(
+          workspace_kind: workspace.workspace_kind,
+          root_path: File.join(Dir.tmpdir, "a2o-observers", safe_id(run.ref), event.tr(".", "-"), hook_index.to_s),
+          source_descriptor: workspace.source_descriptor,
+          slot_paths: {}
+        )
       end
     end
   end

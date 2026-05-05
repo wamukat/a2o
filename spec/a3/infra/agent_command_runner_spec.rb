@@ -205,7 +205,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(request.workspace_request.slots.fetch("repo_alpha")).to include("access" => "read_only")
   end
 
-  it "passes notification command output through diagnostics without a worker protocol request" do
+  it "passes observer command output through diagnostics without a worker protocol request" do
     client.on_fetch = ->(job_id) do
       client.complete(
         job_id,
@@ -215,7 +215,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
           0,
           worker_protocol_result: {
             "success" => true,
-            "summary" => "notification sent",
+            "summary" => "observer sent",
             "diagnostics" => {
               "stdout" => "notified\n",
               "stderr" => "warning\n"
@@ -234,7 +234,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
       sleeper: ->(_) {}
     )
 
-    result = runner.run(["notify"], workspace: workspace, task: task, run: run, command_intent: :notification)
+    result = runner.run(["notify"], workspace: workspace, task: task, run: run, command_intent: :observer)
 
     request = client.records.values.first.request
     expect(result).to have_attributes(success?: true, summary: "notify ok")
@@ -247,7 +247,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
     expect(request.workspace_request.slots.fetch("repo_alpha")).to include("access" => "read_only")
   end
 
-  it "passes failed notification command output through diagnostics" do
+  it "passes failed observer command output through diagnostics" do
     client.on_fetch = ->(job_id) do
       client.complete(
         job_id,
@@ -257,7 +257,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
           9,
           worker_protocol_result: {
             "success" => false,
-            "summary" => "notification failed",
+            "summary" => "observer failed",
             "diagnostics" => {
               "stdout" => "before failure\n",
               "stderr" => "notify failed\n"
@@ -276,7 +276,7 @@ RSpec.describe A3::Infra::AgentCommandRunner do
       sleeper: ->(_) {}
     )
 
-    result = runner.run(["notify"], workspace: workspace, task: task, run: run, command_intent: :notification)
+    result = runner.run(["notify"], workspace: workspace, task: task, run: run, command_intent: :observer)
 
     expect(result).to have_attributes(success?: false, summary: "notify failed")
     expect(result.diagnostics).to include(

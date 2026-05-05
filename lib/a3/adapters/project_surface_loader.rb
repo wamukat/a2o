@@ -43,6 +43,9 @@ module A3
         if runtime.key?("live_ref")
           raise A3::Domain::ConfigurationError, "project.yaml runtime.live_ref is no longer supported; use runtime.phases.merge.target_ref"
         end
+        if runtime.key?("notifications")
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.notifications is no longer supported; migration_required=true replacement=runtime.observers"
+        end
         phases = runtime.fetch("phases") do
           raise A3::Domain::ConfigurationError, "project.yaml runtime.phases must be provided"
         end
@@ -60,7 +63,7 @@ module A3
           verification_commands: payload.fetch("verification_commands", []),
           remediation_commands: payload.fetch("remediation_commands", []),
           metrics_collection_commands: payload.fetch("metrics_collection_commands", []),
-          notification_config: A3::Domain::NotificationConfig.from_project_config(runtime.fetch("notifications", nil)),
+          observer_config: A3::Domain::ObserverConfig.from_project_config(runtime.fetch("observers", nil)),
           workspace_hook: nil,
           decomposition_investigate_command: decomposition_command(runtime, "investigate"),
           decomposition_author_command: decomposition_command(runtime, "author"),

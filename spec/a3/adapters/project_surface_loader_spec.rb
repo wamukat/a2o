@@ -170,14 +170,13 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     expect(surface.scheduler_config.max_parallel_tasks).to eq(2)
   end
 
-  it "loads runtime notification hooks" do
+  it "loads runtime observer hooks" do
     project_config_path = write_project_config(
       "runtime" => {
-        "notifications" => {
-          "failure_policy" => "blocking",
+        "observers" => {
           "hooks" => [
             {
-              "event" => "task.blocked",
+              "event" => "phase.completed",
               "command" => ["commands/notify"]
             }
           ]
@@ -195,21 +194,46 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
 
     surface = loader.load(project_config_path)
 
-    expect(surface.notification_config.failure_policy).to eq("blocking")
-    expect(surface.notification_config.hooks.map(&:persisted_form)).to eq(
+    expect(surface.observer_config.hooks.map(&:persisted_form)).to eq(
       [
         {
-          "event" => "task.blocked",
+          "event" => "phase.completed",
           "command" => ["commands/notify"]
         }
       ]
     )
   end
 
-  it "rejects malformed runtime notification hooks" do
+  it "rejects legacy runtime notifications with a migration diagnostic" do
     project_config_path = write_project_config(
       "runtime" => {
         "notifications" => {
+          "hooks" => [
+            {
+              "event" => "task.completed",
+              "command" => ["commands/notify"]
+            }
+          ]
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, /runtime\.notifications is no longer supported.*migration_required=true.*runtime\.observers/)
+  end
+
+  it "rejects malformed runtime observer hooks" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "observers" => {
           "hooks" => [
             {
               "event" => "task.blocked",
@@ -229,7 +253,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     )
 
     expect { loader.load(project_config_path) }
-      .to raise_error(A3::Domain::ConfigurationError, /runtime\.notifications\.hooks\[0\]\.command/)
+      .to raise_error(A3::Domain::ConfigurationError, /runtime\.observers\.hooks\[0\]\.command/)
   end
 
   it "loads project prompt and skill configuration schema" do

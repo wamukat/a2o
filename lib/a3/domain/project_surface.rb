@@ -12,7 +12,7 @@ module A3
         verification_commands
         remediation_commands
         metrics_collection_commands
-        notification_config
+        observer_config
         decomposition_investigate_command
         decomposition_author_command
         decomposition_review_commands
@@ -24,14 +24,14 @@ module A3
 
       attr_reader(*SURFACE_KEYS)
 
-      def initialize(implementation_skill:, review_skill:, verification_commands:, remediation_commands:, workspace_hook:, implementation_completion_hooks: [], metrics_collection_commands: [], notification_config: A3::Domain::NotificationConfig.empty, decomposition_investigate_command: nil, decomposition_author_command: nil, decomposition_review_commands: [], prompt_config: A3::Domain::ProjectPromptConfig.empty, scheduler_config: A3::Domain::ProjectSchedulerConfig.default, docs_config: nil)
+      def initialize(implementation_skill:, review_skill:, verification_commands:, remediation_commands:, workspace_hook:, implementation_completion_hooks: [], metrics_collection_commands: [], observer_config: A3::Domain::ObserverConfig.empty, decomposition_investigate_command: nil, decomposition_author_command: nil, decomposition_review_commands: [], prompt_config: A3::Domain::ProjectPromptConfig.empty, scheduler_config: A3::Domain::ProjectSchedulerConfig.default, docs_config: nil)
         @implementation_skill = deep_freeze_value(implementation_skill)
         @implementation_completion_hooks = deep_freeze_value(implementation_completion_hooks)
         @review_skill = deep_freeze_value(review_skill)
         @verification_commands = deep_freeze_value(verification_commands)
         @remediation_commands = deep_freeze_value(remediation_commands)
         @metrics_collection_commands = deep_freeze_value(metrics_collection_commands)
-        @notification_config = notification_config || A3::Domain::NotificationConfig.empty
+        @observer_config = observer_config || A3::Domain::ObserverConfig.empty
         @decomposition_investigate_command = deep_freeze_value(decomposition_investigate_command)
         @decomposition_author_command = deep_freeze_value(decomposition_author_command)
         @decomposition_review_commands = deep_freeze_value(decomposition_review_commands)

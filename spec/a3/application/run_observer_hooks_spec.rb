@@ -3,7 +3,7 @@
 require "json"
 require "tmpdir"
 
-RSpec.describe A3::Application::RunNotificationHooks do
+RSpec.describe A3::Application::RunObserverHooks do
   around do |example|
     Dir.mktmpdir do |dir|
       @tmpdir = dir
@@ -75,15 +75,15 @@ RSpec.describe A3::Application::RunNotificationHooks do
 
   it "invokes matching hooks with a JSON event path and records command output" do
     observed_path = File.join(@tmpdir, "observed.json")
-    runtime = runtime_with_notifications(
+    runtime = runtime_with_observers(
       hooks: [
-        A3::Domain::NotificationConfig::Hook.new(
+        A3::Domain::ObserverConfig::Hook.new(
           event: "task.blocked",
           command: [
             "ruby",
             "-rjson",
             "-e",
-            "payload = JSON.parse(File.read(ENV.fetch('A2O_NOTIFICATION_EVENT_PATH'))); File.write(ARGV.fetch(0), JSON.generate(payload)); puts 'notified'",
+            "payload = JSON.parse(File.read(ENV.fetch('A2O_OBSERVER_EVENT_PATH'))); File.write(ARGV.fetch(0), JSON.generate(payload)); puts 'notified'",
             observed_path
           ]
         )
@@ -100,7 +100,7 @@ RSpec.describe A3::Application::RunNotificationHooks do
 
     observed = JSON.parse(File.read(observed_path))
     expect(observed).to include(
-      "schema" => "a2o.notification/v1",
+      "schema" => "a2o.observer/v1",
       "event" => "task.blocked",
       "task_ref" => "A2O#284",
       "task_kind" => "child",
@@ -115,14 +115,14 @@ RSpec.describe A3::Application::RunNotificationHooks do
       "exit_status" => 0,
       "stdout" => "notified\n"
     )
-    expect(result.run.phase_records.last.execution_record.diagnostics.fetch("notification_hooks").first)
+    expect(result.run.phase_records.last.execution_record.diagnostics.fetch("observer_hooks").first)
       .to include("event" => "task.blocked", "success" => true)
   end
 
   it "does not invoke hooks for unmatched events" do
-    runtime = runtime_with_notifications(
+    runtime = runtime_with_observers(
       hooks: [
-        A3::Domain::NotificationConfig::Hook.new(
+        A3::Domain::ObserverConfig::Hook.new(
           event: "task.completed",
           command: ["ruby", "-e", "raise 'unexpected'"]
         )
@@ -141,7 +141,7 @@ RSpec.describe A3::Application::RunNotificationHooks do
     expect(result.run).to eq(run)
   end
 
-  it "passes notification payload through the worker protocol request for agent-owned workspaces" do
+  it "passes observer payload through the worker protocol request for agent-owned workspaces" do
     runner = Class.new do
       attr_reader :call
 
@@ -166,9 +166,9 @@ RSpec.describe A3::Application::RunNotificationHooks do
         )
       end
     end.new
-    runtime = runtime_with_notifications(
+    runtime = runtime_with_observers(
       hooks: [
-        A3::Domain::NotificationConfig::Hook.new(
+        A3::Domain::ObserverConfig::Hook.new(
           event: "task.blocked",
           command: ["notify", "--event"]
         )
@@ -183,11 +183,11 @@ RSpec.describe A3::Application::RunNotificationHooks do
       workspace: workspace
     )
 
-    expect(runner.call.fetch(:commands)).to eq(["A2O_NOTIFICATION_EVENT_PATH=\"$A2O_WORKER_REQUEST_PATH\" notify --event"])
+    expect(runner.call.fetch(:commands)).to eq(["A2O_OBSERVER_EVENT_PATH=\"$A2O_WORKER_REQUEST_PATH\" notify --event"])
     expect(runner.call.fetch(:env)).to eq({})
-    expect(runner.call.fetch(:command_intent)).to eq(:notification)
+    expect(runner.call.fetch(:command_intent)).to eq(:observer)
     expect(runner.call.fetch(:worker_protocol_request)).to include(
-      "schema" => "a2o.notification/v1",
+      "schema" => "a2o.observer/v1",
       "event" => "task.blocked",
       "task_ref" => "A2O#284"
     )
@@ -197,7 +197,7 @@ RSpec.describe A3::Application::RunNotificationHooks do
     )
   end
 
-  def runtime_with_notifications(hooks:, failure_policy: "best_effort")
+  def runtime_with_observers(hooks:)
     A3::Domain::PhaseRuntimeConfig.new(
       task_kind: :child,
       repo_scope: :repo_alpha,
@@ -207,10 +207,7 @@ RSpec.describe A3::Application::RunNotificationHooks do
       verification_commands: [],
       remediation_commands: [],
       metrics_collection_commands: [],
-      notification_config: A3::Domain::NotificationConfig.new(
-        failure_policy: failure_policy,
-        hooks: hooks
-      ),
+      observer_config: A3::Domain::ObserverConfig.new(hooks: hooks),
       workspace_hook: nil,
       merge_target: :merge_to_parent,
       merge_policy: :ff_only

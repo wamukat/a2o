@@ -273,33 +273,33 @@ a2o runtime metrics trends --group-by parent --format json
 
 Grafana, spreadsheets, and BI tools should consume these exports or downstream copies of them. They are not required runtime dependencies for the first metrics implementation.
 
-## Notification Hooks
+## Observer Hooks
 
-Projects may add notification hooks under `runtime.notifications`. A2O invokes matching commands after a phase transition has been determined and persisted, then passes the event payload path in `A2O_NOTIFICATION_EVENT_PATH`.
+Projects may add read-only observer hooks under `runtime.observers`. A2O invokes matching commands for phase/task events and passes the event payload path in `A2O_OBSERVER_EVENT_PATH`.
 
 ```yaml
 runtime:
-  notifications:
-    failure_policy: best_effort
+  observers:
     hooks:
-      - event: task.blocked
+      - event: phase.started
         command: [app/project-package/commands/notify.sh]
-      - event: task.completed
+      - event: phase.completed
         command: [app/project-package/commands/notify.sh]
 ```
 
-A2O owns the hook timing and payload shape. The project package owns all destinations such as Slack, Discord, GitHub comments, email, or internal systems. A2O does not include destination-specific notifier logic.
+A2O owns the hook timing and payload shape. The project package owns all destinations such as Slack, Discord, GitHub comments, email, or internal systems. A2O does not include destination-specific notifier logic. Observer hooks are best-effort and must not be used to control A2O, change agent feedback, or mutate workspace outputs. A2O runs them outside repo slot working directories where practical and records failures without changing task progress.
 
-Supported phase-completion events are:
+Supported observer events are:
 
-- `task.phase_completed`
+- `phase.started`
+- `phase.completed`
 - `task.blocked`
 - `task.needs_clarification`
 - `task.completed`
 - `task.reworked`
 - `parent.follow_up_child_created`
 
-The default `failure_policy` is `best_effort`, which records hook failures without changing task progress. `blocking` records the same diagnostics and fails the runtime command after the committed state is visible. Hook stdout, stderr, exit status, timing, command, and payload path are stored in the latest phase execution diagnostics under `notification_hooks`.
+Hook stdout, stderr, exit status, timing, command, and payload path are stored in the latest phase execution diagnostics under `observer_hooks`.
 
 ## Phase Skills
 

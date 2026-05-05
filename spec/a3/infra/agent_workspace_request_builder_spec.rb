@@ -377,14 +377,14 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     expect(request.slots.fetch("repo_beta")).to include("access" => "read_only", "ownership" => "support")
   end
 
-  it "keeps notification commands read-only and non-publishable during implementation" do
+  it "keeps observer commands read-only and non-publishable during implementation" do
     request = described_class.new(
       source_aliases: {
         repo_alpha: "sample-alpha",
         repo_beta: "sample-beta"
       },
       support_ref: "refs/heads/feature/prototype"
-    ).call(workspace: workspace, task: task, run: run(:implementation), command_intent: :notification)
+    ).call(workspace: workspace, task: task, run: run(:implementation), command_intent: :observer)
 
     expect(request.publish_policy).to be_nil
     expect(request.slots.fetch("repo_alpha")).to include("access" => "read_only", "ownership" => "edit_target")

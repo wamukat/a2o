@@ -777,33 +777,32 @@ a2o runtime metrics summary --group-by parent --format json
 a2o runtime metrics trends --group-by parent --format json
 ```
 
-### 通知 hook
+### Observer hook
 
-`runtime.notifications` は任意設定である。構造化された通知イベントを受け取る、プロジェクト所有のコマンドを宣言する。A2O はイベントを発火するだけで、外部システムへどう通知するかは project package が決める。
+`runtime.observers` は任意設定である。構造化された observer event を受け取る、プロジェクト所有のコマンドを宣言する。A2O はイベントを発火するだけで、外部システムへどう通知するかは project package が決める。
 
 ```yaml
 runtime:
-  notifications:
-    failure_policy: best_effort # best_effort または blocking
+  observers:
     hooks:
-      - event: task.blocked
+      - event: phase.started
         command: [app/project-package/commands/notify.sh]
-      - event: task.completed
+      - event: phase.completed
         command: [app/project-package/commands/notify.sh]
 ```
 
-`failure_policy` の既定値は `best_effort` である。`best_effort` ではコマンド失敗を evidence に記録し、タスク進行は継続する。`blocking` では失敗を記録し、task/run 遷移を保存した後に runtime command を失敗させる。
+Observer hook は read-only / best-effort の event observer である。A2O は hook 失敗を evidence に記録するが、observer の結果で task progress、phase outcome、agent feedback、workspace output は変えない。コマンドは通知や監査記録など外部システムへの送信だけに使う。A2O は local observer command を可能な限り repo slot working directory の外で実行し、agent-materialized observer job では read-only repo access を要求する。
 
-hook の `command` は、空でない文字列だけを含む空でない配列でなければならない。A2O は準備済みワークスペースでコマンドを実行し、次を公開する。
+hook の `command` は、空でない文字列だけを含む空でない配列でなければならない。A2O は次を公開する。
 
-- `A2O_NOTIFICATION_EVENT_PATH`: JSON event payload のパス
+- `A2O_OBSERVER_EVENT_PATH`: JSON event payload のパス
 
-payload は schema `a2o.notification/v1` を使う。
+payload は schema `a2o.observer/v1` を使う。
 
 ```json
 {
-  "schema": "a2o.notification/v1",
-  "event": "task.blocked",
+  "schema": "a2o.observer/v1",
+  "event": "phase.completed",
   "task_ref": "A2O#283",
   "task_kind": "child",
   "status": "blocked",
@@ -816,9 +815,9 @@ payload は schema `a2o.notification/v1` を使う。
 }
 ```
 
-初期実装で発火するイベントは、`task.phase_completed`、`task.blocked`、`task.needs_clarification`、`task.completed`、`task.reworked`、`parent.follow_up_child_created` である。`task.started`、`runtime.idle`、`runtime.error` は、後続の scheduler-level hook point 用に予約されたイベント名である。
+初期実装で発火するイベントは、`phase.started`、`phase.completed`、`task.blocked`、`task.needs_clarification`、`task.completed`、`task.reworked`、`parent.follow_up_child_created` である。`runtime.idle`、`runtime.error` は、後続の scheduler-level observer point 用に予約されたイベント名である。
 
-hook 実行 record は、stdout、stderr、exit status、実行時間、command、event、payload path とともに、最新 phase execution diagnostics の `notification_hooks` に保存される。
+hook 実行 record は、stdout、stderr、exit status、実行時間、command、event、payload path とともに、最新 phase execution diagnostics の `observer_hooks` に保存される。
 
 通常のパッケージでは実装フェーズとレビューフェーズを定義する。
 
@@ -1076,7 +1075,7 @@ runtime:
 ## 現在の契約
 
 1. `project.yaml` のスキーマバージョン `1` が公開設定の契約である。
-2. ランタイムブリッジは `runtime.phases` と、`runtime.notifications` などの任意 runtime 拡張から、内部ランタイム用のパッケージデータを導出する。
+2. ランタイムブリッジは `runtime.phases` と、`runtime.observers` などの任意 runtime 拡張から、内部ランタイム用のパッケージデータを導出する。
 3. 参照用プロダクトパッケージは単一ファイルの `project.yaml` を使う。
 4. パッケージ読み込みは、未対応の分割設定ファイルを拒否する。
 5. パッケージスキーマ、ドキュメント、通常診断は A2O 向けの名前を使う。

@@ -17,7 +17,7 @@ module A3
           register_completed_run: register_completed_run,
           prepare_workspace: prepare_workspace,
           blocked_diagnosis_factory: blocked_diagnosis_factory,
-          notification_hook_runner: A3::Application::RunNotificationHooks.new(command_runner: command_runner)
+          observer_hook_runner: A3::Application::RunObserverHooks.new(command_runner: command_runner)
         )
       end
 

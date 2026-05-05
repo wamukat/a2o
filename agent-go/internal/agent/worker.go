@@ -676,7 +676,7 @@ func commandOutputWorkerProtocolResult(request JobRequest, execution ExecutionRe
 		return nil
 	}
 	intent, _ := request.WorkerProtocolRequest["command_intent"].(string)
-	if intent != "notification" && !strings.HasPrefix(intent, "decomposition_") {
+	if intent != "observer" && !strings.HasPrefix(intent, "decomposition_") {
 		return nil
 	}
 	return map[string]any{
