@@ -45,8 +45,85 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     expect(surface.verification_commands).to eq(["commands/verify-all"])
     expect(surface.remediation_commands).to eq(["commands/apply-remediation"])
     expect(surface.metrics_collection_commands).to eq(["commands/collect-metrics"])
+    expect(surface.implementation_completion_hooks).to eq([])
     expect(surface.scheduler_config.max_parallel_tasks).to eq(1)
     expect(surface.workspace_hook).to be_nil
+  end
+
+  it "loads implementation completion hooks" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md",
+            "completion_hooks" => {
+              "commands" => [
+                {
+                  "name" => "fmt",
+                  "command" => "./scripts/a2o/fmt-apply.sh",
+                  "mode" => "mutating"
+                },
+                {
+                  "name" => "verify",
+                  "command" => "./scripts/a2o/impl-verify.sh",
+                  "mode" => "check",
+                  "on_failure" => "rework"
+                }
+              ]
+            }
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    surface = loader.load(project_config_path)
+
+    expect(surface.implementation_completion_hooks).to eq(
+      [
+        {
+          "name" => "fmt",
+          "command" => "./scripts/a2o/fmt-apply.sh",
+          "mode" => "mutating",
+          "on_failure" => "rework"
+        },
+        {
+          "name" => "verify",
+          "command" => "./scripts/a2o/impl-verify.sh",
+          "mode" => "check",
+          "on_failure" => "rework"
+        }
+      ]
+    )
+  end
+
+  it "rejects malformed implementation completion hooks" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md",
+            "completion_hooks" => {
+              "commands" => [
+                {
+                  "name" => "verify",
+                  "command" => "./scripts/a2o/impl-verify.sh",
+                  "mode" => "observe"
+                }
+              ]
+            }
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }
+      .to raise_error(A3::Domain::ConfigurationError, /completion_hooks\.commands\[0\]\.mode/)
   end
 
   it "loads explicit single-task scheduler config" do

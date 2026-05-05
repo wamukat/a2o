@@ -2207,13 +2207,20 @@ module A3
         cleanup_policy: options.fetch(:agent_workspace_cleanup_policy, :retain_until_a3_cleanup),
         publish_commit_preflight_native_git_hooks: options.fetch(:agent_publish_commit_preflight_native_git_hooks, :bypass),
         publish_commit_preflight_commands: options.fetch(:agent_publish_commit_preflight_commands, []),
-        implementation_completion_hooks: options.fetch(:agent_implementation_completion_hooks, []),
+        implementation_completion_hooks: agent_implementation_completion_hooks(options),
         support_ref: options[:agent_support_ref],
         support_refs: options.fetch(:agent_support_refs, {})
       )
-    end
+      end
 
-    def agent_environment_from_options(options)
+      def agent_implementation_completion_hooks(options)
+        return options.fetch(:agent_implementation_completion_hooks) if options.key?(:agent_implementation_completion_hooks)
+        return [] unless options[:manifest_path]
+
+        load_project_surface(options).implementation_completion_hooks
+      end
+
+      def agent_environment_from_options(options)
       validate_agent_env!(options.fetch(:agent_env, {}))
       environment = {}
       workspace_root = options[:agent_workspace_root].to_s

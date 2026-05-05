@@ -680,10 +680,10 @@ runtime:
       completion_hooks:
         commands:
           - name: fmt
-            command: ./project-package/commands/fmt-apply.sh
+            command: ./scripts/a2o/fmt-apply.sh
             mode: mutating
           - name: verify
-            command: ./project-package/commands/impl-verify.sh
+            command: ./scripts/a2o/impl-verify.sh
             mode: check
             on_failure: rework
 ```
@@ -694,7 +694,7 @@ runtime:
 - `mode: check` はファイルを変更してはならない。
 - `on_failure` は現時点では `rework` のみを受け付け、省略時も `rework` になる。
 
-A2O は hook の定義順を優先し、各 hook を edit-target slot 名の昇順で実行する。各 hook のカレントディレクトリは repo slot の checkout root である。command には次の環境変数も渡される。
+A2O は hook の定義順を優先し、各 hook を edit-target slot 名の昇順で実行する。各 hook のカレントディレクトリは repo slot の checkout root である。slot-local script や `PATH` 上の command など、その slot root から実行できる command を指定する。command には次の環境変数も渡される。
 
 - `A2O_WORKSPACE_ROOT`
 - `A2O_COMPLETION_HOOK_NAME`

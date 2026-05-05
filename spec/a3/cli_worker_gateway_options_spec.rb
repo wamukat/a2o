@@ -160,6 +160,63 @@ RSpec.describe "A3 CLI worker gateway options" do
     )
   end
 
+  it "uses project package implementation completion hooks when CLI hooks are not explicit" do
+    Dir.mktmpdir do |dir|
+      project_path = File.join(dir, "project.yaml")
+      File.write(
+        project_path,
+        <<~YAML
+          schema_version: 1
+          package:
+            name: completion-hook-options
+          kanban:
+            project: CompletionHookOptions
+          runtime:
+            phases:
+              implementation:
+                skill: skills/implementation/base.md
+                completion_hooks:
+                  commands:
+                    - name: fmt
+                      command: ./scripts/a2o/fmt-apply.sh
+                      mode: mutating
+              review:
+                skill: skills/review/default.md
+        YAML
+      )
+
+      gateway = A3::CLI.send(
+        :build_worker_gateway,
+        options: {
+          manifest_path: project_path,
+          preset_dir: File.join(dir, "presets"),
+          worker_gateway: "agent-http",
+          worker_command: "sh",
+          worker_command_args: ["-lc", "worker"],
+          agent_control_plane_url: "http://127.0.0.1:4567",
+          agent_runtime_profile: "host-local",
+          agent_shared_workspace_mode: "agent-materialized",
+          agent_source_aliases: {
+            "repo_alpha" => "sample-alpha"
+          }
+        },
+        command_runner: instance_double(A3::Infra::LocalCommandRunner)
+      )
+
+      builder = gateway.instance_variable_get(:@workspace_request_builder)
+      expect(builder.instance_variable_get(:@implementation_completion_hooks)).to eq(
+        [
+          {
+            "name" => "fmt",
+            "command" => "./scripts/a2o/fmt-apply.sh",
+            "mode" => "mutating",
+            "on_failure" => "rework"
+          }
+        ]
+      )
+    end
+  end
+
   it "builds an agent materialized HTTP worker gateway with slot-specific support refs" do
     gateway = A3::CLI.send(
       :build_worker_gateway,

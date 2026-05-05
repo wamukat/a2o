@@ -55,6 +55,7 @@ module A3
 
         A3::Domain::ProjectSurface.new(
           implementation_skill: payload["implementation_skill"],
+          implementation_completion_hooks: payload.fetch("implementation_completion_hooks", []),
           review_skill: payload["review_skill"],
           verification_commands: payload.fetch("verification_commands", []),
           remediation_commands: payload.fetch("remediation_commands", []),
@@ -100,6 +101,7 @@ module A3
 
         payload = {
           "implementation_skill" => phase_skill_or_prompt_backed_nil(implementation, "implementation", prompt_config),
+          "implementation_completion_hooks" => implementation_completion_hooks(implementation),
           "review_skill" => phase_skill_or_prompt_backed_nil(review, "review", prompt_config),
           "verification_commands" => verification.fetch("commands", []),
           "remediation_commands" => remediation.fetch("commands", []),
@@ -132,6 +134,64 @@ module A3
         return nil if prompt_phase_configured?(prompt_config, name)
 
         raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.#{name}.skill must be provided"
+      end
+
+      def implementation_completion_hooks(implementation)
+        completion_hooks = implementation.fetch("completion_hooks", nil)
+        return [] if completion_hooks.nil?
+        unless completion_hooks.is_a?(Hash)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.implementation.completion_hooks must be a mapping"
+        end
+        commands = completion_hooks.fetch("commands", [])
+        unless commands.is_a?(Array)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.implementation.completion_hooks.commands must be a sequence"
+        end
+        commands.each_with_index.map do |hook, index|
+          unless hook.is_a?(Hash)
+            raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.implementation.completion_hooks.commands[#{index}] must be a mapping"
+          end
+          unsupported = hook.keys.map(&:to_s) - %w[name command mode on_failure]
+          unless unsupported.empty?
+            raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.implementation.completion_hooks.commands[#{index}].#{unsupported.first} is not supported"
+          end
+          {
+            "name" => required_completion_hook_string(hook, "name", index),
+            "command" => required_completion_hook_string(hook, "command", index),
+            "mode" => required_completion_hook_mode(hook, index),
+            "on_failure" => completion_hook_on_failure(hook, index)
+          }
+        end
+      end
+
+      def required_completion_hook_string(hook, key, index)
+        unless hook.key?(key)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.implementation.completion_hooks.commands[#{index}].#{key} must be provided"
+        end
+        value = hook.fetch(key)
+        unless value.is_a?(String) && !value.strip.empty?
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.implementation.completion_hooks.commands[#{index}].#{key} must be a non-empty string"
+        end
+
+        value.strip
+      end
+
+      def required_completion_hook_mode(hook, index)
+        mode = required_completion_hook_string(hook, "mode", index)
+        unless %w[mutating check].include?(mode)
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.implementation.completion_hooks.commands[#{index}].mode must be mutating or check"
+        end
+
+        mode
+      end
+
+      def completion_hook_on_failure(hook, index)
+        on_failure = hook.fetch("on_failure", "rework").to_s.strip
+        on_failure = "rework" if on_failure.empty?
+        unless on_failure == "rework"
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.phases.implementation.completion_hooks.commands[#{index}].on_failure must be rework"
+        end
+
+        on_failure
       end
 
       def prompt_phase_configured?(prompt_config, name)
