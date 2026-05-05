@@ -786,12 +786,30 @@ runtime:
   observers:
     hooks:
       - event: phase.started
-        command: [app/project-package/commands/notify.sh]
+        command:
+          - ruby
+          - -rjson
+          - -e
+          - |
+            payload = JSON.parse(File.read(ENV.fetch("A2O_OBSERVER_EVENT_PATH")))
+            File.open(ENV.fetch("A2O_OBSERVER_LOG", "/tmp/a2o-observer.log"), "a") do |f|
+              f.puts([payload.fetch("event"), payload.fetch("task_ref"), payload.fetch("phase", "-")].join(" "))
+            end
       - event: phase.completed
-        command: [app/project-package/commands/notify.sh]
+        command:
+          - ruby
+          - -rjson
+          - -e
+          - |
+            payload = JSON.parse(File.read(ENV.fetch("A2O_OBSERVER_EVENT_PATH")))
+            File.open(ENV.fetch("A2O_OBSERVER_LOG", "/tmp/a2o-observer.log"), "a") do |f|
+              f.puts([payload.fetch("event"), payload.fetch("task_ref"), payload.fetch("phase", "-")].join(" "))
+            end
 ```
 
 Observer hook は read-only / best-effort の event observer である。A2O は hook 失敗を evidence に記録するが、observer の結果で task progress、phase outcome、agent feedback、workspace output は変えない。コマンドは通知や監査記録など外部システムへの送信だけに使う。A2O は local observer command を可能な限り repo slot working directory の外で実行し、agent-materialized observer job では read-only repo access を要求する。
+
+local observer command は repo slot working directory に依存してはいけない。スクリプトファイルを使う場合は、PATH 上のコマンドか絶対パスで指定する。hook の実行結果は diagnostics に記録されるだけで、成功/失敗のどちらでも task progress、phase outcome、agent feedback、workspace output は変わらない。
 
 hook の `command` は、空でない文字列だけを含む空でない配列でなければならない。A2O は次を公開する。
 

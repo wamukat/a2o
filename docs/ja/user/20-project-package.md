@@ -292,12 +292,39 @@ runtime:
   observers:
     hooks:
       - event: phase.started
-        command: [app/project-package/commands/notify.sh]
+        command:
+          - ruby
+          - -rjson
+          - -e
+          - |
+            payload = JSON.parse(File.read(ENV.fetch("A2O_OBSERVER_EVENT_PATH")))
+            File.open(ENV.fetch("A2O_OBSERVER_LOG", "/tmp/a2o-observer.log"), "a") do |f|
+              f.puts([payload.fetch("event"), payload.fetch("task_ref"), payload.fetch("phase", "-")].join(" "))
+            end
       - event: phase.completed
-        command: [app/project-package/commands/notify.sh]
+        command:
+          - ruby
+          - -rjson
+          - -e
+          - |
+            payload = JSON.parse(File.read(ENV.fetch("A2O_OBSERVER_EVENT_PATH")))
+            File.open(ENV.fetch("A2O_OBSERVER_LOG", "/tmp/a2o-observer.log"), "a") do |f|
+              f.puts([payload.fetch("event"), payload.fetch("task_ref"), payload.fetch("phase", "-")].join(" "))
+            end
 ```
 
 A2O が所有するのは hook の発火タイミングと payload 形状だけである。Slack、Discord、GitHub comment、email、社内通知などの通知先は project package が所有する。A2O core には通知先固有の処理を入れない。Observer hook は best-effort であり、A2O の進行制御、agent feedback、workspace output の変更には使わない。A2O は可能な限り repo slot working directory の外で observer を実行し、失敗してもタスク進行は変えず診断だけを記録する。
+
+local observer command は repo slot working directory に依存してはいけない。通知スクリプトをファイルとして置く場合は、PATH 上のコマンドか絶対パスを使う。repo 内のファイルを更新しても A2O の成果物や agent feedback には反映されないため、observer は外部通知、監査ログ、メトリクス転送だけに使う。
+
+ローカルで最小確認する場合は、A2O を起動する shell で `A2O_OBSERVER_LOG=/tmp/a2o-observer.log` を設定し、タスクを実行した後に次を確認する。
+
+```sh
+tail -f /tmp/a2o-observer.log
+a2o runtime describe-task A2O#123
+```
+
+`describe-task` の最新 phase execution diagnostics に `observer_hooks` が出ていれば、hook の command、payload path、stdout、stderr、exit status、実行時間を確認できる。
 
 初期実装で発火する observer event は次の通り。
 

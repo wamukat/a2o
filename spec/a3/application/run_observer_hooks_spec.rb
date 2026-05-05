@@ -141,6 +141,39 @@ RSpec.describe A3::Application::RunObserverHooks do
     expect(result.run).to eq(run)
   end
 
+  it "records command runner errors without failing the phase" do
+    runner = Class.new do
+      def run(*)
+        raise A3::Domain::ConfigurationError, "observer workspace unavailable"
+      end
+    end.new
+    runtime = runtime_with_observers(
+      hooks: [
+        A3::Domain::ObserverConfig::Hook.new(
+          event: "task.blocked",
+          command: ["notify", "--event"]
+        )
+      ]
+    )
+
+    result = described_class.new(command_runner: runner).call(
+      events: ["task.blocked"],
+      task: task,
+      run: run,
+      runtime: runtime,
+      workspace: workspace
+    )
+
+    expect(result.hook_results.first).to include(
+      "success" => false,
+      "exit_status" => nil,
+      "stdout" => "",
+      "stderr" => include("observer workspace unavailable")
+    )
+    expect(result.run.phase_records.last.execution_record.diagnostics.fetch("observer_hooks").first)
+      .to include("success" => false)
+  end
+
   it "passes observer payload through the worker protocol request for agent-owned workspaces" do
     runner = Class.new do
       attr_reader :call

@@ -24,8 +24,8 @@ module A3
       end
 
       def call(workspace:, task:, run:, command_intent: nil)
-        validate_phase!(run.phase)
         command_intent = normalize_command_intent(command_intent)
+        validate_phase!(run.phase, command_intent: command_intent)
         slots = @repo_slot_policy.resolve_slots(workspace: workspace).each_with_object({}) do |slot_name, request_slots|
           alias_name = @source_aliases[slot_name]
           raise A3::Domain::ConfigurationError, "missing agent source alias for #{slot_name}" if alias_name.to_s.empty?
@@ -61,7 +61,8 @@ module A3
 
       private
 
-      def validate_phase!(phase)
+      def validate_phase!(phase, command_intent:)
+        return if command_intent == :observer
         return if %i[implementation review verification].include?(phase.to_sym)
 
         raise A3::Domain::ConfigurationError, "agent materialized workspace is not supported for phase #{phase}"

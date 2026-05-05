@@ -139,7 +139,7 @@ module A3
           "failing_command" => execution.failing_command,
           "observed_state" => execution.observed_state
         }
-      rescue SystemCallError, ArgumentError, KeyError => e
+      rescue StandardError => e
         {
           "success" => false,
           "exit_status" => nil,

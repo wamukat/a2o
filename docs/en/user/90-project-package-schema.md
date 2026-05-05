@@ -794,12 +794,30 @@ runtime:
   observers:
     hooks:
       - event: phase.started
-        command: [app/project-package/commands/notify.sh]
+        command:
+          - ruby
+          - -rjson
+          - -e
+          - |
+            payload = JSON.parse(File.read(ENV.fetch("A2O_OBSERVER_EVENT_PATH")))
+            File.open(ENV.fetch("A2O_OBSERVER_LOG", "/tmp/a2o-observer.log"), "a") do |f|
+              f.puts([payload.fetch("event"), payload.fetch("task_ref"), payload.fetch("phase", "-")].join(" "))
+            end
       - event: phase.completed
-        command: [app/project-package/commands/notify.sh]
+        command:
+          - ruby
+          - -rjson
+          - -e
+          - |
+            payload = JSON.parse(File.read(ENV.fetch("A2O_OBSERVER_EVENT_PATH")))
+            File.open(ENV.fetch("A2O_OBSERVER_LOG", "/tmp/a2o-observer.log"), "a") do |f|
+              f.puts([payload.fetch("event"), payload.fetch("task_ref"), payload.fetch("phase", "-")].join(" "))
+            end
 ```
 
 Observer hooks are read-only, best-effort event observers. A2O records hook failures in evidence but does not let observer results change task progress, phase outcomes, agent feedback, or workspace outputs. Commands should send notifications or audit records to external systems only. A2O runs local observer commands outside repo slot working directories where practical, and agent-materialized observer jobs request read-only repo access.
+
+Local observer commands must not depend on the repo slot working directory. If the hook calls a script file, invoke it through `PATH` or an absolute path. Hook results are recorded only in diagnostics; success and failure both leave task progress, phase outcome, agent feedback, and workspace output unchanged.
 
 Hook `command` must be a non-empty array of non-empty strings. A2O exposes:
 

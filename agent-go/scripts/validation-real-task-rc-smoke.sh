@@ -104,6 +104,7 @@ RUN_ONCE_PID_FILE="${WORK_DIR}/run-once.pid"
 RUN_ONCE_SERVER_PID_FILE="${WORK_DIR}/run-once-agent-server.pid"
 PREFLIGHT_MARKER="${WORK_DIR}/commit-preflight-smoke.log"
 COMPLETION_HOOK_MARKER="${WORK_DIR}/completion-hook-smoke.log"
+OBSERVER_MARKER="${WORK_DIR}/observer-smoke.log"
 
 mkdir -p "${HOST_INSTALL_DIR}" "${PACKAGE_DIR}/skills/implementation" "${PACKAGE_DIR}/skills/review" "${SOURCE_DIR}" "${WORKER_DIR}"
 
@@ -147,6 +148,22 @@ publish:
     commands:
       - sh -c 'printf "%s\n" "a2o_commit_preflight_smoke_ok slot=\$A2O_COMMIT_PREFLIGHT_SLOT" >> "${PREFLIGHT_MARKER}" && test -f SMOKE.txt'
 runtime:
+  observers:
+    hooks:
+      - event: phase.started
+        command:
+          - ruby
+          - -rjson
+          - -e
+          - 'payload = JSON.parse(File.read(ENV.fetch("A2O_OBSERVER_EVENT_PATH"))); File.open(ARGV.fetch(0), "a") { |f| f.puts([payload.fetch("event"), payload.fetch("task_ref"), payload.fetch("phase", "-")].join(" ")) }'
+          - "${OBSERVER_MARKER}"
+      - event: phase.completed
+        command:
+          - ruby
+          - -rjson
+          - -e
+          - 'payload = JSON.parse(File.read(ENV.fetch("A2O_OBSERVER_EVENT_PATH"))); File.open(ARGV.fetch(0), "a") { |f| f.puts([payload.fetch("event"), payload.fetch("task_ref"), payload.fetch("phase", "-")].join(" ")) }'
+          - "${OBSERVER_MARKER}"
   max_steps: 20
   agent_attempts: 120
   phases:
@@ -307,6 +324,10 @@ grep -Fq "task ${task_ref} kind=single status=done" "${WORK_DIR}/describe-task.o
 grep -Fq "phase=merge" "${WORK_DIR}/describe-task.out"
 grep -Fq "outcome=completed" "${WORK_DIR}/describe-task.out"
 grep -Fq "review_disposition=kind=completed slot_scopes=app finding_key=minimal-real-task-rc-smoke-clean" "${WORK_DIR}/describe-task.out"
+grep -Fq "phase.started ${task_ref} implementation" "${OBSERVER_MARKER}"
+grep -Fq "phase.completed ${task_ref} implementation" "${OBSERVER_MARKER}"
+grep -Fq "phase.completed ${task_ref} verification" "${OBSERVER_MARKER}"
+grep -Fq "phase.completed ${task_ref} merge" "${OBSERVER_MARKER}"
 grep -Fq "a2o_completion_hook_smoke_ok slot=app mode=mutating" "${COMPLETION_HOOK_MARKER}"
 grep -Fq "a2o_commit_preflight_smoke_ok slot=app" "${PREFLIGHT_MARKER}"
 grep -Fq "o/o/o/o" "${WORK_DIR}/watch-summary-after.out"

@@ -391,6 +391,14 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     expect(request.slots.fetch("repo_beta")).to include("access" => "read_only", "ownership" => "support")
   end
 
+  it "keeps observer commands read-only and non-publishable during merge" do
+    request = support_ref_builder.call(workspace: workspace, task: task, run: run(:merge), command_intent: :observer)
+
+    expect(request.publish_policy).to be_nil
+    expect(request.slots.fetch("repo_alpha")).to include("access" => "read_only", "ownership" => "edit_target")
+    expect(request.slots.fetch("repo_beta")).to include("access" => "read_only", "ownership" => "support")
+  end
+
   it "keeps support slots present for verification even when the scope is narrow" do
     request = described_class.new(
       source_aliases: {

@@ -282,12 +282,39 @@ runtime:
   observers:
     hooks:
       - event: phase.started
-        command: [app/project-package/commands/notify.sh]
+        command:
+          - ruby
+          - -rjson
+          - -e
+          - |
+            payload = JSON.parse(File.read(ENV.fetch("A2O_OBSERVER_EVENT_PATH")))
+            File.open(ENV.fetch("A2O_OBSERVER_LOG", "/tmp/a2o-observer.log"), "a") do |f|
+              f.puts([payload.fetch("event"), payload.fetch("task_ref"), payload.fetch("phase", "-")].join(" "))
+            end
       - event: phase.completed
-        command: [app/project-package/commands/notify.sh]
+        command:
+          - ruby
+          - -rjson
+          - -e
+          - |
+            payload = JSON.parse(File.read(ENV.fetch("A2O_OBSERVER_EVENT_PATH")))
+            File.open(ENV.fetch("A2O_OBSERVER_LOG", "/tmp/a2o-observer.log"), "a") do |f|
+              f.puts([payload.fetch("event"), payload.fetch("task_ref"), payload.fetch("phase", "-")].join(" "))
+            end
 ```
 
 A2O owns the hook timing and payload shape. The project package owns all destinations such as Slack, Discord, GitHub comments, email, or internal systems. A2O does not include destination-specific notifier logic. Observer hooks are best-effort and must not be used to control A2O, change agent feedback, or mutate workspace outputs. A2O runs them outside repo slot working directories where practical and records failures without changing task progress.
+
+Local observer commands must not depend on the repo slot working directory. If you keep the notifier in a script file, invoke it through `PATH` or an absolute path. Files changed inside the repo are not consumed as A2O output or agent feedback, so observers should be used only for external notification, audit logs, or metrics forwarding.
+
+For a minimal local check, set `A2O_OBSERVER_LOG=/tmp/a2o-observer.log` in the shell that starts A2O, run a task, then inspect:
+
+```sh
+tail -f /tmp/a2o-observer.log
+a2o runtime describe-task A2O#123
+```
+
+When `observer_hooks` appears in the latest phase execution diagnostics, it contains the hook command, payload path, stdout, stderr, exit status, and elapsed time.
 
 Supported observer events are:
 
