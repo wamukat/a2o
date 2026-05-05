@@ -667,6 +667,47 @@ A2O は、prompt migration の不正を `a2o project validate` と `a2o project 
 実装、レビュー、検証、修復のジョブはすべて `A2O_WORKER_REQUEST_PATH` を公開する。検証と修復の要求 JSON は `command_intent`、`slot_paths`、`scope_snapshot`、`phase_runtime` を含むため、対象リポジトリスロットや適用方針はこれらから判断する。
 スロット単位の修復では、コマンドのカレントディレクトリがリポジトリスロットになる場合があるが、要求は準備済みワークスペース全体を表す。
 
+### Implementation Completion Hooks
+
+`runtime.phases.implementation.completion_hooks.commands` は、implementation worker が成功を返した後、A2O がその実装を review / verification へ進める前に実行する project-owned command を定義する。通常の A2O 管理フローでは、review phase が確認する publish commit を A2O が作る前に hook が実行される。
+
+completion hook は、format、生成、軽量な実装 gate などを実行し、review の前に implementation worker へ rework feedback を返したい場合に使う。これはリポジトリの native Git hook の代替ではなく、A2O が implementation phase の境界内で実行する project-package policy hook である。
+
+```yaml
+runtime:
+  phases:
+    implementation:
+      completion_hooks:
+        commands:
+          - name: fmt
+            command: ./project-package/commands/fmt-apply.sh
+            mode: mutating
+          - name: verify
+            command: ./project-package/commands/impl-verify.sh
+            mode: check
+            on_failure: rework
+```
+
+各 hook には `name`、`command`、`mode` が必要である。
+
+- `mode: mutating` は現在の edit-target repo slot のファイル変更を許可する。
+- `mode: check` はファイルを変更してはならない。
+- `on_failure` は現時点では `rework` のみを受け付け、省略時も `rework` になる。
+
+A2O は hook の定義順を優先し、各 hook を edit-target slot 名の昇順で実行する。各 hook のカレントディレクトリは repo slot の checkout root である。command には次の環境変数も渡される。
+
+- `A2O_WORKSPACE_ROOT`
+- `A2O_COMPLETION_HOOK_NAME`
+- `A2O_COMPLETION_HOOK_MODE`
+- `A2O_COMPLETION_HOOK_SLOT`
+- `A2O_COMPLETION_HOOK_SLOT_PATH`
+
+hook が non-zero で終了する、timeout する、`mode: check` の slot を変更する、または対象外 slot を変更した場合、A2O は失敗した hook の副作用を restore する。その上で、AI の実装結果とそれ以前に成功した mutating hook の出力を含む implementation attempt ref を publish し、`rework_required=true` の controlled feedback を返す。task は review に進まず implementation に留まる。次の implementation run には `phase_runtime.prior_review_feedback` が渡され、利用可能な場合は `completion_hook_diagnostics` も含まれる。
+
+completion hook は agent job の timeout budget を共有する。timeout 時は hook の process group を kill し、rework feedback として扱う。初回公開版では hook ごとの timeout 設定は提供しない。
+
+`runtime.phases.implementation.completion_hooks` は `publish.commit_preflight.commands` とは別の surface である。completion hook は implementation を受理する前に実行され、ファイル変更や implementation worker への feedback を行える。`publish.commit_preflight.commands` はその後、publish 対象変更を stage した後、A2O が publish commit を作る直前に実行される最後の safety gate であり、check-only でなければならない。
+
 検証コマンドと修復コマンドは、マージ設定と同じ `default` / `variants` 形式も使える。`task_kind`、`repo_scope`、フェーズによってコマンド方針が変わる場合だけ使う。
 
 ```yaml

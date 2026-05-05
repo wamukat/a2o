@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -192,7 +191,7 @@ func runCompletionHook(ctx context.Context, prepared PreparedWorkspace, request 
 }
 
 func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, request WorkspaceRequest, runtimePath, slotName string, hook WorkspaceCompletionHook) CompletionHookEntry {
-	cmd := exec.Command("sh", "-c", hook.Command)
+	cmd := exec.CommandContext(ctx, "sh", "-c", hook.Command)
 	cmd.Dir = runtimePath
 	cmd.Env = append(os.Environ(),
 		"A2O_WORKSPACE_ROOT="+prepared.Root,
@@ -202,11 +201,23 @@ func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, requ
 		"A2O_COMPLETION_HOOK_SLOT_PATH="+runtimePath,
 		"A2O_TASK_REF="+request.WorkspaceID,
 	)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	stdoutFile, stdoutPath, stdoutErr := completionHookOutputFile("stdout")
+	if stdoutErr != nil {
+		return failedCompletionHookEntry(slotName, hook, "stdout capture failed: "+stdoutErr.Error())
+	}
+	defer os.Remove(stdoutPath)
+	defer stdoutFile.Close()
+	stderrFile, stderrPath, stderrErr := completionHookOutputFile("stderr")
+	if stderrErr != nil {
+		return failedCompletionHookEntry(slotName, hook, "stderr capture failed: "+stderrErr.Error())
+	}
+	defer os.Remove(stderrPath)
+	defer stderrFile.Close()
+	cmd.Stdout = stdoutFile
+	cmd.Stderr = stderrFile
 	err := runCompletionHookCommand(ctx, cmd)
+	stdout := readCompletionHookOutput(stdoutFile, stdoutPath)
+	stderr := readCompletionHookOutput(stderrFile, stderrPath)
 	exitStatus := 0
 	status := "succeeded"
 	reason := ""
@@ -217,7 +228,7 @@ func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, requ
 		if ctx.Err() == context.DeadlineExceeded {
 			reason = "completion hook timed out"
 			exitStatus = -1
-			stderr.WriteString("A2O completion hook timed out\n")
+			stderr += "A2O completion hook timed out\n"
 		} else if exitErr, ok := err.(*exec.ExitError); ok {
 			exitStatus = exitErr.ExitCode()
 		}
@@ -228,33 +239,47 @@ func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, requ
 		Mode:       hook.Mode,
 		Slot:       slotName,
 		ExitStatus: exitStatus,
-		Stdout:     stdout.String(),
-		Stderr:     stderr.String(),
+		Stdout:     stdout,
+		Stderr:     stderr,
 		Status:     status,
 		Reason:     reason,
 	}
 }
 
+func completionHookOutputFile(stream string) (*os.File, string, error) {
+	file, err := os.CreateTemp("", "a2o-completion-hook-"+stream+"-*")
+	if err != nil {
+		return nil, "", err
+	}
+	return file, file.Name(), nil
+}
+
+func readCompletionHookOutput(file *os.File, path string) string {
+	_ = file.Close()
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(content)
+}
+
 func runCompletionHookCommand(ctx context.Context, cmd *exec.Cmd) error {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Wait()
-	}()
-	select {
-	case err := <-done:
-		return err
-	case <-ctx.Done():
+	cmd.WaitDelay = time.Second
+	cmd.Cancel = func() error {
 		if cmd.Process != nil {
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-			_ = cmd.Process.Kill()
+			var groupErr error
+			if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
+				groupErr = err
+			}
+			if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) && groupErr == nil {
+				return err
+			}
+			return groupErr
 		}
-		<-done
-		return ctx.Err()
+		return nil
 	}
+	return cmd.Run()
 }
 
 func completionHookStateViolation(slotName string, hook WorkspaceCompletionHook, before, after map[string]preflightGitState) string {

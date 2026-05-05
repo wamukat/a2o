@@ -675,6 +675,47 @@ Project commands should treat the worker request JSON and `A2O_*` worker environ
 Implementation, review, verification, and remediation jobs all expose `A2O_WORKER_REQUEST_PATH`. Verification and remediation request JSON includes `command_intent`, `slot_paths`, `scope_snapshot`, and `phase_runtime`; use those fields to decide which repo slots and policies to apply.
 For slot-local remediation, the command may run with a repo slot as the current directory, while the request still describes the full prepared workspace.
 
+### Implementation Completion Hooks
+
+`runtime.phases.implementation.completion_hooks.commands` defines project-owned commands that run after the implementation worker reports success and before A2O accepts that implementation for review or verification. In the normal A2O-managed flow, this means the hooks run before A2O publishes the implementation attempt as the commit that the review phase will inspect.
+
+Use completion hooks when the project needs an implementation feedback loop, for example to run formatting, generation, or a fast implementation gate and ask the implementation worker to rework the result before review. They are not a replacement for native repository Git hooks; they are project-package policy hooks that A2O runs inside the implementation phase boundary.
+
+```yaml
+runtime:
+  phases:
+    implementation:
+      completion_hooks:
+        commands:
+          - name: fmt
+            command: ./project-package/commands/fmt-apply.sh
+            mode: mutating
+          - name: verify
+            command: ./project-package/commands/impl-verify.sh
+            mode: check
+            on_failure: rework
+```
+
+Each hook entry requires `name`, `command`, and `mode`.
+
+- `mode: mutating` may change files in the current edit-target repo slot.
+- `mode: check` must not change files.
+- `on_failure` currently supports only `rework`; it may be omitted and defaults to `rework`.
+
+A2O runs hooks in hook order across edit-target slots sorted by slot name. For each hook invocation, the current directory is the repo slot checkout root. The command also receives:
+
+- `A2O_WORKSPACE_ROOT`
+- `A2O_COMPLETION_HOOK_NAME`
+- `A2O_COMPLETION_HOOK_MODE`
+- `A2O_COMPLETION_HOOK_SLOT`
+- `A2O_COMPLETION_HOOK_SLOT_PATH`
+
+If a hook exits non-zero, times out, mutates a `mode: check` slot, or changes a non-target slot, A2O restores the failed hook's side effects, publishes an implementation attempt ref containing the AI output plus any earlier successful mutating hook output, and returns controlled implementation feedback with `rework_required=true`. The task stays in implementation instead of advancing to review. The next implementation run receives prior feedback in `phase_runtime.prior_review_feedback`, including `completion_hook_diagnostics` when available.
+
+Completion hooks share the agent job timeout budget. A timeout kills the hook process group and is treated as rework feedback. The first public version does not provide a per-hook timeout setting.
+
+`runtime.phases.implementation.completion_hooks` is different from `publish.commit_preflight.commands`. Completion hooks run before the implementation is accepted and can intentionally mutate files or send feedback to the implementation worker. `publish.commit_preflight.commands` runs later, after publish changes have been staged and immediately before A2O creates the publish commit; it must be check-only and is a final publish safety gate.
+
 Verification and remediation commands may also use the same `default` / `variants` shape used by merge settings. Use this only when command policy depends on `task_kind`, `repo_scope`, or phase:
 
 ```yaml

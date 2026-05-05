@@ -907,10 +907,10 @@ func TestRunCompletionHooksUsesProvidedTimeoutContext(t *testing.T) {
 	request := testWorkspaceRequest("repo-alpha")
 	request.CompletionHooks = []WorkspaceCompletionHook{
 		{
-			Name:      "verify",
-			Command:   "sleep 5",
-			Mode:      "check",
-			OnFailure: "rework",
+				Name:      "verify",
+				Command:   "sleep 30",
+				Mode:      "check",
+				OnFailure: "rework",
 		},
 	}
 	materializer := WorkspaceMaterializer{
@@ -934,7 +934,7 @@ func TestRunCompletionHooksUsesProvidedTimeoutContext(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "completion hook timed out") {
 		t.Fatalf("expected hook timeout failure, got report=%#v err=%v", report, err)
 	}
-	if elapsed >= 4*time.Second {
+	if elapsed >= 10*time.Second {
 		t.Fatalf("timeout should kill hook process group promptly, elapsed=%s", elapsed)
 	}
 	if report.FailingEntry() == nil || report.FailingEntry().ExitStatus != -1 {

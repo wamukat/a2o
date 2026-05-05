@@ -29,6 +29,7 @@ A2O 0.5.70 で現在利用できる公開機能と検証範囲を示す。
 - アップグレード診断: `a2o upgrade check`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
 - publish commit preflight 設定: `publish.commit_preflight.commands` で A2O 管理の publish commit 前に project-owned command を実行でき、`publish.commit_preflight.native_git_hooks` でリポジトリの Git commit hook を実行するかを制御できる。詳細は [90-project-package-schema.md#publish](90-project-package-schema.md#publish) を参照する。
+- implementation completion hook 設定: `runtime.phases.implementation.completion_hooks.commands` で implementation worker 成功後、review / verification へ進める前に project-owned command を実行できる。hook は `mutating` または `check` で、失敗時は task を進めず implementation rework feedback を返す。詳細は [90-project-package-schema.md#implementation-completion-hooks](90-project-package-schema.md#implementation-completion-hooks) を参照する。
 - investigate decomposition MVP: `runtime.decomposition.investigate.command`、`runtime.decomposition.author.command`、`a2o runtime decomposition investigate`、`propose`、`review`、`create-children`、`accept-drafts`、`status`、`cleanup`
 - `trigger:investigate` 付き source ticket は decomposition request であり、`repo:*` scope label は不要である。`trigger:auto-implement` で実行する implementation child には、引き続き適切な repo label が必要である。
 - `a2o runtime decomposition investigate`、`propose`、`review` は、project 側が所有する decomposition command を host agent 経由で実行する。runtime container は orchestrator のまま維持しつつ、implementation worker と同じ host workspace 境界で実行するため、Copilot など host 側にしかない agent CLI を decomposition command から呼び出せる。
