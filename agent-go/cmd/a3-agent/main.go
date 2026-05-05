@@ -122,10 +122,15 @@ func run(args []string) int {
 
 func printAgentUsage() {
 	fmt.Fprintln(os.Stderr, "usage:")
-	fmt.Fprintln(os.Stderr, "  a2o-agent [--loop] [--control-plane-url URL]")
+	fmt.Fprintln(os.Stderr, "  a2o-agent [--loop] [--control-plane-url URL] [--poll-interval DURATION] [--max-iterations N]")
 	fmt.Fprintln(os.Stderr, "  a2o-agent doctor --workspace-root PATH --source-path NAME=PATH")
 	fmt.Fprintln(os.Stderr, "  a2o-agent cleanup-workspace --workspace-root PATH --descriptor PATH [--dry-run]")
 	fmt.Fprintln(os.Stderr, "  a2o-agent worker stdin-bundle")
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "loop options:")
+	fmt.Fprintln(os.Stderr, "  --loop                         poll until interrupted or an execution error occurs")
+	fmt.Fprintln(os.Stderr, "  --poll-interval DURATION       idle sleep duration in loop mode, for example 2s")
+	fmt.Fprintln(os.Stderr, "  --max-iterations N             bounded loop count for diagnostics; 0 means unlimited")
 }
 
 func runDoctor(args []string) int {

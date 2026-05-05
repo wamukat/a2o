@@ -331,6 +331,7 @@ func TestWorkerCompletionHookFailureReturnsImplementationRework(t *testing.T) {
 	}
 	client := &fakeClient{request: &request}
 	beforeHead := trimTrailingNewline(git(t, sourceRoot, "rev-parse", "a3/work/Sample-42"))
+	var events bytes.Buffer
 
 	result, idle, err := Worker{
 		AgentName: "host-local",
@@ -342,7 +343,8 @@ func TestWorkerCompletionHookFailureReturnsImplementationRework(t *testing.T) {
 				"sample-catalog-service": sourceRoot,
 			},
 		},
-		Now: func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+		Now:      func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+		EventLog: &events,
 	}.RunOnce()
 	if err != nil {
 		t.Fatal(err)
@@ -378,6 +380,17 @@ func TestWorkerCompletionHookFailureReturnsImplementationRework(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(tmp, "agent-workspaces", "Sample-42-ticket")); !os.IsNotExist(err) {
 		t.Fatalf("workspace was not cleaned up: %v", err)
+	}
+	eventText := events.String()
+	for _, want := range []string{
+		`"stage":"completion_hooks_start"`,
+		`"workspace_root":"` + filepath.ToSlash(filepath.Join(tmp, "agent-workspaces", "Sample-42-ticket")) + `"`,
+		`"stage":"completion_hooks_done"`,
+		`"status":"failed"`,
+	} {
+		if !strings.Contains(eventText, want) {
+			t.Fatalf("missing completion hook event %s in:\n%s", want, eventText)
+		}
 	}
 }
 

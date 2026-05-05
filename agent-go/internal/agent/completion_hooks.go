@@ -19,15 +19,20 @@ type CompletionHookReport struct {
 }
 
 type CompletionHookEntry struct {
-	Name       string `json:"name"`
-	Command    string `json:"command"`
-	Mode       string `json:"mode"`
-	Slot       string `json:"slot"`
-	ExitStatus int    `json:"exit_status"`
-	Stdout     string `json:"stdout"`
-	Stderr     string `json:"stderr"`
-	Status     string `json:"status"`
-	Reason     string `json:"reason,omitempty"`
+	Name           string `json:"name"`
+	Command        string `json:"command"`
+	Mode           string `json:"mode"`
+	Slot           string `json:"slot"`
+	WorkingDir     string `json:"working_dir,omitempty"`
+	WorkspaceRoot  string `json:"workspace_root,omitempty"`
+	Path           string `json:"path,omitempty"`
+	ShellPath      string `json:"shell_path,omitempty"`
+	ExecutablePath string `json:"executable_path,omitempty"`
+	ExitStatus     int    `json:"exit_status"`
+	Stdout         string `json:"stdout"`
+	Stderr         string `json:"stderr"`
+	Status         string `json:"status"`
+	Reason         string `json:"reason,omitempty"`
 }
 
 func (r CompletionHookReport) Ran() bool {
@@ -191,6 +196,9 @@ func runCompletionHook(ctx context.Context, prepared PreparedWorkspace, request 
 }
 
 func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, request WorkspaceRequest, runtimePath, slotName string, hook WorkspaceCompletionHook) CompletionHookEntry {
+	pathValue := os.Getenv("PATH")
+	shellPath, _ := exec.LookPath("sh")
+	executablePath := completionHookExecutablePath(hook.Command)
 	cmd := exec.CommandContext(ctx, "sh", "-c", hook.Command)
 	cmd.Dir = runtimePath
 	cmd.Env = append(os.Environ(),
@@ -203,13 +211,13 @@ func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, requ
 	)
 	stdoutFile, stdoutPath, stdoutErr := completionHookOutputFile("stdout")
 	if stdoutErr != nil {
-		return failedCompletionHookEntry(slotName, hook, "stdout capture failed: "+stdoutErr.Error())
+		return failedCompletionHookEntry(slotName, hook, "stdout capture failed: "+stdoutErr.Error(), runtimePath, prepared.Root, pathValue, shellPath, executablePath)
 	}
 	defer os.Remove(stdoutPath)
 	defer stdoutFile.Close()
 	stderrFile, stderrPath, stderrErr := completionHookOutputFile("stderr")
 	if stderrErr != nil {
-		return failedCompletionHookEntry(slotName, hook, "stderr capture failed: "+stderrErr.Error())
+		return failedCompletionHookEntry(slotName, hook, "stderr capture failed: "+stderrErr.Error(), runtimePath, prepared.Root, pathValue, shellPath, executablePath)
 	}
 	defer os.Remove(stderrPath)
 	defer stderrFile.Close()
@@ -234,16 +242,37 @@ func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, requ
 		}
 	}
 	return CompletionHookEntry{
-		Name:       hook.Name,
-		Command:    hook.Command,
-		Mode:       hook.Mode,
-		Slot:       slotName,
-		ExitStatus: exitStatus,
-		Stdout:     stdout,
-		Stderr:     stderr,
-		Status:     status,
-		Reason:     reason,
+		Name:           hook.Name,
+		Command:        hook.Command,
+		Mode:           hook.Mode,
+		Slot:           slotName,
+		WorkingDir:     runtimePath,
+		WorkspaceRoot:  prepared.Root,
+		Path:           pathValue,
+		ShellPath:      shellPath,
+		ExecutablePath: executablePath,
+		ExitStatus:     exitStatus,
+		Stdout:         stdout,
+		Stderr:         stderr,
+		Status:         status,
+		Reason:         reason,
 	}
+}
+
+func completionHookExecutablePath(command string) string {
+	fields := strings.Fields(strings.TrimSpace(command))
+	if len(fields) == 0 {
+		return ""
+	}
+	executable := fields[0]
+	if strings.Contains(executable, "/") {
+		return executable
+	}
+	resolved, err := exec.LookPath(executable)
+	if err != nil {
+		return ""
+	}
+	return resolved
 }
 
 func completionHookOutputFile(stream string) (*os.File, string, error) {
@@ -366,15 +395,40 @@ func sortedMapKeys(values map[string]string) []string {
 	return keys
 }
 
-func failedCompletionHookEntry(slotName string, hook WorkspaceCompletionHook, reason string) CompletionHookEntry {
+func failedCompletionHookEntry(slotName string, hook WorkspaceCompletionHook, reason string, details ...string) CompletionHookEntry {
+	workingDir := ""
+	workspaceRoot := ""
+	pathValue := ""
+	shellPath := ""
+	executablePath := ""
+	if len(details) > 0 {
+		workingDir = details[0]
+	}
+	if len(details) > 1 {
+		workspaceRoot = details[1]
+	}
+	if len(details) > 2 {
+		pathValue = details[2]
+	}
+	if len(details) > 3 {
+		shellPath = details[3]
+	}
+	if len(details) > 4 {
+		executablePath = details[4]
+	}
 	return CompletionHookEntry{
-		Name:       hook.Name,
-		Command:    hook.Command,
-		Mode:       hook.Mode,
-		Slot:       slotName,
-		ExitStatus: -1,
-		Status:     "failed",
-		Reason:     reason,
+		Name:           hook.Name,
+		Command:        hook.Command,
+		Mode:           hook.Mode,
+		Slot:           slotName,
+		WorkingDir:     workingDir,
+		WorkspaceRoot:  workspaceRoot,
+		Path:           pathValue,
+		ShellPath:      shellPath,
+		ExecutablePath: executablePath,
+		ExitStatus:     -1,
+		Status:         "failed",
+		Reason:         reason,
 	}
 }
 

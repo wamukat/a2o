@@ -270,7 +270,7 @@ The runtime profile rejects remote `http://` control-plane URLs by default. Loop
 
 ## Compatibility Manual Loop Mode
 
-This mode is for local diagnostics, validation fixtures, or operator-controlled troubleshooting. It is not the primary A2O setup flow.
+This mode is for local diagnostics, validation fixtures, or operator-controlled troubleshooting. It is not the primary A2O setup flow, and it is not the host reboot recovery path for completion hooks, verification, or merge.
 
 Run the same profile in loop mode from a terminal while A2O is operating:
 
@@ -286,4 +286,4 @@ Useful flags and environment overrides:
 
 Legacy `A3_AGENT_*` environment variables are no longer accepted as compatibility fallbacks. Use the `A2O_AGENT_*` names.
 
-Loop mode exits non-zero on control-plane or job execution errors. If an operator wants OS-managed restart later, they can wrap this command outside A2O. The current A2O distribution intentionally does not own systemd, launchd, or Windows service registration. Windows users run A2O through WSL2 Ubuntu and should still start from the standard `a2o ...` lifecycle commands.
+Loop mode exits non-zero on control-plane or job execution errors. For OS-managed restart, wrap `a2o runtime resume ...` as documented in `docs/en/user/30-operating-runtime.md` instead of wrapping `a2o-agent --loop`. The current A2O distribution intentionally does not own systemd, launchd, or Windows service registration. Windows users run A2O through WSL2 Ubuntu and should still start from the standard `a2o ...` lifecycle commands.

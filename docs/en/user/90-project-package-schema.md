@@ -677,7 +677,7 @@ For slot-local remediation, the command may run with a repo slot as the current 
 
 ### Implementation Completion Hooks
 
-`runtime.phases.implementation.completion_hooks.commands` defines project-owned commands that run after the implementation worker reports success and before A2O accepts that implementation for review or verification. In the normal A2O-managed flow, this means the hooks run before A2O publishes the implementation attempt as the commit that the review phase will inspect.
+`runtime.phases.implementation.completion_hooks.commands` defines project-owned commands that run after the implementation worker reports success and before A2O accepts that implementation for review or verification. In the normal A2O-managed flow, this means the hooks run before A2O publishes the implementation attempt as the commit that the review phase will inspect. Hooks run in the target repo slot working directory inside the host workspace materialized by the host-local agent. Do not configure them as if they run inside the runtime container. Declare required commands such as `java`, `task`, `mvn`, or `npm` in `agent.required_bins`, then confirm that `a2o doctor` finds them on the host agent PATH.
 
 Use completion hooks when the project needs an implementation feedback loop, for example to run formatting, generation, or a fast implementation gate and ask the implementation worker to rework the result before review. They are not a replacement for native repository Git hooks; they are project-package policy hooks that A2O runs inside the implementation phase boundary.
 
@@ -710,7 +710,7 @@ A2O runs hooks in hook order across edit-target slots sorted by slot name. For e
 - `A2O_COMPLETION_HOOK_SLOT`
 - `A2O_COMPLETION_HOOK_SLOT_PATH`
 
-If a hook exits non-zero, times out, mutates a `mode: check` slot, or changes a non-target slot, A2O restores the failed hook's side effects, publishes an implementation attempt ref containing the AI output plus any earlier successful mutating hook output, and returns controlled implementation feedback with `rework_required=true`. The task stays in implementation instead of advancing to review. The next implementation run receives prior feedback in `phase_runtime.prior_review_feedback`, including `completion_hook_diagnostics` when available.
+If a hook exits non-zero, times out, mutates a `mode: check` slot, or changes a non-target slot, A2O restores the failed hook's side effects, publishes an implementation attempt ref containing the AI output plus any earlier successful mutating hook output, and returns controlled implementation feedback with `rework_required=true`. The task stays in implementation instead of advancing to review. The next implementation run receives prior feedback in `phase_runtime.prior_review_feedback`, including `completion_hook_diagnostics` when available. The hook report includes stdout, stderr, exit status, working directory, workspace root, PATH, shell path, and inferred executable path. For `command not found` failures, inspect those diagnostics to confirm the host-agent PATH and product toolchain setup.
 
 Completion hooks share the agent job timeout budget. A timeout kills the hook process group and is treated as rework feedback. The first public version does not provide a per-hook timeout setting.
 

@@ -38,6 +38,19 @@ a2o runtime up
 a2o runtime resume --interval 60s --agent-poll-interval 5s
 ```
 
+`a2o-agent` は通常運用で別 daemon として常駐させない。`runtime resume` はホスト上で scheduler process を起動し、その scheduler が各 cycle で `runtime run-once` 相当の処理を行う。各 cycle では host launcher が `.work/a2o/agent/bin/a2o-agent` を foreground の host-local agent attempt として起動し、A2O Engine の control plane から job を claim する。つまり `completion_hooks`、verification command、merge は、標準フローでは runtime container 内ではなく host-local agent が materialize した host workspace 上で実行される。
+
+ホスト OS を再起動した後の復旧手順は次の通りである。
+
+```sh
+a2o runtime up
+a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
+a2o doctor
+a2o runtime resume --interval 60s --agent-poll-interval 5s
+```
+
+systemd / launchd などで常駐化したい場合も、登録対象は `a2o-agent --loop` ではなく `a2o runtime resume ...` である。`a2o-agent --loop` は診断や手動トラブルシュート用の互換モードであり、通常の A2O 管理フローでは使わない。
+
 状態確認には次を使う。
 
 ```sh
@@ -205,6 +218,7 @@ a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 エージェントが使うワークスペース、具体化されたデータ、ランチャー設定は `.work/a2o/agent/` 配下に閉じる。プロダクトのリポジトリルートに生成されたランタイムファイルが出る状態は避ける。
 
 エージェントがジョブを実行できるように、プロジェクトパッケージの `agent.required_bins` にはプロダクトのツールチェーンと AI ワーカーの実行ファイルを書く。`your-ai-worker` のようなプレースホルダーが残っていると、`a2o doctor` またはランタイム実行で止まる。
+`runtime.phases.implementation.completion_hooks` で使う `java`、`task`、`mvn`、`npm` なども同じ host-local agent 環境で見える必要がある。hook が使うコマンドは `agent.required_bins` に含め、`a2o doctor` で `agent_required_command.* status=ok` になることを確認する。hook の failure diagnostics には working directory、workspace root、PATH、shell path、推定 executable path が保存されるため、コンテナ内実行なのか、host agent の PATH 不足なのかを切り分けられる。
 
 ## イメージ更新とダイジェスト確認
 

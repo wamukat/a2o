@@ -791,6 +791,10 @@ func TestRunCompletionHooksAllowsMutatingHookOnEditSlot(t *testing.T) {
 	if report.Status != "succeeded" || len(report.Entries) != 1 {
 		t.Fatalf("unexpected hook report: %#v", report)
 	}
+	entry := report.Entries[0]
+	if entry.WorkingDir != filepath.Join(prepared.Root, "repo_alpha") || entry.WorkspaceRoot != prepared.Root || entry.Path == "" || entry.ShellPath == "" {
+		t.Fatalf("completion hook report should include execution environment evidence: %#v", entry)
+	}
 	changed, err := gitChangedPaths(filepath.Join(prepared.Root, "repo_alpha"))
 	if err != nil {
 		t.Fatal(err)

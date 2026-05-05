@@ -38,6 +38,19 @@ a2o runtime up
 a2o runtime resume --interval 60s --agent-poll-interval 5s
 ```
 
+Do not run `a2o-agent` as a separate daemon in the normal operating flow. `runtime resume` starts a host-side scheduler process. Each scheduler cycle runs the equivalent of `runtime run-once`; during that cycle the host launcher starts `.work/a2o/agent/bin/a2o-agent` as a foreground host-local agent attempt, and the agent claims jobs from the A2O Engine control plane. In the standard flow, `completion_hooks`, verification commands, and merge therefore run in host workspaces materialized by the host-local agent, not inside the runtime container.
+
+After rebooting the host OS, use this recovery sequence:
+
+```sh
+a2o runtime up
+a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
+a2o doctor
+a2o runtime resume --interval 60s --agent-poll-interval 5s
+```
+
+If you want OS-managed restart through systemd, launchd, or a similar supervisor, wrap `a2o runtime resume ...`, not `a2o-agent --loop`. `a2o-agent --loop` is a compatibility mode for diagnostics and operator-controlled troubleshooting; it is not the standard A2O-managed runtime path.
+
 Check state with:
 
 ```sh
@@ -207,6 +220,7 @@ a2o agent install --target auto --output ./.work/a2o/agent/bin/a2o-agent
 Agent workspaces, materialized data, and launcher settings stay under `.work/a2o/agent/`. Avoid putting generated runtime files in product repository roots.
 
 Declare the product toolchain and AI executor in `agent.required_bins`. A placeholder such as `your-ai-worker` will block `a2o doctor` or runtime execution until replaced.
+Commands used by `runtime.phases.implementation.completion_hooks`, such as `java`, `task`, `mvn`, or `npm`, must be visible in the same host-local agent environment. Include them in `agent.required_bins` and confirm that `a2o doctor` reports `agent_required_command.* status=ok`. Completion hook failure diagnostics include the working directory, workspace root, PATH, shell path, and inferred executable path so operators can distinguish container execution from a host-agent PATH/toolchain problem.
 
 ## Image Updates And Digests
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/wamukat/a3-engine/agent-go/internal/errorpolicy"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -50,12 +51,48 @@ func TestPublicAgentEnvironmentConfig(t *testing.T) {
 	}
 }
 
+func TestAgentHelpDocumentsLoopOptions(t *testing.T) {
+	output := captureAgentUsage(t)
+
+	for _, want := range []string{
+		"a2o-agent [--loop] [--control-plane-url URL] [--poll-interval DURATION] [--max-iterations N]",
+		"--poll-interval DURATION",
+		"--max-iterations N",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("help output missing %q in:\n%s", want, output)
+		}
+	}
+}
+
 func TestRemovedA3AgentEnvironmentRequiresMigration(t *testing.T) {
 	t.Setenv("A3_AGENT_CONFIG", "/tmp/legacy-profile.json")
 	err := validateRemovedA3AgentEnvironment()
 	if err == nil || !strings.Contains(err.Error(), "migration_required=true replacement=environment variable A2O_AGENT_CONFIG") {
 		t.Fatalf("expected migration error, got %v", err)
 	}
+}
+
+func captureAgentUsage(t *testing.T) string {
+	t.Helper()
+	original := os.Stderr
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stderr = writer
+	defer func() {
+		os.Stderr = original
+	}()
+	printAgentUsage()
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(body)
 }
 
 func TestWorkerErrorCategoryPrioritizesVerificationFailuresOverDirtyWords(t *testing.T) {
