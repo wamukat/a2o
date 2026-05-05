@@ -102,6 +102,7 @@ RUN_ONCE_SERVER_LOG="${WORK_DIR}/run-once-agent-server.log"
 RUN_ONCE_EXIT_FILE="${WORK_DIR}/run-once.exit"
 RUN_ONCE_PID_FILE="${WORK_DIR}/run-once.pid"
 RUN_ONCE_SERVER_PID_FILE="${WORK_DIR}/run-once-agent-server.pid"
+SCHEDULER_LOG="${WORKSPACE_DIR}/.work/a2o-runtime/scheduler.log"
 PREFLIGHT_MARKER="${WORK_DIR}/commit-preflight-smoke.log"
 COMPLETION_HOOK_MARKER="${WORK_DIR}/completion-hook-smoke.log"
 OBSERVER_MARKER="${WORK_DIR}/observer-smoke.log"
@@ -141,6 +142,7 @@ repos:
     label: repo:app
 agent:
   required_bins:
+    - task
     - ruby
     - sh
 publish:
@@ -172,7 +174,7 @@ runtime:
       completion_hooks:
         commands:
           - name: hook-marker
-            command: sh -c 'printf "%s\n" "a2o_completion_hook_smoke_ok slot=\$A2O_COMPLETION_HOOK_SLOT mode=\$A2O_COMPLETION_HOOK_MODE" >> "${COMPLETION_HOOK_MARKER}" && printf "%s\n" "completion hook ran for \$A2O_COMPLETION_HOOK_SLOT" > HOOK.txt'
+            command: "{{a2o_root_dir}}/project-package/commands/post-impl.sh"
             mode: mutating
       executor:
         command:
@@ -191,6 +193,25 @@ runtime:
       policy: ff_only
       target_ref: refs/heads/main
 EOF
+
+cat > "${WORKSPACE_DIR}/Taskfile.yml" <<EOF
+version: '3'
+
+tasks:
+  a2o:completion-hook-smoke:
+    cmds:
+      - sh -c 'printf "%s\n" "a2o_completion_hook_smoke_ok slot=\$A2O_COMPLETION_HOOK_SLOT mode=\$A2O_COMPLETION_HOOK_MODE root=\$A2O_ROOT_DIR" >> "${COMPLETION_HOOK_MARKER}"'
+      - sh -c 'printf "%s\n" "completion hook ran for \$A2O_COMPLETION_HOOK_SLOT via task" > "\$A2O_COMPLETION_HOOK_SLOT_PATH/HOOK.txt"'
+EOF
+
+cat > "${WORKER_DIR}/post-impl.sh" <<'EOF'
+#!/usr/bin/env sh
+set -eu
+
+cd "${A2O_COMPLETION_HOOK_SLOT_PATH}"
+task --taskfile "${A2O_ROOT_DIR}/Taskfile.yml" a2o:completion-hook-smoke
+EOF
+chmod 0755 "${WORKER_DIR}/post-impl.sh"
 
 cat > "${PACKAGE_DIR}/skills/implementation/base.md" <<'EOF'
 # Implementation
@@ -314,12 +335,39 @@ task_ref="$(printf '%s\n' "${task_json}" | python3 -c 'import json,sys; print(js
   export A2O_RUNTIME_RUN_ONCE_EXIT_FILE="${RUN_ONCE_EXIT_FILE}"
   export A2O_RUNTIME_RUN_ONCE_PID_FILE="${RUN_ONCE_PID_FILE}"
   export A2O_RUNTIME_RUN_ONCE_SERVER_PID_FILE="${RUN_ONCE_SERVER_PID_FILE}"
-  "${HOST_A2O}" runtime run-once --max-steps 20 --agent-attempts 180 --agent-poll-interval 1s | tee "${WORK_DIR}/runtime-run-once.out"
+  "${HOST_A2O}" runtime resume --interval 1s --max-steps 20 --agent-attempts 180 --agent-poll-interval 1s | tee "${WORK_DIR}/runtime-resume.out"
+
+  deadline=$((SECONDS + 240))
+  while true; do
+    "${HOST_A2O}" runtime describe-task "${task_ref}" | tee "${WORK_DIR}/describe-task.out"
+    if grep -Fq "task ${task_ref} kind=single status=done" "${WORK_DIR}/describe-task.out" &&
+      grep -Fq "phase=merge" "${WORK_DIR}/describe-task.out" &&
+      grep -Fq "outcome=completed" "${WORK_DIR}/describe-task.out"; then
+      break
+    fi
+    if grep -E "task ${task_ref} .*status=(blocked|failed)" "${WORK_DIR}/describe-task.out" >/dev/null 2>&1; then
+      "${HOST_A2O}" runtime pause | tee "${WORK_DIR}/runtime-pause.out"
+      exit 1
+    fi
+    if (( SECONDS >= deadline )); then
+      "${HOST_A2O}" runtime status | tee "${WORK_DIR}/runtime-status-timeout.out" || true
+      "${HOST_A2O}" runtime pause | tee "${WORK_DIR}/runtime-pause.out"
+      echo "timed out waiting for ${task_ref} to complete through runtime resume" >&2
+      exit 1
+    fi
+    sleep 2
+  done
+
+  "${HOST_A2O}" runtime pause | tee "${WORK_DIR}/runtime-pause.out"
   "${HOST_A2O}" runtime watch-summary | tee "${WORK_DIR}/watch-summary-after.out"
-  "${HOST_A2O}" runtime describe-task "${task_ref}" | tee "${WORK_DIR}/describe-task.out"
 )
 
-grep -Fq "steps=${task_ref}:implementation,${task_ref}:verification,${task_ref}:merge" "${WORK_DIR}/runtime-run-once.out"
+grep -Fq "runtime_scheduler_resumed" "${WORK_DIR}/runtime-resume.out"
+if [[ -f "${RUN_ONCE_LOG}" ]]; then
+  grep -Fq "steps=${task_ref}:implementation,${task_ref}:verification,${task_ref}:merge" "${RUN_ONCE_LOG}"
+else
+  grep -Fq "steps=${task_ref}:implementation,${task_ref}:verification,${task_ref}:merge" "${SCHEDULER_LOG}"
+fi
 grep -Fq "task ${task_ref} kind=single status=done" "${WORK_DIR}/describe-task.out"
 grep -Fq "phase=merge" "${WORK_DIR}/describe-task.out"
 grep -Fq "outcome=completed" "${WORK_DIR}/describe-task.out"
@@ -344,6 +392,9 @@ for runtime_log in "${RUN_ONCE_LOG}" "${RUN_ONCE_SERVER_LOG}" "${RUN_ONCE_EXIT_F
 done
 if [[ -f "${WORKSPACE_DIR}/.work/a2o/runtime-host-agent/agent.log" ]]; then
   log_files+=("${WORKSPACE_DIR}/.work/a2o/runtime-host-agent/agent.log")
+fi
+if [[ -f "${SCHEDULER_LOG}" ]]; then
+  log_files+=("${SCHEDULER_LOG}")
 fi
 if grep -E "A3_WORKSPACE_ROOT|A3_ROOT_DIR|A3_REPO_ROOT|A3_BUNDLE" "${log_files[@]}" >/dev/null 2>&1; then
   echo "removed A3 runtime surface appeared in real-task smoke logs" >&2

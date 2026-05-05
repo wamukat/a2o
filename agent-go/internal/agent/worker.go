@@ -155,7 +155,7 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 			})
 		}
 		hookCtx, cancelHooks := CompletionHookContext(request.TimeoutSeconds, now)
-		hookReport, hookErr := RunCompletionHooksWithContext(hookCtx, *prepared, *request.WorkspaceRequest)
+		hookReport, hookErr := RunCompletionHooksWithContext(hookCtx, *prepared, *request.WorkspaceRequest, runRequest.Env)
 		cancelHooks()
 		if hookReport.Ran() {
 			w.logJobEvent(runRequest, "completion_hooks_done", map[string]any{

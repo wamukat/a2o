@@ -70,7 +70,7 @@ func RunCompletionHooks(prepared PreparedWorkspace, request WorkspaceRequest) (C
 	return RunCompletionHooksWithContext(context.Background(), prepared, request)
 }
 
-func RunCompletionHooksWithContext(ctx context.Context, prepared PreparedWorkspace, request WorkspaceRequest) (CompletionHookReport, error) {
+func RunCompletionHooksWithContext(ctx context.Context, prepared PreparedWorkspace, request WorkspaceRequest, jobEnv ...map[string]string) (CompletionHookReport, error) {
 	report := CompletionHookReport{Status: "skipped"}
 	if len(request.CompletionHooks) == 0 {
 		return report, nil
@@ -86,9 +86,10 @@ func RunCompletionHooksWithContext(ctx context.Context, prepared PreparedWorkspa
 		return report, nil
 	}
 	report.Status = "succeeded"
+	hookEnv := mergeCompletionHookJobEnv(jobEnv...)
 	for _, hook := range request.CompletionHooks {
 		for _, slotName := range editSlots {
-			entry, err := runCompletionHook(ctx, prepared, request, slotPaths, slotName, hook)
+			entry, err := runCompletionHook(ctx, prepared, request, hookEnv, slotPaths, slotName, hook)
 			report.Entries = append(report.Entries, entry)
 			recordCompletionHookEntry(prepared, slotName, entry)
 			if err != nil {
@@ -157,7 +158,7 @@ func completionHookEditSlots(request WorkspaceRequest, slotPaths map[string]stri
 	return slots
 }
 
-func runCompletionHook(ctx context.Context, prepared PreparedWorkspace, request WorkspaceRequest, slotPaths map[string]string, slotName string, hook WorkspaceCompletionHook) (CompletionHookEntry, error) {
+func runCompletionHook(ctx context.Context, prepared PreparedWorkspace, request WorkspaceRequest, jobEnv map[string]string, slotPaths map[string]string, slotName string, hook WorkspaceCompletionHook) (CompletionHookEntry, error) {
 	beforeStates, err := gitStates(slotPaths)
 	if err != nil {
 		return failedCompletionHookEntry(slotName, hook, "snapshot failed: "+err.Error()), err
@@ -173,7 +174,7 @@ func runCompletionHook(ctx context.Context, prepared PreparedWorkspace, request 
 		}
 	}()
 
-	entry := executeCompletionHook(ctx, prepared, request, slotPaths[slotName], slotName, hook)
+	entry := executeCompletionHook(ctx, prepared, request, jobEnv, slotPaths[slotName], slotName, hook)
 	afterStates, stateErr := gitStates(slotPaths)
 	if entry.Status == "succeeded" && stateErr != nil {
 		entry.Status = "failed"
@@ -205,17 +206,18 @@ func runCompletionHook(ctx context.Context, prepared PreparedWorkspace, request 
 	return entry, nil
 }
 
-func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, request WorkspaceRequest, runtimePath, slotName string, hook WorkspaceCompletionHook) CompletionHookEntry {
-	pathValue := completionHookPath(os.Getenv("PATH"))
+func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, request WorkspaceRequest, jobEnv map[string]string, runtimePath, slotName string, hook WorkspaceCompletionHook) CompletionHookEntry {
+	pathValue := completionHookPath(completionHookBasePath(jobEnv))
 	shellPath := completionHookLookPath("sh", pathValue)
-	executablePath := completionHookExecutablePath(hook.Command, pathValue)
+	command := expandCompletionHookCommand(hook.Command, prepared, jobEnv, runtimePath, slotName)
+	executablePath := completionHookExecutablePath(command, pathValue)
 	shellCommand := shellPath
 	if shellCommand == "" {
 		shellCommand = "sh"
 	}
-	cmd := exec.CommandContext(ctx, shellCommand, "-c", hook.Command)
+	cmd := exec.CommandContext(ctx, shellCommand, "-c", command)
 	cmd.Dir = runtimePath
-	cmd.Env = completionHookEnv(os.Environ(), pathValue,
+	cmd.Env = completionHookEnv(os.Environ(), pathValue, jobEnv,
 		"A2O_WORKSPACE_ROOT="+prepared.Root,
 		"A2O_COMPLETION_HOOK_NAME="+hook.Name,
 		"A2O_COMPLETION_HOOK_MODE="+hook.Mode,
@@ -257,7 +259,7 @@ func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, requ
 	}
 	return CompletionHookEntry{
 		Name:           hook.Name,
-		Command:        hook.Command,
+		Command:        command,
 		Mode:           hook.Mode,
 		Slot:           slotName,
 		WorkingDir:     runtimePath,
@@ -293,8 +295,8 @@ func completionHookPath(raw string) string {
 	return strings.Join(parts, string(os.PathListSeparator))
 }
 
-func completionHookEnv(base []string, pathValue string, extra ...string) []string {
-	env := make([]string, 0, len(base)+len(extra)+1)
+func completionHookEnv(base []string, pathValue string, jobEnv map[string]string, extra ...string) []string {
+	env := make([]string, 0, len(base)+len(jobEnv)+len(extra)+1)
 	replacedPath := false
 	for _, item := range base {
 		if strings.HasPrefix(item, "PATH=") {
@@ -304,11 +306,63 @@ func completionHookEnv(base []string, pathValue string, extra ...string) []strin
 		}
 		env = append(env, item)
 	}
+	for _, key := range sortedMapKeysString(jobEnv) {
+		if key == "" || strings.Contains(key, "=") {
+			continue
+		}
+		if key == "PATH" {
+			continue
+		}
+		env = append(env, key+"="+jobEnv[key])
+	}
 	if !replacedPath {
 		env = append(env, "PATH="+pathValue)
 	}
 	env = append(env, extra...)
 	return env
+}
+
+func mergeCompletionHookJobEnv(values ...map[string]string) map[string]string {
+	merged := map[string]string{}
+	for _, value := range values {
+		for key, item := range value {
+			merged[key] = item
+		}
+	}
+	return merged
+}
+
+func completionHookBasePath(jobEnv map[string]string) string {
+	if value := strings.TrimSpace(jobEnv["PATH"]); value != "" {
+		return value
+	}
+	return os.Getenv("PATH")
+}
+
+func expandCompletionHookCommand(command string, prepared PreparedWorkspace, jobEnv map[string]string, runtimePath string, slotName string) string {
+	rootDir := strings.TrimSpace(jobEnv["A2O_ROOT_DIR"])
+	if rootDir == "" {
+		rootDir = strings.TrimSpace(jobEnv["A3_ROOT_DIR"])
+	}
+	if rootDir == "" {
+		rootDir = prepared.Root
+	}
+	replacer := strings.NewReplacer(
+		"{{a2o_root_dir}}", rootDir,
+		"{{workspace_root}}", prepared.Root,
+		"{{slot_path}}", runtimePath,
+		"{{slot}}", slotName,
+	)
+	return replacer.Replace(command)
+}
+
+func sortedMapKeysString(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func completionHookExecutablePath(command string, pathValue string) string {

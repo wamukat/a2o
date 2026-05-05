@@ -825,7 +825,7 @@ func TestCompletionHookPathIncludesStandardHostBins(t *testing.T) {
 	if got := completionHookExecutablePath("task fmt:apply", fakeBin); got != fakeTask {
 		t.Fatalf("completion hook executable path = %q, want %q", got, fakeTask)
 	}
-	env := completionHookEnv([]string{"A=1", "PATH=/thin/bin"}, "/wide/bin", "B=2")
+	env := completionHookEnv([]string{"A=1", "PATH=/thin/bin"}, "/wide/bin", map[string]string{}, "B=2")
 	if !reflect.DeepEqual(env, []string{"A=1", "PATH=/wide/bin", "B=2"}) {
 		t.Fatalf("completion hook env did not replace PATH: %#v", env)
 	}
@@ -851,6 +851,7 @@ func TestExecuteCompletionHookUsesAugmentedHostPath(t *testing.T) {
 		context.Background(),
 		prepared,
 		testWorkspaceRequest("repo-alpha"),
+		map[string]string{},
 		tmp,
 		"repo_alpha",
 		WorkspaceCompletionHook{Name: "post-impl", Command: "task", Mode: "mutating", OnFailure: "rework"},
@@ -868,6 +869,45 @@ func TestExecuteCompletionHookUsesAugmentedHostPath(t *testing.T) {
 	}
 	if string(content) != "fake-task-ok" {
 		t.Fatalf("fake task output = %q", string(content))
+	}
+}
+
+func TestExecuteCompletionHookExpandsRootTemplateWithJobEnvironment(t *testing.T) {
+	tmp := t.TempDir()
+	rootDir := filepath.Join(tmp, "host-root")
+	slotDir := filepath.Join(tmp, "slot")
+	commandDir := filepath.Join(rootDir, "project-package", "commands")
+	if err := os.MkdirAll(commandDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(slotDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	hookScript := filepath.Join(commandDir, "post-impl.sh")
+	if err := os.WriteFile(hookScript, []byte("#!/bin/sh\nprintf '%s' \"$A2O_ROOT_DIR\" > root.txt\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	prepared := PreparedWorkspace{Root: filepath.Join(tmp, "workspace")}
+	entry := executeCompletionHook(
+		context.Background(),
+		prepared,
+		testWorkspaceRequest("repo-alpha"),
+		map[string]string{"A2O_ROOT_DIR": rootDir, "CUSTOM_ENV": "visible"},
+		slotDir,
+		"repo_alpha",
+		WorkspaceCompletionHook{Name: "post-impl", Command: "{{a2o_root_dir}}/project-package/commands/post-impl.sh", Mode: "mutating", OnFailure: "rework"},
+	)
+
+	if entry.Status != "succeeded" || entry.Command != hookScript || entry.ExecutablePath != hookScript {
+		t.Fatalf("completion hook should expand and execute host root command, entry=%#v", entry)
+	}
+	content, err := os.ReadFile(filepath.Join(slotDir, "root.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != rootDir {
+		t.Fatalf("hook did not receive A2O_ROOT_DIR, got %q want %q", string(content), rootDir)
 	}
 }
 
