@@ -343,7 +343,7 @@ func TestWorkerCompletionHookFailureReturnsImplementationRework(t *testing.T) {
 				"sample-catalog-service": sourceRoot,
 			},
 		},
-		Now:      func() time.Time { return time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) },
+		Now:      func() time.Time { return time.Now().UTC() },
 		EventLog: &events,
 	}.RunOnce()
 	if err != nil {
@@ -387,6 +387,14 @@ func TestWorkerCompletionHookFailureReturnsImplementationRework(t *testing.T) {
 		`"workspace_root":"` + filepath.ToSlash(filepath.Join(tmp, "agent-workspaces", "Sample-42-ticket")) + `"`,
 		`"stage":"completion_hooks_done"`,
 		`"status":"failed"`,
+		`"stage":"completion_hook_failed"`,
+		`"hook_name":"verify"`,
+		`"hook_slot":"repo_alpha"`,
+		`"exit_status":7`,
+		`"host_path":"`,
+		`"shell_path":"`,
+		`"working_dir":"` + filepath.ToSlash(filepath.Join(tmp, "agent-workspaces", "Sample-42-ticket", "repo_alpha")) + `"`,
+		`"stderr":"hook-error"`,
 	} {
 		if !strings.Contains(eventText, want) {
 			t.Fatalf("missing completion hook event %s in:\n%s", want, eventText)

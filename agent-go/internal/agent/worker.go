@@ -201,7 +201,7 @@ func (w Worker) RunOnce() (*JobResult, bool, error) {
 			if refreshErr := RefreshWorkspaceEvidence(*prepared); refreshErr == nil {
 				workspaceDescriptor = requestedWorkspaceDescriptor(runRequest, prepared.SlotDescriptors)
 			}
-			w.logJobEvent(runRequest, "completion_hook_failed", map[string]any{"error": hookErr.Error()})
+			w.logJobEvent(runRequest, "completion_hook_failed", completionHookFailureEvent(hookReport, hookErr))
 			result := postCompletionHookReworkResult(*request, workspaceDescriptor, startedAt, finishedAt, logUpload, artifactUploads, hookReport, hookErr)
 			w.logJobEvent(runRequest, "submit_start", map[string]any{"status": result.Status})
 			stopHeartbeat()
@@ -563,6 +563,34 @@ func postCompletionHookReworkResult(request JobRequest, descriptor WorkspaceDesc
 		},
 		Heartbeat: finishedAt,
 	}
+}
+
+func completionHookFailureEvent(report CompletionHookReport, cause error) map[string]any {
+	event := map[string]any{
+		"error":         cause.Error(),
+		"report_status": report.Status,
+		"entry_count":   len(report.Entries),
+	}
+	entry := report.FailingEntry()
+	if entry == nil {
+		return event
+	}
+	event["hook_name"] = entry.Name
+	event["hook_command"] = entry.Command
+	event["hook_mode"] = entry.Mode
+	event["hook_slot"] = entry.Slot
+	event["working_dir"] = entry.WorkingDir
+	event["workspace_root"] = entry.WorkspaceRoot
+	event["path"] = entry.Path
+	event["host_path"] = entry.Path
+	event["shell_path"] = entry.ShellPath
+	event["exec_path"] = entry.ExecutablePath
+	event["executable_path"] = entry.ExecutablePath
+	event["exit_status"] = entry.ExitStatus
+	event["stdout"] = entry.Stdout
+	event["stderr"] = entry.Stderr
+	event["reason"] = entry.Reason
+	return event
 }
 
 func completionHookAttemptRefs(descriptor WorkspaceDescriptor) map[string]string {

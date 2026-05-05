@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -801,6 +802,72 @@ func TestRunCompletionHooksAllowsMutatingHookOnEditSlot(t *testing.T) {
 	}
 	if join(changed) != "changed.txt,formatted.txt" {
 		t.Fatalf("mutating hook output should remain dirty, got %v", changed)
+	}
+}
+
+func TestCompletionHookPathIncludesStandardHostBins(t *testing.T) {
+	pathValue := completionHookPath("/custom/bin:/usr/bin")
+
+	for _, want := range []string{"/custom/bin", "/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"} {
+		if !strings.Contains(pathValue, want) {
+			t.Fatalf("completion hook path should include %s, got %q", want, pathValue)
+		}
+	}
+	if strings.Count(pathValue, "/usr/bin") != 1 {
+		t.Fatalf("completion hook path should avoid duplicates, got %q", pathValue)
+	}
+
+	fakeBin := t.TempDir()
+	fakeTask := filepath.Join(fakeBin, "task")
+	if err := os.WriteFile(fakeTask, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := completionHookExecutablePath("task fmt:apply", fakeBin); got != fakeTask {
+		t.Fatalf("completion hook executable path = %q, want %q", got, fakeTask)
+	}
+	env := completionHookEnv([]string{"A=1", "PATH=/thin/bin"}, "/wide/bin", "B=2")
+	if !reflect.DeepEqual(env, []string{"A=1", "PATH=/wide/bin", "B=2"}) {
+		t.Fatalf("completion hook env did not replace PATH: %#v", env)
+	}
+}
+
+func TestExecuteCompletionHookUsesAugmentedHostPath(t *testing.T) {
+	tmp := t.TempDir()
+	fakeBin := filepath.Join(tmp, "host-bin")
+	if err := os.MkdirAll(fakeBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fakeTask := filepath.Join(fakeBin, "task")
+	if err := os.WriteFile(fakeTask, []byte("#!/bin/sh\nprintf fake-task-ok > task.out\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	previousStandardDirs := standardCompletionHookPathDirs
+	standardCompletionHookPathDirs = []string{fakeBin, "/bin", "/usr/bin"}
+	t.Cleanup(func() { standardCompletionHookPathDirs = previousStandardDirs })
+	t.Setenv("PATH", "/thin/bin")
+
+	prepared := PreparedWorkspace{Root: tmp}
+	entry := executeCompletionHook(
+		context.Background(),
+		prepared,
+		testWorkspaceRequest("repo-alpha"),
+		tmp,
+		"repo_alpha",
+		WorkspaceCompletionHook{Name: "post-impl", Command: "task", Mode: "mutating", OnFailure: "rework"},
+	)
+
+	if entry.Status != "succeeded" || entry.ExecutablePath != fakeTask {
+		t.Fatalf("completion hook should use augmented host PATH, entry=%#v", entry)
+	}
+	if !strings.Contains(entry.Path, fakeBin) {
+		t.Fatalf("completion hook diagnostics should include augmented path, entry=%#v", entry)
+	}
+	content, err := os.ReadFile(filepath.Join(tmp, "task.out"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "fake-task-ok" {
+		t.Fatalf("fake task output = %q", string(content))
 	}
 }
 

@@ -7,11 +7,21 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
 	"time"
 )
+
+var standardCompletionHookPathDirs = []string{
+	"/opt/homebrew/bin",
+	"/usr/local/bin",
+	"/usr/bin",
+	"/bin",
+	"/usr/sbin",
+	"/sbin",
+}
 
 type CompletionHookReport struct {
 	Status  string                `json:"status"`
@@ -196,12 +206,16 @@ func runCompletionHook(ctx context.Context, prepared PreparedWorkspace, request 
 }
 
 func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, request WorkspaceRequest, runtimePath, slotName string, hook WorkspaceCompletionHook) CompletionHookEntry {
-	pathValue := os.Getenv("PATH")
-	shellPath, _ := exec.LookPath("sh")
-	executablePath := completionHookExecutablePath(hook.Command)
-	cmd := exec.CommandContext(ctx, "sh", "-c", hook.Command)
+	pathValue := completionHookPath(os.Getenv("PATH"))
+	shellPath := completionHookLookPath("sh", pathValue)
+	executablePath := completionHookExecutablePath(hook.Command, pathValue)
+	shellCommand := shellPath
+	if shellCommand == "" {
+		shellCommand = "sh"
+	}
+	cmd := exec.CommandContext(ctx, shellCommand, "-c", hook.Command)
 	cmd.Dir = runtimePath
-	cmd.Env = append(os.Environ(),
+	cmd.Env = completionHookEnv(os.Environ(), pathValue,
 		"A2O_WORKSPACE_ROOT="+prepared.Root,
 		"A2O_COMPLETION_HOOK_NAME="+hook.Name,
 		"A2O_COMPLETION_HOOK_MODE="+hook.Mode,
@@ -259,7 +273,45 @@ func executeCompletionHook(ctx context.Context, prepared PreparedWorkspace, requ
 	}
 }
 
-func completionHookExecutablePath(command string) string {
+func completionHookPath(raw string) string {
+	seen := map[string]bool{}
+	parts := []string{}
+	for _, part := range filepath.SplitList(raw) {
+		if part == "" || seen[part] {
+			continue
+		}
+		seen[part] = true
+		parts = append(parts, part)
+	}
+	for _, part := range standardCompletionHookPathDirs {
+		if part == "" || seen[part] {
+			continue
+		}
+		seen[part] = true
+		parts = append(parts, part)
+	}
+	return strings.Join(parts, string(os.PathListSeparator))
+}
+
+func completionHookEnv(base []string, pathValue string, extra ...string) []string {
+	env := make([]string, 0, len(base)+len(extra)+1)
+	replacedPath := false
+	for _, item := range base {
+		if strings.HasPrefix(item, "PATH=") {
+			env = append(env, "PATH="+pathValue)
+			replacedPath = true
+			continue
+		}
+		env = append(env, item)
+	}
+	if !replacedPath {
+		env = append(env, "PATH="+pathValue)
+	}
+	env = append(env, extra...)
+	return env
+}
+
+func completionHookExecutablePath(command string, pathValue string) string {
 	fields := strings.Fields(strings.TrimSpace(command))
 	if len(fields) == 0 {
 		return ""
@@ -268,11 +320,37 @@ func completionHookExecutablePath(command string) string {
 	if strings.Contains(executable, "/") {
 		return executable
 	}
-	resolved, err := exec.LookPath(executable)
-	if err != nil {
+	return completionHookLookPath(executable, pathValue)
+}
+
+func completionHookLookPath(executable string, pathValue string) string {
+	if executable == "" {
 		return ""
 	}
-	return resolved
+	if strings.Contains(executable, "/") {
+		if completionHookExecutableFile(executable) {
+			return executable
+		}
+		return ""
+	}
+	for _, dir := range filepath.SplitList(pathValue) {
+		if dir == "" {
+			continue
+		}
+		candidate := filepath.Join(dir, executable)
+		if completionHookExecutableFile(candidate) {
+			return candidate
+		}
+	}
+	return ""
+}
+
+func completionHookExecutableFile(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return false
+	}
+	return info.Mode().Perm()&0o111 != 0
 }
 
 func completionHookOutputFile(stream string) (*os.File, string, error) {
