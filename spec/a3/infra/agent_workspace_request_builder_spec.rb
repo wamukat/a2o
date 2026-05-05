@@ -333,6 +333,38 @@ RSpec.describe A3::Infra::AgentWorkspaceRequestBuilder do
     expect(review_request.completion_hooks).to eq([])
   end
 
+  it "expands root and workspace placeholders in implementation completion hook commands" do
+    builder = described_class.new(
+      source_aliases: {
+        repo_alpha: "sample-alpha",
+        repo_beta: "sample-beta"
+      },
+      support_ref: "refs/heads/feature/prototype",
+      root_dir: "/opt/a2o root",
+      implementation_completion_hooks: [
+        {
+          "name" => "post-impl",
+          "command" => "{{a2o_root_dir}}/project-package/commands/post-impl.sh --workspace {{workspace_root}} --slot {{slot}} --slot-path {{slot_path}}",
+          "mode" => "mutating",
+          "on_failure" => "rework"
+        }
+      ]
+    )
+
+    implementation_request = builder.call(workspace: workspace, task: task, run: run(:implementation))
+
+    expect(implementation_request.completion_hooks).to eq(
+      [
+        {
+          "name" => "post-impl",
+          "command" => "/opt/a2o\\ root/project-package/commands/post-impl.sh --workspace /tmp/a3-local-workspace --slot {{slot}} --slot-path {{slot_path}}",
+          "mode" => "mutating",
+          "on_failure" => "rework"
+        }
+      ]
+    )
+  end
+
   it "rejects malformed implementation completion hooks" do
     expect do
       described_class.new(

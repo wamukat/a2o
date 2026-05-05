@@ -2209,7 +2209,8 @@ module A3
         publish_commit_preflight_commands: options.fetch(:agent_publish_commit_preflight_commands, []),
         implementation_completion_hooks: agent_implementation_completion_hooks(options),
         support_ref: options[:agent_support_ref],
-        support_refs: options.fetch(:agent_support_refs, {})
+        support_refs: options.fetch(:agent_support_refs, {}),
+        root_dir: options.fetch(:agent_env, {}).fetch("A2O_ROOT_DIR", nil)
       )
       end
 

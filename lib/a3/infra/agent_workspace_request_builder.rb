@@ -4,11 +4,12 @@ require "a3/domain/agent_workspace_request"
 require "a3/domain/branch_namespace"
 require "a3/domain/configuration_error"
 require "a3/infra/agent_workspace_repo_policy"
+require "shellwords"
 
 module A3
   module Infra
     class AgentWorkspaceRequestBuilder
-      def initialize(source_aliases:, repo_slot_policy: nil, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, publish_commit_preflight_native_git_hooks: :bypass, publish_commit_preflight_commands: [], implementation_completion_hooks: [], support_ref: nil, support_refs: {}, branch_namespace: A3::Domain::BranchNamespace.from_env)
+      def initialize(source_aliases:, repo_slot_policy: nil, freshness_policy: :reuse_if_clean_and_ref_matches, cleanup_policy: :retain_until_a3_cleanup, publish_commit_preflight_native_git_hooks: :bypass, publish_commit_preflight_commands: [], implementation_completion_hooks: [], support_ref: nil, support_refs: {}, branch_namespace: A3::Domain::BranchNamespace.from_env, root_dir: nil)
         @source_aliases = source_aliases.transform_keys(&:to_sym).transform_values(&:to_s).freeze
         @branch_namespace = A3::Domain::BranchNamespace.normalize(branch_namespace)
         @repo_slot_policy = repo_slot_policy || A3::Infra::AgentWorkspaceRepoPolicy.new(available_slots: @source_aliases.keys)
@@ -18,6 +19,7 @@ module A3
         @publish_commit_preflight_commands = normalize_preflight_commands(publish_commit_preflight_commands)
         @implementation_completion_hooks = normalize_completion_hooks(implementation_completion_hooks)
         @support_refs = normalize_support_refs(support_ref: support_ref, support_refs: support_refs)
+        @root_dir = root_dir.to_s.strip
         validate_policy!(:freshness_policy, @freshness_policy, A3::Domain::AgentWorkspaceRequest::FRESHNESS_POLICIES)
         validate_policy!(:cleanup_policy, @cleanup_policy, A3::Domain::AgentWorkspaceRequest::CLEANUP_POLICIES)
         validate_policy!(:publish_commit_preflight_native_git_hooks, @publish_commit_preflight_native_git_hooks, A3::Domain::AgentWorkspacePublishPolicy::NATIVE_GIT_HOOK_POLICIES)
@@ -54,7 +56,7 @@ module A3
           topology: topology_for(task: task, workspace: workspace),
           cleanup_policy: @cleanup_policy,
           publish_policy: publish_policy_for(task: task, run: run, command_intent: command_intent),
-          completion_hooks: completion_hooks_for(run: run, command_intent: command_intent),
+          completion_hooks: completion_hooks_for(workspace: workspace, run: run, command_intent: command_intent),
           slots: slots
         )
       end
@@ -195,11 +197,31 @@ module A3
         normalized
       end
 
-      def completion_hooks_for(run:, command_intent:)
+      def completion_hooks_for(workspace:, run:, command_intent:)
         return [] unless run.phase.to_sym == :implementation
         return [] unless command_intent.nil?
 
-        @implementation_completion_hooks
+        @implementation_completion_hooks.map do |hook|
+          hook.merge("command" => expand_completion_hook_command(hook.fetch("command"), workspace: workspace))
+        end
+      end
+
+      def expand_completion_hook_command(command, workspace:)
+        replacements = {
+          "a2o_root_dir" => root_dir,
+          "root_dir" => root_dir,
+          "workspace_root" => workspace.root_path.to_s
+        }
+        command.to_s.gsub(/\{\{([a-z0-9_]+)\}\}/) do |match|
+          value = replacements.fetch(Regexp.last_match(1), nil)
+          value.nil? || value.empty? ? match : Shellwords.shellescape(value)
+        end
+      end
+
+      def root_dir
+        return @root_dir unless @root_dir.empty?
+
+        ENV.fetch("A2O_ROOT_DIR", Dir.pwd)
       end
 
       def publish_policy_for(task:, run:, command_intent:)
