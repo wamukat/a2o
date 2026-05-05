@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe "A3 version" do
-  it "matches the A2O 0.5.70 release version" do
-    expect(A3::VERSION).to eq("0.5.70")
+  it "matches the A2O 0.5.71 release version" do
+    expect(A3::VERSION).to eq("0.5.71")
   end
 
   it "keeps release workflow version aligned" do
@@ -31,7 +31,7 @@ RSpec.describe "A3 version" do
   end
 
   it "keeps bundled Kanbalone default image aligned with the documented release surface" do
-    expected_image = "ghcr.io/wamukat/kanbalone:v0.9.33"
+    expected_image = "ghcr.io/wamukat/kanbalone:v0.9.34"
     repo_root = File.expand_path("../..", __dir__)
     release_compose = File.read(File.join(repo_root, "docker/compose/a2o-kanbalone.release.yml"))
     dev_compose = File.read(File.join(repo_root, "docker/compose/a2o-kanbalone.yml"))
@@ -40,7 +40,7 @@ RSpec.describe "A3 version" do
 
     expect(release_compose).to include("KANBALONE_IMAGE:-#{expected_image}")
     expect(dev_compose).to include("KANBALONE_IMAGE:-#{expected_image}")
-    expect(english_surface).to include("Kanbalone `v0.9.33`")
-    expect(japanese_surface).to include("Kanbalone イメージは `v0.9.33`")
+    expect(english_surface).to include("Kanbalone `v0.9.34`")
+    expect(japanese_surface).to include("Kanbalone イメージは `v0.9.34`")
   end
 end

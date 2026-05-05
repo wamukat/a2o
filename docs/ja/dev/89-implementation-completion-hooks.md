@@ -4,7 +4,7 @@
 
 ## 問題
 
-A2O には verification / remediation command があり、v0.5.70 では `publish.commit_preflight.commands` も追加された。しかし、これらは implementation completion gate ではない。
+A2O には verification / remediation command があり、publish surface には `publish.commit_preflight.commands` もある。しかし、これらは implementation completion gate ではない。
 
 `publish.commit_preflight.commands` は publish commit の直前に実行される。publish を止めることはできるが、worker はすでに成功を返しているため、implementation AI への feedback loop としては遅すぎる。
 

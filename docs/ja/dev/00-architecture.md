@@ -217,7 +217,7 @@ Kanban-first な draft 設計では、早期の draft child 作成、`a2o:draft-
 
 - [../user/80-current-release-surface.md](../user/80-current-release-surface.md)
 
-A2O 0.5.37 の対応済み公開機能と検証境界を扱う。
+現在の A2O リリースの対応済み公開機能と検証境界を扱う。
 
 ### 11. カンバンアダプター境界
 

@@ -6,7 +6,7 @@ ENGINE_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"
 
 VERSION="${VERSION:-}"
 if [[ -z "${VERSION}" ]]; then
-  echo "VERSION is required, for example: VERSION=0.5.70 $0" >&2
+  echo "VERSION is required, for example: VERSION=0.5.71 $0" >&2
   exit 2
 fi
 
@@ -103,6 +103,7 @@ RUN_ONCE_EXIT_FILE="${WORK_DIR}/run-once.exit"
 RUN_ONCE_PID_FILE="${WORK_DIR}/run-once.pid"
 RUN_ONCE_SERVER_PID_FILE="${WORK_DIR}/run-once-agent-server.pid"
 PREFLIGHT_MARKER="${WORK_DIR}/commit-preflight-smoke.log"
+COMPLETION_HOOK_MARKER="${WORK_DIR}/completion-hook-smoke.log"
 
 mkdir -p "${HOST_INSTALL_DIR}" "${PACKAGE_DIR}/skills/implementation" "${PACKAGE_DIR}/skills/review" "${SOURCE_DIR}" "${WORKER_DIR}"
 
@@ -151,6 +152,11 @@ runtime:
   phases:
     implementation:
       skill: skills/implementation/base.md
+      completion_hooks:
+        commands:
+          - name: hook-marker
+            command: sh -c 'printf "%s\n" "a2o_completion_hook_smoke_ok slot=\$A2O_COMPLETION_HOOK_SLOT mode=\$A2O_COMPLETION_HOOK_MODE" >> "${COMPLETION_HOOK_MARKER}" && printf "%s\n" "completion hook ran for \$A2O_COMPLETION_HOOK_SLOT" > HOOK.txt'
+            mode: mutating
       executor:
         command:
           - ruby
@@ -269,7 +275,7 @@ task_json="$(
   api POST "/api/boards/${board_id}/tickets" "{
     \"laneId\": ${lane_id},
     \"title\": \"RC smoke: write marker file\",
-    \"bodyMarkdown\": \"# Goal\\n\\nWrite a marker file through the A2O runtime worker.\\n\\n## Acceptance\\n\\n- implementation writes SMOKE.txt\\n- verification passes\\n- merge reaches Done\",
+    \"bodyMarkdown\": \"# Goal\\n\\nWrite marker files through the A2O runtime worker and completion hook.\\n\\n## Acceptance\\n\\n- implementation writes SMOKE.txt\\n- completion hook writes HOOK.txt\\n- verification passes\\n- merge reaches Done\",
     \"priority\": 2,
     \"tagIds\": [${repo_tag_id}, ${trigger_tag_id}],
     \"blockerIds\": [],
@@ -301,9 +307,11 @@ grep -Fq "task ${task_ref} kind=single status=done" "${WORK_DIR}/describe-task.o
 grep -Fq "phase=merge" "${WORK_DIR}/describe-task.out"
 grep -Fq "outcome=completed" "${WORK_DIR}/describe-task.out"
 grep -Fq "review_disposition=kind=completed slot_scopes=app finding_key=minimal-real-task-rc-smoke-clean" "${WORK_DIR}/describe-task.out"
+grep -Fq "a2o_completion_hook_smoke_ok slot=app mode=mutating" "${COMPLETION_HOOK_MARKER}"
 grep -Fq "a2o_commit_preflight_smoke_ok slot=app" "${PREFLIGHT_MARKER}"
 grep -Fq "o/o/o/o" "${WORK_DIR}/watch-summary-after.out"
 git -C "${SOURCE_DIR}" log --oneline --max-count=1 | grep -Fq "A2O implementation update for ${task_ref}"
+git -C "${SOURCE_DIR}" show HEAD:HOOK.txt | grep -Fq "completion hook ran for app"
 
 log_files=("${WORK_DIR}"/*.out)
 for runtime_log in "${RUN_ONCE_LOG}" "${RUN_ONCE_SERVER_LOG}" "${RUN_ONCE_EXIT_FILE}"; do

@@ -4,7 +4,7 @@ This design defines `runtime.phases.implementation.completion_hooks`, a project-
 
 ## Problem
 
-A2O currently lets a project define verification and remediation commands, and v0.5.70 added `publish.commit_preflight.commands`. Those surfaces are not the same as an implementation completion gate.
+A2O currently lets a project define verification and remediation commands, and the publish surface also supports `publish.commit_preflight.commands`. Those surfaces are not the same as an implementation completion gate.
 
 `publish.commit_preflight.commands` runs at publish-commit time. It can block publication, but it is too late to be a useful feedback loop for the implementation worker because the worker already reported success. The desired behavior is to let a project force checks or formatting between:
 

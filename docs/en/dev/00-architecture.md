@@ -217,7 +217,7 @@ Covers sample products and validation boundaries used by core verification.
 
 - [../user/80-current-release-surface.md](../user/80-current-release-surface.md)
 
-Summarizes the supported public surface and validation boundary for A2O 0.5.37.
+Summarizes the supported public surface and validation boundary for the current A2O release.
 
 ### 11. Kanban Adapter Boundary
 
