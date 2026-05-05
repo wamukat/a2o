@@ -907,10 +907,10 @@ func TestRunCompletionHooksUsesProvidedTimeoutContext(t *testing.T) {
 	request := testWorkspaceRequest("repo-alpha")
 	request.CompletionHooks = []WorkspaceCompletionHook{
 		{
-				Name:      "verify",
-				Command:   "sleep 30",
-				Mode:      "check",
-				OnFailure: "rework",
+			Name:      "verify",
+			Command:   "sleep 30",
+			Mode:      "check",
+			OnFailure: "rework",
 		},
 	}
 	materializer := WorkspaceMaterializer{
