@@ -10,7 +10,7 @@ Examples:
 
 - The worker used an awkward workaround because an architecture rule forbids a dependency that may actually be acceptable.
 - The worker split code unnaturally to satisfy a line-length rule that may be too strict for the project.
-- The worker completed the task but found that a project package prompt, command, or verification policy would make future work easier if adjusted.
+- The worker completed the task but found that a project command, verification policy, runtime policy, or architecture rule would make future work easier if adjusted.
 
 Today the worker can put this in `summary`, but operators can miss it. It can also create or request `follow_up_child`, but that turns an optional proposal into implementation work.
 
@@ -32,6 +32,7 @@ Do not use it for:
 
 - direct code follow-up that should become runnable implementation work: use `review_disposition.kind=follow_up_child` or the existing follow-up child path
 - reusable prompt or skill tuning candidates: use `skill_feedback`
+- project command, verification, runtime policy, or architecture rule proposals: use `operator_proposals`
 - design debt discovered in the changed code: use `refactoring_assessment`
 - task-blocking ambiguity: use `clarification_request`
 - implementation failure or rework feedback: use `success=false` and normal failure fields
@@ -40,7 +41,7 @@ The same worker result may contain both `operator_proposals` and a more specific
 
 ## Worker Result Contract
 
-`operator_proposals` is optional and may be absent, `null`, or a non-empty array.
+`operator_proposals` is optional and may be absent, `null`, an empty array, or an array of proposal entries. An empty array is equivalent to no proposals and must not produce evidence or comments.
 
 Each entry has this MVP shape:
 
