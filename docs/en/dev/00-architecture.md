@@ -27,6 +27,7 @@ Read this document first to understand runtime flow and responsibility boundarie
 | Boundary between core and project extensions | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
 | Multi-project runtime contexts | [85-multi-project-runtime-contexts.md](85-multi-project-runtime-contexts.md) |
 | Docs impact and shared specifications | [86-docs-impact-and-shared-specs.md](86-docs-impact-and-shared-specs.md) |
+| Implementation operator proposals | [91-implementation-operator-proposals.md](91-implementation-operator-proposals.md) |
 | Validation through reference products | [90-reference-product-suite.md](90-reference-product-suite.md) |
 | Release publish latency and distribution boundary | [98-release-publish-latency-and-distribution-build.md](98-release-publish-latency-and-distribution-build.md) |
 | Kanban adapter and Kanbalone boundary | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
@@ -233,6 +234,7 @@ Covers the kanban command contract and adapter boundary.
 | How are workspaces and branches created? | [40-workspace-and-repo-slot-model.md](40-workspace-and-repo-slot-model.md) |
 | What can Engine read from a project package? | [50-project-surface.md](50-project-surface.md) |
 | What contract do project scripts follow? | [55-project-script-contract.md](55-project-script-contract.md) |
+| How can implementation workers leave non-blocking operator proposals? | [91-implementation-operator-proposals.md](91-implementation-operator-proposals.md) |
 | How are agent jobs handed off? | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
 | How should high-level tickets be decomposed before implementation? | [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md) |
 | What evidence exists when a task is blocked? | [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md) |

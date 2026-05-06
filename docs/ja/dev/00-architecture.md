@@ -27,6 +27,7 @@
 | コアとプロジェクト拡張の境界 | [80-runtime-extension-boundary.md](80-runtime-extension-boundary.md) |
 | マルチプロジェクト runtime context | [85-multi-project-runtime-contexts.md](85-multi-project-runtime-contexts.md) |
 | docs-impact と共通仕様ドキュメント | [86-docs-impact-and-shared-specs.md](86-docs-impact-and-shared-specs.md) |
+| 実装フェーズの operator proposal | [91-implementation-operator-proposals.md](91-implementation-operator-proposals.md) |
 | 参照用プロダクトによる検証 | [90-reference-product-suite.md](90-reference-product-suite.md) |
 | release publish の遅延と distribution 境界 | [98-release-publish-latency-and-distribution-build.md](98-release-publish-latency-and-distribution-build.md) |
 | カンバンアダプターと Kanbalone 境界 | [95-kanban-adapter-boundary.md](95-kanban-adapter-boundary.md) |
@@ -233,6 +234,7 @@ Kanban-first な draft 設計では、早期の draft child 作成、`a2o:draft-
 | ワークスペースとブランチの作り方 | [40-workspace-and-repo-slot-model.md](40-workspace-and-repo-slot-model.md) |
 | プロジェクトパッケージから何を読めるか | [50-project-surface.md](50-project-surface.md) |
 | プロジェクトスクリプトの契約 | [55-project-script-contract.md](55-project-script-contract.md) |
+| 実装 worker がブロックしない operator 向け提案を残す方法 | [91-implementation-operator-proposals.md](91-implementation-operator-proposals.md) |
 | エージェントジョブの受け渡し | [70-agent-worker-gateway-design.md](70-agent-worker-gateway-design.md) |
 | 大きな要求チケットを実装前にどう分解するか | [75-ticket-decomposition-mvp.md](75-ticket-decomposition-mvp.md) |
 | ブロック時の証跡 | [60-evidence-and-rerun-diagnosis.md](60-evidence-and-rerun-diagnosis.md) |
