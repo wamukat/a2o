@@ -193,19 +193,25 @@ Implementation workers may return optional `operator_proposals` when the current
 {
   "success": true,
   "summary": "Implemented the requested change.",
+  "rework_required": false,
+  "changed_files": {
+    "app": ["src/generated/customer_model.ts"]
+  },
   "review_disposition": {
     "kind": "completed",
-    "summary": "Ready for review."
+    "slot_scopes": ["app"],
+    "summary": "Ready for review.",
+    "description": "Implementation evidence is ready for review."
   },
   "operator_proposals": [
     {
-      "title": "Split the shared formatter package",
-      "summary": "The task reused formatter code across two repo slots; a small package split would reduce future duplication.",
+      "title": "Allow generated source directories in the lint command",
+      "summary": "The implementation needed generated model output, but the current lint command treats that directory as handwritten source.",
       "priority": "medium",
-      "category": "refactoring",
-      "suggested_action": "Create a planning ticket before the next formatter change.",
-      "scope": ["repo:app", "repo:lib"],
-      "evidence": ["app/src/formatter.ts", "lib/src/format.ts"]
+      "category": "command_policy",
+      "suggested_action": "Review the project lint policy before the next generated-model task.",
+      "scope": ["repo:app"],
+      "evidence": ["src/generated/customer_model.ts"]
     }
   ]
 }
