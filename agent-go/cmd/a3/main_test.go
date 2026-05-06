@@ -5772,7 +5772,7 @@ func TestEnsureRuntimeHostAgentFailsWhenPackageVerifyHitsNonTransientGithubError
 		WorkspaceRoot:   filepath.Join(tempDir, "workspace"),
 	}
 	runner := &fakeRunner{
-		agentPackageVerifyFailureOutput: "failed to fetch agent package bundle: HTTP 404 https://github.com/wamukat/a2o/releases/download/v0.5.75/a2o-agent-linux-amd64.tar.gz\n",
+		agentPackageVerifyFailureOutput: "failed to fetch agent package bundle: HTTP 404 https://github.com/wamukat/a2o/releases/download/v9.9.9/a2o-agent-linux-amd64.tar.gz\n",
 	}
 	var stdout bytes.Buffer
 
