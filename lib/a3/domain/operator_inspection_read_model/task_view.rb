@@ -6,9 +6,9 @@ module A3
   module Domain
     class OperatorInspectionReadModel
       class TaskView
-        attr_reader :ref, :kind, :status, :current_run_ref, :claim_ref, :edit_scope, :verification_scope, :topology, :runnable_assessment, :skill_feedback, :clarification_request
+        attr_reader :ref, :kind, :status, :current_run_ref, :claim_ref, :edit_scope, :verification_scope, :topology, :runnable_assessment, :skill_feedback, :operator_proposals, :clarification_request
 
-        def initialize(ref:, kind:, status:, current_run_ref:, claim_ref: nil, edit_scope:, verification_scope:, topology:, runnable_assessment:, skill_feedback: [], clarification_request: nil)
+        def initialize(ref:, kind:, status:, current_run_ref:, claim_ref: nil, edit_scope:, verification_scope:, topology:, runnable_assessment:, skill_feedback: [], operator_proposals: [], clarification_request: nil)
           @ref = ref
           @kind = kind.to_sym
           @status = status.to_sym
@@ -19,11 +19,12 @@ module A3
           @topology = topology
           @runnable_assessment = runnable_assessment
           @skill_feedback = Array(skill_feedback).freeze
+          @operator_proposals = Array(operator_proposals).freeze
           @clarification_request = clarification_request
           freeze
         end
 
-        def self.from_task(task:, tasks:, skill_feedback: [], clarification_request: nil, claim_ref: nil)
+        def self.from_task(task:, tasks:, skill_feedback: [], operator_proposals: [], clarification_request: nil, claim_ref: nil)
           new(
             ref: task.ref,
             kind: task.kind,
@@ -37,6 +38,7 @@ module A3
               A3::Domain::RunnableTaskAssessment.evaluate(task: task, tasks: tasks)
             ),
             skill_feedback: skill_feedback,
+            operator_proposals: operator_proposals,
             clarification_request: clarification_request
           )
         end

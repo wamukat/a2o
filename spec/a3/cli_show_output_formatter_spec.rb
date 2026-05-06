@@ -624,6 +624,16 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
           "proposal" => { "target" => "project_skill" },
           "confidence" => "medium"
         }
+      ],
+      operator_proposals: [
+        {
+          "title" => "Review project lint command",
+          "summary" => "The implementation needed a workaround for generated sources.",
+          "priority" => "medium",
+          "category" => "project_command",
+          "suggested_action" => "Consider excluding generated sources from lint.",
+          "evidence_path" => "runs/run-1/phase_records/0/operator_proposals/0"
+        }
       ]
     )
 
@@ -639,6 +649,11 @@ RSpec.describe A3::CLI::ShowOutputFormatter do
     expect(result).to include("skill_feedback_pending_review=1 action=review_or_convert_to_ticket")
     expect(result).to include("skill_feedback category=missing_context target=project_skill state=new repo_scope=repo_alpha skill_path=skills/implementation/base.md confidence=medium")
     expect(result).to include("skill_feedback_summary=Add fixture update workflow.")
+    expect(result).to include("operator_proposals_count=1")
+    expect(result).to include("operator_proposal index=1 priority=medium category=project_command evidence_path=runs/run-1/phase_records/0/operator_proposals/0")
+    expect(result).to include("operator_proposal_title=Review project lint command")
+    expect(result).to include("operator_proposal_summary=The implementation needed a workaround for generated sources.")
+    expect(result).to include("operator_proposal_suggested_action=Consider excluding generated sources from lint.")
   end
 
   it "formats run lines through the run formatter" do

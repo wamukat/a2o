@@ -145,6 +145,61 @@ RSpec.describe A3::Application::ShowTask do
     ])
   end
 
+  it "includes current run operator proposals for describe-task output" do
+    run = A3::Domain::Run.new(
+      ref: "run-1",
+      task_ref: "A3-v2#child",
+      phase: :implementation,
+      workspace_kind: :ticket_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.ticket_branch_head(task_ref: "A3-v2#child", ref: "refs/heads/a2o/work/A3-v2-child"),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        ownership_scope: :task
+      ),
+      artifact_owner: A3::Domain::ArtifactOwner.new(
+        owner_ref: "A3-v2#child",
+        owner_scope: :task,
+        snapshot_version: "refs/heads/a2o/work/A3-v2-child"
+      )
+    ).append_phase_evidence(
+      phase: :implementation,
+      source_descriptor: A3::Domain::SourceDescriptor.ticket_branch_head(task_ref: "A3-v2#child", ref: "refs/heads/a2o/work/A3-v2-child"),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        ownership_scope: :task
+      ),
+      execution_record: A3::Domain::PhaseExecutionRecord.new(
+        summary: "implemented",
+        operator_proposals: [
+          {
+            "title" => "Review project lint command",
+            "summary" => "The implementation needed a workaround for generated sources.",
+            "priority" => "medium",
+            "category" => "project_command",
+            "suggested_action" => "Consider excluding generated sources from lint."
+          }
+        ]
+      )
+    )
+    run_repository.save(run)
+
+    result = use_case.call(task_ref: "A3-v2#child")
+
+    expect(result.operator_proposals).to eq([
+      {
+        "title" => "Review project lint command",
+        "summary" => "The implementation needed a workaround for generated sources.",
+        "priority" => "medium",
+        "category" => "project_command",
+        "suggested_action" => "Consider excluding generated sources from lint.",
+        "evidence_path" => "runs/run-1/phase_records/1/operator_proposals/0",
+        "phase" => "implementation"
+      }
+    ])
+  end
+
   it "includes pending feedback from earlier phase records in the current run" do
     source = A3::Domain::SourceDescriptor.ticket_branch_head(task_ref: "A3-v2#child", ref: "refs/heads/a2o/work/A3-v2-child")
     scope = A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], ownership_scope: :task)

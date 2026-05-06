@@ -7,9 +7,9 @@ module A3
     class PhaseExecutionRecord
       include DeepFreezable
 
-      attr_reader :summary, :failing_command, :observed_state, :diagnostics, :runtime_snapshot, :review_disposition, :clarification_request, :skill_feedback, :docs_impact, :refactoring_assessment, :follow_up_child_fingerprints
+      attr_reader :summary, :failing_command, :observed_state, :diagnostics, :runtime_snapshot, :review_disposition, :clarification_request, :skill_feedback, :operator_proposals, :docs_impact, :refactoring_assessment, :follow_up_child_fingerprints
 
-      def initialize(summary:, failing_command: nil, observed_state: nil, diagnostics: {}, runtime_snapshot: nil, review_disposition: nil, clarification_request: nil, skill_feedback: [], docs_impact: nil, refactoring_assessment: nil, follow_up_child_fingerprints: [])
+      def initialize(summary:, failing_command: nil, observed_state: nil, diagnostics: {}, runtime_snapshot: nil, review_disposition: nil, clarification_request: nil, skill_feedback: [], operator_proposals: [], docs_impact: nil, refactoring_assessment: nil, follow_up_child_fingerprints: [])
         @summary = summary
         @failing_command = failing_command
         @observed_state = observed_state
@@ -18,6 +18,7 @@ module A3
         @review_disposition = deep_freeze_value(review_disposition)
         @clarification_request = deep_freeze_value(clarification_request)
         @skill_feedback = deep_freeze_value(Array(skill_feedback))
+        @operator_proposals = deep_freeze_value(Array(operator_proposals))
         @docs_impact = deep_freeze_value(docs_impact)
         @refactoring_assessment = deep_freeze_value(refactoring_assessment)
         @follow_up_child_fingerprints = deep_freeze_value(Array(follow_up_child_fingerprints))
@@ -36,6 +37,7 @@ module A3
           review_disposition: record["review_disposition"],
           clarification_request: record["clarification_request"],
           skill_feedback: record.fetch("skill_feedback", []),
+          operator_proposals: record.fetch("operator_proposals", []),
           docs_impact: record["docs_impact"],
           refactoring_assessment: record["refactoring_assessment"],
           follow_up_child_fingerprints: record.fetch("follow_up_child_fingerprints", [])
@@ -58,6 +60,7 @@ module A3
           },
           clarification_request: execution.clarification_request&.persisted_form,
           skill_feedback: execution.skill_feedback,
+          operator_proposals: execution.operator_proposals,
           docs_impact: execution.docs_impact,
           refactoring_assessment: execution.refactoring_assessment
         )
@@ -73,6 +76,7 @@ module A3
           review_disposition: review_disposition,
           clarification_request: clarification_request,
           skill_feedback: skill_feedback,
+          operator_proposals: operator_proposals,
           docs_impact: docs_impact,
           refactoring_assessment: refactoring_assessment,
           follow_up_child_fingerprints: fingerprints
@@ -89,6 +93,7 @@ module A3
           review_disposition: review_disposition,
           clarification_request: clarification_request,
           skill_feedback: skill_feedback,
+          operator_proposals: operator_proposals,
           docs_impact: docs_impact,
           refactoring_assessment: refactoring_assessment,
           follow_up_child_fingerprints: follow_up_child_fingerprints
@@ -105,6 +110,7 @@ module A3
           "review_disposition" => review_disposition,
           "clarification_request" => clarification_request,
           "skill_feedback" => skill_feedback,
+          "operator_proposals" => operator_proposals,
           "docs_impact" => docs_impact,
           "refactoring_assessment" => refactoring_assessment,
           "follow_up_child_fingerprints" => follow_up_child_fingerprints
@@ -121,6 +127,7 @@ module A3
           other.review_disposition == review_disposition &&
           other.clarification_request == clarification_request &&
           other.skill_feedback == skill_feedback &&
+          other.operator_proposals == operator_proposals &&
           other.docs_impact == docs_impact &&
           other.refactoring_assessment == refactoring_assessment &&
           other.follow_up_child_fingerprints == follow_up_child_fingerprints

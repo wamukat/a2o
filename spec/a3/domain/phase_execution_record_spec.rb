@@ -29,6 +29,7 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
       "review_disposition" => nil,
       "clarification_request" => nil,
       "skill_feedback" => [],
+      "operator_proposals" => [],
       "docs_impact" => nil,
       "refactoring_assessment" => nil,
       "follow_up_child_fingerprints" => [],
@@ -120,6 +121,37 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
     expect(described_class.from_persisted_form(record.persisted_form)).to eq(record)
   end
 
+  it "captures operator proposals from an execution result" do
+    execution = A3::Application::ExecutionResult.new(
+      success: true,
+      summary: "implemented with operator proposal",
+      response_bundle: {
+        "operator_proposals" => [
+          {
+            "title" => "Review project lint command",
+            "summary" => "The implementation needed a workaround for generated sources.",
+            "priority" => "medium",
+            "category" => "project_command",
+            "suggested_action" => "Consider excluding generated sources from lint."
+          }
+        ]
+      }
+    )
+
+    record = described_class.from_execution_result(execution)
+
+    expect(record.operator_proposals).to eq([
+      {
+        "title" => "Review project lint command",
+        "summary" => "The implementation needed a workaround for generated sources.",
+        "priority" => "medium",
+        "category" => "project_command",
+        "suggested_action" => "Consider excluding generated sources from lint."
+      }
+    ])
+    expect(described_class.from_persisted_form(record.persisted_form)).to eq(record)
+  end
+
   it "captures clarification requests from an execution result" do
     execution = A3::Application::ExecutionResult.new(
       success: false,
@@ -190,6 +222,27 @@ RSpec.describe A3::Domain::PhaseExecutionRecord do
     record = described_class.from_execution_result(execution)
 
     expect(record.skill_feedback).to eq([])
+  end
+
+  it "does not persist operator proposals from invalid worker results" do
+    execution = A3::Application::ExecutionResult.new(
+      success: false,
+      summary: "worker result schema invalid",
+      failing_command: "worker_result_schema",
+      observed_state: "invalid_worker_result",
+      response_bundle: {
+        "operator_proposals" => [
+          {
+            "title" => "Rejected proposal",
+            "summary" => "This rejected payload should not become evidence."
+          }
+        ]
+      }
+    )
+
+    record = described_class.from_execution_result(execution)
+
+    expect(record.operator_proposals).to eq([])
   end
 
   it "does not persist docs-impact evidence from invalid worker results" do

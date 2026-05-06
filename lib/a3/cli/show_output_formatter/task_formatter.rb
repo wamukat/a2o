@@ -25,6 +25,7 @@ module A3
             end
             append_clarification_request_lines(result, task.clarification_request)
             append_skill_feedback_lines(result, task.skill_feedback)
+            append_operator_proposal_lines(result, task.operator_proposals)
           end
         end
 
@@ -66,6 +67,23 @@ module A3
             parts << "confidence=#{FormattingHelpers.diagnostic_value(feedback['confidence'])}" if feedback["confidence"]
             result << "skill_feedback #{parts.join(' ')}"
             result << "skill_feedback_summary=#{feedback['summary']}" if feedback["summary"]
+          end
+        end
+
+        def append_operator_proposal_lines(result, proposal_entries)
+          entries = Array(proposal_entries).select { |proposal| proposal.is_a?(Hash) }
+          return if entries.empty?
+
+          result << "operator_proposals_count=#{entries.size}"
+          entries.each_with_index do |proposal, index|
+            parts = ["index=#{index + 1}"]
+            parts << "priority=#{FormattingHelpers.diagnostic_value(proposal['priority'])}" if proposal["priority"]
+            parts << "category=#{FormattingHelpers.diagnostic_value(proposal['category'])}" if proposal["category"]
+            parts << "evidence_path=#{FormattingHelpers.diagnostic_value(proposal['evidence_path'])}" if proposal["evidence_path"]
+            result << "operator_proposal #{parts.join(' ')}"
+            result << "operator_proposal_title=#{proposal['title']}" if proposal["title"]
+            result << "operator_proposal_summary=#{proposal['summary']}" if proposal["summary"]
+            result << "operator_proposal_suggested_action=#{proposal['suggested_action']}" if proposal["suggested_action"]
           end
         end
 

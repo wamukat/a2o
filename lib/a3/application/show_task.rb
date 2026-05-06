@@ -15,6 +15,7 @@ module A3
           task: task,
           tasks: @task_repository.all,
           skill_feedback: latest_skill_feedback(task),
+          operator_proposals: latest_operator_proposals(task),
           clarification_request: latest_clarification_request(task),
           claim_ref: active_claim_for(task)&.claim_ref
         )
@@ -45,6 +46,26 @@ module A3
         nil
       rescue A3::Domain::RecordNotFound, NoMethodError
         nil
+      end
+
+      def latest_operator_proposals(task)
+        return [] unless @run_repository
+
+        run = latest_run_for(task)
+        return [] unless run
+
+        run.phase_records.each_with_index.flat_map do |record, record_index|
+          Array(record.execution_record&.operator_proposals).each_with_index.map do |proposal, proposal_index|
+            next unless proposal.is_a?(Hash)
+
+            proposal.merge(
+              "evidence_path" => "runs/#{run.ref}/phase_records/#{record_index}/operator_proposals/#{proposal_index}",
+              "phase" => record.phase.to_s
+            )
+          end
+        end.compact
+      rescue A3::Domain::RecordNotFound, NoMethodError
+        []
       end
 
       def latest_run_for(task)

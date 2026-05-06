@@ -79,6 +79,16 @@ module A3
         end
       end
 
+      def operator_proposals
+        return [] if invalid_worker_result?
+        return [] unless response_bundle.is_a?(Hash)
+
+        value = response_bundle["operator_proposals"]
+        return [] unless value.is_a?(Array)
+
+        value.select { |entry| entry.is_a?(Hash) }
+      end
+
       def docs_impact
         return nil if invalid_worker_result?
         return nil unless response_bundle.is_a?(Hash)
