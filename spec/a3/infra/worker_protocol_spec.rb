@@ -1197,6 +1197,55 @@ RSpec.describe A3::Infra::WorkerProtocol do
     expect(worker_response).not_to have_key("review_disposition")
   end
 
+  it "accepts frozen agent-materialized implementation results without mutating the worker response" do
+    worker_response = {
+      "success" => true,
+      "summary" => "implementation completed",
+      "task_ref" => task.ref,
+      "run_ref" => run.ref,
+      "phase" => "implementation",
+      "rework_required" => false,
+      "changed_files" => {
+        "repo_beta" => ["marker.txt"].freeze
+      }.freeze,
+      "review_disposition" => {
+        "kind" => "completed",
+        "slot_scopes" => ["repo_beta"].freeze,
+        "summary" => "implementation completed",
+        "description" => "implementation completed"
+      }.freeze,
+      "skill_feedback" => {
+        "category" => "workflow",
+        "summary" => "recorded feedback",
+        "proposal" => {
+          "target" => "project_skill"
+        }.freeze,
+        "repo_scope" => "repo:beta"
+      }.freeze
+    }.freeze
+
+    result = described_class.new(
+      repo_scope_aliases: { "repo:beta" => "repo_beta" },
+      review_disposition_slot_scopes: %w[repo_beta]
+    ).build_execution_result(
+      worker_response,
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: run.ref,
+      expected_phase: :implementation,
+      expected_task_kind: :child,
+      canonical_changed_files: { "repo_beta" => ["marker.txt"] }
+    )
+
+    expect(result).to have_attributes(success?: true)
+    expect(result.response_bundle.fetch("changed_files")).to eq("repo_beta" => ["marker.txt"])
+    expect(result.response_bundle.fetch("review_disposition")).to include("kind" => "completed")
+    expect(result.response_bundle.fetch("skill_feedback").fetch("repo_scope")).to eq("repo_beta")
+    expect(worker_response).to be_frozen
+    expect(worker_response.fetch("review_disposition")).to be_frozen
+    expect(worker_response.fetch("skill_feedback").fetch("repo_scope")).to eq("repo:beta")
+  end
+
   it "accepts a clarification request without blocked failure diagnostics" do
     result = described_class.new.build_execution_result(
       {

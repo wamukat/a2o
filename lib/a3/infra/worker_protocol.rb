@@ -375,6 +375,12 @@ module A3
           expected_run_ref: expected_run_ref,
           expected_phase: expected_phase
         )
+        worker_response = normalize_worker_response(
+          worker_response,
+          workspace: workspace,
+          expected_phase: expected_phase,
+          expected_task_kind: expected_task_kind
+        )
         validation_errors = validate_worker_response(
           worker_response,
           workspace: workspace,
@@ -489,7 +495,6 @@ module A3
       end
 
       def validate_worker_response(worker_response, workspace:, expected_task_ref:, expected_run_ref:, expected_phase:, expected_task_kind: nil)
-        normalize_worker_response!(worker_response, workspace: workspace, expected_phase: expected_phase, expected_task_kind: expected_task_kind)
         implementation_phase = expected_phase.to_s == "implementation"
         parent_review = parent_review?(expected_phase: expected_phase, expected_task_kind: expected_task_kind)
         errors = []
@@ -601,10 +606,11 @@ module A3
         errors
       end
 
-      def normalize_worker_response!(worker_response, workspace:, expected_phase:, expected_task_kind:)
-        disposition = worker_response["review_disposition"]
-        normalize_skill_feedback!(worker_response)
-        normalize_parent_review_success!(worker_response, workspace: workspace) if parent_review?(expected_phase: expected_phase, expected_task_kind: expected_task_kind)
+      def normalize_worker_response(worker_response, workspace:, expected_phase:, expected_task_kind:)
+        normalized = mutable_worker_response(worker_response)
+        normalize_skill_feedback!(normalized)
+        normalize_parent_review_success!(normalized, workspace: workspace) if parent_review?(expected_phase: expected_phase, expected_task_kind: expected_task_kind)
+        normalized
       end
 
       def parent_review?(expected_phase:, expected_task_kind:)
