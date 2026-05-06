@@ -51,7 +51,9 @@ tools/dev_sample/run-operator-proposal-smoke.sh
 This creates a dedicated `[operator-proposal-smoke]` task, runs the local
 engine, then checks both the Kanban completion comment and `show-task` output
 for the preserved operator proposal. It is intended for validating the
-`operator_proposals` worker-result flow before release.
+`operator_proposals` worker-result flow before release. The script resets only
+the isolated dev sample environment before it starts, then stops the isolated
+agent and Kanbalone service when it exits.
 
 ## Run decomposition from a Kanban requirement ticket
 

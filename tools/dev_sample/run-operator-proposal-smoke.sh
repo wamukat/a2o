@@ -5,6 +5,13 @@ source "$(dirname "$0")/env.sh"
 
 cd "$A2O_DEV_SAMPLE_ROOT"
 
+cleanup() {
+  tools/dev_sample/stop-agent.sh >/dev/null 2>&1 || true
+  tools/dev_sample/stop-kanbalone.sh >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+tools/dev_sample/reset.sh >/dev/null 2>&1 || true
 tools/dev_sample/start-kanbalone.sh >/dev/null
 tools/dev_sample/bootstrap-kanban.sh >/dev/null
 tools/dev_sample/start-agent.sh >/dev/null
@@ -24,7 +31,12 @@ printf '%s\n' "$show_output" | grep -q "operator_proposals_count=1"
 printf '%s\n' "$show_output" | grep -q "operator_proposal_title=Review deterministic worker smoke policy"
 printf '%s\n' "$show_output" | grep -q "operator_proposal_suggested_action=Keep this smoke marker available for release validation of proposal visibility."
 
-comments_json="$(python3 ~/.codex/skills/kanbalone-api/scripts/kanbalone_api.py --base "$A2O_DEV_SAMPLE_KANBAN_URL" GET "/api/tickets/$task_id/comments")"
+comments_json="$(python3 tools/kanban/kanban_cli.py \
+  --backend kanbalone \
+  --base-url "$A2O_DEV_SAMPLE_KANBAN_URL" \
+  task-comment-list \
+  --project "$A2O_DEV_SAMPLE_PROJECT" \
+  --task-id "$task_id")"
 printf '%s\n' "$comments_json" | grep -q "Operator proposals"
 printf '%s\n' "$comments_json" | grep -q "Review deterministic worker smoke policy"
 
