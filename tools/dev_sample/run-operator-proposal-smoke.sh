@@ -11,7 +11,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-tools/dev_sample/reset.sh >/dev/null 2>&1 || true
+tools/dev_sample/reset.sh >/dev/null
 tools/dev_sample/start-kanbalone.sh >/dev/null
 tools/dev_sample/bootstrap-kanban.sh >/dev/null
 tools/dev_sample/start-agent.sh >/dev/null
