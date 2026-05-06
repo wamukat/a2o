@@ -1468,7 +1468,10 @@ func ensureRuntimeHostAgent(config runtimeInstanceConfig, plan runtimeRunOncePla
 			return err
 		}
 		if _, err := runExternal(runner, "docker", "exec", containerID, "a2o", "agent", "package", "verify", "--target", plan.HostAgentTarget); err != nil {
-			return err
+			if !isTransientAgentPackageVerifyError(err) {
+				return err
+			}
+			fmt.Fprintf(stdout, "runtime_agent_verify_warning target=%s reason=transient_network detail=%s\n", plan.HostAgentTarget, sanitizePublicCommand(err.Error()))
 		}
 		if _, err := runExternal(runner, "docker", "exec", containerID, "a2o", "agent", "package", "export", "--target", plan.HostAgentTarget, "--output", "/tmp/a2o-runtime-run-once-agent"); err != nil {
 			return err
@@ -1485,6 +1488,28 @@ func ensureRuntimeHostAgent(config runtimeInstanceConfig, plan runtimeRunOncePla
 	default:
 		return fmt.Errorf("unsupported A2O_RUNTIME_RUN_ONCE_AGENT_SOURCE: %s", plan.HostAgentSource)
 	}
+}
+
+func isTransientAgentPackageVerifyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	transientIndicators := []string{
+		"net::opentimeout",
+		"failed to open tcp connection",
+		"execution expired",
+		"connection timed out",
+		"i/o timeout",
+		"temporary failure",
+		"no such host",
+	}
+	for _, indicator := range transientIndicators {
+		if strings.Contains(message, indicator) {
+			return true
+		}
+	}
+	return false
 }
 
 func runtimeContainerID(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner) (string, error) {

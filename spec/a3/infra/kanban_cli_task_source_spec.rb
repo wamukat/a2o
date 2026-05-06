@@ -81,6 +81,49 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     expect(watch_result.warnings).to eq([])
   end
 
+  it "skips only trigger-selected tasks with invalid repo scope labels" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      task_get_includes_labels: false,
+      snapshots: [
+        {
+          "id" => 3051,
+          "ref" => "Sample#3051",
+          "status" => "To do",
+          "priority" => 3,
+          "labels" => ["trigger:auto-implement"],
+          "parent_ref" => nil
+        },
+        {
+          "id" => 3052,
+          "ref" => "Sample#3052",
+          "status" => "To do",
+          "priority" => 4,
+          "labels" => ["repo:ui-app", "trigger:auto-implement"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:ui-app" => [:repo_beta]
+      },
+      trigger_labels: ["trigger:auto-implement"],
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = nil
+      expect { tasks = source.load }.to output(/Sample#3051 skipped: .*has no repo label/).to_stderr
+
+      expect(tasks.map(&:ref)).to eq(["Sample#3052"])
+      expect(tasks.fetch(0).edit_scope).to eq([:repo_beta])
+    end
+  end
+
   it "skips decomposed source tickets before requiring a repo scope label" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,
@@ -292,7 +335,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
-  it "keeps implementation-triggered tasks strict when repo scope labels are missing" do
+  it "skips implementation-triggered tasks when repo scope labels are missing" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,
       task_get_includes_labels: false,
@@ -319,7 +362,10 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     )
 
     with_env(fake_cli.fetch(:env)) do
-      expect { source.load }.to raise_error(A3::Domain::ConfigurationError, /has no repo label/)
+      tasks = nil
+      expect { tasks = source.load }.to output(/Sample#3051 skipped: .*has no repo label/).to_stderr
+
+      expect(tasks).to eq([])
     end
   end
 
@@ -763,7 +809,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
-  it "fails with an actionable diagnostic when trigger-matched labels do not map to repo scopes" do
+  it "logs an actionable diagnostic when trigger-matched labels do not map to repo scopes" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,
       snapshots: [
@@ -789,10 +835,12 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     )
 
     with_env(fake_cli.fetch(:env)) do
-      expect { source.load }.to raise_error(
-        A3::Domain::ConfigurationError,
+      tasks = nil
+      expect { tasks = source.load }.to output(
         /Sample#3038.*repo:both.*repo:starters, repo:ui-app.*add one or more configured repo labels/
-      )
+      ).to_stderr
+
+      expect(tasks).to eq([])
     end
   end
 

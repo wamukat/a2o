@@ -91,16 +91,18 @@ module A3
     end
 
     class SubprocessKanbanCommandClient < KanbanCommandClient
-      def initialize(command_argv:, project:, working_dir: nil)
+      def initialize(command_argv:, project:, working_dir: nil, transient_retry_limit: 3, transient_retry_sleep: 1.0)
         super(project: project)
         @command_argv = Array(command_argv).map(&:to_s).freeze
         raise A3::Domain::ConfigurationError, "kanban command argv must not be empty" if @command_argv.empty?
 
         @working_dir = working_dir && File.expand_path(working_dir)
+        @transient_retry_limit = Integer(transient_retry_limit)
+        @transient_retry_sleep = Float(transient_retry_sleep)
       end
 
       def run_json_command(*args)
-        stdout, stderr, status = Open3.capture3(*@command_argv, *args, **capture_options)
+        stdout, stderr, status = capture_with_transient_retry(args)
         raise A3::Domain::ConfigurationError, build_command_error(stderr, status.exitstatus) unless status.success?
 
         JSON.parse(stdout)
@@ -119,6 +121,25 @@ module A3
 
       def capture_options
         @working_dir ? { chdir: @working_dir } : {}
+      end
+
+      def capture_with_transient_retry(args)
+        attempt = 0
+        loop do
+          stdout, stderr, status = Open3.capture3(*@command_argv, *args, **capture_options)
+          return [stdout, stderr, status] if status.success?
+          return [stdout, stderr, status] unless transient_kanban_unavailable?(stderr)
+          return [stdout, stderr, status] if attempt >= @transient_retry_limit
+
+          attempt += 1
+          warn "kanban command transient failure; retrying attempt=#{attempt} max=#{@transient_retry_limit}: #{stderr.to_s.strip}"
+          sleep(@transient_retry_sleep)
+        end
+      end
+
+      def transient_kanban_unavailable?(stderr)
+        message = stderr.to_s
+        message.include?("HTTP 503") || message.include?("503 Service Unavailable")
       end
 
       def tempfile_dir
