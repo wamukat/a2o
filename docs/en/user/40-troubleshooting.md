@@ -31,6 +31,18 @@ a2o runtime describe-task <task-ref>
 | Merge fails | `a2o runtime describe-task <task-ref>` | Conflict, target ref moved, merge policy mismatch | Git branch, target ref, conflict |
 | Image is not the expected one | `a2o runtime image-digest` | Pinned / local / running image references differ | Runtime image pin, pull, restart |
 
+## Merging Task Does Not Move
+
+When `watch-summary` shows a task in `Merging` or marks it as next but `runtime run-once` repeatedly prints `executed 0 task(s)`, inspect the task first:
+
+```sh
+a2o runtime describe-task <task-ref>
+```
+
+If `describe-task` reports `Task not found` for a Kanban task that is still in an active lane, upgrade to A2O 0.5.79 or later, restart the runtime container with the matching image, and run `a2o runtime run-once` or resume the scheduler. A2O 0.5.79 can recover active `In progress`, `In review`, `Inspection`, and `Merging` tasks from Kanban even when the runtime task record is missing.
+
+If the merge reaches `blocked` with `merge_recovery_conflict_files`, resolve or regenerate the listed files, confirm the repository is clean with `a2o doctor`, then retry. A2O blocks this condition intentionally instead of repeating the same merge attempt.
+
 ## Error Categories
 
 A2O stderr and kanban comments include `error_category` and the next action.

@@ -124,6 +124,7 @@ Scheduler selection follows the kanban board as the source of truth.
 
 - Tasks in `Resolved` or `Archived` are not scheduling targets and do not appear in `watch-summary`.
 - Tasks in `Done` remain visible and remain part of the current board view until a human resolves them.
+- Tasks already in active continuation lanes, including `In progress`, `In review`, `Inspection`, and `Merging`, remain eligible for runtime recovery even when `kanban.selection.status` points only at the intake lane. This lets A2O finish or block in-flight work after scheduler restarts or missing runtime task records.
 - An unresolved kanban blocker keeps the blocked task out of runnable selection.
 - A task labeled `needs:clarification` is imported as `needs_clarification` and is not runnable; this is requester-input waiting, not a technical `blocked` failure.
 - Parent/child gating and sibling ordering still apply in addition to kanban blockers.

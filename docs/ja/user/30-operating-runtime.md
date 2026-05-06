@@ -124,6 +124,7 @@ a2o runtime force-stop-run <run-ref> --dangerous
 
 - `Resolved` / `Archived` のタスクは選択対象にせず、`watch-summary` にも出さない。
 - `Done` は人間が resolve するまで current view に残し、`watch-summary` にも表示する。
+- すでに `In progress`、`In review`、`Inspection`、`Merging` の active continuation lane に入っているタスクは、`kanban.selection.status` が intake lane だけを指していても runtime recovery の対象に残る。これにより、scheduler 再起動後や runtime task record 欠落時にも、進行中の作業を完了または blocked へ進められる。
 - 未解決の kanban blocker があるタスクは runnable にしない。
 - `needs:clarification` ラベル付きタスクは `needs_clarification` として取り込み runnable にしない。これは依頼者入力待ちであり、技術的な `blocked` 失敗とは分けて扱う。
 - 親子関係による制約と sibling の順序制約は、kanban blocker に加えて適用する。

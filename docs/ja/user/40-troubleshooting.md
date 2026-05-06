@@ -31,6 +31,18 @@ a2o runtime describe-task <task-ref>
 | マージできない | `a2o runtime describe-task <task-ref>` | 競合、ターゲット参照の変更、方針不一致 | Git ブランチ、ターゲット参照、競合 |
 | イメージが想定と違う | `a2o runtime image-digest` | 固定参照 / ローカル参照 / 実行中イメージの不一致 | ランタイムイメージの固定、pull、再起動 |
 
+## Merging のタスクが進まない場合
+
+`watch-summary` ではタスクが `Merging` または next に見えるのに、`runtime run-once` が `executed 0 task(s)` を繰り返す場合は、まず対象タスクを確認する。
+
+```sh
+a2o runtime describe-task <task-ref>
+```
+
+カンバン上は active lane に残っているのに `describe-task` が `Task not found` を返す場合は、A2O 0.5.79 以降へ更新し、同じ版の runtime image で runtime container を再起動してから `a2o runtime run-once` または scheduler resume を行う。A2O 0.5.79 は、runtime task record が欠落していても、Kanban 上の `In progress`、`In review`、`Inspection`、`Merging` の active task を復旧対象として扱う。
+
+merge が `blocked` になり `merge_recovery_conflict_files` が表示された場合は、表示されたファイルを解消または再生成し、`a2o doctor` でリポジトリが整理済みであることを確認してから再試行する。A2O はこの状態で同じ merge を繰り返さず、意図的に blocked にする。
+
 ## エラー分類
 
 A2O の stderr とカンバンコメントには `error_category` と次の action が出る。
