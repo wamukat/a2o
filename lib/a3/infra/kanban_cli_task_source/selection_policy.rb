@@ -19,7 +19,8 @@ module A3
         ignore_status_for_decomposition_source =
           include_decomposition_sources && labels.include?(A3::Domain::Task::DECOMPOSITION_TRIGGER_LABEL)
         if @status && !ignore_status_filter && !ignore_status_for_decomposition_source &&
-            !status_matches_filter?(raw_status: raw_snapshot.fetch("status", nil), normalized_status: status)
+            !status_matches_filter?(raw_status: raw_snapshot.fetch("status", nil), normalized_status: status) &&
+            !active_continuation_status?(status: status, labels: labels)
           return nil
         end
 
@@ -134,10 +135,10 @@ module A3
         value.empty? ? nil : value
       end
 
-      def pass_status_filter_to_kanban?
-        return false unless @status
+      def active_continuation_status?(status:, labels:)
+        return false if labels.include?(A3::Domain::Task::DECOMPOSITION_TRIGGER_LABEL)
 
-        ACTIVE_STATUS_MAP.key?(String(@status))
+        %i[in_progress in_review verifying merging].include?(status)
       end
 
       def status_matches_filter?(raw_status:, normalized_status:)

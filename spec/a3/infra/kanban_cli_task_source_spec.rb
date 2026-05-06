@@ -844,7 +844,7 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
     end
   end
 
-  it "passes through a kanban status filter when configured" do
+  it "applies the configured kanban intake status locally" do
     fake_cli = create_fake_kanban_cli(
       @tmp_dir,
       snapshots: [
@@ -880,6 +880,40 @@ RSpec.describe A3::Infra::KanbanCliTaskSource do
       tasks = source.load
 
       expect(tasks.map(&:ref)).to eq(["Sample#5001"])
+    end
+  end
+
+  it "keeps trigger-selected active tasks outside the configured intake status" do
+    fake_cli = create_fake_kanban_cli(
+      @tmp_dir,
+      snapshots: [
+        {
+          "id" => 5004,
+          "ref" => "Sample#5004",
+          "status" => "Merging",
+          "labels" => ["repo:both", "trigger:auto-parent"],
+          "parent_ref" => nil
+        }
+      ]
+    )
+
+    source = described_class.new(
+      command_argv: ["ruby", fake_cli.fetch(:script_path)],
+      project: "Sample",
+      repo_label_map: {
+        "repo:both" => %i[repo_alpha repo_beta]
+      },
+      trigger_labels: ["trigger:auto-parent"],
+      status: "To do",
+      working_dir: @tmp_dir
+    )
+
+    with_env(fake_cli.fetch(:env)) do
+      tasks = source.load
+
+      expect(tasks.map(&:ref)).to eq(["Sample#5004"])
+      expect(tasks.fetch(0).status).to eq(:merging)
+      expect(tasks.fetch(0).automation_enabled).to eq(true)
     end
   end
 

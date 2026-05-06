@@ -96,7 +96,6 @@ module A3
 
       def load_selection_snapshots(tolerate_invalid_edit_scope: false, include_decomposition_sources: false)
         args = ["task-snapshot-list", "--project", @project]
-        args += ["--status", @status] if pass_status_filter_to_kanban? && !include_decomposition_sources
         payload = @client.run_json_command(*args)
         raise A3::Domain::ConfigurationError, "kanban task-snapshot-list must return an array" unless payload.is_a?(Array)
 
