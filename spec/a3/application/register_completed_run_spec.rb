@@ -915,6 +915,85 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(result.run.terminal_outcome).to eq(:verification_required)
   end
 
+  it "publishes merge conflict files when a merge recovery candidate blocks the task" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :merging,
+      current_run_ref: "run-9",
+      external_task_id: 3025
+    )
+    task_repository.save(task)
+    merge_run = A3::Domain::Run.new(
+      ref: "run-9",
+      task_ref: task.ref,
+      phase: :merge,
+      workspace_kind: :runtime_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.runtime_integration_record(task_ref: task.ref, ref: "refs/heads/a2o/parent/3022"),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(edit_scope: [:repo_alpha], verification_scope: [:repo_alpha], ownership_scope: :task),
+      artifact_owner: artifact_owner
+    )
+    run_repository.save(merge_run)
+    execution = A3::Application::ExecutionResult.new(
+      success: false,
+      summary: "merge conflicted",
+      failing_command: "agent_merge_job",
+      observed_state: "merge_recovery_candidate",
+      diagnostics: {
+        "merge_recovery" => {
+          "status" => "conflicted",
+          "target_ref" => "refs/heads/feature/prototype",
+          "conflict_files" => ["scripts/javadoc-style-baseline.txt"]
+        }
+      },
+      response_bundle: {
+        "merge_recovery_required" => true,
+        "merge_recovery" => {
+          "status" => "conflicted",
+          "target_ref" => "refs/heads/feature/prototype",
+          "conflict_files" => ["scripts/javadoc-style-baseline.txt"]
+        }
+      }
+    )
+    blocked_diagnosis = A3::Domain::BlockedDiagnosis.new(
+      task_ref: task.ref,
+      run_ref: merge_run.ref,
+      phase: :merge,
+      outcome: :blocked,
+      review_target: merge_run.evidence.review_target,
+      source_descriptor: merge_run.evidence.source_descriptor,
+      scope_snapshot: merge_run.evidence.scope_snapshot,
+      artifact_owner: merge_run.evidence.artifact_owner,
+      expected_state: "merge succeeds",
+      observed_state: "merge_recovery_candidate",
+      failing_command: "agent_merge_job",
+      diagnostic_summary: "merge conflicted",
+      infra_diagnostics: execution.diagnostics
+    )
+    run_repository.save(merge_run.append_blocked_diagnosis(blocked_diagnosis))
+
+    expect(status_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      status: :blocked,
+      task_kind: :child,
+      status_reason: a_string_matching(/merge conflicted/),
+      status_details: hash_including("phase" => "merge", "failing_command" => "agent_merge_job")
+    )
+    expect(activity_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      body: a_string_matching(/merge_recovery: conflicted.*merge_recovery_target: refs\/heads\/feature\/prototype.*merge_recovery_conflict_files: scripts\/javadoc-style-baseline\.txt/m),
+      event: hash_including("kind" => "task_blocked")
+    )
+
+    result = use_case.call(task_ref: task.ref, run_ref: merge_run.ref, outcome: :blocked, execution: execution)
+
+    expect(result.task.status).to eq(:blocked)
+    expect(result.run.terminal_outcome).to eq(:blocked)
+  end
+
   it "blocks a completed child merge when the parent integration ref is missing in its edit scope" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",

@@ -184,7 +184,7 @@ RSpec.describe A3::Application::RunMerge do
     expect(result.run.phase_records.last.blocked_diagnosis&.observed_state).to eq("non-fast-forward")
   end
 
-  it "keeps recoverable merge conflicts retryable for the merge recovery lane" do
+  it "blocks recoverable merge conflicts to avoid repeated merge retries" do
     allow(prepare_workspace).to receive(:call).and_return(
       A3::Application::PrepareWorkspace::Result.new(workspace: prepared_workspace)
     )
@@ -215,9 +215,17 @@ RSpec.describe A3::Application::RunMerge do
 
     result = use_case.call(task_ref: task.ref, run_ref: run.ref, project_context: project_context)
 
-    expect(result.task.status).to eq(:merging)
-    expect(result.run.terminal_outcome).to eq(:retryable)
-    expect(result.run.phase_records.last.blocked_diagnosis).to be_nil
+    expect(result.task.status).to eq(:blocked)
+    expect(result.run.terminal_outcome).to eq(:blocked)
+    expect(result.run.phase_records.last.blocked_diagnosis).to have_attributes(
+      observed_state: "merge_recovery_candidate"
+    )
+    expect(result.run.phase_records.last.blocked_diagnosis.infra_diagnostics).to include(
+      "merge_recovery" => hash_including(
+        "required" => true,
+        "conflict_files" => ["docs/conflict.md"]
+      )
+    )
     expect(result.run.phase_records.last.execution_record).to have_attributes(
       observed_state: "merge_recovery_candidate"
     )

@@ -712,6 +712,8 @@ module A3
         if present?(recovery["publish_before_head"]) || present?(recovery["publish_after_head"])
           lines << "merge_recovery_publish: #{single_line(recovery['publish_before_head'])}..#{single_line(recovery['publish_after_head'])}"
         end
+        conflict_files = summary_list(recovery["conflict_files"], limit: 10)
+        lines << "merge_recovery_conflict_files: #{conflict_files}" if present?(conflict_files)
       end
 
       def append_inherited_parent_comment_lines(lines, diagnostics)

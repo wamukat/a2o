@@ -601,6 +601,94 @@ RSpec.describe A3::CLI do
     end
   end
 
+  it "blocks a merge recovery candidate after one failed merge instead of retrying until max steps" do
+    Dir.mktmpdir do |dir|
+      create_git_repo_source(dir, name: "repo-alpha-source", file_content: "repo_alpha source\n")
+      create_git_repo_source(dir, name: "repo-beta-source", file_content: "repo_beta source\n")
+      repo_sources = {
+        repo_alpha: File.join(dir, "repo-alpha-source"),
+        repo_beta: File.join(dir, "repo-beta-source")
+      }
+      seed_context(dir)
+      repo_sources.each_value do |repo_path|
+        head = `git -C #{Shellwords.escape(repo_path)} rev-parse HEAD`.strip
+        system("git", "-C", repo_path, "update-ref", "refs/heads/a2o/parent/Sample-5300", head, exception: true, out: File::NULL, err: File::NULL)
+      end
+      task_repository = A3::Infra::SqliteTaskRepository.new(File.join(dir, "a3.sqlite3"))
+      task_repository.save(
+        build_child_task(
+          ref: "Sample#5301",
+          edit_scope: [:repo_beta],
+          status: :done,
+          parent_ref: "Sample#5300"
+        )
+      )
+      task_repository.save(
+        build_parent_task(
+          ref: "Sample#5300",
+          status: :merging,
+          child_refs: ["Sample#5301"]
+        )
+      )
+      allow(merge_runner).to receive(:run).and_return(
+        A3::Application::ExecutionResult.new(
+          success: false,
+          summary: "merge conflicted",
+          failing_command: "agent_merge_job",
+          observed_state: "merge_recovery_candidate",
+          diagnostics: {
+            "merge_recovery" => {
+              "required" => true,
+              "status" => "conflicted",
+              "target_ref" => "refs/heads/feature/prototype",
+              "conflict_files" => ["scripts/javadoc-style-baseline.txt"]
+            }
+          },
+          response_bundle: {
+            "merge_recovery_required" => true,
+            "merge_recovery" => {
+              "required" => true,
+              "status" => "conflicted",
+              "target_ref" => "refs/heads/feature/prototype",
+              "conflict_files" => ["scripts/javadoc-style-baseline.txt"]
+            }
+          }
+        )
+      )
+
+      out = StringIO.new
+      described_class.start(
+        [
+          "execute-until-idle",
+          File.join(dir, "project.yaml"),
+          "--storage-backend", "sqlite",
+          "--storage-dir", dir,
+          *repo_source_args(repo_sources),
+          "--preset-dir", File.join(dir, "presets"),
+          "--max-steps", "5"
+        ],
+        out: out,
+        worker_gateway: worker_gateway,
+        command_runner: command_runner,
+        merge_runner: merge_runner
+      )
+
+      parent = task_repository.fetch("Sample#5300")
+      run = A3::Infra::SqliteRunRepository.new(File.join(dir, "a3.sqlite3")).all.find { |candidate| candidate.task_ref == "Sample#5300" }
+
+      expect(out.string).to include("executed 1 task(s); idle=true stop_reason=idle")
+      expect(out.string).to include("steps=Sample#5300:merge")
+      expect(merge_runner).to have_received(:run).once
+      expect(parent.status).to eq(:blocked)
+      expect(run.terminal_outcome).to eq(:blocked)
+      expect(run.phase_records.last.blocked_diagnosis.infra_diagnostics).to include(
+        "merge_recovery" => hash_including(
+          "conflict_files" => ["scripts/javadoc-style-baseline.txt"]
+        )
+      )
+    end
+  end
+
   def seed_context(dir)
     FileUtils.mkdir_p(File.join(dir, "presets"))
     write_project_yaml(
