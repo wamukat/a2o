@@ -86,7 +86,7 @@ implementation success の場合:
 1. implementation worker が valid worker result を返す。
 2. A2O が既存の worker result contract と一緒に `operator_proposals` を検証する。
 3. A2O が proposals を execution evidence と worker-result artifacts に保存する。
-4. proposal が 1 件以上ある場合、A2O が source task に短い Kanban コメントを投稿する。
+4. proposal が 1 件以上ある場合、A2O が implementation completion Kanban comment に短い Markdown section を追記する。
 5. タスクは通常の implementation-to-review 経路を進む。
 
 proposal は以下をしてはならない。
@@ -101,7 +101,7 @@ implementation failure の場合、MVP では valid proposal を evidence に保
 
 ## Kanban コメント
 
-コメントは Markdown で短くする。少数の proposal を要約し、詳細は `describe-task` で確認できるようにする。
+comment section は Markdown で短くする。最大 3 件の proposal を要約し、詳細は `describe-task` で確認できるようにする。
 
 例:
 
@@ -116,11 +116,11 @@ implementation failure の場合、MVP では valid proposal を evidence に保
 詳細は `a2o runtime describe-task A2O#123` で確認できます。
 ```
 
-固定文言には `kanban.system_comment_locale` を使う。proposal の title / summary は worker が書いた内容なので、A2O が機械翻訳しない。
+固定文言の既定は英語である。`kanban.system_comment_locale: ja` を使うと固定ラベルを日本語で表示する。proposal の title / summary は worker が書いた内容なので、A2O が機械翻訳しない。
 
 ## Runtime 表示
 
-`a2o runtime describe-task <task-ref>` は latest execution diagnostic の下に pending operator proposals を表示する。
+`a2o runtime describe-task <task-ref>` は latest execution diagnostic の下に pending operator proposals を表示する。通常の `watch-summary` には proposal 詳細を表示しない。
 
 表示項目:
 
@@ -131,7 +131,7 @@ implementation failure の場合、MVP では valid proposal を evidence に保
 - suggested action
 - evidence path または artifact reference
 
-通常の `watch-summary` は proposal 詳細を表示しない。必要になれば将来 `--details` で件数だけを表示する。
+必要になれば将来 `watch-summary --details` で件数だけを表示する。
 
 ## 将来拡張
 

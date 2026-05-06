@@ -11,6 +11,7 @@ A2O 0.5.77 で現在利用できる公開機能と検証範囲を示す。
 - ホスト環境の診断: `a2o doctor`
 - プロジェクトパッケージの作成・検証・初期化: `a2o project template`、`lint`、`validate`、`bootstrap`
 - ワーカー補助コマンド: `a2o worker scaffold`、`a2o worker validate-result`
+- Implementation operator proposals: implementation worker は、人間が triage すべき助言的な後続提案として任意の `operator_proposals` を返せる。A2O は proposal を検証・保存し、successful implementation completion comment に短い localized Markdown section を追記し、全詳細を `describe-task` で表示する。詳細は [20-project-package.md#operator-proposals](20-project-package.md#operator-proposals) と [30-operating-runtime.md](30-operating-runtime.md) を参照する。
 - カンバンサービスの起動・外部 Kanbalone 診断: `a2o kanban up`、`doctor`、`url`
 - エージェント対象の判定とバイナリの書き出し: `a2o agent target`、`a2o agent install`
 - ランタイムコンテナの起動・停止: `a2o runtime up`、`down`
@@ -84,6 +85,7 @@ A2O 0.5.77 で現在利用できる公開機能と検証範囲を示す。
 ## マイグレーション案内
 
 - project package の prompt 設定キーを snake_case へ移行すること。`runtime.prompts.repoSlots` は `runtime.prompts.repo_slots` に、`runtime.prompts.phases.decomposition.childDraftTemplate` は `runtime.prompts.phases.decomposition.child_draft_template` に変更する。移行後に `a2o project validate` を実行し、`migration_required=true` が残っていないことを確認する。
+- `operator_proposals` の利用に migration は不要である。既存 custom worker はこの field を省略したままでよい。利用する worker は runtime 実行前に保存済み request / result を `a2o worker validate-result --request request.json --result result.json` で検証すること。
 - この release では metrics collection key の移行は不要である。`runtime.phases.metrics.commands` は、既存の phase command worker request 契約を使う reporting hook として正規 location のまま維持する。ドキュメントでは scheduler phase ではなく metrics collection / reporting と説明する。
 - scheduler resilience fixes を利用するには host launcher/shared assets と runtime image の両方を 0.5.77 に更新する。`agent package verify` の transient-network warning behavior は host launcher 側、Kanbalone 503 retry と invalid-ticket isolation は runtime image 側に含まれる。
   - `docker run --rm -v "$PWD/.work/a2o:/out" ghcr.io/wamukat/a2o-engine:0.5.77 a2o host install --output-dir /out/bin --share-dir /out/share`

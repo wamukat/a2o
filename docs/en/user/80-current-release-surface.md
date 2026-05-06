@@ -11,6 +11,7 @@ Use it to confirm which features can be documented for users and what can be tre
 - Host diagnosis: `a2o doctor`
 - Project authoring and validation: `a2o project template`, `lint`, `validate`, `bootstrap`
 - Worker helper commands: `a2o worker scaffold`, `a2o worker validate-result`
+- Implementation operator proposals: implementation workers may return optional `operator_proposals` for advisory follow-up ideas that should be triaged by a human instead of scheduled automatically. A2O validates and preserves the proposals, appends a compact localized Markdown section to successful implementation completion comments, and exposes full details through `describe-task`. See [20-project-package.md#operator-proposals](20-project-package.md#operator-proposals) and [30-operating-runtime.md](30-operating-runtime.md).
 - Kanban service lifecycle and external Kanbalone checks: `a2o kanban up`, `doctor`, `url`
 - Agent target detection and binary export: `a2o agent target`, `a2o agent install`
 - Runtime container lifecycle: `a2o runtime up`, `down`
@@ -84,6 +85,7 @@ Use it to confirm which features can be documented for users and what can be tre
 ## Migration Notes
 
 - Migrate project package prompt keys to snake_case. Rename `runtime.prompts.repoSlots` to `runtime.prompts.repo_slots`, and rename `runtime.prompts.phases.decomposition.childDraftTemplate` to `runtime.prompts.phases.decomposition.child_draft_template`. After migration, run `a2o project validate` and confirm no `migration_required=true` diagnostics remain.
+- No migration is required for `operator_proposals`. Existing custom workers can keep omitting the field. Workers that opt in should validate saved request/result pairs with `a2o worker validate-result --request request.json --result result.json` before runtime use.
 - No migration is required for metrics collection keys in this release. `runtime.phases.metrics.commands` remains the canonical reporting-hook location because it uses the existing phase command worker request contract; docs should describe it as metrics collection or reporting, not as a scheduler phase.
 - Upgrade both the host launcher/shared assets and runtime image to 0.5.77 for the scheduler resilience fixes. The host launcher contains the `agent package verify` transient-network warning behavior, while the runtime image contains the Kanban 503 retry and invalid-ticket isolation behavior:
   - `docker run --rm -v "$PWD/.work/a2o:/out" ghcr.io/wamukat/a2o-engine:0.5.77 a2o host install --output-dir /out/bin --share-dir /out/share`

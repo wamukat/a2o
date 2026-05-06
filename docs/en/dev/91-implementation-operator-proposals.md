@@ -86,7 +86,7 @@ For implementation success:
 1. The implementation worker returns a valid worker result.
 2. A2O validates `operator_proposals` along with the existing worker result contract.
 3. A2O stores proposals in execution evidence and worker-result artifacts.
-4. A2O posts a short Kanban comment on the source task when at least one proposal exists.
+4. A2O appends a short Markdown section to the implementation completion Kanban comment when at least one proposal exists.
 5. The task continues through the normal implementation-to-review path.
 
 The proposal must not:
@@ -101,7 +101,7 @@ For implementation failure, the MVP may preserve valid proposals in evidence but
 
 ## Kanban Comment
 
-The comment should be Markdown and compact. It should summarize up to a small fixed number of proposals and point operators to `describe-task` for full evidence.
+The comment section should be Markdown and compact. It summarizes up to three proposals and points operators to `describe-task` for full evidence.
 
 Example:
 
@@ -116,11 +116,11 @@ The implementation completed and reported 1 non-blocking proposal.
 Full details are available in `a2o runtime describe-task A2O#123`.
 ```
 
-Use `kanban.system_comment_locale` for the fixed system text. Proposal titles and summaries are worker-authored and should not be machine-translated by A2O.
+The default fixed system text is English. Use `kanban.system_comment_locale: ja` to render fixed labels in Japanese. Proposal titles and summaries are worker-authored and should not be machine-translated by A2O.
 
 ## Runtime Visibility
 
-`a2o runtime describe-task <task-ref>` should show pending operator proposals under the latest execution diagnostic. The display should include:
+`a2o runtime describe-task <task-ref>` should show pending operator proposals under the latest execution diagnostic. Normal `watch-summary` output should not include proposal details. The display should include:
 
 - proposal count
 - title
@@ -129,7 +129,7 @@ Use `kanban.system_comment_locale` for the fixed system text. Proposal titles an
 - suggested action
 - evidence path or artifact reference when available
 
-`watch-summary` should not show proposal details in the normal tree. A future `--details` view may show a compact count if operators ask for it.
+A future `watch-summary --details` view may show a compact count if operators ask for it.
 
 ## Future Extensions
 

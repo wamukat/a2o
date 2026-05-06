@@ -185,6 +185,44 @@ a2o worker validate-result --request request.json --result result.json
 
 The validator reports concrete missing keys, type errors, and `task_ref` / `run_ref` / `phase` mismatches before runtime execution. If your executor uses configured review disposition slot scopes, pass the same public values with repeated `--review-slot-scope SCOPE`. The canonical review disposition scope key is `slot_scopes`; `repo_scope` is rejected. `review_disposition.finding_key` is required only for actionable `follow_up_child` or `blocked` findings. Clean `completed` reviews may omit it or set it to `null`.
 
+### Operator Proposals
+
+Implementation workers may return optional `operator_proposals` when the current task reveals follow-up work that a human operator should consider but A2O should not schedule automatically.
+
+```json
+{
+  "success": true,
+  "summary": "Implemented the requested change.",
+  "review_disposition": {
+    "kind": "completed",
+    "summary": "Ready for review."
+  },
+  "operator_proposals": [
+    {
+      "title": "Split the shared formatter package",
+      "summary": "The task reused formatter code across two repo slots; a small package split would reduce future duplication.",
+      "priority": "medium",
+      "category": "refactoring",
+      "suggested_action": "Create a planning ticket before the next formatter change.",
+      "scope": ["repo:app", "repo:lib"],
+      "evidence": ["app/src/formatter.ts", "lib/src/format.ts"]
+    }
+  ]
+}
+```
+
+`operator_proposals` may be omitted, `null`, an empty array, or an array of proposal entries. Each entry must include non-empty `title` and `summary`. Optional `priority` must be one of `low`, `medium`, `high`, or `urgent`; optional `scope` and `evidence` are string arrays. Unknown proposal fields are preserved so project workers can add extra metadata.
+
+Use the narrowest worker result field:
+
+- Use `review_disposition.kind=follow_up_child` or the existing follow-up child path when the follow-up should become runnable implementation work.
+- Use `skill_feedback` when the worker learned a reusable prompt, skill, or worker-command improvement.
+- Use `refactoring_assessment` for code-structure debt directly observed in the current code.
+- Use `clarification_request` when ambiguity blocks safe progress.
+- Use `operator_proposals` for advisory project, process, policy, or architecture ideas that need human triage.
+
+`a2o worker validate-result` validates the `operator_proposals` shape before runtime execution. A2O persists accepted proposals in execution evidence, appends a compact localized Markdown section to the successful implementation completion comment, and exposes the full details through `a2o runtime describe-task <task-ref>`. Proposals are advisory only; they do not create tickets, labels, blockers, or scheduling changes by themselves.
+
 If the worker cannot continue because the requested product behavior is ambiguous or conflicts with an existing contract, return `success=false`, `rework_required=false`, and `clarification_request` instead of using `blocked` diagnostics:
 
 ```json

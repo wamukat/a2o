@@ -78,6 +78,7 @@ a2o runtime describe-task <task-ref>
 stdin-bundle worker が組み込みの補正ループ後も不正な JSON または schema-invalid JSON を返し続けた場合、A2O は worker metadata directory の `invalid-worker-results/latest.json` に invalid-result salvage record を保存し、最新 5 件の salvage record を残す。salvage record には raw または parsed の不正出力、構造化 validation error、task/run/phase、schema name が含まれる。同じ workspace で後続 retry が走る場合、最新 salvage record は worker bundle の `previous_invalid_worker_result` として渡される。不正な result が task state を進めることはない。
 Kanbalone が blocked / clarification ラベルの理由メタデータを返す場合、`describe-task` は kanban task セクションにそれを含め、`watch-summary --details` は `kanban_tag_reason=` の詳細行を表示する。通常の `watch-summary` にはこれらの追加行を出さない。
 worker がプロダクト仕様の曖昧さや矛盾により安全に続行できない場合は `clarification_request` を返せる。A2O はタスクを `needs_clarification` として保存し、Kanban に `needs:clarification` ラベルを付け、質問・背景・選択肢・影響をコメントに残し、依頼者の回答後にラベル／状態が解除されるまでスケジューラ対象外にする。
+successful implementation worker が `operator_proposals` を返した場合、`describe-task` は `operator_proposals_count=`、proposal ごとの `operator_proposal` summary 行、title / summary / suggested-action の詳細行を表示する。各 proposal には latest phase record 配下の logical evidence path も付く。通常の `watch-summary` には proposal 詳細を出さない。A2O は successful implementation completion comment に短い Markdown proposal section を追記し、最大 3 件を表示する。保存された全件を確認する場合は `describe-task` を使う。
 
 prompt / skill / worker command の改善に使うため、A2O は次の分析用 artifact を永続化する。
 

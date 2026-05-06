@@ -199,6 +199,44 @@ a2o worker validate-result --request request.json --result result.json
 
 検証では、必須キーの不足、型エラー、`task_ref` / `run_ref` / `phase` の不一致を具体的に報告する。executor が review disposition の slot scope を設定している場合は、同じ公開値を `--review-slot-scope SCOPE` の繰り返しで渡す。`review_disposition` の scope は `slot_scopes` が正規キーであり、`repo_scope` は受け付けない。`review_disposition.finding_key` は actionable な `follow_up_child` / `blocked` finding の場合のみ必須であり、clean な `completed` review では省略または `null` にできる。
 
+### Operator proposals
+
+implementation worker は、現在のタスクから人間が検討すべき後続作業を見つけたが、A2O が自動実行すべきではない場合に、任意の `operator_proposals` を返せる。
+
+```json
+{
+  "success": true,
+  "summary": "Implemented the requested change.",
+  "review_disposition": {
+    "kind": "completed",
+    "summary": "Ready for review."
+  },
+  "operator_proposals": [
+    {
+      "title": "Split the shared formatter package",
+      "summary": "The task reused formatter code across two repo slots; a small package split would reduce future duplication.",
+      "priority": "medium",
+      "category": "refactoring",
+      "suggested_action": "Create a planning ticket before the next formatter change.",
+      "scope": ["repo:app", "repo:lib"],
+      "evidence": ["app/src/formatter.ts", "lib/src/format.ts"]
+    }
+  ]
+}
+```
+
+`operator_proposals` は省略、`null`、空配列、または proposal entry の配列にできる。各 entry は空でない `title` と `summary` を必須とする。任意の `priority` は `low`、`medium`、`high`、`urgent` のいずれかである。任意の `scope` と `evidence` は文字列配列である。未知の proposal field は保持されるため、project worker は追加 metadata を付与できる。
+
+worker result field は用途ごとに使い分ける。
+
+- 実行可能な実装 follow-up にしたい場合は `review_disposition.kind=follow_up_child` または既存の follow-up child 経路を使う。
+- prompt、skill、worker command の再利用可能な改善には `skill_feedback` を使う。
+- 現在のコードで直接見つかった構造的負債には `refactoring_assessment` を使う。
+- 曖昧さにより安全に進められない場合は `clarification_request` を使う。
+- 人間が triage すべき project、process、policy、architecture の提案には `operator_proposals` を使う。
+
+`a2o worker validate-result` は runtime 実行前に `operator_proposals` の形を検証する。A2O は accepted proposal を execution evidence に保存し、successful implementation completion comment に短い localized Markdown section を追記し、詳細を `a2o runtime describe-task <task-ref>` で表示する。proposal は助言専用であり、それ自体では ticket、label、blocker、scheduler 状態を作らない。
+
 要求されたプロダクト仕様が曖昧、または既存契約と矛盾して安全に続行できない場合、worker は技術的な `blocked` ではなく `clarification_request` を返す。
 
 ```json
