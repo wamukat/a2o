@@ -607,7 +607,7 @@ Existing project packages do not need to migrate before adopting a new A2O versi
 - `runtime.phases.implementation.skill`
 - `runtime.phases.review.skill`
 - `runtime.phases.parent_review.skill`, when the project uses parent review
-- phase executor, verification, remediation, and merge commands under `runtime.phases`
+- phase executor, verification, remediation commands, and merge policy under `runtime.phases`
 - decomposition command configuration under `runtime.decomposition`
 
 The new `runtime.prompts` surface is additive guidance. It does not replace the phase skill or executor contract. Keep the current phase skills in place while moving project-specific guidance into prompt files, then simplify the old skill files only after the project has validated the new prompt layering.

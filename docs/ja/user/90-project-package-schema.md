@@ -611,7 +611,7 @@ project prompt / skill は durable な内容に限る。1 ticket だけに必要
 - `runtime.phases.implementation.skill`
 - `runtime.phases.review.skill`
 - project が parent review を使う場合の `runtime.phases.parent_review.skill`
-- `runtime.phases` 配下の phase executor、verification、remediation、merge command
+- `runtime.phases` 配下の phase executor、verification / remediation command、merge policy
 - `runtime.decomposition` 配下の decomposition command 設定
 
 新しい `runtime.prompts` surface は追加 guidance である。phase skill や executor contract を置き換えるものではない。まず既存 phase skill を維持したまま project-specific guidance を prompt file に移し、新しい prompt layering を検証した後にだけ古い skill file を整理する。
