@@ -344,7 +344,7 @@ A2O intentionally keeps separate public surfaces for different lifecycle positio
 
 | Surface | Canonical keys | Mutability | Failure semantics | Use it for |
 |---|---|---|---|---|
-| Phase commands | `runtime.phases.<phase>.executor.command`, `runtime.phases.verification.commands`, `runtime.phases.remediation.commands`, `runtime.decomposition.*.command(s)` | Phase-defined | Controls the phase or decomposition result | AI workers, verification, remediation, merge/decomposition work |
+| Phase commands | `runtime.phases.<phase>.executor.command`, `runtime.phases.verification.commands`, `runtime.phases.remediation.commands`, `runtime.decomposition.*.command(s)` | Phase-defined | Controls the phase or decomposition result | AI workers, verification, remediation, and decomposition work |
 | Implementation completion gates | `runtime.phases.implementation.completion_hooks.commands` | `mode: mutating` may edit target slots; `mode: check` may not edit | Feeds controlled rework back to implementation before review/verification | Formatting, generation, and fast checks that should be visible to the implementation worker |
 | Publish preflight | `publish.commit_preflight.commands`, `publish.commit_preflight.native_git_hooks` | Check-only | Blocks the publish commit and records evidence | Final commit-time safety checks and optional native Git commit hooks |
 | Read-only observers and reporting | `runtime.observers.hooks`, `runtime.phases.metrics.commands` | Read-only / reporting | Records diagnostics or metrics without changing task progress | Notifications, audit logs, metrics export |

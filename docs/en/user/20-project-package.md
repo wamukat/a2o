@@ -244,7 +244,7 @@ Choose the narrowest A2O surface that matches the lifecycle point:
 
 | Need | Use | Why |
 |---|---|---|
-| Run the implementation, review, verification, remediation, merge, or decomposition work itself | Phase/decomposition commands under `runtime.phases` or `runtime.decomposition` | These commands define the lifecycle result. |
+| Run the implementation, review, verification, remediation, or decomposition work itself | Phase/decomposition commands under `runtime.phases` or `runtime.decomposition` | These commands define the lifecycle result. Merge is configured by merge policy, not a command. |
 | Run formatter/generator/fast checks after implementation success and ask the implementation worker to rework before review | `runtime.phases.implementation.completion_hooks.commands` | Completion hooks are inside the implementation boundary and can return controlled implementation feedback. |
 | Run final check-only commands before the A2O-managed publish commit | `publish.commit_preflight.commands` | Publish preflight is commit-time safety and must not mutate files. |
 | Send notifications or audit events without changing task progress | `runtime.observers.hooks` | Observers are read-only and best-effort. |

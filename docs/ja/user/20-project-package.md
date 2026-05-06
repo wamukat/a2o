@@ -254,7 +254,7 @@ lifecycle 上の位置に合う、最も狭い A2O surface を選ぶ。
 
 | 目的 | 使う surface | 理由 |
 | --- | --- | --- |
-| implementation、review、verification、remediation、merge、decomposition の作業そのものを実行する | `runtime.phases` または `runtime.decomposition` 配下の phase / decomposition command | lifecycle の結果を決める command であるため |
+| implementation、review、verification、remediation、decomposition の作業そのものを実行する | `runtime.phases` または `runtime.decomposition` 配下の phase / decomposition command | lifecycle の結果を決める command であるため。merge は command ではなく merge policy で設定する |
 | implementation 成功後に formatter / generator / 軽量チェックを実行し、review 前に implementation worker へ rework させる | `runtime.phases.implementation.completion_hooks.commands` | implementation 境界内で controlled feedback を返せるため |
 | A2O 管理の publish commit 直前に check-only の最終確認を行う | `publish.commit_preflight.commands` | commit-time safety であり、ファイル変更してはいけないため |
 | task progress を変えずに通知や監査イベントを送る | `runtime.observers.hooks` | observer は read-only / best-effort であるため |
