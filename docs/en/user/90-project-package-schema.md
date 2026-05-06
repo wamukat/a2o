@@ -115,6 +115,14 @@ runtime:
 
 `kanban.selection.status` selects runnable tasks. The default is `To do`.
 
+`kanban.system_comment_locale` is optional and controls A2O-authored Kanban system comments when a localized comment exists. Supported values are `en` and `ja`; the default is `en`. Decomposition child-creation comments use this setting for the source-ticket audit comment and include `accept-drafts` CLI examples in the selected language.
+
+```yaml
+kanban:
+  project: Sample
+  system_comment_locale: ja
+```
+
 ## Runtime
 
 `runtime.agent_attempts` and `runtime.agent_poll_interval` control the outer host-agent loop.

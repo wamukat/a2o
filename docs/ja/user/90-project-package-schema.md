@@ -133,6 +133,18 @@ task_templates:
 
 `package` はプロダクトのリポジトリではなく、パッケージを識別する。`package.name` は安定したパッケージ識別子であり、ファイルシステムとブランチ参照で安全に使える名前にする。
 
+`kanban.project` は board / project 名である。A2O は `a2o kanban up` によって必要な lane と内部 label を用意する。
+
+`kanban.selection.status` は runnable task を選択する lane / status を指定する。既定は `To do` である。
+
+`kanban.system_comment_locale` は任意であり、A2O が Kanban に投稿する system comment のうち多言語化済みのものに使う locale を指定する。対応値は `en` と `ja` で、既定は `en` である。decomposition child creation の source-ticket audit comment はこの設定を使い、選択した言語で `accept-drafts` CLI 例を表示する。
+
+```yaml
+kanban:
+  project: Sample
+  system_comment_locale: ja
+```
+
 `runtime.agent_attempts` と `runtime.agent_poll_interval` は host agent の外側ループを制御する。
 
 `runtime.agent_control_plane_connect_timeout`、`runtime.agent_control_plane_request_timeout`、`runtime.agent_control_plane_retry_count`、`runtime.agent_control_plane_retry_delay` は、host agent が local agent server へ HTTP 接続するときの connect timeout / request timeout / retry を制御する。TCP 接続 timeout や一時的な control-plane failure を project ごとに調整したいときはここを使う。

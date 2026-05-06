@@ -10,10 +10,11 @@ module A3
     class RunDecompositionChildCreation
       Result = Struct.new(:success, :status, :summary, :parent_ref, :child_refs, :child_keys, :evidence_path, :source_ticket_summary, :source_ticket_summary_published, keyword_init: true)
 
-      def initialize(storage_dir:, child_writer:, publish_external_task_activity: nil)
+      def initialize(storage_dir:, child_writer:, publish_external_task_activity: nil, system_comment_locale: "en")
         @storage_dir = storage_dir
         @child_writer = child_writer
         @publish_external_task_activity = publish_external_task_activity
+        @system_comment_locale = normalize_system_comment_locale(system_comment_locale)
       end
 
       def call(task:, gate:, proposal_evidence_path: nil, review_evidence_path: nil, source_remote: nil)
@@ -209,22 +210,102 @@ module A3
           else
             "blocked"
           end
-        lines = ["Decomposition draft child creation: #{stage_state}"]
-        lines << "Summary: #{summary}"
-        lines << "Outcome: #{proposal_outcome(proposal)}" if proposal
+        return source_ticket_summary_for_ja(stage_state: stage_state, success: success, status: status, summary: summary, parent_ref: parent_ref, child_refs: child_refs, proposal: proposal, evidence_path: evidence_path) if @system_comment_locale == "ja"
+
+        lines = ["## Decomposition draft child creation: #{stage_state}", ""]
+        lines << "- Summary: #{summary}"
+        lines << "- Outcome: #{proposal_outcome(proposal)}" if proposal
         if proposal && proposal_outcome(proposal) == "needs_clarification"
           questions = Array(proposal["questions"]).map(&:to_s).reject(&:empty?)
-          lines << "Questions:"
+          lines << ""
+          lines << "### Questions"
           questions.each { |question| lines << "- #{question}" }
         end
-        lines << "Generated parent: #{parent_ref || 'none'}"
-        lines << "Draft children: #{child_refs.empty? ? 'none' : child_refs.join(', ')}"
+        lines << ""
+        lines << "### Details"
+        lines << "- Generated parent: #{parent_ref || 'none'}"
+        lines << "- Draft children: #{child_refs.empty? ? 'none' : child_refs.join(', ')}"
+        lines << "- Evidence: #{evidence_path}"
         if success == true && status == "created"
-          lines << "Accept: add trigger:auto-implement to a draft child when it is ready for implementation."
-          lines << "Parent automation: add trigger:auto-parent to the generated parent after accepted child work is ready."
+          lines << ""
+          lines.concat(accept_drafts_guidance_lines(parent_ref: parent_ref, child_refs: child_refs))
         end
-        lines << "Evidence: #{evidence_path}"
         lines.join("\n")
+      end
+
+      def source_ticket_summary_for_ja(stage_state:, success:, status:, summary:, parent_ref:, child_refs:, proposal:, evidence_path:)
+        lines = ["## デコンポジション子チケット作成: #{localized_stage_state(stage_state)}", ""]
+        lines << "- 概要: #{summary}"
+        lines << "- 結果: #{proposal_outcome(proposal)}" if proposal
+        if proposal && proposal_outcome(proposal) == "needs_clarification"
+          questions = Array(proposal["questions"]).map(&:to_s).reject(&:empty?)
+          lines << ""
+          lines << "### 確認事項"
+          questions.each { |question| lines << "- #{question}" }
+        end
+        lines << ""
+        lines << "### 詳細"
+        lines << "- 生成された親チケット: #{parent_ref || 'なし'}"
+        lines << "- 下書き子チケット: #{child_refs.empty? ? 'なし' : child_refs.join(', ')}"
+        lines << "- 証跡: #{evidence_path}"
+        if success == true && status == "created"
+          lines << ""
+          lines.concat(accept_drafts_guidance_lines_ja(parent_ref: parent_ref, child_refs: child_refs))
+        end
+        lines.join("\n")
+      end
+
+      def accept_drafts_guidance_lines(parent_ref:, child_refs:)
+        all_command = parent_ref ? "a2o runtime decomposition accept-drafts #{parent_ref} --all" : nil
+        ready_command = parent_ref ? "a2o runtime decomposition accept-drafts #{parent_ref} --ready" : nil
+        child_command = parent_ref && child_refs.any? ? "a2o runtime decomposition accept-drafts #{parent_ref} --child #{child_refs.first}" : nil
+
+        lines = [
+          "### Accept draft children",
+          "",
+          "Draft children stay in Backlog until an operator accepts them and moves accepted work to To do.",
+          "",
+          "Next step with CLI:"
+        ]
+        lines << "- Accept all draft children: `#{all_command}`" if all_command
+        lines << "- Accept one draft child: `#{child_command}`" if child_command
+        lines << "- Accept draft children labeled `a2o:ready-child`: `#{ready_command}`" if ready_command
+        lines << ""
+        lines << "Parent automation: `accept-drafts` enables the generated parent by default; pass `--no-parent-auto` only when suppressing parent automation."
+        lines
+      end
+
+      def accept_drafts_guidance_lines_ja(parent_ref:, child_refs:)
+        all_command = parent_ref ? "a2o runtime decomposition accept-drafts #{parent_ref} --all" : nil
+        ready_command = parent_ref ? "a2o runtime decomposition accept-drafts #{parent_ref} --ready" : nil
+        child_command = parent_ref && child_refs.any? ? "a2o runtime decomposition accept-drafts #{parent_ref} --child #{child_refs.first}" : nil
+
+        lines = [
+          "### 下書き子チケットの承認",
+          "",
+          "下書き子チケットは、オペレーターが承認して To do レーンへ移動するまで Backlog に残ります。",
+          "",
+          "次のステップ（CLIで承認する場合）:"
+        ]
+        lines << "- すべての下書き子チケットを承認: `#{all_command}`" if all_command
+        lines << "- 1件の下書き子チケットを承認: `#{child_command}`" if child_command
+        lines << "- `a2o:ready-child` 付きの下書き子チケットを承認: `#{ready_command}`" if ready_command
+        lines << ""
+        lines << "親チケットの自動化: `accept-drafts` は既定で生成親チケットを有効化します。抑止する場合だけ `--no-parent-auto` を指定してください。"
+        lines
+      end
+
+      def localized_stage_state(stage_state)
+        {
+          "completed" => "完了",
+          "not attempted" => "未実行",
+          "blocked" => "ブロック"
+        }.fetch(stage_state, stage_state)
+      end
+
+      def normalize_system_comment_locale(locale)
+        value = locale.to_s.strip
+        %w[en ja].include?(value) ? value : "en"
       end
 
       def publish_source_ticket_summary(task:, body:)

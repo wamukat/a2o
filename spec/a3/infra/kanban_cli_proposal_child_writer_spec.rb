@@ -340,8 +340,27 @@ RSpec.describe A3::Infra::KanbanCliProposalChildWriter do
     )
     expect(client.comments.any? { |args| args.include?("240") }).to be(true)
     source_comment = client.instance_variable_get(:@comment_texts)["240"].join("\n")
-    expect(source_comment).to include("Generated implementation parent A3-v2#5301")
+    expect(source_comment).to include("## Decomposition child creation")
+    expect(source_comment).to include("- Generated implementation parent: A3-v2#5301")
+    expect(source_comment).to include("a2o runtime decomposition accept-drafts A3-v2#5301 --all")
     expect(source_comment).not_to include("Source remote:")
+  end
+
+  it "localizes generated parent traceability comments for Japanese operators" do
+    client = FakeProposalClient.new
+    writer = described_class.new(project: "A3-v2", client: client, mode: :draft, system_comment_locale: "ja")
+
+    result = writer.call(parent_task_ref: "A3-v2#5300", parent_external_task_id: 5300, proposal_evidence: proposal_evidence)
+
+    expect(result.success?).to be(true)
+    source_comment = client.instance_variable_get(:@comment_texts)["5300"].join("\n")
+    expect(source_comment).to include("## デコンポジション子チケット作成")
+    expect(source_comment).to include("- 生成親チケット: A3-v2#5301")
+    expect(source_comment).to include("a2o runtime decomposition accept-drafts A3-v2#5301 --all")
+    parent_comment = client.instance_variable_get(:@comment_texts)["5301"].join("\n")
+    expect(parent_comment).to include("生成された実装親チケット")
+    child_comment = client.instance_variable_get(:@comment_texts)["5302"].join("\n")
+    expect(child_comment).to include("下書き子チケットを作成しました")
   end
 
   it "keeps child creation non-fatal when older Kanbalone lacks generated external references" do

@@ -3,7 +3,7 @@
 require "tmpdir"
 
 RSpec.describe A3::Application::RunDecompositionChildCreation do
-  WriterResult = Struct.new(:success?, :child_refs, :child_keys, :summary, :diagnostics, keyword_init: true)
+  WriterResult = Struct.new(:success?, :parent_ref, :child_refs, :child_keys, :summary, :diagnostics, keyword_init: true)
 
   let(:task) { A3::Domain::Task.new(ref: "A3-v2#5300", kind: :single, edit_scope: [:repo_alpha], external_task_id: 5300) }
 
@@ -69,7 +69,7 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
         parent_external_task_id: 5300,
         proposal_evidence: hash_including("proposal_fingerprint" => "fp-1"),
         source_remote: nil
-      ).and_return(WriterResult.new(success?: true, child_refs: ["A3-v2#5301"], child_keys: ["child-key-1"]))
+      ).and_return(WriterResult.new(success?: true, parent_ref: "A3-v2#5302", child_refs: ["A3-v2#5301"], child_keys: ["child-key-1"]))
 
       result = described_class.new(storage_dir: dir, child_writer: writer).call(task: task, gate: true)
 
@@ -84,8 +84,14 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
       expect(evidence.fetch("child_refs_by_key")).to eq("child-key-1" => "A3-v2#5301")
       expect(evidence).not_to have_key("source_remote")
       expect(evidence.fetch("source_ticket_summary")).to include("Decomposition draft child creation: completed")
-      expect(evidence.fetch("source_ticket_summary")).to include("Accept: add trigger:auto-implement")
-      expect(evidence.fetch("source_ticket_summary")).to include("Parent automation: add trigger:auto-parent")
+      expect(evidence.fetch("source_ticket_summary")).to include("### Details")
+      expect(evidence.fetch("source_ticket_summary")).to include("### Accept draft children")
+      expect(evidence.fetch("source_ticket_summary")).to include("Draft children stay in Backlog")
+      expect(evidence.fetch("source_ticket_summary")).to include("a2o runtime decomposition accept-drafts A3-v2#5302 --all")
+      expect(evidence.fetch("source_ticket_summary")).to include("a2o runtime decomposition accept-drafts A3-v2#5302 --child A3-v2#5301")
+      expect(evidence.fetch("source_ticket_summary")).to include("a2o runtime decomposition accept-drafts A3-v2#5302 --ready")
+      expect(evidence.fetch("source_ticket_summary")).to include("Accept draft children labeled `a2o:ready-child`")
+      expect(evidence.fetch("source_ticket_summary")).to include("Parent automation: `accept-drafts` enables the generated parent")
     end
   end
 
@@ -151,7 +157,7 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
       write_evidence(dir)
       writer = instance_double("ProposalChildWriter")
       allow(writer).to receive(:call).and_return(
-        WriterResult.new(success?: true, child_refs: ["A3-v2#5301"], child_keys: ["child-key-1"], summary: "created 1 draft child")
+        WriterResult.new(success?: true, parent_ref: "A3-v2#5302", child_refs: ["A3-v2#5301"], child_keys: ["child-key-1"], summary: "created 1 draft child")
       )
       publisher = instance_double("ExternalTaskActivityPublisher")
       expect(publisher).to receive(:publish).with(
@@ -160,7 +166,9 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
         body: a_string_including(
           "Decomposition draft child creation: completed",
           "Draft children: A3-v2#5301",
-          "trigger:auto-implement"
+          "a2o runtime decomposition accept-drafts A3-v2#5302 --all",
+          "a2o runtime decomposition accept-drafts A3-v2#5302 --child A3-v2#5301",
+          "a2o runtime decomposition accept-drafts A3-v2#5302 --ready"
         )
       )
 
@@ -168,6 +176,28 @@ RSpec.describe A3::Application::RunDecompositionChildCreation do
 
       expect(result.source_ticket_summary_published).to be(true)
       expect(result.source_ticket_summary).to include("Draft children: A3-v2#5301")
+    end
+  end
+
+  it "publishes Japanese decomposition child creation guidance when configured" do
+    Dir.mktmpdir do |dir|
+      write_evidence(dir)
+      writer = instance_double("ProposalChildWriter")
+      allow(writer).to receive(:call).and_return(
+        WriterResult.new(success?: true, parent_ref: "A3-v2#5302", child_refs: ["A3-v2#5301"], child_keys: ["child-key-1"], summary: "created 1 draft child")
+      )
+
+      result = described_class.new(storage_dir: dir, child_writer: writer, system_comment_locale: "ja").call(task: task, gate: true)
+
+      expect(result.source_ticket_summary).to include("デコンポジション子チケット作成: 完了")
+      expect(result.source_ticket_summary).to include("### 詳細")
+      expect(result.source_ticket_summary).to include("下書き子チケット: A3-v2#5301")
+      expect(result.source_ticket_summary).to include("次のステップ（CLIで承認する場合）:")
+      expect(result.source_ticket_summary).to include("a2o runtime decomposition accept-drafts A3-v2#5302 --all")
+      expect(result.source_ticket_summary).to include("a2o runtime decomposition accept-drafts A3-v2#5302 --child A3-v2#5301")
+      expect(result.source_ticket_summary).to include("a2o runtime decomposition accept-drafts A3-v2#5302 --ready")
+      expect(result.source_ticket_summary).to include("`a2o:ready-child` 付きの下書き子チケットを承認")
+      expect(result.source_ticket_summary).not_to include("trigger:auto-implement 付きの下書き子チケットを承認")
     end
   end
 

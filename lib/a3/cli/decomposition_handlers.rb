@@ -273,7 +273,8 @@ module A3
           command_argv: kanban_command_argv(session.options),
           project: session.options.fetch(:kanban_project),
           working_dir: session.options[:kanban_working_dir],
-          mode: :draft
+          mode: :draft,
+          system_comment_locale: decomposition_system_comment_locale(session)
         )
         result = A3::Application::RunDecompositionChildCreation.new(
           storage_dir: session.options.fetch(:storage_dir),
@@ -281,7 +282,8 @@ module A3
           publish_external_task_activity: build_decomposition_source_activity_publisher(
             session.options,
             fallback: session.container.fetch(:external_task_activity_publisher)
-          )
+          ),
+          system_comment_locale: decomposition_system_comment_locale(session)
         ).call(
           task: task,
           gate: true,
@@ -291,6 +293,13 @@ module A3
         )
         publish_decomposition_source_status(session: session, task: task, status: decomposition_source_terminal_status(result)) if result.success == true
         AutomaticDraftChildCreationResult.executed(result)
+      end
+
+      def decomposition_system_comment_locale(session)
+        surface = session.respond_to?(:project_surface) ? session.project_surface : nil
+        return "en" unless surface.respond_to?(:system_comment_locale)
+
+        surface.system_comment_locale
       end
 
       AutomaticDraftChildCreationResult = Struct.new(:executed?, :skip_reason, :child_creation_result, keyword_init: true) do

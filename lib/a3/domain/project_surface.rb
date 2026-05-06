@@ -19,12 +19,13 @@ module A3
         prompt_config
         scheduler_config
         docs_config
+        system_comment_locale
         workspace_hook
       ].freeze
 
       attr_reader(*SURFACE_KEYS)
 
-      def initialize(implementation_skill:, review_skill:, verification_commands:, remediation_commands:, workspace_hook:, implementation_completion_hooks: [], metrics_collection_commands: [], observer_config: A3::Domain::ObserverConfig.empty, decomposition_investigate_command: nil, decomposition_author_command: nil, decomposition_review_commands: [], prompt_config: A3::Domain::ProjectPromptConfig.empty, scheduler_config: A3::Domain::ProjectSchedulerConfig.default, docs_config: nil)
+      def initialize(implementation_skill:, review_skill:, verification_commands:, remediation_commands:, workspace_hook:, implementation_completion_hooks: [], metrics_collection_commands: [], observer_config: A3::Domain::ObserverConfig.empty, decomposition_investigate_command: nil, decomposition_author_command: nil, decomposition_review_commands: [], prompt_config: A3::Domain::ProjectPromptConfig.empty, scheduler_config: A3::Domain::ProjectSchedulerConfig.default, docs_config: nil, system_comment_locale: "en")
         @implementation_skill = deep_freeze_value(implementation_skill)
         @implementation_completion_hooks = deep_freeze_value(implementation_completion_hooks)
         @review_skill = deep_freeze_value(review_skill)
@@ -38,6 +39,7 @@ module A3
         @prompt_config = prompt_config || A3::Domain::ProjectPromptConfig.empty
         @scheduler_config = scheduler_config || A3::Domain::ProjectSchedulerConfig.default
         @docs_config = deep_freeze_value(docs_config)
+        @system_comment_locale = system_comment_locale.to_s
         @workspace_hook = deep_freeze_value(workspace_hook)
         freeze
       end

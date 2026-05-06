@@ -25,6 +25,7 @@ module A3
         project_config = load_project_config(manifest_path)
         project_package_root = File.dirname(File.expand_path(manifest_path))
         validate_docs_config(project_config.fetch("docs", nil), project_package_root, project_config.fetch("repos", {}))
+        system_comment_locale = kanban_system_comment_locale(project_config.fetch("kanban", nil))
         runtime = project_config.fetch("runtime") do
           raise A3::Domain::ConfigurationError, "project.yaml runtime must be provided"
         end
@@ -70,7 +71,8 @@ module A3
           decomposition_review_commands: decomposition_review_commands(runtime),
           prompt_config: project_prompt_config,
           scheduler_config: A3::Domain::ProjectSchedulerConfig.from_project_config(runtime.fetch("scheduler", nil)),
-          docs_config: project_config.fetch("docs", nil)
+          docs_config: project_config.fetch("docs", nil),
+          system_comment_locale: system_comment_locale
         )
       end
 
@@ -93,6 +95,17 @@ module A3
         end
 
         payload
+      end
+
+      def kanban_system_comment_locale(kanban)
+        return "en" unless kanban.is_a?(Hash) && kanban.key?("system_comment_locale")
+
+        locale = kanban.fetch("system_comment_locale").to_s.strip
+        unless %w[en ja].include?(locale)
+          raise A3::Domain::ConfigurationError, "project.yaml kanban.system_comment_locale must be one of: en, ja"
+        end
+
+        locale
       end
 
       def surface_payload_from_phases(phases, prompt_config:)

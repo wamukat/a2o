@@ -22,10 +22,11 @@ module A3
         end
       end
 
-      def initialize(command_argv: nil, project:, working_dir: nil, client: nil, mode: :runnable)
+      def initialize(command_argv: nil, project:, working_dir: nil, client: nil, mode: :runnable, system_comment_locale: "en")
         @project = project.to_s
         @client = client || KanbanCommandClient.subprocess(command_argv: command_argv, project: @project, working_dir: working_dir)
         @mode = mode.to_sym
+        @system_comment_locale = normalize_system_comment_locale(system_comment_locale)
         raise A3::Domain::ConfigurationError, "unknown proposal child writer mode: #{mode}" unless %i[runnable draft].include?(@mode)
       end
 
@@ -104,7 +105,7 @@ module A3
         parent_title = parent["title"].to_s.strip
         parent_body = parent["body"].to_s.strip
         refactoring_body = refactoring_assessment_body(proposal["refactoring_assessment"])
-        comment = "Created generated implementation parent for requirement #{source_task_ref}; proposal #{proposal_fingerprint}."
+        comment = generated_parent_comment(source_task_ref: source_task_ref, proposal_fingerprint: proposal_fingerprint)
         {
           "title" => parent_title.empty? ? "Implementation plan for #{source_task_ref}" : parent_title,
           "description" => <<~DESC.strip,
@@ -169,13 +170,9 @@ module A3
 
       def canonical_task_payload(parent_task_ref:, proposal_fingerprint:, child:)
         child_key = child.fetch("child_key")
-        comment = if draft_mode?
-                    "Created draft from decomposition proposal #{proposal_fingerprint}; child key #{child_key}. Add #{RUNNABLE_LABEL} to accept for implementation."
-                  else
-                    "Created from decomposition proposal #{proposal_fingerprint}; child key #{child_key}."
-                  end
+        comment = child_comment(proposal_fingerprint: proposal_fingerprint, child_key: child_key)
         if draft_mode? && proposal_labels(child).include?(RUNNABLE_LABEL)
-          comment = "#{comment} Proposal suggested #{RUNNABLE_LABEL}, but draft mode did not apply it."
+          comment = "#{comment} #{suggested_runnable_label_ignored_comment}"
         end
         {
           "title" => child.fetch("title"),
@@ -392,8 +389,69 @@ module A3
       def ensure_source_parent_comment(source_task_id, generated_parent_ref:, proposal_fingerprint:)
         ensure_comment(
           source_task_id,
-          "Generated implementation parent #{generated_parent_ref} from decomposition proposal #{proposal_fingerprint}."
+          source_parent_comment(generated_parent_ref: generated_parent_ref, proposal_fingerprint: proposal_fingerprint)
         )
+      end
+
+      def generated_parent_comment(source_task_ref:, proposal_fingerprint:)
+        return "要求 #{source_task_ref} から生成された実装親チケットです。proposal #{proposal_fingerprint}。" if @system_comment_locale == "ja"
+
+        "Created generated implementation parent for requirement #{source_task_ref}; proposal #{proposal_fingerprint}."
+      end
+
+      def child_comment(proposal_fingerprint:, child_key:)
+        if @system_comment_locale == "ja"
+          return "decomposition proposal #{proposal_fingerprint} から下書き子チケットを作成しました。child key #{child_key}。実装対象にするには accept-drafts で承認してください。" if draft_mode?
+
+          return "decomposition proposal #{proposal_fingerprint} から子チケットを作成しました。child key #{child_key}。"
+        end
+
+        if draft_mode?
+          "Created draft from decomposition proposal #{proposal_fingerprint}; child key #{child_key}. Add #{RUNNABLE_LABEL} to accept for implementation."
+        else
+          "Created from decomposition proposal #{proposal_fingerprint}; child key #{child_key}."
+        end
+      end
+
+      def suggested_runnable_label_ignored_comment
+        return "proposal は #{RUNNABLE_LABEL} を提案しましたが、draft mode では適用しませんでした。" if @system_comment_locale == "ja"
+
+        "Proposal suggested #{RUNNABLE_LABEL}, but draft mode did not apply it."
+      end
+
+      def source_parent_comment(generated_parent_ref:, proposal_fingerprint:)
+        if @system_comment_locale == "ja"
+          return <<~MARKDOWN.strip
+            ## デコンポジション子チケット作成
+
+            - 生成親チケット: #{generated_parent_ref}
+            - proposal: #{proposal_fingerprint}
+
+            下書き子チケットの承認:
+
+            - すべて承認: `a2o runtime decomposition accept-drafts #{generated_parent_ref} --all`
+            - 個別承認: `a2o runtime decomposition accept-drafts #{generated_parent_ref} --child <child-ref>`
+            - `a2o:ready-child` 付きの子だけ承認: `a2o runtime decomposition accept-drafts #{generated_parent_ref} --ready`
+          MARKDOWN
+        end
+
+        <<~MARKDOWN.strip
+          ## Decomposition child creation
+
+          - Generated implementation parent: #{generated_parent_ref}
+          - Proposal: #{proposal_fingerprint}
+
+          Accept draft children:
+
+          - All drafts: `a2o runtime decomposition accept-drafts #{generated_parent_ref} --all`
+          - One draft: `a2o runtime decomposition accept-drafts #{generated_parent_ref} --child <child-ref>`
+          - Drafts labeled `a2o:ready-child`: `a2o runtime decomposition accept-drafts #{generated_parent_ref} --ready`
+        MARKDOWN
+      end
+
+      def normalize_system_comment_locale(locale)
+        value = locale.to_s.strip
+        %w[en ja].include?(value) ? value : "en"
       end
 
       def relation_exists?(relations, related_task_id:, relation_kind:)

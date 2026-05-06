@@ -47,7 +47,55 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     expect(surface.metrics_collection_commands).to eq(["commands/collect-metrics"])
     expect(surface.implementation_completion_hooks).to eq([])
     expect(surface.scheduler_config.max_parallel_tasks).to eq(1)
+    expect(surface.system_comment_locale).to eq("en")
     expect(surface.workspace_hook).to be_nil
+  end
+
+  it "loads kanban system comment locale" do
+    project_config_path = write_project_config(
+      "kanban" => {
+        "project" => "Sample",
+        "system_comment_locale" => "ja"
+      },
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    surface = loader.load(project_config_path)
+
+    expect(surface.system_comment_locale).to eq("ja")
+  end
+
+  it "rejects unsupported kanban system comment locale" do
+    project_config_path = write_project_config(
+      "kanban" => {
+        "project" => "Sample",
+        "system_comment_locale" => "fr"
+      },
+      "runtime" => {
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(project_config_path) }.to raise_error(
+      A3::Domain::ConfigurationError,
+      /kanban\.system_comment_locale must be one of: en, ja/
+    )
   end
 
   it "loads implementation completion hooks" do

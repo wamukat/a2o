@@ -106,6 +106,9 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	if _, ok := kanbanPayload["bootstrap"]; ok {
 		return config, fmt.Errorf("project package config %s has invalid kanban.bootstrap: kanban.bootstrap is no longer supported; define project labels in kanban.labels or repos.<slot>.label", projectFile)
 	}
+	if err := validateKanbanSystemCommentLocale(kanbanPayload); err != nil {
+		return config, fmt.Errorf("project package config %s has invalid kanban.system_comment_locale: %w", projectFile, err)
+	}
 	if _, ok := runtimePayload["live_ref"]; ok {
 		return config, fmt.Errorf("project package config %s has invalid runtime.live_ref: runtime.live_ref is no longer supported; use runtime.phases.merge.target_ref", projectFile)
 	}
@@ -171,6 +174,25 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 		return config, fmt.Errorf("project package config %s is missing repos", projectFile)
 	}
 	return config, nil
+}
+
+func validateKanbanSystemCommentLocale(kanban map[string]any) error {
+	if kanban == nil {
+		return nil
+	}
+	raw, ok := kanban["system_comment_locale"]
+	if !ok {
+		return nil
+	}
+	locale, ok := raw.(string)
+	if !ok {
+		return fmt.Errorf("must be a string")
+	}
+	locale = strings.TrimSpace(locale)
+	if locale != "en" && locale != "ja" {
+		return fmt.Errorf("must be one of: en, ja")
+	}
+	return nil
 }
 
 func buildProjectExecutorConfig(phases map[string]projectPackagePhaseYAML) (map[string]any, error) {

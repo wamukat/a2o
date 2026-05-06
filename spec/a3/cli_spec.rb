@@ -462,12 +462,14 @@ RSpec.describe A3::CLI do
       command_argv: ["kanban", "--json"],
       project: "A3-v2",
       working_dir: "/tmp",
-      mode: :draft
+      mode: :draft,
+      system_comment_locale: "en"
     ).and_return(writer)
     expect(A3::Application::RunDecompositionChildCreation).to receive(:new).with(
       storage_dir: "/tmp/a2o-state",
       child_writer: writer,
-      publish_external_task_activity: an_instance_of(A3::Infra::KanbanCliTaskActivityPublisher)
+      publish_external_task_activity: an_instance_of(A3::Infra::KanbanCliTaskActivityPublisher),
+      system_comment_locale: "en"
     ).and_return(child_service)
     expect(child_service).to receive(:call).with(
       task: task,
