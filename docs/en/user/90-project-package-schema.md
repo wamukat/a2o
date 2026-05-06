@@ -338,6 +338,28 @@ Migration errors are explicit. A2O should not silently reinterpret removed or re
 
 The existing docs surface still has camelCase keys: `docs.repoSlot`, `docs.surfaces.*.repoSlot`, and `docs.authorities.*.repoSlot`. They are a separate migration target from prompt key normalization and are not changed by the prompt-key migration. When the docs surface is migrated, `repo_slot` should become canonical and old `repoSlot` keys should follow the same migration-required policy.
 
+### Public Command And Hook Model
+
+A2O intentionally keeps separate public surfaces for different lifecycle positions. Do not add one generic hook setting when the command's failure semantics, mutability, or timing are different.
+
+| Surface | Canonical keys | Mutability | Failure semantics | Use it for |
+|---|---|---|---|---|
+| Phase commands | `runtime.phases.<phase>.executor.command`, `runtime.phases.verification.commands`, `runtime.phases.remediation.commands`, `runtime.decomposition.*.command(s)` | Phase-defined | Controls the phase or decomposition result | AI workers, verification, remediation, merge/decomposition work |
+| Implementation completion gates | `runtime.phases.implementation.completion_hooks.commands` | `mode: mutating` may edit target slots; `mode: check` may not edit | Feeds controlled rework back to implementation before review/verification | Formatting, generation, and fast checks that should be visible to the implementation worker |
+| Publish preflight | `publish.commit_preflight.commands`, `publish.commit_preflight.native_git_hooks` | Check-only | Blocks the publish commit and records evidence | Final commit-time safety checks and optional native Git commit hooks |
+| Read-only observers and reporting | `runtime.observers.hooks`, `runtime.phases.metrics.commands` | Read-only / reporting | Records diagnostics or metrics without changing task progress | Notifications, audit logs, metrics export |
+| Delivery hooks | `runtime.delivery.after_push.command` | Provider automation after delivery | Fails the delivery/merge step if the project-owned provider action fails | PR/MR creation, remote issue comments, delivery notifications |
+
+`runtime.phases.metrics.commands` remains the canonical metrics collection key. Although `metrics` is not a Kanban scheduler phase, it uses the same worker request contract as phase commands and is part of the existing phase command surface. No migration to a new `runtime.reporting` key is required for this release; user-facing prose should call it metrics collection or a reporting hook instead of a metrics phase.
+
+When choosing a surface:
+
+- Use implementation completion hooks when the implementation worker should receive feedback and rework before review.
+- Use publish preflight when changes are already staged for the A2O-managed publish commit and the command must be check-only.
+- Use observer hooks when the command is notification or audit only and must never change A2O progress or workspace outputs.
+- Use metrics commands when the command produces structured post-verification records.
+- Use delivery hooks only for provider-specific post-push automation.
+
 ## Runtime Decomposition
 
 `runtime.decomposition.investigate.command` is the project-owned command for `trigger:investigate` ticket decomposition. `runtime.decomposition.author.command` is the project-owned command that turns investigation evidence into a normalized child-ticket proposal. They are optional unless the project wants A2O to run the matching decomposition pipeline step.

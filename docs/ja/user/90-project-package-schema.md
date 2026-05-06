@@ -342,6 +342,28 @@ decomposition では、`include_child` は refactoring work を通常の child d
 
 既存 docs surface には `docs.repoSlot`、`docs.surfaces.*.repoSlot`、`docs.authorities.*.repoSlot` の camelCase key が残っている。これらは prompt key 正規化とは別の移行対象であり、現行の prompt key 移行では変更しない。docs surface 側の snake_case 化では `repo_slot` を正規形とし、同じ migration-required 方針で扱う。
 
+### 公開 command / hook モデル
+
+A2O は lifecycle 上の位置が異なる処理を、別々の公開 surface として扱う。失敗時の意味、ファイル変更の可否、実行タイミングが違うものを、1 つの汎用 hook 設定にまとめない。
+
+| surface | 正規 key | 変更可否 | 失敗時の意味 | 使いどころ |
+| --- | --- | --- | --- | --- |
+| Phase command | `runtime.phases.<phase>.executor.command`、`runtime.phases.verification.commands`、`runtime.phases.remediation.commands`、`runtime.decomposition.*.command(s)` | phase 定義に従う | phase または decomposition の結果を決める | AI worker、verification、remediation、merge / decomposition 作業 |
+| Implementation completion gate | `runtime.phases.implementation.completion_hooks.commands` | `mode: mutating` は対象 slot の編集可、`mode: check` は編集不可 | review / verification 前に implementation へ controlled rework feedback を返す | formatter、生成、軽量な実装チェック |
+| Publish preflight | `publish.commit_preflight.commands`、`publish.commit_preflight.native_git_hooks` | check-only | publish commit を block し evidence を残す | commit 直前の最終 safety check、任意の native Git commit hook |
+| Read-only observer / reporting | `runtime.observers.hooks`、`runtime.phases.metrics.commands` | read-only / reporting | task progress を変えず diagnostics または metrics を記録する | 通知、監査ログ、metrics export |
+| Delivery hook | `runtime.delivery.after_push.command` | delivery 後の provider automation | project-owned provider action が失敗した場合に delivery / merge step を失敗させる | PR / MR 作成、remote issue comment、delivery 通知 |
+
+`runtime.phases.metrics.commands` は、metrics collection の正規 key として維持する。`metrics` は Kanban scheduler phase ではないが、phase command と同じ worker request 契約を使う既存 surface に属している。この release では `runtime.reporting` のような新 key へ移行しない。利用者向け説明では「metrics phase」ではなく「メトリクス収集」または「reporting hook」と呼ぶ。
+
+surface を選ぶときは次の基準にする。
+
+- implementation worker に feedback を返し、review 前に rework させたい場合は implementation completion hook を使う。
+- A2O 管理の publish commit 用に変更が stage 済みで、check-only の最終確認をしたい場合は publish preflight を使う。
+- 通知や監査だけを行い、A2O の進行や workspace output を絶対に変えない場合は observer hook を使う。
+- verification 後の構造化 record を保存したい場合は metrics command を使う。
+- provider 固有の post-push 自動化だけを delivery hook に置く。
+
 ## Runtime Decomposition
 
 `runtime.decomposition.investigate.command` は、`trigger:investigate` チケット分解で使うプロジェクト所有の調査コマンドである。`runtime.decomposition.author.command` は、調査証跡を正規化された child-ticket proposal に変換するプロジェクト所有コマンドである。プロジェクトが該当する decomposition pipeline step を使う場合に指定する。

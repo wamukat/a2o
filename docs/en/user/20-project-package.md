@@ -238,6 +238,21 @@ Good remediation commands are conservative:
 - avoid changing product behavior
 - avoid committing, pushing, or editing kanban state
 
+## Command And Hook Categories
+
+Choose the narrowest A2O surface that matches the lifecycle point:
+
+| Need | Use | Why |
+|---|---|---|
+| Run the implementation, review, verification, remediation, merge, or decomposition work itself | Phase/decomposition commands under `runtime.phases` or `runtime.decomposition` | These commands define the lifecycle result. |
+| Run formatter/generator/fast checks after implementation success and ask the implementation worker to rework before review | `runtime.phases.implementation.completion_hooks.commands` | Completion hooks are inside the implementation boundary and can return controlled implementation feedback. |
+| Run final check-only commands before the A2O-managed publish commit | `publish.commit_preflight.commands` | Publish preflight is commit-time safety and must not mutate files. |
+| Send notifications or audit events without changing task progress | `runtime.observers.hooks` | Observers are read-only and best-effort. |
+| Collect post-verification reporting data | `runtime.phases.metrics.commands` | Metrics collection is a reporting hook that uses the phase command request contract. |
+| Create PRs/MRs or notify providers after remote branch delivery | `runtime.delivery.after_push.command` | Delivery hooks are provider-specific post-push automation. |
+
+Do not use observer hooks for rework feedback, do not use publish preflight for formatting, and do not treat metrics collection as a scheduler phase with its own kanban lane. The detailed field reference is [Public Command And Hook Model](90-project-package-schema.md#public-command-and-hook-model).
+
 ## Optional Metrics Collection
 
 Projects may add an optional metrics command that runs after successful verification. This is for lightweight operational reporting; it does not affect whether verification passed.

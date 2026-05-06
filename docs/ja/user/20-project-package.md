@@ -248,6 +248,21 @@ runtime:
 
 コマンドがタスク種別やリポジトリスロットによって変わる場合だけ、`project.yaml` の variants を使う。単純なパッケージでは既定のコマンドを優先する。
 
+## command / hook の分類
+
+lifecycle 上の位置に合う、最も狭い A2O surface を選ぶ。
+
+| 目的 | 使う surface | 理由 |
+| --- | --- | --- |
+| implementation、review、verification、remediation、merge、decomposition の作業そのものを実行する | `runtime.phases` または `runtime.decomposition` 配下の phase / decomposition command | lifecycle の結果を決める command であるため |
+| implementation 成功後に formatter / generator / 軽量チェックを実行し、review 前に implementation worker へ rework させる | `runtime.phases.implementation.completion_hooks.commands` | implementation 境界内で controlled feedback を返せるため |
+| A2O 管理の publish commit 直前に check-only の最終確認を行う | `publish.commit_preflight.commands` | commit-time safety であり、ファイル変更してはいけないため |
+| task progress を変えずに通知や監査イベントを送る | `runtime.observers.hooks` | observer は read-only / best-effort であるため |
+| verification 後の reporting data を収集する | `runtime.phases.metrics.commands` | phase command request 契約を使う reporting hook であるため |
+| remote branch delivery 後に PR / MR 作成や provider 通知を行う | `runtime.delivery.after_push.command` | provider 固有の post-push automation であるため |
+
+observer hook を rework feedback に使わない。publish preflight で formatter を動かさない。metrics collection を Kanban lane を持つ scheduler phase として扱わない。詳細は [公開 command / hook モデル](90-project-package-schema.md#公開-command--hook-モデル) を参照する。
+
 ## 任意のメトリクス収集
 
 プロジェクトは、検証成功後にだけ動く任意のメトリクス収集コマンドを追加できる。これは軽量な運用レポート用であり、検証が成功したかどうかの判定には影響しない。
