@@ -28,11 +28,16 @@ Reasons:
 
 Use `operator_proposals` when the worker wants a human to consider a project, process, policy, or architecture improvement after the current task.
 
+Good fits include:
+
+- project command, verification policy, runtime policy, or architecture rule proposals
+- process or operating-policy adjustments that may make future A2O runs easier
+- advisory alternatives that are useful to the operator but should not become runnable work automatically
+
 Do not use it for:
 
 - direct code follow-up that should become runnable implementation work: use `review_disposition.kind=follow_up_child` or the existing follow-up child path
 - reusable prompt or skill tuning candidates: use `skill_feedback`
-- project command, verification, runtime policy, or architecture rule proposals: use `operator_proposals`
 - design debt discovered in the changed code: use `refactoring_assessment`
 - task-blocking ambiguity: use `clarification_request`
 - implementation failure or rework feedback: use `success=false` and normal failure fields
