@@ -133,6 +133,9 @@ func loadProjectPackageConfigFile(projectFile string) (projectPackageConfig, err
 	if err := validateProjectCompletionHooksConfig(runtimePayload); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.phases.implementation.completion_hooks: %w", projectFile, err)
 	}
+	if err := validateProjectReworkProgressConfig(runtimePayload); err != nil {
+		return config, fmt.Errorf("project package config %s has invalid runtime.max_consecutive_rework_without_commit: %w", projectFile, err)
+	}
 	if err := validateProjectSchedulerConfig(runtimePayload); err != nil {
 		return config, fmt.Errorf("project package config %s has invalid runtime.scheduler: %w", projectFile, err)
 	}
@@ -358,6 +361,21 @@ func validateProjectSchedulerConfig(runtimePayload map[string]any) error {
 	}
 	if maxParallelTasks > 1 {
 		return fmt.Errorf("max_parallel_tasks > 1 is not supported yet; requires scheduler task claims, batch planning, and shared-ref publish/merge locks")
+	}
+	return nil
+}
+
+func validateProjectReworkProgressConfig(runtimePayload map[string]any) error {
+	rawLimit, ok := runtimePayload["max_consecutive_rework_without_commit"]
+	if !ok {
+		return nil
+	}
+	limit, ok := schedulerInteger(rawLimit)
+	if !ok {
+		return fmt.Errorf("must be an integer")
+	}
+	if limit < 1 {
+		return fmt.Errorf("must be greater than or equal to 1")
 	}
 	return nil
 }

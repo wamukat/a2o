@@ -229,6 +229,65 @@ func TestProjectValidateAcceptsSingleTaskSchedulerConfig(t *testing.T) {
 	}
 }
 
+func TestProjectValidateAcceptsNoCommitReworkGuardConfig(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	writeSchedulerValidationProjectPackage(t, packageDir, "  max_consecutive_rework_without_commit: 3\n")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project validate should accept max_consecutive_rework_without_commit=3, code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "lint_check name=project_package status=ok") {
+		t.Fatalf("project validate should report ok, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateRejectsInvalidNoCommitReworkGuardConfig(t *testing.T) {
+	cases := []struct {
+		name       string
+		runtime    string
+		wantDetail string
+	}{
+		{
+			name:       "non-integer",
+			runtime:    "  max_consecutive_rework_without_commit: \"3\"\n",
+			wantDetail: "must be an integer",
+		},
+		{
+			name:       "float",
+			runtime:    "  max_consecutive_rework_without_commit: 1.0\n",
+			wantDetail: "must be an integer",
+		},
+		{
+			name:       "lower than one",
+			runtime:    "  max_consecutive_rework_without_commit: 0\n",
+			wantDetail: "must be greater than or equal to 1",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			packageDir := filepath.Join(tempDir, "package")
+			writeSchedulerValidationProjectPackage(t, packageDir, tc.runtime)
+
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+			if code == 0 {
+				t.Fatalf("project validate should reject %s, stdout=%s", tc.name, stdout.String())
+			}
+			if !strings.Contains(stdout.String(), "invalid runtime.max_consecutive_rework_without_commit") ||
+				!strings.Contains(stdout.String(), tc.wantDetail) {
+				t.Fatalf("project validate should reject %s, stdout=%s stderr=%s", tc.name, stdout.String(), stderr.String())
+			}
+		})
+	}
+}
+
 func TestProjectValidateRejectsMalformedSchedulerConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
