@@ -39,7 +39,7 @@ a2o runtime describe-task <task-ref>
 a2o runtime describe-task <task-ref>
 ```
 
-カンバン上は active lane に残っているのに `describe-task` が `Task not found` を返す場合は、A2O 0.5.79 以降へ更新し、同じ版の runtime image で runtime container を再起動してから `a2o runtime run-once` または scheduler resume を行う。A2O 0.5.79 は、runtime task record が欠落していても、Kanban 上の `In progress`、`In review`、`Inspection`、`Merging` の active task を復旧対象として扱う。
+カンバン上は active lane に残っているのに `describe-task` が `Task not found` を返す場合は、A2O 0.5.80 以降へ更新し、同じ版の runtime image で runtime container を再起動してから `a2o runtime run-once` または scheduler resume を行う。A2O 0.5.80 は、runtime task record が欠落していても、Kanban 上の `In progress`、`In review`、`Inspection`、`Merging` の active task を復旧対象として扱う。
 
 merge が `blocked` になり `merge_recovery_conflict_files` が表示された場合は、表示されたファイルを解消または再生成し、`a2o doctor` でリポジトリが整理済みであることを確認してから再試行する。A2O はこの状態で同じ merge を繰り返さず、意図的に blocked にする。
 

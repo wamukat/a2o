@@ -1,5 +1,5 @@
 # frozen_string_literal: true
 
 module A3
-  VERSION = "0.5.79"
+  VERSION = "0.5.80"
 end
