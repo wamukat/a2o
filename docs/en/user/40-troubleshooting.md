@@ -39,7 +39,7 @@ When `watch-summary` shows a task in `Merging` or marks it as next but `runtime 
 a2o runtime describe-task <task-ref>
 ```
 
-If `describe-task` reports `Task not found` for a Kanban task that is still in an active lane, upgrade to A2O 0.5.81 or later, restart the runtime container with the matching image, and run `a2o runtime run-once` or resume the scheduler. A2O 0.5.81 can recover active `In progress`, `In review`, `Inspection`, and `Merging` tasks from Kanban even when the runtime task record is missing.
+If `describe-task` reports `Task not found` for a Kanban task that is still in an active lane, upgrade to A2O 0.5.82 or later, restart the runtime container with the matching image, and run `a2o runtime run-once` or resume the scheduler. A2O 0.5.82 can recover active `In progress`, `In review`, `Inspection`, and `Merging` tasks from Kanban even when the runtime task record is missing.
 
 If the merge reaches `blocked` with `merge_recovery_conflict_files`, resolve or regenerate the listed files, confirm the repository is clean with `a2o doctor`, then retry. A2O blocks this condition intentionally instead of repeating the same merge attempt.
 

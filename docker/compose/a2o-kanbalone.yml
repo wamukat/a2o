@@ -1,5 +1,6 @@
 services:
   a2o-runtime:
+    init: true
     build:
       context: ../..
       dockerfile: docker/a3-runtime/Dockerfile

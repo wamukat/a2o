@@ -239,7 +239,7 @@ To apply a released version in one step, keep the scheduler stopped and run:
 
 ```sh
 a2o runtime pause
-a2o upgrade apply 0.5.81
+a2o upgrade apply 0.5.82
 a2o runtime status
 ```
 
