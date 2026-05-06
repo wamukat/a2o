@@ -880,7 +880,7 @@ func TestWorkerResponseSchemaIncludesPhaseSpecificProperties(t *testing.T) {
 			request: map[string]any{
 				"phase": "implementation",
 			},
-			properties: []string{"changed_files", "review_disposition", "clarification_request"},
+			properties: []string{"changed_files", "review_disposition", "operator_proposals", "clarification_request"},
 			required:   []string{},
 		},
 		{
@@ -1021,6 +1021,103 @@ func TestWorkerPayloadRequiresReviewDispositionOnlyForImplementationSuccess(t *t
 	errors := validateWorkerPayload(successPayload, request)
 	if !containsString(errors, "review_disposition must be present for implementation success") {
 		t.Fatalf("implementation success should require review_disposition, got %#v", errors)
+	}
+}
+
+func TestWorkerPayloadAcceptsImplementationOperatorProposals(t *testing.T) {
+	request := map[string]any{
+		"task_ref":   "A2O#7",
+		"run_ref":    "run-1",
+		"phase":      "implementation",
+		"slot_paths": map[string]any{"repo_alpha": "/tmp/repo-alpha"},
+	}
+	payload := map[string]any{
+		"task_ref":        "A2O#7",
+		"run_ref":         "run-1",
+		"phase":           "implementation",
+		"success":         true,
+		"summary":         "implemented",
+		"failing_command": nil,
+		"observed_state":  nil,
+		"rework_required": false,
+		"changed_files":   map[string]any{"repo_alpha": []any{"main.go"}},
+		"review_disposition": map[string]any{
+			"kind":        "completed",
+			"slot_scopes": []any{"repo_alpha"},
+			"summary":     "self review clean",
+			"description": "No findings.",
+		},
+		"operator_proposals": []any{
+			map[string]any{
+				"title":            "Relax generated source lint rule",
+				"summary":          "The implementation worked around a policy that may be better expressed in project commands.",
+				"description":      "Consider allowing generated source directories in the lint command.",
+				"category":         "project_command",
+				"priority":         "medium",
+				"scope":            []any{"repo_alpha"},
+				"evidence":         []any{"The workaround split generated files before lint."},
+				"suggested_action": "Review the project lint command.",
+				"future_key":       "ignored",
+			},
+		},
+	}
+	if errors := validateWorkerPayload(payload, request); len(errors) != 0 {
+		t.Fatalf("operator proposals should be valid, got %#v", errors)
+	}
+
+	payload["operator_proposals"] = nil
+	if errors := validateWorkerPayload(payload, request); len(errors) != 0 {
+		t.Fatalf("null operator proposals should be valid, got %#v", errors)
+	}
+	payload["operator_proposals"] = []any{}
+	if errors := validateWorkerPayload(payload, request); len(errors) != 0 {
+		t.Fatalf("empty operator proposals should be valid, got %#v", errors)
+	}
+}
+
+func TestWorkerPayloadRejectsMalformedOperatorProposals(t *testing.T) {
+	request := map[string]any{
+		"task_ref":   "A2O#7",
+		"run_ref":    "run-1",
+		"phase":      "implementation",
+		"slot_paths": map[string]any{"repo_alpha": "/tmp/repo-alpha"},
+	}
+	payload := map[string]any{
+		"task_ref":        "A2O#7",
+		"run_ref":         "run-1",
+		"phase":           "implementation",
+		"success":         true,
+		"summary":         "implemented",
+		"failing_command": nil,
+		"observed_state":  nil,
+		"rework_required": false,
+		"changed_files":   map[string]any{"repo_alpha": []any{"main.go"}},
+		"review_disposition": map[string]any{
+			"kind":        "completed",
+			"slot_scopes": []any{"repo_alpha"},
+			"summary":     "self review clean",
+			"description": "No findings.",
+		},
+		"operator_proposals": []any{
+			map[string]any{
+				"title":    " ",
+				"priority": "later",
+				"scope":    []any{"repo_alpha", ""},
+				"evidence": "not an array",
+			},
+		},
+	}
+	errors := validateWorkerPayload(payload, request)
+	for _, want := range []string{
+		"operator_proposals[0].title must be a non-empty string",
+		"operator_proposals[0].summary must be a non-empty string",
+		"operator_proposals[0].priority must be one of low, medium, high, urgent",
+		"operator_proposals[0].scope must be an array of non-empty strings when present",
+		"operator_proposals[0].evidence must be an array of non-empty strings when present",
+	} {
+		if !containsString(errors, want) {
+			t.Fatalf("missing %q in %#v", want, errors)
+		}
 	}
 }
 

@@ -149,6 +149,7 @@ def bundle_for(request)
           "When requirements are ambiguous or conflicting and you cannot safely continue, return success=false, rework_required=false, and clarification_request with question, optional context/options/recommended_option/impact. This is for requester input, not runtime or validation failures.",
           "For implementation success, include changed_files as an object like {\"repo_alpha\": [\"src/main.rb\"]} using only relative paths under each slot.",
           "For implementation success, you may include review_disposition when the final self-review is clean.",
+          "For implementation success, you may include operator_proposals as advisory operator-facing project, command, policy, or process proposals. Each proposal requires title and summary. These proposals must not be used for runnable code follow-up work.",
           "Optionally include refactoring_assessment when implementation or review finds design debt. Use disposition one of none, include_child, defer_follow_up, blocked_by_design_debt, needs_clarification and recommended_action one of none, document_only, include_in_current_child, create_refactoring_child, create_follow_up_child, request_clarification, block_until_decision.",
           "For review failures caused by findings, include rework_required=true.",
           "Copy task_ref, run_ref, and phase exactly from request. If you are uncertain, omit them rather than inventing values.",
@@ -288,6 +289,7 @@ def response_schema(request)
       "required" => %w[kind slot_scopes summary description],
       "additionalProperties" => false
     }
+    properties["operator_proposals"] = operator_proposals_schema
   end
   if parent_review
     properties["review_disposition"] = {
@@ -392,6 +394,39 @@ def skill_feedback_schema
       {
         "type" => "array",
         "items" => feedback_entry
+      },
+      { "type" => "null" }
+    ]
+  }
+end
+
+def operator_proposals_schema
+  proposal_entry = {
+    "type" => "object",
+    "properties" => {
+      "title" => { "type" => "string" },
+      "summary" => { "type" => "string" },
+      "description" => { "type" => "string" },
+      "category" => { "type" => "string" },
+      "priority" => { "type" => "string", "enum" => valid_operator_proposal_priorities },
+      "scope" => {
+        "type" => "array",
+        "items" => { "type" => "string" }
+      },
+      "evidence" => {
+        "type" => "array",
+        "items" => { "type" => "string" }
+      },
+      "suggested_action" => { "type" => "string" }
+    },
+    "required" => %w[title summary],
+    "additionalProperties" => true
+  }
+  {
+    "anyOf" => [
+      {
+        "type" => "array",
+        "items" => proposal_entry
       },
       { "type" => "null" }
     ]
@@ -561,6 +596,7 @@ def validate_payload(payload, request:)
 
   errors << "diagnostics must be an object" if payload.key?("diagnostics") && !payload["diagnostics"].is_a?(Hash)
   validate_skill_feedback(payload["skill_feedback"]).each { |error| errors << error } if payload.key?("skill_feedback")
+  validate_operator_proposals(payload["operator_proposals"], request: request).each { |error| errors << error } if payload.key?("operator_proposals")
   validate_clarification_request(payload["clarification_request"], success: payload["success"]).each { |error| errors << error } if payload.key?("clarification_request")
   if payload.key?("refactoring_assessment")
     A3::Domain::RefactoringAssessment.validation_errors(payload["refactoring_assessment"]).each { |error| errors << error }
@@ -769,6 +805,50 @@ def validate_skill_feedback_entry(entry, index)
   end
   errors << "#{prefix}.evidence must be an object when present" if entry.key?("evidence") && !entry["evidence"].is_a?(Hash)
   errors
+end
+
+def validate_operator_proposals(value, request:)
+  return [] if value.nil?
+
+  errors = []
+  unless request["phase"] == "implementation"
+    errors << "operator_proposals is only supported for implementation results"
+  end
+  unless value.is_a?(Array)
+    errors << "operator_proposals must be an array or null when present"
+    return errors
+  end
+
+  value.each_with_index do |entry, index|
+    errors.concat(validate_operator_proposal_entry(entry, index))
+  end
+  errors
+end
+
+def validate_operator_proposal_entry(entry, index)
+  prefix = "operator_proposals[#{index}]"
+  return ["#{prefix} must be an object"] unless entry.is_a?(Hash)
+
+  errors = []
+  %w[title summary].each do |field|
+    errors << "#{prefix}.#{field} must be a non-empty string" unless present_string?(entry[field])
+  end
+  %w[description category suggested_action].each do |field|
+    errors << "#{prefix}.#{field} must be a string when present" if entry.key?(field) && !entry[field].is_a?(String)
+  end
+  if entry.key?("priority") && !valid_operator_proposal_priorities.include?(entry["priority"])
+    errors << "#{prefix}.priority must be one of #{valid_operator_proposal_priorities.join(', ')}"
+  end
+  %w[scope evidence].each do |field|
+    if entry.key?(field) && !(entry[field].is_a?(Array) && entry[field].all? { |item| item.is_a?(String) && !item.strip.empty? })
+      errors << "#{prefix}.#{field} must be an array of non-empty strings when present"
+    end
+  end
+  errors
+end
+
+def valid_operator_proposal_priorities
+  %w[low medium high urgent]
 end
 
 def valid_skill_feedback_targets

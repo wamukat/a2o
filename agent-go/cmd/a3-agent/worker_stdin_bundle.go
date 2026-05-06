@@ -477,6 +477,7 @@ func writeWorkerResponseSchema(request map[string]any) (string, func(), error) {
 			},
 		}
 		properties["review_disposition"] = reviewDispositionSchema([]string{"object", "null"})
+		properties["operator_proposals"] = operatorProposalsSchema()
 	}
 	if stringValue(request["phase"]) == "review" && nestedString(request, "phase_runtime", "task_kind") == "parent" {
 		properties["review_disposition"] = reviewDispositionSchema("object")
@@ -517,6 +518,30 @@ func reviewDispositionSchema(schemaType any) map[string]any {
 		},
 		"required":             []string{"kind", "slot_scopes", "summary", "description"},
 		"additionalProperties": false,
+	}
+}
+
+func operatorProposalsSchema() map[string]any {
+	proposal := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"title":            map[string]any{"type": "string"},
+			"summary":          map[string]any{"type": "string"},
+			"description":      map[string]any{"type": "string"},
+			"category":         map[string]any{"type": "string"},
+			"priority":         map[string]any{"type": "string", "enum": operatorProposalPriorities()},
+			"scope":            map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+			"evidence":         map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+			"suggested_action": map[string]any{"type": "string"},
+		},
+		"required":             []string{"title", "summary"},
+		"additionalProperties": true,
+	}
+	return map[string]any{
+		"anyOf": []any{
+			map[string]any{"type": "array", "items": proposal},
+			map[string]any{"type": "null"},
+		},
 	}
 }
 
@@ -753,6 +778,7 @@ func workerBundle(correction *workerResultCorrection) string {
 				"When requirements are ambiguous or conflicting and you cannot safely continue, return success=false, rework_required=false, and clarification_request with question, optional context/options/recommended_option/impact. This is for requester input, not runtime or validation failures.",
 				"For implementation success, include changed_files keyed by slot name with relative paths to publish.",
 				"For implementation success, include review_disposition with kind=completed when self-review is clean.",
+				"For implementation success, you may include operator_proposals as advisory operator-facing project, command, policy, or process proposals. Each proposal requires title and summary. These proposals must not be used for runnable code follow-up work.",
 				"For review failures caused by findings, include rework_required=true.",
 				"For parent review, include review_disposition with kind, slot_scopes, summary, and description unless you return clarification_request. Include finding_key only for actionable follow_up_child or blocked findings; completed clean reviews may omit it or set it to null.",
 				"Copy task_ref, run_ref, and phase exactly from request. If you are uncertain, omit them rather than inventing values.",
@@ -931,6 +957,9 @@ func validateWorkerPayload(payload map[string]any, request map[string]any) []str
 	if _, ok := payload["clarification_request"]; ok {
 		errors = append(errors, validateClarificationRequest(payload["clarification_request"], success)...)
 	}
+	if _, ok := payload["operator_proposals"]; ok {
+		errors = append(errors, validateOperatorProposals(payload["operator_proposals"], request)...)
+	}
 	if stringValue(request["phase"]) == "implementation" && success {
 		if _, ok := payload["changed_files"].(map[string]any); !ok {
 			errors = append(errors, "changed_files must be present for implementation success")
@@ -964,6 +993,51 @@ func validateWorkerPayload(payload map[string]any, request map[string]any) []str
 			}
 			errors = append(errors, validateWorkerReviewDispositionSlotScopes(disposition["slot_scopes"])...)
 			errors = append(errors, validateWorkerReviewDisposition(disposition, request, success)...)
+		}
+	}
+	return errors
+}
+
+func validateOperatorProposals(value any, request map[string]any) []string {
+	if value == nil {
+		return nil
+	}
+	errors := []string{}
+	if stringValue(request["phase"]) != "implementation" {
+		errors = append(errors, "operator_proposals is only supported for implementation results")
+	}
+	entries, ok := value.([]any)
+	if !ok {
+		return append(errors, "operator_proposals must be an array or null when present")
+	}
+	for index, entry := range entries {
+		proposal, ok := entry.(map[string]any)
+		prefix := fmt.Sprintf("operator_proposals[%d]", index)
+		if !ok {
+			errors = append(errors, prefix+" must be an object")
+			continue
+		}
+		for _, field := range []string{"title", "summary"} {
+			if strings.TrimSpace(stringValue(proposal[field])) == "" {
+				errors = append(errors, prefix+"."+field+" must be a non-empty string")
+			}
+		}
+		for _, field := range []string{"description", "category", "suggested_action"} {
+			if value, ok := proposal[field]; ok {
+				if _, ok := value.(string); !ok {
+					errors = append(errors, prefix+"."+field+" must be a string when present")
+				}
+			}
+		}
+		if priority, ok := proposal["priority"]; ok && !containsString(operatorProposalPriorities(), stringValue(priority)) {
+			errors = append(errors, prefix+".priority must be one of "+strings.Join(operatorProposalPriorities(), ", "))
+		}
+		for _, field := range []string{"scope", "evidence"} {
+			if value, ok := proposal[field]; ok {
+				if !nonEmptyStringArray(value) {
+					errors = append(errors, prefix+"."+field+" must be an array of non-empty strings when present")
+				}
+			}
 		}
 	}
 	return errors
@@ -1227,6 +1301,14 @@ func stringSliceValue(value any) []string {
 		values = append(values, scope)
 	}
 	return values
+}
+
+func nonEmptyStringArray(value any) bool {
+	return len(stringSliceValue(value)) > 0
+}
+
+func operatorProposalPriorities() []string {
+	return []string{"low", "medium", "high", "urgent"}
 }
 
 func invalidStringMembers(values []string, valid []string) []string {

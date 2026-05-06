@@ -1351,6 +1351,128 @@ RSpec.describe A3::Infra::WorkerProtocol do
     )
   end
 
+  it "accepts structured implementation operator proposals" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => true,
+        "summary" => "worker completed",
+        "task_ref" => task.ref,
+        "run_ref" => implementation_run.ref,
+        "phase" => "implementation",
+        "rework_required" => false,
+        "changed_files" => { "repo_beta" => ["marker.txt"] },
+        "review_disposition" => {
+          "kind" => "completed",
+          "slot_scopes" => ["repo_beta"],
+          "summary" => "self-review clean",
+          "description" => "No findings.",
+          "finding_key" => "none"
+        },
+        "operator_proposals" => [
+          {
+            "title" => "Relax generated source lint rule",
+            "summary" => "The implementation worked around a policy that may be better expressed in project commands.",
+            "description" => "Consider allowing generated source directories in the lint command.",
+            "category" => "project_command",
+            "priority" => "medium",
+            "scope" => ["repo_beta"],
+            "evidence" => ["The workaround split generated files before lint."],
+            "suggested_action" => "Review the project lint command.",
+            "future_key" => "ignored"
+          }
+        ]
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: implementation_run.ref,
+      expected_phase: :implementation,
+      canonical_changed_files: { "repo_beta" => ["marker.txt"] }
+    )
+
+    expect(result).to have_attributes(success?: true)
+    expect(result.response_bundle.fetch("operator_proposals").first).to include(
+      "title" => "Relax generated source lint rule",
+      "priority" => "medium",
+      "future_key" => "ignored"
+    )
+  end
+
+  it "accepts null and empty implementation operator proposals" do
+    base_response = {
+      "success" => true,
+      "summary" => "worker completed",
+      "task_ref" => task.ref,
+      "run_ref" => implementation_run.ref,
+      "phase" => "implementation",
+      "rework_required" => false,
+      "changed_files" => { "repo_beta" => ["marker.txt"] },
+      "review_disposition" => {
+        "kind" => "completed",
+        "slot_scopes" => ["repo_beta"],
+        "summary" => "self-review clean",
+        "description" => "No findings.",
+        "finding_key" => "none"
+      }
+    }
+
+    [nil, []].each do |operator_proposals|
+      result = described_class.new.build_execution_result(
+        base_response.merge("operator_proposals" => operator_proposals),
+        workspace: workspace,
+        expected_task_ref: task.ref,
+        expected_run_ref: implementation_run.ref,
+        expected_phase: :implementation,
+        canonical_changed_files: { "repo_beta" => ["marker.txt"] }
+      )
+
+      expect(result).to have_attributes(success?: true)
+    end
+  end
+
+  it "rejects malformed implementation operator proposals" do
+    result = described_class.new.build_execution_result(
+      {
+        "success" => true,
+        "summary" => "worker completed",
+        "task_ref" => task.ref,
+        "run_ref" => implementation_run.ref,
+        "phase" => "implementation",
+        "rework_required" => false,
+        "changed_files" => { "repo_beta" => ["marker.txt"] },
+        "review_disposition" => {
+          "kind" => "completed",
+          "slot_scopes" => ["repo_beta"],
+          "summary" => "self-review clean",
+          "description" => "No findings.",
+          "finding_key" => "none"
+        },
+        "operator_proposals" => [
+          {
+            "title" => " ",
+            "priority" => "later",
+            "scope" => ["repo_beta", ""],
+            "evidence" => "not an array"
+          }
+        ]
+      },
+      workspace: workspace,
+      expected_task_ref: task.ref,
+      expected_run_ref: implementation_run.ref,
+      expected_phase: :implementation,
+      canonical_changed_files: { "repo_beta" => ["marker.txt"] }
+    )
+
+    expect(result).to have_attributes(success?: false)
+    expect(result.summary).to eq("worker result schema invalid")
+    expect(result.diagnostics.fetch("validation_errors")).to include(
+      "operator_proposals[0].title must be a non-empty string",
+      "operator_proposals[0].summary must be a non-empty string",
+      "operator_proposals[0].priority must be one of low, medium, high, urgent",
+      "operator_proposals[0].scope must be an array of non-empty strings when present",
+      "operator_proposals[0].evidence must be an array of non-empty strings when present"
+    )
+  end
+
   it "rejects malformed skill feedback when present" do
     result = described_class.new.build_execution_result(
       {

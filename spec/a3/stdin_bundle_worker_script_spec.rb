@@ -517,6 +517,102 @@ RSpec.describe "worker:stdin-bundle" do
     )
   end
 
+  it "accepts implementation operator proposals in worker helper validation" do
+    payload = {
+      "task_ref" => "Sample#3112",
+      "run_ref" => "run-1",
+      "phase" => "implementation",
+      "success" => true,
+      "summary" => "implemented",
+      "failing_command" => nil,
+      "observed_state" => nil,
+      "rework_required" => false,
+      "changed_files" => { "repo_alpha" => ["src/main.rb"] },
+      "review_disposition" => {
+        "kind" => "completed",
+        "slot_scopes" => ["repo_alpha"],
+        "summary" => "self review clean",
+        "description" => "No findings."
+      },
+      "operator_proposals" => [
+        {
+          "title" => "Relax generated source lint rule",
+          "summary" => "The implementation worked around a policy that may be better expressed in project commands.",
+          "description" => "Consider allowing generated source directories in the lint command.",
+          "category" => "project_command",
+          "priority" => "medium",
+          "scope" => ["repo_alpha"],
+          "evidence" => ["The workaround split generated files before lint."],
+          "suggested_action" => "Review the project lint command.",
+          "future_key" => "ignored"
+        }
+      ]
+    }
+
+    expect(validate_payload(payload, request: base_request)).to eq([])
+  end
+
+  it "accepts null and empty implementation operator proposals" do
+    payload = {
+      "task_ref" => "Sample#3112",
+      "run_ref" => "run-1",
+      "phase" => "implementation",
+      "success" => true,
+      "summary" => "implemented",
+      "failing_command" => nil,
+      "observed_state" => nil,
+      "rework_required" => false,
+      "changed_files" => { "repo_alpha" => ["src/main.rb"] },
+      "review_disposition" => {
+        "kind" => "completed",
+        "slot_scopes" => ["repo_alpha"],
+        "summary" => "self review clean",
+        "description" => "No findings."
+      },
+      "operator_proposals" => nil
+    }
+    expect(validate_payload(payload, request: base_request)).to eq([])
+
+    payload["operator_proposals"] = []
+    expect(validate_payload(payload, request: base_request)).to eq([])
+  end
+
+  it "rejects malformed implementation operator proposals" do
+    payload = {
+      "task_ref" => "Sample#3112",
+      "run_ref" => "run-1",
+      "phase" => "implementation",
+      "success" => true,
+      "summary" => "implemented",
+      "failing_command" => nil,
+      "observed_state" => nil,
+      "rework_required" => false,
+      "changed_files" => { "repo_alpha" => ["src/main.rb"] },
+      "review_disposition" => {
+        "kind" => "completed",
+        "slot_scopes" => ["repo_alpha"],
+        "summary" => "self review clean",
+        "description" => "No findings."
+      },
+      "operator_proposals" => [
+        {
+          "title" => " ",
+          "priority" => "later",
+          "scope" => ["repo_alpha", ""],
+          "evidence" => "not an array"
+        }
+      ]
+    }
+
+    expect(validate_payload(payload, request: base_request)).to include(
+      "operator_proposals[0].title must be a non-empty string",
+      "operator_proposals[0].summary must be a non-empty string",
+      "operator_proposals[0].priority must be one of low, medium, high, urgent",
+      "operator_proposals[0].scope must be an array of non-empty strings when present",
+      "operator_proposals[0].evidence must be an array of non-empty strings when present"
+    )
+  end
+
   it "requires review_disposition for implementation success" do
     payload = {
       "task_ref" => "Sample#3112",

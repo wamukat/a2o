@@ -570,6 +570,7 @@ module A3
           errors << "diagnostics must be an object"
         end
         validate_skill_feedback(worker_response["skill_feedback"]).each { |error| errors << error } if worker_response.key?("skill_feedback")
+        validate_operator_proposals(worker_response["operator_proposals"], expected_phase: expected_phase).each { |error| errors << error } if worker_response.key?("operator_proposals")
         validate_clarification_request(worker_response["clarification_request"], success: worker_response["success"]).each { |error| errors << error } if worker_response.key?("clarification_request")
         validate_docs_impact(
           worker_response["docs_impact"],
@@ -696,6 +697,50 @@ module A3
         end
         errors << "#{prefix}.evidence must be an object when present" if entry.key?("evidence") && !entry["evidence"].is_a?(Hash)
         errors
+      end
+
+      def validate_operator_proposals(value, expected_phase:)
+        return [] if value.nil?
+
+        errors = []
+        errors << "operator_proposals is only supported for implementation results" unless expected_phase.to_s == "implementation"
+        unless value.is_a?(Array)
+          errors << "operator_proposals must be an array or null when present"
+          return errors
+        end
+
+        value.each_with_index.flat_map do |entry, index|
+          errors.concat(validate_operator_proposal_entry(entry, index))
+        end
+        errors
+      end
+
+      def validate_operator_proposal_entry(entry, index)
+        prefix = "operator_proposals[#{index}]"
+        return ["#{prefix} must be an object"] unless entry.is_a?(Hash)
+
+        errors = []
+        %w[title summary].each do |field|
+          errors << "#{prefix}.#{field} must be a non-empty string" unless present_string?(entry[field])
+        end
+        %w[description category suggested_action].each do |field|
+          errors << "#{prefix}.#{field} must be a string when present" if entry.key?(field) && !entry[field].is_a?(String)
+        end
+        if entry.key?("priority") && !valid_operator_proposal_priorities.include?(entry["priority"])
+          errors << "#{prefix}.priority must be one of #{valid_operator_proposal_priorities.join(', ')}"
+        end
+        %w[scope evidence].each do |field|
+          next unless entry.key?(field)
+
+          unless entry[field].is_a?(Array) && entry[field].all? { |item| present_string?(item) }
+            errors << "#{prefix}.#{field} must be an array of non-empty strings when present"
+          end
+        end
+        errors
+      end
+
+      def valid_operator_proposal_priorities
+        %w[low medium high urgent]
       end
 
       def validate_clarification_request(value, success:)
