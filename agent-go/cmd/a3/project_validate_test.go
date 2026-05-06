@@ -381,8 +381,8 @@ runtime:
         prompt: prompts/implementation-rework.md
       decomposition:
         prompt: prompts/decomposition.md
-        childDraftTemplate: prompts/decomposition-child-template.md
-    repoSlots:
+        child_draft_template: prompts/decomposition-child-template.md
+    repo_slots:
       app:
         phases:
           review:
@@ -1091,7 +1091,7 @@ repos:
     path: ..
 runtime:
   prompts:
-    repoSlots:
+    repo_slots:
       backend:
         phases:
           review:
@@ -1118,8 +1118,91 @@ runtime:
 		t.Fatalf("project validate should reject unknown prompt repo slot, stdout=%s", stdout.String())
 	}
 	if !strings.Contains(stdout.String(), "invalid runtime.prompts") ||
-		!strings.Contains(stdout.String(), "repoSlots.backend must match a repos entry") {
+		!strings.Contains(stdout.String(), "repo_slots.backend must match a repos entry") {
 		t.Fatalf("project validate should reject unknown prompt repo slot, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
+func TestProjectValidateRejectsLegacyPromptCamelCaseKeys(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    repoSlots:
+      app:
+        phases:
+          review:
+            skills:
+              - skills/app-review.md
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject legacy repoSlots, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "repoSlots is no longer supported; migration_required=true replacement=repo_slots") {
+		t.Fatalf("project validate should report repoSlots migration guidance, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+
+	body = `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ..
+runtime:
+  prompts:
+    phases:
+      decomposition:
+        childDraftTemplate: prompts/decomposition-child-template.md
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+	if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("project validate should reject legacy childDraftTemplate, stdout=%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "phases.decomposition.childDraftTemplate is no longer supported; migration_required=true replacement=phases.decomposition.child_draft_template") {
+		t.Fatalf("project validate should report childDraftTemplate migration guidance, stdout=%s stderr=%s", stdout.String(), stderr.String())
 	}
 }
 
@@ -1144,7 +1227,7 @@ repos:
     path: ..
 runtime:
   prompts:
-    repoSlots:
+    repo_slots:
       app:
         phases:
           deployment:
@@ -1170,7 +1253,7 @@ runtime:
 	if code == 0 {
 		t.Fatalf("project validate should reject unsupported prompt phase, stdout=%s", stdout.String())
 	}
-	if !strings.Contains(stdout.String(), "repoSlots.app.phases.deployment is not a supported prompt phase") {
+	if !strings.Contains(stdout.String(), "repo_slots.app.phases.deployment is not a supported prompt phase") {
 		t.Fatalf("project validate should reject unsupported prompt phase, stdout=%s stderr=%s", stdout.String(), stderr.String())
 	}
 
@@ -1188,7 +1271,7 @@ runtime:
       review:
         skills:
           - skills/common.md
-    repoSlots:
+    repo_slots:
       app:
         phases:
           review:
@@ -1213,7 +1296,7 @@ runtime:
 	if code == 0 {
 		t.Fatalf("project validate should reject duplicate repo-slot skill addon, stdout=%s", stdout.String())
 	}
-	if !strings.Contains(stdout.String(), "repoSlots.app.phases.review.skills duplicates phases.review.skills entry: skills/common.md") {
+	if !strings.Contains(stdout.String(), "repo_slots.app.phases.review.skills duplicates phases.review.skills entry: skills/common.md") {
 		t.Fatalf("project validate should reject duplicate repo-slot skill addon, stdout=%s stderr=%s", stdout.String(), stderr.String())
 	}
 
@@ -1231,7 +1314,7 @@ runtime:
       implementation:
         skills:
           - skills/common.md
-    repoSlots:
+    repo_slots:
       app:
         phases:
           implementation_rework:
@@ -1256,7 +1339,7 @@ runtime:
 	if code == 0 {
 		t.Fatalf("project validate should reject duplicate repo-slot rework skill addon, stdout=%s", stdout.String())
 	}
-	if !strings.Contains(stdout.String(), "repoSlots.app.phases.implementation_rework.skills duplicates phases.implementation.skills entry: skills/common.md") {
+	if !strings.Contains(stdout.String(), "repo_slots.app.phases.implementation_rework.skills duplicates phases.implementation.skills entry: skills/common.md") {
 		t.Fatalf("project validate should reject duplicate repo-slot rework skill addon, stdout=%s stderr=%s", stdout.String(), stderr.String())
 	}
 }
@@ -1282,7 +1365,7 @@ runtime:
   prompts:
     phases:
       review:
-        childDraftTemplate: prompts/review-child-template.md
+        child_draft_template: prompts/review-child-template.md
   phases:
     implementation:
       skill: skills/implementation/base.md
@@ -1301,10 +1384,10 @@ runtime:
 	var stderr bytes.Buffer
 	code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
 	if code == 0 {
-		t.Fatalf("project validate should reject childDraftTemplate outside decomposition, stdout=%s", stdout.String())
+		t.Fatalf("project validate should reject child_draft_template outside decomposition, stdout=%s", stdout.String())
 	}
-	if !strings.Contains(stdout.String(), "phases.review.childDraftTemplate is only supported for decomposition") {
-		t.Fatalf("project validate should reject childDraftTemplate outside decomposition, stdout=%s stderr=%s", stdout.String(), stderr.String())
+	if !strings.Contains(stdout.String(), "phases.review.child_draft_template is only supported for decomposition") {
+		t.Fatalf("project validate should reject child_draft_template outside decomposition, stdout=%s stderr=%s", stdout.String(), stderr.String())
 	}
 }
 
@@ -1496,7 +1579,7 @@ runtime:
         prompt: prompts/implementation.md
         skills:
           - skills/implementation-policy.md
-    repoSlots:
+    repo_slots:
       app:
         phases:
           implementation_rework:
@@ -1628,18 +1711,18 @@ runtime:
         prompt: prompts/decomposition.md
         skills:
           - skills/decomposition-policy.md
-        childDraftTemplate: prompts/decomposition-child-template.md
-    repoSlots:
+        child_draft_template: prompts/decomposition-child-template.md
+    repo_slots:
       app:
         phases:
           decomposition:
             prompt: prompts/app-decomposition.md
-            childDraftTemplate: prompts/app-child-template.md
+            child_draft_template: prompts/app-child-template.md
       lib:
         phases:
           decomposition:
             prompt: prompts/lib-decomposition.md
-            childDraftTemplate: prompts/lib-child-template.md
+            child_draft_template: prompts/lib-child-template.md
   phases:
     implementation:
       skill: skills/implementation/base.md

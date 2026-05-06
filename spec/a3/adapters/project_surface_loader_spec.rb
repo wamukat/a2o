@@ -273,10 +273,10 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
             },
             "decomposition" => {
               "prompt" => "prompts/decomposition.md",
-              "childDraftTemplate" => "prompts/decomposition-child-template.md"
+              "child_draft_template" => "prompts/decomposition-child-template.md"
             }
           },
-          "repoSlots" => {
+          "repo_slots" => {
             "app" => {
               "phases" => {
                 "review" => {
@@ -632,7 +632,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
               "skills" => ["skills/base-review.md"]
             }
           },
-          "repoSlots" => {
+          "repo_slots" => {
             "app" => {
               "phases" => {
                 "review" => {
@@ -681,7 +681,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
               "skills" => ["skills/common.md"]
             }
           },
-          "repoSlots" => {
+          "repo_slots" => {
             "app" => {
               "phases" => {
                 "implementation_rework" => {
@@ -704,7 +704,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     write_project_files("skills/common.md" => "common")
 
     expect { loader.load(project_config_path) }
-      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots.app.phases.implementation_rework.skills duplicates runtime.prompts.phases.implementation.skills entry: skills/common.md")
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repo_slots.app.phases.implementation_rework.skills duplicates runtime.prompts.phases.implementation.skills entry: skills/common.md")
   end
 
   it "rejects repo-slot prompt addons that do not match a repo entry" do
@@ -714,7 +714,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
       },
       "runtime" => {
         "prompts" => {
-          "repoSlots" => {
+          "repo_slots" => {
             "backend" => {
               "phases" => {
                 "review" => {
@@ -737,7 +737,59 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     write_project_files("skills/backend-review.md" => "backend review skill")
 
     expect { loader.load(project_config_path) }
-      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots.backend must match a repos entry")
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repo_slots.backend must match a repos entry")
+  end
+
+  it "rejects legacy camelCase prompt keys with migration guidance" do
+    repo_slots_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "repoSlots" => {
+            "app" => {
+              "phases" => {
+                "review" => {
+                  "skills" => ["skills/app-review.md"]
+                }
+              }
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(repo_slots_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots is no longer supported; migration_required=true replacement=runtime.prompts.repo_slots")
+
+    child_template_path = write_project_config(
+      "runtime" => {
+        "prompts" => {
+          "phases" => {
+            "decomposition" => {
+              "childDraftTemplate" => "prompts/decomposition-child-template.md"
+            }
+          }
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    expect { loader.load(child_template_path) }
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.phases.decomposition.childDraftTemplate is no longer supported; migration_required=true replacement=runtime.prompts.phases.decomposition.child_draft_template")
   end
 
   it "rejects unsupported prompt phases and duplicate repo-slot skills" do
@@ -749,7 +801,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
               "skills" => ["skills/common.md"]
             }
           },
-          "repoSlots" => {
+          "repo_slots" => {
             "app" => {
               "phases" => {
                 "deployment" => {
@@ -775,7 +827,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     )
 
     expect { loader.load(project_config_path) }
-      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots.app.phases.deployment is not a supported prompt phase")
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repo_slots.app.phases.deployment is not a supported prompt phase")
 
     duplicate_path = write_project_config(
       "runtime" => {
@@ -785,7 +837,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
               "skills" => ["skills/common.md"]
             }
           },
-          "repoSlots" => {
+          "repo_slots" => {
             "app" => {
               "phases" => {
                 "review" => {
@@ -807,7 +859,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     )
 
     expect { loader.load(duplicate_path) }
-      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots.app.phases.review.skills duplicates runtime.prompts.phases.review.skills entry: skills/common.md")
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repo_slots.app.phases.review.skills duplicates runtime.prompts.phases.review.skills entry: skills/common.md")
   end
 
   it "uses an empty prompt config when runtime.prompts is absent" do
@@ -858,7 +910,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
         "prompts" => {
           "phases" => {
             "review" => {
-              "childDraftTemplate" => "prompts/review-child-template.md"
+              "child_draft_template" => "prompts/review-child-template.md"
             }
           }
         },
@@ -875,7 +927,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     write_project_files("prompts/review-child-template.md" => "review template")
 
     expect { loader.load(project_config_path) }
-      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.phases.review.childDraftTemplate is only supported for decomposition")
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml runtime.prompts.phases.review.child_draft_template is only supported for decomposition")
   end
 
   it "rejects missing prompt files" do

@@ -30,23 +30,26 @@ func validateProjectPromptsConfig(runtimePayload map[string]any, packagePath str
 	if err := validatePromptPhaseMapping(prompts["phases"], "phases", packagePath); err != nil {
 		return err
 	}
-	if rawRepoSlots, ok := prompts["repoSlots"]; ok {
+	if _, ok := prompts["repoSlots"]; ok {
+		return fmt.Errorf("repoSlots is no longer supported; migration_required=true replacement=repo_slots")
+	}
+	if rawRepoSlots, ok := prompts["repo_slots"]; ok {
 		repoSlots, ok := normalizeYAMLValue(rawRepoSlots).(map[string]any)
 		if !ok {
-			return fmt.Errorf("repoSlots must be a mapping")
+			return fmt.Errorf("repo_slots must be a mapping")
 		}
 		for slot, rawSlotConfig := range repoSlots {
 			if strings.TrimSpace(slot) == "" {
-				return fmt.Errorf("repoSlots keys must be non-empty strings")
+				return fmt.Errorf("repo_slots keys must be non-empty strings")
 			}
 			if len(repoNames) > 0 && !containsString(repoNames, slot) {
-				return fmt.Errorf("repoSlots.%s must match a repos entry", slot)
+				return fmt.Errorf("repo_slots.%s must match a repos entry", slot)
 			}
 			slotConfig, ok := normalizeYAMLValue(rawSlotConfig).(map[string]any)
 			if !ok {
-				return fmt.Errorf("repoSlots.%s must be a mapping", slot)
+				return fmt.Errorf("repo_slots.%s must be a mapping", slot)
 			}
-			if err := validatePromptPhaseMapping(slotConfig["phases"], "repoSlots."+slot+".phases", packagePath); err != nil {
+			if err := validatePromptPhaseMapping(slotConfig["phases"], "repo_slots."+slot+".phases", packagePath); err != nil {
 				return err
 			}
 			slotPhases, _ := normalizeYAMLValue(slotConfig["phases"]).(map[string]any)
@@ -109,8 +112,11 @@ func validatePromptPhaseMapping(rawPhases any, label string, packagePath string)
 		if !ok {
 			return fmt.Errorf("%s.%s must be a mapping", label, phase)
 		}
-		if _, ok := phaseConfig["childDraftTemplate"]; ok && phase != "decomposition" {
-			return fmt.Errorf("%s.%s.childDraftTemplate is only supported for decomposition", label, phase)
+		if _, ok := phaseConfig["childDraftTemplate"]; ok {
+			return fmt.Errorf("%s.%s.childDraftTemplate is no longer supported; migration_required=true replacement=%s.%s.child_draft_template", label, phase, label, phase)
+		}
+		if _, ok := phaseConfig["child_draft_template"]; ok && phase != "decomposition" {
+			return fmt.Errorf("%s.%s.child_draft_template is only supported for decomposition", label, phase)
 		}
 		if err := validatePromptPath(phaseConfig["prompt"], label+"."+phase+".prompt", packagePath, false); err != nil {
 			return err
@@ -118,7 +124,7 @@ func validatePromptPhaseMapping(rawPhases any, label string, packagePath string)
 		if err := validatePromptStringList(phaseConfig["skills"], label+"."+phase+".skills", packagePath); err != nil {
 			return err
 		}
-		if err := validatePromptPath(phaseConfig["childDraftTemplate"], label+"."+phase+".childDraftTemplate", packagePath, false); err != nil {
+		if err := validatePromptPath(phaseConfig["child_draft_template"], label+"."+phase+".child_draft_template", packagePath, false); err != nil {
 			return err
 		}
 	}
@@ -219,7 +225,7 @@ func validateRepoSlotPromptSkillAddons(slot string, basePhases map[string]any, s
 		baseSkills := promptPhaseSkillFiles(basePhases[basePhase])
 		for _, skill := range slotSkills {
 			if containsString(baseSkills, skill) {
-				return fmt.Errorf("repoSlots.%s.phases.%s.skills duplicates phases.%s.skills entry: %s", slot, phase, basePhase, skill)
+				return fmt.Errorf("repo_slots.%s.phases.%s.skills duplicates phases.%s.skills entry: %s", slot, phase, basePhase, skill)
 			}
 		}
 	}
@@ -243,7 +249,7 @@ func promptPhaseConfigEmptyRaw(rawPhase any) bool {
 		return true
 	}
 	prompt, _ := phase["prompt"].(string)
-	childDraftTemplate, _ := phase["childDraftTemplate"].(string)
+	childDraftTemplate, _ := phase["child_draft_template"].(string)
 	return strings.TrimSpace(prompt) == "" && strings.TrimSpace(childDraftTemplate) == "" && len(promptPhaseSkillFiles(rawPhase)) == 0
 }
 

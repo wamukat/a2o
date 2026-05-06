@@ -44,7 +44,7 @@ module A3
           form = {}
           form["prompt"] = prompt_file if prompt_file
           form["skills"] = skill_files unless skill_files.empty?
-          form["childDraftTemplate"] = child_draft_template_file if child_draft_template_file
+          form["child_draft_template"] = child_draft_template_file if child_draft_template_file
           form.freeze
         end
 
@@ -114,7 +114,7 @@ module A3
         form["system"] = { "file" => system_file } if system_file
         form["phases"] = phases.transform_values(&:persisted_form) unless phases.empty?
         unless repo_slots.empty?
-          form["repoSlots"] = repo_slots.transform_values do |slot_phases|
+          form["repo_slots"] = repo_slots.transform_values do |slot_phases|
             { "phases" => slot_phases.transform_values(&:persisted_form) }
           end
         end

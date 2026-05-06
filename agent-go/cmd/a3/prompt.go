@@ -26,7 +26,7 @@ type promptConfigYAML struct {
 		File string `yaml:"file"`
 	} `yaml:"system"`
 	Phases    map[string]promptPhaseYAML    `yaml:"phases"`
-	RepoSlots map[string]promptRepoSlotYAML `yaml:"repoSlots"`
+	RepoSlots map[string]promptRepoSlotYAML `yaml:"repo_slots"`
 }
 
 type promptRepoSlotYAML struct {
@@ -36,7 +36,7 @@ type promptRepoSlotYAML struct {
 type promptPhaseYAML struct {
 	Prompt             string   `yaml:"prompt"`
 	Skills             []string `yaml:"skills"`
-	ChildDraftTemplate string   `yaml:"childDraftTemplate"`
+	ChildDraftTemplate string   `yaml:"child_draft_template"`
 }
 
 type promptLayerPreview struct {
@@ -268,7 +268,7 @@ func buildPromptPreviewLayers(context promptCommandContext, profile string, runt
 		for _, repoSlot := range repoSlots {
 			slotConfig, ok := prompts.RepoSlots[repoSlot]
 			if !ok {
-				return nil, fmt.Errorf("repo slot %q is not configured under runtime.prompts.repoSlots", repoSlot)
+				return nil, fmt.Errorf("repo slot %q is not configured under runtime.prompts.repo_slots", repoSlot)
 			}
 			repoSlotLayers, err := promptPhaseLayers(context.packagePath, "repo_slot_phase", "repo_slot_decomposition_child_draft_template", profile, slotConfig.Phases[profile])
 			if err != nil {
@@ -460,7 +460,7 @@ func runDoctorPrompts(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 	context, err := loadPromptCommandContext(*packagePath, *configPath, *workspaceRoot)
 	if err != nil {
-		report("project_package", false, err.Error(), "fix runtime.prompts paths, phase names, repoSlots, or childDraftTemplate placement")
+		report("project_package", false, err.Error(), "fix runtime.prompts paths, phase names, repo_slots, or child_draft_template placement")
 		fmt.Fprintf(stdout, "prompt_doctor_status=%s\n", status)
 		return 1
 	}
@@ -517,7 +517,7 @@ func promptPhaseDoctorDetail(config promptPhaseYAML) string {
 		parts = append(parts, "skills="+strings.Join(config.Skills, ","))
 	}
 	if strings.TrimSpace(config.ChildDraftTemplate) != "" {
-		parts = append(parts, "childDraftTemplate="+config.ChildDraftTemplate)
+		parts = append(parts, "child_draft_template="+config.ChildDraftTemplate)
 	}
 	return strings.Join(parts, " ")
 }

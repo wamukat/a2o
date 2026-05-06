@@ -504,11 +504,14 @@ module A3
           raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts must be a mapping"
         end
         phases = prompt_phase_mapping(prompts.fetch("phases", {}), "runtime.prompts.phases", project_package_root)
+        if prompts.key?("repoSlots")
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots is no longer supported; migration_required=true replacement=runtime.prompts.repo_slots"
+        end
 
         A3::Domain::ProjectPromptConfig.new(
           system_document: system_prompt_document(prompts, project_package_root),
           phases: phases,
-          repo_slots: prompt_repo_slots(prompts.fetch("repoSlots", {}), project_package_root, known_slots: repo_slots, base_phases: phases)
+          repo_slots: prompt_repo_slots(prompts.fetch("repo_slots", {}), project_package_root, known_slots: repo_slots, base_phases: phases)
         )
       end
 
@@ -524,22 +527,22 @@ module A3
 
       def prompt_repo_slots(repo_slots, project_package_root, known_slots:, base_phases:)
         unless repo_slots.is_a?(Hash)
-          raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots must be a mapping"
+          raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repo_slots must be a mapping"
         end
 
         repo_slots.each_with_object({}) do |(slot, config), mapping|
           unless slot.is_a?(String) && !slot.strip.empty?
-            raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots keys must be non-empty strings"
+            raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repo_slots keys must be non-empty strings"
           end
           unless config.is_a?(Hash)
-            raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots.#{slot} must be a mapping"
+            raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repo_slots.#{slot} must be a mapping"
           end
           if !known_slots.empty? && !known_slots.include?(slot)
-            raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repoSlots.#{slot} must match a repos entry"
+            raise A3::Domain::ConfigurationError, "project.yaml runtime.prompts.repo_slots.#{slot} must match a repos entry"
           end
           slot_phases = prompt_phase_mapping(
             config.fetch("phases", {}),
-            "runtime.prompts.repoSlots.#{slot}.phases",
+            "runtime.prompts.repo_slots.#{slot}.phases",
             project_package_root
           )
           validate_repo_slot_skill_addons(slot, base_phases, slot_phases)
@@ -562,14 +565,17 @@ module A3
           unless config.is_a?(Hash)
             raise A3::Domain::ConfigurationError, "project.yaml #{location}.#{phase} must be a mapping"
           end
-          if config.key?("childDraftTemplate") && phase != "decomposition"
-            raise A3::Domain::ConfigurationError, "project.yaml #{location}.#{phase}.childDraftTemplate is only supported for decomposition"
+          if config.key?("childDraftTemplate")
+            raise A3::Domain::ConfigurationError, "project.yaml #{location}.#{phase}.childDraftTemplate is no longer supported; migration_required=true replacement=#{location}.#{phase}.child_draft_template"
+          end
+          if config.key?("child_draft_template") && phase != "decomposition"
+            raise A3::Domain::ConfigurationError, "project.yaml #{location}.#{phase}.child_draft_template is only supported for decomposition"
           end
 
           mapping[phase] = A3::Domain::ProjectPromptConfig::PhaseConfig.new(
             prompt_document: prompt_document(config.fetch("prompt", nil), "#{location}.#{phase}.prompt", project_package_root),
             skill_documents: prompt_skill_documents(config.fetch("skills", []), "#{location}.#{phase}.skills", project_package_root),
-            child_draft_template_document: prompt_document(config.fetch("childDraftTemplate", nil), "#{location}.#{phase}.childDraftTemplate", project_package_root)
+            child_draft_template_document: prompt_document(config.fetch("child_draft_template", nil), "#{location}.#{phase}.child_draft_template", project_package_root)
           )
         end
       end
@@ -613,7 +619,7 @@ module A3
           next unless duplicate
 
           raise A3::Domain::ConfigurationError,
-                "project.yaml runtime.prompts.repoSlots.#{slot}.phases.#{phase}.skills duplicates runtime.prompts.phases.#{base_phase}.skills entry: #{duplicate}"
+                "project.yaml runtime.prompts.repo_slots.#{slot}.phases.#{phase}.skills duplicates runtime.prompts.phases.#{base_phase}.skills entry: #{duplicate}"
         end
       end
 
