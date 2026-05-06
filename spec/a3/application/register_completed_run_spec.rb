@@ -207,6 +207,129 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(result.task.status).to eq(:verifying)
   end
 
+  it "publishes compact operator proposal markdown for completed implementation runs" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :in_progress,
+      current_run_ref: "run-1",
+      external_task_id: 3025
+    )
+    execution_record = A3::Domain::PhaseExecutionRecord.new(
+      summary: "implemented greeting behavior",
+      diagnostics: {},
+      operator_proposals: [
+        {
+          "title" => "Review project lint command",
+          "summary" => "Generated sources required a workaround.",
+          "priority" => "medium",
+          "category" => "project_command",
+          "suggested_action" => "Consider excluding generated sources from lint.",
+          "evidence" => ["The implementation moved generated files before lint."]
+        }
+      ]
+    )
+    task_repository.save(task)
+    run_repository.save(
+      run.append_phase_evidence(
+        phase: run.phase,
+        source_descriptor: run.source_descriptor,
+        scope_snapshot: run.scope_snapshot,
+        execution_record: execution_record
+      )
+    )
+
+    expect(status_publisher).to receive(:publish)
+    expect(activity_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      body: a_string_matching(
+        /## オペレーター向け追加提案.*1\. \*\*Review project lint command\*\* \(priority=medium category=project_command\).*要約: Generated sources required a workaround\..*推奨対応: Consider excluding generated sources from lint\..*根拠: The implementation moved generated files before lint\./m
+      )
+    )
+
+    result = use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :completed)
+
+    expect(result.task.status).to eq(:verifying)
+  end
+
+  it "does not publish operator proposal markdown for empty proposal lists" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :in_progress,
+      current_run_ref: "run-1",
+      external_task_id: 3025
+    )
+    execution_record = A3::Domain::PhaseExecutionRecord.new(
+      summary: "implemented greeting behavior",
+      diagnostics: {},
+      operator_proposals: []
+    )
+    task_repository.save(task)
+    run_repository.save(
+      run.append_phase_evidence(
+        phase: run.phase,
+        source_descriptor: run.source_descriptor,
+        scope_snapshot: run.scope_snapshot,
+        execution_record: execution_record
+      )
+    )
+
+    expect(status_publisher).to receive(:publish)
+    expect(activity_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      body: satisfy { |body| !body.include?("オペレーター向け追加提案") }
+    )
+
+    use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :completed)
+  end
+
+  it "does not publish normal operator proposal markdown for failed implementation runs" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :in_progress,
+      current_run_ref: "run-1",
+      external_task_id: 3025
+    )
+    execution_record = A3::Domain::PhaseExecutionRecord.new(
+      summary: "implementation failed",
+      failing_command: "bundle exec rspec",
+      observed_state: "spec failed",
+      diagnostics: {},
+      operator_proposals: [
+        {
+          "title" => "Do not publish on failure",
+          "summary" => "This failed payload should stay out of the normal proposal comment."
+        }
+      ]
+    )
+    task_repository.save(task)
+    run_repository.save(
+      run.append_phase_evidence(
+        phase: run.phase,
+        source_descriptor: run.source_descriptor,
+        scope_snapshot: run.scope_snapshot,
+        execution_record: execution_record
+      )
+    )
+
+    expect(status_publisher).to receive(:publish)
+    expect(activity_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      body: satisfy { |body| !body.include?("オペレーター向け追加提案") && body.include?("失敗コマンド: bundle exec rspec") },
+      event: hash_including("kind" => "task_blocked")
+    )
+
+    use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :blocked)
+  end
+
   it "stops phase advancement when the external task has an operator blocked label" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",

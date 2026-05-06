@@ -350,6 +350,7 @@ module A3
         append_review_disposition_comment_lines(lines, execution_record&.review_disposition)
         append_docs_impact_comment_lines(lines, execution_record&.docs_impact)
         append_refactoring_assessment_comment_lines(lines, execution_record&.refactoring_assessment)
+        append_operator_proposal_comment_lines(lines, execution_record&.operator_proposals) if implementation_completed?(run)
         append_clarification_request_comment_lines(lines, execution_record&.clarification_request)
         append_merge_recovery_comment_lines(lines, execution_record&.diagnostics || execution&.diagnostics)
         append_worker_result_diagnostic_comment_lines(
@@ -432,6 +433,31 @@ module A3
         lines << "refactoring-assessment: #{single_line(value.summary)}"
         evidence = summary_list(value.evidence, limit: 3)
         lines << "refactoring-evidence: #{evidence}" if present?(evidence)
+      end
+
+      def append_operator_proposal_comment_lines(lines, proposals)
+        entries = Array(proposals).select { |proposal| proposal.is_a?(Hash) }
+        return if entries.empty?
+
+        lines << ""
+        lines << "## オペレーター向け追加提案"
+        entries.each_with_index do |proposal, index|
+          title = single_line(proposal["title"])
+          summary = single_line(proposal["summary"])
+          fields = []
+          fields << "priority=#{single_line(proposal['priority'])}" if present?(proposal["priority"])
+          fields << "category=#{single_line(proposal['category'])}" if present?(proposal["category"])
+          heading = ["#{index + 1}.", "**#{title.empty? ? '追加提案' : title}**", fields.empty? ? nil : "(#{fields.join(' ')})"].compact.join(" ")
+          lines << heading
+          lines << "   - 要約: #{summary}" if present?(summary)
+          lines << "   - 推奨対応: #{single_line(proposal['suggested_action'])}" if present?(proposal["suggested_action"])
+          evidence = summary_list(proposal["evidence"], limit: 3)
+          lines << "   - 根拠: #{evidence}" if present?(evidence)
+        end
+      end
+
+      def implementation_completed?(run)
+        run.phase.to_sym == :implementation && run.terminal_outcome.to_sym == :completed
       end
 
       def summary_list(value, limit: 5)
