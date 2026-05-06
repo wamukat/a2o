@@ -5731,6 +5731,64 @@ func TestEnsureRuntimeHostAgentUsesPublicA2OPackageCommand(t *testing.T) {
 	}
 }
 
+func TestEnsureRuntimeHostAgentWarnsAndExportsWhenPackageVerifyHitsNetworkTimeout(t *testing.T) {
+	tempDir := t.TempDir()
+	hostAgentBin := filepath.Join(tempDir, ".work", "a2o", "agent", "bin", "a2o-agent")
+	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
+	plan := runtimeRunOncePlan{
+		ComposePrefix:   []string{"compose", "-p", "a3-test", "-f", "compose.yml"},
+		HostAgentSource: "runtime-image",
+		HostAgentTarget: "linux-amd64",
+		HostAgentBin:    hostAgentBin,
+		WorkspaceRoot:   filepath.Join(tempDir, "workspace"),
+	}
+	runner := &fakeRunner{
+		agentPackageVerifyFailureOutput: "/usr/local/lib/ruby/3.1.0/net/http.rb:1018:in `initialize': Failed to open TCP connection to github.com:443 (execution expired) (Net::OpenTimeout)\n",
+	}
+	var stdout bytes.Buffer
+
+	if err := ensureRuntimeHostAgent(config, plan, runner, &stdout); err != nil {
+		t.Fatalf("ensureRuntimeHostAgent should tolerate transient verify network failure: %v", err)
+	}
+
+	if !strings.Contains(stdout.String(), "runtime_agent_verify_warning target=linux-amd64 reason=transient_network") {
+		t.Fatalf("stdout should report verify warning, got %q", stdout.String())
+	}
+	joined := runner.joinedCalls()
+	assertCallContains(t, joined, "docker exec container-123 a2o agent package verify --target linux-amd64")
+	assertCallContains(t, joined, "docker exec container-123 a2o agent package export --target linux-amd64 --output /tmp/a2o-runtime-run-once-agent")
+	assertCallContains(t, joined, "docker cp container-123:/tmp/a2o-runtime-run-once-agent "+hostAgentBin)
+}
+
+func TestEnsureRuntimeHostAgentFailsWhenPackageVerifyHitsNonTransientGithubError(t *testing.T) {
+	tempDir := t.TempDir()
+	hostAgentBin := filepath.Join(tempDir, ".work", "a2o", "agent", "bin", "a2o-agent")
+	config := runtimeInstanceConfig{RuntimeService: "a2o-runtime"}
+	plan := runtimeRunOncePlan{
+		ComposePrefix:   []string{"compose", "-p", "a3-test", "-f", "compose.yml"},
+		HostAgentSource: "runtime-image",
+		HostAgentTarget: "linux-amd64",
+		HostAgentBin:    hostAgentBin,
+		WorkspaceRoot:   filepath.Join(tempDir, "workspace"),
+	}
+	runner := &fakeRunner{
+		agentPackageVerifyFailureOutput: "failed to fetch agent package bundle: HTTP 404 https://github.com/wamukat/a2o/releases/download/v0.5.75/a2o-agent-linux-amd64.tar.gz\n",
+	}
+	var stdout bytes.Buffer
+
+	err := ensureRuntimeHostAgent(config, plan, runner, &stdout)
+	if err == nil {
+		t.Fatal("ensureRuntimeHostAgent should fail non-transient github verify errors")
+	}
+	if strings.Contains(stdout.String(), "runtime_agent_verify_warning") {
+		t.Fatalf("stdout should not report transient warning for non-transient failure, got %q", stdout.String())
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if strings.Contains(joined, "agent package export") {
+		t.Fatalf("export should not run after non-transient verify failure, calls:\n%s", joined)
+	}
+}
+
 func TestRunHostAgentLoopPreservesExistingLogAcrossRestarts(t *testing.T) {
 	tempDir := t.TempDir()
 	hostAgentLog := filepath.Join(tempDir, ".work", "a2o", "runtime-host-agent", "agent.log")
@@ -8103,46 +8161,47 @@ func assertNoRemovedA3Env(t *testing.T, env map[string]string) {
 }
 
 type fakeRunner struct {
-	calls                      [][]string
-	emptyContainer             bool
-	missingVolumes             map[string]bool
-	legacySoloBoardDBVolumes   map[string]bool
-	failShowTask               bool
-	showStateOutput            string
-	showTaskOutput             string
-	decompositionStatusOutput  string
-	decompositionStatusOutputs []string
-	decompositionStatusHooks   []func()
-	taskWithoutCurrentRun      bool
-	staleCurrentRun            bool
-	runtimeExitMissing         bool
-	legacyRuntimeOrphans       []string
-	failLegacyRuntimeRM        bool
-	missingRunHistory          bool
-	schedulerPaused            bool
-	schedulerStopReason        string
-	schedulerExecutedCount     int
-	startBackgroundErr         error
-	err                        error
-	lastEnv                    map[string]string
-	nextPID                    int
-	processCommands            map[int]string
-	errorOutput                string
-	imageInspectDigests        map[string]string
-	imageInspectIDs            map[string]string
-	containerImageIDs          map[string]string
-	logManifestOutput          string
-	logManifestOutputs         []string
-	runtimeLogTargetsOutput    string
-	runtimeLogTargetsOutputs   []string
-	watchSummaryOutput         string
-	taskStatus                 string
-	hostAgentOutput            string
-	hostAgentOutputs           []string
-	hostAgentOutputIndex       int
-	runtimeCommandLogOutput    string
-	runtimeCommandLogOutputs   []string
-	decompositionPlanOutput    string
+	calls                           [][]string
+	emptyContainer                  bool
+	missingVolumes                  map[string]bool
+	legacySoloBoardDBVolumes        map[string]bool
+	failShowTask                    bool
+	showStateOutput                 string
+	showTaskOutput                  string
+	decompositionStatusOutput       string
+	decompositionStatusOutputs      []string
+	decompositionStatusHooks        []func()
+	taskWithoutCurrentRun           bool
+	staleCurrentRun                 bool
+	runtimeExitMissing              bool
+	legacyRuntimeOrphans            []string
+	failLegacyRuntimeRM             bool
+	missingRunHistory               bool
+	schedulerPaused                 bool
+	schedulerStopReason             string
+	schedulerExecutedCount          int
+	startBackgroundErr              error
+	agentPackageVerifyFailureOutput string
+	err                             error
+	lastEnv                         map[string]string
+	nextPID                         int
+	processCommands                 map[int]string
+	errorOutput                     string
+	imageInspectDigests             map[string]string
+	imageInspectIDs                 map[string]string
+	containerImageIDs               map[string]string
+	logManifestOutput               string
+	logManifestOutputs              []string
+	runtimeLogTargetsOutput         string
+	runtimeLogTargetsOutputs        []string
+	watchSummaryOutput              string
+	taskStatus                      string
+	hostAgentOutput                 string
+	hostAgentOutputs                []string
+	hostAgentOutputIndex            int
+	runtimeCommandLogOutput         string
+	runtimeCommandLogOutputs        []string
+	decompositionPlanOutput         string
 }
 
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
@@ -8261,6 +8320,11 @@ func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 			return []byte("\n"), nil
 		}
 		return []byte("container-123\n"), nil
+	case strings.Contains(joined, "docker exec container-123 a2o agent package verify"):
+		if r.agentPackageVerifyFailureOutput != "" {
+			return []byte(r.agentPackageVerifyFailureOutput), errors.New("exit status 1")
+		}
+		return []byte{}, nil
 	case strings.Contains(joined, " exec -T ") && strings.Contains(joined, " test -f /tmp/a2o-runtime-run-once.exit"):
 		if r.runtimeExitMissing {
 			return []byte("missing\n"), errors.New("missing")

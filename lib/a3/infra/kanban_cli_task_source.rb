@@ -25,7 +25,9 @@ module A3
       end
 
       def load
-        selection_snapshots = load_selection_snapshots
+        selection = load_selection_snapshots(tolerate_invalid_edit_scope: true)
+        selection.fetch(:warnings).each { |warning| warn "kanban task source warning: #{warning}" }
+        selection_snapshots = selection.fetch(:snapshots)
         topology = load_topology(selection_snapshots: selection_snapshots)
         build_tasks(
           selection_snapshots,

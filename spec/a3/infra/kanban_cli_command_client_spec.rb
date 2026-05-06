@@ -11,6 +11,7 @@ RSpec.describe A3::Infra::KanbanCliCommandClient do
   end
 
   let(:success_status) { instance_double(Process::Status, success?: true, exitstatus: 0) }
+  let(:failure_status) { instance_double(Process::Status, success?: false, exitstatus: 1) }
 
   it "runs JSON commands with text transported through a file option" do
     captured_path = nil
@@ -33,6 +34,28 @@ RSpec.describe A3::Infra::KanbanCliCommandClient do
     expect(payload).to eq("ok" => true)
     expect(captured_path).to start_with(@tmp_dir)
     expect(File.exist?(captured_path)).to be(false)
+  end
+
+  it "retries transient Kanbalone 503 JSON command failures" do
+    attempts = 0
+    allow(Open3).to receive(:capture3) do
+      attempts += 1
+      if attempts == 1
+        ["", "HTTP 503 /api/boards", failure_status]
+      else
+        ['[{"ref":"Sample#1"}]', "", success_status]
+      end
+    end
+
+    client = described_class.new(
+      command_argv: %w[task kanban:api --],
+      project: "Sample",
+      working_dir: @tmp_dir,
+      transient_retry_sleep: 0
+    )
+
+    expect(client.run_json_command("task-snapshot-list", "--project", "Sample")).to eq([{ "ref" => "Sample#1" }])
+    expect(attempts).to eq(2)
   end
 
   it "runs non-JSON commands with text transported through a file option" do
