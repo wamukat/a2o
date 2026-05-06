@@ -327,7 +327,7 @@ decomposition では、`include_child` は refactoring work を通常の child d
 
 ## Public Key Naming Convention
 
-`project.yaml` の公開設定キーは snake_case を正規形とする。A2O の内部 worker payload や外部 provider payload が camelCase を使う場合でも、project package の利用者が直接書く YAML key は snake_case に寄せる。これにより、`review_gate`、`commit_preflight`、`native_git_hooks`、`completion_hooks`、`after_push` など既存の公開設定と同じ読み方になる。
+`project.yaml` の公開設定キーは snake_case を正規形とする。A2O の内部 worker payload や外部 provider payload が camelCase を使う場合でも、新規または変更対象の user-authored YAML key は snake_case に寄せる。これにより、`review_gate`、`commit_preflight`、`native_git_hooks`、`completion_hooks`、`after_push` など既存の公開設定と同じ読み方になる。
 
 命名規則は次の通りである。
 
@@ -339,6 +339,8 @@ decomposition では、`include_child` は refactoring work を通常の child d
 - 旧 `repoSlots`、`childDraftTemplate` のような camelCase key は正規形ではない。移行する場合は `repo_slots`、`child_draft_template` を使う。
 
 移行エラーは黙って互換解釈しない。削除済みまたは名前変更済みの key を使った場合、A2O は `migration_required=true` と移行先 key を含む診断で失敗する。
+
+既存 docs surface には `docs.repoSlot`、`docs.surfaces.*.repoSlot`、`docs.authorities.*.repoSlot` の camelCase key が残っている。これらは prompt key 正規化とは別の移行対象であり、現行の prompt key 移行では変更しない。docs surface 側の snake_case 化では `repo_slot` を正規形とし、同じ migration-required 方針で扱う。
 
 ## Runtime Decomposition
 

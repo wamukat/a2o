@@ -50,6 +50,7 @@ A2O 0.5.75 で現在利用できる公開機能と検証範囲を示す。
 - multi-repo documentation surfaces: `docs.surfaces` で repo-local docs と integration docs を分けて宣言できる。`docs.authorities` は source-of-truth file が存在する repo slot を指定でき、worker の `docs_context` には surface id、repo slot、role、candidate docs、authority source metadata が含まれる。
 - agent-materialized execution では、host agent が具体化した実際の source alias / path から documentation context を解決する。これにより、host agent が workspace を所有する実行経路でも repo-local docs と cross-repo authority を参照できる。
 - project package public key naming: `project.yaml` の公開設定キーは snake_case を正規形とする。`runtime.prompts.repo_slots` と `child_draft_template` が prompt 設定の正規キーであり、旧 `runtime.prompts.repoSlots` / `childDraftTemplate` は移行対象である。詳細は [90-project-package-schema.md#public-key-naming-convention](90-project-package-schema.md#public-key-naming-convention) と [90-project-package-schema.md#runtime-prompts](90-project-package-schema.md#runtime-prompts) を参照する。
+- docs surface の `repoSlot` 系 key は prompt key 正規化とは別の移行対象であり、この release note では既存例外として明記する。後続の docs surface 移行では `repo_slot` を正規形にする。
 - project prompt composition: `runtime.prompts.repo_slots` は multi-repo task で、task の `repo_slots` / `edit_scope` 順に各 repo slot の prompt / skill addon を合成する。
 - worker runtime request と inspection output は、multi-repo task について順序付きの `repo_slots` を出力する。従来の `repo_scope` は single-scope 互換フィールドとして残し、旧 variant lookup 互換のために `both` を表示する場合があるが、multi-repo identity の正本ではない。
 - prompt diagnostics / evidence は順序付きの `project_prompt.repo_slots` を出力する。従来の単数 `repo_slot` は single-slot task の場合だけ設定される。

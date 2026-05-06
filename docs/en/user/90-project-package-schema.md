@@ -323,7 +323,7 @@ Use `run` only when the hook is deterministic in the agent workspace and its req
 
 ## Public Key Naming Convention
 
-Public `project.yaml` keys use snake_case as the canonical form. Even when an internal worker payload or external provider payload uses camelCase, YAML keys that project-package authors write should stay aligned with existing public settings such as `review_gate`, `commit_preflight`, `native_git_hooks`, `completion_hooks`, and `after_push`.
+Public `project.yaml` keys use snake_case as the canonical form. Even when an internal worker payload or external provider payload uses camelCase, new or changed user-authored YAML keys should stay aligned with existing public settings such as `review_gate`, `commit_preflight`, `native_git_hooks`, `completion_hooks`, and `after_push`.
 
 The naming rules are:
 
@@ -335,6 +335,8 @@ The naming rules are:
 - Old camelCase keys such as `repoSlots` and `childDraftTemplate` are not canonical. Use `repo_slots` and `child_draft_template`.
 
 Migration errors are explicit. A2O should not silently reinterpret removed or renamed keys; it should fail with `migration_required=true` and the replacement key.
+
+The existing docs surface still has camelCase keys: `docs.repoSlot`, `docs.surfaces.*.repoSlot`, and `docs.authorities.*.repoSlot`. They are a separate migration target from prompt key normalization and are not changed by the prompt-key migration. When the docs surface is migrated, `repo_slot` should become canonical and old `repoSlot` keys should follow the same migration-required policy.
 
 ## Runtime Decomposition
 
