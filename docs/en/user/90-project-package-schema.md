@@ -321,6 +321,21 @@ If any command exits non-zero, A2O blocks the publish commit and records the fai
 
 Use `run` only when the hook is deterministic in the agent workspace and its required tools are declared in `agent.required_bins`. A failing hook blocks the phase publish and leaves the task needing remediation or operator attention.
 
+## Public Key Naming Convention
+
+Public `project.yaml` keys use snake_case as the canonical form. Even when an internal worker payload or external provider payload uses camelCase, YAML keys that project-package authors write should stay aligned with existing public settings such as `review_gate`, `commit_preflight`, `native_git_hooks`, `completion_hooks`, and `after_push`.
+
+The naming rules are:
+
+- Use `command` for one executable command and `commands` for an ordered list of executable commands.
+- Use `hooks` for ordered phase-boundary hook collections.
+- Put read-only notification and audit integrations under `observers`.
+- Use `*_gate` for configuration that controls whether execution may advance.
+- Avoid adding phase-like names for work that is not a real scheduler phase; when a setting is reporting, observer, or delivery behavior, keep that role explicit in the section name or prose.
+- Old camelCase keys such as `repoSlots` and `childDraftTemplate` are not canonical. Use `repo_slots` and `child_draft_template`.
+
+Migration errors are explicit. A2O should not silently reinterpret removed or renamed keys; it should fail with `migration_required=true` and the replacement key.
+
 ## Runtime Decomposition
 
 `runtime.decomposition.investigate.command` is the project-owned command for `trigger:investigate` ticket decomposition. `runtime.decomposition.author.command` is the project-owned command that turns investigation evidence into a normalized child-ticket proposal. They are optional unless the project wants A2O to run the matching decomposition pipeline step.
@@ -473,8 +488,8 @@ runtime:
         prompt: prompts/parent-review.md
       decomposition:
         prompt: prompts/decomposition.md
-        childDraftTemplate: prompts/decomposition-child-template.md
-    repoSlots:
+        child_draft_template: prompts/decomposition-child-template.md
+    repo_slots:
       app:
         phases:
           review:
@@ -482,9 +497,9 @@ runtime:
               - skills/app-review.md
 ```
 
-All paths are package-relative non-empty strings. Prompt phase names are limited to A2O-recognized phase profiles. `phases.<phase>.skills` preserves the declared order and must not list the same skill file more than once. `implementation_rework` is optional and falls back to `implementation` when no rework-specific prompt profile is configured. `repoSlots.<slot>.phases` is an additive layer on top of the project phase defaults, and `<slot>` must match a `repos` entry. Phase prompts and skills are composed before repo-slot prompts and skills. Diagnostics and evidence identify repo-slot layers as `repo_slot_phase_prompt`, `repo_slot_phase_skill`, or `repo_slot_decomposition_child_draft_template`.
+All paths are package-relative non-empty strings. Prompt phase names are limited to A2O-recognized phase profiles. `phases.<phase>.skills` preserves the declared order and must not list the same skill file more than once. `implementation_rework` is optional and falls back to `implementation` when no rework-specific prompt profile is configured. `repo_slots.<slot>.phases` is an additive layer on top of the project phase defaults, and `<slot>` must match a `repos` entry. Phase prompts and skills are composed before repo-slot prompts and skills. Diagnostics and evidence identify repo-slot layers as `repo_slot_phase_prompt`, `repo_slot_phase_skill`, or `repo_slot_decomposition_child_draft_template`.
 
-For tasks that span multiple repositories, A2O composes repo-slot addons for each slot in the task `repo_slots` / `edit_scope`, in that order. A multi-repo implementation touching `app` and `lib` therefore receives the project-wide phase prompt first, then `repoSlots.app` phase addons, then `repoSlots.lib` phase addons, before ticket-specific instructions. Diagnostics expose `repo_slots` as the ordered list; the legacy `repo_scope` field is kept for compatibility and the singular `repo_slot` field is populated only for single-slot tasks. If the combined instructions would be too broad or conflicting, split the work into repo-slot child tasks.
+For tasks that span multiple repositories, A2O composes repo-slot addons for each slot in the task `repo_slots` / `edit_scope`, in that order. A multi-repo implementation touching `app` and `lib` therefore receives the project-wide phase prompt first, then `repo_slots.app` phase addons, then `repo_slots.lib` phase addons, before ticket-specific instructions. Diagnostics expose `repo_slots` as the ordered list; the legacy `repo_scope` field is kept for compatibility and the singular `repo_slot` field is populated only for single-slot tasks. If the combined instructions would be too broad or conflicting, split the work into repo-slot child tasks.
 
 Composition order is fixed and additive:
 
@@ -493,7 +508,7 @@ A2O core worker contract
   > runtime.prompts.system
   > runtime.prompts.phases.<profile>.prompt
   > runtime.prompts.phases.<profile>.skills
-  > runtime.prompts.repoSlots.<slot>.phases.<profile> addons for each scoped slot
+  > runtime.prompts.repo_slots.<slot>.phases.<profile> addons for each scoped slot
   > ticket-specific instruction and task packet
 ```
 
@@ -518,7 +533,7 @@ Judge whether child outputs integrate cleanly. Identify follow-up child work onl
 Split broad requirements into draft child tickets with clear ownership, dependencies, non-goals, acceptance criteria, and verification method.
 ```
 
-Skills are longer reusable Markdown guidance referenced from a phase. Use prompts for phase stance and instruction layering; use skills for detailed procedures such as testing policy, API compatibility rules, UI review checklist, or Kanban decomposition templates. `childDraftTemplate` is decomposition-specific guidance for the expected child ticket shape. It is passed to the proposal author request, while durable evidence stores only safe prompt metadata.
+Skills are longer reusable Markdown guidance referenced from a phase. Use prompts for phase stance and instruction layering; use skills for detailed procedures such as testing policy, API compatibility rules, UI review checklist, or Kanban decomposition templates. `child_draft_template` is decomposition-specific guidance for the expected child ticket shape. It is passed to the proposal author request, while durable evidence stores only safe prompt metadata.
 
 Inspect prompt composition before running a worker with:
 
@@ -536,7 +551,7 @@ Validate prompt configuration without running workers or changing Kanban state w
 a2o doctor prompts
 ```
 
-The prompt doctor reports missing files, invalid paths, unsupported prompt phases, duplicate skill entries, invalid repo-slot addons, fallback-visible prompt profiles, and invalid `childDraftTemplate` placement with package path and phase context.
+The prompt doctor reports missing files, invalid paths, unsupported prompt phases, duplicate skill entries, invalid repo-slot addons, fallback-visible prompt profiles, and invalid `child_draft_template` placement with package path and phase context.
 
 A copyable baseline is available at `samples/prompt-packs/ja-conservative/`. It demonstrates a Japanese system prompt, phase prompts for implementation, implementation rework, review, parent review, and decomposition, reusable phase skills, a decomposition child draft template, and a minimal `runtime.prompts` config snippet.
 
@@ -617,7 +632,7 @@ runtime:
         prompt: prompts/parent-review.md
       decomposition:
         prompt: prompts/decomposition.md
-        childDraftTemplate: prompts/decomposition-child-template.md
+        child_draft_template: prompts/decomposition-child-template.md
   phases:
     implementation:
       skill: skills/implementation.md
@@ -647,9 +662,9 @@ Precedence is fixed. When `runtime.phases.<phase>.skill` is configured, that leg
 
 Projects that have fully moved a phase to `runtime.prompts.phases.<phase>` may omit `runtime.phases.<phase>.skill` for that phase. In that prompts-only mode, A2O does not emit an `a2o_core_instruction` layer for the omitted skill; the project system prompt, phase prompt, phase skill files, repo-slot addons, and ticket-specific instruction form the project prompt stack. The corresponding prompt phase must contain at least one prompt or skill file. A system prompt alone does not make a phase prompts-backed.
 
-`implementation_rework` is a prompt profile, not a separate scheduler phase. It is selected for implementation requests that include prior review feedback, and it falls back to `implementation` when omitted. `phase_runtime.prior_review_feedback` includes the previous review run `summary`, `observed_state`, and `failing_command`, plus the structured review result as a `review_disposition` object when the review worker returned one. Rework workers can read `prior_review_feedback.review_disposition.kind`, `description`, `finding_key`, and `slot_scopes` instead of parsing free-form Kanban comments. These values are not copied to the top level of `prior_review_feedback`; the nested `review_disposition` object is the source of truth. `parent_review` follows the same prompt layering as other review profiles. `decomposition` uses the decomposition prompt plus optional `childDraftTemplate`; the template is allowed only for decomposition and should describe the expected draft child ticket format.
+`implementation_rework` is a prompt profile, not a separate scheduler phase. It is selected for implementation requests that include prior review feedback, and it falls back to `implementation` when omitted. `phase_runtime.prior_review_feedback` includes the previous review run `summary`, `observed_state`, and `failing_command`, plus the structured review result as a `review_disposition` object when the review worker returned one. Rework workers can read `prior_review_feedback.review_disposition.kind`, `description`, `finding_key`, and `slot_scopes` instead of parsing free-form Kanban comments. These values are not copied to the top level of `prior_review_feedback`; the nested `review_disposition` object is the source of truth. `parent_review` follows the same prompt layering as other review profiles. `decomposition` uses the decomposition prompt plus optional `child_draft_template`; the template is allowed only for decomposition and should describe the expected draft child ticket format.
 
-A2O reports invalid prompt migration through `a2o project validate` and `a2o project lint` diagnostics. Typical failures include missing prompt or skill files, paths outside the package root, non-file paths, unsupported prompt phase names, duplicate skill files in one phase layer, unknown `repoSlots` keys, duplicate repo-slot skill additions, and `childDraftTemplate` outside `decomposition`. Validation coverage exists for both old-style packages without `runtime.prompts` and new-style packages with project prompt configuration.
+A2O reports invalid prompt migration through `a2o project validate` and `a2o project lint` diagnostics. Typical failures include missing prompt or skill files, paths outside the package root, non-file paths, unsupported prompt phase names, duplicate skill files in one phase layer, unknown `repo_slots` keys, duplicate repo-slot skill additions, and `child_draft_template` outside `decomposition`. Validation coverage exists for both old-style packages without `runtime.prompts` and new-style packages with project prompt configuration. Old `runtime.prompts.repoSlots` and `childDraftTemplate` keys are not canonical; when used, A2O fails with `migration_required=true` and the replacement key.
 
 This is a coexistence policy, not a deprecation notice. Existing phase skills continue to work until a deliberate migration/removal plan is documented in a future release, while prompts-only phases are supported for projects that have intentionally moved their phase guidance into `runtime.prompts`.
 
@@ -751,6 +766,8 @@ The simple list form remains the recommended default. Use variants when the pack
 ### Metrics Collection
 
 `runtime.phases.metrics.commands` is optional. When present, A2O runs these commands only after verification succeeds.
+
+`metrics` is not a scheduler phase with a Kanban lane. It is a reporting hook that runs after successful verification while using the same worker request contract as phase commands. The canonical location remains `runtime.phases.metrics.commands` because it belongs to the existing phase command surface, but user-facing docs should describe it as metrics collection or a reporting hook, not as a separate metrics phase.
 
 ```yaml
 runtime:
