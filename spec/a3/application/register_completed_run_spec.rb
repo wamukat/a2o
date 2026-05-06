@@ -227,7 +227,10 @@ RSpec.describe A3::Application::RegisterCompletedRun do
           "category" => "project_command",
           "suggested_action" => "Consider excluding generated sources from lint.",
           "evidence" => ["The implementation moved generated files before lint."]
-        }
+        },
+        { "title" => "Second proposal", "summary" => "Second summary." },
+        { "title" => "Third proposal", "summary" => "Third summary." },
+        { "title" => "Fourth proposal", "summary" => "Fourth summary." }
       ]
     )
     task_repository.save(task)
@@ -245,13 +248,63 @@ RSpec.describe A3::Application::RegisterCompletedRun do
       task_ref: task.ref,
       external_task_id: 3025,
       body: a_string_matching(
-        /## オペレーター向け追加提案.*1\. \*\*Review project lint command\*\* \(priority=medium category=project_command\).*要約: Generated sources required a workaround\..*推奨対応: Consider excluding generated sources from lint\..*根拠: The implementation moved generated files before lint\./m
+        /## Operator proposals.*1\. \*\*Review project lint command\*\* \(priority=medium category=project_command\).*Summary: Generated sources required a workaround\..*Suggested action: Consider excluding generated sources from lint\..*Evidence: The implementation moved generated files before lint\..*3\. \*\*Third proposal\*\*.*\+1 more proposal\(s\); use describe-task for full details\./m
       )
     )
 
     result = use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :completed)
 
     expect(result.task.status).to eq(:verifying)
+  end
+
+  it "honors Japanese kanban system comment locale for operator proposal markdown" do
+    localized_use_case = described_class.new(
+      task_repository: task_repository,
+      run_repository: run_repository,
+      plan_next_phase: plan_next_phase,
+      publish_external_task_status: status_publisher,
+      publish_external_task_activity: activity_publisher,
+      integration_ref_readiness_checker: integration_ref_readiness_checker,
+      system_comment_locale: "ja"
+    )
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :in_progress,
+      current_run_ref: "run-1",
+      external_task_id: 3025
+    )
+    execution_record = A3::Domain::PhaseExecutionRecord.new(
+      summary: "implemented greeting behavior",
+      diagnostics: {},
+      operator_proposals: [
+        {
+          "title" => "Review project lint command",
+          "summary" => "Generated sources required a workaround.",
+          "suggested_action" => "Consider excluding generated sources from lint.",
+          "evidence" => ["The implementation moved generated files before lint."]
+        }
+      ]
+    )
+    task_repository.save(task)
+    run_repository.save(
+      run.append_phase_evidence(
+        phase: run.phase,
+        source_descriptor: run.source_descriptor,
+        scope_snapshot: run.scope_snapshot,
+        execution_record: execution_record
+      )
+    )
+
+    expect(status_publisher).to receive(:publish)
+    expect(activity_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      body: a_string_matching(/## オペレーター向け追加提案.*要約: Generated sources required a workaround\..*推奨対応: Consider excluding generated sources from lint\..*根拠: The implementation moved generated files before lint\./m)
+    )
+
+    localized_use_case.call(task_ref: task.ref, run_ref: run.ref, outcome: :completed)
   end
 
   it "does not publish operator proposal markdown for empty proposal lists" do

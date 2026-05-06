@@ -3,7 +3,7 @@
 module A3
   module Bootstrap
     class Container
-      def self.build(storage_backend:, storage_dir:, run_id_generator:, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::DisabledMergeRunner.new, worker_gateway: nil, repo_sources: {}, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
+      def self.build(storage_backend:, storage_dir:, run_id_generator:, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::DisabledMergeRunner.new, worker_gateway: nil, repo_sources: {}, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil, system_comment_locale: "en")
         new(
           **repositories_for(storage_backend: storage_backend, storage_dir: storage_dir),
           run_id_generator: run_id_generator,
@@ -15,11 +15,12 @@ module A3
           external_task_source: external_task_source,
           external_task_status_publisher: external_task_status_publisher,
           external_task_activity_publisher: external_task_activity_publisher,
-          external_follow_up_child_writer: external_follow_up_child_writer
+          external_follow_up_child_writer: external_follow_up_child_writer,
+          system_comment_locale: system_comment_locale
         ).build
       end
 
-      def self.json(storage_dir:, run_id_generator:, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::DisabledMergeRunner.new, worker_gateway: nil, repo_sources: {}, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
+      def self.json(storage_dir:, run_id_generator:, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::DisabledMergeRunner.new, worker_gateway: nil, repo_sources: {}, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil, system_comment_locale: "en")
         build(
           storage_backend: :json,
           storage_dir: storage_dir,
@@ -31,11 +32,12 @@ module A3
           external_task_source: external_task_source,
           external_task_status_publisher: external_task_status_publisher,
           external_task_activity_publisher: external_task_activity_publisher,
-          external_follow_up_child_writer: external_follow_up_child_writer
+          external_follow_up_child_writer: external_follow_up_child_writer,
+          system_comment_locale: system_comment_locale
         )
       end
 
-      def self.sqlite(storage_dir:, run_id_generator:, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::DisabledMergeRunner.new, worker_gateway: nil, repo_sources: {}, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
+      def self.sqlite(storage_dir:, run_id_generator:, command_runner: A3::Infra::LocalCommandRunner.new, merge_runner: A3::Infra::DisabledMergeRunner.new, worker_gateway: nil, repo_sources: {}, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil, system_comment_locale: "en")
         build(
           storage_backend: :sqlite,
           storage_dir: storage_dir,
@@ -47,11 +49,12 @@ module A3
           external_task_source: external_task_source,
           external_task_status_publisher: external_task_status_publisher,
           external_task_activity_publisher: external_task_activity_publisher,
-          external_follow_up_child_writer: external_follow_up_child_writer
+          external_follow_up_child_writer: external_follow_up_child_writer,
+          system_comment_locale: system_comment_locale
         )
       end
 
-      def initialize(task_repository:, run_repository:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:, storage_dir:, repo_sources:, task_metrics_repository: A3::Infra::InMemoryTaskMetricsRepository.new, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
+      def initialize(task_repository:, run_repository:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:, storage_dir:, repo_sources:, task_metrics_repository: A3::Infra::InMemoryTaskMetricsRepository.new, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil, system_comment_locale: "en")
         @task_repository = task_repository
         @run_repository = run_repository
         @task_metrics_repository = task_metrics_repository
@@ -65,6 +68,7 @@ module A3
         @external_task_status_publisher = external_task_status_publisher
         @external_task_activity_publisher = external_task_activity_publisher
         @external_follow_up_child_writer = external_follow_up_child_writer
+        @system_comment_locale = system_comment_locale
       end
 
       def build
@@ -85,7 +89,8 @@ module A3
           external_task_source: @external_task_source,
           external_task_status_publisher: @external_task_status_publisher,
           external_task_activity_publisher: @external_task_activity_publisher,
-          external_follow_up_child_writer: @external_follow_up_child_writer
+          external_follow_up_child_writer: @external_follow_up_child_writer,
+          system_comment_locale: @system_comment_locale
         )
 
         A3::Bootstrap::ContainerBuilder.build(

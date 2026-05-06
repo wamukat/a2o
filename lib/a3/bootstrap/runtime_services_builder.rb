@@ -7,7 +7,7 @@ require "a3/bootstrap/runtime_services_builder/execution_group_builder"
 module A3
   module Bootstrap
     class RuntimeServicesBuilder
-      def self.build(repositories:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:, storage_dir:, repo_sources:, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
+      def self.build(repositories:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:, storage_dir:, repo_sources:, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil, system_comment_locale: "en")
         new(
           repositories: repositories,
           run_id_generator: run_id_generator,
@@ -19,11 +19,12 @@ module A3
           external_task_source: external_task_source,
           external_task_status_publisher: external_task_status_publisher,
           external_task_activity_publisher: external_task_activity_publisher,
-          external_follow_up_child_writer: external_follow_up_child_writer
+          external_follow_up_child_writer: external_follow_up_child_writer,
+          system_comment_locale: system_comment_locale
         ).build
       end
 
-      def initialize(repositories:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:, storage_dir:, repo_sources:, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
+      def initialize(repositories:, run_id_generator:, command_runner:, merge_runner:, worker_gateway:, storage_dir:, repo_sources:, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil, system_comment_locale: "en")
         @repositories = repositories
         @run_id_generator = run_id_generator
         @command_runner = command_runner
@@ -35,6 +36,7 @@ module A3
         @external_task_status_publisher = external_task_status_publisher
         @external_task_activity_publisher = external_task_activity_publisher
         @external_follow_up_child_writer = external_follow_up_child_writer
+        @system_comment_locale = system_comment_locale
       end
 
       def build
@@ -55,7 +57,8 @@ module A3
           external_task_source: @external_task_source,
           external_task_status_publisher: @external_task_status_publisher,
           external_task_activity_publisher: @external_task_activity_publisher,
-          external_follow_up_child_writer: @external_follow_up_child_writer
+          external_follow_up_child_writer: @external_follow_up_child_writer,
+          system_comment_locale: @system_comment_locale
         )
       end
 

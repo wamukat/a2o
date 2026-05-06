@@ -99,7 +99,8 @@ module A3
           external_task_source: external_task_source,
           external_task_status_publisher: external_task_status_publisher,
           external_task_activity_publisher: external_task_activity_publisher,
-          external_follow_up_child_writer: external_follow_up_child_writer
+          external_follow_up_child_writer: external_follow_up_child_writer,
+          system_comment_locale: project_surface.system_comment_locale
         )
         runtime_environment_config = A3::Bootstrap::RuntimeEnvironmentConfig.build(
           runtime_package: runtime_package,

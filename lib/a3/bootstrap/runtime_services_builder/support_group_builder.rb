@@ -7,7 +7,7 @@ module A3
   module Bootstrap
     class RuntimeServicesBuilder
       class SupportGroupBuilder
-        def self.build(repositories:, run_id_generator:, storage_dir:, repo_sources:, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil)
+        def self.build(repositories:, run_id_generator:, storage_dir:, repo_sources:, external_task_source: A3::Infra::NullExternalTaskSource.new, external_task_status_publisher: A3::Infra::NullExternalTaskStatusPublisher.new, external_task_activity_publisher: A3::Infra::NullExternalTaskActivityPublisher.new, external_follow_up_child_writer: nil, system_comment_locale: "en")
           workspace_plan_builder = A3::Application::BuildWorkspacePlan.new(repo_slots: repo_sources.keys)
           start_phase = A3::Application::StartPhase.new(
             workspace_plan_builder: workspace_plan_builder,
@@ -29,7 +29,8 @@ module A3
             publish_external_task_status: external_task_status_publisher,
             publish_external_task_activity: external_task_activity_publisher,
             integration_ref_readiness_checker: integration_ref_readiness_checker,
-            handle_parent_review_disposition: parent_review_disposition_handler
+            handle_parent_review_disposition: parent_review_disposition_handler,
+            system_comment_locale: system_comment_locale
           )
           reconcile_manual_merge_recovery = A3::Application::ReconcileManualMergeRecovery.new(
             task_repository: repositories.fetch(:task_repository),

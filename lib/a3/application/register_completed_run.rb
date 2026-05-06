@@ -8,13 +8,14 @@ module A3
     class RegisterCompletedRun
       Result = Struct.new(:task, :run, keyword_init: true)
 
-      def initialize(task_repository:, run_repository:, plan_next_phase:, publish_external_task_status: nil, publish_external_task_activity: nil, integration_ref_readiness_checker:, handle_parent_review_disposition: nil, branch_namespace: A3::Domain::BranchNamespace.from_env)
+      def initialize(task_repository:, run_repository:, plan_next_phase:, publish_external_task_status: nil, publish_external_task_activity: nil, integration_ref_readiness_checker:, handle_parent_review_disposition: nil, branch_namespace: A3::Domain::BranchNamespace.from_env, system_comment_locale: "en")
         @task_repository = task_repository
         @run_repository = run_repository
         @plan_next_phase = plan_next_phase
         @publish_external_task_status = publish_external_task_status
         @publish_external_task_activity = publish_external_task_activity
         @branch_namespace = A3::Domain::BranchNamespace.normalize(branch_namespace)
+        @system_comment_locale = normalize_system_comment_locale(system_comment_locale)
         raise ArgumentError, "integration_ref_readiness_checker is required" unless integration_ref_readiness_checker
 
         @integration_ref_readiness_checker = integration_ref_readiness_checker
@@ -440,24 +441,67 @@ module A3
         return if entries.empty?
 
         lines << ""
-        lines << "## オペレーター向け追加提案"
-        entries.each_with_index do |proposal, index|
+        lines << localized_operator_proposal_heading
+        entries.first(3).each_with_index do |proposal, index|
           title = single_line(proposal["title"])
           summary = single_line(proposal["summary"])
           fields = []
           fields << "priority=#{single_line(proposal['priority'])}" if present?(proposal["priority"])
           fields << "category=#{single_line(proposal['category'])}" if present?(proposal["category"])
-          heading = ["#{index + 1}.", "**#{title.empty? ? '追加提案' : title}**", fields.empty? ? nil : "(#{fields.join(' ')})"].compact.join(" ")
+          heading = ["#{index + 1}.", "**#{title.empty? ? localized_operator_proposal_fallback_title : title}**", fields.empty? ? nil : "(#{fields.join(' ')})"].compact.join(" ")
           lines << heading
-          lines << "   - 要約: #{summary}" if present?(summary)
-          lines << "   - 推奨対応: #{single_line(proposal['suggested_action'])}" if present?(proposal["suggested_action"])
+          lines << "   - #{localized_operator_proposal_label(:summary)}: #{summary}" if present?(summary)
+          lines << "   - #{localized_operator_proposal_label(:suggested_action)}: #{single_line(proposal['suggested_action'])}" if present?(proposal["suggested_action"])
           evidence = summary_list(proposal["evidence"], limit: 3)
-          lines << "   - 根拠: #{evidence}" if present?(evidence)
+          lines << "   - #{localized_operator_proposal_label(:evidence)}: #{evidence}" if present?(evidence)
         end
+        lines << localized_operator_proposal_more(entries.length - 3) if entries.length > 3
       end
 
       def implementation_completed?(run)
         run.phase.to_sym == :implementation && run.terminal_outcome.to_sym == :completed
+      end
+
+      def localized_operator_proposal_heading
+        return "## オペレーター向け追加提案" if @system_comment_locale == "ja"
+
+        "## Operator proposals"
+      end
+
+      def localized_operator_proposal_fallback_title
+        return "追加提案" if @system_comment_locale == "ja"
+
+        "Operator proposal"
+      end
+
+      def localized_operator_proposal_label(key)
+        labels = if @system_comment_locale == "ja"
+                   {
+                     summary: "要約",
+                     suggested_action: "推奨対応",
+                     evidence: "根拠"
+                   }
+                 else
+                   {
+                     summary: "Summary",
+                     suggested_action: "Suggested action",
+                     evidence: "Evidence"
+                   }
+                 end
+        labels.fetch(key)
+      end
+
+      def localized_operator_proposal_more(count)
+        return "+#{count} 件の追加提案は describe-task で確認してください。" if @system_comment_locale == "ja"
+
+        "+#{count} more proposal(s); use describe-task for full details."
+      end
+
+      def normalize_system_comment_locale(locale)
+        value = locale.to_s.strip
+        return value if %w[en ja].include?(value)
+
+        "en"
       end
 
       def summary_list(value, limit: 5)
