@@ -65,6 +65,7 @@ publish:
       - ./project-package/commands/publish-preflight.sh
 runtime:
   max_steps: 20
+  max_consecutive_rework_without_commit: 3
   agent_attempts: 200
   agent_poll_interval: 1s
   agent_control_plane_connect_timeout: 5s
@@ -128,6 +129,8 @@ kanban:
 `runtime.agent_attempts` and `runtime.agent_poll_interval` control the outer host-agent loop.
 
 `runtime.agent_control_plane_connect_timeout`, `runtime.agent_control_plane_request_timeout`, `runtime.agent_control_plane_retry_count`, and `runtime.agent_control_plane_retry_delay` control the host agent's HTTP client when it talks to the local agent server. Use these when TCP connect timeouts or transient control-plane failures need project-specific tuning.
+
+`runtime.max_consecutive_rework_without_commit` is optional, must be an integer greater than or equal to `1`, and defaults to `3`. A2O applies it only to implementation rework runs that expose a commit progress fingerprint, such as completion hook attempt refs. When the same fingerprint repeats for the configured number of consecutive implementation rework runs, A2O blocks the task with `failing_command=rework_progress_guard`. This catches stuck completion-hook loops without stopping normal rework that keeps adding commits.
 
 `runtime.review_gate.child` and `runtime.review_gate.single` are optional booleans. They default to `false`. When enabled for a task kind, successful implementation transitions to `review` before verification. Review approval continues to verification; review findings can require rework and return the task to implementation.
 

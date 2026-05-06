@@ -70,7 +70,7 @@ module A3
           decomposition_author_command: decomposition_command(runtime, "author"),
           decomposition_review_commands: decomposition_review_commands(runtime),
           prompt_config: project_prompt_config,
-          scheduler_config: A3::Domain::ProjectSchedulerConfig.from_project_config(runtime.fetch("scheduler", nil)),
+          scheduler_config: A3::Domain::ProjectSchedulerConfig.from_project_config(runtime.fetch("scheduler", nil), runtime: runtime),
           docs_config: project_config.fetch("docs", nil),
           system_comment_locale: system_comment_locale
         )

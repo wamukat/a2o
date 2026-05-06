@@ -72,6 +72,7 @@ publish:
 
 runtime:
   max_steps: 20
+  max_consecutive_rework_without_commit: 3
   agent_attempts: 200
   agent_poll_interval: 1s
   agent_control_plane_connect_timeout: 5s
@@ -148,6 +149,8 @@ kanban:
 `runtime.agent_attempts` と `runtime.agent_poll_interval` は host agent の外側ループを制御する。
 
 `runtime.agent_control_plane_connect_timeout`、`runtime.agent_control_plane_request_timeout`、`runtime.agent_control_plane_retry_count`、`runtime.agent_control_plane_retry_delay` は、host agent が local agent server へ HTTP 接続するときの connect timeout / request timeout / retry を制御する。TCP 接続 timeout や一時的な control-plane failure を project ごとに調整したいときはここを使う。
+
+`runtime.max_consecutive_rework_without_commit` は任意であり、`1` 以上の integer を指定する。既定は `3` である。A2O は completion hook attempt refs などの commit progress fingerprint を持つ implementation rework にだけこの設定を適用する。同じ fingerprint が設定回数だけ連続した場合、A2O は `failing_command=rework_progress_guard` でタスクを blocked にする。これにより、commit が増えない completion hook 失敗ループを検知しつつ、rework ごとに commit を積む正常な自己修正は止めない。
 
 `runtime.review_gate.child` と `runtime.review_gate.single` は任意の boolean であり、既定は `false` である。有効にした task kind は implementation 成功後に verification へ直行せず、先に `review` へ遷移する。レビュー承認後は verification へ進み、レビュー指摘がある場合は implementation へ戻せる。
 

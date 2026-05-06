@@ -109,6 +109,90 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     expect(result.run.terminal_outcome).to eq(:completed)
   end
 
+  it "blocks implementation rework after consecutive runs without commit progress" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :in_progress,
+      current_run_ref: "run-3",
+      external_task_id: 3025
+    )
+    task_repository.save(task)
+    run_repository.save(
+      implementation_rework_run("run-1", completion_hook_attempt_refs: { "repo_alpha" => "same-head" }).complete(outcome: :rework)
+    )
+    run_repository.save(
+      implementation_rework_run("run-2", completion_hook_attempt_refs: { "repo_alpha" => "same-head" }).complete(outcome: :rework)
+    )
+    current_run = implementation_rework_run("run-3", completion_hook_attempt_refs: { "repo_alpha" => "same-head" })
+    run_repository.save(current_run)
+    runtime = phase_runtime_with_no_commit_rework_limit(3)
+
+    expect(status_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      status: :blocked,
+      task_kind: :child,
+      status_reason: "implementation rework blocked after 3 consecutive run(s) without commit progress",
+      status_details: hash_including(
+        "failing_command" => "rework_progress_guard",
+        "expected_state" => "implementation rework produces commit progress before retrying again"
+      )
+    )
+    expect(activity_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      body: a_string_matching(/主要失敗コマンド: rework_progress_guard.*consecutive_rework_without_commit=3/m),
+      event: hash_including("kind" => "task_blocked")
+    )
+
+    result = use_case.call(task_ref: task.ref, run_ref: current_run.ref, outcome: :rework, phase_runtime: runtime)
+
+    expect(result.task.status).to eq(:blocked)
+    expect(result.run.terminal_outcome).to eq(:blocked)
+    diagnosis = result.run.phase_records.last.blocked_diagnosis
+    expect(diagnosis.infra_diagnostics.fetch("rework_progress_guard")).to include(
+      "consecutive_rework_without_commit" => 3,
+      "max_consecutive_rework_without_commit" => 3,
+      "commit_progress_fingerprint" => "repo_alpha=same-head"
+    )
+  end
+
+  it "continues implementation rework when commit progress changes between attempts" do
+    task = A3::Domain::Task.new(
+      ref: "A3-v2#3025",
+      kind: :child,
+      edit_scope: [:repo_alpha],
+      status: :in_progress,
+      current_run_ref: "run-3",
+      external_task_id: 3025
+    )
+    task_repository.save(task)
+    run_repository.save(
+      implementation_rework_run("run-1", completion_hook_attempt_refs: { "repo_alpha" => "head-1" }).complete(outcome: :rework)
+    )
+    run_repository.save(
+      implementation_rework_run("run-2", completion_hook_attempt_refs: { "repo_alpha" => "head-2" }).complete(outcome: :rework)
+    )
+    current_run = implementation_rework_run("run-3", completion_hook_attempt_refs: { "repo_alpha" => "head-3" })
+    run_repository.save(current_run)
+    runtime = phase_runtime_with_no_commit_rework_limit(3)
+
+    expect(status_publisher).to receive(:publish).with(task_ref: task.ref, external_task_id: 3025, status: :in_progress, task_kind: :child)
+    expect(activity_publisher).to receive(:publish).with(
+      task_ref: task.ref,
+      external_task_id: 3025,
+      body: a_string_matching(/結果: rework.*タスク状態: in_progress/m)
+    )
+
+    result = use_case.call(task_ref: task.ref, run_ref: current_run.ref, outcome: :rework, phase_runtime: runtime)
+
+    expect(result.task.status).to eq(:in_progress)
+    expect(result.run.terminal_outcome).to eq(:rework)
+    expect(result.run.phase_records.last.blocked_diagnosis).to be_nil
+  end
+
   it "publishes concise docs-impact traceability summaries in completion comments" do
     task = A3::Domain::Task.new(
       ref: "A3-v2#3025",
@@ -1192,5 +1276,63 @@ RSpec.describe A3::Application::RegisterCompletedRun do
     latest = result.run.phase_records.last.execution_record
     expect(latest.summary).to eq("stdin worker returned no final result")
     expect(latest.diagnostics).to eq("stdout" => "partial", "stderr" => "none")
+  end
+
+  def implementation_rework_run(ref, completion_hook_attempt_refs:)
+    A3::Domain::Run.new(
+      ref: ref,
+      task_ref: "A3-v2#3025",
+      phase: :implementation,
+      workspace_kind: :ticket_workspace,
+      source_descriptor: A3::Domain::SourceDescriptor.new(
+        workspace_kind: :ticket_workspace,
+        source_type: :branch_head,
+        ref: "refs/heads/a2o/work/3025",
+        task_ref: "A3-v2#3025"
+      ),
+      scope_snapshot: A3::Domain::ScopeSnapshot.new(
+        edit_scope: [:repo_alpha],
+        verification_scope: [:repo_alpha],
+        ownership_scope: :task
+      ),
+      review_target: A3::Domain::ReviewTarget.new(
+        base_commit: "base123",
+        head_commit: "head456",
+        task_ref: "A3-v2#3025",
+        phase_ref: :review
+      ),
+      artifact_owner: artifact_owner
+    ).append_phase_evidence(
+      phase: :implementation,
+      source_descriptor: run.source_descriptor,
+      scope_snapshot: run.scope_snapshot,
+      execution_record: A3::Domain::PhaseExecutionRecord.new(
+        summary: "implementation completion hook verify failed for slot repo_alpha",
+        failing_command: "implementation_completion_hooks.verify",
+        observed_state: "exit status 201",
+        diagnostics: {
+          "completion_hook_attempt_refs" => completion_hook_attempt_refs
+        }
+      )
+    )
+  end
+
+  def phase_runtime_with_no_commit_rework_limit(limit)
+    A3::Domain::PhaseRuntimeConfig.new(
+      task_kind: :child,
+      repo_scope: :repo_alpha,
+      phase: :implementation,
+      implementation_skill: "skills/implementation/base.md",
+      review_skill: "skills/review/base.md",
+      verification_commands: ["commands/verify-all"],
+      remediation_commands: ["commands/apply-remediation"],
+      workspace_hook: "hooks/prepare-runtime.sh",
+      merge_target: :merge_to_parent,
+      merge_policy: :ff_only,
+      scheduler_config: A3::Domain::ProjectSchedulerConfig.new(
+        max_parallel_tasks: 1,
+        max_consecutive_rework_without_commit: limit
+      )
+    )
   end
 end

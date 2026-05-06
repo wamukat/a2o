@@ -5,11 +5,11 @@ module A3
     class PhaseRuntimeConfig
       attr_reader :task_kind, :repo_scope, :repo_slots, :phase, :implementation_skill, :review_skill,
                   :verification_commands, :remediation_commands, :metrics_collection_commands, :observer_config, :workspace_hook, :merge_target, :merge_policy,
-                  :merge_target_ref, :review_gate_required, :project_prompt_config, :docs_config
+                  :merge_target_ref, :review_gate_required, :project_prompt_config, :docs_config, :scheduler_config
 
       def initialize(task_kind:, repo_scope:, phase:, implementation_skill:, review_skill:, verification_commands:,
                      remediation_commands:, workspace_hook:, merge_target:, merge_policy:, metrics_collection_commands: [], merge_target_ref: nil,
-                     observer_config: A3::Domain::ObserverConfig.empty, review_gate_required: false, project_prompt_config: A3::Domain::ProjectPromptConfig.empty, docs_config: nil, repo_slots: nil)
+                     observer_config: A3::Domain::ObserverConfig.empty, review_gate_required: false, project_prompt_config: A3::Domain::ProjectPromptConfig.empty, docs_config: nil, repo_slots: nil, scheduler_config: A3::Domain::ProjectSchedulerConfig.default)
         @task_kind = task_kind.to_sym
         @repo_scope = repo_scope.to_sym
         @repo_slots = normalize_repo_slots(repo_slots, fallback_scope: @repo_scope)
@@ -27,6 +27,7 @@ module A3
         @review_gate_required = !!review_gate_required
         @project_prompt_config = project_prompt_config || A3::Domain::ProjectPromptConfig.empty
         @docs_config = deep_freeze_value(docs_config)
+        @scheduler_config = scheduler_config || A3::Domain::ProjectSchedulerConfig.default
         freeze
       end
 
@@ -48,7 +49,8 @@ module A3
           other.merge_target_ref == merge_target_ref &&
           other.review_gate_required == review_gate_required &&
           other.project_prompt_config == project_prompt_config &&
-          other.docs_config == docs_config
+          other.docs_config == docs_config &&
+          other.scheduler_config == scheduler_config
       end
       alias eql? ==
 
@@ -69,7 +71,8 @@ module A3
           "merge_policy" => merge_policy.to_s,
           "merge_target_ref" => merge_target_ref,
           "review_gate_required" => review_gate_required,
-          "docs_configured" => !docs_config.nil?
+          "docs_configured" => !docs_config.nil?,
+          "max_consecutive_rework_without_commit" => scheduler_config.max_consecutive_rework_without_commit
         }
       end
 

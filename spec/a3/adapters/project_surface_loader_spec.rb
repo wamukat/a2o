@@ -194,6 +194,31 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     surface = loader.load(project_config_path)
 
     expect(surface.scheduler_config.max_parallel_tasks).to eq(1)
+    expect(surface.scheduler_config.max_consecutive_rework_without_commit).to eq(3)
+  end
+
+  it "loads root runtime no-commit rework guard config" do
+    project_config_path = write_project_config(
+      "runtime" => {
+        "max_consecutive_rework_without_commit" => 5,
+        "scheduler" => {
+          "max_parallel_tasks" => 2
+        },
+        "phases" => {
+          "implementation" => {
+            "skill" => "skills/implementation/base.md"
+          },
+          "review" => {
+            "skill" => "skills/review/project.md"
+          }
+        }
+      }
+    )
+
+    surface = loader.load(project_config_path)
+
+    expect(surface.scheduler_config.max_parallel_tasks).to eq(2)
+    expect(surface.scheduler_config.max_consecutive_rework_without_commit).to eq(5)
   end
 
   it "loads max_parallel_tasks greater than one for the bounded parallel scheduler" do

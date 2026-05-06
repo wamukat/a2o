@@ -30,9 +30,16 @@ module A3
         return disposition_result if disposition_result
 
         artifact_violation = artifact_contract_violation?(task: task, run: run, outcome: outcome)
-        terminal_outcome = (artifact_violation || operator_blocked) ? :blocked : outcome
+        rework_stall_diagnosis = rework_without_commit_diagnosis(task: task, run: run, outcome: outcome, phase_runtime: phase_runtime)
+        terminal_outcome = (artifact_violation || operator_blocked || rework_stall_diagnosis) ? :blocked : outcome
         phase_result = @plan_next_phase.call(task: task, run: run, outcome: terminal_outcome, phase_runtime: phase_runtime)
-        completed_run = completed_run_for(task: task, run: run, outcome: terminal_outcome, artifact_violation: artifact_violation)
+        completed_run = completed_run_for(
+          task: task,
+          run: run,
+          outcome: terminal_outcome,
+          artifact_violation: artifact_violation,
+          rework_stall_diagnosis: rework_stall_diagnosis
+        )
         completed_task = task.complete_run(
           next_phase: phase_result.next_phase,
           terminal_status: phase_result.terminal_status,
@@ -282,12 +289,94 @@ module A3
         nil
       end
 
-      def completed_run_for(task:, run:, outcome:, artifact_violation:)
+      def completed_run_for(task:, run:, outcome:, artifact_violation:, rework_stall_diagnosis:)
+        return run.append_blocked_diagnosis(rework_stall_diagnosis).complete(outcome: :blocked) if rework_stall_diagnosis
         return run.complete(outcome: outcome) unless artifact_violation
 
         run.append_blocked_diagnosis(
           artifact_contract_blocked_diagnosis(task: task, run: run)
         ).complete(outcome: :blocked)
+      end
+
+      def rework_without_commit_diagnosis(task:, run:, outcome:, phase_runtime:)
+        return nil unless outcome.to_sym == :rework
+        return nil unless run.phase.to_sym == :implementation
+
+        fingerprint = commit_progress_fingerprint(run)
+        return nil unless present?(fingerprint)
+
+        limit = Integer(phase_runtime&.scheduler_config&.max_consecutive_rework_without_commit || 3)
+        consecutive = consecutive_rework_count_without_commit(task_ref: task.ref, current_run: run, current_fingerprint: fingerprint)
+        return nil if consecutive < limit
+
+        A3::Domain::BlockedDiagnosis.new(
+          task_ref: task.ref,
+          run_ref: run.ref,
+          phase: run.phase,
+          outcome: :blocked,
+          review_target: run.evidence.review_target,
+          source_descriptor: run.evidence.source_descriptor,
+          scope_snapshot: run.evidence.scope_snapshot,
+          artifact_owner: run.evidence.artifact_owner,
+          expected_state: "implementation rework produces commit progress before retrying again",
+          observed_state: "consecutive_rework_without_commit=#{consecutive} commit_progress_fingerprint=#{fingerprint}",
+          failing_command: "rework_progress_guard",
+          diagnostic_summary: "implementation rework blocked after #{consecutive} consecutive run(s) without commit progress",
+          infra_diagnostics: {
+            "rework_progress_guard" => {
+              "consecutive_rework_without_commit" => consecutive,
+              "max_consecutive_rework_without_commit" => limit,
+              "commit_progress_fingerprint" => fingerprint
+            }
+          }
+        )
+      end
+
+      def consecutive_rework_count_without_commit(task_ref:, current_run:, current_fingerprint:)
+        ordered_runs = @run_repository.all.map { |candidate| candidate.ref == current_run.ref ? current_run : candidate }
+        implementation_runs = ordered_runs.select do |candidate|
+          candidate.task_ref == task_ref && candidate.phase.to_sym == :implementation
+        end
+
+        count = 0
+        implementation_runs.reverse_each do |candidate|
+          if candidate.ref == current_run.ref
+            candidate_outcome = :rework
+            fingerprint = current_fingerprint
+          else
+            candidate_outcome = candidate.terminal_outcome
+            fingerprint = commit_progress_fingerprint(candidate)
+          end
+          break unless candidate_outcome&.to_sym == :rework
+          break unless present?(fingerprint)
+          break unless fingerprint == current_fingerprint
+
+          count += 1
+        end
+        count
+      end
+
+      def commit_progress_fingerprint(run)
+        record = latest_phase_record(run)
+        diagnostics = record&.execution_record&.diagnostics
+        return nil unless diagnostics.is_a?(Hash)
+
+        refs = diagnostics["completion_hook_attempt_refs"]
+        if refs.is_a?(Hash) && !refs.empty?
+          return refs.keys.map(&:to_s).sort.map { |key| "#{key}=#{refs[key]}" }.join("|")
+        end
+
+        published_slots = Array(diagnostics["published_slots"]).select { |entry| entry.is_a?(Hash) }
+        publish_refs = published_slots.filter_map do |entry|
+          slot = entry["slot"] || entry[:slot]
+          after = entry["publish_after_head"] || entry[:publish_after_head] || entry["after_head"] || entry[:after_head]
+          next unless present?(slot) && present?(after)
+
+          "#{slot}=#{after}"
+        end
+        return publish_refs.sort.join("|") unless publish_refs.empty?
+
+        nil
       end
 
       def artifact_contract_violation?(task:, run:, outcome:)

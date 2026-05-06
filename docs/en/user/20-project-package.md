@@ -123,6 +123,7 @@ The command receives a worker request bundle on stdin and writes the worker resu
 ```yaml
 runtime:
   max_steps: 20
+  max_consecutive_rework_without_commit: 3
   agent_attempts: 200
   agent_poll_interval: 1s
   agent_control_plane_connect_timeout: 5s
@@ -151,6 +152,8 @@ Use these rules:
 `runtime.review_gate.child` and `runtime.review_gate.single` are optional. The default is `false`, which keeps the historical flow where child and single tasks move from implementation to verification. When set to `true`, implementation success moves that task kind into the review phase first; review approval then continues to verification, and review findings can send the task back to implementation.
 
 `runtime.review_gate.skip_labels` and `runtime.review_gate.require_labels` optionally override the task-kind default per kanban task. `require_labels` turns the review gate on when a task has a matching label, and `skip_labels` turns it off when a task has a matching label. If both match, `skip_labels` wins.
+
+`runtime.max_consecutive_rework_without_commit` is optional and defaults to `3`. During implementation rework, A2O compares the commit progress fingerprint recorded in completion hook diagnostics. If the same fingerprint appears for this many consecutive implementation rework runs, A2O blocks the task with `failing_command=rework_progress_guard` instead of waiting for the broader `max_steps` guard. Normal rework that produces a new commit fingerprint continues.
 
 Generate a minimal worker with:
 
