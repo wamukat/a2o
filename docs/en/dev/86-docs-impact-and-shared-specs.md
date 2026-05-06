@@ -86,12 +86,12 @@ When docs live in a separate repo slot:
 
 ```yaml
 docs:
-  repoSlot: docs
+  repo_slot: docs
   root: docs
   index: docs/README.md
 ```
 
-Without `repoSlot`, docs are assumed to live in the primary repo slot. A2O resolves docs paths inside the target repo slot checkout, not relative to the project-package root.
+Without `repo_slot`, docs are assumed to live in the primary repo slot. A2O resolves docs paths inside the target repo slot checkout, not relative to the project-package root.
 
 A2O may update a docs repo only when that repo is declared as a repo slot. It must not clone or push to an undeclared external docs repository.
 
@@ -101,7 +101,7 @@ Docs config is validated strictly, like prompt / skill config.
 
 - `root`, `index`, category paths, and authority paths are relative paths inside the target repo slot.
 - Absolute paths, `..` escapes, and symlink escapes are rejected.
-- `repoSlot` must match a declared repo slot.
+- `repo_slot` must match a declared repo slot.
 - Category IDs must be non-empty, unique, stable machine-readable keys.
 - Missing docs roots are created or rejected according to project policy.
 - If front matter has a schema version, unrecognized versions are warning or error according to policy.

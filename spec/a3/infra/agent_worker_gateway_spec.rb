@@ -716,7 +716,7 @@ RSpec.describe A3::Infra::AgentWorkerGateway do
       merge_target: :merge_to_parent,
       merge_policy: :squash,
       docs_config: {
-        "repoSlot" => "repo_beta",
+        "repo_slot" => "repo_beta",
         "root" => "docs",
         "categories" => {
           "shared_specs" => { "path" => "docs/shared" }

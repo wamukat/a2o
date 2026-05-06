@@ -402,7 +402,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
         "docs" => { "path" => "docs-repo" }
       },
       "docs" => {
-        "repoSlot" => "docs",
+        "repo_slot" => "docs",
         "root" => "docs",
         "index" => "docs/README.md",
         "policy" => { "missingRoot" => "create" },
@@ -456,21 +456,21 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
       "docs" => {
         "surfaces" => {
           "app" => {
-            "repoSlot" => "app",
+            "repo_slot" => "app",
             "root" => "docs",
             "categories" => {
               "features" => { "path" => "docs/features" }
             }
           },
           "lib" => {
-            "repoSlot" => "lib",
+            "repo_slot" => "lib",
             "root" => "docs",
             "categories" => {
               "shared_specs" => { "path" => "docs/shared-specs" }
             }
           },
           "integrated" => {
-            "repoSlot" => "docs",
+            "repo_slot" => "docs",
             "role" => "integration",
             "root" => "docs",
             "categories" => {
@@ -480,7 +480,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
         },
         "authorities" => {
           "greeting_schema" => {
-            "repoSlot" => "lib",
+            "repo_slot" => "lib",
             "source" => "docs/shared-specs/greeting-format.md",
             "docs" => [
               { "surface" => "lib", "path" => "docs/shared-specs/greeting-format.md" },
@@ -504,6 +504,57 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     expect { loader.load(project_config_path) }.not_to raise_error
   end
 
+  it "rejects legacy camelCase docs repoSlot keys with migration guidance" do
+    cases = [
+      [
+        { "repoSlot" => "docs", "root" => "docs" },
+        "project.yaml docs.repoSlot is no longer supported; migration_required=true replacement=docs.repo_slot"
+      ],
+      [
+        {
+          "surfaces" => {
+            "app" => { "repoSlot" => "app", "root" => "docs" }
+          }
+        },
+        "project.yaml docs.surfaces.app.repoSlot is no longer supported; migration_required=true replacement=docs.surfaces.app.repo_slot"
+      ],
+      [
+        {
+          "surfaces" => {
+            "app" => { "repo_slot" => "app", "root" => "docs" }
+          },
+          "authorities" => {
+            "openapi" => { "repoSlot" => "app", "source" => "spec/openapi.yaml" }
+          }
+        },
+        "project.yaml docs.authorities.openapi.repoSlot is no longer supported; migration_required=true replacement=docs.authorities.openapi.repo_slot"
+      ]
+    ]
+
+    cases.each do |docs_config, expected_message|
+      project_config_path = write_project_config(
+        "repos" => {
+          "app" => { "path" => "app" },
+          "docs" => { "path" => "docs-repo" }
+        },
+        "docs" => docs_config,
+        "runtime" => {
+          "phases" => {
+            "implementation" => {
+              "skill" => "skills/implementation/base.md"
+            },
+            "review" => {
+              "skill" => "skills/review/project.md"
+            }
+          }
+        }
+      )
+
+      expect { loader.load(project_config_path) }
+        .to raise_error(A3::Domain::ConfigurationError, expected_message)
+    end
+  end
+
   it "loads the Java reference product multi-surface docs config" do
     repo_root = File.expand_path("../../..", __dir__)
     project_config_path = File.join(repo_root, "reference-products", "java-spring-multi-module", "project-package", "project.yaml")
@@ -517,7 +568,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
         "app" => { "path" => "app" }
       },
       "docs" => {
-        "repoSlot" => "backend",
+        "repo_slot" => "backend",
         "root" => "docs"
       },
       "runtime" => {
@@ -533,7 +584,7 @@ RSpec.describe A3::Adapters::ProjectSurfaceLoader do
     )
 
     expect { loader.load(project_config_path) }
-      .to raise_error(A3::Domain::ConfigurationError, "project.yaml docs.repoSlot must match a repos entry: backend")
+      .to raise_error(A3::Domain::ConfigurationError, "project.yaml docs.repo_slot must match a repos entry: backend")
 
     repo_root = File.join(@tmpdir, "app")
     outside_path = File.join(@tmpdir, "outside-doc.md")

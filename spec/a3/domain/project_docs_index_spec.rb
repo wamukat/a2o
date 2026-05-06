@@ -283,21 +283,21 @@ RSpec.describe A3::Domain::ProjectDocsIndex do
       docs_config: {
         "surfaces" => {
           "app" => {
-            "repoSlot" => "app",
+            "repo_slot" => "app",
             "root" => "docs",
             "categories" => {
               "features" => { "path" => "docs/features" }
             }
           },
           "lib" => {
-            "repoSlot" => "lib",
+            "repo_slot" => "lib",
             "root" => "docs",
             "categories" => {
               "shared_specs" => { "path" => "docs/shared-specs" }
             }
           },
           "integrated" => {
-            "repoSlot" => "docs",
+            "repo_slot" => "docs",
             "role" => "integration",
             "root" => "docs",
             "categories" => {
@@ -307,7 +307,7 @@ RSpec.describe A3::Domain::ProjectDocsIndex do
         },
         "authorities" => {
           "greeting_schema" => {
-            "repoSlot" => "lib",
+            "repo_slot" => "lib",
             "source" => "schema/greeting.json",
             "docs" => [
               { "surface" => "lib", "path" => "docs/shared-specs/greeting-format.md" },

@@ -236,7 +236,7 @@ RSpec.describe A3::Domain::ProjectDocsUpdater do
       docs_config: {
         "surfaces" => {
           "lib" => {
-            "repoSlot" => "lib",
+            "repo_slot" => "lib",
             "index" => "docs/README.md",
             "categories" => {
               "shared_specs" => { "path" => "docs/shared-specs" }

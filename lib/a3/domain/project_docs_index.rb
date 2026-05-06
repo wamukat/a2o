@@ -181,7 +181,7 @@ module A3
         if raw_surfaces.any?
           raw_surfaces.keys.sort.map do |id|
             surface_config = stringify_keys(raw_surfaces.fetch(id, {}))
-            repo_slot = surface_config["repoSlot"] || docs_config["repoSlot"]
+            repo_slot = surface_config["repo_slot"] || docs_config["repo_slot"]
             Surface.new(
               id: id,
               repo_slot: repo_slot,
@@ -196,7 +196,7 @@ module A3
             )
           end
         else
-          repo_slot = docs_config["repoSlot"]
+          repo_slot = docs_config["repo_slot"]
           [
             Surface.new(
               id: "default",
@@ -362,7 +362,7 @@ module A3
           source = declaration["source"].to_s
           next if source.empty?
 
-          repo_slot = declaration["repoSlot"]
+          repo_slot = declaration["repo_slot"]
           authority_repo_root = repo_root_for_slot(repo_slot)
           absolute_path = safe_repo_path(source, authority_repo_root)
           exists = !!(absolute_path && File.exist?(absolute_path))

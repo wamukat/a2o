@@ -34,7 +34,7 @@ repos:
     role: product
     label: repo:app
 docs:
-  repoSlot: app
+  repo_slot: app
   root: docs
   index: docs/README.md
   categories:
@@ -167,11 +167,11 @@ Repo slots are stable aliases used in runtime state and agent job payloads.
 
 ## Docs
 
-`docs` is optional. It declares the documentation surface that A2O may inspect or update when a task has documentation impact. In a single-repo package, `docs.repoSlot` may be omitted and A2O treats docs paths as belonging to that repo slot. In multi-repo packages, or when docs live in a dedicated repository, declare the repository under `repos` and set `docs.repoSlot` to the matching slot.
+`docs` is optional. It declares the documentation surface that A2O may inspect or update when a task has documentation impact. In a single-repo package, `docs.repo_slot` may be omitted and A2O treats docs paths as belonging to that repo slot. In multi-repo packages, or when docs live in a dedicated repository, declare the repository under `repos` and set `docs.repo_slot` to the matching slot.
 
 ```yaml
 docs:
-  repoSlot: docs
+  repo_slot: docs
   root: docs
   index: docs/README.md
   categories:
@@ -195,27 +195,27 @@ docs:
         - docs/api.md
 ```
 
-`docs.root`, `docs.index`, category paths, authority sources, and authority docs are repo-slot-relative paths. A2O rejects absolute paths, `..` escapes, and existing symlinks that resolve outside the selected repo slot. `docs.repoSlot` must match a declared `repos` entry. Category and authority IDs must be non-empty machine-readable keys such as `architecture`, `shared_specs`, or `openapi`.
+`docs.root`, `docs.index`, category paths, authority sources, and authority docs are repo-slot-relative paths. A2O rejects absolute paths, `..` escapes, and existing symlinks that resolve outside the selected repo slot. `docs.repo_slot` must match a declared `repos` entry. Category and authority IDs must be non-empty machine-readable keys such as `architecture`, `shared_specs`, or `openapi`.
 
-Multi-repo packages can declare multiple documentation surfaces. A surface is a named docs area with its own `repoSlot`, root, categories, and optional `role`. Use `role: integration` for cross-repo architecture or interface docs that should be visible even when a task edits only one product repo.
+Multi-repo packages can declare multiple documentation surfaces. A surface is a named docs area with its own `repo_slot`, root, categories, and optional `role`. Use `role: integration` for cross-repo architecture or interface docs that should be visible even when a task edits only one product repo.
 
 ```yaml
 docs:
   surfaces:
     app:
-      repoSlot: app
+      repo_slot: app
       root: docs
       categories:
         features:
           path: docs/features
     lib:
-      repoSlot: lib
+      repo_slot: lib
       root: docs
       categories:
         shared_specs:
           path: docs/shared-specs
     integrated:
-      repoSlot: docs
+      repo_slot: docs
       root: docs
       role: integration
       categories:
@@ -223,7 +223,7 @@ docs:
           path: docs/interfaces
   authorities:
     greeting_schema:
-      repoSlot: lib
+      repo_slot: lib
       source: docs/shared-specs/greeting-format.md
       docs:
         - surface: lib
@@ -232,7 +232,7 @@ docs:
           path: docs/interfaces/greeting-api.md
 ```
 
-When `docs.surfaces` is present, each surface path is relative to that surface's repo slot. Authority sources can also declare `repoSlot`; authority `docs` entries may use `{surface, path}` so a source-of-truth artifact in one repo can point to generated or mirrored docs in another surface. Existing single-surface `docs.repoSlot` configs remain valid.
+When `docs.surfaces` is present, each surface path is relative to that surface's repo slot. Authority sources can also declare `repo_slot`; authority `docs` entries may use `{surface, path}` so a source-of-truth artifact in one repo can point to generated or mirrored docs in another surface. Existing single-surface `docs.repo_slot` configs remain valid.
 
 `docs.impactPolicy.mirrorPolicy` controls mirror debt handling for `docs.languages.secondary`: `require_all` means every declared language should be updated together, `require_canonical_warn_mirror` records mirror debt for missing secondary docs, and `canonical_only` suppresses mirror debt.
 
@@ -332,11 +332,11 @@ The naming rules are:
 - Put read-only notification and audit integrations under `observers`.
 - Use `*_gate` for configuration that controls whether execution may advance.
 - Avoid adding phase-like names for work that is not a real scheduler phase; when a setting is reporting, observer, or delivery behavior, keep that role explicit in the section name or prose.
-- Old camelCase keys such as `repoSlots` and `childDraftTemplate` are not canonical. Use `repo_slots` and `child_draft_template`.
+- Old camelCase keys such as `repoSlots`, `childDraftTemplate`, and docs-surface `repoSlot` are not canonical. Use `repo_slots`, `child_draft_template`, and `repo_slot`.
 
 Migration errors are explicit. A2O should not silently reinterpret removed or renamed keys; it should fail with `migration_required=true` and the replacement key.
 
-The existing docs surface still has camelCase keys: `docs.repoSlot`, `docs.surfaces.*.repoSlot`, and `docs.authorities.*.repoSlot`. They are a separate migration target from prompt key normalization and are not changed by the prompt-key migration. When the docs surface is migrated, `repo_slot` should become canonical and old `repoSlot` keys should follow the same migration-required policy.
+The docs surface uses snake_case repository slot keys: `docs.repo_slot`, `docs.surfaces.*.repo_slot`, and `docs.authorities.*.repo_slot`. Old camelCase `repoSlot` keys on these surfaces are not compatibility aliases; A2O fails with `migration_required=true` and the replacement path.
 
 ### Public Command And Hook Model
 

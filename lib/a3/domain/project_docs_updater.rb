@@ -264,7 +264,7 @@ module A3
 
       def repo_root_for_surface
         active_config = surface_config || docs_config
-        slot = active_config["repoSlot"] || docs_config["repoSlot"]
+        slot = active_config["repo_slot"] || docs_config["repo_slot"]
         return repo_roots.fetch(slot.to_s, repo_root) if slot
 
         repo_root

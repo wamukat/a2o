@@ -120,7 +120,7 @@ module A3
       end
 
       def docs_repo_root(workspace:, docs_config:)
-        slot = docs_config["repoSlot"] || docs_config[:repoSlot]
+        slot = docs_config["repo_slot"] || docs_config[:repo_slot]
         if slot
           slot_path = workspace.slot_paths[slot.to_sym]
           return slot_path.to_s if slot_path
@@ -144,7 +144,7 @@ module A3
         surfaces = raw_surfaces.each_with_object({}) do |(id, raw_surface), memo|
           surface = stringify_keys(raw_surface)
           memo[id] = {
-            "repo_slot" => surface["repoSlot"],
+            "repo_slot" => surface["repo_slot"],
             "role" => surface["role"],
             "root" => surface["root"],
             "categories" => stringify_keys(surface["categories"] || {}).keys.sort
@@ -152,7 +152,7 @@ module A3
         end
         {
           "root" => docs_config["root"] || docs_config[:root],
-          "repo_slot" => docs_config["repoSlot"] || docs_config[:repoSlot],
+          "repo_slot" => docs_config["repo_slot"] || docs_config[:repo_slot],
           "index" => docs_config["index"] || docs_config[:index],
           "policy" => docs_config["policy"] || docs_config[:policy],
           "categories" => categories.keys.sort,

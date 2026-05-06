@@ -176,9 +176,9 @@ RSpec.describe A3::Domain::ProjectDocsImpactAnalyzer do
       repo_roots: { "app" => app_root, "lib" => lib_root, "docs" => docs_root },
       docs_config: {
         "surfaces" => {
-          "app" => { "repoSlot" => "app", "root" => "docs", "categories" => { "features" => { "path" => "docs/features" } } },
-          "lib" => { "repoSlot" => "lib", "root" => "docs", "categories" => { "shared_specs" => { "path" => "docs/shared-specs" } } },
-          "integrated" => { "repoSlot" => "docs", "role" => "integration", "root" => "docs", "categories" => { "interfaces" => { "path" => "docs/interfaces" } } }
+          "app" => { "repo_slot" => "app", "root" => "docs", "categories" => { "features" => { "path" => "docs/features" } } },
+          "lib" => { "repo_slot" => "lib", "root" => "docs", "categories" => { "shared_specs" => { "path" => "docs/shared-specs" } } },
+          "integrated" => { "repo_slot" => "docs", "role" => "integration", "root" => "docs", "categories" => { "interfaces" => { "path" => "docs/interfaces" } } }
         }
       }
     )

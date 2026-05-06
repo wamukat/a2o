@@ -605,7 +605,7 @@ repos:
   docs:
     path: ../docs-repo
 docs:
-  repoSlot: docs
+  repo_slot: docs
   root: docs
   index: docs/README.md
   policy:
@@ -687,19 +687,19 @@ repos:
 docs:
   surfaces:
     app:
-      repoSlot: app
+      repo_slot: app
       root: docs
       categories:
         features:
           path: docs/features
     lib:
-      repoSlot: lib
+      repo_slot: lib
       root: docs
       categories:
         shared_specs:
           path: docs/shared-specs
     integrated:
-      repoSlot: docs
+      repo_slot: docs
       role: integration
       root: docs
       categories:
@@ -707,7 +707,7 @@ docs:
           path: docs/interfaces
   authorities:
     greeting_schema:
-      repoSlot: lib
+      repo_slot: lib
       source: schema/greeting.json
       docs:
         - surface: lib
@@ -740,6 +740,91 @@ runtime:
 	}
 }
 
+func TestProjectValidateRejectsLegacyDocsRepoSlotKeys(t *testing.T) {
+	cases := []struct {
+		name     string
+		docs     string
+		expected string
+	}{
+		{
+			name: "top level",
+			docs: `docs:
+  repoSlot: docs
+  root: docs
+`,
+			expected: "repoSlot is no longer supported; migration_required=true replacement=repo_slot",
+		},
+		{
+			name: "surface",
+			docs: `docs:
+  surfaces:
+    app:
+      repoSlot: app
+      root: docs
+`,
+			expected: "surfaces.app.repoSlot is no longer supported; migration_required=true replacement=surfaces.app.repo_slot",
+		},
+		{
+			name: "authority",
+			docs: `docs:
+  surfaces:
+    app:
+      repo_slot: app
+      root: docs
+  authorities:
+    openapi:
+      repoSlot: app
+      source: spec/openapi.yaml
+`,
+			expected: "authorities.openapi.repoSlot is no longer supported; migration_required=true replacement=authorities.openapi.repo_slot",
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			packageDir := filepath.Join(tempDir, "package")
+			if err := os.MkdirAll(packageDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			body := `schema_version: 1
+package:
+  name: sample
+kanban:
+  project: Sample
+repos:
+  app:
+    path: ../app
+  docs:
+    path: ../docs
+` + testCase.docs + `runtime:
+  phases:
+    implementation:
+      skill: skills/implementation/base.md
+      executor:
+        command:
+          - worker
+    merge:
+      policy: ff_only
+      target_ref: refs/heads/main
+`
+			if err := os.WriteFile(filepath.Join(packageDir, "project.yaml"), []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			code := run([]string{"project", "validate", "--package", packageDir}, &fakeRunner{}, &stdout, &stderr)
+			if code == 0 {
+				t.Fatalf("project validate should reject legacy docs repoSlot, stdout=%s", stdout.String())
+			}
+			if !strings.Contains(stdout.String(), "invalid docs") ||
+				!strings.Contains(stdout.String(), testCase.expected) {
+				t.Fatalf("project validate should report docs repoSlot migration guidance, stdout=%s stderr=%s", stdout.String(), stderr.String())
+			}
+		})
+	}
+}
+
 func TestProjectValidateRejectsInvalidDocsConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")
@@ -755,7 +840,7 @@ repos:
   app:
     path: ../app
 docs:
-  repoSlot: backend
+  repo_slot: backend
   root: /docs
 runtime:
   phases:
@@ -779,7 +864,7 @@ runtime:
 		t.Fatalf("project validate should reject invalid docs config, stdout=%s", stdout.String())
 	}
 	if !strings.Contains(stdout.String(), "invalid docs") ||
-		!strings.Contains(stdout.String(), "repoSlot must match a repos entry: backend") {
+		!strings.Contains(stdout.String(), "repo_slot must match a repos entry: backend") {
 		t.Fatalf("project validate should reject invalid docs config, stdout=%s stderr=%s", stdout.String(), stderr.String())
 	}
 
@@ -842,14 +927,14 @@ repos:
 docs:
   surfaces:
     app:
-      repoSlot: app
+      repo_slot: app
       root: docs
       categories:
         features:
           path: docs/features
   authorities:
     openapi:
-      repoSlot: app
+      repo_slot: app
       source: spec/openapi.yaml
       docs:
         - surface: missing

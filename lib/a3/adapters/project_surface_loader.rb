@@ -243,9 +243,10 @@ module A3
           raise A3::Domain::ConfigurationError, "project.yaml docs must be a mapping"
         end
 
-        repo_slot = docs.fetch("repoSlot", nil)
-        if docs.key?("repoSlot") && (!repo_slot.is_a?(String) || repo_slot.strip.empty?)
-          raise A3::Domain::ConfigurationError, "project.yaml docs.repoSlot must be a non-empty string"
+        reject_legacy_docs_repo_slot!(docs, "docs")
+        repo_slot = docs.fetch("repo_slot", nil)
+        if docs.key?("repo_slot") && (!repo_slot.is_a?(String) || repo_slot.strip.empty?)
+          raise A3::Domain::ConfigurationError, "project.yaml docs.repo_slot must be a non-empty string"
         end
         repo_slot = nil if repo_slot.to_s.strip.empty?
         repo_names = repos.is_a?(Hash) ? repos.keys.map(&:to_s).sort : []
@@ -259,10 +260,10 @@ module A3
           return
         end
         if repo_slot && !repo_names.empty? && !repo_names.include?(repo_slot)
-          raise A3::Domain::ConfigurationError, "project.yaml docs.repoSlot must match a repos entry: #{repo_slot}"
+          raise A3::Domain::ConfigurationError, "project.yaml docs.repo_slot must match a repos entry: #{repo_slot}"
         end
         if !repo_slot && repo_names.length > 1
-          raise A3::Domain::ConfigurationError, "project.yaml docs.repoSlot must be provided when multiple repos are declared"
+          raise A3::Domain::ConfigurationError, "project.yaml docs.repo_slot must be provided when multiple repos are declared"
         end
         repo_slot ||= repo_names.first
         repo_root = docs_repo_root(project_package_root, repos, repo_slot)
@@ -287,11 +288,12 @@ module A3
           unless surface.is_a?(Hash)
             raise A3::Domain::ConfigurationError, "project.yaml docs.surfaces.#{id} must be a mapping"
           end
-          surface_slot = docs_repo_slot(surface.fetch("repoSlot", nil), repo_names, "docs.surfaces.#{id}.repoSlot")
-          surface_slot ||= docs_repo_slot(docs.fetch("repoSlot", nil), repo_names, "docs.repoSlot")
+          reject_legacy_docs_repo_slot!(surface, "docs.surfaces.#{id}")
+          surface_slot = docs_repo_slot(surface.fetch("repo_slot", nil), repo_names, "docs.surfaces.#{id}.repo_slot")
+          surface_slot ||= docs_repo_slot(docs.fetch("repo_slot", nil), repo_names, "docs.repo_slot")
           surface_slot ||= repo_names.first if repo_names.length == 1
           if surface_slot.nil? && repo_names.length > 1
-            raise A3::Domain::ConfigurationError, "project.yaml docs.surfaces.#{id}.repoSlot must be provided when multiple repos are declared"
+            raise A3::Domain::ConfigurationError, "project.yaml docs.surfaces.#{id}.repo_slot must be provided when multiple repos are declared"
           end
           repo_root = docs_repo_root(project_package_root, repos, surface_slot)
           validate_docs_path(surface.fetch("root", nil), "docs.surfaces.#{id}.root", repo_root, required: true)
@@ -359,11 +361,12 @@ module A3
             raise A3::Domain::ConfigurationError, "project.yaml docs.authorities.#{id} must be a mapping"
           end
           repo_names = repos.is_a?(Hash) ? repos.keys.map(&:to_s).sort : []
-          repo_slot = docs_repo_slot(authority.fetch("repoSlot", nil), repo_names, "docs.authorities.#{id}.repoSlot")
-          repo_slot ||= docs_repo_slot(docs.fetch("repoSlot", nil), repo_names, "docs.repoSlot")
+          reject_legacy_docs_repo_slot!(authority, "docs.authorities.#{id}")
+          repo_slot = docs_repo_slot(authority.fetch("repo_slot", nil), repo_names, "docs.authorities.#{id}.repo_slot")
+          repo_slot ||= docs_repo_slot(docs.fetch("repo_slot", nil), repo_names, "docs.repo_slot")
           repo_slot ||= repo_names.first if repo_names.length == 1
           if repo_slot.nil? && surfaces && repo_names.length > 1
-            raise A3::Domain::ConfigurationError, "project.yaml docs.authorities.#{id}.repoSlot must be provided when docs.surfaces and multiple repos are declared"
+            raise A3::Domain::ConfigurationError, "project.yaml docs.authorities.#{id}.repo_slot must be provided when docs.surfaces and multiple repos are declared"
           end
           repo_root = docs_repo_root(project_package_root, repos, repo_slot)
           generated = authority.fetch("generated", false) == true
@@ -409,13 +412,21 @@ module A3
           raise A3::Domain::ConfigurationError, "project.yaml docs.surfaces.#{surface_id} must be a mapping"
         end
         repo_names = repos.is_a?(Hash) ? repos.keys.map(&:to_s).sort : []
-        repo_slot = docs_repo_slot(surface.fetch("repoSlot", nil), repo_names, "docs.surfaces.#{surface_id}.repoSlot")
-        repo_slot ||= docs_repo_slot(docs.fetch("repoSlot", nil), repo_names, "docs.repoSlot")
+        reject_legacy_docs_repo_slot!(surface, "docs.surfaces.#{surface_id}")
+        repo_slot = docs_repo_slot(surface.fetch("repo_slot", nil), repo_names, "docs.surfaces.#{surface_id}.repo_slot")
+        repo_slot ||= docs_repo_slot(docs.fetch("repo_slot", nil), repo_names, "docs.repo_slot")
         repo_slot ||= repo_names.first if repo_names.length == 1
         if repo_slot.nil? && repo_names.length > 1
-          raise A3::Domain::ConfigurationError, "project.yaml docs.surfaces.#{surface_id}.repoSlot must be provided when multiple repos are declared"
+          raise A3::Domain::ConfigurationError, "project.yaml docs.surfaces.#{surface_id}.repo_slot must be provided when multiple repos are declared"
         end
         docs_repo_root(project_package_root, repos, repo_slot)
+      end
+
+      def reject_legacy_docs_repo_slot!(mapping, location)
+        return unless mapping.is_a?(Hash) && mapping.key?("repoSlot")
+
+        raise A3::Domain::ConfigurationError,
+              "project.yaml #{location}.repoSlot is no longer supported; migration_required=true replacement=#{location}.repo_slot"
       end
 
       def validate_docs_languages(languages)

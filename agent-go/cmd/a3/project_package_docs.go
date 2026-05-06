@@ -21,6 +21,9 @@ func validateProjectDocsConfig(rawDocs any, packagePath string, repos map[string
 	if !ok {
 		return fmt.Errorf("must be a mapping")
 	}
+	if _, ok := docs["repoSlot"]; ok {
+		return fmt.Errorf("repoSlot is no longer supported; migration_required=true replacement=repo_slot")
+	}
 	repoNames := projectRepoNames(repos)
 	if rawSurfaces, ok := docs["surfaces"]; ok {
 		surfaces, ok := normalizeYAMLValue(rawSurfaces).(map[string]any)
@@ -35,12 +38,15 @@ func validateProjectDocsConfig(rawDocs any, packagePath string, repos map[string
 			if !ok {
 				return fmt.Errorf("surfaces.%s must be a mapping", id)
 			}
-			repoSlot, err := projectDocsRepoSlot(surface["repoSlot"], repoNames, "surfaces.%s.repoSlot", id)
+			if _, ok := surface["repoSlot"]; ok {
+				return fmt.Errorf("surfaces.%s.repoSlot is no longer supported; migration_required=true replacement=surfaces.%s.repo_slot", id, id)
+			}
+			repoSlot, err := projectDocsRepoSlot(surface["repo_slot"], repoNames, "surfaces.%s.repo_slot", id)
 			if err != nil {
 				return err
 			}
 			if repoSlot == "" {
-				repoSlot, err = projectDocsRepoSlot(docs["repoSlot"], repoNames, "repoSlot")
+				repoSlot, err = projectDocsRepoSlot(docs["repo_slot"], repoNames, "repo_slot")
 				if err != nil {
 					return err
 				}
@@ -49,7 +55,7 @@ func validateProjectDocsConfig(rawDocs any, packagePath string, repos map[string
 				repoSlot = repoNames[0]
 			}
 			if repoSlot == "" && len(repoNames) > 1 {
-				return fmt.Errorf("surfaces.%s.repoSlot must be provided when multiple repos are declared", id)
+				return fmt.Errorf("surfaces.%s.repo_slot must be provided when multiple repos are declared", id)
 			}
 			repoRoot := projectDocsRepoRoot(packagePath, repos, repoSlot)
 			if err := validateProjectDocsPath(surface["root"], "surfaces."+id+".root", repoRoot, true); err != nil {
@@ -77,19 +83,19 @@ func validateProjectDocsConfig(rawDocs any, packagePath string, repos map[string
 		return nil
 	}
 	repoSlot := ""
-	if rawRepoSlot, ok := docs["repoSlot"]; ok {
+	if rawRepoSlot, ok := docs["repo_slot"]; ok {
 		value, ok := rawRepoSlot.(string)
 		if !ok || strings.TrimSpace(value) == "" {
-			return fmt.Errorf("repoSlot must be a non-empty string")
+			return fmt.Errorf("repo_slot must be a non-empty string")
 		}
 		repoSlot = strings.TrimSpace(value)
 		if len(repoNames) > 0 && !containsString(repoNames, repoSlot) {
-			return fmt.Errorf("repoSlot must match a repos entry: %s", repoSlot)
+			return fmt.Errorf("repo_slot must match a repos entry: %s", repoSlot)
 		}
 	} else if len(repoNames) == 1 {
 		repoSlot = repoNames[0]
 	} else if len(repoNames) > 1 {
-		return fmt.Errorf("repoSlot must be provided when multiple repos are declared")
+		return fmt.Errorf("repo_slot must be provided when multiple repos are declared")
 	}
 	repoRoot := projectDocsRepoRoot(packagePath, repos, repoSlot)
 	if err := validateProjectDocsPath(docs["root"], "root", repoRoot, true); err != nil {
@@ -259,17 +265,20 @@ func validateProjectDocsAuthorities(rawAuthorities any, packagePath string, repo
 }
 
 func projectDocsAuthorityRepoSlot(authority map[string]any, docs map[string]any, rawSurfaces map[string]any, repoNames []string, id string) (string, error) {
-	if slot, err := projectDocsRepoSlot(authority["repoSlot"], repoNames, "authorities."+id+".repoSlot"); err != nil || slot != "" {
+	if _, ok := authority["repoSlot"]; ok {
+		return "", fmt.Errorf("authorities.%s.repoSlot is no longer supported; migration_required=true replacement=authorities.%s.repo_slot", id, id)
+	}
+	if slot, err := projectDocsRepoSlot(authority["repo_slot"], repoNames, "authorities."+id+".repo_slot"); err != nil || slot != "" {
 		return slot, err
 	}
-	if slot, err := projectDocsRepoSlot(docs["repoSlot"], repoNames, "repoSlot"); err != nil || slot != "" {
+	if slot, err := projectDocsRepoSlot(docs["repo_slot"], repoNames, "repo_slot"); err != nil || slot != "" {
 		return slot, err
 	}
 	if len(repoNames) == 1 {
 		return repoNames[0], nil
 	}
 	if len(rawSurfaces) > 0 {
-		return "", fmt.Errorf("authorities.%s.repoSlot must be provided when docs.surfaces and multiple repos are declared", id)
+		return "", fmt.Errorf("authorities.%s.repo_slot must be provided when docs.surfaces and multiple repos are declared", id)
 	}
 	return "", nil
 }
@@ -287,12 +296,15 @@ func projectDocsSurfaceRepoRoot(packagePath string, repos map[string]struct {
 		return "", fmt.Errorf("surfaces.%s must be a mapping", surfaceID)
 	}
 	repoNames := projectRepoNames(repos)
-	slot, err := projectDocsRepoSlot(surface["repoSlot"], repoNames, "surfaces."+surfaceID+".repoSlot")
+	if _, ok := surface["repoSlot"]; ok {
+		return "", fmt.Errorf("surfaces.%s.repoSlot is no longer supported; migration_required=true replacement=surfaces.%s.repo_slot", surfaceID, surfaceID)
+	}
+	slot, err := projectDocsRepoSlot(surface["repo_slot"], repoNames, "surfaces."+surfaceID+".repo_slot")
 	if err != nil {
 		return "", err
 	}
 	if slot == "" {
-		slot, err = projectDocsRepoSlot(docs["repoSlot"], repoNames, "repoSlot")
+		slot, err = projectDocsRepoSlot(docs["repo_slot"], repoNames, "repo_slot")
 		if err != nil {
 			return "", err
 		}
@@ -301,7 +313,7 @@ func projectDocsSurfaceRepoRoot(packagePath string, repos map[string]struct {
 		slot = repoNames[0]
 	}
 	if slot == "" && len(repoNames) > 1 {
-		return "", fmt.Errorf("surfaces.%s.repoSlot must be provided when multiple repos are declared", surfaceID)
+		return "", fmt.Errorf("surfaces.%s.repo_slot must be provided when multiple repos are declared", surfaceID)
 	}
 	return projectDocsRepoRoot(packagePath, repos, slot), nil
 }

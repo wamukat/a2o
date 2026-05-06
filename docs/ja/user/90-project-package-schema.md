@@ -39,7 +39,7 @@ repos:
     label: repo:app
 
 docs:
-  repoSlot: app
+  repo_slot: app
   root: docs
   index: docs/README.md
   categories:
@@ -173,11 +173,11 @@ runtime:
 
 `repos` は安定したリポジトリスロットを定義する。スロットキーはランタイム上の識別子である。`path` は絶対パスでない限り、パッケージディレクトリからの相対パスとする。`label` はカンバンラベルとリポジトリスロットを対応づける。省略時、実装処理は `repo:<slot>` を導出してよい。
 
-`docs` は任意である。タスクに docs-impact がある場合に、A2O が参照または更新してよいドキュメント面を宣言する。単一 repo package では `docs.repoSlot` を省略でき、その repo slot に docs path が属するとみなす。multi-repo package、または docs が専用 repository にある場合は、その repository を `repos` に宣言し、対応する slot を `docs.repoSlot` に設定する。
+`docs` は任意である。タスクに docs-impact がある場合に、A2O が参照または更新してよいドキュメント面を宣言する。単一 repo package では `docs.repo_slot` を省略でき、その repo slot に docs path が属するとみなす。multi-repo package、または docs が専用 repository にある場合は、その repository を `repos` に宣言し、対応する slot を `docs.repo_slot` に設定する。
 
 ```yaml
 docs:
-  repoSlot: docs
+  repo_slot: docs
   root: docs
   index: docs/README.md
   categories:
@@ -201,27 +201,27 @@ docs:
         - docs/api.md
 ```
 
-`docs.root`、`docs.index`、category path、authority source、authority docs は repo slot からの相対 path である。A2O は absolute path、`..` による escape、選択した repo slot の外へ解決される既存 symlink を拒否する。`docs.repoSlot` は `repos` に宣言された slot と一致しなければならない。category id と authority id は `architecture`、`shared_specs`、`openapi` のような空でない machine-readable key にする。
+`docs.root`、`docs.index`、category path、authority source、authority docs は repo slot からの相対 path である。A2O は absolute path、`..` による escape、選択した repo slot の外へ解決される既存 symlink を拒否する。`docs.repo_slot` は `repos` に宣言された slot と一致しなければならない。category id と authority id は `architecture`、`shared_specs`、`openapi` のような空でない machine-readable key にする。
 
-multi-repo package では複数の documentation surface を宣言できる。surface は名前付きの docs 領域であり、それぞれが `repoSlot`、root、category、任意の `role` を持つ。複数 repo にまたがる architecture や interface docs には `role: integration` を指定する。integration surface は、タスクの編集対象が単一 product repo の場合でも候補として提示される。
+multi-repo package では複数の documentation surface を宣言できる。surface は名前付きの docs 領域であり、それぞれが `repo_slot`、root、category、任意の `role` を持つ。複数 repo にまたがる architecture や interface docs には `role: integration` を指定する。integration surface は、タスクの編集対象が単一 product repo の場合でも候補として提示される。
 
 ```yaml
 docs:
   surfaces:
     app:
-      repoSlot: app
+      repo_slot: app
       root: docs
       categories:
         features:
           path: docs/features
     lib:
-      repoSlot: lib
+      repo_slot: lib
       root: docs
       categories:
         shared_specs:
           path: docs/shared-specs
     integrated:
-      repoSlot: docs
+      repo_slot: docs
       root: docs
       role: integration
       categories:
@@ -229,7 +229,7 @@ docs:
           path: docs/interfaces
   authorities:
     greeting_schema:
-      repoSlot: lib
+      repo_slot: lib
       source: docs/shared-specs/greeting-format.md
       docs:
         - surface: lib
@@ -238,7 +238,7 @@ docs:
           path: docs/interfaces/greeting-api.md
 ```
 
-`docs.surfaces` がある場合、各 surface の path はその surface の repo slot からの相対 path である。authority source も `repoSlot` を持てる。authority の `docs` entry は `{surface, path}` 形式を使えるため、ある repo の source-of-truth artifact から別 surface の生成 docs や mirror docs を指せる。既存の single-surface `docs.repoSlot` 設定は引き続き有効である。
+`docs.surfaces` がある場合、各 surface の path はその surface の repo slot からの相対 path である。authority source も `repo_slot` を持てる。authority の `docs` entry は `{surface, path}` 形式を使えるため、ある repo の source-of-truth artifact から別 surface の生成 docs や mirror docs を指せる。既存の single-surface `docs.repo_slot` 設定は引き続き有効である。
 
 `docs.impactPolicy.mirrorPolicy` は `docs.languages.secondary` に対する mirror debt の扱いを制御する。`require_all` は宣言されたすべての言語を同じ変更で更新する方針、`require_canonical_warn_mirror` は不足した secondary docs を mirror debt として記録する方針、`canonical_only` は mirror debt を記録しない方針である。
 
@@ -336,11 +336,11 @@ decomposition では、`include_child` は refactoring work を通常の child d
 - read-only の通知 / 監査用途は `observers` に置く。
 - 実行可否を制御する設定は `*_gate` を使う。
 - phase そのものではない後処理は、phase と同格に見える名前を増やさず、目的が分かる section 名または説明で reporting / observer / delivery hook として区別する。
-- 旧 `repoSlots`、`childDraftTemplate` のような camelCase key は正規形ではない。移行する場合は `repo_slots`、`child_draft_template` を使う。
+- 旧 `repoSlots`、`childDraftTemplate`、docs surface の `repoSlot` のような camelCase key は正規形ではない。移行する場合は `repo_slots`、`child_draft_template`、`repo_slot` を使う。
 
 移行エラーは黙って互換解釈しない。削除済みまたは名前変更済みの key を使った場合、A2O は `migration_required=true` と移行先 key を含む診断で失敗する。
 
-既存 docs surface には `docs.repoSlot`、`docs.surfaces.*.repoSlot`、`docs.authorities.*.repoSlot` の camelCase key が残っている。これらは prompt key 正規化とは別の移行対象であり、現行の prompt key 移行では変更しない。docs surface 側の snake_case 化では `repo_slot` を正規形とし、同じ migration-required 方針で扱う。
+docs surface の repository slot key は `docs.repo_slot`、`docs.surfaces.*.repo_slot`、`docs.authorities.*.repo_slot` の snake_case を使う。これらの surface に残る旧 camelCase `repoSlot` は互換 alias ではない。A2O は `migration_required=true` と移行先 path を含む診断で失敗する。
 
 ### 公開 command / hook モデル
 

@@ -86,12 +86,12 @@ docs が別 repo slot にある場合は、repo slot と root を指定する。
 
 ```yaml
 docs:
-  repoSlot: docs
+  repo_slot: docs
   root: docs
   index: docs/README.md
 ```
 
-`repoSlot` がない場合、docs は primary repo slot の中にあるとみなす。A2O は docs path を project-package root ではなく、対象 repo slot の checkout 内で解決する。
+`repo_slot` がない場合、docs は primary repo slot の中にあるとみなす。A2O は docs path を project-package root ではなく、対象 repo slot の checkout 内で解決する。
 
 docs repo を更新するには、その repo が A2O の repo slot として宣言されていなければならない。A2O は未宣言の外部 docs repository を直接 clone / push しない。
 
@@ -101,7 +101,7 @@ docs config は prompt / skill config と同じく厳格に検証する。
 
 - `root`、`index`、category path、authority path は対象 repo slot 内の相対 path である。
 - absolute path、`..` による repo 外参照、symlink escape は拒否する。
-- `repoSlot` は既存 repo slot と一致しなければならない。
+- `repo_slot` は既存 repo slot と一致しなければならない。
 - category id は空でなく、一意で、安定した machine-readable key である。
 - docs root が存在しない場合は、project policy に従って作成するか、明確な configuration error にする。
 - front matter schema version がある場合、A2O が認識できない version は warning または error として扱う。
