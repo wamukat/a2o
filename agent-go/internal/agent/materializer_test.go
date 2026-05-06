@@ -413,7 +413,9 @@ func TestWorkspaceMaterializerBootstrapsMissingParentThenChildBranch(t *testing.
 	tmp := t.TempDir()
 	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
 	git(t, sourceRoot, "branch", "feature/prototype", "HEAD")
+	git(t, sourceRoot, "checkout", "-q", "feature/prototype")
 	liveHead := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "HEAD"))
+	liveBranch := strings.TrimSpace(git(t, sourceRoot, "symbolic-ref", "-q", "HEAD"))
 	request := testWorkspaceRequest("sample-catalog-service")
 	slot := request.Slots["repo_alpha"]
 	slot.Ref = "refs/heads/a3/work/Sample-204"
@@ -441,8 +443,60 @@ func TestWorkspaceMaterializerBootstrapsMissingParentThenChildBranch(t *testing.
 	if childHead := strings.TrimSpace(git(t, sourceRoot, "rev-parse", "refs/heads/a3/work/Sample-204")); childHead != liveHead {
 		t.Fatalf("child branch was not bootstrapped from parent head: got=%s want=%s", childHead, liveHead)
 	}
+	if currentBranch := strings.TrimSpace(git(t, sourceRoot, "symbolic-ref", "-q", "HEAD")); currentBranch != liveBranch {
+		t.Fatalf("live repo branch changed during materialization: got=%s want=%s", currentBranch, liveBranch)
+	}
 	if err := materializer.Cleanup(prepared); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestAssertSourceCheckoutUnchangedReportsChangedLiveBranch(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
+	git(t, sourceRoot, "branch", "feature/prototype", "HEAD")
+	git(t, sourceRoot, "branch", "a3/parent/Sample-203", "HEAD")
+	git(t, sourceRoot, "checkout", "-q", "feature/prototype")
+	before, err := captureSourceCheckoutSnapshot(sourceRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	git(t, sourceRoot, "checkout", "-q", "a3/parent/Sample-203")
+	if err := assertSourceCheckoutUnchanged(sourceRoot, before); err == nil {
+		t.Fatal("expected changed live repo branch to be reported")
+	}
+
+	if currentBranch := strings.TrimSpace(git(t, sourceRoot, "symbolic-ref", "-q", "HEAD")); currentBranch != "refs/heads/a3/parent/Sample-203" {
+		t.Fatalf("assertion should not mutate live repo branch: got=%s", currentBranch)
+	}
+}
+
+func TestJoinSourceCheckoutInvariantErrorPreservesPriorError(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := createGitSource(t, tmp, "sample-catalog-service")
+	git(t, sourceRoot, "branch", "feature/prototype", "HEAD")
+	git(t, sourceRoot, "branch", "a3/parent/Sample-203", "HEAD")
+	git(t, sourceRoot, "checkout", "-q", "feature/prototype")
+	before, err := captureSourceCheckoutSnapshot(sourceRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	git(t, sourceRoot, "checkout", "-q", "a3/parent/Sample-203")
+	joinedErr := joinSourceCheckoutInvariantError(sourceRoot, before, fmt.Errorf("materialization failed"))
+	if joinedErr == nil {
+		t.Fatal("expected joined error")
+	}
+	errText := joinedErr.Error()
+	if !strings.Contains(errText, "materialization failed") {
+		t.Fatalf("joined error did not include prior error: %s", errText)
+	}
+	if !strings.Contains(errText, "source checkout changed during materialization") {
+		t.Fatalf("joined error did not include checkout invariant error: %s", errText)
+	}
+	if currentBranch := strings.TrimSpace(git(t, sourceRoot, "symbolic-ref", "-q", "HEAD")); currentBranch != "refs/heads/a3/parent/Sample-203" {
+		t.Fatalf("invariant check should not mutate live repo branch: got=%s", currentBranch)
 	}
 }
 

@@ -36,6 +36,12 @@ type cleanupOperation struct {
 	slotPath   string
 }
 
+type sourceCheckoutSnapshot struct {
+	symbolicRef string
+	head        string
+	detached    bool
+}
+
 type publishPlan struct {
 	slotName    string
 	runtimePath string
@@ -1426,7 +1432,15 @@ func (m WorkspaceMaterializer) sourceRoot(alias string) (string, error) {
 	return filepath.Abs(path)
 }
 
-func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot WorkspaceSlotRequest) (map[string]any, error) {
+func (m WorkspaceMaterializer) materializeSlot(sourceRoot, slotPath string, slot WorkspaceSlotRequest) (_ map[string]any, resultErr error) {
+	sourceCheckout, err := captureSourceCheckoutSnapshot(sourceRoot)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		resultErr = joinSourceCheckoutInvariantError(sourceRoot, sourceCheckout, resultErr)
+	}()
+
 	if dirtyFiles, err := gitDirtyFiles(sourceRoot); err != nil {
 		return nil, err
 	} else if len(dirtyFiles) > 0 {
@@ -1607,6 +1621,37 @@ func ensureWorkspaceSlotRef(root, targetRef, bootstrapRef, bootstrapBaseRef stri
 		return "", false, false, err
 	}
 	return bootstrapHead, true, false, nil
+}
+
+func captureSourceCheckoutSnapshot(root string) (sourceCheckoutSnapshot, error) {
+	head, err := gitOutput(root, "rev-parse", "HEAD")
+	if err != nil {
+		return sourceCheckoutSnapshot{}, err
+	}
+	symbolicRef, err := gitOutput(root, "symbolic-ref", "-q", "HEAD")
+	if err != nil {
+		return sourceCheckoutSnapshot{head: head, detached: true}, nil
+	}
+	return sourceCheckoutSnapshot{symbolicRef: symbolicRef, head: head}, nil
+}
+
+func assertSourceCheckoutUnchanged(root string, before sourceCheckoutSnapshot) error {
+	after, err := captureSourceCheckoutSnapshot(root)
+	if err != nil {
+		return err
+	}
+	if after.symbolicRef == before.symbolicRef && after.head == before.head && after.detached == before.detached {
+		return nil
+	}
+	return fmt.Errorf("source checkout changed during materialization: before_ref=%s before_head=%s before_detached=%t after_ref=%s after_head=%s after_detached=%t",
+		before.symbolicRef, before.head, before.detached, after.symbolicRef, after.head, after.detached)
+}
+
+func joinSourceCheckoutInvariantError(root string, before sourceCheckoutSnapshot, resultErr error) error {
+	if checkoutErr := assertSourceCheckoutUnchanged(root, before); checkoutErr != nil {
+		return errors.Join(resultErr, checkoutErr)
+	}
+	return resultErr
 }
 
 func rollbackWorkspaceSlotRefs(root, targetRef, bootstrapRef string, createdTargetRef, createdBootstrapRef bool) error {

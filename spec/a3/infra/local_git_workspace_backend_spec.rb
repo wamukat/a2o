@@ -26,6 +26,8 @@ RSpec.describe A3::Infra::LocalGitWorkspaceBackend do
       destination = Pathname(File.join(dir, "worktree"))
 
       create_git_repo_source(dir, name: "repo")
+      system("git", "-C", source_root.to_s, "checkout", "-q", "-b", "feature/prototype", exception: true)
+      live_branch = `git -C #{source_root} symbolic-ref -q HEAD`.strip
 
       backend.materialize(
         source_root: source_root,
@@ -38,6 +40,30 @@ RSpec.describe A3::Infra::LocalGitWorkspaceBackend do
       branch_ref = `git -C #{source_root} rev-parse refs/heads/a2o/work/Sample-3046`.strip
       head_ref = `git -C #{source_root} rev-parse HEAD`.strip
       expect(branch_ref).to eq(head_ref)
+      expect(`git -C #{source_root} symbolic-ref -q HEAD`.strip).to eq(live_branch)
+    end
+  end
+
+  it "reports checkout invariant failures without restoring the live repo branch" do
+    Dir.mktmpdir do |dir|
+      source_root = Pathname(File.join(dir, "repo"))
+
+      create_git_repo_source(dir, name: "repo")
+      system("git", "-C", source_root.to_s, "branch", "feature/prototype", "HEAD", exception: true)
+      system("git", "-C", source_root.to_s, "branch", "a2o/parent/Sample-3046", "HEAD", exception: true)
+      system("git", "-C", source_root.to_s, "checkout", "-q", "feature/prototype", exception: true)
+      before = backend.send(:source_checkout_state, source_root)
+
+      system("git", "-C", source_root.to_s, "checkout", "-q", "a2o/parent/Sample-3046", exception: true)
+      expect do
+        backend.send(
+          :assert_source_checkout_unchanged_or_raise!,
+          source_root,
+          before,
+          A3::Domain::ConfigurationError.new("materialization failed")
+        )
+      end.to raise_error(A3::Domain::ConfigurationError, /materialization failed.*source checkout changed during materialization/)
+      expect(`git -C #{source_root} symbolic-ref -q HEAD`.strip).to eq("refs/heads/a2o/parent/Sample-3046")
     end
   end
 

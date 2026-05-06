@@ -15,17 +15,26 @@ module A3
       def materialize(source_root:, destination:, ref:, create_branch_if_missing: false, reset_branch_to: nil)
         ensure_safe_directory!(source_root)
         assert_repo_identity!(source_root, source_root, label: "source_root")
-        run_git!(source_root, "worktree", "prune")
-        remove(source_root: source_root, destination: destination)
-        if create_branch_if_missing
-          ensure_branch_ref!(source_root, ref, reset_to: reset_branch_to)
-        elsif reset_branch_to
-          reset_branch_ref!(source_root, ref, reset_to: reset_branch_to)
+        source_checkout = source_checkout_state(source_root)
+        materialization_error = nil
+        begin
+          run_git!(source_root, "worktree", "prune")
+          remove(source_root: source_root, destination: destination)
+          if create_branch_if_missing
+            ensure_branch_ref!(source_root, ref, reset_to: reset_branch_to)
+          elsif reset_branch_to
+            reset_branch_ref!(source_root, ref, reset_to: reset_branch_to)
+          end
+          ensure_worktrees_dir!(source_root)
+          run_git!(source_root, "worktree", "add", "--force", "--detach", destination.to_s, ref)
+          ensure_safe_directory!(destination)
+          assert_same_repository!(destination, source_root, label: "destination")
+        rescue StandardError => e
+          materialization_error = e
+          raise
+        ensure
+          assert_source_checkout_unchanged_or_raise!(source_root, source_checkout, materialization_error)
         end
-        ensure_worktrees_dir!(source_root)
-        run_git!(source_root, "worktree", "add", "--force", "--detach", destination.to_s, ref)
-        ensure_safe_directory!(destination)
-        assert_same_repository!(destination, source_root, label: "destination")
       end
 
       def ready?(source_root:, destination:, ref:)
@@ -127,6 +136,31 @@ module A3
       def run_git!(root, *args)
         _stdout, stderr, status = Open3.capture3("git", "-C", root.to_s, *args)
         raise A3::Domain::ConfigurationError, "git #{args.join(' ')} failed: #{stderr}" unless status.success?
+      end
+
+      def source_checkout_state(root)
+        head = rev_parse(root, "HEAD")
+        stdout, _stderr, status = Open3.capture3("git", "-C", root.to_s, "symbolic-ref", "-q", "HEAD")
+        if status.success?
+          { symbolic_ref: stdout.strip, head: head, detached: false }
+        else
+          { symbolic_ref: nil, head: head, detached: true }
+        end
+      end
+
+      def assert_source_checkout_unchanged!(root, before)
+        after = source_checkout_state(root)
+        return if after == before
+
+        raise A3::Domain::ConfigurationError,
+              "source checkout changed during materialization: before_ref=#{before[:symbolic_ref]} before_head=#{before[:head]} before_detached=#{before[:detached]} after_ref=#{after[:symbolic_ref]} after_head=#{after[:head]} after_detached=#{after[:detached]}"
+      end
+
+      def assert_source_checkout_unchanged_or_raise!(root, before, materialization_error)
+        assert_source_checkout_unchanged!(root, before)
+      rescue StandardError => checkout_error
+        message = materialization_error ? "#{materialization_error.message}; #{checkout_error.message}" : checkout_error.message
+        raise A3::Domain::ConfigurationError, message
       end
 
       def registered_worktree?(root, destination)

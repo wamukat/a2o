@@ -802,6 +802,8 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
   it "places child ticket workspaces under the parent workspace and bootstraps parent integration slots as worktrees" do
     repo_root = Pathname(File.join(tmpdir, "repo-alpha"))
     create_git_repo_source(tmpdir, name: "repo-alpha")
+    system("git", "-C", repo_root.to_s, "checkout", "-q", "-b", "feature/prototype", exception: true)
+    live_branch = `git -C #{repo_root} symbolic-ref -q HEAD`.strip
     task = A3::Domain::Task.new(
       ref: "Sample#135",
       kind: :child,
@@ -840,5 +842,6 @@ RSpec.describe A3::Infra::LocalWorkspaceProvisioner do
     expect(parent_slot).to exist
     expect(`git -C #{repo_root} worktree list --porcelain`).to include(parent_slot.to_s)
     expect(`git -C #{repo_root} rev-parse refs/heads/a2o/parent/Sample-134`.strip).to eq(`git -C #{parent_slot} rev-parse HEAD`.strip)
+    expect(`git -C #{repo_root} symbolic-ref -q HEAD`.strip).to eq(live_branch)
   end
 end
