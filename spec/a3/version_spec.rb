@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe "A3 version" do
-  it "matches the A2O 0.5.77 release version" do
-    expect(A3::VERSION).to eq("0.5.77")
+  it "matches the A2O 0.5.78 release version" do
+    expect(A3::VERSION).to eq("0.5.78")
   end
 
   it "keeps release workflow version aligned" do

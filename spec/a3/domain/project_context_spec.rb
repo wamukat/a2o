@@ -88,7 +88,8 @@ RSpec.describe A3::Domain::ProjectContext do
       "merge_policy" => "ff_only",
       "merge_target_ref" => "refs/heads/live",
       "review_gate_required" => false,
-      "docs_configured" => false
+      "docs_configured" => false,
+      "max_consecutive_rework_without_commit" => 3
     )
   end
 
