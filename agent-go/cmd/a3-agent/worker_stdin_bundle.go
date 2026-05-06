@@ -1034,7 +1034,7 @@ func validateOperatorProposals(value any, request map[string]any) []string {
 		}
 		for _, field := range []string{"scope", "evidence"} {
 			if value, ok := proposal[field]; ok {
-				if !nonEmptyStringArray(value) {
+				if !stringArray(value) {
 					errors = append(errors, prefix+"."+field+" must be an array of non-empty strings when present")
 				}
 			}
@@ -1303,8 +1303,25 @@ func stringSliceValue(value any) []string {
 	return values
 }
 
-func nonEmptyStringArray(value any) bool {
-	return len(stringSliceValue(value)) > 0
+func stringArray(value any) bool {
+	switch entries := value.(type) {
+	case []any:
+		for _, entry := range entries {
+			if strings.TrimSpace(stringValue(entry)) == "" {
+				return false
+			}
+		}
+		return true
+	case []string:
+		for _, entry := range entries {
+			if strings.TrimSpace(entry) == "" {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func operatorProposalPriorities() []string {
