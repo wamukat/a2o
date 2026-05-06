@@ -233,7 +233,17 @@ a2o runtime image-digest
 
 `upgrade check` は pull、再起動、ファイル編集をしない。ホスト用ランチャーのバージョン、初期化済みインスタンス設定、ランタイムイメージのダイジェスト、エージェント配置状態、次に実行すべきコマンドを表示する。
 
-イメージを取得してランタイムを再起動する。
+リリース済みバージョンを一括適用する場合は、scheduler を止めた状態で実行する。
+
+```sh
+a2o runtime pause
+a2o upgrade apply 0.5.80
+a2o runtime status
+```
+
+`upgrade apply` は単一 runtime instance 向けの正規アップグレードコマンドである。実行中の launcher が自分自身をプロセス内で上書きしないよう、finalizer へ handoff してから処理する。finalizer は対象イメージを pull し、そのイメージに host launcher / shared asset の導入を委譲し、`.work/a2o/runtime-instance.json` を更新し、対象イメージで runtime を再起動し、`.work/a2o/agent/bin/a2o-agent` を更新して `a2o doctor` を実行する。scheduler がまだ running の場合は、ファイルを変更する前に中断する。`.work/a2o/project-registry.json` を使う workspace では、registry 全体の upgrade support が追加されるまで手動更新を使う。`--dry-run` を付けると、変更せずに finalizer script を確認できる。
+
+診断や復旧では、従来の手動更新も利用できる。
 
 ```sh
 a2o runtime up --pull

@@ -235,7 +235,17 @@ a2o runtime image-digest
 
 `upgrade check` does not pull images, restart services, or edit files. It reports the host launcher version, initialized instance config, runtime image digest, agent install state, and the next commands to run.
 
-To pull and restart the runtime image:
+To apply a released version in one step, keep the scheduler stopped and run:
+
+```sh
+a2o runtime pause
+a2o upgrade apply 0.5.80
+a2o runtime status
+```
+
+`upgrade apply` is the canonical upgrade command for a single runtime instance. It uses a finalizer handoff so the currently running launcher does not overwrite its own executable in-process. The finalizer pulls the target image, delegates host launcher and shared asset installation to that image, updates `.work/a2o/runtime-instance.json`, restarts the runtime with the target image, refreshes `.work/a2o/agent/bin/a2o-agent`, and runs `a2o doctor`. If the scheduler is still running, the command aborts before any mutation. Workspaces using `.work/a2o/project-registry.json` should keep using the manual sequence until registry-wide upgrade support is added. Use `--dry-run` to inspect the generated finalizer script without changing files.
+
+Manual upgrade remains available for diagnostics or recovery:
 
 ```sh
 a2o runtime up --pull

@@ -27,7 +27,7 @@ A2O 0.5.79 で現在利用できる公開機能と検証範囲を示す。
 - parent review の clean success result は、worker が `review_disposition` を省略または一部だけ返しても completed disposition に正規化される。明示的に矛盾する disposition は引き続き拒否される。frozen worker payload でも、この正規化で scheduler がクラッシュしない。
 - review result validation は、stdin から渡される任意の `review_disposition` payload について、follow-up 専用の項目を不要に要求しない。`finding_key` は review finding が実際に follow-up child または blocked outcome を作る場合だけ必要であり、clean / completed review evidence が無関係な項目不足で拒否されない。
 - multi-project runtime context は runtime storage、host log / workspace、scheduler pid / log file、temp file、branch namespace を解決済み project key ごとに分離する。`a2o runtime resume --all-projects`、`pause --all-projects`、`status --all-projects` は登録 project ごとに scheduler を1つずつ扱い、各 project 内の active task は1件のまま維持する。
-- アップグレード診断: `a2o upgrade check`
+- アップグレード操作: `a2o upgrade check`、`a2o upgrade apply <version> [--image IMAGE] [--dry-run]`
 - 単一ファイルのプロジェクトパッケージ設定: `project.yaml`
 - publish commit preflight 設定: `publish.commit_preflight.commands` で A2O 管理の publish commit 前に project-owned command を実行でき、`publish.commit_preflight.native_git_hooks` でリポジトリの Git commit hook を実行するかを制御できる。詳細は [90-project-package-schema.md#publish](90-project-package-schema.md#publish) を参照する。
 - implementation completion hook 設定: `runtime.phases.implementation.completion_hooks.commands` で implementation worker 成功後、review / verification へ進める前に project-owned command を実行できる。hook は `mutating` または `check` で、失敗時は task を進めず implementation rework feedback を返す。詳細は [90-project-package-schema.md#implementation-completion-hooks](90-project-package-schema.md#implementation-completion-hooks) を参照する。

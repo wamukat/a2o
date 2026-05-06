@@ -1349,6 +1349,7 @@ func TestUsageAdvertisesKanbanAndRuntimeEntrypoints(t *testing.T) {
 	for _, want := range []string{
 		"a2o doctor prompts [--package DIR]",
 		"a2o upgrade check",
+		"a2o upgrade apply <version>",
 		"a2o prompt preview --phase PHASE",
 		"a2o project bootstrap [--package DIR]",
 		"a2o project lint [--package DIR]",
@@ -6805,7 +6806,7 @@ func TestUpgradeCheckReportsCheckOnlyPlan(t *testing.T) {
 
 	output := stdout.String()
 	for _, want := range []string{
-		"upgrade_check mode=check-only apply_supported=false",
+		"upgrade_check mode=check-only apply_supported=true",
 		"host_launcher_version=0.5.test",
 		"runtime_package=" + packageDir,
 		"compose_project=a2o-upgrade",
@@ -6820,11 +6821,8 @@ func TestUpgradeCheckReportsCheckOnlyPlan(t *testing.T) {
 		"doctor_check name=project_package status=ok",
 		"doctor_status=ok",
 		"upgrade_doctor_status=ok exit_code=0",
-		"upgrade_next 1 command=a2o runtime image-digest",
-		"upgrade_next 2 command=a2o runtime up --pull",
-		"upgrade_next 3 command=a2o agent install --target auto --output " + shellQuote(agentPath),
-		"upgrade_next 4 command=a2o doctor",
-		"upgrade_next 5 command=a2o runtime status",
+		"upgrade_next 1 command=a2o upgrade apply '0.5.test'",
+		"upgrade_next 2 command=a2o runtime status",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("upgrade check missing %q in:\n%s", want, output)
@@ -6836,6 +6834,266 @@ func TestUpgradeCheckReportsCheckOnlyPlan(t *testing.T) {
 	forbidden := " up "
 	if strings.Contains(strings.Join(runner.joinedCalls(), "\n"), forbidden+"-d") {
 		t.Fatalf("upgrade check should not start services, calls:\n%s", strings.Join(runner.joinedCalls(), "\n"))
+	}
+}
+
+func TestUpgradeApplyDryRunPrintsSelfUpdateFinalizer(t *testing.T) {
+	tempDir := t.TempDir()
+	installRoot := filepath.Join(tempDir, "install")
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(filepath.Join(installRoot, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-upgrade",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3480",
+		RuntimeImage:   "ghcr.io/wamukat/a2o-engine:0.5.79",
+	})
+	oldExecutablePathFunc := executablePathFunc
+	executablePathFunc = func() (string, error) {
+		return filepath.Join(installRoot, "bin", "a2o-darwin-amd64"), nil
+	}
+	defer func() { executablePathFunc = oldExecutablePathFunc }()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	withChdir(t, tempDir, func() {
+		code := run([]string{"upgrade", "apply", "0.5.80", "--dry-run"}, &fakeRunner{}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	output := stdout.String()
+	for _, want := range []string{
+		"upgrade_apply mode=handoff version=0.5.80 image=ghcr.io/wamukat/a2o-engine:0.5.80",
+		"upgrade_install_root index=1 path=" + installRoot,
+		"upgrade_install_root index=2 path=" + filepath.Join(tempDir, ".work", "a2o"),
+		"upgrade_finalizer_script_begin",
+		"docker pull 'ghcr.io/wamukat/a2o-engine:0.5.80'",
+		"docker run --rm -v '" + installRoot + ":/install' 'ghcr.io/wamukat/a2o-engine:0.5.80' a2o host install --output-dir /install/bin --share-dir /install/share/a2o --runtime-image 'ghcr.io/wamukat/a2o-engine:0.5.80'",
+		"docker run --rm -v '" + filepath.Join(tempDir, ".work", "a2o") + ":/install' 'ghcr.io/wamukat/a2o-engine:0.5.80' a2o host install --output-dir /install/bin --share-dir /install/share/a2o --runtime-image 'ghcr.io/wamukat/a2o-engine:0.5.80'",
+		"exec \"$launcher\" upgrade finalize --version '0.5.80' --image 'ghcr.io/wamukat/a2o-engine:0.5.80'",
+		"upgrade_finalizer_script_end",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("upgrade apply dry-run missing %q in:\n%s", want, output)
+		}
+	}
+}
+
+func TestUpgradeApplyAbortsWhenSchedulerRunning(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-upgrade",
+		RuntimeService: "a2o-runtime",
+		RuntimeImage:   "ghcr.io/wamukat/a2o-engine:0.5.79",
+	})
+	paths := schedulerPaths(runtimeInstanceConfig{WorkspaceRoot: tempDir})
+	if err := os.MkdirAll(paths.Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(paths.PIDFile, []byte("12345\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	command := testSchedulerCommand(t, "runtime", "loop", "--interval", "60s")
+	if err := os.WriteFile(paths.CommandFile, []byte(command+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{processCommands: map[int]string{12345: command}}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	withChdir(t, tempDir, func() {
+		code := run([]string{"upgrade", "apply", "0.5.80", "--dry-run"}, runner, &stdout, &stderr)
+		if code != 1 {
+			t.Fatalf("run returned %d, want 1", code)
+		}
+	})
+	if !strings.Contains(stderr.String(), "scheduler is running pid=12345") {
+		t.Fatalf("stderr should explain running scheduler, got:\n%s", stderr.String())
+	}
+	if strings.Contains(stdout.String(), "upgrade_finalizer_script_begin") {
+		t.Fatalf("upgrade apply should abort before printing finalizer script, got:\n%s", stdout.String())
+	}
+}
+
+func TestUpgradeApplyRejectsProjectRegistryWorkspace(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	writeTestInstanceConfig(t, tempDir, runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-upgrade",
+		RuntimeService: "a2o-runtime",
+		RuntimeImage:   "ghcr.io/wamukat/a2o-engine:0.5.79",
+	})
+	writeProjectRegistry(t, tempDir, multiProjectRegistryPayload(packageDir, tempDir))
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	withChdir(t, tempDir, func() {
+		code := run([]string{"upgrade", "apply", "0.5.80", "--dry-run"}, &fakeRunner{}, &stdout, &stderr)
+		if code != 1 {
+			t.Fatalf("run returned %d, want 1", code)
+		}
+	})
+	if !strings.Contains(stderr.String(), "does not support project registry workspaces yet") {
+		t.Fatalf("stderr should explain project registry limitation, got:\n%s", stderr.String())
+	}
+	if strings.Contains(stdout.String(), "upgrade_finalizer_script_begin") {
+		t.Fatalf("upgrade apply should abort before finalizer script, got:\n%s", stdout.String())
+	}
+}
+
+func TestUpgradeFinalizeUpdatesRuntimeImageAndRunsPostInstallChecks(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	config := runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-upgrade",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3480",
+		RuntimeImage:   "ghcr.io/wamukat/a2o-engine:0.5.79",
+	}
+	writeTestInstanceConfig(t, tempDir, config)
+	configPath := filepath.Join(tempDir, instanceConfigRelativePath)
+	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
+	runner := &fakeRunner{
+		imageInspectDigests: map[string]string{
+			"image-123": "ghcr.io/wamukat/a2o-engine@sha256:target",
+		},
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	withChdir(t, tempDir, func() {
+		code := run([]string{
+			"upgrade", "finalize",
+			"--version", "0.5.80",
+			"--image", "ghcr.io/wamukat/a2o-engine:0.5.80",
+			"--config-path", configPath,
+			"--backup-path", configPath + ".upgrade-backup",
+			"--agent-output", agentPath,
+		}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	updated, err := readInstanceConfig(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.RuntimeImage != "ghcr.io/wamukat/a2o-engine:0.5.80" {
+		t.Fatalf("runtime image not updated: %s", updated.RuntimeImage)
+	}
+	if _, err := os.Stat(configPath + ".upgrade-backup"); err != nil {
+		t.Fatalf("backup missing: %v", err)
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		"runtime_up compose_project=a2o-upgrade",
+		"agent_installed target=",
+		"doctor_status=ok",
+		"upgrade_complete version=0.5.80 doctor_status=ok",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("upgrade finalize missing %q in:\n%s", want, output)
+		}
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	for _, want := range []string{
+		"docker compose -p a2o-upgrade -f compose.yml pull a2o-runtime",
+		"docker compose -p a2o-upgrade -f compose.yml up -d a2o-runtime kanbalone",
+		"docker cp container-123:/tmp/a2o-agent-export " + agentPath,
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("upgrade finalize calls missing %q in:\n%s", want, joined)
+		}
+	}
+}
+
+func TestUpgradeFinalizeKeepsTargetConfigWhenAgentInstallFailsAfterRuntimeRestart(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	config := runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    "compose.yml",
+		ComposeProject: "a2o-upgrade",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3480",
+		RuntimeImage:   "ghcr.io/wamukat/a2o-engine:0.5.79",
+	}
+	writeTestInstanceConfig(t, tempDir, config)
+	configPath := filepath.Join(tempDir, instanceConfigRelativePath)
+	runner := &fakeRunner{agentPackageVerifyFailureOutput: "agent package invalid\n"}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	withChdir(t, tempDir, func() {
+		code := run([]string{
+			"upgrade", "finalize",
+			"--version", "0.5.80",
+			"--image", "ghcr.io/wamukat/a2o-engine:0.5.80",
+			"--config-path", configPath,
+			"--backup-path", configPath + ".upgrade-backup",
+			"--agent-output", filepath.Join(tempDir, hostAgentBinRelativePath),
+		}, runner, &stdout, &stderr)
+		if code != 1 {
+			t.Fatalf("run returned %d, want 1", code)
+		}
+	})
+
+	updated, err := readInstanceConfig(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.RuntimeImage != "ghcr.io/wamukat/a2o-engine:0.5.80" {
+		t.Fatalf("runtime image should remain on target after runtime restart, got %s", updated.RuntimeImage)
+	}
+	if !strings.Contains(stderr.String(), "runtime instance config remains on ghcr.io/wamukat/a2o-engine:0.5.80") {
+		t.Fatalf("stderr should explain post-restart recovery, got:\n%s", stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "runtime_up compose_project=a2o-upgrade") {
+		t.Fatalf("runtime should have restarted before agent failure, got:\n%s", stdout.String())
 	}
 }
 
