@@ -138,4 +138,47 @@ RSpec.describe "reference product commands" do
       expect(disposition).not_to have_key("repo_scope")
     end
   end
+
+  it "emits operator proposals for the deterministic smoke marker" do
+    Dir.mktmpdir do |dir|
+      request_path = File.join(dir, "request.json")
+      result_path = File.join(dir, "result.json")
+      repo_beta = File.join(dir, "repo_beta")
+      FileUtils.mkdir_p(File.join(repo_beta, "src"))
+      FileUtils.mkdir_p(File.join(repo_beta, "tests"))
+      File.write(File.join(repo_beta, "src", "render-storefront.js"), "export function renderSummary() { return 'ok'; }\n")
+      File.write(File.join(repo_beta, "tests", "render-storefront.test.js"), "import assert from 'node:assert/strict';\n")
+      File.write(
+        request_path,
+        JSON.pretty_generate(
+          "task_ref" => "A2OReference#2",
+          "run_ref" => "run-2",
+          "phase" => "implementation",
+          "slot_paths" => { "repo_beta" => repo_beta },
+          "scope_snapshot" => { "edit_scope" => ["repo_beta"] },
+          "task_packet" => {
+            "title" => "[operator-proposal-smoke] Verify proposal visibility",
+            "description" => "Run the reference worker operator proposal smoke path."
+          }
+        )
+      )
+
+      script = File.expand_path("../../tools/reference_validation/deterministic_worker.rb", __dir__)
+      env = {
+        "A2O_WORKER_REQUEST_PATH" => request_path,
+        "A2O_WORKER_RESULT_PATH" => result_path
+      }
+      _stdout, stderr, status = Open3.capture3(env, "ruby", script)
+
+      expect(status).to be_success, stderr
+      result = JSON.parse(File.read(result_path))
+      expect(result.fetch("operator_proposals")).to include(
+        include(
+          "title" => "Review deterministic worker smoke policy",
+          "category" => "reference_smoke",
+          "scope" => ["repo_beta"]
+        )
+      )
+    end
+  end
 end

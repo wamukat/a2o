@@ -5,6 +5,10 @@ set -eu
 
 cd "$A2O_DEV_SAMPLE_ROOT"
 mkdir -p "$A2O_DEV_SAMPLE_STORAGE_DIR"
+max_steps_args=""
+if [ -n "${A2O_DEV_SAMPLE_MAX_STEPS:-}" ]; then
+  max_steps_args="--max-steps $A2O_DEV_SAMPLE_MAX_STEPS"
+fi
 
 "$A2O_DEV_SAMPLE_ROOT/tools/dev_sample/prepare-sources.sh" >/dev/null
 app_source="$A2O_DEV_SAMPLE_ROOT/.work/a2o-dev-sample/sources/web-app"
@@ -14,6 +18,7 @@ docs_source="$A2O_DEV_SAMPLE_ROOT/.work/a2o-dev-sample/sources/docs"
 ruby -Ilib bin/a3 execute-until-idle \
   --storage-backend sqlite \
   --storage-dir "$A2O_DEV_SAMPLE_STORAGE_DIR" \
+  $max_steps_args \
   --repo-source "app=$app_source" \
   --repo-source "lib=$lib_source" \
   --repo-source "docs=$docs_source" \

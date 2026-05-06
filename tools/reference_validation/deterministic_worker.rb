@@ -27,7 +27,7 @@ def editable_slot?(request, slot)
   request.fetch("scope_snapshot", {}).fetch("edit_scope", request.fetch("slot_paths").keys).include?(slot)
 end
 
-def success(request, summary:, changed_files: {}, slot_scopes: nil)
+def success(request, summary:, changed_files: {}, slot_scopes: nil, operator_proposals: nil)
   payload = {
     "task_ref" => request.fetch("task_ref"),
     "run_ref" => request.fetch("run_ref"),
@@ -48,6 +48,7 @@ def success(request, summary:, changed_files: {}, slot_scopes: nil)
       "description" => "Reference validation worker applied the requested baseline change.",
       "finding_key" => "reference-validation-clean"
     }
+    payload["operator_proposals"] = operator_proposals if operator_proposals
   elsif request.fetch("phase") == "review"
     payload["review_disposition"] = {
       "kind" => "completed",
@@ -58,6 +59,29 @@ def success(request, summary:, changed_files: {}, slot_scopes: nil)
     }
   end
   payload
+end
+
+def operator_proposal_smoke?(request)
+  packet = request.fetch("task_packet", {})
+  text = [packet["title"], packet["description"]].compact.join("\n")
+  text.include?("[operator-proposal-smoke]")
+end
+
+def operator_proposals_for_smoke(request, changed_files)
+  return nil unless operator_proposal_smoke?(request)
+
+  first_slot = changed_files.keys.first || request.fetch("slot_paths").keys.first
+  [
+    {
+      "title" => "Review deterministic worker smoke policy",
+      "summary" => "The reference worker emitted an advisory proposal for the operator proposal smoke task.",
+      "priority" => "low",
+      "category" => "reference_smoke",
+      "suggested_action" => "Keep this smoke marker available for release validation of proposal visibility.",
+      "scope" => [first_slot],
+      "evidence" => ["task marker [operator-proposal-smoke]"]
+    }
+  ]
 end
 
 def fail_payload(request, error)
@@ -721,7 +745,12 @@ begin
     end
     raise "No supported reference product slot found" if changed.empty?
 
-    result = success(request, summary: "deterministic implementation completed", changed_files: changed)
+    result = success(
+      request,
+      summary: "deterministic implementation completed",
+      changed_files: changed,
+      operator_proposals: operator_proposals_for_smoke(request, changed)
+    )
   else
     raise "Unsupported phase #{phase}"
   end

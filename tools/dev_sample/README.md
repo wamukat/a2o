@@ -42,6 +42,17 @@ This executes `ruby -Ilib bin/a3 execute-until-idle` from the current source
 tree. It uses `.work/a2o-dev-sample/` for runtime state and talks only to the
 isolated Kanbalone on port `3471` and the local agent server on port `7394`.
 
+## Run operator proposal smoke
+
+```sh
+tools/dev_sample/run-operator-proposal-smoke.sh
+```
+
+This creates a dedicated `[operator-proposal-smoke]` task, runs the local
+engine, then checks both the Kanban completion comment and `show-task` output
+for the preserved operator proposal. It is intended for validating the
+`operator_proposals` worker-result flow before release.
+
 ## Run decomposition from a Kanban requirement ticket
 
 Create a ticket in `To do` with `trigger:investigate`, then run:
