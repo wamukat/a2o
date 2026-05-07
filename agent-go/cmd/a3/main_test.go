@@ -7045,6 +7045,138 @@ func TestUpgradeFinalizeUpdatesRuntimeImageAndRunsPostInstallChecks(t *testing.T
 	}
 }
 
+func TestUpgradeFinalizeRefreshesDistributionComposeFile(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	oldComposeFile := filepath.Join(tempDir, "old-install", "share", "a2o", "docker", "compose", "a2o-kanbalone.yml")
+	if err := os.MkdirAll(filepath.Dir(oldComposeFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(oldComposeFile, []byte("services:\n  a2o-runtime:\n    command: [\"sleep\", \"infinity\"]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	refreshedComposeFile := filepath.Join(tempDir, ".work", "a2o", "share", "a2o", "docker", "compose", "a2o-kanbalone.yml")
+	if err := os.MkdirAll(filepath.Dir(refreshedComposeFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(refreshedComposeFile, []byte("services:\n  a2o-runtime:\n    init: true\n    command: [\"sleep\", \"infinity\"]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	config := runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    oldComposeFile,
+		ComposeProject: "a2o-upgrade",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3480",
+		RuntimeImage:   "ghcr.io/wamukat/a2o-engine:0.5.82",
+	}
+	writeTestInstanceConfig(t, tempDir, config)
+	configPath := filepath.Join(tempDir, instanceConfigRelativePath)
+	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
+	runner := &fakeRunner{}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	withChdir(t, tempDir, func() {
+		code := run([]string{
+			"upgrade", "finalize",
+			"--version", "0.5.83",
+			"--image", "ghcr.io/wamukat/a2o-engine:0.5.83",
+			"--config-path", configPath,
+			"--backup-path", configPath + ".upgrade-backup",
+			"--agent-output", agentPath,
+		}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	updated, err := readInstanceConfig(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.ComposeFile != refreshedComposeFile {
+		t.Fatalf("compose file not refreshed:\ngot  %s\nwant %s", updated.ComposeFile, refreshedComposeFile)
+	}
+	if !strings.Contains(stdout.String(), "upgrade_compose_file status=updated") {
+		t.Fatalf("stdout should report compose file refresh, got:\n%s", stdout.String())
+	}
+	joined := strings.Join(runner.joinedCalls(), "\n")
+	if !strings.Contains(joined, "docker compose -p a2o-upgrade -f "+refreshedComposeFile+" up -d a2o-runtime kanbalone") {
+		t.Fatalf("runtime up should use refreshed compose file, calls:\n%s", joined)
+	}
+}
+
+func TestUpgradeFinalizeKeepsCustomComposeFile(t *testing.T) {
+	tempDir := t.TempDir()
+	packageDir := filepath.Join(tempDir, "package")
+	if err := os.MkdirAll(packageDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMultiRepoProjectYaml(t, packageDir)
+	customComposeFile := filepath.Join(tempDir, "ops", "a2o-kanbalone.yml")
+	if err := os.MkdirAll(filepath.Dir(customComposeFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(customComposeFile, []byte("services:\n  a2o-runtime:\n    command: [\"sleep\", \"infinity\"]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	refreshedComposeFile := filepath.Join(tempDir, ".work", "a2o", "share", "a2o", "docker", "compose", "a2o-kanbalone.yml")
+	if err := os.MkdirAll(filepath.Dir(refreshedComposeFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(refreshedComposeFile, []byte("services:\n  a2o-runtime:\n    init: true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	config := runtimeInstanceConfig{
+		SchemaVersion:  1,
+		PackagePath:    packageDir,
+		WorkspaceRoot:  tempDir,
+		ComposeFile:    customComposeFile,
+		ComposeProject: "a2o-custom-compose",
+		RuntimeService: "a2o-runtime",
+		KanbalonePort:  "3480",
+		RuntimeImage:   "ghcr.io/wamukat/a2o-engine:0.5.82",
+	}
+	writeTestInstanceConfig(t, tempDir, config)
+	configPath := filepath.Join(tempDir, instanceConfigRelativePath)
+	agentPath := filepath.Join(tempDir, hostAgentBinRelativePath)
+	runner := &fakeRunner{}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	withChdir(t, tempDir, func() {
+		code := run([]string{
+			"upgrade", "finalize",
+			"--version", "0.5.83",
+			"--image", "ghcr.io/wamukat/a2o-engine:0.5.83",
+			"--config-path", configPath,
+			"--backup-path", configPath + ".upgrade-backup",
+			"--agent-output", agentPath,
+		}, runner, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("run returned %d, stderr=%s", code, stderr.String())
+		}
+	})
+
+	updated, err := readInstanceConfig(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.ComposeFile != customComposeFile {
+		t.Fatalf("custom compose file should remain operator-controlled:\ngot  %s\nwant %s", updated.ComposeFile, customComposeFile)
+	}
+	if strings.Contains(stdout.String(), "upgrade_compose_file status=updated") {
+		t.Fatalf("stdout should not report custom compose file refresh, got:\n%s", stdout.String())
+	}
+}
+
 func TestUpgradeFinalizeKeepsTargetConfigWhenAgentInstallFailsAfterRuntimeRestart(t *testing.T) {
 	tempDir := t.TempDir()
 	packageDir := filepath.Join(tempDir, "package")

@@ -237,11 +237,13 @@ a2o runtime image-digest
 
 ```sh
 a2o runtime pause
-a2o upgrade apply 0.5.82
+a2o upgrade apply 0.5.83
 a2o runtime status
 ```
 
 `upgrade apply` は単一 runtime instance 向けの正規アップグレードコマンドである。実行中の launcher が自分自身をプロセス内で上書きしないよう、finalizer へ handoff してから処理する。finalizer は対象イメージを pull し、そのイメージに host launcher / shared asset の導入を委譲し、`.work/a2o/runtime-instance.json` を更新し、対象イメージで runtime を再起動し、`.work/a2o/agent/bin/a2o-agent` を更新して `a2o doctor` を実行する。scheduler がまだ running の場合は、ファイルを変更する前に中断する。`.work/a2o/project-registry.json` を使う workspace では、registry 全体の upgrade support が追加されるまで手動更新を使う。`--dry-run` を付けると、変更せずに finalizer script を確認できる。
+
+A2O 配布 Compose file を使っている runtime instance では、`upgrade apply` は runtime を再起動する前に `.work/a2o/runtime-instance.json` の Compose file 参照も新しく導入した shared asset へ更新する。これにより、子プロセス回収用の Docker `init: true` のような release 管理の Compose 設定が、選択した release image と揃う。独自 `--compose-file` を使う構成は引き続き運用者の管理対象である。
 
 診断や復旧では、従来の手動更新も利用できる。
 
@@ -253,6 +255,18 @@ a2o runtime status
 ```
 
 `runtime image-digest` は、設定済みの固定参照、ローカルの latest 参照、実行中コンテナの参照を比較する。不一致が出た場合は、使うイメージを確認してから `a2o runtime up` で再起動する。
+
+## 内包 Kanbalone の外部連携資格情報
+
+内包 Kanbalone は、A2O が Compose service を起動するときのホスト環境変数から外部 issue tracker の資格情報を受け取れる。provider ごとの資格情報は `KANBALONE_REMOTE_CREDENTIALS`、GitHub access は `GITHUB_TOKEN` に設定し、内包 Kanbalone service を再作成する。
+
+```sh
+export KANBALONE_REMOTE_CREDENTIALS='{"redmine:https://redmine.example.com":"YOUR_API_KEY"}'
+export GITHUB_TOKEN='ghp_...'
+a2o kanban up
+```
+
+これらの変数は Compose file に直接書き込むのではなく、A2O 配布 Compose file が passthrough する。そのため、A2O shared asset を更新しても設定方法は維持される。資格情報の値は、A2O を起動する host service manager、shell profile、secret manager で管理し、project package や repository file へ commit しない。
 
 ## 診断コマンド
 

@@ -20,6 +20,8 @@ services:
       HOST: 0.0.0.0
       PORT: 3000
       KANBALONE_DB_FILE: /app/data/kanbalone.sqlite
+      KANBALONE_REMOTE_CREDENTIALS: ${KANBALONE_REMOTE_CREDENTIALS:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
     ports:
       - "${A2O_BUNDLE_KANBALONE_PORT:-3470}:3000"
     volumes:

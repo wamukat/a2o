@@ -239,11 +239,13 @@ To apply a released version in one step, keep the scheduler stopped and run:
 
 ```sh
 a2o runtime pause
-a2o upgrade apply 0.5.82
+a2o upgrade apply 0.5.83
 a2o runtime status
 ```
 
 `upgrade apply` is the canonical upgrade command for a single runtime instance. It uses a finalizer handoff so the currently running launcher does not overwrite its own executable in-process. The finalizer pulls the target image, delegates host launcher and shared asset installation to that image, updates `.work/a2o/runtime-instance.json`, restarts the runtime with the target image, refreshes `.work/a2o/agent/bin/a2o-agent`, and runs `a2o doctor`. If the scheduler is still running, the command aborts before any mutation. Workspaces using `.work/a2o/project-registry.json` should keep using the manual sequence until registry-wide upgrade support is added. Use `--dry-run` to inspect the generated finalizer script without changing files.
+
+When the runtime instance uses the A2O distribution Compose file, `upgrade apply` also refreshes `.work/a2o/runtime-instance.json` to point at the newly installed shared Compose asset before restarting the runtime. This keeps release-managed Compose settings, such as Docker `init: true` for child-process reaping, aligned with the selected release image. Custom `--compose-file` deployments remain under operator control.
 
 Manual upgrade remains available for diagnostics or recovery:
 
@@ -255,6 +257,18 @@ a2o runtime status
 ```
 
 `runtime image-digest` compares configured pinned references, local `latest`, and the running container image. If they differ, decide which image should be active before restarting with `a2o runtime up`.
+
+## Bundled Kanbalone Remote Credentials
+
+Bundled Kanbalone can receive external issue tracker credentials through host environment variables when A2O starts the Compose services. Set `KANBALONE_REMOTE_CREDENTIALS` for provider-specific credentials, or `GITHUB_TOKEN` for GitHub access, then recreate the bundled Kanbalone service:
+
+```sh
+export KANBALONE_REMOTE_CREDENTIALS='{"redmine:https://redmine.example.com":"YOUR_API_KEY"}'
+export GITHUB_TOKEN='ghp_...'
+a2o kanban up
+```
+
+These variables are passed through by the A2O distribution Compose file rather than being edited into the Compose file directly, so they survive A2O shared-asset upgrades. Store them in the host service manager, shell profile, or secret manager that launches A2O; do not commit credential values into project packages or repository files.
 
 ## Diagnostics
 

@@ -38,6 +38,35 @@ func TestRuntimeComposeServicesUseInit(t *testing.T) {
 	}
 }
 
+func TestKanbaloneComposeSupportsRemoteCredentialPassthrough(t *testing.T) {
+	repoRoot := findRepoRootForComposeTest(t)
+	for _, path := range []string{
+		filepath.Join(repoRoot, "docker", "compose", "a2o-kanbalone.yml"),
+		filepath.Join(repoRoot, "docker", "compose", "a2o-kanbalone.release.yml"),
+	} {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			body, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			text := string(body)
+			serviceIndex := strings.Index(text, "  kanbalone:\n")
+			if serviceIndex < 0 {
+				t.Fatalf("%s does not define kanbalone service", path)
+			}
+			rest := text[serviceIndex+len("  kanbalone:\n"):]
+			for _, want := range []string{
+				"KANBALONE_REMOTE_CREDENTIALS: ${KANBALONE_REMOTE_CREDENTIALS:-}",
+				"GITHUB_TOKEN: ${GITHUB_TOKEN:-}",
+			} {
+				if !strings.Contains(rest, want) {
+					t.Fatalf("%s kanbalone service must support credential passthrough %q", path, want)
+				}
+			}
+		})
+	}
+}
+
 func findRepoRootForComposeTest(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()

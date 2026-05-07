@@ -291,6 +291,15 @@ func runUpgradeFinalize(args []string, runner commandRunner, stdout io.Writer, s
 		return fmt.Errorf("write runtime instance config backup: %w", err)
 	}
 	config.RuntimeImage = strings.TrimSpace(*targetImage)
+	if composeFile, ok := refreshedDistributionComposeFile(*config); ok {
+		previous := strings.TrimSpace(config.ComposeFile)
+		config.ComposeFile = composeFile
+		if previous != composeFile {
+			fmt.Fprintf(stdout, "upgrade_compose_file status=updated previous=%s path=%s\n", publicComposeFilePath(previous), publicComposeFilePath(composeFile))
+		} else {
+			fmt.Fprintf(stdout, "upgrade_compose_file status=current path=%s\n", publicComposeFilePath(composeFile))
+		}
+	}
 	if err := writeInstanceConfigPath(*configPath, *config); err != nil {
 		return err
 	}
@@ -316,6 +325,33 @@ func runUpgradeFinalize(args []string, runner commandRunner, stdout io.Writer, s
 	}
 	fmt.Fprintf(stdout, "upgrade_complete version=%s doctor_status=ok\n", strings.TrimSpace(*targetVersion))
 	return nil
+}
+
+func refreshedDistributionComposeFile(config runtimeInstanceConfig) (string, bool) {
+	if !shouldRefreshDistributionComposeFile(config.ComposeFile) {
+		return "", false
+	}
+	candidate := filepath.Join(config.WorkspaceRoot, ".work", "a2o", "share", "a2o", "docker", "compose", "a2o-kanbalone.yml")
+	if _, err := os.Stat(candidate); err == nil {
+		return candidate, true
+	}
+	return "", false
+}
+
+func shouldRefreshDistributionComposeFile(path string) bool {
+	clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(path)))
+	if clean == "" || clean == "." {
+		return true
+	}
+	return strings.Contains(clean, "/share/a2o/docker/compose/") || strings.Contains(clean, "/share/a3/docker/compose/")
+}
+
+func publicComposeFilePath(path string) string {
+	value := strings.TrimSpace(path)
+	if value == "" {
+		return "-"
+	}
+	return value
 }
 
 func writeInstanceConfigPath(path string, config runtimeInstanceConfig) error {
