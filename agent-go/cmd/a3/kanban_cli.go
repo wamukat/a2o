@@ -1650,6 +1650,8 @@ func runKanbanCLITaskLabelAdd(client kanbaloneHTTPClient, args []string, stderr 
 		var ignored map[string]any
 		if err := client.request("POST", fmt.Sprintf("/api/tickets/%d/tags/%d", id, intValue(tag["id"])), payload, &ignored); err == nil {
 			return taskLabels(client, id)
+		} else if !kanbaloneNotFound(err) {
+			return nil, err
 		}
 	}
 	current, err := currentTaskLabelTitles(client, id)

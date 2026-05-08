@@ -183,6 +183,48 @@ func TestKanbanCLILabelReasonFallbackOnlyOnNotFound(t *testing.T) {
 	}
 }
 
+func TestKanbanCLITaskLabelAddReasonFallbackOnlyOnNotFound(t *testing.T) {
+	legacyPatchCalled := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/tickets/8":
+			_, _ = w.Write([]byte(`{"id":8,"boardId":2,"laneId":9,"title":"Label me","bodyMarkdown":"","isResolved":false,"isArchived":false,"priority":2,"position":0,"ref":"A2O#8","shortRef":"#8","tags":[],"comments":[]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/boards/2":
+			_, _ = w.Write([]byte(`{"board":{"id":2,"name":"A2O"},"lanes":[{"id":9,"name":"To do","position":1}],"tags":[{"id":3,"name":"repo:app","color":"#888888"}]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/boards/2/tags":
+			_, _ = w.Write([]byte(`{"tags":[{"id":3,"name":"repo:app","color":"#888888"}]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/tickets/8/tags/3":
+			http.Error(w, `{"statusCode":500,"message":"tag reason failed"}`, http.StatusInternalServerError)
+		case r.Method == http.MethodPatch && r.URL.Path == "/api/tickets/8":
+			legacyPatchCalled = true
+			t.Fatalf("legacy tag patch should not run after non-404 structured tag error")
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runKanbanCLI([]string{
+		"--base-url", server.URL,
+		"task-label-add",
+		"--task-id", "8",
+		"--label", "repo:app",
+		"--reason", "because",
+	}, &stdout, &stderr)
+	if err == nil {
+		t.Fatalf("task-label-add should fail on non-404 tag reason API errors")
+	}
+	if !strings.Contains(err.Error(), "tag reason failed") {
+		t.Fatalf("error=%v, want original server error", err)
+	}
+	if legacyPatchCalled {
+		t.Fatalf("legacy tag patch should not be called")
+	}
+}
+
 func TestKanbanCLITaskUpdateDoneRefreshPreservesSuppliedDescription(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
