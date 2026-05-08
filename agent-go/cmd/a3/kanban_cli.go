@@ -56,6 +56,8 @@ func runKanbanCLI(args []string, stdout io.Writer, stderr io.Writer) error {
 		payload, err = runKanbanCLILabelList(client, commandArgs, stderr)
 	case "label-ensure":
 		payload, err = runKanbanCLILabelEnsure(client, commandArgs, stderr)
+	case "label-delete":
+		payload, err = runKanbanCLILabelDelete(client, commandArgs, stderr)
 	case "task-list", "task-find":
 		payload, err = runKanbanCLITaskList(client, command, commandArgs, stderr)
 	case "task-snapshot-list":
@@ -88,6 +90,8 @@ func runKanbanCLI(args []string, stdout io.Writer, stderr io.Writer) error {
 		payload, err = runKanbanCLITaskUpdate(client, commandArgs, stderr)
 	case "task-transition":
 		payload, err = runKanbanCLITaskTransition(client, commandArgs, stderr)
+	case "task-reorder":
+		payload, err = runKanbanCLITaskReorder(client, commandArgs, stderr)
 	case "task-relation-create":
 		payload, err = runKanbanCLITaskRelationCreate(client, commandArgs, stderr)
 	case "task-relation-delete":
@@ -721,6 +725,61 @@ func runKanbanCLILabelEnsure(client kanbaloneHTTPClient, args []string, stderr i
 		return nil, err
 	}
 	return normalizeLabel(created), nil
+}
+
+func runKanbanCLILabelDelete(client kanbaloneHTTPClient, args []string, stderr io.Writer) (any, error) {
+	flags := flag.NewFlagSet("label-delete", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	var pf projectFlagSet
+	addProjectFlags(flags, &pf)
+	labelID := flags.Int("label-id", 0, "label ID")
+	title := flags.String("title", "", "title")
+	label := flags.String("label", "", "label")
+	if err := flags.Parse(args); err != nil {
+		return nil, err
+	}
+	if *title == "" {
+		*title = *label
+	}
+	boardID, err := resolveBoardID(client, pf.projectID, pf.project)
+	if err != nil {
+		return nil, err
+	}
+	tags, err := boardTags(client, boardID)
+	if err != nil {
+		return nil, err
+	}
+	var matched []map[string]any
+	for _, raw := range tags {
+		tag := asMap(raw)
+		if *labelID > 0 && intValue(tag["id"]) == *labelID {
+			matched = append(matched, tag)
+		}
+		if *labelID == 0 && *title != "" && firstString(tag["name"], tag["title"]) == *title {
+			matched = append(matched, tag)
+		}
+	}
+	if len(matched) > 1 {
+		parts := make([]string, 0, len(matched))
+		for _, tag := range matched {
+			parts = append(parts, fmt.Sprintf("%d:%s", intValue(tag["id"]), firstString(tag["name"], tag["title"])))
+		}
+		return nil, errors.New("Tag title is ambiguous: " + strings.Join(parts, ", "))
+	}
+	if len(matched) == 1 {
+		if err := client.request("DELETE", fmt.Sprintf("/api/tags/%d", intValue(matched[0]["id"])), nil, nil); err != nil {
+			return nil, err
+		}
+	}
+	remaining, err := boardTags(client, boardID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]map[string]any, 0, len(remaining))
+	for _, tag := range remaining {
+		result = append(result, normalizeLabel(asMap(tag)))
+	}
+	return result, nil
 }
 
 func listBoardTickets(client kanbaloneHTTPClient, boardID int, search string, includeClosed bool) (map[string]any, string, []map[string]any, error) {
@@ -1631,11 +1690,13 @@ func runKanbanCLITaskCreate(client kanbaloneHTTPClient, args []string, stderr io
 	title := flags.String("title", "", "title")
 	description := flags.String("description", "", "description")
 	descriptionFile := flags.String("description-file", "", "description file")
+	reference := flags.String("reference", "", "reference")
 	status := flags.String("status", "To do", "status")
 	priority := flags.Int("priority", 2, "priority")
 	if err := flags.Parse(args); err != nil {
 		return nil, err
 	}
+	_ = reference
 	boardID, err := resolveBoardID(client, pf.projectID, pf.project)
 	if err != nil {
 		return nil, err
@@ -1674,11 +1735,13 @@ func runKanbanCLITaskUpdate(client kanbaloneHTTPClient, args []string, stderr io
 	descriptionFile := flags.String("description-file", "", "description file")
 	appendDescription := flags.String("append-description", "", "append description")
 	appendDescriptionFile := flags.String("append-description-file", "", "append description file")
+	reference := flags.String("reference", "", "reference")
 	priority := flags.Int("priority", 0, "priority")
 	done := flags.String("done", "", "done")
 	if err := flags.Parse(args); err != nil {
 		return nil, err
 	}
+	_ = reference
 	id, err := resolveTaskID(client, tf.taskID, tf.task)
 	if err != nil {
 		return nil, err
@@ -1730,6 +1793,8 @@ func runKanbanCLITaskTransition(client kanbaloneHTTPClient, args []string, stder
 	addTaskFlags(flags, &tf)
 	status := flags.String("status", "", "status")
 	syncDone := flags.Bool("sync-done-state", false, "sync done")
+	flags.BoolVar(syncDone, "sync-completion-state", false, "sync done")
+	flags.BoolVar(syncDone, "complete", false, "sync done")
 	if err := flags.Parse(args); err != nil {
 		return nil, err
 	}
@@ -1738,8 +1803,15 @@ func runKanbanCLITaskTransition(client kanbaloneHTTPClient, args []string, stder
 		return nil, err
 	}
 	payload := map[string]any{"laneName": *status}
-	if *syncDone && strings.EqualFold(*status, "Done") {
+	current, _, _, err := taskByID(client, id)
+	if err != nil {
+		return nil, err
+	}
+	targetIsDone := strings.EqualFold(strings.TrimSpace(*status), "Done")
+	if *syncDone && targetIsDone {
 		payload["isResolved"] = true
+	} else if !targetIsDone && (*syncDone || boolValue(current["done"])) {
+		payload["isResolved"] = false
 	}
 	var transitioned map[string]any
 	if err := client.request("PATCH", fmt.Sprintf("/api/tickets/%d/transition", id), payload, &transitioned); err != nil {
@@ -1757,6 +1829,143 @@ func runKanbanCLITaskTransition(client kanbaloneHTTPClient, args []string, stder
 	}
 	normalized["related_tasks"] = relations
 	return normalizeTaskDetail(normalized, boardTitle), nil
+}
+
+func runKanbanCLITaskReorder(client kanbaloneHTTPClient, args []string, stderr io.Writer) (any, error) {
+	flags := flag.NewFlagSet("task-reorder", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	var tf taskFlagSet
+	addTaskFlags(flags, &tf)
+	status := flags.String("status", "", "status")
+	laneID := flags.Int("lane-id", 0, "lane ID")
+	flags.IntVar(laneID, "bucket-id", 0, "lane ID")
+	flags.IntVar(laneID, "column-id", 0, "lane ID")
+	position := flags.Int("position", -1, "position")
+	if err := flags.Parse(args); err != nil {
+		return nil, err
+	}
+	if *position < 0 {
+		return nil, errors.New("--position must be zero or greater.")
+	}
+	id, err := resolveTaskID(client, tf.taskID, tf.task)
+	if err != nil {
+		return nil, err
+	}
+	task, shell, boardTitle, err := taskByID(client, id)
+	if err != nil {
+		return nil, err
+	}
+	targetLaneID := *laneID
+	if targetLaneID == 0 {
+		targetLaneID = intValue(task["column_id"])
+	}
+	if *status != "" {
+		targetLaneID, err = laneIDByName(shell, *status)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var response map[string]any
+	if err := client.request("GET", fmt.Sprintf("/api/boards/%d/tickets", intValue(task["project_id"])), nil, &response); err != nil {
+		return nil, err
+	}
+	tickets := asSlice(response["tickets"])
+	if tickets == nil {
+		return nil, errors.New("Unexpected tasks response.")
+	}
+	items, err := buildReorderedTicketItems(tickets, id, targetLaneID, *position, shell)
+	if err != nil {
+		return nil, err
+	}
+	var reordered map[string]any
+	if err := client.request("POST", fmt.Sprintf("/api/boards/%d/tickets/reorder", intValue(task["project_id"])), map[string]any{"items": items}, &reordered); err != nil {
+		return nil, err
+	}
+	updatedTickets := asSlice(reordered["tickets"])
+	for _, raw := range updatedTickets {
+		ticket := asMap(raw)
+		if intValue(ticket["id"]) == id {
+			return normalizeTaskDetail(normalizeTicket(ticket, boardTitle, shell), boardTitle), nil
+		}
+	}
+	return nil, fmt.Errorf("Reordered task was not returned: %d", id)
+}
+
+func buildReorderedTicketItems(tickets []any, taskID int, targetLaneID int, targetPosition int, shell map[string]any) ([]map[string]int, error) {
+	var laneOrder []int
+	for _, rawLane := range asSlice(shell["lanes"]) {
+		laneID := intValue(asMap(rawLane)["id"])
+		if laneID > 0 {
+			laneOrder = append(laneOrder, laneID)
+		}
+	}
+	laneSeen := map[int]bool{}
+	for _, laneID := range laneOrder {
+		laneSeen[laneID] = true
+	}
+	if !laneSeen[targetLaneID] {
+		return nil, fmt.Errorf("Lane does not belong to board: %d", targetLaneID)
+	}
+	grouped := map[int][]map[string]any{}
+	var target map[string]any
+	for _, raw := range tickets {
+		ticket := asMap(raw)
+		id := intValue(ticket["id"])
+		laneID := intValue(ticket["laneId"])
+		if !laneSeen[laneID] && laneID > 0 {
+			laneOrder = append(laneOrder, laneID)
+			laneSeen[laneID] = true
+		}
+		if id == taskID {
+			target = ticket
+			continue
+		}
+		grouped[laneID] = append(grouped[laneID], ticket)
+	}
+	if target == nil {
+		return nil, fmt.Errorf("Task is not reorderable in the active board ticket list: %d", taskID)
+	}
+	for laneID := range grouped {
+		sort.Slice(grouped[laneID], func(i, j int) bool {
+			left := grouped[laneID][i]
+			right := grouped[laneID][j]
+			if intValue(left["position"]) == intValue(right["position"]) {
+				return intValue(left["id"]) < intValue(right["id"])
+			}
+			return intValue(left["position"]) < intValue(right["position"])
+		})
+	}
+	targetGroup := grouped[targetLaneID]
+	boundedPosition := targetPosition
+	if boundedPosition > len(targetGroup) {
+		boundedPosition = len(targetGroup)
+	}
+	target = copyMap(target)
+	target["laneId"] = targetLaneID
+	targetGroup = append(targetGroup, nil)
+	copy(targetGroup[boundedPosition+1:], targetGroup[boundedPosition:])
+	targetGroup[boundedPosition] = target
+	grouped[targetLaneID] = targetGroup
+
+	var items []map[string]int
+	for _, laneID := range laneOrder {
+		for position, ticket := range grouped[laneID] {
+			items = append(items, map[string]int{
+				"ticketId": intValue(ticket["id"]),
+				"laneId":   laneID,
+				"position": position,
+			})
+		}
+	}
+	return items, nil
+}
+
+func copyMap(input map[string]any) map[string]any {
+	output := make(map[string]any, len(input))
+	for key, value := range input {
+		output[key] = value
+	}
+	return output
 }
 
 func runKanbanCLITaskRelationCreate(client kanbaloneHTTPClient, args []string, stderr io.Writer) (any, error) {
