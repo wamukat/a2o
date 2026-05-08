@@ -385,8 +385,9 @@ func runtimeDecompositionKanbanOptions(plan runtimeRunOncePlan) []string {
 
 func runtimeDecompositionKanbanWriteOptions(plan runtimeRunOncePlan) []string {
 	return []string{
-		"--kanban-command", "python3",
-		"--kanban-command-arg", packagedKanbanCLIPath,
+		"--kanban-command", packagedKanbanCommand,
+		"--kanban-command-arg", "kanban",
+		"--kanban-command-arg", "cli",
 		"--kanban-command-arg", "--backend",
 		"--kanban-command-arg", "kanbalone",
 		"--kanban-command-arg", "--base-url",

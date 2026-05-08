@@ -15,8 +15,7 @@ import (
 	"time"
 )
 
-const packagedKanbanCLIPath = "/opt/a2o/share/tools/kanban/cli.py"
-const packagedKanbanBootstrapPath = "/opt/a2o/share/tools/kanban/bootstrap_kanbalone.py"
+const packagedKanbanCommand = "a2o-host"
 
 func runRuntime(args []string, runner commandRunner, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -1251,8 +1250,9 @@ func runtimeWatchSummaryArgs(plan runtimeRunOncePlan, details bool) []string {
 		return args
 	}
 	args = append(args,
-		"--kanban-command", "python3",
-		"--kanban-command-arg", packagedKanbanCLIPath,
+		"--kanban-command", packagedKanbanCommand,
+		"--kanban-command-arg", "kanban",
+		"--kanban-command-arg", "cli",
 		"--kanban-command-arg", "--backend",
 		"--kanban-command-arg", "kanbalone",
 		"--kanban-command-arg", "--base-url",
@@ -1285,14 +1285,14 @@ func printDescribeSection(stdout io.Writer, name string, output string) {
 }
 
 func printDescribeKanbanSection(config runtimeInstanceConfig, plan runtimeRunOncePlan, runner commandRunner, stdout io.Writer, taskRef string) {
-	taskOutput, taskErr := runtimeDescribeSectionOutput(config, plan, runner, "kanban_task", "python3", packagedKanbanCLIPath, "--backend", "kanbalone", "--base-url", plan.SoloBoardInternalURL, "task-get", "--project", plan.KanbanProject, "--task", taskRef)
+	taskOutput, taskErr := runtimeDescribeSectionOutput(config, plan, runner, "kanban_task", packagedKanbanCommand, "kanban", "cli", "--backend", "kanbalone", "--base-url", plan.SoloBoardInternalURL, "task-get", "--project", plan.KanbanProject, "--task", taskRef)
 	if taskErr != nil {
 		fmt.Fprintf(stdout, "describe_section name=kanban_task status=blocked action=check kanban service detail=%s\n", singleLine(taskErr.Error()))
 	} else {
 		printDescribeSection(stdout, "kanban_task", taskOutput)
 	}
 
-	commentOutput, commentErr := runtimeDescribeSectionOutput(config, plan, runner, "kanban_comments", "python3", packagedKanbanCLIPath, "--backend", "kanbalone", "--base-url", plan.SoloBoardInternalURL, "task-comment-list", "--project", plan.KanbanProject, "--task", taskRef)
+	commentOutput, commentErr := runtimeDescribeSectionOutput(config, plan, runner, "kanban_comments", packagedKanbanCommand, "kanban", "cli", "--backend", "kanbalone", "--base-url", plan.SoloBoardInternalURL, "task-comment-list", "--project", plan.KanbanProject, "--task", taskRef)
 	if commentErr != nil {
 		fmt.Fprintf(stdout, "describe_section name=kanban_comments status=blocked action=check kanban service detail=%s\n", singleLine(commentErr.Error()))
 		return
@@ -1759,8 +1759,9 @@ func executeUntilIdleArgs(plan runtimeRunOncePlan) []string {
 		args = append(args, "--worker-command-arg", workerArg)
 	}
 	args = append(args,
-		"--kanban-command", "python3",
-		"--kanban-command-arg", packagedKanbanCLIPath,
+		"--kanban-command", packagedKanbanCommand,
+		"--kanban-command-arg", "kanban",
+		"--kanban-command-arg", "cli",
 		"--kanban-command-arg", "--backend",
 		"--kanban-command-arg", "kanbalone",
 		"--kanban-command-arg", "--base-url",

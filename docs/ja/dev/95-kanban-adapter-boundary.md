@@ -57,27 +57,29 @@ A2O は自動処理の完了と人間の最終確認を分けて扱う。
 
 カンバンアクセスは Ruby の操作クライアント境界を中心に構成する。
 
-1. `tools/kanban/cli.py` はコマンド契約用の開発者 / 運用者 CLI である。
-2. Engine コードは、操作単位の JSON / テキスト補助機能を持つ `A3::Infra::KanbanCommandClient` 経由でカンバン操作を実行する。
-3. `SubprocessKanbanCommandClient` は、その境界の背後にある現在の本番用 Kanbalone 互換実装である。
-4. 追加プロバイダー実装は、ランタイム既定値になる前に同じ操作単位の意味論を維持する必要がある。
+1. `a2o-host kanban cli` はコマンド契約用の bundled runtime CLI である。
+2. `tools/kanban/cli.py` は parity 維持中の開発者 / 運用者向け互換 CLI として残る。
+3. Engine コードは、操作単位の JSON / テキスト補助機能を持つ `A3::Infra::KanbanCommandClient` 経由でカンバン操作を実行する。
+4. `SubprocessKanbanCommandClient` は Ruby Engine の境界として残るが、標準 runtime subprocess は Go の `a2o-host kanban cli` 実装を呼ぶ。
+5. 追加プロバイダー実装は、ランタイム既定値になる前に同じ操作単位の意味論を維持する必要がある。
 
-## ランタイムの Python 依存
+## ランタイム Kanban CLI
 
-A2O 0.5.37 は `docker/a3-runtime/Dockerfile` に `python3` を残すが、`python3-venv` はインストールしない。
+A2O の標準 bundled runtime Kanban 経路は Python を要求しない。
 
-現在のランタイムには、まだ Engine が所有する Python 依存がある。
+標準 runtime 経路は次の通りである。
 
-- Go 製ホストランチャーは、ランタイムコマンドを `--kanban-command python3` 付きで組み立てる。
-- コマンド引数は `a3-engine/tools/kanban/cli.py` を指す。
-- Ruby Engine のブリッジ構築は、まだ `subprocess-cli` カンバンバックエンドを既定値にしている。
-- `SubprocessKanbanCommandClient` は、`KanbanCommandClient` の背後にある唯一の本番用 Kanbalone 互換実装である。
+- runtime image は Go launcher を `a2o-host` として公開する。
+- Go 製ホストランチャーは、ランタイムコマンドを `--kanban-command a2o-host` 付きで組み立てる。
+- コマンド引数は `kanban cli --backend kanbalone --base-url <runtime-url>` で始まる。
+- board bootstrap は `a2o-host kanban bootstrap` を使う。
+- Ruby Engine のブリッジ構築は引き続き `subprocess-cli` カンバンバックエンドを使い、subprocess 実装だけを差し替えながら operation contract を保つ。
 
-そのため、サブプロセス CLI がランタイム既定値である間にランタイムイメージから Python を削除すると、標準の `a2o kanban ...` ランタイム経路が壊れる。
+`tools/kanban/cli.py` は local compatibility check や development script には有用だが、bundled runtime default ではない。
 
 ## 現在のアダプター境界
 
-`A3::Infra::KanbanCommandClient` は操作単位の境界であり、タスクソース、状態公開、アクティビティ公開、後続子タスク書き込み、スナップショット読み取りが使う。コンストラクタは `command_argv` を受け取り、`SubprocessKanbanCommandClient` を作成する。そのため、ランタイムの振る舞いと公開 CLI 引数は安定する。
+`A3::Infra::KanbanCommandClient` は操作単位の境界であり、タスクソース、状態公開、アクティビティ公開、後続子タスク書き込み、スナップショット読み取りが使う。コンストラクタは `command_argv` を受け取り、`SubprocessKanbanCommandClient` を作成する。そのため、bundled subprocess が Go の `a2o-host kanban cli` 実装に変わっても、ランタイムの振る舞いと公開 CLI 引数は安定する。
 
 ## 互換要件
 

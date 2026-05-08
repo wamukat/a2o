@@ -1678,7 +1678,7 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 
 	joined := runner.joinedCalls()
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime kanbalone")
-	assertCallContains(t, joined, `docker compose -p a3-test -f compose.yml exec -T a2o-runtime python3 /opt/a2o/share/tools/kanban/bootstrap_kanbalone.py --config-json {"boards":[{"name":"A2OReference","tags":[{"name":"area:reference"},{"name":"repo:app"}]}]} --base-url http://kanbalone:3000 --board A2OReference`)
+	assertCallContains(t, joined, `docker compose -p a3-test -f compose.yml exec -T a2o-runtime a2o-host kanban bootstrap --config-json {"boards":[{"name":"A2OReference","tags":[{"name":"area:reference"},{"name":"repo:app"}]}]} --base-url http://kanbalone:3000 --board A2OReference`)
 	if !strings.Contains(stdout.String(), "kanban_bootstrapped project=A2OReference source=project.yaml") {
 		t.Fatalf("stdout should describe kanban bootstrap, got %q", stdout.String())
 	}
@@ -2852,7 +2852,9 @@ func TestRuntimeRunOnceUsesBootstrappedInstanceConfig(t *testing.T) {
 		"'--kanban-repo-label' 'repo:catalog=repo_alpha'",
 		"'--repo-source' 'repo_alpha=/workspace/repos/catalog-service'",
 		"'--preset-dir' '/tmp/a3-engine/config/presets'",
-		"'--kanban-command-arg' '/opt/a2o/share/tools/kanban/cli.py'",
+		"'--kanban-command' 'a2o-host'",
+		"'--kanban-command-arg' 'kanban'",
+		"'--kanban-command-arg' 'cli'",
 	} {
 		if !strings.Contains(joinedText, want) {
 			t.Fatalf("run-once missing %q in:\n%s", want, joinedText)
@@ -4319,7 +4321,7 @@ func TestRuntimeDescribeTaskAggregatesTaskRunKanbanAndLogHints(t *testing.T) {
 		"export A2O_INTERNAL_SECRET_REFERENCE=\"${A2O_INTERNAL_SECRET_REFERENCE:-a2o-runtime-secret}\"",
 		"show-run",
 		filepath.Join(packageDir, "project.yaml"),
-		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime python3 /opt/a2o/share/tools/kanban/cli.py --backend kanbalone --base-url http://kanbalone:3000 task-comment-list --project A2OReferenceMultiRepo --task A2O#16",
+		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a2o-host kanban cli --backend kanbalone --base-url http://kanbalone:3000 task-comment-list --project A2OReferenceMultiRepo --task A2O#16",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("describe-task missing call %q in:\n%s", want, joined)
@@ -4569,7 +4571,9 @@ func TestRuntimeDecompositionCreateChildrenPassesKanbanReadOptions(t *testing.T)
 	for _, want := range []string{
 		"run-decomposition-child-creation",
 		"Portal#240",
-		"'--kanban-command' 'python3'",
+		"'--kanban-command' 'a2o-host'",
+		"'--kanban-command-arg' 'kanban'",
+		"'--kanban-command-arg' 'cli'",
 		"'--kanban-project' 'A2OReferenceMultiRepo'",
 		"'--kanban-status' 'To do'",
 		"'--kanban-repo-label' 'repo:catalog=repo_alpha'",
@@ -4627,7 +4631,9 @@ func TestRuntimeDecompositionAcceptDraftsDispatchesGuardedRubyCommand(t *testing
 		"accept-decomposition-drafts",
 		"Portal#240",
 		"'--storage-dir' '/var/lib/a3/test-runtime'",
-		"'--kanban-command' 'python3'",
+		"'--kanban-command' 'a2o-host'",
+		"'--kanban-command-arg' 'kanban'",
+		"'--kanban-command-arg' 'cli'",
 		"'--kanban-project' 'A2OReferenceMultiRepo'",
 		"'--child' 'Portal#241'",
 		"'--child' 'Portal#242'",
@@ -5232,7 +5238,7 @@ func TestRuntimeWatchSummaryRunsContainerSummaryWithKanbanContext(t *testing.T) 
 	joined := strings.Join(runner.joinedCalls(), "\n")
 	for _, want := range []string{
 		"docker compose -p a3-test -f compose.yml exec -T a2o-runtime a3 watch-summary --storage-backend json --storage-dir /var/lib/a3/test-runtime",
-		"--kanban-command python3 --kanban-command-arg /opt/a2o/share/tools/kanban/cli.py --kanban-command-arg --backend --kanban-command-arg kanbalone --kanban-command-arg --base-url --kanban-command-arg http://kanbalone:3000",
+		"--kanban-command a2o-host --kanban-command-arg kanban --kanban-command-arg cli --kanban-command-arg --backend --kanban-command-arg kanbalone --kanban-command-arg --base-url --kanban-command-arg http://kanbalone:3000",
 		"--kanban-project A2OReferenceMultiRepo --kanban-working-dir /workspace",
 		"--kanban-repo-label repo:catalog=repo_alpha",
 		"--kanban-repo-label repo:storefront=repo_beta",

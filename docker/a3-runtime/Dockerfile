@@ -29,9 +29,6 @@ ARG A3_IMAGE_VERSION=0.5.83
 ARG GO_TASK_VERSION=3.41.0
 ARG BUNDLER_VERSION=2.5.22
 
-# Transitional dependency: the runtime still invokes tools/kanban/cli.py
-# through the subprocess kanban adapter until the Ruby-native Kanbalone
-# adapter becomes the runtime default.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
       bash \
@@ -43,7 +40,6 @@ RUN apt-get update \
       libsqlite3-dev \
       pkg-config \
       procps \
-      python3 \
       ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
@@ -82,7 +78,14 @@ RUN cp /opt/a2o/share/docker/compose/a2o-kanbalone.release.yml /opt/a2o/share/do
 
 COPY --from=agent-builder /opt/a2o/agents /opt/a2o/agents
 
-RUN ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a2o \
+RUN arch="$(dpkg --print-architecture)" \
+    && case "$arch" in \
+      amd64) a2o_arch="amd64" ;; \
+      arm64) a2o_arch="arm64" ;; \
+      *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
+    esac \
+    && ln -sf "/opt/a2o/agents/linux-${a2o_arch}/a2o" /usr/local/bin/a2o-host \
+    && ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a2o \
     && printf '%s\n' \
       '#!/usr/bin/env sh' \
       'if [ "$1" = "agent" ] && [ "$2" = "package" ]; then' \

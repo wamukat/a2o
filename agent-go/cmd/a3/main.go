@@ -164,6 +164,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  a2o kanban up [--build]")
 	fmt.Fprintln(w, "  a2o kanban doctor")
 	fmt.Fprintln(w, "  a2o kanban url")
+	fmt.Fprintln(w, "  a2o kanban cli [--backend kanbalone] [--base-url URL] COMMAND [ARGS...]")
 	fmt.Fprintln(w, "  a2o runtime up [--project KEY] [--build] [--pull]")
 	fmt.Fprintln(w, "  a2o runtime down [--project KEY]")
 	fmt.Fprintln(w, "  a2o runtime resume [--project KEY|--all-projects] [--interval DURATION] [--agent-poll-interval DURATION] # resume scheduler")

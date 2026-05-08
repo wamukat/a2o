@@ -48,6 +48,18 @@ func runKanban(args []string, runner commandRunner, stdout io.Writer, stderr io.
 			return 1
 		}
 		return 0
+	case "cli":
+		if err := runKanbanCLI(args[1:], stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
+	case "bootstrap":
+		if err := runKanbanBootstrapCLI(args[1:], stdout, stderr); err != nil {
+			printUserFacingError(stderr, err)
+			return 1
+		}
+		return 0
 	default:
 		fmt.Fprintf(stderr, "unknown kanban subcommand: %s\n", args[0])
 		printUsage(stderr)
@@ -224,7 +236,7 @@ func runKanbanBootstrap(config runtimeInstanceConfig, runner commandRunner, stdo
 	if err != nil {
 		return err
 	}
-	args := append(composeArgs(config), "exec", "-T", config.RuntimeService, "python3", packagedKanbanBootstrapPath, "--config-json", configJSON, "--base-url", kanbanRuntimeURL(config), "--board", packageConfig.KanbanProject)
+	args := append(composeArgs(config), "exec", "-T", config.RuntimeService, packagedKanbanCommand, "kanban", "bootstrap", "--config-json", configJSON, "--base-url", kanbanRuntimeURL(config), "--board", packageConfig.KanbanProject)
 	if err := runKanbanBootstrapWithRetry(runner, args); err != nil {
 		return err
 	}

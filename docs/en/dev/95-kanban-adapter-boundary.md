@@ -57,27 +57,29 @@ The adapter boundary must preserve these fields and semantics when reading snaps
 
 Kanban access is organized around a Ruby operation client boundary:
 
-1. `tools/kanban/cli.py` is the developer/operator CLI for the command contract.
-2. Engine code routes kanban operations through `A3::Infra::KanbanCommandClient`, including operation-level JSON and text helpers.
-3. `SubprocessKanbanCommandClient` is the current production Kanbalone-compatible implementation behind that boundary.
-4. Additional provider implementations must preserve the same operation-level semantics before becoming runtime defaults.
+1. `a2o-host kanban cli` is the bundled runtime CLI for the command contract.
+2. `tools/kanban/cli.py` remains a developer/operator compatibility CLI while parity is maintained.
+3. Engine code routes kanban operations through `A3::Infra::KanbanCommandClient`, including operation-level JSON and text helpers.
+4. `SubprocessKanbanCommandClient` remains the Ruby Engine boundary, but the standard runtime subprocess now targets the Go `a2o-host kanban cli` implementation.
+5. Additional provider implementations must preserve the same operation-level semantics before becoming runtime defaults.
 
-## Runtime Python Dependency
+## Runtime Kanban CLI
 
-A2O 0.5.37 keeps `python3` in `docker/a3-runtime/Dockerfile`, but does not install `python3-venv`.
+A2O no longer requires Python for the standard bundled runtime Kanban path.
 
-The runtime still has an Engine-owned Python dependency:
+The standard runtime path is:
 
-- the Go host launcher builds runtime commands with `--kanban-command python3`
-- the command argv points at `a3-engine/tools/kanban/cli.py`
-- Ruby Engine bridge construction still defaults to the `subprocess-cli` kanban backend
-- `SubprocessKanbanCommandClient` is still the only production Kanbalone-compatible implementation behind `KanbanCommandClient`
+- the runtime image exposes the Go launcher as `a2o-host`
+- the Go host launcher builds runtime commands with `--kanban-command a2o-host`
+- the command argv starts with `kanban cli --backend kanbalone --base-url <runtime-url>`
+- board bootstrapping uses `a2o-host kanban bootstrap`
+- Ruby Engine bridge construction still uses the `subprocess-cli` kanban backend, preserving the operation contract while changing the subprocess implementation
 
-Removing Python from the runtime image while the subprocess CLI remains the runtime default would break the standard `a2o kanban ...` runtime path.
+`tools/kanban/cli.py` remains useful for local compatibility checks and development scripts, but it is no longer the bundled runtime default.
 
 ## Current Adapter Boundary
 
-`A3::Infra::KanbanCommandClient` is the operation-level boundary used by task source, status publisher, activity publisher, follow-up child writer, and snapshot reader. Constructors accept `command_argv` and create `SubprocessKanbanCommandClient`, so runtime behavior and public CLI arguments stay stable.
+`A3::Infra::KanbanCommandClient` is the operation-level boundary used by task source, status publisher, activity publisher, follow-up child writer, and snapshot reader. Constructors accept `command_argv` and create `SubprocessKanbanCommandClient`, so runtime behavior and public CLI arguments stay stable even though the bundled subprocess now resolves to the Go `a2o-host kanban cli` implementation.
 
 ## Compatibility Requirements
 
