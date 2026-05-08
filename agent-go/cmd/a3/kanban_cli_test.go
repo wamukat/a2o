@@ -9,6 +9,71 @@ import (
 	"testing"
 )
 
+func TestKanbanCLIConfigMatchesPythonCompatibility(t *testing.T) {
+	t.Run("backend is case insensitive", func(t *testing.T) {
+		t.Setenv("KANBAN_BACKEND", "Kanbalone")
+		t.Setenv("KANBALONE_BASE_URL", "")
+		t.Setenv("SOLOBOARD_BASE_URL", "")
+		t.Setenv("KANBALONE_API_TOKEN", "")
+		t.Setenv("SOLOBOARD_API_TOKEN", "")
+		config, remaining, err := parseKanbanCLIConfig([]string{"project-list"}, ioDiscard{})
+		if err != nil {
+			t.Fatalf("parseKanbanCLIConfig error=%v", err)
+		}
+		if config.BaseURL != defaultKanbaloneURL || config.Token != "" {
+			t.Fatalf("config=%+v, want default base URL and empty token", config)
+		}
+		if len(remaining) != 1 || remaining[0] != "project-list" {
+			t.Fatalf("remaining=%v", remaining)
+		}
+	})
+
+	t.Run("rejects legacy base url env fallback", func(t *testing.T) {
+		t.Setenv("KANBAN_BACKEND", "")
+		t.Setenv("KANBALONE_BASE_URL", "")
+		t.Setenv("SOLOBOARD_BASE_URL", "http://localhost:3460")
+		t.Setenv("KANBALONE_API_TOKEN", "")
+		t.Setenv("SOLOBOARD_API_TOKEN", "")
+		_, _, err := parseKanbanCLIConfig([]string{"project-list"}, ioDiscard{})
+		if err == nil || !strings.Contains(err.Error(), "migration_required=true replacement_env=KANBALONE_BASE_URL") {
+			t.Fatalf("error=%v, want legacy base URL migration error", err)
+		}
+	})
+
+	t.Run("rejects legacy token env fallback", func(t *testing.T) {
+		t.Setenv("KANBAN_BACKEND", "")
+		t.Setenv("KANBALONE_BASE_URL", "")
+		t.Setenv("SOLOBOARD_BASE_URL", "")
+		t.Setenv("KANBALONE_API_TOKEN", "")
+		t.Setenv("SOLOBOARD_API_TOKEN", "legacy-token")
+		_, _, err := parseKanbanCLIConfig([]string{"project-list"}, ioDiscard{})
+		if err == nil || !strings.Contains(err.Error(), "migration_required=true replacement_env=KANBALONE_API_TOKEN") {
+			t.Fatalf("error=%v, want legacy token migration error", err)
+		}
+	})
+
+	t.Run("canonical env overrides legacy env", func(t *testing.T) {
+		t.Setenv("KANBAN_BACKEND", "")
+		t.Setenv("KANBALONE_BASE_URL", "http://localhost:3470/")
+		t.Setenv("SOLOBOARD_BASE_URL", "http://localhost:3460")
+		t.Setenv("KANBALONE_API_TOKEN", "public-token")
+		t.Setenv("SOLOBOARD_API_TOKEN", "legacy-token")
+		config, _, err := parseKanbanCLIConfig([]string{"project-list"}, ioDiscard{})
+		if err != nil {
+			t.Fatalf("parseKanbanCLIConfig error=%v", err)
+		}
+		if config.BaseURL != "http://localhost:3470" || config.Token != "public-token" {
+			t.Fatalf("config=%+v, want canonical env values", config)
+		}
+	})
+}
+
+type ioDiscard struct{}
+
+func (ioDiscard) Write(p []byte) (int, error) {
+	return len(p), nil
+}
+
 func TestKanbanCLITransitionClearsResolvedWhenLeavingDone(t *testing.T) {
 	var transitionPayload map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

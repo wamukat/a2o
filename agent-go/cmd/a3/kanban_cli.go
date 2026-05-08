@@ -128,26 +128,74 @@ func runKanbanCLI(args []string, stdout io.Writer, stderr io.Writer) error {
 func parseKanbanCLIConfig(args []string, stderr io.Writer) (kanbanCLIConfig, []string, error) {
 	flags := flag.NewFlagSet("a2o kanban cli", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	backend := flags.String("backend", kanbanEnvDefault("KANBAN_BACKEND", "kanbalone"), "kanban backend")
-	baseURL := flags.String("base-url", kanbanEnvDefault("KANBALONE_BASE_URL", defaultKanbaloneURL), "Kanbalone base URL")
-	token := flags.String("token", os.Getenv("KANBALONE_API_TOKEN"), "Kanbalone API token")
+	backend := flags.String("backend", "", "kanban backend")
+	baseURL := flags.String("base-url", "", "Kanbalone base URL")
+	token := flags.String("token", "", "Kanbalone API token")
 	if err := flags.Parse(args); err != nil {
 		return kanbanCLIConfig{}, nil, err
 	}
-	if strings.TrimSpace(*backend) != "kanbalone" {
-		if strings.TrimSpace(*backend) == "soloboard" {
-			return kanbanCLIConfig{}, nil, errors.New("Removed kanban backend: soloboard. migration_required=true replacement_backend=kanbalone. Use KANBAN_BACKEND=kanbalone or omit KANBAN_BACKEND.")
-		}
-		return kanbanCLIConfig{}, nil, fmt.Errorf("Unsupported kanban backend: %s. Supported: kanbalone", *backend)
+	backendKind, err := resolveKanbanBackend(*backend)
+	if err != nil {
+		return kanbanCLIConfig{}, nil, err
 	}
-	return kanbanCLIConfig{BaseURL: *baseURL, Token: *token}, flags.Args(), nil
+	resolvedBaseURL, err := resolveKanbanBaseURL(*baseURL, backendKind)
+	if err != nil {
+		return kanbanCLIConfig{}, nil, err
+	}
+	resolvedToken, err := resolveKanbanToken(*token, backendKind)
+	if err != nil {
+		return kanbanCLIConfig{}, nil, err
+	}
+	return kanbanCLIConfig{BaseURL: resolvedBaseURL, Token: resolvedToken}, flags.Args(), nil
 }
 
-func kanbanEnvDefault(name, fallback string) string {
-	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
-		return value
+func resolveKanbanBackend(cliValue string) (string, error) {
+	value := strings.ToLower(strings.TrimSpace(cliValue))
+	if value == "" {
+		value = strings.ToLower(strings.TrimSpace(os.Getenv("KANBAN_BACKEND")))
 	}
-	return fallback
+	if value == "" {
+		value = "kanbalone"
+	}
+	if value == "soloboard" {
+		return "", errors.New("Removed kanban backend: soloboard. migration_required=true replacement_backend=kanbalone. Use KANBAN_BACKEND=kanbalone or omit KANBAN_BACKEND.")
+	}
+	if value != "kanbalone" {
+		return "", fmt.Errorf("Unsupported kanban backend: %s. Supported: kanbalone", value)
+	}
+	return value, nil
+}
+
+func resolveKanbanBaseURL(cliValue string, backendKind string) (string, error) {
+	if backendKind != "kanbalone" {
+		return "", fmt.Errorf("Unsupported kanban backend: %s", backendKind)
+	}
+	if cliValue == "" && os.Getenv("KANBALONE_BASE_URL") == "" && os.Getenv("SOLOBOARD_BASE_URL") != "" {
+		return "", errors.New("Removed environment variable: SOLOBOARD_BASE_URL. migration_required=true replacement_env=KANBALONE_BASE_URL.")
+	}
+	if cliValue != "" {
+		return strings.TrimRight(cliValue, "/"), nil
+	}
+	if value := os.Getenv("KANBALONE_BASE_URL"); value != "" {
+		return strings.TrimRight(value, "/"), nil
+	}
+	return defaultKanbaloneURL, nil
+}
+
+func resolveKanbanToken(cliValue string, backendKind string) (string, error) {
+	if backendKind != "kanbalone" {
+		return "", fmt.Errorf("Unsupported kanban backend: %s", backendKind)
+	}
+	if cliValue == "" && os.Getenv("KANBALONE_API_TOKEN") == "" && os.Getenv("SOLOBOARD_API_TOKEN") != "" {
+		return "", errors.New("Removed environment variable: SOLOBOARD_API_TOKEN. migration_required=true replacement_env=KANBALONE_API_TOKEN.")
+	}
+	if cliValue != "" {
+		return cliValue, nil
+	}
+	if value := os.Getenv("KANBALONE_API_TOKEN"); value != "" {
+		return value, nil
+	}
+	return "", nil
 }
 
 func (c kanbaloneHTTPClient) request(method, path string, payload any, out any) error {
@@ -1167,12 +1215,20 @@ func runKanbanCLITaskWatchSummaryList(client kanbaloneHTTPClient, args []string,
 func runKanbanBootstrapCLI(args []string, stdout io.Writer, stderr io.Writer) error {
 	flags := flag.NewFlagSet("a2o kanban bootstrap", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	baseURL := flags.String("base-url", kanbanEnvDefault("KANBALONE_BASE_URL", defaultKanbaloneURL), "Kanbalone base URL")
-	token := flags.String("token", os.Getenv("KANBALONE_API_TOKEN"), "Kanbalone API token")
+	baseURL := flags.String("base-url", "", "Kanbalone base URL")
+	token := flags.String("token", "", "Kanbalone API token")
 	board := flags.String("board", "", "board name")
 	configJSON := flags.String("config-json", "", "bootstrap config JSON")
 	configFile := flags.String("config-file", "", "bootstrap config file")
 	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	resolvedBaseURL, err := resolveKanbanBaseURL(*baseURL, "kanbalone")
+	if err != nil {
+		return err
+	}
+	resolvedToken, err := resolveKanbanToken(*token, "kanbalone")
+	if err != nil {
 		return err
 	}
 	rawConfig, ok, err := readTextArg(*configJSON, *configFile)
@@ -1187,8 +1243,8 @@ func runKanbanBootstrapCLI(args []string, stdout io.Writer, stderr io.Writer) er
 		return errors.New("JSON argument is invalid.")
 	}
 	client := kanbaloneHTTPClient{
-		baseURL: strings.TrimRight(*baseURL, "/"),
-		token:   *token,
+		baseURL: strings.TrimRight(resolvedBaseURL, "/"),
+		token:   resolvedToken,
 		client:  &http.Client{Timeout: 30 * time.Second},
 	}
 	result, err := ensureKanbaloneBootstrap(client, config, *board)
