@@ -123,3 +123,99 @@ func TestKanbanCLIReordersTask(t *testing.T) {
 		t.Fatalf("first reorder item=%v, want ticket 8 lane 10 position 0", first)
 	}
 }
+
+func TestKanbanCLIStructuredEventFallbackOnlyOnNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/tickets/8/events":
+			http.Error(w, `{"statusCode":500,"message":"boom"}`, http.StatusInternalServerError)
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runKanbanCLI([]string{
+		"--base-url", server.URL,
+		"task-event-create",
+		"--task-id", "8",
+		"--source", "a2o",
+		"--kind", "task_started",
+		"--title", "Started",
+		"--summary", "Started",
+		"--fallback-comment", "fallback",
+	}, &stdout, &stderr)
+	if err == nil {
+		t.Fatalf("task-event-create should fail on non-404 event API errors")
+	}
+	if !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("error=%v, want original server error", err)
+	}
+}
+
+func TestKanbanCLILabelReasonFallbackOnlyOnNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/tickets/8/tag-reasons":
+			http.Error(w, `{"statusCode":401,"message":"unauthorized"}`, http.StatusUnauthorized)
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runKanbanCLI([]string{
+		"--base-url", server.URL,
+		"task-label-reason-list",
+		"--task-id", "8",
+	}, &stdout, &stderr)
+	if err == nil {
+		t.Fatalf("task-label-reason-list should fail on non-404 tag reason API errors")
+	}
+	if !strings.Contains(err.Error(), "unauthorized") {
+		t.Fatalf("error=%v, want original auth error", err)
+	}
+}
+
+func TestKanbanCLITaskUpdateDoneRefreshPreservesSuppliedDescription(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/tickets/8":
+			_, _ = w.Write([]byte(`{"id":8,"boardId":2,"laneId":9,"title":"Update me","isResolved":true,"isArchived":false,"priority":2,"position":0,"ref":"A2O#8","shortRef":"#8","tags":[],"comments":[]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/boards/2":
+			_, _ = w.Write([]byte(`{"board":{"id":2,"name":"A2O"},"lanes":[{"id":9,"name":"To do","position":1}],"tags":[]}`))
+		case r.Method == http.MethodPatch && r.URL.Path == "/api/tickets/8":
+			_, _ = w.Write([]byte(`{"id":8,"boardId":2,"laneId":9,"title":"Update me","isResolved":true,"isArchived":false,"priority":2,"position":0,"ref":"A2O#8","shortRef":"#8"}`))
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runKanbanCLI([]string{
+		"--base-url", server.URL,
+		"task-update",
+		"--task-id", "8",
+		"--description", "Preserved body",
+		"--done", "true",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("runKanbanCLI error=%v stderr=%s", err, stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("decode stdout: %v\n%s", err, stdout.String())
+	}
+	if got := payload["description"]; got != "Preserved body" {
+		t.Fatalf("description=%v, want preserved body\n%s", got, stdout.String())
+	}
+}

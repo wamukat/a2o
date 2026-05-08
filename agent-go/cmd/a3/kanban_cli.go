@@ -29,6 +29,24 @@ type kanbaloneHTTPClient struct {
 	client  *http.Client
 }
 
+type kanbaloneHTTPError struct {
+	StatusCode int
+	Body       string
+	Path       string
+}
+
+func (e kanbaloneHTTPError) Error() string {
+	if strings.TrimSpace(e.Body) != "" {
+		return e.Body
+	}
+	return fmt.Sprintf("HTTP %d %s", e.StatusCode, e.Path)
+}
+
+func kanbaloneNotFound(err error) bool {
+	var httpErr kanbaloneHTTPError
+	return errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound
+}
+
 func runKanbanCLI(args []string, stdout io.Writer, stderr io.Writer) error {
 	config, remaining, err := parseKanbanCLIConfig(args, stderr)
 	if err != nil {
@@ -163,10 +181,7 @@ func (c kanbaloneHTTPClient) request(method, path string, payload any, out any) 
 		return err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		if strings.TrimSpace(string(raw)) != "" {
-			return errors.New(string(raw))
-		}
-		return fmt.Errorf("HTTP %d %s", resp.StatusCode, path)
+		return kanbaloneHTTPError{StatusCode: resp.StatusCode, Body: string(raw), Path: path}
 	}
 	if out == nil || len(raw) == 0 {
 		return nil
@@ -893,6 +908,9 @@ func taskLabelReasons(client kanbaloneHTTPClient, taskID int) ([]map[string]any,
 	var response map[string]any
 	err := client.request("GET", fmt.Sprintf("/api/tickets/%d/tag-reasons", taskID), nil, &response)
 	if err != nil {
+		if !kanbaloneNotFound(err) {
+			return nil, err
+		}
 		labels, labelErr := taskLabels(client, taskID)
 		if labelErr != nil {
 			return nil, err
@@ -1415,6 +1433,9 @@ func runKanbanCLITaskEventList(client kanbaloneHTTPClient, args []string, stderr
 	}
 	var response map[string]any
 	if err := client.request("GET", fmt.Sprintf("/api/tickets/%d/events", id), nil, &response); err != nil {
+		if !kanbaloneNotFound(err) {
+			return nil, err
+		}
 		return []map[string]any{}, nil
 	}
 	events := asSlice(response["events"])
@@ -1472,6 +1493,9 @@ func runKanbanCLITaskEventCreate(client kanbaloneHTTPClient, args []string, stde
 	}
 	var created map[string]any
 	if err := client.request("POST", fmt.Sprintf("/api/tickets/%d/events", id), payload, &created); err != nil {
+		if !kanbaloneNotFound(err) {
+			return nil, err
+		}
 		comment, ok, readErr := readTextArg(*fallbackComment, *fallbackCommentFile)
 		if readErr != nil {
 			return nil, readErr
@@ -1777,6 +1801,17 @@ func runKanbanCLITaskUpdate(client kanbaloneHTTPClient, args []string, stderr io
 	var updated map[string]any
 	if err := client.request("PATCH", fmt.Sprintf("/api/tickets/%d", id), payload, &updated); err != nil {
 		return nil, err
+	}
+	if strings.TrimSpace(*done) != "" {
+		refreshed, _, _, err := taskByID(client, id)
+		if err != nil {
+			return nil, err
+		}
+		if _, changedDescription := payload["bodyMarkdown"]; changedDescription && firstString(refreshed["description"], refreshed["bodyMarkdown"]) == "" {
+			refreshed["description"] = payload["bodyMarkdown"]
+			refreshed["bodyMarkdown"] = payload["bodyMarkdown"]
+		}
+		return normalizeTaskDetail(refreshed, firstString(refreshed["project"], intValue(refreshed["project_id"]))), nil
 	}
 	shell, err := boardShell(client, intValue(updated["boardId"]))
 	if err != nil {
