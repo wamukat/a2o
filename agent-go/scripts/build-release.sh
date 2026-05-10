@@ -8,6 +8,10 @@ PACKAGE_ARCHIVES="${PACKAGE_ARCHIVES:-1}"
 PUBLICATION_BUNDLE_ARCHIVE="${PUBLICATION_BUNDLE_ARCHIVE:-}"
 PUBLICATION_BUNDLE_URL="${PUBLICATION_BUNDLE_URL:-}"
 PUBLICATION_BUNDLE_SHA256="${PUBLICATION_BUNDLE_SHA256:-}"
+A2O_AGENT_LDFLAGS="${A2O_AGENT_LDFLAGS:-}"
+if [[ -z "${A2O_AGENT_LDFLAGS}" ]]; then
+  A2O_AGENT_LDFLAGS="-s -w"
+fi
 
 if [[ -n "${TARGETS:-}" ]]; then
   read -r -a targets <<< "${TARGETS}"
@@ -53,9 +57,9 @@ for target in "${targets[@]}"; do
   (
     cd "${ROOT_DIR}"
     GOOS="${goos}" GOARCH="${goarch}" CGO_ENABLED=0 \
-      go build -trimpath -o "${out_dir}/a2o-agent" ./cmd/a3-agent
+      go build -trimpath -ldflags "${A2O_AGENT_LDFLAGS}" -o "${out_dir}/a2o-agent" ./cmd/a3-agent
     GOOS="${goos}" GOARCH="${goarch}" CGO_ENABLED=0 \
-      go build -trimpath -ldflags "-X main.version=${VERSION}" -o "${out_dir}/a2o" ./cmd/a3
+      go build -trimpath -ldflags "${A2O_AGENT_LDFLAGS} -X main.version=${VERSION}" -o "${out_dir}/a2o" ./cmd/a3
   )
 
   archive_name="a2o-agent-${VERSION}-${goos}-${goarch}"

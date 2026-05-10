@@ -243,7 +243,10 @@ module A3
         FileUtils.rm_rf(cache_dir)
         FileUtils.mkdir_p(extracted_dir)
         bundle_path = File.join(cache_dir, publication_payload.bundle_archive)
-        if publication_payload.bundle_url.start_with?("file://")
+        local_bundle_path = File.join(package_dir, publication_payload.bundle_archive)
+        if File.file?(local_bundle_path)
+          FileUtils.cp(local_bundle_path, bundle_path)
+        elsif publication_payload.bundle_url.start_with?("file://")
           FileUtils.cp(URI(publication_payload.bundle_url).path, bundle_path)
         else
           URI.open(publication_payload.bundle_url, "rb") do |input|

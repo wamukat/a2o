@@ -49,7 +49,7 @@ COPY bin /tmp/a3-engine/bin
 
 RUN --mount=type=cache,target=/usr/local/bundle/cache \
     cd /tmp/a3-engine \
-    && bundle _${BUNDLER_VERSION}_ install \
+    && BUNDLE_WITHOUT=development:test bundle _${BUNDLER_VERSION}_ install \
     && rm -rf /usr/local/bundle/cache/*.gem
 
 FROM ruby:3.1-slim
@@ -105,6 +105,8 @@ RUN arch="$(dpkg --print-architecture)" \
       arm64) a2o_arch="arm64" ;; \
       *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
     esac \
+    && find /opt/a2o/agents -mindepth 1 -maxdepth 1 -type d ! -name "linux-${a2o_arch}" -exec rm -rf {} + \
+    && find /opt/a2o/agents -mindepth 1 -maxdepth 1 -type f -name 'a2o-agent-[0-9]*-*.tar.gz' -delete \
     && ln -sf "/opt/a2o/agents/linux-${a2o_arch}/a2o" /usr/local/bin/a2o-host \
     && ln -sf /tmp/a3-engine/bin/a3 /usr/local/bin/a2o \
     && printf '%s\n' \

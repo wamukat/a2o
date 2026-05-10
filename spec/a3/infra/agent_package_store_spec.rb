@@ -116,6 +116,22 @@ RSpec.describe A3::Infra::AgentPackageStore do
     expect(File.read(output)).to eq("#!/bin/sh\necho external\n")
   end
 
+  it "uses a locally embedded publication bundle before the remote bundle URL" do
+    embedded_bundle = write_publication_bundle(target: "darwin-arm64", body: "#!/bin/sh\necho local bundle\n")
+    write_publication(bundle_path: embedded_bundle, bundle_url: "file:///definitely/missing/a2o-agent-packages.tar.gz")
+    File.write(
+      File.join(@tmp_dir, "release-manifest.jsonl"),
+      JSON.generate("version" => A3::VERSION, "goos" => "linux", "goarch" => "amd64", "archive" => "a2o-agent-dev-linux-amd64.tar.gz", "sha256" => "placeholder") + "\n"
+    )
+    write_contract(runtime_version: A3::VERSION, package_version: A3::VERSION)
+    output = File.join(@tmp_dir, "bin", "a2o-agent")
+
+    result = described_class.new(package_dir: @tmp_dir).export(target: "darwin-arm64", output: output)
+
+    expect(result).to include(target: "darwin-arm64")
+    expect(File.read(output)).to eq("#!/bin/sh\necho local bundle\n")
+  end
+
   it "fails fast when the removed A3 package cache environment is used" do
     bundle_path = write_publication_bundle(target: "darwin-arm64", body: "#!/bin/sh\necho external\n")
     write_publication(bundle_path: bundle_path)
@@ -226,7 +242,7 @@ RSpec.describe A3::Infra::AgentPackageStore do
     )
   end
 
-  def write_publication(bundle_path:)
+  def write_publication(bundle_path:, bundle_url: nil)
     sha256 =
       if File.file?(bundle_path)
         Digest::SHA256.file(bundle_path).hexdigest
@@ -239,7 +255,7 @@ RSpec.describe A3::Infra::AgentPackageStore do
         "schema" => "a2o-agent-package-publication/v1",
         "version" => A3::VERSION,
         "bundle_archive" => File.basename(bundle_path),
-        "bundle_url" => "file://#{bundle_path}",
+        "bundle_url" => bundle_url || "file://#{bundle_path}",
         "bundle_archive_sha256" => sha256,
         "compatibility_contract" => "package-compatibility.json",
         "archive_manifest" => "release-manifest.jsonl",
