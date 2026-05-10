@@ -1320,13 +1320,16 @@ func ensureKanbaloneDefaultLanes(client kanbaloneHTTPClient, boardID int) error 
 		return err
 	}
 	existing := map[string]map[string]any{}
+	var existingLanes []map[string]any
 	for _, raw := range asSlice(shell["lanes"]) {
 		lane := asMap(raw)
-		existing[strings.ToLower(firstString(lane["name"]))] = lane
+		existingLanes = append(existingLanes, lane)
+		existing[firstString(lane["name"])] = lane
 	}
 	var laneIDs []int
+	requiredLaneIDs := map[int]bool{}
 	for _, name := range []string{"Backlog", "To do", "In progress", "In review", "Inspection", "Merging", "Done"} {
-		lane := existing[strings.ToLower(name)]
+		lane := existing[name]
 		if lane == nil {
 			var created map[string]any
 			if err := client.request("POST", fmt.Sprintf("/api/boards/%d/lanes", boardID), map[string]any{"name": name}, &created); err != nil {
@@ -1334,7 +1337,24 @@ func ensureKanbaloneDefaultLanes(client kanbaloneHTTPClient, boardID int) error 
 			}
 			lane = created
 		}
-		laneIDs = append(laneIDs, intValue(lane["id"]))
+		laneID := intValue(lane["id"])
+		laneIDs = append(laneIDs, laneID)
+		requiredLaneIDs[laneID] = true
+	}
+	sort.SliceStable(existingLanes, func(i, j int) bool {
+		left := intValue(existingLanes[i]["position"])
+		right := intValue(existingLanes[j]["position"])
+		if left == right {
+			return intValue(existingLanes[i]["id"]) < intValue(existingLanes[j]["id"])
+		}
+		return left < right
+	})
+	for _, lane := range existingLanes {
+		laneID := intValue(lane["id"])
+		if laneID == 0 || requiredLaneIDs[laneID] {
+			continue
+		}
+		laneIDs = append(laneIDs, laneID)
 	}
 	var ignored map[string]any
 	return client.request("POST", fmt.Sprintf("/api/boards/%d/lanes/reorder", boardID), map[string]any{"laneIds": laneIDs}, &ignored)

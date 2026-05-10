@@ -1678,7 +1678,7 @@ func TestKanbanUpBootstrapsPackageBoard(t *testing.T) {
 
 	joined := runner.joinedCalls()
 	assertCallContains(t, joined, "docker compose -p a3-test -f compose.yml up -d a2o-runtime kanbalone")
-	assertCallContains(t, joined, `docker compose -p a3-test -f compose.yml exec -T a2o-runtime a2o-host kanban bootstrap --config-json {"boards":[{"name":"A2OReference","tags":[{"name":"area:reference"},{"name":"repo:app"}]}]} --base-url http://kanbalone:3000 --board A2OReference`)
+	assertCallContains(t, joined, `docker compose -p a3-test -f compose.yml exec -T a2o-runtime a2o-host kanban bootstrap --config-json {"boards":[{"name":"A2OReference","tags":[{"name":"a2o:decomposed"},{"name":"a2o:draft-child"},{"name":"a2o:ready-child"},{"name":"area:reference"},{"name":"blocked"},{"name":"repo:app"},{"name":"trigger:auto-implement"},{"name":"trigger:auto-parent"},{"name":"trigger:investigate"}]}]} --base-url http://kanbalone:3000 --board A2OReference`)
 	if !strings.Contains(stdout.String(), "kanban_bootstrapped project=A2OReference source=project.yaml") {
 		t.Fatalf("stdout should describe kanban bootstrap, got %q", stdout.String())
 	}

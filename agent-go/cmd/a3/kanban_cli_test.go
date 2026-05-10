@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -186,6 +187,65 @@ func TestKanbanCLIReordersTask(t *testing.T) {
 	first := items[0].(map[string]any)
 	if intValue(first["ticketId"]) != 8 || intValue(first["laneId"]) != 10 || intValue(first["position"]) != 0 {
 		t.Fatalf("first reorder item=%v, want ticket 8 lane 10 position 0", first)
+	}
+}
+
+func TestKanbanBootstrapReordersAllExistingLanes(t *testing.T) {
+	var reorderPayload map[string]any
+	nextLaneID := 100
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/boards":
+			_, _ = w.Write([]byte(`{"boards":[{"id":2,"name":"A2O"}]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/boards/2":
+			_, _ = w.Write([]byte(`{"board":{"id":2,"name":"A2O"},"lanes":[{"id":71,"name":"Default","position":0},{"id":9,"name":"To do","position":1},{"id":72,"name":"Later","position":2},{"id":73,"name":"done","position":3}],"tags":[]}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/boards/2/lanes":
+			var payload map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode lane payload: %v", err)
+			}
+			nextLaneID++
+			_, _ = w.Write([]byte(`{"id":` + strconv.Itoa(nextLaneID) + `,"name":"` + payload["name"].(string) + `","position":99}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/boards/2/lanes/reorder":
+			if err := json.NewDecoder(r.Body).Decode(&reorderPayload); err != nil {
+				t.Fatalf("decode reorder payload: %v", err)
+			}
+			_, _ = w.Write([]byte(`{"lanes":[]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/boards/2/tags":
+			_, _ = w.Write([]byte(`{"tags":[]}`))
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := runKanbanBootstrapCLI([]string{
+		"--base-url", server.URL,
+		"--board", "A2O",
+		"--config-json", `{"boards":[{"name":"A2O"}]}`,
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("runKanbanBootstrapCLI error=%v stderr=%s", err, stderr.String())
+	}
+	laneIDs, ok := reorderPayload["laneIds"].([]any)
+	if !ok {
+		t.Fatalf("laneIds missing: %v", reorderPayload)
+	}
+	got := make([]int, 0, len(laneIDs))
+	for _, raw := range laneIDs {
+		got = append(got, intValue(raw))
+	}
+	want := []int{101, 9, 102, 103, 104, 105, 106, 71, 72, 73}
+	if len(got) != len(want) {
+		t.Fatalf("laneIds=%v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("laneIds=%v, want %v", got, want)
+		}
 	}
 }
 

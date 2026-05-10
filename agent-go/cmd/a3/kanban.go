@@ -273,6 +273,17 @@ func kanbanBootstrapTags(config projectPackageConfig) []map[string]string {
 			names[name] = true
 		}
 	}
+	for _, label := range []string{
+		"a2o:decomposed",
+		"a2o:draft-child",
+		"a2o:ready-child",
+		"blocked",
+		"trigger:auto-implement",
+		"trigger:auto-parent",
+		"trigger:investigate",
+	} {
+		add(label)
+	}
 	for _, label := range config.KanbanLabels {
 		add(label)
 	}
