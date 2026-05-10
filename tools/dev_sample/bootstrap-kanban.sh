@@ -6,7 +6,7 @@ source "$(dirname "$0")/env.sh"
 cd "$A2O_DEV_SAMPLE_ROOT"
 git update-ref refs/heads/a2o/dev-sample-live HEAD
 
-KANBAN=(python3 tools/kanban/kanban_cli.py --backend kanbalone --base-url "$A2O_DEV_SAMPLE_KANBAN_URL")
+KANBAN=(go run ./agent-go/cmd/a3 kanban cli --backend kanbalone --base-url "$A2O_DEV_SAMPLE_KANBAN_URL")
 
 project_id="$("${KANBAN[@]}" project-list | ruby -rjson -e 'name = ENV.fetch("A2O_DEV_SAMPLE_PROJECT"); item = JSON.parse(STDIN.read).find { |project| project.fetch("name", project["title"]) == name || project["title"] == name }; puts item && item.fetch("id")')"
 if [ -z "$project_id" ]; then
@@ -14,27 +14,22 @@ if [ -z "$project_id" ]; then
   project_id="$("${KANBAN[@]}" project-list | ruby -rjson -e 'name = ENV.fetch("A2O_DEV_SAMPLE_PROJECT"); item = JSON.parse(STDIN.read).find { |project| project.fetch("name", project["title"]) == name || project["title"] == name }; puts item && item.fetch("id")')"
 fi
 
-python3 - "$A2O_DEV_SAMPLE_KANBAN_URL" "$project_id" <<'PY'
-import json
-import sys
-import urllib.request
-
-base_url, board_id = sys.argv[1].rstrip("/"), sys.argv[2]
-board = json.load(urllib.request.urlopen(f"{base_url}/api/boards/{board_id}"))
-lanes = board.get("lanes") or []
-has_done = any((lane.get("name") or "") == "Done" for lane in lanes)
-if not has_done:
-    for lane in lanes:
-        if (lane.get("name") or "") == "done":
-            request = urllib.request.Request(
-                f"{base_url}/api/lanes/{lane['id']}",
-                data=json.dumps({"name": "Done"}).encode(),
-                headers={"content-type": "application/json"},
-                method="PATCH",
-            )
-            urllib.request.urlopen(request).read()
-            break
-PY
+ruby -rjson -rnet/http -ruri - "$A2O_DEV_SAMPLE_KANBAN_URL" "$project_id" <<'RUBY'
+base_url = ARGV.fetch(0).sub(%r{/+\z}, "")
+board_id = ARGV.fetch(1)
+board = JSON.parse(Net::HTTP.get(URI("#{base_url}/api/boards/#{board_id}")))
+lanes = board.fetch("lanes", [])
+unless lanes.any? { |lane| lane["name"] == "Done" }
+  lane = lanes.find { |candidate| candidate["name"] == "done" }
+  if lane
+    uri = URI("#{base_url}/api/lanes/#{lane.fetch("id")}")
+    request = Net::HTTP::Patch.new(uri)
+    request["content-type"] = "application/json"
+    request.body = JSON.dump({ "name" => "Done" })
+    Net::HTTP.start(uri.hostname, uri.port) { |http| http.request(request) }
+  end
+end
+RUBY
 
 "${KANBAN[@]}" project-ensure-buckets \
   --project "$A2O_DEV_SAMPLE_PROJECT" \

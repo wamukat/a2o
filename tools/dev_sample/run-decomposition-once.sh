@@ -13,8 +13,11 @@ COMMON_OPTIONS=(
   --repo-source "lib=$A2O_DEV_SAMPLE_ROOT/reference-products/java-spring-multi-module/utility-lib"
   --repo-source "docs=$A2O_DEV_SAMPLE_ROOT/reference-products/java-spring-multi-module/docs"
   --kanban-backend subprocess-cli
-  --kanban-command python3
-  --kanban-command-arg tools/kanban/kanban_cli.py
+  --kanban-command go
+  --kanban-command-arg run
+  --kanban-command-arg ./agent-go/cmd/a3
+  --kanban-command-arg kanban
+  --kanban-command-arg cli
   --kanban-command-arg --backend
   --kanban-command-arg kanbalone
   --kanban-command-arg --base-url

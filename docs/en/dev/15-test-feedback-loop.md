@@ -11,7 +11,6 @@ Measured on 2026-05-03:
 | Ruby full suite | `bundle exec rspec --profile 20 --format progress` | passed in 13 minutes 32 seconds; 1335 examples |
 | Ruby full suite, 3 example shards | `A2O_TEST_RUBY_SHARDS=3 tools/dev/test-core.sh` | passed with the slowest Ruby shard at 400 seconds; 1335 examples total |
 | Go full suite | `cd agent-go && go test ./...` | passed in about 56 seconds with cached internal packages |
-| Kanban Python suite | `python3 -m unittest discover -s tools/kanban/tests` | passed in about 1 second |
 
 The cost is mostly real integration coverage. The Ruby suite and Go internal agent package exercise runtime, workspace, worker, and process behavior. Do not replace them with lighter checks for release validation.
 
@@ -23,9 +22,9 @@ For broad local confidence without dropping coverage, run:
 tools/dev/test-core.sh
 ```
 
-This runs the Ruby, Go, and Kanban Python suites in parallel and writes logs under `.work/test-core/` by default. Override the log directory with `A2O_TEST_LOG_DIR`.
+This runs the Ruby and Go suites in parallel and writes logs under `.work/test-core/` by default. Override the log directory with `A2O_TEST_LOG_DIR`.
 
-This reduces wall-clock time by avoiding serial Ruby -> Go -> Python execution. It does not remove assertions or skip packages.
+This reduces wall-clock time by avoiding serial Ruby -> Go execution. It does not remove assertions or skip packages.
 
 If the Ruby suite is the limiting path on a local machine with spare CPU, split the Ruby spec files into deterministic shards:
 
@@ -46,7 +45,6 @@ The default commands can be overridden for diagnostics or for validating the scr
 ```sh
 A2O_TEST_RUBY_CMD='bundle exec rspec spec/a3/infra/worker_protocol_spec.rb' \
 A2O_TEST_GO_CMD='cd agent-go && go test ./cmd/a3 -run TestWorkerPublicValidatorMatchesSharedProtocolFixtures' \
-A2O_TEST_KANBAN_PY_CMD='python3 -m unittest tools.kanban.tests.test_cli.KanbaloneCliTest.test_normalize_task_watch_summary_preserves_parent_ref' \
 tools/dev/test-core.sh
 ```
 
@@ -59,7 +57,6 @@ Examples:
 ```sh
 bundle exec rspec spec/a3/infra/worker_protocol_spec.rb
 cd agent-go && go test ./cmd/a3 ./cmd/a3-agent
-python3 -m unittest discover -s tools/kanban/tests
 ```
 
 ## Release Validation

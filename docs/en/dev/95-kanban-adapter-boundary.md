@@ -6,7 +6,7 @@ Read this to keep A2O domain state separate from Kanbalone API and CLI details. 
 
 ## Current Contract
 
-The A2O engine talks to kanban through a command contract compatible with `tools/kanban/cli.py`. Runtime operations include:
+The A2O engine talks to kanban through the `a2o-host kanban cli` command contract. Runtime operations include:
 
 - read: `task-snapshot-list`, `task-watch-summary-list`, `task-get`, `task-label-list`, `task-relation-list`, `task-find`
 - read structured metadata when supported: `task-label-reason-list`, `task-event-list`
@@ -58,10 +58,9 @@ The adapter boundary must preserve these fields and semantics when reading snaps
 Kanban access is organized around a Ruby operation client boundary:
 
 1. `a2o-host kanban cli` is the bundled runtime CLI for the command contract.
-2. `tools/kanban/cli.py` remains a developer/operator compatibility CLI while parity is maintained.
-3. Engine code routes kanban operations through `A3::Infra::KanbanCommandClient`, including operation-level JSON and text helpers.
-4. `SubprocessKanbanCommandClient` remains the Ruby Engine boundary, but the standard runtime subprocess now targets the Go `a2o-host kanban cli` implementation.
-5. Additional provider implementations must preserve the same operation-level semantics before becoming runtime defaults.
+2. Engine code routes kanban operations through `A3::Infra::KanbanCommandClient`, including operation-level JSON and text helpers.
+3. `SubprocessKanbanCommandClient` remains the Ruby Engine boundary, but the standard runtime subprocess now targets the Go `a2o-host kanban cli` implementation.
+4. Additional provider implementations must preserve the same operation-level semantics before becoming runtime defaults.
 
 ## Runtime Kanban CLI
 
@@ -75,7 +74,7 @@ The standard runtime path is:
 - board bootstrapping uses `a2o-host kanban bootstrap`
 - Ruby Engine bridge construction still uses the `subprocess-cli` kanban backend, preserving the operation contract while changing the subprocess implementation
 
-`tools/kanban/cli.py` remains useful for local compatibility checks and development scripts, but it is no longer the bundled runtime default.
+The legacy Python Kanban CLI has been removed from the product tree. Development scripts and local checks should use the Go launcher command contract directly.
 
 ## Current Adapter Boundary
 

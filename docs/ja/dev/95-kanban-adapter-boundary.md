@@ -6,7 +6,7 @@
 
 ## 現在の契約
 
-A2O Engine は現在、`tools/kanban/cli.py` と互換のコマンド契約を通じてカンバンと通信する。ランタイムは次の操作を使う。
+A2O Engine は現在、`a2o-host kanban cli` のコマンド契約を通じてカンバンと通信する。ランタイムは次の操作を使う。
 
 - 読み取り操作: `task-snapshot-list`、`task-watch-summary-list`、`task-get`、`task-label-list`、`task-relation-list`、`task-find`
 - 対応している場合に読む構造化メタデータ: `task-label-reason-list`、`task-event-list`
@@ -58,10 +58,9 @@ A2O は自動処理の完了と人間の最終確認を分けて扱う。
 カンバンアクセスは Ruby の操作クライアント境界を中心に構成する。
 
 1. `a2o-host kanban cli` はコマンド契約用の bundled runtime CLI である。
-2. `tools/kanban/cli.py` は parity 維持中の開発者 / 運用者向け互換 CLI として残る。
-3. Engine コードは、操作単位の JSON / テキスト補助機能を持つ `A3::Infra::KanbanCommandClient` 経由でカンバン操作を実行する。
-4. `SubprocessKanbanCommandClient` は Ruby Engine の境界として残るが、標準 runtime subprocess は Go の `a2o-host kanban cli` 実装を呼ぶ。
-5. 追加プロバイダー実装は、ランタイム既定値になる前に同じ操作単位の意味論を維持する必要がある。
+2. Engine コードは、操作単位の JSON / テキスト補助機能を持つ `A3::Infra::KanbanCommandClient` 経由でカンバン操作を実行する。
+3. `SubprocessKanbanCommandClient` は Ruby Engine の境界として残るが、標準 runtime subprocess は Go の `a2o-host kanban cli` 実装を呼ぶ。
+4. 追加プロバイダー実装は、ランタイム既定値になる前に同じ操作単位の意味論を維持する必要がある。
 
 ## ランタイム Kanban CLI
 
@@ -75,7 +74,7 @@ A2O の標準 bundled runtime Kanban 経路は Python を要求しない。
 - board bootstrap は `a2o-host kanban bootstrap` を使う。
 - Ruby Engine のブリッジ構築は引き続き `subprocess-cli` カンバンバックエンドを使い、subprocess 実装だけを差し替えながら operation contract を保つ。
 
-`tools/kanban/cli.py` は local compatibility check や development script には有用だが、bundled runtime default ではない。
+旧 Python Kanban CLI は product tree から削除済みである。development script や local check は Go launcher のコマンド契約を直接使う。
 
 ## 現在のアダプター境界
 

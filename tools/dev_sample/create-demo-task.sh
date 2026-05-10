@@ -4,7 +4,7 @@ set -eu
 source "$(dirname "$0")/env.sh"
 
 cd "$A2O_DEV_SAMPLE_ROOT"
-KANBAN=(python3 tools/kanban/kanban_cli.py --backend kanbalone --base-url "$A2O_DEV_SAMPLE_KANBAN_URL")
+KANBAN=(go run ./agent-go/cmd/a3 kanban cli --backend kanbalone --base-url "$A2O_DEV_SAMPLE_KANBAN_URL")
 
 description=$'A2O dev sample task for the Java Spring multi-module product.\n\nExpected behavior:\n- utility-lib owns greeting formatting\n- web-app exposes the HTTP endpoint\n- Maven reactor tests pass'
 task_json="$("${KANBAN[@]}" task-create \

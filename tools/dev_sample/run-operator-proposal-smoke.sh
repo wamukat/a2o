@@ -31,7 +31,7 @@ printf '%s\n' "$show_output" | grep -q "operator_proposals_count=1"
 printf '%s\n' "$show_output" | grep -q "operator_proposal_title=Review deterministic worker smoke policy"
 printf '%s\n' "$show_output" | grep -q "operator_proposal_suggested_action=Keep this smoke marker available for release validation of proposal visibility."
 
-comments_json="$(python3 tools/kanban/kanban_cli.py \
+comments_json="$(go run ./agent-go/cmd/a3 kanban cli \
   --backend kanbalone \
   --base-url "$A2O_DEV_SAMPLE_KANBAN_URL" \
   task-comment-list \

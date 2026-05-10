@@ -24,8 +24,11 @@ ruby -Ilib bin/a3 execute-until-idle \
   --repo-source "docs=$docs_source" \
   --preset-dir config/presets \
   --kanban-backend subprocess-cli \
-  --kanban-command python3 \
-  --kanban-command-arg tools/kanban/kanban_cli.py \
+  --kanban-command go \
+  --kanban-command-arg run \
+  --kanban-command-arg ./agent-go/cmd/a3 \
+  --kanban-command-arg kanban \
+  --kanban-command-arg cli \
   --kanban-command-arg --backend \
   --kanban-command-arg kanbalone \
   --kanban-command-arg --base-url \

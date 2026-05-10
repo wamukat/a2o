@@ -135,7 +135,7 @@ The quickest setup path is [docs/en/user/10-quickstart.md](docs/en/user/10-quick
 - Engine core: `lib/a3/`, `bin/a3`, `spec/`
 - Host launcher / agent: `agent-go/`
 - Docker runtime assets: `docker/`
-- Kanban tooling: `tools/kanban/`
+- Development sample tooling: `tools/dev_sample/`
 - Reference product packages: `reference-products/`
 - English user docs: [docs/en/user/](docs/en/user/)
 - English developer docs: [docs/en/dev/](docs/en/dev/)

@@ -71,13 +71,13 @@ Storefront 側の子タスクラベル:
 ランタイム実行前に、子タスクを親タスクの subtask として関連づける。
 
 ```sh
-python3 tools/kanban/cli.py task-relation-create \
+a2o kanban cli task-relation-create \
   --project "A2OReferenceMultiRepo" \
   --task "<parent-ref>" \
   --other-task "<catalog-child-ref>" \
   --relation-kind subtask
 
-python3 tools/kanban/cli.py task-relation-create \
+a2o kanban cli task-relation-create \
   --project "A2OReferenceMultiRepo" \
   --task "<parent-ref>" \
   --other-task "<storefront-child-ref>" \

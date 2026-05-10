@@ -7,7 +7,6 @@ RUBY_CMD="${A2O_TEST_RUBY_CMD:-bundle exec rspec}"
 RUBY_SHARDS="${A2O_TEST_RUBY_SHARDS:-1}"
 RUBY_SHARD_GRANULARITY="${A2O_TEST_RUBY_SHARD_GRANULARITY:-example}"
 GO_CMD="${A2O_TEST_GO_CMD:-cd agent-go && go test ./...}"
-KANBAN_PY_CMD="${A2O_TEST_KANBAN_PY_CMD:-python3 -m unittest discover -s tools/kanban/tests}"
 mkdir -p "${LOG_DIR}"
 
 if ! [[ "${RUBY_SHARDS}" =~ ^[1-9][0-9]*$ ]]; then
@@ -161,9 +160,6 @@ else
 fi
 
 run_suite go "bash" "-c" "${GO_CMD}" &
-pids+=("$!")
-
-run_suite kanban_py "bash" "-c" "${KANBAN_PY_CMD}" &
 pids+=("$!")
 
 overall=0

@@ -69,13 +69,13 @@ Storefront child labels:
 Relate the children to the parent before runtime execution.
 
 ```sh
-python3 tools/kanban/cli.py task-relation-create \
+a2o kanban cli task-relation-create \
   --project "A2OReferenceMultiRepo" \
   --task "<parent-ref>" \
   --other-task "<catalog-child-ref>" \
   --relation-kind subtask
 
-python3 tools/kanban/cli.py task-relation-create \
+a2o kanban cli task-relation-create \
   --project "A2OReferenceMultiRepo" \
   --task "<parent-ref>" \
   --other-task "<storefront-child-ref>" \

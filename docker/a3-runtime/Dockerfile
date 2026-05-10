@@ -23,37 +23,19 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     DIST_DIR=/opt/a2o/agents VERSION="${A3_AGENT_VERSION}" TARGETS="${A3_AGENT_TARGETS}" PACKAGE_ARCHIVES="${PACKAGE_ARCHIVES}" PUBLICATION_BUNDLE_ARCHIVE="${PUBLICATION_BUNDLE_ARCHIVE}" PUBLICATION_BUNDLE_URL="${PUBLICATION_BUNDLE_URL}" PUBLICATION_BUNDLE_SHA256="${PUBLICATION_BUNDLE_SHA256}" ./scripts/build-release.sh
 
-FROM ruby:3.1-slim
+FROM ruby:3.1-slim AS ruby-builder
 
-ARG A3_IMAGE_VERSION=0.5.83
-ARG GO_TASK_VERSION=3.41.0
 ARG BUNDLER_VERSION=2.5.22
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-      bash \
       build-essential \
       ca-certificates \
-      curl \
-      git \
-      jq \
       libsqlite3-dev \
       pkg-config \
-      procps \
-      ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PATH=/usr/local/bin:/usr/local/bundle/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
-
-RUN arch="$(dpkg --print-architecture)" \
-    && case "$arch" in \
-      amd64) task_arch="amd64" ;; \
-      arm64) task_arch="arm64" ;; \
-      *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
-    esac \
-    && curl -fsSL "https://github.com/go-task/task/releases/download/v${GO_TASK_VERSION}/task_linux_${task_arch}.tar.gz" \
-      | tar -xz -C /usr/local/bin task \
-    && chmod +x /usr/local/bin/task
 
 RUN gem install bundler -v "${BUNDLER_VERSION}"
 
@@ -70,9 +52,48 @@ RUN --mount=type=cache,target=/usr/local/bundle/cache \
     && bundle _${BUNDLER_VERSION}_ install \
     && rm -rf /usr/local/bundle/cache/*.gem
 
+FROM ruby:3.1-slim
+
+ARG A3_IMAGE_VERSION=0.5.83
+ARG GO_TASK_VERSION=3.41.0
+ARG BUNDLER_VERSION=2.5.22
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+      bash \
+      ca-certificates \
+      curl \
+      git \
+      jq \
+      libsqlite3-0 \
+      procps \
+      ripgrep \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PATH=/usr/local/bin:/usr/local/bundle/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
+
+RUN arch="$(dpkg --print-architecture)" \
+    && case "$arch" in \
+      amd64) task_arch="amd64" ;; \
+      arm64) task_arch="arm64" ;; \
+      *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSL "https://github.com/go-task/task/releases/download/v${GO_TASK_VERSION}/task_linux_${task_arch}.tar.gz" \
+      | tar -xz -C /usr/local/bin task \
+    && chmod +x /usr/local/bin/task
+
+WORKDIR /workspace
+
+COPY --from=ruby-builder /usr/local/bundle /usr/local/bundle
+COPY --from=ruby-builder /tmp/a3-engine/Gemfile /tmp/a3-engine/Gemfile
+COPY --from=ruby-builder /tmp/a3-engine/Gemfile.lock /tmp/a3-engine/Gemfile.lock
+COPY --from=ruby-builder /tmp/a3-engine/a2o.gemspec /tmp/a3-engine/a2o.gemspec
+COPY --from=ruby-builder /tmp/a3-engine/lib /tmp/a3-engine/lib
+COPY --from=ruby-builder /tmp/a3-engine/bin /tmp/a3-engine/bin
+
 COPY config /tmp/a3-engine/config
-COPY tools /tmp/a3-engine/tools
-COPY tools /opt/a2o/share/tools
+COPY tools/reference_validation /tmp/a3-engine/tools/reference_validation
+COPY tools/reference_validation /opt/a2o/share/tools/reference_validation
 COPY docker/compose /opt/a2o/share/docker/compose
 RUN cp /opt/a2o/share/docker/compose/a2o-kanbalone.release.yml /opt/a2o/share/docker/compose/a2o-kanbalone.yml
 
