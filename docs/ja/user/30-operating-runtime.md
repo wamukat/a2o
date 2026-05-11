@@ -237,7 +237,7 @@ a2o runtime image-digest
 
 ```sh
 a2o runtime pause
-a2o upgrade apply 0.5.83
+a2o upgrade apply 0.5.84
 a2o runtime status
 ```
 

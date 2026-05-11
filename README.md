@@ -93,7 +93,7 @@ a2o version
 a2o host install
 a2o doctor
 a2o upgrade check
-a2o upgrade apply 0.5.83
+a2o upgrade apply 0.5.84
 a2o project template --with-skills --output ./project-package/project.yaml
 a2o worker scaffold --language python --output ./project-package/commands/a2o-worker.py
 a2o worker scaffold --language command --output ./project-package/commands/a2o-command-worker

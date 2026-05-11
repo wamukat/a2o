@@ -7092,8 +7092,8 @@ func TestUpgradeFinalizeRefreshesDistributionComposeFile(t *testing.T) {
 	withChdir(t, tempDir, func() {
 		code := run([]string{
 			"upgrade", "finalize",
-			"--version", "0.5.83",
-			"--image", "ghcr.io/wamukat/a2o-engine:0.5.83",
+			"--version", "0.5.84",
+			"--image", "ghcr.io/wamukat/a2o-engine:0.5.84",
 			"--config-path", configPath,
 			"--backup-path", configPath + ".upgrade-backup",
 			"--agent-output", agentPath,
@@ -7160,8 +7160,8 @@ func TestUpgradeFinalizeKeepsCustomComposeFile(t *testing.T) {
 	withChdir(t, tempDir, func() {
 		code := run([]string{
 			"upgrade", "finalize",
-			"--version", "0.5.83",
-			"--image", "ghcr.io/wamukat/a2o-engine:0.5.83",
+			"--version", "0.5.84",
+			"--image", "ghcr.io/wamukat/a2o-engine:0.5.84",
 			"--config-path", configPath,
 			"--backup-path", configPath + ".upgrade-backup",
 			"--agent-output", agentPath,
