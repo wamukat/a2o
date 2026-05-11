@@ -41,7 +41,7 @@ concurrency:
 
 env:
   IMAGE_NAME: ghcr.io/wamukat/a2o-engine
-  A2O_RELEASE_VERSION: 0.5.84
+  A2O_RELEASE_VERSION: 0.5.85
 
 jobs:
   packages:
@@ -130,7 +130,7 @@ jobs:
         id: agent_targets
         run: |
           echo "targets=" >> "$GITHUB_OUTPUT"
-          echo "package_archives=1" >> "$GITHUB_OUTPUT"
+          echo "package_archives=0" >> "$GITHUB_OUTPUT"
 
       - name: Build runtime image
         uses: docker/build-push-action@v7

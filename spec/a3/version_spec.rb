@@ -1,14 +1,22 @@
 # frozen_string_literal: true
 
 RSpec.describe "A3 version" do
-  it "matches the A2O 0.5.84 release version" do
-    expect(A3::VERSION).to eq("0.5.84")
+  it "matches the A2O 0.5.85 release version" do
+    expect(A3::VERSION).to eq("0.5.85")
   end
 
   it "keeps release workflow version aligned" do
     workflow = File.read(File.expand_path("../../.github/workflows/publish-a2o-engine.yml", __dir__))
 
     expect(workflow).to include("A2O_RELEASE_VERSION: #{A3::VERSION}")
+  end
+
+  it "keeps published runtime images from embedding a mismatched release bundle" do
+    workflow = File.read(File.expand_path("../../.github/workflows/publish-a2o-engine.yml", __dir__))
+
+    expect(workflow).to include("PUBLICATION_BUNDLE_SHA256=${{ needs.packages.outputs.bundle_sha256 }}")
+    expect(workflow).to include("PACKAGE_ARCHIVES=${{ steps.agent_targets.outputs.package_archives }}")
+    expect(workflow).to include("echo \"package_archives=0\" >> \"$GITHUB_OUTPUT\"")
   end
 
   it "keeps runtime image defaults aligned" do
